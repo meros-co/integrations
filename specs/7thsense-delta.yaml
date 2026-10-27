@@ -1,0 +1,688 @@
+spec: 1
+id: 7thsense-delta
+name: 7thSense Delta Media Server (external control)
+vendor: 7thSense
+category: playback
+
+# Delta Media Server takes its external control commands on TCP port 23 (the
+# multi-Telnet port, five clients at a time by default), each ended by a
+# carriage return, case-insensitive. It answers OK when it recognises a command
+# (parameters are not checked) and BAD when it does not; replies with data,
+# such as STATUS, come as labelled lines before the OK. On connecting it sends
+# a banner ending in READY. STATUS is polled for the server, show file, mode,
+# frame, frame rate and levels.
+source:
+  - title: "Delta v2.8 b15 External/Sequence Control Protocol Reference (online help)"
+    author: 7thSense
+    url: "https://portal.7thsense.one/user-guides/resources/ExternalControlHelp.html"
+    note: >
+      Manufacturer documentation, read 2026-10-27. Commands end with CR (0x0D) and are not case-sensitive;
+      TL=X (1-32), TL=R or TL=name addresses a timeline; names with spaces in double quotes; markers !
+      (non-realtime, may interrupt playback), !* (not with Seamless Loop), E (external only), S (sequence
+      only). Commands used: CUE, PLAY, STOP, RECORD, ADVANCE n, STEPBACK n, REWIND, GOTOMARKER name [play],
+      GOTOFRAME n [play], GOTOTIME timecode framerate [play], RATE n, RATESCALE n (0.1-4), SMPTE on|off,
+      CLIPSEARCH clip=next|previous [play=], MARKERSEARCH direction=next|previous [play=],
+      REVERSEPLAYBACK reverse=true|false; AUDIOLEVEL percent, VIDEOLEVEL percent, GLOBALFADE up|down n,
+      GLOBALAUDIOFADE up|down n; LOAD, MERGE, LOADALL, SAVE, SAVEALL, MERGEALL, CLEAR, LISTSHOWS,
+      LISTALLSHOWS; DISPLAY and DISPLAYALL fullscreen|windowed|minimized, GEOMETRY, BLENDING,
+      BLACKLEVELUPLIFT on|off, GRAPH, STATS, AUDIOVU on|off, CHANNELID on|off, APPLYSHOWMODE,
+      TOGGLE3DEYES; LAYERFADE, LAYERFADEALL layer %, LAYERENABLE, LAYERENABLEALL layer on|off,
+      LAYERFADETIMED, LAYERFADETIMEDALL layer up|down n; SEQUENCE, SEQUENCEALL name, CANCELSEQUENCE,
+      CANCELALLSEQUENCES, PAUSESEQUENCE name y|n, RELOADSEQUENCES, LOADSEQUENCES, LISTSEQUENCES,
+      SEQUENCESTATUS; GLOBALVARSET $name=value, GLOBALVARGET $name, GLOBALVARLIST, GLOBALVARDELETE $name;
+      RESERVE on|off, TIMELINEOPACITY value= [Time=] tl=, SETTIMELINEVISIBILITY visible=y|n tl=; PLAYLISTNEXT
+      playlistextctrlname= index=; MEDIAENABLE extctrlname y|n; ARTNET inputenable= outputenable=;
+      EXTCTRLCOMMS enable=; STATUS, LISTMARKERS; RESTART_PC, SHUTDOWN_PC, QUIT_APP.
+  - title: "Delta external control: command syntax and return codes (MC255 Managing Servers)"
+    author: 7thSense
+    url: "https://portal.7thsense.one/user-guides/MC255-managing-servers/deltagui_external_controls_returncodes.html"
+    note: >
+      Manufacturer documentation, read 2026-10-27, with its parent topic deltagui_external_control.html.
+      The connection banner (ApplicationName Deltaserver.exe, the welcome line, SERVER: <PC name>, READY),
+      every line ended by CR LF; BAD for a command not recognised and OK for one recognised, parameters
+      not validated; the STATUS reply's labelled lines (SERVER with (Leader) or (Follower), FILE, MODE
+      Stopped / Preparing to Play / Playing, CURRENTFRAME, FRAMERATE, LICENCE, MOVIEDRIVES, OTHERDRIVE,
+      GRAPHICS, SMPTE, AUDIOLEVEL, VIDEOLEVEL), a blank line and OK; LOAD answering the STATUS block; the
+      leader-only commands.
+  - title: "7thSense Comms Ports: Delta, Juggler, Compere, M685-5 (December 2023)"
+    author: 7thSense
+    url: "https://portal.7thsense.one/user-guides/pdf-library/Media%20servers/M685-5%20Delta%20and%20Juggler%20Comms%20Ports.pdf"
+    note: >
+      Manufacturer document, read 2026-10-27, p.5: Deltaserver.exe TCP 23 (multi-Telnet, 5 simultaneous
+      connections by default), 24-26 deprecated, UDP 7780/7781 external control, OSC 57120 from Delta 2.8.
+
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: cr
+  encoding: utf-8
+  timeout_ms: 5000
+  reply_match: '^(OK|BAD)\b'
+  probe: "STATUS"
+
+ports:
+  - { port: 23, protocol: tcp, role: control, note: "Delta's multi-Telnet external control port" }
+
+models:
+  - id: delta
+    name: 7thSense Delta Media Server
+    supports: &all [cue, play, stop, rewind, cue_timeline, play_timeline, stop_timeline, rewind_timeline, record,
+                    advance, step_back, goto_marker, goto_marker_timeline, goto_frame, goto_frame_timeline, goto_time,
+                    rate, rate_scale, smpte, clip_search, marker_search, reverse_playback, audio_level, video_level,
+                    global_fade, global_audio_fade, load_show, merge_show, load_show_all, merge_show_all, save_show,
+                    save_show_all, clear_show, list_shows, list_markers, display_mode, display_mode_all, geometry,
+                    blending, black_level_uplift, diagnostic_graph, diagnostic_stats, audio_vu, channel_id,
+                    apply_show_mode, toggle_3d_eyes, layer_fade, layer_fade_all, layer_enable, layer_enable_all,
+                    layer_fade_timed, layer_fade_timed_all, run_sequence, run_sequence_all, cancel_sequence,
+                    cancel_all_sequences, pause_sequence, reload_sequences, load_sequences, list_sequences,
+                    sequence_status, set_global_variable, get_global_variable, list_global_variables,
+                    delete_global_variable, reserve_timeline, timeline_opacity, timeline_opacity_fade,
+                    timeline_visibility, playlist_next, media_enable, artnet, external_control_comms, get_status,
+                    restart_pc, shutdown_pc, quit_app, send_command]
+    verification: none
+
+commands:
+  # ── Playhead ────────────────────────────────────────────────────────────
+  cue:
+    summary: "Cue the show and wait for play (CUE)"
+    send: "CUE"
+    expect: &ok { matches: "^OK$" }
+    returns: ack
+  play:
+    summary: "Play the show (PLAY)"
+    send: "PLAY"
+    expect: *ok
+    returns: ack
+  stop:
+    summary: "Stop the show (STOP)"
+    send: "STOP"
+    expect: *ok
+    returns: ack
+  rewind:
+    summary: "Rewind the show to frame 0 (REWIND)"
+    send: "REWIND"
+    expect: *ok
+    returns: ack
+  cue_timeline:
+    summary: "Cue one timeline (CUE TL=x)"
+    params:
+      timeline: &timeline { type: string, pattern: '^([0-9]+|R|ALL|[A-Za-z][A-Za-z0-9_]*)$', max_length: 64, required: true,
+                            label: Timeline, description: "The timeline: its number 1 to 32, R for the reserve timeline, ALL for every timeline, or its unique name." }
+    send: "CUE TL={timeline}"
+    expect: *ok
+    returns: ack
+  play_timeline:
+    summary: "Play one timeline (PLAY TL=x)"
+    params: { timeline: *timeline }
+    send: "PLAY TL={timeline}"
+    expect: *ok
+    returns: ack
+  stop_timeline:
+    summary: "Stop one timeline (STOP TL=x)"
+    params: { timeline: *timeline }
+    send: "STOP TL={timeline}"
+    expect: *ok
+    returns: ack
+  rewind_timeline:
+    summary: "Rewind one timeline to frame 0 (REWIND TL=x)"
+    params: { timeline: *timeline }
+    send: "REWIND TL={timeline}"
+    expect: *ok
+    returns: ack
+  record:
+    summary: "Start recording as set up in DeltaGUI (RECORD)"
+    send: "RECORD"
+    expect: *ok
+    returns: ack
+  advance:
+    summary: "Step forward a number of frames (ADVANCE n)"
+    params:
+      frames: &frames { type: int, min: 1, default: 1, label: Frames, description: "How many frames to step." }
+    send: "ADVANCE {frames}"
+    expect: *ok
+    returns: ack
+  step_back:
+    summary: "Step back a number of frames (STEPBACK n)"
+    params: { frames: *frames }
+    send: "STEPBACK {frames}"
+    expect: *ok
+    returns: ack
+  goto_marker:
+    summary: "Move to a named marker, optionally playing from it (GOTOMARKER)"
+    params:
+      marker: &name_param { type: string, pattern: '^[^"]+$', max_length: 256, required: true, label: Marker, description: "The marker's name." }
+      play: &play_after { type: bool, default: false, label: Play, description: "Play from there; otherwise the playhead waits." }
+    send: 'GOTOMARKER "{marker}"{play:map.play_suffix}'
+    expect: *ok
+    returns: ack
+  goto_marker_timeline:
+    summary: "Move one timeline to a named marker, optionally playing from it (GOTOMARKER ... TL=x)"
+    params: { marker: *name_param, play: *play_after, timeline: *timeline }
+    send: 'GOTOMARKER "{marker}"{play:map.play_suffix} TL={timeline}'
+    expect: *ok
+    returns: ack
+  goto_frame:
+    summary: "Move to a frame, optionally playing from it (GOTOFRAME)"
+    params:
+      frame: &frame { type: int, min: 0, required: true, label: Frame, description: "The frame number to move to." }
+      play: *play_after
+    send: "GOTOFRAME {frame}{play:map.play_suffix}"
+    expect: *ok
+    returns: ack
+  goto_frame_timeline:
+    summary: "Move one timeline to a frame, optionally playing from it (GOTOFRAME ... TL=x)"
+    params: { frame: *frame, play: *play_after, timeline: *timeline }
+    send: "GOTOFRAME {frame}{play:map.play_suffix} TL={timeline}"
+    expect: *ok
+    returns: ack
+  goto_time:
+    summary: "Move to a timecode at a frame rate, optionally playing from it (GOTOTIME)"
+    params:
+      timecode: { type: string, pattern: '^[0-9]+:[0-9]+:[0-9]+:[0-9]+$', max_length: 32, required: true,
+                  label: Timecode, description: "The timecode as hours:minutes:seconds:frames, such as 0:1:0:15." }
+      framerate: { type: float, min: 1, max: 240, required: true, label: Frame rate,
+                   description: "The frame rate the timecode is counted at, in frames per second; the timeline's own rate decides where it lands." }
+      play: *play_after
+    send: "GOTOTIME {timecode} {framerate:.2f}{play:map.play_suffix}"
+    expect: *ok
+    returns: ack
+  rate:
+    summary: "Set the playback frame rate (RATE n)"
+    params:
+      fps: { type: float, min: 1, max: 240, required: true, label: Frame rate, description: "Frames per second." }
+    send: "RATE {fps:.3f}"
+    expect: *ok
+    returns: ack
+  rate_scale:
+    summary: "Scale the playback rate (RATESCALE n)"
+    params:
+      factor: { type: float, min: 0.1, max: 4, required: true, label: Rate scale, description: "The factor the frame rate is multiplied by, 0.1 to 4." }
+    send: "RATESCALE {factor:.3f}"
+    expect: *ok
+    returns: ack
+  smpte:
+    summary: "Track external SMPTE timecode or stop tracking it (SMPTE on|off)"
+    params:
+      enabled: &on_off { type: bool, required: true, label: Enabled, description: "On or off." }
+    send: "SMPTE {enabled:map.on_off}"
+    expect: *ok
+    returns: ack
+  clip_search:
+    summary: "Move to the start of the next or previous clip (CLIPSEARCH)"
+    params:
+      direction: &direction { type: enum, values: [next, previous], required: true, label: Direction, description: "Search forward or back." }
+      play: *play_after
+    send: "CLIPSEARCH clip={direction} play={play}"
+    expect: *ok
+    returns: ack
+  marker_search:
+    summary: "Move to the next or previous marker (MARKERSEARCH)"
+    params: { direction: *direction, play: *play_after }
+    send: "MARKERSEARCH direction={direction} play={play}"
+    expect: *ok
+    returns: ack
+  reverse_playback:
+    summary: "Play backwards or forwards (REVERSEPLAYBACK)"
+    params:
+      reverse: { type: bool, required: true, label: Reverse, description: "True plays backwards, false forwards." }
+    send: "REVERSEPLAYBACK reverse={reverse}"
+    expect: *ok
+    returns: ack
+
+  # ── Levels ──────────────────────────────────────────────────────────────
+  audio_level:
+    summary: "Set the global audio level (AUDIOLEVEL)"
+    params:
+      percent: &percent { type: int, min: 0, max: 100, required: true, label: Level, description: "The level in percent." }
+    send: "AUDIOLEVEL {percent}"
+    expect: *ok
+    returns: ack
+  video_level:
+    summary: "Set the global video level (VIDEOLEVEL)"
+    params: { percent: *percent }
+    send: "VIDEOLEVEL {percent}"
+    expect: *ok
+    returns: ack
+  global_fade:
+    summary: "Fade the video up or down over a number of frames (GLOBALFADE)"
+    params:
+      direction: &updown { type: enum, values: [up, down], required: true, label: Direction, description: "Fade up or down." }
+      frames: &fade_frames { type: int, min: 0, required: true, label: Duration, description: "The fade's length in frames." }
+    send: "GLOBALFADE {direction} {frames}"
+    expect: *ok
+    returns: ack
+  global_audio_fade:
+    summary: "Fade the audio up or down over a number of frames (GLOBALAUDIOFADE)"
+    params: { direction: *updown, frames: *fade_frames }
+    send: "GLOBALAUDIOFADE {direction} {frames}"
+    expect: *ok
+    returns: ack
+
+  # ── Show files ──────────────────────────────────────────────────────────
+  load_show:
+    summary: "Load a show file; answers with the status (LOAD)"
+    params:
+      file: &file { type: string, pattern: '^[^"]+$', max_length: 1024, required: true, label: Show file, description: "The show file's name, such as TILE.xml, or its path." }
+    send: 'LOAD "{file}"'
+    expect: *ok
+    returns: ack
+  merge_show:
+    summary: "Merge a show file into the loaded show (MERGE)"
+    params: { file: *file }
+    send: 'MERGE "{file}"'
+    expect: *ok
+    returns: ack
+  load_show_all:
+    summary: "Load a show file on every server of the group (LOADALL)"
+    params: { file: *file }
+    send: 'LOADALL "{file}"'
+    expect: *ok
+    returns: ack
+  merge_show_all:
+    summary: "Merge a show file on every server of the group (MERGEALL)"
+    params: { file: *file }
+    send: 'MERGEALL "{file}"'
+    expect: *ok
+    returns: ack
+  save_show:
+    summary: "Save the show to a file (SAVE)"
+    params: { file: *file }
+    send: 'SAVE "{file}"'
+    expect: *ok
+    returns: ack
+  save_show_all:
+    summary: "Save the show to a file on every server of the group (SAVEALL)"
+    params: { file: *file }
+    send: 'SAVEALL "{file}"'
+    expect: *ok
+    returns: ack
+  clear_show:
+    summary: "Clear the loaded show (CLEAR)"
+    send: "CLEAR"
+    expect: *ok
+    returns: ack
+  list_shows:
+    summary: "List the show files in a folder; the list arrives before the OK (LISTSHOWS)"
+    params:
+      path: { type: string, pattern: '^[^"]*$', max_length: 1024, default: "", label: Folder, description: "The folder to list; empty for the default." }
+    send: 'LISTSHOWS "{path}"'
+    expect: *ok
+    returns: ack
+  list_markers:
+    summary: "List the markers of the show; the list arrives before the OK (LISTMARKERS)"
+    send: "LISTMARKERS"
+    expect: *ok
+    returns: ack
+
+  # ── Display and mode ────────────────────────────────────────────────────
+  display_mode:
+    summary: "Show the output fullscreen, windowed or minimised (DISPLAY)"
+    params:
+      mode: &display { type: enum, values: [fullscreen, windowed, minimized], required: true, label: Display, description: "How the output window is shown." }
+    send: "DISPLAY {mode}"
+    expect: *ok
+    returns: ack
+  display_mode_all:
+    summary: "Show the output of every server of the group fullscreen, windowed or minimised (DISPLAYALL)"
+    params: { mode: *display }
+    send: "DISPLAYALL {mode}"
+    expect: *ok
+    returns: ack
+  geometry:
+    summary: "Turn geometry correction on or off (GEOMETRY)"
+    params: { enabled: *on_off }
+    send: "GEOMETRY {enabled:map.on_off}"
+    expect: *ok
+    returns: ack
+  blending:
+    summary: "Turn edge blending on or off (BLENDING)"
+    params: { enabled: *on_off }
+    send: "BLENDING {enabled:map.on_off}"
+    expect: *ok
+    returns: ack
+  black_level_uplift:
+    summary: "Turn black level uplift on or off (BLACKLEVELUPLIFT)"
+    params: { enabled: *on_off }
+    send: "BLACKLEVELUPLIFT {enabled:map.on_off}"
+    expect: *ok
+    returns: ack
+  diagnostic_graph:
+    summary: "Show or hide the diagnostic graphs (GRAPH)"
+    params: { enabled: *on_off }
+    send: "GRAPH {enabled:map.on_off}"
+    expect: *ok
+    returns: ack
+  diagnostic_stats:
+    summary: "Show or hide the diagnostic statistics (STATS)"
+    params: { enabled: *on_off }
+    send: "STATS {enabled:map.on_off}"
+    expect: *ok
+    returns: ack
+  audio_vu:
+    summary: "Show or hide the audio VU meters (AUDIOVU)"
+    params: { enabled: *on_off }
+    send: "AUDIOVU {enabled:map.on_off}"
+    expect: *ok
+    returns: ack
+  channel_id:
+    summary: "Show or hide the channel identification (CHANNELID)"
+    params: { enabled: *on_off }
+    send: "CHANNELID {enabled:map.on_off}"
+    expect: *ok
+    returns: ack
+  apply_show_mode:
+    summary: "Put the system in show mode (APPLYSHOWMODE)"
+    send: "APPLYSHOWMODE"
+    expect: *ok
+    returns: ack
+  toggle_3d_eyes:
+    summary: "Swap the left and right eyes of stereoscopic output (TOGGLE3DEYES)"
+    send: "TOGGLE3DEYES"
+    expect: *ok
+    returns: ack
+
+  # ── Layers ──────────────────────────────────────────────────────────────
+  layer_fade:
+    summary: "Set a layer's level (LAYERFADE)"
+    params:
+      layer: &layer { type: string, pattern: '^[^" ]+$', max_length: 256, required: true, label: Layer, description: "The layer's number, or the name of its media." }
+      percent: *percent
+    send: "LAYERFADE {layer} {percent}"
+    expect: *ok
+    returns: ack
+  layer_fade_all:
+    summary: "Set a layer's level on every server of the group (LAYERFADEALL)"
+    params: { layer: *layer, percent: *percent }
+    send: "LAYERFADEALL {layer} {percent}"
+    expect: *ok
+    returns: ack
+  layer_enable:
+    summary: "Turn a layer on or off (LAYERENABLE)"
+    params: { layer: *layer, enabled: *on_off }
+    send: "LAYERENABLE {layer} {enabled:map.on_off}"
+    expect: *ok
+    returns: ack
+  layer_enable_all:
+    summary: "Turn a layer on or off on every server of the group (LAYERENABLEALL)"
+    params: { layer: *layer, enabled: *on_off }
+    send: "LAYERENABLEALL {layer} {enabled:map.on_off}"
+    expect: *ok
+    returns: ack
+  layer_fade_timed:
+    summary: "Fade a layer up or down over a number of frames (LAYERFADETIMED)"
+    params: { layer: *layer, direction: *updown, frames: *fade_frames }
+    send: "LAYERFADETIMED {layer} {direction} {frames}"
+    expect: *ok
+    returns: ack
+  layer_fade_timed_all:
+    summary: "Fade a layer up or down on every server of the group (LAYERFADETIMEDALL)"
+    params: { layer: *layer, direction: *updown, frames: *fade_frames }
+    send: "LAYERFADETIMEDALL {layer} {direction} {frames}"
+    expect: *ok
+    returns: ack
+
+  # ── Sequences ───────────────────────────────────────────────────────────
+  run_sequence:
+    summary: "Start a named sequence (SEQUENCE)"
+    params:
+      sequence: &sequence { type: string, pattern: '^[^"]+$', max_length: 256, required: true, label: Sequence, description: "The sequence's name." }
+    send: 'SEQUENCE "{sequence}"'
+    expect: *ok
+    returns: ack
+  run_sequence_all:
+    summary: "Start a named sequence on every server of the group (SEQUENCEALL)"
+    params: { sequence: *sequence }
+    send: 'SEQUENCEALL "{sequence}"'
+    expect: *ok
+    returns: ack
+  cancel_sequence:
+    summary: "Cancel a running sequence by its unique name (CANCELSEQUENCE)"
+    params: { sequence: *sequence }
+    send: 'CANCELSEQUENCE "{sequence}"'
+    expect: *ok
+    returns: ack
+  cancel_all_sequences:
+    summary: "Cancel every running sequence (CANCELALLSEQUENCES)"
+    send: "CANCELALLSEQUENCES"
+    expect: *ok
+    returns: ack
+  pause_sequence:
+    summary: "Pause or resume a running sequence (PAUSESEQUENCE)"
+    params:
+      sequence: *sequence
+      paused: { type: bool, required: true, label: Paused, description: "True pauses the sequence, false resumes it." }
+    send: 'PAUSESEQUENCE "{sequence}" {paused:map.y_n}'
+    expect: *ok
+    returns: ack
+  reload_sequences:
+    summary: "Reload the sequences (RELOADSEQUENCES)"
+    send: "RELOADSEQUENCES"
+    expect: *ok
+    returns: ack
+  load_sequences:
+    summary: "Load sequences from a file (LOADSEQUENCES)"
+    params: { file: *file }
+    send: 'LOADSEQUENCES "{file}"'
+    expect: *ok
+    returns: ack
+  list_sequences:
+    summary: "List the sequences; the list arrives before the OK (LISTSEQUENCES)"
+    send: "LISTSEQUENCES"
+    expect: *ok
+    returns: ack
+  sequence_status:
+    summary: "Report the running sequences; the report arrives before the OK (SEQUENCESTATUS)"
+    send: "SEQUENCESTATUS"
+    expect: *ok
+    returns: ack
+
+  # ── Global variables ────────────────────────────────────────────────────
+  set_global_variable:
+    summary: "Set a global variable (GLOBALVARSET $name=value)"
+    params:
+      variable: &variable { type: string, pattern: '^[A-Za-z_][A-Za-z0-9_]*$', max_length: 128, required: true,
+                            label: Variable, description: "The variable's name, without the $." }
+      value: { type: string, pattern: '^[^"$]*$', max_length: 128, required: true, label: Value,
+               description: "The value: a number or text of up to 128 characters." }
+    send: "GLOBALVARSET ${variable}={value}"
+    expect: *ok
+    returns: ack
+  get_global_variable:
+    summary: "Read a global variable; the value arrives before the OK (GLOBALVARGET $name)"
+    params: { variable: *variable }
+    send: "GLOBALVARGET ${variable}"
+    expect: *ok
+    returns: ack
+  list_global_variables:
+    summary: "List the global variables; the list arrives before the OK (GLOBALVARLIST)"
+    send: "GLOBALVARLIST"
+    expect: *ok
+    returns: ack
+  delete_global_variable:
+    summary: "Delete a global variable (GLOBALVARDELETE $name)"
+    params: { variable: *variable }
+    send: "GLOBALVARDELETE ${variable}"
+    expect: *ok
+    returns: ack
+
+  # ── Timelines ───────────────────────────────────────────────────────────
+  reserve_timeline:
+    summary: "Turn the reserve timeline on or off (RESERVE)"
+    params: { enabled: *on_off }
+    send: "RESERVE {enabled:map.on_off}"
+    expect: *ok
+    returns: ack
+  timeline_opacity:
+    summary: "Set a timeline's opacity (TIMELINEOPACITY)"
+    params:
+      timeline: *timeline
+      percent: *percent
+    send: "TIMELINEOPACITY value={percent} tl={timeline}"
+    expect: *ok
+    returns: ack
+  timeline_opacity_fade:
+    summary: "Fade a timeline's opacity over a time (TIMELINEOPACITY with Time=)"
+    params:
+      timeline: *timeline
+      percent: *percent
+      time: { type: float, min: 0, required: true, label: Time, description: "The fade's length in seconds." }
+    send: "TIMELINEOPACITY value={percent} Time={time:.2f} tl={timeline}"
+    expect: *ok
+    returns: ack
+  timeline_visibility:
+    summary: "Show or hide a timeline (SETTIMELINEVISIBILITY)"
+    params:
+      timeline: *timeline
+      visible: { type: bool, required: true, label: Visible, description: "Show the timeline, or hide it." }
+    send: "SETTIMELINEVISIBILITY visible={visible:map.y_n} tl={timeline}"
+    expect: *ok
+    returns: ack
+
+  # ── Playlists, media, comms ─────────────────────────────────────────────
+  playlist_next:
+    summary: "Set which item a playlist plays next (PLAYLISTNEXT)"
+    params:
+      playlist: { type: string, pattern: '^[^" ]+$', max_length: 256, required: true, label: Playlist, description: "The playlist's external control name." }
+      index: { type: int, min: 0, required: true, label: Item, description: "The item's index in the playlist." }
+    send: "PLAYLISTNEXT playlistextctrlname={playlist} index={index}"
+    expect: *ok
+    returns: ack
+  media_enable:
+    summary: "Enable or disable a media item by its external control name (MEDIAENABLE)"
+    params:
+      control: { type: string, pattern: '^[^" ]+$', max_length: 256, required: true, label: Media, description: "The media item's external control name." }
+      enabled: { type: bool, required: true, label: Enabled, description: "Enable the item, or disable it." }
+    send: "MEDIAENABLE {control} {enabled:map.y_n}"
+    expect: *ok
+    returns: ack
+  artnet:
+    summary: "Turn Art-Net input and output on or off (ARTNET)"
+    params:
+      input: { type: bool, required: true, label: Input, description: "Receive Art-Net." }
+      output: { type: bool, required: true, label: Output, description: "Send Art-Net." }
+    send: "ARTNET inputenable={input:map.y_n} outputenable={output:map.y_n}"
+    expect: *ok
+    returns: ack
+  external_control_comms:
+    summary: "Turn external control communications on or off; while off, Delta answers only that they are disabled (EXTCTRLCOMMS)"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On to accept external control commands." }
+    send: "EXTCTRLCOMMS enable={enabled}"
+    expect: *ok
+    returns: ack
+
+  # ── Status and system ───────────────────────────────────────────────────
+  get_status:
+    summary: "Ask for the status block (server, file, mode, frame, frame rate, levels), which arrives before the OK (STATUS)"
+    send: "STATUS"
+    expect: *ok
+    returns: ack
+  restart_pc:
+    summary: "Restart the server's computer (RESTART_PC)"
+    send: "RESTART_PC"
+    expect: *ok
+    returns: ack
+  shutdown_pc:
+    summary: "Shut down the server's computer (SHUTDOWN_PC)"
+    params:
+      immediate: { type: bool, default: false, label: Immediately, description: "Shut down at once rather than after Windows' usual delay." }
+    send: "SHUTDOWN_PC{immediate:map.immediate}"
+    expect: *ok
+    returns: ack
+  quit_app:
+    summary: "Quit the Delta server application (QUIT_APP)"
+    send: "QUIT_APP"
+    expect: *ok
+    returns: ack
+  send_command:
+    summary: "Send any external control command, for the commands not covered here (DeltaGUI Help > External Control lists them)"
+    params:
+      command: { type: string, max_length: 4096, required: true, label: Command,
+                 description: "The command line exactly as the reference writes it, without the carriage return." }
+    send: "{command}"
+    expect: { matches: "^(OK)$" }
+    returns: ack
+
+maps:
+  on_off: { "true": "on", "false": "off" }
+  y_n: { "true": "y", "false": "n" }
+  play_suffix: { "true": " play", "false": "" }
+  immediate: { "true": " immediate", "false": "" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Delta answers OK for any command it recognises, whatever its parameters, and BAD for one it does not:
+      OK does not mean the parameters were right. Replies with data (STATUS, the lists) arrive as lines
+      before the OK; the commands report the OK, and STATUS's lines are read into state.
+  - models: [all]
+    severity: info
+    text: >
+      PLAY, CUE, STOP, ADVANCE, STEPBACK, REWIND, RATE, RATESCALE, LOADALL, MERGEALL, SEQUENCEALL,
+      LAYERFADEALL, DISPLAYALL, GOTOMARKER, GOTOFRAME, GOTOTIME, MARKERSEARCH and CLIPSEARCH work on a group's
+      leader only; its followers receive them from the leader. Connect to the leader to drive a group.
+  - models: [all]
+    severity: critical
+    text: >
+      Non-realtime commands (STOP, RECORD, ADVANCE, STEPBACK, REWIND, MERGE, LOADALL, SAVE, SAVEALL,
+      MERGEALL, DISPLAY, GEOMETRY, BLENDING, APPLYSHOWMODE and others the reference marks !) can interrupt
+      playback or stop it; GOTOMARKER, GOTOFRAME, GOTOTIME and RATE do not when Seamless Loop is on. LOAD,
+      CLEAR, RESTART_PC, SHUTDOWN_PC and QUIT_APP end the show on air.
+  - models: [all]
+    severity: info
+    text: >
+      Delta allows five multi-Telnet connections at a time by default; this one stays open and polls STATUS
+      every second. The reference writes some names in single quotes ('file'); names are sent here in double
+      quotes, which the syntax rules give for names with spaces.
+
+state:
+  server.name: { type: string, description: "The server's PC name (the connection banner and STATUS)" }
+  server.role: { type: string, description: "Leader or Follower" }
+  show.file: { type: string, description: "The loaded show file" }
+  playback.mode: { type: string, description: "Stopped, Preparing to Play or Playing" }
+  playback.frame: { type: int, description: "The current frame" }
+  playback.framerate: { type: float, unit: fps, description: "The current frame rate" }
+  playback.smpte: { type: bool, description: "Tracking external SMPTE timecode" }
+  levels.audio: { type: int, unit: "%", description: "The global audio level" }
+  levels.video: { type: int, unit: "%", description: "The global video level" }
+  system.licence: { type: string, description: "Permanent, or the expiry date of a time-limited licence" }
+  system.graphics: { type: string, description: "The display resolution and refresh rate, such as 1920 X 1080 60 HZ" }
+  system.movie_drives: { type: string, description: "The movie drive letters, separated by spaces" }
+  system.other_drive: { type: string, description: "The other drive" }
+  device.ready: { type: bool, description: "The connection banner ended with READY" }
+
+telemetry:
+  poll:
+    send: ["STATUS"]
+    every_ms: 1000
+  updates:
+    - match: "^SERVER\\s*:\\s*(.*?)\\s*\\((Leader|Follower)\\)\\s*$"
+      state: { server.name: "{1}", server.role: "{2}" }
+    - match: "^SERVER\\s*:\\s*([^()]*[^() ])\\s*$"
+      state: { server.name: "{1}" }
+    - match: "^FILE\\s*:\\s*(.*?)\\s*$"
+      state: { show.file: "{1}" }
+    - match: "^MODE\\s*:\\s*(.*?)\\s*$"
+      state: { playback.mode: "{1}" }
+    - match: "^CURRENTFRAME\\s*:\\s*(-?[0-9]+)\\s*$"
+      state: { playback.frame: "{1}" }
+    - match: "^FRAMERATE\\s*:\\s*([0-9.]+)\\s*$"
+      state: { playback.framerate: "{1}" }
+    - match: "^SMPTE\\s*:\\s*(ON|OFF|on|off|On|Off)\\s*$"
+      state: { playback.smpte: { value: "{1}", map: { "ON": true, "on": true, "On": true, "OFF": false, "off": false, "Off": false } } }
+    - match: "^AUDIOLEVEL\\s*:\\s*([0-9]+)\\s*$"
+      state: { levels.audio: "{1}" }
+    - match: "^VIDEOLEVEL\\s*:\\s*([0-9]+)\\s*$"
+      state: { levels.video: "{1}" }
+    - match: "^LICEN[CS]E\\s*:\\s*(.*?)\\s*$"
+      state: { system.licence: "{1}" }
+    - match: "^GRAPHICS\\s*:\\s*(.*?)\\s*$"
+      state: { system.graphics: "{1}" }
+    - match: "^MOVIEDRIVES\\s*:\\s*(.*?)\\s*$"
+      state: { system.movie_drives: "{1}" }
+    - match: "^OTHERDRIVES?\\s*:\\s*(.*?)\\s*$"
+      state: { system.other_drive: "{1}" }
+    - match: "^READY$"
+      state: { device.ready: "true" }

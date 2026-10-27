@@ -16,6 +16,7 @@ use std::{collections::BTreeSet, env, fs, path::PathBuf};
 /// feature (`src/modules/mod.rs`). `crates/core/Cargo.toml` has one feature
 /// per spec id and one per group listing exactly these; a test checks it.
 const VENDOR_GROUPS: &[(&str, &[&str])] = &[
+    ("vendor-7thsense", &["7thsense-delta"]),
     ("vendor-ableton", &["ableton-live"]),
     ("vendor-aes70", &["aes70"]),
     (
@@ -44,6 +45,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-anomes", &["millumin"]),
+    ("vendor-arkaos", &["arkaos-mediamaster"]),
     ("vendor-atlona", &["atlona-matrix"]),
     ("vendor-avstumpfl", &["avstumpfl-pixera"]),
     ("vendor-avolites", &["avolites-titan"]),
@@ -84,6 +86,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-bluenviron", &["mediamtx"]),
     ("vendor-blustream", &["blustream-matrix"]),
     ("vendor-boinx", &["boinx-mimolive"]),
+    ("vendor-brightsign", &["brightsign-dws", "brightsign-udp"]),
     ("vendor-brompton", &["brompton-tessera"]),
     ("vendor-canon", &["canon-ptz"]),
     ("vendor-casparcg", &["casparcg"]),
@@ -92,7 +95,12 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-chamsys", &["chamsys-magicq", "chamsys-magicq-udp"]),
     (
         "vendor-christie",
-        &["christie-1dlp", "christie-spyder", "christie-trulife"],
+        &[
+            "christie-1dlp",
+            "christie-pandorasbox",
+            "christie-spyder",
+            "christie-trulife",
+        ],
     ),
     ("vendor-churchapps", &["freeshow"]),
     ("vendor-clock8001", &["clock-8001"]),
@@ -166,6 +174,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-holyrics", &["holyrics"]),
     ("vendor-imagine", &["vdcp"]),
     ("vendor-imimot", &["imimot-mitti"]),
+    ("vendor-ioversal", &["ioversal-vertex"]),
     (
         "vendor-irisdown",
         &["irisdown-countdown-timer", "irisdown-remote-show-control"],
@@ -205,6 +214,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-megapixel", &["megapixel-helios"]),
     ("vendor-meros", &["meros-camera"]),
     ("vendor-meta", &["facebook-account", "facebook-live"]),
+    (
+        "vendor-modulopi",
+        &["modulopi-kinetic", "modulopi-player", "modulopi-spydog"],
+    ),
     (
         "vendor-nec",
         &["nec-display", "nec-projector", "nec-projector-ascii"],
@@ -355,8 +368,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-tvone", &["tvone-coriomaster"]),
     ("vendor-twitch", &["twitch"]),
     ("vendor-vaddio", &["vaddio-roboshot"]),
+    ("vendor-ventuz", &["ventuz-director"]),
     ("vendor-videolan", &["videolan-vlc"]),
     ("vendor-vimeo", &["vimeo-live"]),
+    ("vendor-vioso", &["vioso-exaplay"]),
     ("vendor-wyrestorm", &["wyrestorm-matrix"]),
     (
         "vendor-yamaha",
