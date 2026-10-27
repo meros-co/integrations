@@ -90,6 +90,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-castr", &["castr"]),
     ("vendor-bss", &["bss-london"]),
     ("vendor-chamsys", &["chamsys-magicq", "chamsys-magicq-udp"]),
+    ("vendor-characterworks", &["characterworks"]),
     (
         "vendor-christie",
         &["christie-1dlp", "christie-spyder", "christie-trulife"],

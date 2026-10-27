@@ -947,6 +947,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether QuickQ DIN accepts remote control. ([specs/chamsys-magicq-udp.yaml:852](specs/chamsys-magicq-udp.yaml#L852))
 - [ ] On MQ40 and MQ40N, confirm the remote protocol works. ([specs/chamsys-magicq-udp.yaml:830](specs/chamsys-magicq-udp.yaml#L830))
 
+## characterworks — CharacterWorks
+
+- [ ] Confirm the request path (/) and content type (application/json) the Remote Control Server accepts. ([specs/characterworks.yaml:348](specs/characterworks.yaml#L348))
+- [ ] Record what a command does without a channel, and whether other channel names (more live channels) exist. ([specs/characterworks.yaml:339](specs/characterworks.yaml#L339))
+- [ ] Confirm the row selection action is select_data_source_rows (the document's examples write source). ([specs/characterworks.yaml:344](specs/characterworks.yaml#L344))
+- [ ] Record the HTTP status of a failure reply (the spec reads the result field, whatever the status). ([specs/characterworks.yaml:329](specs/characterworks.yaml#L329))
+
 ## christie-1dlp — Christie 1DLP projectors
 
 - [ ] Check that a set sent with the "#" prefix is answered by its echo over TCP, and whether the echo keeps the "#" ("(#PWR 1)") or drops it ("(PWR 1)"). ([specs/christie-1dlp.yaml:479](specs/christie-1dlp.yaml#L479))

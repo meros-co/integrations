@@ -1,0 +1,351 @@
+spec: 1
+id: characterworks
+name: CharacterWorks (Remote Control Server)
+vendor: CharacterWorks (AGF)
+category: other
+
+# CharacterWorks' Remote Control Server takes JSON commands as HTTP POSTs on
+# port 5201: one {"action": ...} object per request. Each answers with
+# {"result": "success"} (with warnings) or {"result": "failure", "errors":
+# [...]}; the list commands answer with their lists. Nothing is pushed.
+
+source:
+  - title: CharacterWorks Online Help, Remote Control
+    author: CharacterWorks
+    url: https://www.chrworks.com/help/doc/RemoteControl.html
+    note: >
+      Manufacturer document, read 2026-10-27 (no version given). The CW
+      Remote Control Server on TCP 5201 takes JSON commands over HTTP POST,
+      one command object or an array of them; the same port serves the
+      WWWRoot folder. Commands list_motions, list_motions_with_ids,
+      list_layers (parent, parent_id, channel), play_motions, stop_motions,
+      eject_motions, finish_motions, pause_motions, resume_motions,
+      restart_motions, finish_and_restart_motions (motions, motion_ids,
+      channel), set_text (layer, layer_id, value, channel), list_grid_names,
+      list_grid_cells (grid), activate_grid_cell (grid, cell [column, row],
+      channel), run_data_source_query (data_source),
+      set_data_source_query_parameter (data_source, parameter, value; no value
+      removes it), the row selection by index_list or by field and value; the
+      result, warnings and errors with their codes (already_playing,
+      already_stopped, already_finishing, already_stopped_or_paused,
+      not_paused, not_playing, motion_not_found, layer_not_found, cell_empty,
+      data_source_not_found, selection_criteria_not_specified). Channels in
+      the examples: preview, live1, live2.
+  - title: companion-module-agf-characterworks (Bitfocus Companion module, MIT licence)
+    author: Bitfocus AS
+    url: https://github.com/bitfocus/companion-module-agf-characterworks
+    note: >
+      Read for corroboration only (by an earlier research pass): POSTs JSON to
+      / with Content-Type application/json, offers the channels preview,
+      live1 and live2, and notes set_text needs the motion playing; tested
+      with CharacterWorks 3.7. No code taken.
+
+transport:
+  type: http
+  port: 5201
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe: { method: POST, path: /, body: '{"action":"list_motions"}', content_type: application/json }
+
+ports:
+  - { port: 5201, protocol: http, role: control, note: "CW Remote Control Server" }
+
+models:
+  - id: characterworks
+    name: CharacterWorks 3
+    supports: [list_motions, list_motions_with_ids, list_layers, list_layers_under, play_motions,
+               play_motions_by_id, stop_motions, stop_motions_by_id, eject_motions, eject_motions_by_id,
+               finish_motions, finish_motions_by_id, pause_motions, pause_motions_by_id, resume_motions,
+               resume_motions_by_id, restart_motions, restart_motions_by_id, finish_and_restart_motions,
+               finish_and_restart_motions_by_id, set_text, set_text_by_id, list_grid_names, list_grid_cells,
+               activate_grid_cell, run_data_source_query, set_data_source_query_parameter,
+               remove_data_source_query_parameter, select_data_source_rows, select_data_source_rows_matching,
+               send_commands]
+    verification: none
+
+commands:
+  list_motions:
+    summary: List the project's motions by name (list_motions)
+    send: { method: POST, path: /, body: '{"action":"list_motions"}', content_type: application/json }
+    expect: { status: 200, json_path: "$.motions" }
+    returns: value
+  list_motions_with_ids:
+    summary: List the project's motions with their ids (list_motions_with_ids)
+    send: { method: POST, path: /, body: '{"action":"list_motions_with_ids"}', content_type: application/json }
+    expect: { status: 200, json_path: "$.motions" }
+    returns: value
+  list_layers:
+    summary: List the whole project's layer tree on a channel, with names, paths, ids and types (list_layers)
+    params:
+      channel: &channel { type: enum, values: [preview, live1, live2], required: true, label: Channel,
+                          description: "Output channel: preview, live1 or live2." }
+    send: { method: POST, path: /, body: '{"action":"list_layers","channel":"{channel}"}', content_type: application/json }
+    expect: { status: 200, json_path: "$.layers" }
+    returns: value
+  list_layers_under:
+    summary: List the layer tree under a layer path (list_layers with parent)
+    params:
+      parent: { type: string, max_length: 1024, required: true, label: Parent,
+                description: "Absolute layer path, names joined by backslashes, such as UnderWater\\sea." }
+      channel: *channel
+    send: { method: POST, path: /, body: '{"action":"list_layers","parent":{parent:json},"channel":"{channel}"}', content_type: application/json }
+    expect: { status: 200, json_path: "$.layers" }
+    returns: value
+
+  # ── Motion playback ─────────────────────────────────────────────────────
+  play_motions:
+    summary: Play motions by name on a channel; already playing is a warning (play_motions)
+    params: &by_name
+      motions: { type: json, required: true, label: Motions,
+                 description: "JSON array of motion names, [\"Motion 1\", \"Motion 2\"]." }
+      channel: *channel
+    send: { method: POST, path: /, body: '{"action":"play_motions","motions":{motions},"channel":"{channel}"}', content_type: application/json }
+    expect: &success { status: 200, json_equals: { "$.result": success } }
+    returns: ack
+  play_motions_by_id:
+    summary: Play motions by id on a channel (play_motions with motion_ids)
+    params: &by_id
+      motion_ids: { type: json, required: true, label: Motion ids,
+                    description: "JSON array of motion ids as strings, as list_motions_with_ids gives them." }
+      channel: *channel
+    send: { method: POST, path: /, body: '{"action":"play_motions","motion_ids":{motion_ids},"channel":"{channel}"}', content_type: application/json }
+    expect: *success
+    returns: ack
+  stop_motions:
+    summary: Stop motions by name (stop_motions)
+    params: *by_name
+    send: { method: POST, path: /, body: '{"action":"stop_motions","motions":{motions},"channel":"{channel}"}', content_type: application/json }
+    expect: *success
+    returns: ack
+  stop_motions_by_id:
+    summary: Stop motions by id (stop_motions with motion_ids)
+    params: *by_id
+    send: { method: POST, path: /, body: '{"action":"stop_motions","motion_ids":{motion_ids},"channel":"{channel}"}', content_type: application/json }
+    expect: *success
+    returns: ack
+  eject_motions:
+    summary: Eject motions by name (eject_motions)
+    params: *by_name
+    send: { method: POST, path: /, body: '{"action":"eject_motions","motions":{motions},"channel":"{channel}"}', content_type: application/json }
+    expect: *success
+    returns: ack
+  eject_motions_by_id:
+    summary: Eject motions by id (eject_motions with motion_ids)
+    params: *by_id
+    send: { method: POST, path: /, body: '{"action":"eject_motions","motion_ids":{motion_ids},"channel":"{channel}"}', content_type: application/json }
+    expect: *success
+    returns: ack
+  finish_motions:
+    summary: Finish motions by name, playing their out (finish_motions)
+    params: *by_name
+    send: { method: POST, path: /, body: '{"action":"finish_motions","motions":{motions},"channel":"{channel}"}', content_type: application/json }
+    expect: *success
+    returns: ack
+  finish_motions_by_id:
+    summary: Finish motions by id (finish_motions with motion_ids)
+    params: *by_id
+    send: { method: POST, path: /, body: '{"action":"finish_motions","motion_ids":{motion_ids},"channel":"{channel}"}', content_type: application/json }
+    expect: *success
+    returns: ack
+  pause_motions:
+    summary: Pause motions by name (pause_motions)
+    params: *by_name
+    send: { method: POST, path: /, body: '{"action":"pause_motions","motions":{motions},"channel":"{channel}"}', content_type: application/json }
+    expect: *success
+    returns: ack
+  pause_motions_by_id:
+    summary: Pause motions by id (pause_motions with motion_ids)
+    params: *by_id
+    send: { method: POST, path: /, body: '{"action":"pause_motions","motion_ids":{motion_ids},"channel":"{channel}"}', content_type: application/json }
+    expect: *success
+    returns: ack
+  resume_motions:
+    summary: Resume paused motions by name (resume_motions)
+    params: *by_name
+    send: { method: POST, path: /, body: '{"action":"resume_motions","motions":{motions},"channel":"{channel}"}', content_type: application/json }
+    expect: *success
+    returns: ack
+  resume_motions_by_id:
+    summary: Resume paused motions by id (resume_motions with motion_ids)
+    params: *by_id
+    send: { method: POST, path: /, body: '{"action":"resume_motions","motion_ids":{motion_ids},"channel":"{channel}"}', content_type: application/json }
+    expect: *success
+    returns: ack
+  restart_motions:
+    summary: Restart playing motions by name (restart_motions)
+    params: *by_name
+    send: { method: POST, path: /, body: '{"action":"restart_motions","motions":{motions},"channel":"{channel}"}', content_type: application/json }
+    expect: *success
+    returns: ack
+  restart_motions_by_id:
+    summary: Restart playing motions by id (restart_motions with motion_ids)
+    params: *by_id
+    send: { method: POST, path: /, body: '{"action":"restart_motions","motion_ids":{motion_ids},"channel":"{channel}"}', content_type: application/json }
+    expect: *success
+    returns: ack
+  finish_and_restart_motions:
+    summary: Finish motions by name and start them again (finish_and_restart_motions)
+    params: *by_name
+    send: { method: POST, path: /, body: '{"action":"finish_and_restart_motions","motions":{motions},"channel":"{channel}"}', content_type: application/json }
+    expect: *success
+    returns: ack
+  finish_and_restart_motions_by_id:
+    summary: Finish motions by id and start them again (finish_and_restart_motions with motion_ids)
+    params: *by_id
+    send: { method: POST, path: /, body: '{"action":"finish_and_restart_motions","motion_ids":{motion_ids},"channel":"{channel}"}', content_type: application/json }
+    expect: *success
+    returns: ack
+
+  # ── Text ────────────────────────────────────────────────────────────────
+  set_text:
+    summary: Set the text of a layer by its path, in a playing motion (set_text)
+    params:
+      layer: { type: string, max_length: 1024, required: true, label: Layer,
+               description: "Absolute layer path, names joined by backslashes, such as Motion 1\\Text 1." }
+      value: &text { type: string, max_length: 65536, multiline: true, required: true, label: Text,
+                     description: "New text of the layer." }
+      channel: *channel
+    send: { method: POST, path: /, body: '{"action":"set_text","layer":{layer:json},"value":{value:json},"channel":"{channel}"}', content_type: application/json }
+    expect: *success
+    returns: ack
+  set_text_by_id:
+    summary: Set the text of a layer by its id (set_text with layer_id)
+    params:
+      layer_id: { type: string, max_length: 32, pattern: "^[0-9]+$", required: true, label: Layer id,
+                  description: "Layer id, as list_layers gives it." }
+      value: *text
+      channel: *channel
+    send: { method: POST, path: /, body: '{"action":"set_text","layer_id":{layer_id:json},"value":{value:json},"channel":"{channel}"}', content_type: application/json }
+    expect: *success
+    returns: ack
+
+  # ── Grids ───────────────────────────────────────────────────────────────
+  list_grid_names:
+    summary: List the project's grid names (list_grid_names)
+    send: { method: POST, path: /, body: '{"action":"list_grid_names"}', content_type: application/json }
+    expect: { status: 200, json_path: "$.grids" }
+    returns: value
+  list_grid_cells:
+    summary: List a grid's cells with their text, key and colour (list_grid_cells)
+    params:
+      grid: &grid { type: string, max_length: 256, required: true, label: Grid, description: "Grid name." }
+    send: { method: POST, path: /, body: '{"action":"list_grid_cells","grid":{grid:json}}', content_type: application/json }
+    expect: { status: 200, json_path: "$.grids" }
+    returns: value
+  activate_grid_cell:
+    summary: Activate a grid cell, as a click on it does (activate_grid_cell)
+    params:
+      grid: *grid
+      column: { type: int, min: 0, required: true, label: Column, description: "Cell column, from 0." }
+      row: { type: int, min: 0, required: true, label: Row, description: "Cell row, from 0." }
+      channel: { type: enum, values: [preview, live1, live2], required: true, label: Channel,
+                 description: "Channel used by the cell's actions set to the Auto channel." }
+    send: { method: POST, path: /, body: '{"action":"activate_grid_cell","grid":{grid:json},"cell":[{column},{row}],"channel":"{channel}"}', content_type: application/json }
+    expect: *success
+    returns: ack
+
+  # ── Data sources ────────────────────────────────────────────────────────
+  run_data_source_query:
+    summary: Run a data source's query again (XML/JSON, ODBC or Key-Value) (run_data_source_query)
+    params:
+      source: &source { type: string, max_length: 256, required: true, label: Data source, description: "Data source name, such as XML/JSON Source 1." }
+    send: { method: POST, path: /, body: '{"action":"run_data_source_query","data_source":{source:json}}', content_type: application/json }
+    expect: *success
+    returns: ack
+  set_data_source_query_parameter:
+    summary: Set a query variable of a data source, kept for later runs (set_data_source_query_parameter)
+    params:
+      source: *source
+      parameter: &param { type: string, max_length: 256, required: true, label: Parameter, description: "Query variable name." }
+      value: { type: string, max_length: 65536, required: true, label: Value, description: "Value of the variable." }
+    send: { method: POST, path: /, body: '{"action":"set_data_source_query_parameter","data_source":{source:json},"parameter":{parameter:json},"value":{value:json}}', content_type: application/json }
+    expect: *success
+    returns: ack
+  remove_data_source_query_parameter:
+    summary: Remove a query variable of a data source (set_data_source_query_parameter without a value)
+    params:
+      source: *source
+      parameter: *param
+    send: { method: POST, path: /, body: '{"action":"set_data_source_query_parameter","data_source":{source:json},"parameter":{parameter:json}}', content_type: application/json }
+    expect: *success
+    returns: ack
+  select_data_source_rows:
+    summary: Select rows of a data source by index (select_data_source_rows with index_list)
+    params:
+      source: *source
+      rows: { type: json, required: true, label: Rows, description: "JSON array of row indexes from 0, [0, 1, 5]." }
+    send: { method: POST, path: /, body: '{"action":"select_data_source_rows","data_source":{source:json},"index_list":{rows}}', content_type: application/json }
+    expect: *success
+    returns: ack
+  select_data_source_rows_matching:
+    summary: Select the rows of a data source whose field matches a value, * a wildcard (select_data_source_rows with field and value)
+    params:
+      source: *source
+      field: { type: string, max_length: 256, required: true, label: Field, description: "Field (column) name." }
+      value: { type: string, max_length: 4096, required: true, label: Value, description: "Value to match; * is a wildcard, such as Lon*." }
+    send: { method: POST, path: /, body: '{"action":"select_data_source_rows","data_source":{source:json},"field":{field:json},"value":{value:json}}', content_type: application/json }
+    expect: *success
+    returns: ack
+  send_commands:
+    summary: Send several commands in one request, as CharacterWorks allows (a JSON array of command objects)
+    params:
+      commands: { type: json, required: true, label: Commands,
+                  description: "JSON array of command objects as CharacterWorks documents them, [{\"action\": \"play_motions\", ...}, ...]." }
+    send: { method: POST, path: /, body: "{commands}", content_type: application/json }
+    expect: { status: 200 }
+    returns: text
+
+telemetry:
+  # Nothing is pushed and nothing says what plays; the motion and grid lists
+  # are read every 10 s.
+  poll:
+    every_ms: 10000
+    send:
+      - { method: POST, path: /, body: '{"action":"list_motions_with_ids"}', content_type: application/json }
+      - { method: POST, path: /, body: '{"action":"list_grid_names"}', content_type: application/json }
+  updates:
+    - path: "^/$"
+      request_match: { "$.action": "^list_motions_with_ids$" }
+      json_match: { "$.motions": "^\\[" }
+      json_each: "$.motions"
+      json: { name: "$.name", id: "$.id" }
+      replace: motions
+      state: { "motions.{name:key}.id": "{id}" }
+    - path: "^/$"
+      request_match: { "$.action": "^list_grid_names$" }
+      json_match: { "$.grids": "^\\[" }
+      json_each: "$.grids"
+      json: { name: "$" }
+      replace: grids
+      state: { "grids.{name:key}": "true" }
+
+state:
+  motions.*.id: { type: string, description: "Each motion's id, keyed by motion name" }
+  grids.*: { type: bool, description: "Each grid of the project, keyed by name; always true" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      The Remote Control Server reports no playback state and pushes nothing:
+      state holds the motions (with ids) and grids, read every 10 s. A command
+      succeeds when CharacterWorks answers {"result": "success"}, warnings
+      (such as already_playing) included; failures carry errors with codes
+      such as motion_not_found or layer_not_found.
+  - models: [all]
+    severity: warning
+    text: >
+      The channel is optional in CharacterWorks' commands; this spec always
+      names it (preview, live1 or live2, the documents' and the Companion
+      module's values), since what CharacterWorks does without one is not
+      documented. set_text applies to a playing motion. The document's examples
+      of row selection write "action": "source"; the spec sends
+      select_data_source_rows, the section's name.
+  - models: [all]
+    severity: info
+    text: >
+      The documents name neither the request path nor the content type; the
+      spec posts JSON to / as CharacterWorks' Companion module does. The same
+      port serves the WWWRoot folder (the sample Web Grid), and grid cells
+      also run TriCaster macros, outside this API.
