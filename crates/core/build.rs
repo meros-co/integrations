@@ -157,6 +157,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-highend", &["highend-hog4"]),
     ("vendor-holyrics", &["holyrics"]),
     ("vendor-imimot", &["imimot-mitti"]),
+    ("vendor-ioversal", &["ioversal-vertex"]),
     (
         "vendor-irisdown",
         &["irisdown-countdown-timer", "irisdown-remote-show-control"],

@@ -1755,6 +1755,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether cue-level feedback keys a cue by its number or its ID, and the value range of the documented /mitti/<cue>/opacity. ([specs/imimot-mitti.yaml:654](specs/imimot-mitti.yaml#L654))
 - [ ] Confirm the UDP string form of the no-value commands, and that OSC control is ignored while Mitti follows MTC or LTC. ([specs/imimot-mitti.yaml:664](specs/imimot-mitti.yaml#L664))
 
+## ioversal-vertex — ioversal VERTEX
+
+- [ ] Confirm the script server answers nothing to commands without return (a set, a Play), so nothing is taken for a later query's answer. ([specs/ioversal-vertex.yaml:307](specs/ioversal-vertex.yaml#L307))
+- [ ] Confirm what Authenticate:username,password answers, and what an unauthenticated command gets when authentication is on. ([specs/ioversal-vertex.yaml:66](specs/ioversal-vertex.yaml#L66))
+- [ ] Confirm FadeToCue's arguments are the cue, a preload time and a fade time in seconds, and that GotoFrame takes a frame number. ([specs/ioversal-vertex.yaml:181](specs/ioversal-vertex.yaml#L181))
+- [ ] Check the TimeCode value's JSON field order (FPS before TotalFrames) on current versions, and that ListItems.Playback lists every playback by name. ([specs/ioversal-vertex.yaml:350](specs/ioversal-vertex.yaml#L350))
+
 ## irisdown-countdown-timer — Irisdown Countdown Timer
 
 - [ ] Confirm that UPDATEMODE and UPDATES apply per connection and that UPDATEMODE 2 answers OK before UPDATES ON turns other answers off. ([specs/irisdown-countdown-timer.yaml:180](specs/irisdown-countdown-timer.yaml#L180))
