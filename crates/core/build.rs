@@ -315,6 +315,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "visca",
         ],
     ),
+    ("vendor-sounddevices", &["sounddevices-pixnet"]),
     ("vendor-stagetimer", &["stagetimer"]),
     ("vendor-streamlabs", &["streamlabs-desktop"]),
     ("vendor-studiocoast", &["vmix"]),

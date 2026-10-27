@@ -3304,6 +3304,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the unit of Recording Duration (0xD120) while a movie records (seconds, frames or another count), so recording.duration can state it; the reference gives none. ([specs/sony-camera.yaml:2717](specs/sony-camera.yaml#L2717))
 - [ ] Check what the range of Custom WB Capture Frame Size (0xD26C) holds (the frame's width and height as the maximum, or something else), since the property has no current value and the reference describes only the packing. ([specs/sony-camera.yaml:2685](specs/sony-camera.yaml#L2685))
 
+## sounddevices-pixnet — Sound Devices / Video Devices PIX and 970 (PIXNET)
+
+- [ ] Check every call against Sound Devices' PIXNET Web API (v1.02), which could not be retrieved: the POST of {} to /sounddevices/settransport/play, stop and rec. ([specs/sounddevices-pixnet.yaml:74](specs/sounddevices-pixnet.yaml#L74))
+- [ ] Confirm the RemoteApi call encoding (/invoke/RemoteApi/<name>(<types>)/<count>/<type>,<value>...) and the PlaybackSpeed values PlayX2 and PlayX16. ([specs/sounddevices-pixnet.yaml:89](specs/sounddevices-pixnet.yaml#L89))
+- [ ] Confirm the key codes and KeyEventType values of simulateKey. ([specs/sounddevices-pixnet.yaml:117](specs/sounddevices-pixnet.yaml#L117))
+- [ ] Confirm setsetting/RecordToDrive<n>=<mode> and the mode names (Off, Record, Ethernet File Transfer, Switch to Network upon Full), and the drives each model has. ([specs/sounddevices-pixnet.yaml:152](specs/sounddevices-pixnet.yaml#L152))
+- [ ] Confirm formatAllDrives's label rules and the EXFAT argument. ([specs/sounddevices-pixnet.yaml:140](specs/sounddevices-pixnet.yaml#L140))
+- [ ] Confirm PIXNET answers 200 to a command, its answer to a refused one, and whether it asks for a login. ([specs/sounddevices-pixnet.yaml:77](specs/sounddevices-pixnet.yaml#L77))
+- [ ] Find the PIXNET status replies (GET /sounddevices/transport and the settings) so the recorder's state can be read. ([specs/sounddevices-pixnet.yaml:172](specs/sounddevices-pixnet.yaml#L172))
+
 ## stagetimer — Stagetimer
 
 - [ ] Confirm the desktop app serves the API and Socket.IO under /v1/ on its own port, as the cloud's API URL has it, and record the API URL its Menu > API shows. ([specs/stagetimer.yaml:971](specs/stagetimer.yaml#L971))

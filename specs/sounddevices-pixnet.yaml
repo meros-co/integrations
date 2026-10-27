@@ -1,0 +1,179 @@
+spec: 1
+id: sounddevices-pixnet
+name: Sound Devices / Video Devices PIX and 970 recorders (PIXNET)
+vendor: Sound Devices
+category: recorder
+
+# PIXNET, the web control of the Video Devices PIX 250i, 260i and 270i and the Sound Devices 970, on port 80: each
+# command is an HTTP POST under /sounddevices/. Sound Devices' "PIXNET Web API" document (v1.02) could not be
+# retrieved (its site and the copy found elsewhere refuse automated access), so every call here is taken from the
+# Bitfocus Companion module and is inferred. The recorders' state is not read: the document's status replies are
+# not public.
+source:
+  - title: "bitfocus/companion-module-sounddevices-pixnet (MIT)"
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-sounddevices-pixnet
+    note: >
+      The only public source used, not copied (retrieved 2026-10-27): the models PIX 250i, 260i, 270i and 970 on
+      port 80 (companion/HELP.md, src/setup.js); every command a POST of {} as application/json to
+      /sounddevices/<command> with the path URI-encoded (src/index.js); settransport/play, stop and rec;
+      invoke/RemoteApi/ calls fastForwardPlay(PlaybackSpeed)/1/10,<PlayX2|PlayX16>,
+      fastReversePlay(PlaybackSpeed)/1/10,<speed>, falseTake(), jamReceivedTc(), jamTimeOfDay(),
+      simulateKey(int,KeyEventType)/2/5,<key code>/10,<KeyPressAndRelease|KeyPress|KeyRelease>,
+      closeMessageBox(QString)/1/10,<button text>, setAutoDismiss(int,DialogControl)/2/5,<seconds>/10,<Accept|Reject>,
+      formatAllDrives(QString,QString)/2/10,<label>/10,EXFAT and createSoundReportCurrentReel(); and
+      setsetting/RecordToDrive<n>=<mode> with drives 1-2 on the 250i and 1-4 on the others (src/actions.js,
+      src/setup.js).
+  - title: "Video Devices PIXNET Web API, v1.02 (not retrieved)"
+    author: Sound Devices, LLC
+    url: https://www.sounddevices.com/
+    note: >
+      Manufacturer document, named here because it is the authority: sounddevices.com answers automated requests
+      with 403 and a copy found on another site with an error, so nothing was taken from it. Search results
+      describe its transport status request (GET /sounddevices/transport) and settings; their reply shapes are
+      unknown, so the spec reads no state.
+
+transport:
+  type: http
+  port: 80
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+
+ports:
+  - { port: 80, protocol: http, role: control, note: "PIXNET, the recorder's web server" }
+
+models:
+  - id: pix-250i
+    name: Video Devices PIX 250i
+    supports: &all [play, stop, record, fast_forward, fast_reverse, false_take, jam_received_tc, jam_time_of_day,
+      key_press, close_message_box, set_dialog_dismiss, format_all_drives, create_sound_report, set_drive_mode]
+    verification: none
+  - id: pix-260i
+    name: Video Devices PIX 260i
+    supports: *all
+    verification: none
+  - id: pix-270i
+    name: Video Devices PIX 270i
+    supports: *all
+    verification: none
+  - id: sd-970
+    name: Sound Devices 970
+    supports: *all
+    verification: none
+
+maps:
+  speed: { "2": PlayX2, "16": PlayX16 }
+  key: { play: "0x01000080", stop: "0x01000081", rewind: "0x01000082", fast_forward: "0x01000083", record: "0x01000084",
+    audio: "0x0100004e", lcd: "0x0100004f", files: "0x01000050", menu: "0x01000051", enter: "0x01000004" }
+  key_event: { press_and_release: KeyPressAndRelease, press: KeyPress, release: KeyRelease }
+  dialog: { accept: Accept, reject: Reject }
+  drive_mode: { "off": "Off", record: Record, ethernet_transfer: Ethernet File Transfer, network_when_full: Switch to Network upon Full }
+
+commands:
+  play:
+    summary: Play, or pause playback when playing (POST /sounddevices/settransport/play)
+    send: &post { method: POST, path: /sounddevices/settransport/play, content_type: application/json, body: "{}" }
+    expect: &ok { status: 200 }
+    returns: ack
+  stop:
+    summary: Stop recording or playback (POST /sounddevices/settransport/stop)
+    send: { method: POST, path: /sounddevices/settransport/stop, content_type: application/json, body: "{}" }
+    expect: *ok
+    returns: ack
+  record:
+    summary: Start recording (POST /sounddevices/settransport/rec)
+    send: { method: POST, path: /sounddevices/settransport/rec, content_type: application/json, body: "{}" }
+    expect: *ok
+    returns: ack
+  fast_forward:
+    summary: Play fast forward at 2x or 16x, during playback (RemoteApi fastForwardPlay)
+    params:
+      speed: &speed { type: enum, values: ["2", "16"], required: true, label: Speed, description: "2 or 16 times normal speed." }
+    send: { method: POST, path: "/sounddevices/invoke/RemoteApi/fastForwardPlay(PlaybackSpeed)/1/10,{speed:map.speed}", content_type: application/json, body: "{}" }
+    expect: *ok
+    returns: ack
+  fast_reverse:
+    summary: Play fast reverse at 2x or 16x, during playback (RemoteApi fastReversePlay)
+    params: { speed: *speed }
+    send: { method: POST, path: "/sounddevices/invoke/RemoteApi/fastReversePlay(PlaybackSpeed)/1/10,{speed:map.speed}", content_type: application/json, body: "{}" }
+    expect: *ok
+    returns: ack
+  false_take:
+    summary: Mark the take false; the recorder asks for confirmation, which close_message_box answers (RemoteApi falseTake)
+    send: { method: POST, path: "/sounddevices/invoke/RemoteApi/falseTake()", content_type: application/json, body: "{}" }
+    expect: *ok
+    returns: ack
+  jam_received_tc:
+    summary: Jam the timecode generator from the received timecode (RemoteApi jamReceivedTc)
+    send: { method: POST, path: "/sounddevices/invoke/RemoteApi/jamReceivedTc()", content_type: application/json, body: "{}" }
+    expect: *ok
+    returns: ack
+  jam_time_of_day:
+    summary: Jam the timecode generator to the time of day (RemoteApi jamTimeOfDay)
+    send: { method: POST, path: "/sounddevices/invoke/RemoteApi/jamTimeOfDay()", content_type: application/json, body: "{}" }
+    expect: *ok
+    returns: ack
+  key_press:
+    summary: Press or release a front panel key (RemoteApi simulateKey)
+    params:
+      key: { type: enum, values: [play, stop, rewind, fast_forward, record, audio, lcd, files, menu, enter], required: true, label: Key, description: "The front panel key." }
+      event: { type: enum, values: [press_and_release, press, release], default: press_and_release, label: Event, description: "Press and release it, or only press or only release it." }
+    send: { method: POST, path: "/sounddevices/invoke/RemoteApi/simulateKey(int,KeyEventType)/2/5,{key:map.key}/10,{event:map.key_event}", content_type: application/json, body: "{}" }
+    expect: *ok
+    returns: ack
+  close_message_box:
+    summary: Close the message on the screen by pressing one of its buttons (RemoteApi closeMessageBox)
+    params:
+      button: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_ -]+$", required: true, label: Button, description: "The button's text exactly as the screen shows it, such as OK." }
+    send: { method: POST, path: "/sounddevices/invoke/RemoteApi/closeMessageBox(QString)/1/10,{button}", content_type: application/json, body: "{}" }
+    expect: *ok
+    returns: ack
+  set_dialog_dismiss:
+    summary: Have dialogs answer themselves after a time (RemoteApi setAutoDismiss)
+    params:
+      seconds: { type: int, min: 0, max: 60, required: true, label: Time, description: "Seconds before a dialog is answered, 0-60; 0 turns it off." }
+      action: { type: enum, values: [accept, reject], required: true, label: Answer, description: "accept or reject the dialog." }
+    send: { method: POST, path: "/sounddevices/invoke/RemoteApi/setAutoDismiss(int,DialogControl)/2/5,{seconds}/10,{action:map.dialog}", content_type: application/json, body: "{}" }
+    expect: *ok
+    returns: ack
+  format_all_drives:
+    summary: Format every drive as exFAT with a label (RemoteApi formatAllDrives)
+    params:
+      label: { type: string, max_length: 11, pattern: "^[A-Za-z0-9_-]+$", required: true, label: Label, description: "The drives' label: letters, digits, - and _." }
+    send: { method: POST, path: "/sounddevices/invoke/RemoteApi/formatAllDrives(QString,QString)/2/10,{label}/10,EXFAT", content_type: application/json, body: "{}" }
+    expect: *ok
+    returns: ack
+  create_sound_report:
+    summary: Create the sound report of the current reel (RemoteApi createSoundReportCurrentReel)
+    send: { method: POST, path: "/sounddevices/invoke/RemoteApi/createSoundReportCurrentReel()", content_type: application/json, body: "{}" }
+    expect: *ok
+    returns: ack
+  set_drive_mode:
+    summary: Set a drive's recording mode (setsetting RecordToDrive<n>)
+    params:
+      drive: { type: int, min: 1, max: 4, required: true, label: Drive, description: "The drive, 1-4 (1-2 on the PIX 250i)." }
+      mode: { type: enum, values: ["off", record, ethernet_transfer, network_when_full], required: true, label: Mode,
+        description: "off, record, ethernet_transfer (Ethernet file transfer) or network_when_full (switch to the network when full)." }
+    send: { method: POST, path: "/sounddevices/setsetting/RecordToDrive{drive}={mode:map.drive_mode}", content_type: application/json, body: "{}" }
+    expect: *ok
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      format_all_drives erases every drive; record, stop and the transport keys change a recording at once.
+  - models: [all]
+    severity: warning
+    text: >
+      Sound Devices' PIXNET Web API document (v1.02) could not be retrieved; every call and its form (a POST of {}
+      to /sounddevices/..., the RemoteApi argument encoding, the key codes and setting names) are taken from the
+      Bitfocus Companion module and inferred, as is the 200 answer. The recorder's state (transport, timecode,
+      files, settings) is not read, because the shape of its status replies is not public.
+  - models: [all]
+    severity: info
+    text: >
+      Fast forward and reverse do nothing while stopped or recording. A false take asks for confirmation on the
+      screen. The PIX 250i has drives 1 and 2 only. PIXNET answers on port 80 without a login in this spec;
+      whether a password can be set is not public.
