@@ -2809,6 +2809,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the older section-per-command lists against a projector where their titles and bytes disagree (GMFI2 printed GMFI1, QJB as QJK, QFI as QEI, and value conflicts such as SHIFT -327 and -127). ([specs/panasonic-projector.yaml:16353](specs/panasonic-projector.yaml#L16353))
 - [ ] Confirm QPW codes other than 000 and 001 that some series may return (warm-up, cooling). ([specs/panasonic-projector.yaml:9094](specs/panasonic-projector.yaml#L9094))
 
+## pharos-designer — Pharos Designer controllers (HTTP and WebSocket API)
+
+- [ ] With security enabled, check that POST /authenticate?original_url=/ answers with a token cookie (status 302 or 200), that an expired token is answered 401, and what wrong credentials produce. ([specs/pharos-designer.yaml:1138](specs/pharos-designer.yaml#L1138))
+- [ ] Check whether resending the subscriptions every 10 s with the {} keep-alive duplicates broadcasts, and that the timeline broadcast is labeled "timeline". ([specs/pharos-designer.yaml:1149](specs/pharos-designer.yaml#L1149))
+- [ ] Check that sending fade 0, delay 0, path Default and conditions true when not asked for behaves as leaving them out, and the endpoint the Ping API really uses. ([specs/pharos-designer.yaml:1159](specs/pharos-designer.yaml#L1159))
+- [ ] On an LPC or TPC, check whether subscribing to content_target is refused harmlessly. ([specs/pharos-designer.yaml:1171](specs/pharos-designer.yaml#L1171))
+- [ ] Check the HTTPS certificate controllers present, and the status codes of the POST/PUT/DELETE endpoints (200, 202 or 204). ([specs/pharos-designer.yaml:1176](specs/pharos-designer.yaml#L1176))
+
 ## philips-sicp — Philips professional displays (SICP)
 
 - [ ] Confirm the command set of current models (Q, D, C, E and T Line, 55BDL4107X video walls) against SICP V2.03, the newest public version; record get_platform and get_sicp_version on each. ([specs/philips-sicp.yaml:947](specs/philips-sicp.yaml#L947))
