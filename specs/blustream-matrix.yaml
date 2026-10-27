@@ -1,0 +1,1553 @@
+spec: 1
+id: blustream-matrix
+name: Blustream HDMI and HDBaseT matrix switchers (Telnet and RS-232 API)
+vendor: Blustream
+category: router
+
+# Blustream's matrix switchers take one plain-text command set over Telnet
+# (TCP 23) and their RS-232 port, each model's own help text (the "<model> -
+# API" download on its product page, the switcher's answer to HELP) listing
+# the commands it has. Two spellings of the same grammar exist: the HDBaseT
+# matrices (C, HMX, HMXL and PLA ranges) write OUTxx FR yy with the number
+# against the word, and the CMX, MX and Pro ranges write OUT xx FR yy.
+# Numbers are two digits, 00 meaning every output or input. Every model below
+# supports only the commands its own help text lists, in its own spelling.
+#
+# Blustream documents no answer to any command, so commands are sent without
+# waiting for one (reply: none). State comes from the STATUS report, whose
+# layout Blustream documents for the PLA88CS (its API download includes it);
+# the rules here read that layout's tables line by line.
+#
+# Not here: the MX44KVM (a USB KVM matrix with GPIO, a separate command set),
+# the ACM210/500/1000 controllers of the IP50/IP200/IP300 AV-over-IP range
+# (another product), the help commands, and the "Yes" confirmation's
+# alternatives (any other command discards a pending reset).
+source:
+  - title: "PLA88CS - API (help text, firmware V2.3.0, with the STATUS and CTRLSTA reports)"
+    author: Blustream
+    url: https://www.blustream.co.uk/Attachment/DownloadFile?downloadId=646
+    note: >
+      Manufacturer document. Every PLA88CS command with its ranges: STATUS,
+      INSTA, OUTSTA, CTRLSTA, HDBTSTA, PRESETSTATUS, FWVERSION, PON/OFF, KEY,
+      IR, LCD, RESET (confirmed with Yes), OUTxx ON/OFF, IROUTxx and IRINxx
+      (SIMPLE), POCOUTxx, POCINxx, OUT/IN xx GUEST, OUT/IN xx IRHEXSEND,
+      OUTxx FR yy (00 all outputs), OUTxx and INxx EH/ET, INxx SWMODE yy
+      (00-07), AUDIOxx FR yy, AUDIOxx DMIX, AUDIOxx Delay (0-1000 ms),
+      OUTxx EMBED yy, MUTE ON/OFF TX xx, AUDOUT xx ON/OFF, VOLxx TX yy
+      (0-100, +, -), OUTxx VOLSTA, OUT xx SCALING, OUT/IN xx LR, OUT xx ARC,
+      MXRS232OUT/IN, MXIRRX, MXIRTX, MXIR, IRFV, EDID xx DF zz (00-36),
+      EDID xx CP yy, EDID SAVE yy TO zz, PRESET pp SAVE/CLR/APPLY (1-9), the
+      output and input CEC commands, CECUSERCMD, RS232BAUD z (1-7, 57600
+      default), OUT/IN xx RS232SEND, RS232DLYOUT/IN, RS232OUT/IN, RS232ON,
+      RS232OFF (and DISABLE), NET DHCP, TN, TN8000, MDNS, IP, GW, SM, RB,
+      TN port; then the STATUS report (system, input, output and audio
+      tables, network, Telnet, MAC) and the CTRLSTA report (RS-232 and IR
+      control tables, stored RS-232 commands and delays).
+  - title: "PLA88CS User Manual, REVB3"
+    author: Blustream
+    url: https://www.blustream.co.uk/Attachment/DownloadFile?downloadId=1155
+    note: Manufacturer document. RS-232 and Telnet control, 57600 8N1.
+  - title: "CMX88CS-V2 User Manual, REVA2"
+    author: Blustream
+    url: https://www.blustream.co.uk/Attachment/DownloadFile?downloadId=1411
+    note: >
+      Manufacturer document. Web GUI network settings (Port 8000 TCP/IP
+      access, Telnet access and port, 23 by default, mDNS) p.20; serial
+      57600 8N1 by default, control over RS-232 and TCP/IP (Telnet, SSH),
+      CR LF required after every command, spaces optional "unless specified"
+      p.26; the command tables (including OUT xx DIAG, IN xx DIAG, DIAGPRINT,
+      SYSTEMLOG, IN yy ON/OFF, OUT xx SCALING 01-03, RSB 0-6, RS232ONOUT
+      y:z:a, NET MDNS name.local) p.27-28.
+  - title: "Help text API downloads for the C44CS, C66CS, C88CS, CMX42AB, CMX42CS (firmware 2.1.0), CMX44CS, CMX88CS, HMX44-18G, HMX88-18G (V1.2.0), HMXL42ARC-KIT (V1.5.0), HMXL66ARC, HMXL88ARC, MX22AB-8K, MX44VW, 16x16 Pro and Custom Pro HUB 8x8"
+    author: Blustream
+    url: https://www.blustream.co.uk/
+    note: >
+      Manufacturer documents, the "<model> - API" download of each product
+      page (DownloadFile ids 622, 623, 624, 625, 858, 626, 628, 632, 733, 633,
+      634, 635, 640, 642, 619 and 647). Each model's supports list below is
+      its own help text; the C44CS download ends after OUT xx SCALING.
+  - title: Bitfocus Companion module companion-module-blustream-hdmimatrix (MIT), index.js
+    author: Joseph Adams and contributors
+    url: https://github.com/bitfocus/companion-module-blustream-hdmimatrix
+    note: >
+      Community code, read for corroboration only (top-level LICENSE is MIT;
+      no code copied). It sends each command with CR LF on TCP 23, polls
+      STATUS, reads the Output table's FromIn and OutputEn columns, and shows
+      a 4x4 matrix answering OUT01FR01 with "[SUCCESS]Set output 01 connect
+      from input 01." after a prompt.
+
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 3000
+  # Blustream documents no answers, only the reports STATUS and the other
+  # status commands print: commands are sent without waiting.
+  reply: none
+  # The same commands on the rear RS-232 port, 57600 8N1 by default (PLA88CS
+  # and CMX88CS-V2 manuals; RS232BAUD and RSB "57600 (Default)").
+  serial:
+    baud_rate: { default: 57600, values: [2400, 4800, 9600, 19200, 38400, 57600, 115200] }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
+
+maps:
+  upper_onoff: { "true": "ON", "false": "OFF" }
+  title_onoff: { "true": "On", "false": "Off" }
+  power_word: { "true": "PON", "false": "POFF" }
+  cec_word: { "true": "ENABLE", "false": "DISABLE" }
+  edid_source: { hdmi: EH, hdbt: ET }
+  baud_code: { "2400": "1", "4800": "2", "9600": "3", "19200": "4", "38400": "5", "57600": "6", "115200": "7" }
+  rsb_code: { "115200": "0", "57600": "1", "38400": "2", "19200": "3", "9600": "4", "4800": "5", "2400": "6" }
+
+ports:
+  - { port: 23, protocol: tcp, role: control, when: "link tcp", note: "Telnet, changeable with NET TN; some models also accept the API on TCP 8000 (NET TN8000)" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The matrix's RS-232 port, 3-pin Phoenix connector" }
+
+models:
+  - id: pla88cs
+    name: Blustream PLA88CS (8x8 HDBaseT matrix with audio DSP)
+    supports:
+      [route, set_output_enabled, set_input_switch_mode, save_preset, recall_preset, clear_preset, set_power,
+       set_front_panel_keys, set_ir, set_lcd, factory_reset, set_serial_baud, set_scaling, set_long_reach,
+       set_input_long_reach, set_edid_source, set_input_edid_source, set_input_edid, copy_edid, save_edid,
+       set_mute, set_audio_output, set_volume, volume_up, volume_down, get_volume, set_audio_source,
+       set_audio_downmix, set_audio_delay, set_embedded_audio, set_arc, set_poc, set_input_poc,
+       set_guest_mode, set_input_guest_mode, set_ir_control, set_ir_simple_control, set_input_ir_control,
+       set_input_ir_simple_control, send_ir, send_input_ir, set_ir_follow_video, route_ir,
+       route_ir_to_receiver, route_ir_to_transmitter, route_serial_to_receiver, route_serial_to_transmitter,
+       set_serial_control, set_input_serial_control, send_serial, send_input_serial, set_serial_delay,
+       set_input_serial_delay, set_serial_on_command, set_serial_off_command_slot, disable_serial_commands,
+       set_input_serial_on_command, set_input_serial_off_command, disable_input_serial_commands,
+       set_output_cec, cec_output, cec_output_input, set_input_cec, cec_input, cec_user_command, set_dhcp,
+       set_ip_address, set_gateway, set_subnet_mask, network_reboot, set_telnet_port, set_telnet,
+       set_port_8000, set_mdns, get_status, get_input_status, get_output_status, get_control_status,
+       get_hdbt_status, get_preset_status, get_firmware]
+    verification: none
+    notes: >
+      Inputs 1-8 (HDMI; inputs 1-2 also HDBaseT), outputs 1-8. The richest
+      command set, and the only model whose STATUS report Blustream
+      documents. Presets 1-9.
+  - id: c44cs
+    name: Blustream C44CS (4x4 HDBaseT matrix)
+    supports:
+      [route, set_output_enabled, set_input_enabled, set_power, set_front_panel_keys, set_ir, set_lcd,
+       factory_reset, set_scaling, set_edid_source, set_poc, set_guest_mode, set_ir_control, route_ir,
+       get_status, get_input_status, get_output_status, get_control_status, get_preset_status, get_firmware]
+    verification: none
+    notes: Inputs and outputs 1-4. Its API download lists the commands up to OUT xx SCALING only.
+  - id: c66cs
+    name: Blustream C66CS (6x6 HDBaseT matrix)
+    supports:
+      [route, set_output_enabled, save_preset, recall_preset, clear_preset, set_power, set_front_panel_keys,
+       set_ir, set_lcd, factory_reset, set_serial_baud, set_scaling, set_edid_source, set_input_edid,
+       copy_edid, save_edid, set_poc, set_guest_mode, set_ir_control, send_ir, set_ir_follow_video, route_ir,
+       set_serial_control, send_serial, set_serial_delay, set_serial_on_command, set_serial_off_command,
+       disable_serial_commands, cec_output, cec_output_input, cec_input, cec_user_command, set_dhcp,
+       set_ip_address, set_gateway, set_subnet_mask, network_reboot, set_telnet_port, set_telnet, set_mdns,
+       get_status, get_input_status, get_output_status, get_control_status, get_preset_status, get_firmware]
+    verification: none
+    notes: Inputs and outputs 1-6. Presets 1-9.
+  - id: c88cs
+    name: Blustream C88CS (8x8 HDBaseT matrix)
+    supports:
+      [route, set_output_enabled, save_preset, recall_preset, clear_preset, set_power, set_front_panel_keys,
+       set_ir, set_lcd, factory_reset, set_serial_baud, set_scaling, set_edid_source, set_input_edid,
+       copy_edid, save_edid, set_poc, set_guest_mode, set_ir_control, send_ir, set_ir_follow_video, route_ir,
+       set_serial_control, send_serial, set_serial_delay, set_serial_on_command, set_serial_off_command,
+       disable_serial_commands, cec_output, cec_output_input, cec_input, cec_user_command, set_dhcp,
+       set_ip_address, set_gateway, set_subnet_mask, network_reboot, set_telnet_port, set_telnet, set_mdns,
+       get_status, get_input_status, get_output_status, get_control_status, get_preset_status, get_firmware]
+    verification: none
+    notes: Inputs and outputs 1-8. Presets 1-9.
+  - id: hmx44-18g
+    name: Blustream HMX44-18G (4x4 18Gbps HDBaseT matrix)
+    supports:
+      [route, set_output_enabled, set_input_enabled, save_preset, recall_preset, clear_preset, set_power,
+       set_front_panel_keys, set_ir, set_lcd, factory_reset, set_serial_baud, set_scaling, set_long_reach,
+       set_edid_source, set_input_edid, copy_edid, save_edid, set_mute, set_audio_output, set_volume,
+       volume_up, volume_down, set_audio_source, set_arc, set_poc, set_guest_mode, set_ir_control, send_ir,
+       set_ir_follow_video, route_ir, set_serial_control, send_serial, set_serial_delay,
+       set_serial_on_command, set_serial_off_command, disable_serial_commands, set_output_cec, cec_output,
+       cec_output_input, set_input_cec, cec_input, cec_user_command, set_dhcp, set_ip_address, set_gateway,
+       set_subnet_mask, network_reboot, set_telnet_port, set_telnet, set_port_8000, set_mdns, get_status,
+       get_input_status, get_output_status, get_control_status, get_preset_status, get_audio_status,
+       get_firmware]
+    verification: none
+    notes: Inputs and outputs 1-4, analog outputs 1-4 and optical 9-12. Presets 1-9.
+  - id: hmx88-18g
+    name: Blustream HMX88-18G (8x8 18Gbps HDBaseT matrix)
+    supports:
+      [route, set_output_enabled, set_input_enabled, save_preset, recall_preset, clear_preset, set_power,
+       set_front_panel_keys, set_ir, set_lcd, factory_reset, set_serial_baud, set_scaling, set_long_reach,
+       set_edid_source, set_input_edid, copy_edid, save_edid, set_mute, set_audio_output, set_volume,
+       volume_up, volume_down, set_audio_source, set_arc, set_poc, set_guest_mode, set_ir_control, send_ir,
+       set_ir_follow_video, route_ir, set_serial_control, send_serial, set_serial_delay,
+       set_serial_on_command, set_serial_off_command, disable_serial_commands, set_output_cec, cec_output,
+       cec_output_input, set_input_cec, cec_input, cec_user_command, set_dhcp, set_ip_address, set_gateway,
+       set_subnet_mask, network_reboot, set_telnet_port, set_telnet, set_port_8000, set_mdns, get_status,
+       get_input_status, get_output_status, get_control_status, get_preset_status, get_audio_status,
+       get_firmware]
+    verification: none
+    notes: Inputs and outputs 1-8, analog outputs 1-8 and optical 9-16. Presets 1-9.
+  - id: hmxl42arc
+    name: Blustream HMXL42ARC-KIT (4x2 HDBaseT matrix with ARC)
+    supports:
+      [route, set_output_enabled, set_switching_mode, save_preset, recall_preset, clear_preset, set_power,
+       set_front_panel_keys, set_ir, factory_reset, set_serial_baud, set_scaling, set_edid_source,
+       set_input_edid, copy_edid, save_edid, set_mute, set_audio_output, set_volume, volume_up, volume_down,
+       set_audio_source, set_arc, set_poc, set_guest_mode, set_ir_control, send_ir, set_ir_follow_video,
+       route_ir, set_serial_control, send_serial, set_serial_delay, set_serial_on_command,
+       set_serial_off_command, disable_serial_commands, set_output_cec, cec_output, cec_output_input,
+       set_input_cec, cec_input, cec_user_command, set_dhcp, set_ip_address, set_gateway, set_subnet_mask,
+       network_reboot, set_telnet_port, set_telnet, set_port_8000, set_mdns, get_status, get_input_status,
+       get_output_status, get_control_status, get_preset_status, get_audio_status, get_firmware]
+    verification: none
+    notes: Inputs 1-4, outputs 1-2 with automatic or manual switching (OUT xx SWITCH). Presets 1-9.
+  - id: hmxl66arc
+    name: Blustream HMXL66ARC (6x6 HDBaseT matrix with ARC)
+    supports:
+      [route, set_output_enabled, save_preset, recall_preset, clear_preset, set_power, set_front_panel_keys,
+       set_ir, set_lcd, factory_reset, set_serial_baud, set_scaling, set_edid_source, set_input_edid,
+       copy_edid, save_edid, set_mute, set_audio_output, set_volume, volume_up, volume_down,
+       set_audio_source, set_arc, set_poc, set_guest_mode, set_ir_control, send_ir, set_ir_follow_video,
+       route_ir, set_serial_control, send_serial, set_serial_delay, set_serial_on_command,
+       set_serial_off_command, disable_serial_commands, set_output_cec, cec_output, cec_output_input,
+       set_input_cec, cec_input, cec_user_command, set_dhcp, set_ip_address, set_gateway, set_subnet_mask,
+       network_reboot, set_telnet_port, set_telnet, set_port_8000, set_mdns, get_status, get_input_status,
+       get_output_status, get_control_status, get_preset_status, get_audio_status, get_firmware]
+    verification: none
+    notes: Inputs and outputs 1-6. Presets 1-9.
+  - id: hmxl88arc
+    name: Blustream HMXL88ARC (8x8 HDBaseT matrix with ARC)
+    supports:
+      [route, set_output_enabled, save_preset, recall_preset, clear_preset, set_power, set_front_panel_keys,
+       set_ir, set_lcd, factory_reset, set_serial_baud, set_scaling, set_edid_source, set_input_edid,
+       copy_edid, save_edid, set_mute, set_audio_output, set_volume, volume_up, volume_down,
+       set_audio_source, set_arc, set_poc, set_guest_mode, set_ir_control, send_ir, set_ir_follow_video,
+       route_ir, set_serial_control, send_serial, set_serial_delay, set_serial_on_command,
+       set_serial_off_command, disable_serial_commands, set_output_cec, cec_output, cec_output_input,
+       set_input_cec, cec_input, cec_user_command, set_dhcp, set_ip_address, set_gateway, set_subnet_mask,
+       network_reboot, set_telnet_port, set_telnet, set_port_8000, set_mdns, get_status, get_input_status,
+       get_output_status, get_control_status, get_preset_status, get_audio_status, get_firmware]
+    verification: none
+    notes: Inputs and outputs 1-8. Presets 1-9.
+  - id: cmx42ab
+    name: Blustream CMX42AB (4x2 HDMI matrix with audio breakout)
+    supports:
+      [route, set_output_enabled, set_power, set_front_panel_keys, set_ir, set_beep, factory_reset,
+       set_input_edid, copy_edid, set_mute, get_status]
+    verification: none
+    notes: Inputs 1-4, outputs 1-2. No presets or network commands in its help text.
+  - id: cmx42cs
+    name: Blustream CMX42CS (4x2 HDMI matrix)
+    supports:
+      [route, set_output_enabled, save_preset, recall_preset, set_preset, set_power, set_front_panel_keys,
+       set_ir, reboot, factory_reset, factory_reset_all, set_serial_baud, set_video_mode, set_input_edid,
+       copy_edid, set_dhcp, set_ip_address, set_gateway, set_subnet_mask, network_reboot, set_telnet_port,
+       set_telnet, set_tcp_port, set_dns_name, get_status, get_preset_status, get_firmware]
+    verification: none
+    notes: Inputs 1-4, outputs 1-2. Presets 1-8, set by list with PRESET pp SET aa,bb.
+  - id: cmx44cs
+    name: Blustream CMX44CS (4x4 HDMI matrix)
+    supports:
+      [route, set_output_enabled, save_preset, recall_preset, set_preset, set_power, set_front_panel_keys,
+       set_ir, set_beep, set_lcd, reboot, factory_reset, factory_reset_all, set_serial_baud, set_video_mode,
+       set_input_edid, copy_edid, set_input_audio_mode, set_dhcp, set_ip_address, set_gateway,
+       set_subnet_mask, network_reboot, set_telnet_port, set_dns_name, get_status, get_preset_status,
+       get_firmware]
+    verification: none
+    notes: Inputs and outputs 1-4. Presets 1-8.
+  - id: cmx88cs
+    name: Blustream CMX88CS (8x8 HDMI matrix)
+    supports:
+      [route, set_output_enabled, save_preset, recall_preset, set_preset, set_power, set_front_panel_keys,
+       set_ir, set_beep, set_lcd, set_power_led, reboot, factory_reset, factory_reset_all, set_serial_baud,
+       set_video_mode, set_input_edid, copy_edid, set_dhcp, set_ip_address, set_gateway, set_subnet_mask,
+       network_reboot, set_telnet_port, set_dns_name, get_status, get_preset_status, get_firmware]
+    verification: none
+    notes: Inputs and outputs 1-8. Presets 1-8.
+  - id: cmx88cs-v2
+    name: Blustream CMX88CS-V2 (8x8 HDMI matrix, second generation)
+    supports:
+      [route, set_output_enabled, set_input_enabled, save_preset, recall_preset, clear_preset, set_power,
+       set_front_panel_keys, set_ir, set_beep, set_lcd, set_diagnostics_log, set_system_log, reboot,
+       factory_reset, factory_reset_all, set_serial_baud, set_video_mode, set_input_edid, copy_edid,
+       save_edid, set_audio_output, send_local_serial, set_output_cec, cec_output, cec_output_input,
+       set_input_cec, cec_input, cec_user_command, set_dhcp, set_ip_address, set_gateway, set_subnet_mask,
+       network_reboot, set_telnet_port, set_telnet, set_port_8000, set_mdns, set_mdns_name, get_status,
+       get_input_status, get_output_status, get_control_status, get_preset_status, get_firmware,
+       get_output_diagnostics, get_input_diagnostics]
+    verification: none
+    notes: Inputs and outputs 1-8. Commands from its user manual (REVA2, p.27-28); it also takes SSH.
+  - id: mx22ab-8k
+    name: Blustream MX22AB-8K (2x2 8K HDMI matrix with audio breakout)
+    supports:
+      [route, set_output_enabled, set_auto_switch, set_power, set_front_panel_keys, set_ir, set_ir_voltage,
+       factory_reset, set_serial_baud, set_input_edid, copy_edid, load_usb_edid, get_status]
+    verification: none
+    notes: Inputs and outputs 1-2, input auto-switching, user EDIDs loaded from USB into slots 75-76.
+  - id: mx44vw
+    name: Blustream MX44VW (4x4 seamless HDMI matrix, multi-view and video wall)
+    supports:
+      [route, set_output_enabled, set_output_mode, route_video_wall, set_video_wall_bezel, set_input_signal,
+       set_multiview_audio, set_power, set_front_panel_keys, set_ir, set_beep, set_lcd, set_debug,
+       factory_reset, factory_reset_all, set_input_edid, copy_edid, set_dhcp, set_ip_address, set_gateway,
+       set_subnet_mask, network_reboot, set_telnet_port, get_status]
+    verification: none
+    notes: Inputs and outputs 1-4 in matrix, multi-view (layouts 0-9) or video wall (2x2, 4x1, 1x4) mode.
+  - id: pro16
+    name: Blustream 16x16 Pro matrix
+    supports:
+      [route, set_output_enabled, save_preset, recall_preset, set_preset, set_power, set_front_panel_keys,
+       set_ir, set_beep, set_lcd, factory_reset, factory_reset_all, set_serial_baud,
+       set_color_space_conversion, set_input_uhd_edid, set_edid_source, set_input_edid, copy_edid, save_edid,
+       set_mute, set_input_audio_mode, set_poc, route_ir, set_global_ir, set_dhcp, set_ip_address,
+       set_gateway, set_subnet_mask, network_reboot, set_telnet_port, get_status, get_preset_status,
+       get_audio_status, get_ir_routing]
+    verification: none
+    notes: Inputs and outputs 1-16, Dante audio embedding (AUD RX xx DANTE). Presets 1-8.
+  - id: prohub8
+    name: Blustream Custom Pro HUB 8x8 matrix
+    supports:
+      [route, set_output_enabled, save_preset, recall_preset, set_preset, set_power, set_front_panel_keys,
+       set_ir, set_beep, set_lcd, factory_reset, factory_reset_all, set_serial_baud, set_edid_source,
+       set_input_edid, copy_edid, set_mute, set_input_audio_mode, set_poc, route_ir, set_global_ir,
+       route_serial, set_dhcp, set_ip_address, set_gateway, set_subnet_mask, network_reboot, set_telnet_port,
+       get_status, get_preset_status, get_audio_status, get_ir_routing]
+    verification: none
+    notes: Inputs and outputs 1-8. Presets 1-8.
+
+commands:
+  # ── Routing ──────────────────────────────────────────────────────────────
+  route:
+    summary: Route an input to an output, or to every output (OUTxx FR yy)
+    params:
+      output: &output_all { type: int, min: 0, max: 16, required: true, label: Output,
+                            description: "The output from 1, or 0 for every output." }
+      input: &input_one { type: int, min: 1, max: 16, required: true, label: Input,
+                          description: "The input from 1, as numbered on the matrix." }
+    send:
+      - { models: &new [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "OUT{output:02d} FR {input:02d}" }
+      - { models: &spaced [cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8], message: "OUT {output:02d} FR {input:02d}" }
+    returns: none
+
+  set_output_enabled:
+    summary: Turn an output on or off (OUTxx ON/OFF)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: Enabled, description: "On sends the output's signal; off turns the output off." }
+    send:
+      - { models: *new, message: "OUT{output:02d} {enabled:map.upper_onoff}" }
+      - { models: *spaced, message: "OUT {output:02d} {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_input_enabled:
+    summary: Turn an input on or off (INyy ON/OFF)
+    params:
+      input: &input_all { type: int, min: 0, max: 16, required: true, label: Input,
+                          description: "The input from 1, or 0 for every input." }
+      enabled: { type: bool, required: true, label: Enabled, description: "On enables the input; off disables it." }
+    send:
+      - { models: [c44cs, hmx44-18g, hmx88-18g], message: "IN{input:02d} {enabled:map.upper_onoff}" }
+      - { models: [cmx88cs-v2], message: "IN {input:02d} {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_output_mode:
+    summary: Set the MX44VW's output mode, matrix, a multi-view layout or a video wall shape (OUT MODE mm)
+    params:
+      mode: { type: enum, values: [MX, MV, MV0, MV1, MV2, MV3, MV4, MV5, MV6, MV7, MV8, MV9, VW, VW22, VW41, VW14], required: true, label: Mode,
+              description: "MX matrix, MV multi-view (MV0-MV9 its layouts), VW video wall (VW22 2x2, VW41 4x1, VW14 1x4)." }
+    send:
+      - { models: [mx44vw], message: "OUT MODE {mode}" }
+    returns: none
+
+  route_video_wall:
+    summary: Show an input on the MX44VW's video wall (OUT VW FR yy)
+    params: { input: *input_one }
+    send:
+      - { models: [mx44vw], message: "OUT VW FR {input:02d}" }
+    returns: none
+
+  set_video_wall_bezel:
+    summary: Set the MX44VW's video-wall bezel compensation on one side of an output (OUT xx VCL/VCR/VCT/VCB bb)
+    params:
+      output: *output_all
+      side: { type: enum, values: [VCL, VCR, VCT, VCB], required: true, label: Side,
+              description: "VCL left, VCR right, VCT top, VCB bottom border." }
+      pixels: { type: int, min: 0, max: 100, required: true, label: Pixels, description: "Border in pixels, 0-100." }
+    send:
+      - { models: [mx44vw], message: "OUT {output:02d} {side} {pixels:02d}" }
+    returns: none
+
+  set_input_signal:
+    summary: Choose the MX44VW input's connector, HDMI or VGA (IN xx FR HDMI/VGA)
+    params:
+      input: *input_all
+      signal: { type: enum, values: [HDMI, VGA], required: true, label: Signal, description: "Take the input from its HDMI or its VGA connector." }
+    send:
+      - { models: [mx44vw], message: "IN {input:02d} FR {signal}" }
+    returns: none
+
+  set_multiview_audio:
+    summary: Choose the MX44VW's multi-view audio input (MV AUD aa)
+    params:
+      input: { type: int, min: 0, max: 4, required: true, label: Audio input, description: "The input whose audio the multi-view carries, or 0 to follow output 1's selected input." }
+    send:
+      - { models: [mx44vw], message: "MV AUD {input:02d}" }
+    returns: none
+
+  set_switching_mode:
+    summary: Set an output to switch automatically or by hand (OUT xx SWITCH AUTO/MAN)
+    params:
+      output: *output_all
+      mode: { type: enum, values: [AUTO, MAN], required: true, label: Switching, description: "AUTO switches to an active input on its own; MAN only routes when told." }
+    send:
+      - { models: [hmxl42arc], message: "OUT {output:02d} SWITCH {mode}" }
+    returns: none
+
+  set_auto_switch:
+    summary: Turn input auto-switching on or off (AUTO SWITCH ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: Auto-switch, description: "On switches to an input when its signal appears." }
+    send:
+      - { models: [mx22ab-8k], message: "AUTO SWITCH {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_input_switch_mode:
+    summary: Set how an HDBaseT/HDMI input chooses its connector (INxx SWMODE yy)
+    params:
+      input: { type: int, min: 0, max: 2, required: true, label: Input, description: "Input 1 or 2, or 0 for both." }
+      mode: { type: int, min: 0, max: 7, required: true, label: Mode,
+              description: "0 force HDMI (default), 1 force HDBaseT, 2-4 5V detect with HDMI, HDBaseT or no priority, 5-7 TMDS detect with HDMI, HDBaseT or no priority." }
+    send:
+      - { models: [pla88cs], message: "IN{input:02d} SWMODE {mode:02d}" }
+    returns: none
+
+  # ── Presets ──────────────────────────────────────────────────────────────
+  save_preset:
+    summary: Save the current routing to a preset (PRESET pp SAVE)
+    params: &preset
+      preset: { type: int, min: 1, max: 9, required: true, label: Preset, description: "Preset from 1: 1-9 on HDBaseT matrices, 1-8 on CMX and Pro models." }
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, pro16, prohub8], message: "PRESET {preset:02d} SAVE" }
+    returns: none
+
+  recall_preset:
+    summary: Apply a preset's routing (PRESET pp APPLY)
+    params: *preset
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, pro16, prohub8], message: "PRESET {preset:02d} APPLY" }
+    returns: none
+
+  clear_preset:
+    summary: Delete a preset, or every preset (PRESET pp CLR)
+    params:
+      preset: { type: int, min: 0, max: 9, required: true, label: Preset, description: "Preset from 1, or 0 for every preset." }
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "PRESET {preset:02d} CLR" }
+    returns: none
+
+  set_preset:
+    summary: Write a preset's routing as a list of inputs, one per output (PRESET pp SET aa,bb,...)
+    params:
+      preset: { type: int, min: 1, max: 8, required: true, label: Preset, description: "Preset 1-8." }
+      inputs: { type: string, pattern: '^[0-9]{2}(,[0-9]{2}){1,15}$', required: true, label: Inputs,
+                description: "The input for each output in order, two digits each, separated by commas, 00 for not set: as many as the model has outputs, such as 01,02,03,04." }
+    send:
+      - { models: [cmx42cs, cmx44cs, cmx88cs, pro16, prohub8], message: "PRESET {preset:02d} SET {inputs}" }
+    returns: none
+
+  # ── Power and front panel ────────────────────────────────────────────────
+  set_power:
+    summary: Power the matrix on, or put it in power save (PON, POFF)
+    params:
+      powered: { type: bool, required: true, label: Power, description: "On powers the matrix on; off puts it in its power-save state." }
+    send:
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8], message: "{powered:map.power_word}" }
+    returns: none
+
+  set_front_panel_keys:
+    summary: Enable or disable the front-panel buttons (KEY ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: Buttons enabled, description: "On lets the front-panel buttons work; off locks them." }
+    send:
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8], message: "KEY {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_ir:
+    summary: Enable or disable the front-panel IR receiver (IR ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: IR enabled, description: "On accepts the IR remote; off ignores it." }
+    send:
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8], message: "IR {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_ir_voltage:
+    summary: Set the IR receiver's supply voltage (IR 5V, IR 12V)
+    params:
+      volts: { type: enum, values: [5V, 12V], required: true, label: IR supply, description: "The supply voltage of the IR receiver connected." }
+    send:
+      - { models: [mx22ab-8k], message: "IR {volts}" }
+    returns: none
+
+  set_beep:
+    summary: Turn the onboard beep on or off (BEEP ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: Beep, description: "On beeps on changes; off is silent." }
+    send:
+      - { models: [cmx42ab, cmx44cs, cmx88cs, cmx88cs-v2, mx44vw, pro16, prohub8], message: "BEEP {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_lcd:
+    summary: Keep the front-panel display always on, or let it turn off after 30 s (LCD ON/OFF)
+    params:
+      always_on: { type: bool, required: true, label: Always on, description: "On keeps the display lit; off turns it off after 30 seconds without use." }
+    send:
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl66arc, hmxl88arc, cmx44cs, cmx88cs, cmx88cs-v2, mx44vw, pro16, prohub8], message: "LCD {always_on:map.upper_onoff}" }
+    returns: none
+
+  set_power_led:
+    summary: Set how long the power LED stays lit when on or in power save (LED PON/POFF yy)
+    params:
+      state: { type: enum, values: [PON, POFF], required: true, label: Power state, description: "PON when the matrix is on, POFF when it is in power save." }
+      timeout: { type: enum, values: ["OFF", "15", "30", "60", "ON"], required: true, label: LED,
+                 description: "OFF always off, 15/30/60 off after that many seconds, ON always on." }
+    send:
+      - { models: [cmx88cs], message: "LED {state} {timeout}" }
+    returns: none
+
+  set_debug:
+    summary: Turn debug mode on or off (DBG ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: Debug, description: "On turns the matrix's debug mode on." }
+    send:
+      - { models: [mx44vw], message: "DBG {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_diagnostics_log:
+    summary: Turn the diagnostics log print on or off (DIAGPRINT ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: Diagnostics log, description: "On prints diagnostics messages on this connection." }
+    send:
+      - { models: [cmx88cs-v2], message: "DIAGPRINT {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_system_log:
+    summary: Turn the system log print on or off (SYSTEMLOG ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: System log, description: "On prints system log messages on this connection." }
+    send:
+      - { models: [cmx88cs-v2], message: "SYSTEMLOG {enabled:map.upper_onoff}" }
+    returns: none
+
+  reboot:
+    summary: Restart the matrix and its network (REBOOT)
+    send:
+      - { models: [cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2], message: "REBOOT" }
+    returns: none
+
+  factory_reset:
+    summary: Reset the matrix to its default settings, confirming with Yes (RESET, Yes)
+    send:
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8], message: "RESET" }
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8], message: "Yes" }
+    returns: none
+
+  factory_reset_all:
+    summary: Reset the matrix and its network settings to default, confirming with Yes (RESET ALL, Yes)
+    send:
+      - { models: [cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx44vw, pro16, prohub8], message: "RESET ALL" }
+      - { models: [cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx44vw, pro16, prohub8], message: "Yes" }
+    returns: none
+
+  set_serial_baud:
+    summary: Set the RS-232 control port's baud rate (RS232BAUD z, or RSB x)
+    params:
+      baud: { type: enum, values: ["2400", "4800", "9600", "19200", "38400", "57600", "115200"], required: true, label: Baud rate,
+              description: "Bits per second; the CMX42CS, CMX44CS, CMX88CS, MX22AB-8K and Pro models offer 9600 to 115200 only." }
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "RS232BAUD {baud:map.baud_code}" }
+      - { models: [cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, pro16, prohub8], message: "RSB {baud:map.rsb_code}" }
+    returns: none
+
+  # ── Video ────────────────────────────────────────────────────────────────
+  set_scaling:
+    summary: Turn an output's scaler on or off (OUT xx SCALING ON/OFF)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: Scaling, description: "On scales to the display; off passes the source through." }
+    send:
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "OUT {output:02d} SCALING {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_video_mode:
+    summary: Set an output's video mode, bypass, force 1080p or match the display (OUT xx SCALING yy)
+    params:
+      output: *output_all
+      mode: { type: int, min: 1, max: 3, required: true, label: Video mode, description: "1 bypass, 2 force 1080p, 3 match the display." }
+    send:
+      - { models: [cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2], message: "OUT {output:02d} SCALING {mode:02d}" }
+    returns: none
+
+  set_color_space_conversion:
+    summary: Turn color space conversion on or off for every input or every HDBaseT output (IN CSC, OUT CSC)
+    params:
+      side: { type: enum, values: [IN, OUT], required: true, label: Ports, description: "IN for every input, OUT for every HDBaseT output." }
+      enabled: { type: bool, required: true, label: CSC, description: "On converts color space; off passes it through." }
+    send:
+      - { models: [pro16], message: "{side} CSC {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_input_uhd_edid:
+    summary: Let an input's EDID offer UHD, or not (IN xx UHD ON/OFF)
+    params:
+      input: *input_all
+      enabled: { type: bool, required: true, label: UHD, description: "On offers UHD modes in the input's EDID." }
+    send:
+      - { models: [pro16], message: "IN {input:02d} UHD {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_long_reach:
+    summary: Turn HDBaseT long reach on or off on an output (OUT xx LR ON/OFF; OUTxx LRM on HMX models)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: Long reach, description: "On uses HDBaseT long-reach mode, at a lower bandwidth." }
+    send:
+      - { models: [pla88cs], message: "OUT {output:02d} LR {enabled:map.upper_onoff}" }
+      - { models: [hmx44-18g, hmx88-18g], message: "OUT{output:02d} LRM {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_input_long_reach:
+    summary: Turn HDBaseT long reach on or off on an input (IN xx LR ON/OFF)
+    params:
+      input: { type: int, min: 0, max: 2, required: true, label: Input, description: "HDBaseT input 1 or 2, or 0 for both." }
+      enabled: { type: bool, required: true, label: Long reach, description: "On uses HDBaseT long-reach mode." }
+    send:
+      - { models: [pla88cs], message: "IN {input:02d} LR {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_edid_source:
+    summary: Choose whether an output's HDMI or HDBaseT port gives the EDID and CEC (OUTxx EH/ET)
+    params:
+      output: *output_all
+      source: { type: enum, values: [hdmi, hdbt], required: true, label: Priority, description: "hdmi uses the HDMI port's display, hdbt the HDBaseT port's." }
+    send:
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "OUT{output:02d} {source:map.edid_source}" }
+      - { models: [pro16, prohub8], message: "OUT {output:02d} {source:map.edid_source}" }
+    returns: none
+
+  set_input_edid_source:
+    summary: Choose whether an input's HDMI or HDBaseT port takes the EDID and CEC (INxx EH/ET)
+    params:
+      input: { type: int, min: 0, max: 8, required: true, label: Input, description: "The input from 1, or 0 for every input." }
+      source: { type: enum, values: [hdmi, hdbt], required: true, label: Priority, description: "hdmi or hdbt." }
+    send:
+      - { models: [pla88cs], message: "IN{input:02d} {source:map.edid_source}" }
+    returns: none
+
+  # ── EDID ─────────────────────────────────────────────────────────────────
+  set_input_edid:
+    summary: Give an input one of the built-in EDIDs (EDID xx DF zz)
+    params:
+      input: *input_all
+      edid: { type: int, min: 0, max: 36, required: true, label: EDID,
+              description: "Built-in EDID number from the model's table: 00 1080p60 2CH (default) to 33, 34 and 35 the user EDIDs, 36 pass-through (PLA88CS, HMX); the Pro range's table differs (00-23)." }
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8], message: "EDID {input:02d} DF {edid:02d}" }
+    returns: none
+
+  copy_edid:
+    summary: Copy the EDID of an output's display to an input (EDID xx CP yy)
+    params:
+      input: *input_all
+      output: { type: int, min: 1, max: 16, required: true, label: Output, description: "The output whose display's EDID is copied." }
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8], message: "EDID {input:02d} CP {output:02d}" }
+    returns: none
+
+  save_edid:
+    summary: Save an output display's EDID to a user EDID slot (EDID SAVE yy TO zz)
+    params:
+      output: { type: int, min: 1, max: 16, required: true, label: Output, description: "The output whose display's EDID is saved." }
+      slot: { type: int, min: 0, max: 35, required: true, label: Slot, description: "01 or 34 user EDID 1, 02 or 35 user EDID 2, 00 both (Pro: 1 or 2)." }
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2, pro16], message: "EDID SAVE {output:02d} TO {slot:02d}" }
+    returns: none
+
+  load_usb_edid:
+    summary: Load a custom EDID from a USB stick into a user slot (EDIDSAVE xx)
+    params:
+      slot: { type: int, min: 75, max: 76, required: true, label: Slot, description: "75 user EDID 1, 76 user EDID 2." }
+    send:
+      - { models: [mx22ab-8k], message: "EDIDSAVE {slot}" }
+    returns: none
+
+  # ── Audio ────────────────────────────────────────────────────────────────
+  set_mute:
+    summary: Mute or unmute an output's audio (MUTE ON/OFF TX xx)
+    params:
+      output: &audio_output { type: int, min: 0, max: 16, required: true, label: Audio output,
+                              description: "The audio output from 1, or 0 for all; on HDBaseT models 1-8 are the analog outputs and 9-16 the optical ones." }
+      muted: { type: bool, required: true, label: Muted, description: "On mutes; off unmutes." }
+    send:
+      - { models: [pla88cs, cmx42ab, pro16, prohub8], message: "MUTE {muted:map.upper_onoff} TX {output:02d}" }
+      - { models: [hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "MUTE {muted:map.title_onoff} TX {output:02d}" }
+    returns: none
+
+  set_audio_output:
+    summary: Turn an analog or optical audio output on or off (AUDOUT xx ON/OFF)
+    params:
+      output: *audio_output
+      enabled: { type: bool, required: true, label: Enabled, description: "On enables the audio output; off silences it." }
+    send:
+      - { models: [pla88cs, cmx88cs-v2], message: "AUDOUT {output:02d} {enabled:map.upper_onoff}" }
+      - { models: [hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "AUDOUT {output:02d} {enabled:map.title_onoff}" }
+    returns: none
+
+  set_volume:
+    summary: Set an output's volume, 0-100 (VOLxx TX yy)
+    params:
+      output: *output_all
+      level: { type: int, min: 0, max: 100, required: true, label: Volume, description: "Volume level 0-100." }
+    send:
+      - { models: [pla88cs], message: "VOL{level} TX {output:02d}" }
+      - { models: [hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "VOL {level} TX {output:02d}" }
+    returns: none
+
+  volume_up:
+    summary: Raise an output's volume one step (VOL+ TX yy)
+    params: { output: *output_all }
+    send:
+      - { models: [pla88cs], message: "VOL+ TX {output:02d}" }
+      - { models: [hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "VOL + TX {output:02d}" }
+    returns: none
+
+  volume_down:
+    summary: Lower an output's volume one step (VOL- TX yy)
+    params: { output: *output_all }
+    send:
+      - { models: [pla88cs], message: "VOL- TX {output:02d}" }
+      - { models: [hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "VOL - TX {output:02d}" }
+    returns: none
+
+  get_volume:
+    summary: Print an output's volume level (OUTxx VOLSTA)
+    params:
+      output: { type: int, min: 1, max: 8, required: true, label: Output, description: "The output to read." }
+    send:
+      - { models: [pla88cs], message: "OUT{output:02d} VOLSTA" }
+    returns: none
+
+  set_audio_source:
+    summary: Choose where an audio output's sound comes from (AUDIOxx FR yy)
+    params:
+      output: *output_all
+      source: { type: int, min: 1, max: 34, required: true, label: Source,
+                description: "1-8 an input's audio, 9-16 an output's, 17-24 an output's ARC, 25-26 optical input 1-2, 33-34 analog input 1-2 (25 and 33 only on HMX models)." }
+    send:
+      - { models: [pla88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "AUDIO{output:02d} FR {source:02d}" }
+    returns: none
+
+  set_audio_downmix:
+    summary: Turn downmixing on or off for an analog or optical output (AUDIOxx DMIX ON/OFF)
+    params:
+      output: *audio_output
+      enabled: { type: bool, required: true, label: Downmix, description: "On downmixes multichannel audio to stereo." }
+    send:
+      - { models: [pla88cs], message: "AUDIO{output:02d} DMIX {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_audio_delay:
+    summary: Delay an audio output (AUDIOxx Delay yy)
+    params:
+      output: *output_all
+      milliseconds: { type: int, min: 0, max: 1000, required: true, label: Delay, description: "Delay in milliseconds, 0-1000; applies with downmix on or LPCM 2.0 input." }
+    send:
+      - { models: [pla88cs], message: "AUDIO{output:02d} Delay {milliseconds}" }
+    returns: none
+
+  set_embedded_audio:
+    summary: Choose the audio embedded in an HDMI/HDBaseT output (OUTxx EMBED yy)
+    params:
+      output: *output_all
+      source: { type: int, min: 0, max: 56, required: true, label: Source,
+                description: "0 none, 1-8 an input, 9-16 follow video (default), 17-24 ARC, 25-26 optical in, 33-34 analog in, 49-56 DSP 1-8." }
+    send:
+      - { models: [pla88cs], message: "OUT{output:02d} EMBED {source:02d}" }
+    returns: none
+
+  set_input_audio_mode:
+    summary: Choose the audio an input carries, its own or embedded analog or Dante (AUD RX xx ORG/ANA/AUTO/DANTE)
+    params:
+      input: *input_all
+      mode: { type: enum, values: [ORG, ANA, AUTO, DANTE], required: true, label: Audio,
+              description: "ORG the received audio, ANA embed the analog L/R input, AUTO embed analog when the source is DVI, DANTE embed Dante audio (16x16 Pro only)." }
+    send:
+      - { models: [cmx44cs, pro16, prohub8], message: "AUD RX {input:02d} {mode}" }
+    returns: none
+
+  set_arc:
+    summary: Set an HDBaseT receiver's ARC mode (OUT xx ARC aa)
+    params:
+      output: *output_all
+      mode: { type: int, min: 1, max: 2, required: true, label: ARC, description: "1 ARC from optical, 2 ARC from HDMI." }
+    send:
+      - { models: [pla88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "OUT {output:02d} ARC {mode:02d}" }
+    returns: none
+
+  # ── HDBaseT power and guest mode ─────────────────────────────────────────
+  set_poc:
+    summary: Turn power over HDBaseT on or off for an output (POCOUTxx ON/OFF; POC TX on Pro models)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: PoC, description: "On powers the receiver over the HDBaseT cable." }
+    send:
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "POCOUT{output:02d} {enabled:map.upper_onoff}" }
+      - { models: [pro16, prohub8], message: "POC TX {output:02d} {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_input_poc:
+    summary: Turn power over HDBaseT on or off for an HDBaseT input (POCINxx ON/OFF)
+    params:
+      input: { type: int, min: 0, max: 2, required: true, label: Input, description: "HDBaseT input 1 or 2, or 0 for both." }
+      enabled: { type: bool, required: true, label: PoC, description: "On powers the transmitter over the HDBaseT cable." }
+    send:
+      - { models: [pla88cs], message: "POCIN{input:02d} {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_guest_mode:
+    summary: Turn guest mode on or off for an output, ending every Telnet connection (OUT xx GUEST ON/OFF)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: Guest mode, description: "On opens the output's guest pass-through; changing it disconnects every Telnet session." }
+    send:
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "OUT {output:02d} GUEST {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_input_guest_mode:
+    summary: Turn guest mode on or off for an HDBaseT input, ending every Telnet connection (IN xx GUEST ON/OFF)
+    params:
+      input: { type: int, min: 0, max: 2, required: true, label: Input, description: "HDBaseT input 1 or 2, or 0 for both." }
+      enabled: { type: bool, required: true, label: Guest mode, description: "On opens the input's guest pass-through; changing it disconnects every Telnet session." }
+    send:
+      - { models: [pla88cs], message: "IN {input:02d} GUEST {enabled:map.upper_onoff}" }
+    returns: none
+
+  # ── IR ───────────────────────────────────────────────────────────────────
+  set_ir_control:
+    summary: Enable or disable IR remote control through an HDBaseT output's receiver (IROUTxx ON/OFF)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: IR control, description: "On passes IR from the receiver to the matrix." }
+    send:
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "IROUT{output:02d} {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_ir_simple_control:
+    summary: Enable or disable simple IR remote control on an HDBaseT output (IROUTxx SIMPLE ON/OFF)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: Simple IR, description: "On enables the simple IR remote-control mode." }
+    send:
+      - { models: [pla88cs], message: "IROUT{output:02d} SIMPLE {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_input_ir_control:
+    summary: Enable or disable IR remote control through an HDBaseT input (IRINxx ON/OFF)
+    params:
+      input: { type: int, min: 0, max: 2, required: true, label: Input, description: "HDBaseT input 1 or 2, or 0 for both." }
+      enabled: { type: bool, required: true, label: IR control, description: "On enables IR remote control on the input." }
+    send:
+      - { models: [pla88cs], message: "IRIN{input:02d} {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_input_ir_simple_control:
+    summary: Enable or disable simple IR remote control on an HDBaseT input (IRINxx SIMPLE ON/OFF)
+    params:
+      input: { type: int, min: 0, max: 2, required: true, label: Input, description: "HDBaseT input 1 or 2, or 0 for both." }
+      enabled: { type: bool, required: true, label: Simple IR, description: "On enables the simple IR remote-control mode." }
+    send:
+      - { models: [pla88cs], message: "IRIN{input:02d} SIMPLE {enabled:map.upper_onoff}" }
+    returns: none
+
+  send_ir:
+    summary: Send a Pronto hex IR code from an output's remote end (OUT xx IRHEXSEND code)
+    params:
+      output: *output_all
+      code: &pronto { type: string, pattern: '^[0-9A-Fa-f]{4}( [0-9A-Fa-f]{4})*$', max_length: 4000, required: true, label: Pronto code,
+                      description: "The IR code in Pronto hex: four-digit words separated by spaces." }
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "OUT {output:02d} IRHEXSEND {code}" }
+    returns: none
+
+  send_input_ir:
+    summary: Send a Pronto hex IR code from an HDBaseT input's remote end (IN xx IRHEXSEND code)
+    params:
+      input: { type: int, min: 0, max: 2, required: true, label: Input, description: "HDBaseT input 1 or 2, or 0 for both." }
+      code: *pronto
+    send:
+      - { models: [pla88cs], message: "IN {input:02d} IRHEXSEND {code}" }
+    returns: none
+
+  set_ir_follow_video:
+    summary: Make the local IR outputs follow video switching, or not (IRFV ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: Follow video, description: "On routes IR along with the video routes." }
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "IRFV {enabled:map.upper_onoff}" }
+    returns: none
+
+  route_ir:
+    summary: Route IR between the matrix's local IR ports and the HDBaseT receivers' (MXIR xx FR yy)
+    params:
+      destination: { type: int, min: 0, max: 16, required: true, label: IR output,
+                     description: "HDBaseT models: the local IR output 1-16; Pro models: the remote receiver's IR output, 0 for all." }
+      source: { type: int, min: 0, max: 16, required: true, label: IR input,
+                description: "HDBaseT models: the remote receiver's IR input, 0 for all; Pro models: the local IR input." }
+    send:
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, pro16, prohub8], message: "MXIR {destination:02d} FR {source:02d}" }
+    returns: none
+
+  route_ir_to_receiver:
+    summary: Route a local or transmitter IR input to a remote receiver's IR output (MXIRRX xx FR yy)
+    params:
+      receiver: { type: int, min: 0, max: 8, required: true, label: Receiver, description: "Remote receiver 1-8, or 0 for all." }
+      source: { type: int, min: 0, max: 10, required: true, label: IR input, description: "0 off, 1-8 local IR in, 9-10 remote transmitter 1-2's IR in." }
+    send:
+      - { models: [pla88cs], message: "MXIRRX {receiver:02d} FR {source:02d}" }
+    returns: none
+
+  route_ir_to_transmitter:
+    summary: Route a local or receiver IR input to a remote transmitter's IR output (MXIRTX xx FR yy)
+    params:
+      transmitter: { type: int, min: 0, max: 2, required: true, label: Transmitter, description: "Remote transmitter 1-2, or 0 for both." }
+      source: { type: int, min: 0, max: 16, required: true, label: IR input, description: "0 off, 1-8 local IR in, 9-16 remote receiver 1-8's IR in." }
+    send:
+      - { models: [pla88cs], message: "MXIRTX {transmitter:02d} FR {source:02d}" }
+    returns: none
+
+  set_global_ir:
+    summary: Add or remove a port from the global IR input or output set (MXIR GI/GO +xx/-xx)
+    params:
+      set: { type: enum, values: [GI, GO], required: true, label: Set, description: "GI where the global IR input goes, GO where the global IR output comes from." }
+      action: { type: enum, values: ["+", "-"], required: true, label: Action, description: "+ adds the port, - removes it." }
+      port: { type: int, min: 9, max: 49, required: true, label: Port,
+              description: "The port number from the model's table: local IR 9-16 and remote 17-24 on the HUB 8x8, local 17-32 and remote 33-48 on the 16x16 Pro, the global input 25 or 49." }
+    send:
+      - { models: [pro16, prohub8], message: "MXIR {set} {action}{port:02d}" }
+    returns: none
+
+  # ── RS-232 pass-through and display control ─────────────────────────────
+  route_serial:
+    summary: Route the global RS-232 to a remote HDBaseT receiver (MXRS xx TO yy)
+    params:
+      receiver: { type: int, min: 0, max: 16, required: true, label: Receiver, description: "0 not connected, 9-16 the remote HDBaseT receivers." }
+    send:
+      - { models: [prohub8], message: "MXRS 09 TO {receiver:02d}" }
+    returns: none
+
+  route_serial_to_receiver:
+    summary: Route a local RS-232 port to a remote receiver (MXRS232OUT xx FR yy)
+    params:
+      receiver: { type: int, min: 0, max: 8, required: true, label: Receiver, description: "Remote receiver 1-8, or 0 for all." }
+      source: { type: int, min: 1, max: 10, required: true, label: Source, description: "1-8 local RS-232 port, 9-10 remote transmitter 1-2's RS-232." }
+    send:
+      - { models: [pla88cs], message: "MXRS232OUT {receiver:02d} FR {source:02d}" }
+    returns: none
+
+  route_serial_to_transmitter:
+    summary: Route a local RS-232 port to a remote transmitter (MXRS232IN xx FR yy)
+    params:
+      transmitter: { type: int, min: 0, max: 2, required: true, label: Transmitter, description: "Remote transmitter 1-2, or 0 for both." }
+      source: { type: int, min: 1, max: 8, required: true, label: Source, description: "Local RS-232 port 1-8." }
+    send:
+      - { models: [pla88cs], message: "MXRS232IN {transmitter:02d} FR {source:02d}" }
+    returns: none
+
+  set_serial_control:
+    summary: Enable or disable RS-232 remote control through an HDBaseT output (RS232OUTxx ON/OFF)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: RS-232 control, description: "On passes RS-232 control through the output's receiver." }
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "RS232OUT{output:02d} {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_input_serial_control:
+    summary: Enable or disable RS-232 remote control through an HDBaseT input (RS232INxx ON/OFF)
+    params:
+      input: { type: int, min: 0, max: 2, required: true, label: Input, description: "HDBaseT input 1 or 2, or 0 for both." }
+      enabled: { type: bool, required: true, label: RS-232 control, description: "On passes RS-232 control through the input's transmitter." }
+    send:
+      - { models: [pla88cs], message: "RS232IN{input:02d} {enabled:map.upper_onoff}" }
+    returns: none
+
+  send_serial:
+    summary: Send a command out of the local or an output's RS-232 port and wait for its answer (OUT xx RS232SEND yy:z:a:b)
+    params:
+      output: { type: int, min: 0, max: 8, required: true, label: Port, description: "0 the local RS-232 port, 1-8 the output's receiver." }
+      wait: &wait { type: int, min: 0, max: 10, default: 0, label: Wait, description: "Seconds to wait for the device's feedback, 0-10." }
+      format: &serial_format { type: enum, values: [a, h], default: a, label: Format, description: "a ASCII, h hex." }
+      baud: &serial_baud { type: enum, values: ["2400", "4800", "9600", "19200", "38400", "57600", "115200"], default: "57600", label: Baud rate, description: "The target device's baud rate." }
+      command: &serial_command { type: string, pattern: '^[^:\r\n]{1,200}$', required: true, label: Command, description: "The command text, or hex bytes with format h, without colons." }
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "OUT {output:02d} RS232SEND {wait:02d}:{format}:{baud:map.baud_code}:{command}" }
+    returns: none
+
+  send_input_serial:
+    summary: Send a command out of an HDBaseT input's RS-232 and wait for its answer (IN xx RS232SEND yy:z:a:b)
+    params:
+      input: { type: int, min: 0, max: 2, required: true, label: Port, description: "0 the local RS-232 port, 1-2 the HDBaseT input's transmitter." }
+      wait: *wait
+      format: *serial_format
+      baud: *serial_baud
+      command: *serial_command
+    send:
+      - { models: [pla88cs], message: "IN {input:02d} RS232SEND {wait:02d}:{format}:{baud:map.baud_code}:{command}" }
+    returns: none
+
+  send_local_serial:
+    summary: Send a command out of the matrix's own RS-232 port (RS232ONOUT y:z:a)
+    params:
+      format: *serial_format
+      baud: { type: enum, values: ["2400", "4800", "9600", "19200", "38400", "57600", "115200"], default: "57600", label: Baud rate, description: "The target device's baud rate." }
+      command: *serial_command
+    send:
+      - { models: [cmx88cs-v2], message: "RS232ONOUT {format}:{baud:map.rsb_code}:{command}" }
+    returns: none
+
+  set_serial_delay:
+    summary: Set the delay between an output's stored display-on command and its user commands (RS232DLYOUTxx:tt)
+    params:
+      output: *output_all
+      seconds: { type: int, min: 0, max: 180, required: true, label: Delay, description: "Seconds, 0-180." }
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "RS232DLYOUT{output:02d}:{seconds}" }
+    returns: none
+
+  set_input_serial_delay:
+    summary: Set the delay between an input's stored display-on command and its user commands (RS232DLYINxx:tt)
+    params:
+      input: { type: int, min: 0, max: 2, required: true, label: Input, description: "HDBaseT input 1 or 2, or 0 for both." }
+      seconds: { type: int, min: 0, max: 180, required: true, label: Delay, description: "Seconds, 0-180." }
+    send:
+      - { models: [pla88cs], message: "RS232DLYIN{input:02d}:{seconds}" }
+    returns: none
+
+  set_serial_on_command:
+    summary: Store a command an output sends when a signal appears (RS232ONOUTxx y:z:a:b)
+    params:
+      output: *output_all
+      slot: { type: int, min: 1, max: 5, required: true, label: Slot, description: "1 display on, 2 display input select, 3-5 user commands 1-3." }
+      format: *serial_format
+      baud: *serial_baud
+      command: *serial_command
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "RS232ONOUT{output:02d} {slot}:{format}:{baud:map.baud_code}:{command}" }
+    returns: none
+
+  set_serial_off_command:
+    summary: Store the command an output sends when its signal goes (RS232OFFOUTxx z:a:b)
+    params:
+      output: *output_all
+      format: *serial_format
+      baud: *serial_baud
+      command: *serial_command
+    send:
+      - { models: [c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "RS232OFFOUT{output:02d} {format}:{baud:map.baud_code}:{command}" }
+    returns: none
+
+  set_serial_off_command_slot:
+    summary: Store one of the two commands an output sends when its signal goes (RS232OFFOUTxx y:z:a:b)
+    params:
+      output: *output_all
+      slot: { type: int, min: 1, max: 2, required: true, label: Slot, description: "Display off command 1 or 2." }
+      format: *serial_format
+      baud: *serial_baud
+      command: *serial_command
+    send:
+      - { models: [pla88cs], message: "RS232OFFOUT{output:02d} {slot}:{format}:{baud:map.baud_code}:{command}" }
+    returns: none
+
+  disable_serial_commands:
+    summary: Stop an output sending its stored commands when a signal appears or goes (RS232ONOUTxx DISABLE, RS232OFFOUTxx DISABLE)
+    params:
+      output: *output_all
+      event: { type: enum, values: ["ON", "OFF"], required: true, label: Event, description: "ON the signal-detected commands, OFF the signal-lost ones." }
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "RS232{event}OUT{output:02d} DISABLE" }
+    returns: none
+
+  set_input_serial_on_command:
+    summary: Store a command an HDBaseT input sends when a signal appears (RS232ONINxx y:z:a:b)
+    params:
+      input: { type: int, min: 0, max: 2, required: true, label: Input, description: "HDBaseT input 1 or 2, or 0 for both." }
+      slot: { type: int, min: 1, max: 5, required: true, label: Slot, description: "1 display on, 2 display input select, 3-5 user commands 1-3." }
+      format: *serial_format
+      baud: *serial_baud
+      command: *serial_command
+    send:
+      - { models: [pla88cs], message: "RS232ONIN{input:02d} {slot}:{format}:{baud:map.baud_code}:{command}" }
+    returns: none
+
+  set_input_serial_off_command:
+    summary: Store one of the commands an HDBaseT input sends when its signal goes (RS232OFFINxx y:z:a:b)
+    params:
+      input: { type: int, min: 0, max: 2, required: true, label: Input, description: "HDBaseT input 1 or 2, or 0 for both." }
+      slot: { type: int, min: 1, max: 2, required: true, label: Slot, description: "Display off command 1 or 2." }
+      format: *serial_format
+      baud: *serial_baud
+      command: *serial_command
+    send:
+      - { models: [pla88cs], message: "RS232OFFIN{input:02d} {slot}:{format}:{baud:map.baud_code}:{command}" }
+    returns: none
+
+  disable_input_serial_commands:
+    summary: Stop an HDBaseT input sending its stored commands (RS232ONINxx DISABLE, RS232OFFINxx DISABLE)
+    params:
+      input: { type: int, min: 0, max: 2, required: true, label: Input, description: "HDBaseT input 1 or 2, or 0 for both." }
+      event: { type: enum, values: ["ON", "OFF"], required: true, label: Event, description: "ON the signal-detected commands, OFF the signal-lost ones." }
+    send:
+      - { models: [pla88cs], message: "RS232{event}IN{input:02d} DISABLE" }
+    returns: none
+
+  # ── CEC ──────────────────────────────────────────────────────────────────
+  set_output_cec:
+    summary: Enable or disable CEC control on an output (OUTxx CEC ENABLE/DISABLE)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: CEC, description: "On enables CEC control of the output's display." }
+    send:
+      - { models: [pla88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "OUT{output:02d} CEC {enabled:map.cec_word}" }
+    returns: none
+
+  cec_output:
+    summary: Send a CEC command to an output's display (OUTxx CEC action)
+    params:
+      output: *output_all
+      action: { type: enum, values: [OK, UP, DOWN, LEFT, RIGHT, RETURN, EXIT, VOLUP, VOLDOWN, MUTE, PLAY, STOP, PAUSE, RECORD, POFF, PON], required: true, label: Action,
+                description: "The CEC key: navigation, volume, mute toggle, transport, power off or on." }
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "OUT{output:02d} CEC {action}" }
+    returns: none
+
+  cec_output_input:
+    summary: Switch an output's display to one of its HDMI inputs over CEC (OUTxx CEC INPUTyy)
+    params:
+      output: *output_all
+      tv_input: { type: int, min: 0, max: 4, required: true, label: TV input, description: "The display's HDMI input 1-4, or 0 for its current one." }
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "OUT{output:02d} CEC INPUT{tv_input:02d}" }
+    returns: none
+
+  set_input_cec:
+    summary: Enable or disable CEC control on an input (INxx CEC ENABLE/DISABLE)
+    params:
+      input: *input_all
+      enabled: { type: bool, required: true, label: CEC, description: "On enables CEC control of the input's source." }
+    send:
+      - { models: [pla88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "IN{input:02d} CEC {enabled:map.cec_word}" }
+    returns: none
+
+  cec_input:
+    summary: Send a CEC command to an input's source (INxx CEC action)
+    params:
+      input: *input_all
+      action: { type: enum, values: [OK, UP, DOWN, LEFT, RIGHT, RETURN, EXIT, VOLUP, VOLDOWN, PLAY, STOP, PAUSE, RECORD, REWIND, FF, FWD, BWD, POFF, PON], required: true, label: Action,
+                description: "The CEC key: navigation, volume, transport, power off or on." }
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "IN{input:02d} CEC {action}" }
+    returns: none
+
+  cec_user_command:
+    summary: Send a raw CEC message (CECUSERCMD <device address opcode operands>)
+    params:
+      message: { type: string, pattern: '^[0-9A-Fa-f]{2}( [0-9A-Fa-f]{2}){2,16}$', required: true, label: CEC message,
+                 description: "Hex bytes separated by spaces: the port (00 all inputs, 01-08 an input, F0 all outputs, F1-F8 an output), the CEC address, the opcode and up to 14 operands, such as F0 40 44 41." }
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "CECUSERCMD <{message} >" }
+    returns: none
+
+  # ── Network ──────────────────────────────────────────────────────────────
+  set_dhcp:
+    summary: Turn DHCP on or off (NET DHCP ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: DHCP, description: "On takes an address from DHCP; off uses the static address." }
+    send:
+      - { models: &net [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx44vw, pro16, prohub8], message: "NET DHCP {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_ip_address:
+    summary: Set the static IP address, applied by a network reboot (NET IP a.b.c.d)
+    params:
+      address: &ipv4 { type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$', required: true,
+                       label: Address, description: "An IPv4 address in dot-decimal notation." }
+    send:
+      - { models: *net, message: "NET IP {address}" }
+    returns: none
+
+  set_gateway:
+    summary: Set the gateway address, applied by a network reboot (NET GW a.b.c.d)
+    params: { address: *ipv4 }
+    send:
+      - { models: *net, message: "NET GW {address}" }
+    returns: none
+
+  set_subnet_mask:
+    summary: Set the subnet mask, applied by a network reboot (NET SM a.b.c.d)
+    params: { address: *ipv4 }
+    send:
+      - { models: *net, message: "NET SM {address}" }
+    returns: none
+
+  network_reboot:
+    summary: Restart the network to apply new settings (NET RB)
+    send:
+      - { models: *net, message: "NET RB" }
+    returns: none
+
+  set_telnet_port:
+    summary: Set the Telnet port (NET TN port)
+    params:
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "The Telnet port; 23 by default." }
+    send:
+      - { models: *net, message: "NET TN {port}" }
+    returns: none
+
+  set_telnet:
+    summary: Turn the Telnet server on or off (NET TN ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: Telnet, description: "On runs Telnet; off stops it, ending control over the network." }
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42cs, cmx88cs-v2], message: "NET TN {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_port_8000:
+    summary: Turn TCP/IP access on port 8000 on or off (NET TN8000 ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: Port 8000, description: "On also accepts the API on TCP 8000." }
+    send:
+      - { models: [pla88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "NET TN8000 {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_tcp_port:
+    summary: Set the raw TCP control port, or turn it on or off (NET TCPPORT port|ON|OFF)
+    params:
+      value: { type: string, pattern: '^([0-9]{1,5}|ON|OFF)$', required: true, label: TCP port, description: "A port number, or ON or OFF." }
+    send:
+      - { models: [cmx42cs], message: "NET TCPPORT {value}" }
+    returns: none
+
+  set_mdns:
+    summary: Turn mDNS on or off (NET MDNS ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: mDNS, description: "On announces the matrix on the local network by name." }
+    send:
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "NET MDNS {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_mdns_name:
+    summary: Set the mDNS name, as name.local (NET MDNS name.local)
+    params:
+      name: { type: string, pattern: '^[A-Za-z0-9-]{1,63}$', required: true, label: mDNS name, description: "The host name before .local, letters, digits and dashes." }
+    send:
+      - { models: [cmx88cs-v2], message: "NET MDNS {name}.local" }
+    returns: none
+
+  set_dns_name:
+    summary: Set the DNS domain name (NET DNS name)
+    params:
+      name: { type: string, pattern: '^[A-Za-z0-9.-]{1,63}$', required: true, label: Name, description: "The domain name." }
+    send:
+      - { models: [cmx42cs, cmx44cs, cmx88cs], message: "NET DNS {name}" }
+    returns: none
+
+  # ── Reports ──────────────────────────────────────────────────────────────
+  get_status:
+    summary: Print the full status report; its lines update state (STATUS)
+    send:
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8], message: "STATUS" }
+    returns: none
+
+  get_input_status:
+    summary: Print the input status report (INSTA)
+    send:
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "INSTA" }
+    returns: none
+
+  get_output_status:
+    summary: Print the output status report (OUTSTA)
+    send:
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "OUTSTA" }
+    returns: none
+
+  get_control_status:
+    summary: Print the RS-232 and IR control report; its lines update state (CTRLSTA)
+    send:
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "CTRLSTA" }
+    returns: none
+
+  get_hdbt_status:
+    summary: Print the HDBaseT link report (HDBTSTA)
+    send:
+      - { models: [pla88cs], message: "HDBTSTA" }
+    returns: none
+
+  get_preset_status:
+    summary: Print the presets' routing (PRESETSTATUS, or PRESET STATUS)
+    send:
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "PRESETSTATUS" }
+      - { models: [cmx42cs, cmx44cs, cmx88cs, pro16, prohub8], message: "PRESET STATUS" }
+    returns: none
+
+  get_audio_status:
+    summary: Print the audio report (AUDSTA, or AUD STA)
+    send:
+      - { models: [hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "AUDSTA" }
+      - { models: [pro16, prohub8], message: "AUD STA" }
+    returns: none
+
+  get_ir_routing:
+    summary: Print the IR (and RS-232) routing report (MXSTA)
+    send:
+      - { models: [pro16, prohub8], message: "MXSTA" }
+    returns: none
+
+  get_firmware:
+    summary: Print the firmware versions (FWVERSION, or FWVER)
+    send:
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "FWVERSION" }
+      - { models: [cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2], message: "FWVER" }
+    returns: none
+
+  get_output_diagnostics:
+    summary: Print an output's diagnostics (OUT xx DIAG)
+    params: { output: *output_all }
+    send:
+      - { models: [cmx88cs-v2], message: "OUT {output:02d} DIAG" }
+    returns: none
+
+  get_input_diagnostics:
+    summary: Print an input's diagnostics (IN xx DIAG)
+    params: { input: *input_all }
+    send:
+      - { models: [cmx88cs-v2], message: "IN {input:02d} DIAG" }
+    returns: none
+
+state:
+  model:                         { type: string, description: "Model line of the status report, such as PLA88CS HDBaseT Matrix" }
+  firmware:                      { type: string, description: "Firmware version, such as V2.3.0 (FW Version)" }
+  power:                         { type: bool, description: "Whether the matrix is on (Power column)" }
+  ir:                            { type: bool, description: "Whether the front-panel IR receiver is enabled (IR column)" }
+  front_panel_keys:              { type: bool, description: "Whether the front-panel buttons work (Key column)" }
+  lcd_always_on:                 { type: bool, description: "Whether the display stays lit (LCD column)" }
+  serial_baud:                   { type: int, description: "RS-232 control port baud rate (Baud column)" }
+  ir_follow_video:               { type: bool, description: "Whether local IR outputs follow video switching (IRFV column)" }
+  inputs.*.edid:                 { type: string, description: "EDID the input presents, such as Default_00 (Edid column)" }
+  inputs.*.connected:            { type: bool, description: "Whether a source is connected (HDMIcon column)" }
+  inputs.*.cec:                  { type: bool, description: "Whether CEC control is enabled on the input (CECIn column)" }
+  inputs.*.priority:             { type: string, description: "HDMI or HDBT, the port giving EDID and CEC (Priority column)" }
+  inputs.*.switch_mode:          { type: string, description: "Input connector switching mode, such as FORCE_HDMI, or NULL where it has none (SWmode column)" }
+  inputs.*.switch_selected:      { type: string, description: "Connector in use, HDMI or HDBT (SWsel column)" }
+  inputs.*.poc:                  { type: string, description: "Power over HDBaseT: ON, OFF or NULL where the input has none (PoC column)" }
+  inputs.*.long_reach:           { type: string, description: "HDBaseT long reach: ON, OFF or NULL (LongReach column)" }
+  inputs.*.guest_mode:           { type: string, description: "Guest mode: ON, OFF or NULL (GuestMode column)" }
+  inputs.*.serial_control:       { type: bool, description: "Whether RS-232 remote control is enabled on the input (RS232ctr column)" }
+  inputs.*.ir_control:           { type: bool, description: "Whether IR remote control is enabled on the input (IRctr column)" }
+  inputs.*.ir_simple_control:    { type: bool, description: "Whether simple IR remote control is enabled (IRctrsmp column)" }
+  inputs.*.serial_delay:         { type: int, unit: s, description: "Delay before the input's stored user RS-232 commands (RS232DLYIN)" }
+  inputs.*.serial_on_commands.*: { type: string, description: "Stored signal-detected RS-232 command by slot 1-5, or Disable" }
+  inputs.*.serial_off_commands.*: { type: string, description: "Stored signal-lost RS-232 command by slot 1-2, or Disable" }
+  outputs.*.input:               { type: int, description: "Input routed to the output (FromIn column, or a [SUCCESS] routing line)" }
+  outputs.*.connected:           { type: bool, description: "Whether a display is connected (HDMIcon column)" }
+  outputs.*.enabled:             { type: bool, description: "Whether the output is on (OutputEn column)" }
+  outputs.*.osp:                 { type: string, description: "Output signal priority, such as SNK (OSP column)" }
+  outputs.*.poc:                 { type: bool, description: "Whether power over HDBaseT is on (PoC column)" }
+  outputs.*.long_reach:          { type: bool, description: "Whether HDBaseT long reach is on (LongReach column)" }
+  outputs.*.scaling:             { type: bool, description: "Whether the output scaler is on (Scaling column)" }
+  outputs.*.cec:                 { type: bool, description: "Whether CEC control is enabled on the output (CECOut column)" }
+  outputs.*.priority:            { type: string, description: "HDMI or HDBT, the port giving EDID and CEC (Priority column)" }
+  outputs.*.guest_mode:          { type: bool, description: "Whether guest mode is on (GuestMode column)" }
+  outputs.*.serial_control:      { type: bool, description: "Whether RS-232 remote control is enabled on the output (RS232ctr column)" }
+  outputs.*.ir_control:          { type: bool, description: "Whether IR remote control is enabled on the output (IRctr column)" }
+  outputs.*.ir_simple_control:   { type: bool, description: "Whether simple IR remote control is enabled (IRctrsmp column)" }
+  outputs.*.serial_delay:        { type: int, unit: s, description: "Delay before the output's stored user RS-232 commands (RS232DLYOUT)" }
+  outputs.*.serial_on_commands.*: { type: string, description: "Stored signal-detected RS-232 command by slot 1-5, or Disable" }
+  outputs.*.serial_off_commands.*: { type: string, description: "Stored signal-lost RS-232 command by slot 1-2, or Disable" }
+  audio.*.source:                { type: string, description: "Where the audio output's sound comes from, such as VideoOut01 (AudioFrom column)" }
+  audio.*.optical:               { type: bool, description: "Whether the optical output is on (Optical column)" }
+  audio.*.optical_downmix:       { type: bool, description: "Whether the optical output downmixes (OptDmix column)" }
+  audio.*.analog:                { type: bool, description: "Whether the analog output is on (Analog column)" }
+  audio.*.analog_downmix:        { type: bool, description: "Whether the analog output downmixes (AnaDmix column)" }
+  audio.*.delay:                 { type: int, unit: ms, description: "Audio delay (AudioDelay column)" }
+  audio.*.volume:                { type: int, description: "Analog volume, 0-100 (AnalogVol column)" }
+  audio.*.muted:                 { type: bool, description: "Whether the analog output is muted (AnalogMute column)" }
+  audio.*.embed:                 { type: string, description: "Audio embedded in the HDMI/HDBaseT output, such as FOLVideo (EmbedFrom column)" }
+  network.dhcp:                  { type: bool, description: "Whether DHCP is on" }
+  network.ip_address:            { type: string, description: "IP address" }
+  network.gateway:               { type: string, description: "Gateway address" }
+  network.subnet_mask:           { type: string, description: "Subnet mask" }
+  network.telnet_port:           { type: int, description: "Telnet port" }
+  network.port_8000:             { type: bool, description: "Whether TCP 8000 access is on" }
+  network.mdns:                  { type: bool, description: "Whether mDNS is on" }
+  network.mdns_name:             { type: string, description: "mDNS name" }
+  network.mac_address:           { type: string, description: "LAN MAC address" }
+
+telemetry:
+  poll:
+    - every_ms: 5000
+      send: ["STATUS"]
+    - every_ms: 60000
+      send:
+        - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "CTRLSTA" }
+  updates:
+    # The STATUS report (PLA88CS API download): a title line, FW Version,
+    # then tables whose rows begin with a two-digit port number. Each table's
+    # rows are told apart by their columns.
+    - match: '^\s*([A-Z][A-Z0-9-]+(?: [A-Za-z0-9/-]+)* Matrix)\s*$'
+      state: { model: "{1}" }
+    - match: '^\s*FW Version:\s*(\S+)\s*$'
+      state: { firmware: "{1}" }
+    - match: '^(ON|OFF)\s+(ON|OFF)\s+(ON|OFF)\s+(ON|OFF)\s+(\d{4,6})\s+(ON|OFF)\s*$'
+      state:
+        power: { value: "{1}", map: { "ON": true, "OFF": false } }
+        ir: { value: "{2}", map: { "ON": true, "OFF": false } }
+        front_panel_keys: { value: "{3}", map: { "ON": true, "OFF": false } }
+        lcd_always_on: { value: "{4}", map: { "ON": true, "OFF": false } }
+        serial_baud: "{5}"
+        ir_follow_video: { value: "{6}", map: { "ON": true, "OFF": false } }
+    # Input table: Input Edid HDMIcon CECIn Priority SWmode SWsel PoC LongReach GuestMode
+    - match: '^(\d{2})\s+([A-Za-z]+_\S+)\s+(ON|OFF)\s+(ON|OFF)\s+(HDMI|HDBT)\s+(\S+)\s+(HDMI|HDBT)\s+(ON|OFF|NULL)\s+(ON|OFF|NULL)\s+(ON|OFF|NULL)\s*$'
+      state:
+        "inputs.{1}.edid": "{2}"
+        "inputs.{1}.connected": { value: "{3}", map: { "ON": true, "OFF": false } }
+        "inputs.{1}.cec": { value: "{4}", map: { "ON": true, "OFF": false } }
+        "inputs.{1}.priority": "{5}"
+        "inputs.{1}.switch_mode": "{6}"
+        "inputs.{1}.switch_selected": "{7}"
+        "inputs.{1}.poc": "{8}"
+        "inputs.{1}.long_reach": "{9}"
+        "inputs.{1}.guest_mode": "{10}"
+    # Output table: Output FromIn HDMIcon OutputEn OSP PoC LongReach Scaling CECOut Priority GuestMode
+    - match: '^(\d{2})\s+(\d{2})\s+(ON|OFF)\s+(Yes|No)\s+(\S+)\s+(ON|OFF)\s+(ON|OFF)\s+(ON|OFF)\s+(ON|OFF)\s+(HDMI|HDBT)\s+(ON|OFF)\s*$'
+      state:
+        "outputs.{1}.connected": { value: "{3}", map: { "ON": true, "OFF": false } }
+        "outputs.{1}.osp": "{5}"
+        "outputs.{1}.poc": { value: "{6}", map: { "ON": true, "OFF": false } }
+        "outputs.{1}.long_reach": { value: "{7}", map: { "ON": true, "OFF": false } }
+        "outputs.{1}.scaling": { value: "{8}", map: { "ON": true, "OFF": false } }
+        "outputs.{1}.cec": { value: "{9}", map: { "ON": true, "OFF": false } }
+        "outputs.{1}.priority": "{10}"
+        "outputs.{1}.guest_mode": { value: "{11}", map: { "ON": true, "OFF": false } }
+    # Any output row: the port, the input routed to it and, later on the
+    # line, Yes or No for OutputEn, whatever the model's other columns.
+    - match: '^(\d{2})\s+(\d{2})\s+.*?\b(Yes|No)\b'
+      state:
+        "outputs.{1}.input": "{2}"
+        "outputs.{1}.enabled": { value: "{3}", map: { "Yes": true, "No": false } }
+    # Audio table: OutputPort AudioFrom Optical OptDmix Analog AnaDmix AudioDelay AnalogVol AnalogMute EmbedFrom
+    - match: '^(\d{2})\s+([A-Za-z]+\d*)\s+(ON|OFF)\s+(ON|OFF)\s+(ON|OFF)\s+(ON|OFF)\s+(\d+)\s+(\d+)\s+(ON|OFF)\s+(\S+)\s*$'
+      state:
+        "audio.{1}.source": "{2}"
+        "audio.{1}.optical": { value: "{3}", map: { "ON": true, "OFF": false } }
+        "audio.{1}.optical_downmix": { value: "{4}", map: { "ON": true, "OFF": false } }
+        "audio.{1}.analog": { value: "{5}", map: { "ON": true, "OFF": false } }
+        "audio.{1}.analog_downmix": { value: "{6}", map: { "ON": true, "OFF": false } }
+        "audio.{1}.delay": "{7}"
+        "audio.{1}.volume": "{8}"
+        "audio.{1}.muted": { value: "{9}", map: { "ON": true, "OFF": false } }
+        "audio.{1}.embed": "{10}"
+    # Network lines: DHCP IP Gateway SubnetMask, then Telnet Port8000 mDNS mDNS-name, then the MAC.
+    - match: '^(ON|OFF)\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)\s*$'
+      state:
+        network.dhcp: { value: "{1}", map: { "ON": true, "OFF": false } }
+        network.ip_address: "{2}"
+        network.gateway: "{3}"
+        network.subnet_mask: "{4}"
+    - match: '^(\d{1,5})\s+(ON|OFF)\s+(ON|OFF)\s+(\S+)\s*$'
+      state:
+        network.telnet_port: "{1}"
+        network.port_8000: { value: "{2}", map: { "ON": true, "OFF": false } }
+        network.mdns: { value: "{3}", map: { "ON": true, "OFF": false } }
+        network.mdns_name: "{4}"
+    - match: '^([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})\s*$'
+      state: { network.mac_address: "{1}" }
+    # The CTRLSTA report: input rows RS232ctr IRctr IRctrsmp RS232Floc IRoutFloc RS232Frx IRoutFrx,
+    # output rows RS232ctr IRctr IRctrsmp RS232Floc RS232Ftx IRroutFloc IRroutFtx IRloutFtx IRloutFrx.
+    - match: '^(\d{2})\s+(ON|OFF)\s+(ON|OFF)\s+(ON|OFF)\s+\d{2}\s+\d{2}\s+\S+\s+\S+\s*$'
+      state:
+        "inputs.{1}.serial_control": { value: "{2}", map: { "ON": true, "OFF": false } }
+        "inputs.{1}.ir_control": { value: "{3}", map: { "ON": true, "OFF": false } }
+        "inputs.{1}.ir_simple_control": { value: "{4}", map: { "ON": true, "OFF": false } }
+    - match: '^(\d{2})\s+(ON|OFF)\s+(ON|OFF)\s+(ON|OFF)\s+\d{2}\s+\S+\s+\S+\s+\S+\s+\S+\s+\d+\s*$'
+      state:
+        "outputs.{1}.serial_control": { value: "{2}", map: { "ON": true, "OFF": false } }
+        "outputs.{1}.ir_control": { value: "{3}", map: { "ON": true, "OFF": false } }
+        "outputs.{1}.ir_simple_control": { value: "{4}", map: { "ON": true, "OFF": false } }
+    - match: '^RS232ONOUT(\d{2})\s+Command (\d)[^:]*:\s*(.+?)\s*$'
+      state: { "outputs.{1}.serial_on_commands.{2}": "{3}" }
+    - match: '^RS232OFFOUT(\d{2})\s+Command Off (\d):\s*(.+?)\s*$'
+      state: { "outputs.{1}.serial_off_commands.{2}": "{3}" }
+    - match: '^RS232DLYOUT(\d{2})\s+Time Delay:\s*(\d+) Second'
+      state: { "outputs.{1}.serial_delay": "{2}" }
+    - match: '^RS232ONIN(\d{2})\s+Command (\d)[^:]*:\s*(.+?)\s*$'
+      state: { "inputs.{1}.serial_on_commands.{2}": "{3}" }
+    - match: '^RS232OFFIN(\d{2})\s+Command Off (\d):\s*(.+?)\s*$'
+      state: { "inputs.{1}.serial_off_commands.{2}": "{3}" }
+    - match: '^RS232DLYIN(\d{2})\s+Time Delay:\s*(\d+) Second'
+      state: { "inputs.{1}.serial_delay": "{2}" }
+    # A routing change's confirmation, as the Companion module shows it.
+    - match: '\[SUCCESS\]Set output (\d+) connect from input (\d+)\.'
+      state: { "outputs.{1}.input": "{2}" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      factory_reset and factory_reset_all send RESET and the confirming Yes
+      at once: the matrix's routing, presets and settings (and, with RESET
+      ALL, its network settings) return to default and cannot be restored
+      from here. recall_preset and route to output 0 change every output at
+      once.
+  - models: [all]
+    severity: warning
+    text: >
+      Blustream documents no answer to any command, so commands report
+      unverified and a refused one goes unnoticed. State is read from the
+      STATUS report every 5 s (and CTRLSTA every minute); a change shows at
+      the next report. The matrix's prompt and its "[SUCCESS]" confirmation
+      lines are not documented by Blustream; the routing confirmation the
+      Companion module shows is read when it comes.
+  - models: [all]
+    severity: info
+    text: >
+      Only the PLA88CS's STATUS layout is documented. The rules read each
+      table row by its columns, so other models' rows are read where their
+      columns match the PLA88CS's; any model's output rows give the routed
+      input and whether the output is on, which is what the Companion module
+      reads from the CMX and C ranges' reports. The reports of INSTA,
+      OUTSTA, HDBTSTA, PRESETSTATUS, AUDSTA, MXSTA, FWVERSION, VOLSTA and
+      DIAG are undocumented and not read.
+  - models: [all]
+    severity: info
+    text: >
+      API limits: presets' contents, EDID names other than the input
+      table's, volume on models other than the PLA88CS, and every setting
+      the STATUS report does not show cannot be read back.
+  - models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc]
+    severity: warning
+    text: >
+      Changing guest mode on an input or output disconnects every Telnet
+      connection to the matrix (Blustream's help text); the core reconnects.
+  - models: [all]
+    severity: info
+    text: >
+      Commands are sent as each model's help text writes them, with CR LF
+      (Blustream requires both). The CMX88CS-V2 manual says spaces are
+      optional unless specified; other models' handling of a missing or
+      extra space is not documented.

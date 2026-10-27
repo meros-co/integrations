@@ -775,6 +775,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm which models have an RS-422 router control port that answers in Leitch server mode (Smart Videohub 12x12/20x20/40x40, CleanSwitch 12x12, Universal Videohub 72/288 from the manuals; older Smart Videohub, Broadcast and Studio Videohub not checked) and the connector each uses. ([specs/blackmagic-videohub-leitch.yaml:112](specs/blackmagic-videohub-leitch.yaml#L112))
 - [ ] Confirm a read-back right after a route (`@ X?`) reports the new source, and that @ B:R behaves as @ B:C. ([specs/blackmagic-videohub-leitch.yaml:160](specs/blackmagic-videohub-leitch.yaml#L160))
 
+## blustream-matrix — Blustream matrix switchers
+
+- [ ] Record what each model answers to a command (Blustream documents none; a [SUCCESS] line and a prompt are reported). ([specs/blustream-matrix.yaml:17](specs/blustream-matrix.yaml#L17))
+- [ ] Record the STATUS report of each model other than the PLA88CS, and check the table rules read it. ([specs/blustream-matrix.yaml:1449](specs/blustream-matrix.yaml#L1449))
+- [ ] Confirm RESET followed at once by Yes resets the matrix (the help text asks for Yes to confirm). ([specs/blustream-matrix.yaml:554](specs/blustream-matrix.yaml#L554))
+- [ ] Confirm the HDBaseT models accept OUTxx FR yy with a space before FR, as their help text writes it, and the CMX models OUT xx FR yy. ([specs/blustream-matrix.yaml:327](specs/blustream-matrix.yaml#L327))
+- [ ] Confirm the HMX and HMXL models take MUTE On/Off and AUDOUT xx On/Off in that case. ([specs/blustream-matrix.yaml:691](specs/blustream-matrix.yaml#L691))
+- [ ] Confirm the RS-232 factory default of the CMX, MX and Pro models (57600 assumed from the HDBaseT models and the CMX88CS-V2). ([specs/blustream-matrix.yaml:92](specs/blustream-matrix.yaml#L92))
+- [ ] Check the CECUSERCMD form with a space before the closing bracket, as the help text example writes it. ([specs/blustream-matrix.yaml:1173](specs/blustream-matrix.yaml#L1173))
+- [ ] Record what the CTRLSTA report looks like on models other than the PLA88CS. ([specs/blustream-matrix.yaml:1292](specs/blustream-matrix.yaml#L1292))
+- [ ] Confirm the [SUCCESS] routing line text on current firmware. ([specs/blustream-matrix.yaml:1505](specs/blustream-matrix.yaml#L1505))
+
 ## boinx-mimolive — Boinx mimoLive
 
 - [ ] Confirm that writes with Content-Type application/vnd.api+json are accepted (Boinx's reference requires it; the manual's examples send application/json). ([specs/boinx-mimolive.yaml:2091](specs/boinx-mimolive.yaml#L2091))
