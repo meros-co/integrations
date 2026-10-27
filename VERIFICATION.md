@@ -1624,6 +1624,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that refreshall makes the console send every status, and whether repeating it every 60 s is noticeable on the console. ([specs/highend-hog4.yaml:489](specs/highend-hog4.yaml#L489))
 - [ ] Check whether the HPU acts on front panel keys, encoders and faders sent over OSC. ([specs/highend-hog4.yaml:556](specs/highend-hog4.yaml#L556))
 
+## holyrics — Holyrics
+
+- [ ] Confirm the API Server's default port (8091 is taken from the GetAPIServerInfo example; the documentation names no default). ([specs/holyrics.yaml:31](specs/holyrics.yaml#L31))
+- [ ] Record the HTTP status and body Holyrics answers an invalid or revoked token with ({"status":"error","error":"invalid token"} is documented, its status not; 401 is assumed for the refusal), and confirm CheckPermissions' 401 carries an error object instead. ([specs/holyrics.yaml:35](specs/holyrics.yaml#L35))
+- [ ] Confirm actions documented as returning no value answer {"status":"ok"} with HTTP 200, and that an action the token lacks answers status error rather than 401. ([specs/holyrics.yaml:146](specs/holyrics.yaml#L146))
+- [ ] Confirm GetCurrentPresentation answers data null while nothing is presented (the case that empties presentation state), and that GetHue answers data null while the hue is off. ([specs/holyrics.yaml:1537](specs/holyrics.yaml#L1537))
+- [ ] Check which response Numbers can be fractional: time_ms, duration_ms, volume, slide_number and total_slides are read as integers, countdown_time, stopwatch_time, BPM and the others as decimals. ([specs/holyrics.yaml:1427](specs/holyrics.yaml#L1427))
+- [ ] Confirm SetHue with hue null turns the hue off. ([specs/holyrics.yaml:1409](specs/holyrics.yaml#L1409))
+
 ## imimot-mitti — Mitti
 
 - [ ] Check that a Custom OSC Feedback target (this host and the feedback_port setting) receives every feedback message, and which port Mitti suggests by default. ([specs/imimot-mitti.yaml:617](specs/imimot-mitti.yaml#L617))

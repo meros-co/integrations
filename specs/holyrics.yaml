@@ -1,0 +1,1745 @@
+spec: 1
+id: holyrics
+name: Holyrics (API Server)
+vendor: Holyrics
+category: playback
+
+# Holyrics' API Server over the local network: POST /api/<Action>?token=<token>
+# with a JSON body (Content-Type application/json), every reply
+# {"status": "ok", "data": ...} or {"status": "error", "error": ...}. Tokens and
+# their permissions are made in File > Settings > API Server > manage
+# permissions. Every documented action is a command: those whose parameters
+# are all required scalars take them typed, the others take the request object
+# as the API documents it. State follows the live actions, polled.
+
+source:
+  - title: Holyrics API-Server documentation (README-en.md)
+    author: Holyrics
+    url: https://github.com/holyrics/API-Server/blob/main/README-en.md
+    note: >
+      Manufacturer documentation (repository without a licence: facts only,
+      nothing quoted), retrieved 2026-10-23. The local request form POST
+      http://[IP]:[PORT]/api/{action}?token=..., the hash method (Auth nonce,
+      sid, rid, sha256 dtoken), the internet relay (api.holyrics.com.br with
+      api_key and token headers), the reply envelope and its errors, and
+      every action of "Available actions" with its parameters, response
+      fields and version (v2.19.0 to v2.29.0); GetAPIServerInfo's example
+      port 8091.
+
+transport:
+  type: http
+  port: 8091
+  scheme: http
+  auth: none
+  refusal_status: [401]
+  refusal_status_body: { json: { "$.error": "(?i)^invalid token$" } }
+  timeout_ms: 5000
+  probe: { method: POST, path: /api/GetTokenInfo, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+
+settings:
+  token: { type: string, secret: true, required: true, label: Token, description: "An API Server token made in Holyrics (File > Settings > API Server > manage permissions); it allows only the actions its permissions list." }
+
+ports:
+  - { port: 8091, protocol: http, role: control, note: "Holyrics' API Server (File > Settings > API Server); 8091 as the documentation's example gives it" }
+
+models:
+  - id: holyrics
+    name: Holyrics 2.19 and later, API Server
+    supports:
+      [get_token_info, check_permissions, get_lyrics, get_songs, search_lyrics, show_lyrics,
+       get_text, get_texts, search_text, show_text, show_verse, get_audios, get_videos, get_images,
+       get_files, get_audio, get_video, get_image, get_file, get_file_tags,
+       set_audio_item_property, set_video_item_property, set_image_item_property,
+       set_file_item_property, play_audio, play_video, show_image, execute_file, audio_exists,
+       video_exists, image_exists, file_exists, show_announcement, get_custom_messages,
+       show_custom_message, show_custom_message_standalone, get_custom_message_display_info,
+       show_quick_presentation, show_countdown, get_quiz_list, show_quiz, quiz_action,
+       get_automatic_presentations, get_automatic_presentation, play_automatic_presentation,
+       get_automatic_presentation_player_info, automatic_presentation_player_action,
+       get_media_player_info, media_player_action, get_lyrics_playlist, add_lyrics_to_playlist,
+       remove_from_lyrics_playlist, set_lyrics_playlist_item, get_media_playlist,
+       set_media_playlist_item, media_playlist_action, get_next_song_playlist,
+       get_next_media_playlist, show_next_song_playlist, show_next_media_playlist,
+       get_previous_song_playlist, get_previous_media_playlist, show_previous_song_playlist,
+       show_previous_media_playlist, add_to_playlist, remove_from_media_playlist,
+       set_playlist_item_duration, set_playlist_item_midi_time_code, get_slide_descriptions,
+       get_favorites, favorite_action, get_apis, get_scripts, api_action, script_action,
+       api_request, module_action, run_actions, get_current_presentation,
+       close_current_presentation, get_f8, get_f9, get_f10, set_f8, set_f9, set_f10, toggle_f8,
+       toggle_f9, toggle_f10, action_next, action_previous, action_go_to_index,
+       action_go_to_slide_description, get_current_background, get_current_theme, get_themes,
+       get_backgrounds, get_background_tags, set_current_background, get_thumbnail, get_color_map,
+       get_alert, set_alert, get_current_schedule, get_schedules, get_saved_playlists,
+       load_saved_playlist, get_history, get_histories, get_nearest_history, get_song_group,
+       get_song_groups, get_teams, get_members, get_roles, get_services, get_events,
+       get_announcement, get_announcements, get_modules, get_communication_panel_info,
+       set_communication_panel_settings, start_countdown_communication_panel,
+       stop_countdown_communication_panel, start_timer_communication_panel,
+       stop_timer_communication_panel, set_text_communication_panel, set_alert_communication_panel,
+       communication_panel_call_attention, get_wallpaper_settings, set_wallpaper_settings,
+       get_display_settings, set_display_settings, get_display_settings_presets,
+       get_ndi_settings_list, get_ndi_settings, set_ndi_settings, get_transition_effect_settings,
+       set_transition_effect_settings, get_translation_preset_list, get_translation_preset,
+       apply_translation_preset, get_logo_settings_preset_list, get_logo_settings_preset,
+       apply_logo_settings_preset, get_bible_responsive_reading_settings_preset_list,
+       get_bible_responsive_reading_settings_preset,
+       apply_bible_responsive_reading_settings_preset, get_bible_versions, get_bible_versions_v2,
+       get_bible_settings, set_bible_settings, get_available_bible_books, get_bible_books,
+       identify_verse_references, parse_verse_id2_verse_reference,
+       parse_verse_id2_verse_reference_group, get_presentation_footer_settings,
+       set_presentation_footer_settings, get_bpm, set_bpm, get_hue, set_hue,
+       get_runtime_environment, set_runtime_environment, set_logo, get_sync_status,
+       get_interface_input, set_interface_input, get_opened_window, select_verse, open_draw_lots,
+       get_media_duration, get_version, get_holyrics_plan_info, get_api_server_info,
+       get_real_time_song_key, set_real_time_song_key, action_next_quick_presentation,
+       action_previous_quick_presentation, close_current_quick_presentation,
+       get_current_quick_presentation, get_triggers, get_trigger_tags,
+       get_trigger_pause_state_for_tag, set_trigger_pause_state_for_tag,
+       get_trigger_pause_state_for_receiver, set_trigger_pause_state_for_receiver,
+       get_scheduled_tasks, get_global_settings, set_global_settings, get_styled_models,
+       get_styled_models_as_map, get_midi_settings, get_rule_group_list, get_rule_group,
+       test_rule_group, get_transition_effect_template_settings_list,
+       get_transition_effect_template_settings, set_transition_effect_template_settings,
+       create_item, edit_item, delete_item, add_songs_to_song_group, remove_songs_from_song_group,
+       set_current_schedule, disable_hue]
+    verification: none
+
+commands:
+  get_token_info:
+    summary: "Gets the token information (GetTokenInfo, v2.25.0)"
+    send: { method: POST, path: /api/GetTokenInfo, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  check_permissions:
+    summary: "Checks if the token has the required permissions (CheckPermissions, v2.25.0)"
+    params:
+      actions: {"type": "string", "required": true, "label": "Actions", "description": "List of required actions for the token, separated by commas."}
+    send: { method: POST, path: /api/CheckPermissions, query: { token: "{settings.token}" }, content_type: application/json, body: '{"actions":{actions:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_lyrics:
+    summary: "Returns a song (GetLyrics, also GetSong, v2.19.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for GetLyrics, with id, fields (optional)."}
+    send: { method: POST, path: /api/GetLyrics, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_songs:
+    summary: "Returns the list of songs (GetSongs, v2.21.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for GetSongs, with fields (optional)."}
+    send: { method: POST, path: /api/GetSongs, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  search_lyrics:
+    summary: "Performs a search in the user's lyrics list (SearchLyrics, also SearchSong, v2.19.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for SearchLyrics, with input, text, title (optional), artist (optional), note (optional), lyrics (optional), group (optional), fields (optional)."}
+    send: { method: POST, path: /api/SearchLyrics, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  show_lyrics:
+    summary: "Starts a lyric show (ShowLyrics, also ShowSong, v2.19.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for ShowLyrics, with id, initial_index (optional)."}
+    send: { method: POST, path: /api/ShowLyrics, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_text:
+    summary: "Returns a text (GetText, v2.21.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for GetText, with id, fields (optional)."}
+    send: { method: POST, path: /api/GetText, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_texts:
+    summary: "Returns the list of texts (GetTexts, v2.21.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for GetTexts, with fields (optional)."}
+    send: { method: POST, path: /api/GetTexts, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  search_text:
+    summary: "Performs a search in the user's text list (SearchText, v2.21.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for SearchText, with input, text, fields (optional)."}
+    send: { method: POST, path: /api/SearchText, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  show_text:
+    summary: "Starts a presentation of a text tab item (ShowText, v2.19.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for ShowText, with id, initial_index (optional)."}
+    send: { method: POST, path: /api/ShowText, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  show_verse:
+    summary: "Starts a Bible verse presentation (ShowVerse, v2.19.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for ShowVerse, with input, id (optional), ids (optional), references (optional), version (optional), quick_presentation (optional), show_x_verses (optional), default_action (optional)."}
+    send: { method: POST, path: /api/ShowVerse, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_audios:
+    summary: "Returns the list of files from the respective tab: audio, video, image, file (GetAudios, v2.19.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for GetAudios, with folder (optional), filter (optional), include_metadata (optional), include_thumbnail (optional)."}
+    send: { method: POST, path: /api/GetAudios, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_videos:
+    summary: "Returns the list of files from the respective tab: audio, video, image, file (GetVideos, v2.19.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for GetVideos, with folder (optional), filter (optional), include_metadata (optional), include_thumbnail (optional)."}
+    send: { method: POST, path: /api/GetVideos, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_images:
+    summary: "Returns the list of files from the respective tab: audio, video, image, file (GetImages, v2.19.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for GetImages, with folder (optional), filter (optional), include_metadata (optional), include_thumbnail (optional)."}
+    send: { method: POST, path: /api/GetImages, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_files:
+    summary: "Returns the list of files from the respective tab: audio, video, image, file (GetFiles, v2.19.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for GetFiles, with folder (optional), filter (optional), include_metadata (optional), include_thumbnail (optional)."}
+    send: { method: POST, path: /api/GetFiles, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_audio:
+    summary: "Returns the data of a file from the list of files in the respective tab: audio, video, image, file (GetAudio, v2.24.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for GetAudio, with name, include_metadata (optional), include_thumbnail (optional)."}
+    send: { method: POST, path: /api/GetAudio, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_video:
+    summary: "Returns the data of a file from the list of files in the respective tab: audio, video, image, file (GetVideo, v2.24.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for GetVideo, with name, include_metadata (optional), include_thumbnail (optional)."}
+    send: { method: POST, path: /api/GetVideo, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_image:
+    summary: "Returns the data of a file from the list of files in the respective tab: audio, video, image, file (GetImage, v2.24.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for GetImage, with name, include_metadata (optional), include_thumbnail (optional)."}
+    send: { method: POST, path: /api/GetImage, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_file:
+    summary: "Returns the data of a file from the list of files in the respective tab: audio, video, image, file (GetFile, v2.24.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for GetFile, with name, include_metadata (optional), include_thumbnail (optional)."}
+    send: { method: POST, path: /api/GetFile, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_file_tags:
+    summary: "Returns the list of all existing tags used in the files (GetFileTags, v2.29.0)"
+    send: { method: POST, path: /api/GetFileTags, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_audio_item_property:
+    summary: "Changes the custom information of a file (SetAudioItemProperty, v2.24.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for SetAudioItemProperty, with name, properties."}
+    send: { method: POST, path: /api/SetAudioItemProperty, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  set_video_item_property:
+    summary: "Changes the custom information of a file (SetVideoItemProperty, v2.24.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for SetVideoItemProperty, with name, properties."}
+    send: { method: POST, path: /api/SetVideoItemProperty, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  set_image_item_property:
+    summary: "Changes the custom information of a file (SetImageItemProperty, v2.24.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for SetImageItemProperty, with name, properties."}
+    send: { method: POST, path: /api/SetImageItemProperty, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  set_file_item_property:
+    summary: "Changes the custom information of a file (SetFileItemProperty, v2.24.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for SetFileItemProperty, with name, properties."}
+    send: { method: POST, path: /api/SetFileItemProperty, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  play_audio:
+    summary: "Play an audio or a list of audios (folder) (PlayAudio, v2.19.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for PlayAudio, with file, settings (optional)."}
+    send: { method: POST, path: /api/PlayAudio, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  play_video:
+    summary: "Play a video or a list of videos (folder) (PlayVideo, v2.19.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for PlayVideo, with file, settings (optional)."}
+    send: { method: POST, path: /api/PlayVideo, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  show_image:
+    summary: "Displays an image or a list of images (folder) (ShowImage, v2.19.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for ShowImage, with file, automatic (optional)."}
+    send: { method: POST, path: /api/ShowImage, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  execute_file:
+    summary: "Executes a file (ExecuteFile, v2.21.0)"
+    params:
+      file: {"type": "string", "required": true, "label": "File", "description": "File name."}
+    send: { method: POST, path: /api/ExecuteFile, query: { token: "{settings.token}" }, content_type: application/json, body: '{"file":{file:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  audio_exists:
+    summary: "Checks if there is a file with the informed name (AudioExists, v2.21.0)"
+    params:
+      file: {"type": "string", "required": true, "label": "File", "description": "File name."}
+    send: { method: POST, path: /api/AudioExists, query: { token: "{settings.token}" }, content_type: application/json, body: '{"file":{file:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  video_exists:
+    summary: "Checks if there is a file with the informed name (VideoExists, v2.21.0)"
+    params:
+      file: {"type": "string", "required": true, "label": "File", "description": "File name."}
+    send: { method: POST, path: /api/VideoExists, query: { token: "{settings.token}" }, content_type: application/json, body: '{"file":{file:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  image_exists:
+    summary: "Checks if there is a file with the informed name (ImageExists, v2.21.0)"
+    params:
+      file: {"type": "string", "required": true, "label": "File", "description": "File name."}
+    send: { method: POST, path: /api/ImageExists, query: { token: "{settings.token}" }, content_type: application/json, body: '{"file":{file:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  file_exists:
+    summary: "Checks if there is a file with the informed name (FileExists, v2.21.0)"
+    params:
+      file: {"type": "string", "required": true, "label": "File", "description": "File name."}
+    send: { method: POST, path: /api/FileExists, query: { token: "{settings.token}" }, content_type: application/json, body: '{"file":{file:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  show_announcement:
+    summary: "Displays an announcement or a list of announcements (ShowAnnouncement, v2.19.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for ShowAnnouncement, with id (optional), ids (optional), name (optional), names (optional), automatic (optional)."}
+    send: { method: POST, path: /api/ShowAnnouncement, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_custom_messages:
+    summary: "List of custom messages (GetCustomMessages, v2.19.0)"
+    send: { method: POST, path: /api/GetCustomMessages, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  show_custom_message:
+    summary: "Display a custom message (ShowCustomMessage, v2.19.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for ShowCustomMessage, with name, position_? (optional), params (optional), note."}
+    send: { method: POST, path: /api/ShowCustomMessage, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  show_custom_message_standalone:
+    summary: "Display a custom message without the need for the reference object to exist (ShowCustomMessageStandalone, v2.29.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for ShowCustomMessageStandalone, with name, message, note, <br>**params**, params."}
+    send: { method: POST, path: /api/ShowCustomMessageStandalone, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_custom_message_display_info:
+    summary: "Get information from a custom message sent for display (GetCustomMessageDisplayInfo, v2.30.0)"
+    params:
+      display_id: {"type": "string", "required": true, "label": "Presentation", "description": "Presentation ID."}
+    send: { method: POST, path: /api/GetCustomMessageDisplayInfo, query: { token: "{settings.token}" }, content_type: application/json, body: '{"display_id":{display_id:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  show_quick_presentation:
+    summary: "Quick display of text (ShowQuickPresentation, v2.19.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for ShowQuickPresentation, with text, slides, theme (optional), custom_theme (optional), automatic (optional), initial_index (optional)."}
+    send: { method: POST, path: /api/ShowQuickPresentation, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  show_countdown:
+    summary: "Display a countdown on the public screen (ShowCountdown, v2.20.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for ShowCountdown, with time, exact_time (optional), text_before (optional), text_after (optional), zero_fill (optional), hide_zero_minute (optional), countdown_relative_size (optional), theme (optional), countdown_style (optional), custom_theme (optional)."}
+    send: { method: POST, path: /api/ShowCountdown, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_quiz_list:
+    summary: "Get the existing multiple choice groups (GetQuizList, v2.26.0)"
+    send: { method: POST, path: /api/GetQuizList, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  show_quiz:
+    summary: "Start a multiple choice presentation (ShowQuiz, v2.20.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for ShowQuiz, with questions, settings."}
+    send: { method: POST, path: /api/ShowQuiz, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  quiz_action:
+    summary: "Execute an action in a multiple choice presentation (QuizAction, v2.20.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for QuizAction, with action (optional), hide_alternative (optional), select_alternative (optional), countdown (optional)."}
+    send: { method: POST, path: /api/QuizAction, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_automatic_presentations:
+    summary: "Returns the list of automatic presentations (GetAutomaticPresentations, also GetAPs, v2.21.0)"
+    send: { method: POST, path: /api/GetAutomaticPresentations, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_automatic_presentation:
+    summary: "Returns an automatic presentation (GetAutomaticPresentation, also GetAP, v2.21.0)"
+    params:
+      file: {"type": "string", "required": true, "label": "File", "description": "File name. Example: file.ap."}
+    send: { method: POST, path: /api/GetAutomaticPresentation, query: { token: "{settings.token}" }, content_type: application/json, body: '{"file":{file:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  play_automatic_presentation:
+    summary: "Play an automatic presentation item (PlayAutomaticPresentation, also PlayAP, v2.19.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for PlayAutomaticPresentation, with file, theme (optional), custom_theme (optional)."}
+    send: { method: POST, path: /api/PlayAutomaticPresentation, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_automatic_presentation_player_info:
+    summary: "Returns the information of the automatic presentation on display (GetAutomaticPresentationPlayerInfo, also GetAPPlayerInfo, v2.20.0)"
+    send: { method: POST, path: /api/GetAutomaticPresentationPlayerInfo, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  automatic_presentation_player_action:
+    summary: "Perform actions in the player (AutomaticPresentationPlayerAction, also APPlayerAction, v2.20.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for AutomaticPresentationPlayerAction, with action (optional), volume (optional), mute (optional), time_ms (optional)."}
+    send: { method: POST, path: /api/AutomaticPresentationPlayerAction, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_media_player_info:
+    summary: "Returns player information (GetMediaPlayerInfo, v2.19.0)"
+    send: { method: POST, path: /api/GetMediaPlayerInfo, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  media_player_action:
+    summary: "Perform actions in the player (MediaPlayerAction, v2.19.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for MediaPlayerAction, with action (optional), volume (optional), mute (optional), repeat (optional), shuffle (optional), execute_single (optional), fullscreen (optional), time_ms (optional)."}
+    send: { method: POST, path: /api/MediaPlayerAction, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_lyrics_playlist:
+    summary: "Lyrics playlist (GetLyricsPlaylist, also GetSongPlaylist, v2.19.0)"
+    send: { method: POST, path: /api/GetLyricsPlaylist, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  add_lyrics_to_playlist:
+    summary: "Add song lyrics to playlist (AddLyricsToPlaylist, also AddSongsToPlaylist, v2.19.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for AddLyricsToPlaylist, with id (optional), ids (optional), index (optional), media_playlist (optional), event_id (optional)."}
+    send: { method: POST, path: /api/AddLyricsToPlaylist, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  remove_from_lyrics_playlist:
+    summary: "Remove lyrics from playlist (RemoveFromLyricsPlaylist, also RemoveFromSongPlaylist, v2.19.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for RemoveFromLyricsPlaylist, with id (optional), ids (optional), index (optional), indexes (optional), event_id (optional)."}
+    send: { method: POST, path: /api/RemoveFromLyricsPlaylist, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  set_lyrics_playlist_item:
+    summary: "Change a Lyrics Playlist Item (SetLyricsPlaylistItem, also SetSongPlaylistItem, v2.22.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for SetLyricsPlaylistItem, with index, song_id, event_id (optional)."}
+    send: { method: POST, path: /api/SetLyricsPlaylistItem, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_media_playlist:
+    summary: "Media playlist (GetMediaPlaylist, v2.19.0)"
+    send: { method: POST, path: /api/GetMediaPlaylist, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_media_playlist_item:
+    summary: "Change a media playlist item (SetMediaPlaylistItem, v2.22.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for SetMediaPlaylistItem, with index, item, event_id (optional)."}
+    send: { method: POST, path: /api/SetMediaPlaylistItem, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  media_playlist_action:
+    summary: "Play a media playlist item (MediaPlaylistAction, v2.19.0)"
+    params:
+      id: {"type": "string", "required": true, "label": "ID", "description": "Item ID."}
+    send: { method: POST, path: /api/MediaPlaylistAction, query: { token: "{settings.token}" }, content_type: application/json, body: '{"id":{id:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_next_song_playlist:
+    summary: "Returns the next song in the playlist (GetNextSongPlaylist, v2.22.0)"
+    send: { method: POST, path: /api/GetNextSongPlaylist, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_next_media_playlist:
+    summary: "Returns the next executable item from the media playlist (GetNextMediaPlaylist, v2.22.0)"
+    send: { method: POST, path: /api/GetNextMediaPlaylist, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  show_next_song_playlist:
+    summary: "Play the next song in the playlist Method does not return value (ShowNextSongPlaylist, v2.22.0)"
+    send: { method: POST, path: /api/ShowNextSongPlaylist, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  show_next_media_playlist:
+    summary: "Plays the next item in the media playlist Method does not return value (ShowNextMediaPlaylist, v2.22.0)"
+    send: { method: POST, path: /api/ShowNextMediaPlaylist, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_previous_song_playlist:
+    summary: "Returns the previous song in the playlist (GetPreviousSongPlaylist, v2.22.0)"
+    send: { method: POST, path: /api/GetPreviousSongPlaylist, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_previous_media_playlist:
+    summary: "Returns the previous executable item from the media playlist (GetPreviousMediaPlaylist, v2.22.0)"
+    send: { method: POST, path: /api/GetPreviousMediaPlaylist, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  show_previous_song_playlist:
+    summary: "Play the previous song in the playlist Method does not return value (ShowPreviousSongPlaylist, v2.22.0)"
+    send: { method: POST, path: /api/ShowPreviousSongPlaylist, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  show_previous_media_playlist:
+    summary: "Plays the previous item in the media playlist Method does not return value (ShowPreviousMediaPlaylist, v2.22.0)"
+    send: { method: POST, path: /api/ShowPreviousMediaPlaylist, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  add_to_playlist:
+    summary: "Add items to the media playlist (AddToPlaylist, v2.20.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for AddToPlaylist, with items, index (optional), ignore_duplicates (optional), event_id (optional)."}
+    send: { method: POST, path: /api/AddToPlaylist, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  remove_from_media_playlist:
+    summary: "Remove items from media playlist (RemoveFromMediaPlaylist, v2.19.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for RemoveFromMediaPlaylist, with id (optional), ids (optional), index (optional), indexes (optional), event_id (optional)."}
+    send: { method: POST, path: /api/RemoveFromMediaPlaylist, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  set_playlist_item_duration:
+    summary: "Change duration of an item in the media playlist (SetPlaylistItemDuration, v2.21.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for SetPlaylistItemDuration, with id (optional), index (optional), duration (optional)."}
+    send: { method: POST, path: /api/SetPlaylistItemDuration, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  set_playlist_item_midi_time_code:
+    summary: "Change the timecode of an item in the media playlist (SetPlaylistItemMidiTimeCode, also SetPlaylistItemMTC, v2.28.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for SetPlaylistItemMidiTimeCode, with id (optional), index (optional), midi_time_code."}
+    send: { method: POST, path: /api/SetPlaylistItemMidiTimeCode, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_slide_descriptions:
+    summary: "List of available slide descriptions (GetSlideDescriptions, v2.21.0)"
+    send: { method: POST, path: /api/GetSlideDescriptions, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_favorites:
+    summary: "Favorites bar items (GetFavorites, v2.19.0)"
+    send: { method: POST, path: /api/GetFavorites, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  favorite_action:
+    summary: "Execute an item from the bookmarks bar (FavoriteAction, v2.19.0)"
+    params:
+      id: {"type": "string", "required": true, "label": "ID", "description": "Item ID."}
+    send: { method: POST, path: /api/FavoriteAction, query: { token: "{settings.token}" }, content_type: application/json, body: '{"id":{id:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_apis:
+    summary: "Returns the list of APIs (GetApis, v2.21.0)"
+    send: { method: POST, path: /api/GetApis, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_scripts:
+    summary: "Returns the list of scripts (GetScripts, v2.21.0)"
+    send: { method: POST, path: /api/GetScripts, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  api_action:
+    summary: "Executes the action of an existing API item in the program (ApiAction, v2.19.0)"
+    params:
+      id: {"type": "string", "required": true, "label": "ID", "description": "Item ID."}
+    send: { method: POST, path: /api/ApiAction, query: { token: "{settings.token}" }, content_type: application/json, body: '{"id":{id:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  script_action:
+    summary: "Executes the action of an existing Script item in the program (ScriptAction, v2.19.0)"
+    params:
+      id: {"type": "string", "required": true, "label": "ID", "description": "Item ID."}
+    send: { method: POST, path: /api/ScriptAction, query: { token: "{settings.token}" }, content_type: application/json, body: '{"id":{id:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  api_request:
+    summary: "Executes a request to the associated receiver and returns the receiver's response (ApiRequest, v2.19.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for ApiRequest, with id, raw."}
+    send: { method: POST, path: /api/ApiRequest, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  module_action:
+    summary: "Execute a public action of a module (ModuleAction, v2.26.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for ModuleAction, with module_id, action_id, action_type (optional), async (optional), timeout (optional), notification (optional), input (optional)."}
+    send: { method: POST, path: /api/ModuleAction, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  run_actions:
+    summary: "Execute an action of the 'Actions' type Available actions: HolyricsActions (RunActions, v2.27.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for RunActions, with action_id, settings."}
+    send: { method: POST, path: /api/RunActions, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_current_presentation:
+    summary: "Item currently being presented or null if no presentation is being displayed (GetCurrentPresentation, v2.19.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for GetCurrentPresentation, with include_slides (optional), include_slide_comment (optional), include_slide_preview (optional), slide_preview_size (optional)."}
+    send: { method: POST, path: /api/GetCurrentPresentation, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  close_current_presentation:
+    summary: "End current presentation Method does not return value (CloseCurrentPresentation, v2.19.0)"
+    send: { method: POST, path: /api/CloseCurrentPresentation, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_f8:
+    summary: "Returns the current state of the respective option F8 (wallpaper), F9 (empty screen) or F10 (black screen) (GetF8, v2.19.0)"
+    send: { method: POST, path: /api/GetF8, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_f9:
+    summary: "Returns the current state of the respective option F8 (wallpaper), F9 (empty screen) or F10 (black screen) (GetF9, v2.19.0)"
+    send: { method: POST, path: /api/GetF9, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_f10:
+    summary: "Returns the current state of the respective option F8 (wallpaper), F9 (empty screen) or F10 (black screen) (GetF10, v2.19.0)"
+    send: { method: POST, path: /api/GetF10, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_f8:
+    summary: "Changes the current state of the respective option F8 (wallpaper), F9 (empty screen) or F10 (black screen) (SetF8, v2.19.0)"
+    params:
+      enable: {"type": "bool", "required": true, "label": "Enabled", "description": "True or false."}
+    send: { method: POST, path: /api/SetF8, query: { token: "{settings.token}" }, content_type: application/json, body: '{"enable":{enable}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  set_f9:
+    summary: "Changes the current state of the respective option F8 (wallpaper), F9 (empty screen) or F10 (black screen) (SetF9, v2.19.0)"
+    params:
+      enable: {"type": "bool", "required": true, "label": "Enabled", "description": "True or false."}
+    send: { method: POST, path: /api/SetF9, query: { token: "{settings.token}" }, content_type: application/json, body: '{"enable":{enable}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  set_f10:
+    summary: "Changes the current state of the respective option F8 (wallpaper), F9 (empty screen) or F10 (black screen) (SetF10, v2.19.0)"
+    params:
+      enable: {"type": "bool", "required": true, "label": "Enabled", "description": "True or false."}
+    send: { method: POST, path: /api/SetF10, query: { token: "{settings.token}" }, content_type: application/json, body: '{"enable":{enable}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  toggle_f8:
+    summary: "Changes the current state of the respective option F8 (wallpaper), F9 (empty screen) or F10 (black screen) Method does not return value (ToggleF8, v2.19.0)"
+    send: { method: POST, path: /api/ToggleF8, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  toggle_f9:
+    summary: "Changes the current state of the respective option F8 (wallpaper), F9 (empty screen) or F10 (black screen) Method does not return value (ToggleF9, v2.19.0)"
+    send: { method: POST, path: /api/ToggleF9, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  toggle_f10:
+    summary: "Changes the current state of the respective option F8 (wallpaper), F9 (empty screen) or F10 (black screen) Method does not return value (ToggleF10, v2.19.0)"
+    send: { method: POST, path: /api/ToggleF10, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  action_next:
+    summary: "Performs a next command on the current presentation Method does not return value (ActionNext, v2.19.0)"
+    send: { method: POST, path: /api/ActionNext, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  action_previous:
+    summary: "Performs a back command on the current presentation Method does not return value (ActionPrevious, v2.19.0)"
+    send: { method: POST, path: /api/ActionPrevious, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  action_go_to_index:
+    summary: "Changes the slide in view from the slide index (ActionGoToIndex, v2.19.0)"
+    params:
+      index: {"type": "int", "min": 0, "required": true, "label": "Slide index", "description": "Slide index in presentation (starts at zero)."}
+    send: { method: POST, path: /api/ActionGoToIndex, query: { token: "{settings.token}" }, content_type: application/json, body: '{"index":{index}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  action_go_to_slide_description:
+    summary: "Changes the slide in view from the name of the slide description (ActionGoToSlideDescription, v2.19.0)"
+    params:
+      name: {"type": "string", "required": true, "label": "Name", "description": "Slide description name."}
+    send: { method: POST, path: /api/ActionGoToSlideDescription, query: { token: "{settings.token}" }, content_type: application/json, body: '{"name":{name:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_current_background:
+    summary: "Returns the background of the currently displayed presentation (GetCurrentBackground, v2.19.0)"
+    send: { method: POST, path: /api/GetCurrentBackground, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_current_theme:
+    summary: "Returns the theme of the presentation currently displayed (GetCurrentTheme, v2.22.0)"
+    send: { method: POST, path: /api/GetCurrentTheme, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_themes:
+    summary: "List of topics (GetThemes, v2.27.0)"
+    send: { method: POST, path: /api/GetThemes, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_backgrounds:
+    summary: "List of themes and backgrounds (GetBackgrounds, v2.19.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for GetBackgrounds, with input (optional), type (optional), tag (optional), tags (optional), intersection (optional)."}
+    send: { method: POST, path: /api/GetBackgrounds, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_background_tags:
+    summary: "List of Tags created for organizing Themes and Backgrounds (GetBackgroundTags, v2.26.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for GetBackgroundTags, with input (optional), type (optional)."}
+    send: { method: POST, path: /api/GetBackgroundTags, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_current_background:
+    summary: "Changes the background (or theme) of the current presentation (SetCurrentBackground, v2.19.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for SetCurrentBackground, with input (optional), id (optional), name (optional), type (optional), tag (optional), tags (optional), intersection (optional), edit (optional), custom_theme (optional)."}
+    send: { method: POST, path: /api/SetCurrentBackground, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_thumbnail:
+    summary: "Returns the thumbnail image of an item in the program (GetThumbnail, v2.21.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for GetThumbnail, with id (optional), ids (optional), type."}
+    send: { method: POST, path: /api/GetThumbnail, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_color_map:
+    summary: "Returns the information of the predominant color of a respective type of item (GetColorMap, v2.20.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for GetColorMap, with type, source (optional)."}
+    send: { method: POST, path: /api/GetColorMap, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_alert:
+    summary: "Returns alert message settings (GetAlert, v2.20.0)"
+    send: { method: POST, path: /api/GetAlert, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_alert:
+    summary: "Change alert message settings (SetAlert, v2.19.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for SetAlert, with text (optional), show (optional), display_ahead (optional), close_after_seconds (optional)."}
+    send: { method: POST, path: /api/SetAlert, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_current_schedule:
+    summary: "Current schedule (selected in the main program window) (GetCurrentSchedule, v2.19.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for GetCurrentSchedule, with include_lyrics_slides (optional), include_lyrics_history (optional)."}
+    send: { method: POST, path: /api/GetCurrentSchedule, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_schedules:
+    summary: "Returns the schedule list for a specific month (GetSchedules, v2.19.0)"
+    params:
+      month: {"type": "int", "min": 1, "max": 12, "required": true, "label": "Month", "description": "Month (1-12)."}
+      year: {"type": "int", "min": 1, "required": true, "label": "Year", "description": "Year."}
+    send: { method: POST, path: /api/GetSchedules, query: { token: "{settings.token}" }, content_type: application/json, body: '{"month":{month},"year":{year}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_saved_playlists:
+    summary: "Returns saved playlists (GetSavedPlaylists, v2.19.0)"
+    send: { method: POST, path: /api/GetSavedPlaylists, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  load_saved_playlist:
+    summary: "Populates the media list of the currently selected playlist in the program with the given list (LoadSavedPlaylist, v2.19.0)"
+    params:
+      name: {"type": "string", "required": true, "label": "Name", "description": "Saved playlist name."}
+      merge: {"type": "bool", "default": false, "label": "Merge", "description": "Adds the items to the end of the list instead of replacing."}
+    send: { method: POST, path: /api/LoadSavedPlaylist, query: { token: "{settings.token}" }, content_type: application/json, body: '{"name":{name:json},"merge":{merge}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_history:
+    summary: "\"Music played\" history (GetHistory, v2.19.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for GetHistory, with id, in_millis (optional)."}
+    send: { method: POST, path: /api/GetHistory, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_histories:
+    summary: "History of all tags for \"Music played\" (GetHistories, v2.19.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for GetHistories, with in_millis (optional)."}
+    send: { method: POST, path: /api/GetHistories, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_nearest_history:
+    summary: "Gets the date of the \"Song played\" history closest to a date and time passed as a parameter (or the current system date and time) (GetNearestHistory, v2.24.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for GetNearestHistory, with id, datetime (optional), type (optional)."}
+    send: { method: POST, path: /api/GetNearestHistory, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_song_group:
+    summary: "Music group (GetSongGroup, v2.25.0)"
+    params:
+      name: {"type": "string", "required": true, "label": "Name", "description": "The song group's name."}
+    send: { method: POST, path: /api/GetSongGroup, query: { token: "{settings.token}" }, content_type: application/json, body: '{"name":{name:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_song_groups:
+    summary: "List of music groups (GetSongGroups, v2.24.0)"
+    send: { method: POST, path: /api/GetSongGroups, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_teams:
+    summary: "Team list (GetTeams, v2.22.0)"
+    send: { method: POST, path: /api/GetTeams, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_members:
+    summary: "List of members (GetMembers, v2.19.0)"
+    params:
+      only_active: {"type": "bool", "default": true, "label": "Active only", "description": "Return only active entries."}
+    send: { method: POST, path: /api/GetMembers, query: { token: "{settings.token}" }, content_type: application/json, body: '{"only_active":{only_active}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_roles:
+    summary: "List of functions (GetRoles, v2.19.0)"
+    params:
+      only_active: {"type": "bool", "default": true, "label": "Active only", "description": "Return only active entries."}
+    send: { method: POST, path: /api/GetRoles, query: { token: "{settings.token}" }, content_type: application/json, body: '{"only_active":{only_active}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_services:
+    summary: "Service list (GetServices, v2.22.0)"
+    params:
+      only_active: {"type": "bool", "default": true, "label": "Active only", "description": "Return only active entries."}
+    send: { method: POST, path: /api/GetServices, query: { token: "{settings.token}" }, content_type: application/json, body: '{"only_active":{only_active}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_events:
+    summary: "Event list (GetEvents, v2.22.0)"
+    params:
+      month: {"type": "int", "min": 1, "max": 12, "required": true, "label": "Month", "description": "Month (1-12)."}
+      year: {"type": "int", "min": 1, "required": true, "label": "Year", "description": "Year."}
+    send: { method: POST, path: /api/GetEvents, query: { token: "{settings.token}" }, content_type: application/json, body: '{"month":{month},"year":{year}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_announcement:
+    summary: "Announcement (GetAnnouncement, v2.22.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for GetAnnouncement, with id (optional), name (optional)."}
+    send: { method: POST, path: /api/GetAnnouncement, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_announcements:
+    summary: "Announcement list (GetAnnouncements, v2.22.0)"
+    send: { method: POST, path: /api/GetAnnouncements, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_modules:
+    summary: "List of modules (GetModules, v2.26.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for GetModules, with input (optional), id (optional), name (optional), jscommunity_id (optional), info_id (optional), active (optional), enabled_by_user (optional), conditional_execution (optional)."}
+    send: { method: POST, path: /api/GetModules, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_communication_panel_info:
+    summary: "Current communication panel configuration (GetCommunicationPanelInfo, also GetCPInfo, GetCPSettings, v2.19.0)"
+    send: { method: POST, path: /api/GetCommunicationPanelInfo, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_communication_panel_settings:
+    summary: "Change the current setting of the communication panel (SetCommunicationPanelSettings, also SetCPSettings, v2.20.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for SetCommunicationPanelSettings, with text, show, display_ahead, theme, custom_theme (optional), alert_text, alert_show, countdown_font_relative_size, countdown_font_color, stopwatch_font_color, time_font_color, display_clock_as_background, display_clock_on_alert, countdown_display_location, display_clock_with_countdown_fullscreen, display_vlc_player_remaining_time, attention_icon_color, attention_background_color, countdown_hide_zero_minute, countdown_hide_zero_hour, stopwatch_hide_zero_minute, stopwatch_hide_zero_hour."}
+    send: { method: POST, path: /api/SetCommunicationPanelSettings, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  start_countdown_communication_panel:
+    summary: "Starts a countdown on the communication panel (StartCountdownCommunicationPanel, also StartCountdownCP, v2.19.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for StartCountdownCommunicationPanel, with minutes, seconds, exact_time, yellow_starts_at (optional), stop_at_zero (optional), text (optional), alert_text (optional)."}
+    send: { method: POST, path: /api/StartCountdownCommunicationPanel, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  stop_countdown_communication_panel:
+    summary: "Ends current communication panel countdown Method does not return value (StopCountdownCommunicationPanel, also StopCountdownCP, v2.19.0)"
+    send: { method: POST, path: /api/StopCountdownCommunicationPanel, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  start_timer_communication_panel:
+    summary: "Start a stopwatch on the communication panel (StartTimerCommunicationPanel, also StartTimerCP, v2.20.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for StartTimerCommunicationPanel, with text (optional), alert_text (optional)."}
+    send: { method: POST, path: /api/StartTimerCommunicationPanel, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  stop_timer_communication_panel:
+    summary: "End the current stopwatch of the communication panel Method does not return value (StopTimerCommunicationPanel, also StopTimerCP, v2.20.0)"
+    send: { method: POST, path: /api/StopTimerCommunicationPanel, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  set_text_communication_panel:
+    summary: "Change communication panel text (SetTextCommunicationPanel, also SetTextCP, v2.19.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for SetTextCommunicationPanel, with text (optional), show (optional), display_ahead (optional), theme (optional), custom_theme (optional)."}
+    send: { method: POST, path: /api/SetTextCommunicationPanel, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  set_alert_communication_panel:
+    summary: "Change communication panel alert settings (SetAlertCommunicationPanel, also SetAlertCP, v2.19.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for SetAlertCommunicationPanel, with text (optional), show (optional), close_after_seconds (optional)."}
+    send: { method: POST, path: /api/SetAlertCommunicationPanel, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  communication_panel_call_attention:
+    summary: "Execute the 'call attention' option available in the communication panel Method does not return value (CommunicationPanelCallAttention, also CPCallAttention, v2.20.0)"
+    send: { method: POST, path: /api/CommunicationPanelCallAttention, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_wallpaper_settings:
+    summary: "Wallpaper settings (GetWallpaperSettings, v2.19.0)"
+    send: { method: POST, path: /api/GetWallpaperSettings, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_wallpaper_settings:
+    summary: "Change wallpaper settings (SetWallpaperSettings, v2.19.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for SetWallpaperSettings, with file (optional), enabled (optional), fill_color (optional), extend (optional), adjust_type, show_clock (optional), by_screen (optional)."}
+    send: { method: POST, path: /api/SetWallpaperSettings, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_display_settings:
+    summary: "List of display settings for each screen (GetDisplaySettings, v2.19.0)"
+    send: { method: POST, path: /api/GetDisplaySettings, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_display_settings:
+    summary: "Change a screen's display settings (SetDisplaySettings, v2.19.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for SetDisplaySettings, with input."}
+    send: { method: POST, path: /api/SetDisplaySettings, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_display_settings_presets:
+    summary: "List of saved display configuration models (GetDisplaySettingsPresets, v2.26.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for GetDisplaySettingsPresets, with type."}
+    send: { method: POST, path: /api/GetDisplaySettingsPresets, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_ndi_settings_list:
+    summary: "List of NDI® output settings (GetNDISettingsList, v2.29.0)"
+    send: { method: POST, path: /api/GetNDISettingsList, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_ndi_settings:
+    summary: "Settings for a specific NDI® output (GetNDISettings, v2.29.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for GetNDISettings, with id (optional), name (optional)."}
+    send: { method: POST, path: /api/GetNDISettings, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_ndi_settings:
+    summary: "Change the settings of an NDI® output (SetNDISettings, v2.29.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for SetNDISettings, with input."}
+    send: { method: POST, path: /api/SetNDISettings, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_transition_effect_settings:
+    summary: "List of transition effect configuration (GetTransitionEffectSettings, v2.21.0)"
+    send: { method: POST, path: /api/GetTransitionEffectSettings, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_transition_effect_settings:
+    summary: "Change the settings of a transition effect (SetTransitionEffectSettings, v2.21.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for SetTransitionEffectSettings, with id, settings."}
+    send: { method: POST, path: /api/SetTransitionEffectSettings, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_translation_preset_list:
+    summary: "List of saved translation configuration models (GetTranslationPresetList, v2.27.0)"
+    send: { method: POST, path: /api/GetTranslationPresetList, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_translation_preset:
+    summary: "Returns a translation configuration model (GetTranslationPreset, v2.27.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for GetTranslationPreset, with id (optional), name (optional)."}
+    send: { method: POST, path: /api/GetTranslationPreset, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  apply_translation_preset:
+    summary: "Applies translation settings from a template (ApplyTranslationPreset, v2.27.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for ApplyTranslationPreset, with id (optional), name (optional)."}
+    send: { method: POST, path: /api/ApplyTranslationPreset, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_logo_settings_preset_list:
+    summary: "List of saved Logo configuration models (GetLogoSettingsPresetList, v2.28.0)"
+    send: { method: POST, path: /api/GetLogoSettingsPresetList, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_logo_settings_preset:
+    summary: "Returns a logo configuration model (GetLogoSettingsPreset, v2.28.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for GetLogoSettingsPreset, with id (optional), name (optional)."}
+    send: { method: POST, path: /api/GetLogoSettingsPreset, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  apply_logo_settings_preset:
+    summary: "Applies the Logo settings from a template (ApplyLogoSettingsPreset, v2.28.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for ApplyLogoSettingsPreset, with id (optional), name (optional)."}
+    send: { method: POST, path: /api/ApplyLogoSettingsPreset, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_bible_responsive_reading_settings_preset_list:
+    summary: "List of saved models for alternate Bible verse reading configuration (GetBibleResponsiveReadingSettingsPresetList, v2.28.0)"
+    send: { method: POST, path: /api/GetBibleResponsiveReadingSettingsPresetList, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_bible_responsive_reading_settings_preset:
+    summary: "Returns a model for alternating reading configuration of Bible verses (GetBibleResponsiveReadingSettingsPreset, v2.28.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for GetBibleResponsiveReadingSettingsPreset, with id (optional), name (optional)."}
+    send: { method: POST, path: /api/GetBibleResponsiveReadingSettingsPreset, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  apply_bible_responsive_reading_settings_preset:
+    summary: "Applies the alternate reading settings for Bible verses based on a template (ApplyBibleResponsiveReadingSettingsPreset, v2.28.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for ApplyBibleResponsiveReadingSettingsPreset, with id (optional), name (optional)."}
+    send: { method: POST, path: /api/ApplyBibleResponsiveReadingSettingsPreset, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_bible_versions:
+    summary: "deprecated Replaced for: hly('GetBibleVersionsV2') Returns the list of available versions of the Bible, and also the associated shortcuts (GetBibleVersions, v2.21.0)"
+    send: { method: POST, path: /api/GetBibleVersions, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_bible_versions_v2:
+    summary: "Returns the list of available versions of the Bible, and also the associated shortcuts (GetBibleVersionsV2, v2.23.0)"
+    send: { method: POST, path: /api/GetBibleVersionsV2, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_bible_settings:
+    summary: "Bible module settings (GetBibleSettings, v2.21.0)"
+    send: { method: POST, path: /api/GetBibleSettings, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_bible_settings:
+    summary: "Change the settings of the Bible module (SetBibleSettings, v2.21.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for SetBibleSettings, with input."}
+    send: { method: POST, path: /api/SetBibleSettings, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_available_bible_books:
+    summary: "Returns the list of available book sets in different languages (GetAvailableBibleBooks, v2.30.0)"
+    send: { method: POST, path: /api/GetAvailableBibleBooks, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_bible_books:
+    summary: "Returns a set of Bible books (GetBibleBooks, v2.30.0)"
+    params:
+      language_id: {"type": "string", "required": true, "label": "Language", "description": "Language ID of the book set."}
+    send: { method: POST, path: /api/GetBibleBooks, query: { token: "{settings.token}" }, content_type: application/json, body: '{"language_id":{language_id:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  identify_verse_references:
+    summary: "Identifies possible biblical references in the provided text (IdentifyVerseReferences, v2.30.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for IdentifyVerseReferences, with value, language_id (optional)."}
+    send: { method: POST, path: /api/IdentifyVerseReferences, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  parse_verse_id2_verse_reference:
+    summary: "Convert the ID of a Bible verse into a reference (ParseVerseID2VerseReference, v2.30.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for ParseVerseID2VerseReference, with id, language_id (optional)."}
+    send: { method: POST, path: /api/ParseVerseID2VerseReference, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  parse_verse_id2_verse_reference_group:
+    summary: "Convert a list of Bible verse IDs into references (ParseVerseID2VerseReferenceGroup, v2.30.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for ParseVerseID2VerseReferenceGroup, with items, language_id (optional)."}
+    send: { method: POST, path: /api/ParseVerseID2VerseReferenceGroup, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_presentation_footer_settings:
+    summary: "Presentation footer settings (GetPresentationFooterSettings, v2.23.0)"
+    send: { method: POST, path: /api/GetPresentationFooterSettings, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_presentation_footer_settings:
+    summary: "Change the presentation footer settings (SetPresentationFooterSettings, v2.23.0)"
+    params:
+      rows: {"type": "int", "min": 1, "max": 4, "required": true, "label": "Rows", "description": "Number of lines. 1 ~ 4."}
+      preview_mode: {"type": "enum", "values": ["text", "image"], "required": true, "label": "Preview mode", "description": "Accepted values: text image."}
+      minimized: {"type": "bool", "required": true, "label": "Minimized", "description": "Whether the footer is shown minimized."}
+    send: { method: POST, path: /api/SetPresentationFooterSettings, query: { token: "{settings.token}" }, content_type: application/json, body: '{"rows":{rows},"preview_mode":{preview_mode:json},"minimized":{minimized}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_bpm:
+    summary: "Returns the current BPM value set in the program (GetBpm, v2.19.0)"
+    send: { method: POST, path: /api/GetBpm, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_bpm:
+    summary: "Change the current BPM value of the program (SetBpm, v2.19.0)"
+    params:
+      bpm: {"type": "float", "min": 0.0, "required": true, "label": "BPM", "description": "BPM value."}
+    send: { method: POST, path: /api/SetBpm, query: { token: "{settings.token}" }, content_type: application/json, body: '{"bpm":{bpm:.2f}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_hue:
+    summary: "Returns the current hue value defined in the program (GetHue, v2.19.0)"
+    send: { method: POST, path: /api/GetHue, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_hue:
+    summary: "Changes the program's current hue value (SetHue, v2.19.0)"
+    params:
+      hue: {"type": "int", "min": 0, "max": 360, "required": true, "label": "Hue", "description": "Hue value. Minimum=0, Maximum=360 or null to disable."}
+    send: { method: POST, path: /api/SetHue, query: { token: "{settings.token}" }, content_type: application/json, body: '{"hue":{hue}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_runtime_environment:
+    summary: "Returns the name of the currently defined runtime environment in the program settings (GetRuntimeEnvironment, also GetRE, v2.19.0)"
+    send: { method: POST, path: /api/GetRuntimeEnvironment, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_runtime_environment:
+    summary: "Change the current runtime environment (SetRuntimeEnvironment, also SetRE, v2.19.0)"
+    params:
+      name: {"type": "string", "required": true, "label": "Name", "description": "Runtime environment name."}
+    send: { method: POST, path: /api/SetRuntimeEnvironment, query: { token: "{settings.token}" }, content_type: application/json, body: '{"name":{name:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  set_logo:
+    summary: "Change the settings for the program's *Logo* functionality (tools menu) (SetLogo, v2.19.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for SetLogo, with enable (optional), hide (optional)."}
+    send: { method: POST, path: /api/SetLogo, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_sync_status:
+    summary: "Returns the current state of online synchronization via Google Drive™ (GetSyncStatus, v2.19.0)"
+    send: { method: POST, path: /api/GetSyncStatus, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_interface_input:
+    summary: "Returns the value of a field from the program interface (GetInterfaceInput, v2.21.0)"
+    params:
+      id: {"type": "string", "required": true, "label": "ID", "description": "Item ID. Can be: mainlyricstabsearch maintexttabsearch mainaudiotabsearch mainvideotabsearch mainimagetabsearch mainfiletabsearch mainautomaticpresentationtabsearch mainselectedtheme mainselectedsonggroupfilter mainselectedtabevent 2.27.0 mainsongtabselecteditem maintexttabselecteditem maintexttabselectedfolder mainaudiotabselecteditem mainvideotabselecteditem mainimagetabselecteditem mainfiletabselecteditem maincustommessagetabselecteditem mainautomaticpresentationtabselecteditem 2.29.0 mainselectedlibrarytab."}
+    send: { method: POST, path: /api/GetInterfaceInput, query: { token: "{settings.token}" }, content_type: application/json, body: '{"id":{id:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_interface_input:
+    summary: "Change the value of a field in the program interface (SetInterfaceInput, v2.21.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for SetInterfaceInput, with id, value, focus (optional)."}
+    send: { method: POST, path: /api/SetInterfaceInput, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_opened_window:
+    summary: "List of currently open windows (limited list) (GetOpenedWindow, v2.29.0)"
+    send: { method: POST, path: /api/GetOpenedWindow, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  select_verse:
+    summary: "Selects a verse in the Bible window (SelectVerse, v2.21.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for SelectVerse, with id (optional), reference (optional)."}
+    send: { method: POST, path: /api/SelectVerse, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  open_draw_lots:
+    summary: "Opens the draw window from a list of items (OpenDrawLots, v2.21.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for OpenDrawLots, with items."}
+    send: { method: POST, path: /api/OpenDrawLots, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_media_duration:
+    summary: "Returns the duration of the media (GetMediaDuration, v2.21.0)"
+    params:
+      type: {"type": "enum", "values": ["video", "audio", "automatic_presentation"], "required": true, "label": "Type", "description": "Type of item. Can be: video, audio, automatic_presentation."}
+      name: {"type": "string", "required": true, "label": "Name", "description": "Item name."}
+    send: { method: POST, path: /api/GetMediaDuration, query: { token: "{settings.token}" }, content_type: application/json, body: '{"type":{type:json},"name":{name:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_version:
+    summary: "Returns information about the version of the running program (GetVersion, v2.22.0)"
+    send: { method: POST, path: /api/GetVersion, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_holyrics_plan_info:
+    summary: "Returns information about the current subscription (GetHolyricsPlanInfo, v2.28.0)"
+    send: { method: POST, path: /api/GetHolyricsPlanInfo, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_api_server_info:
+    summary: "Returns information from the API server (GetAPIServerInfo, v2.26.0)"
+    send: { method: POST, path: /api/GetAPIServerInfo, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_real_time_song_key:
+    summary: "GetRealTimeSongKey (GetRealTimeSongKey, v2.24.0)"
+    params:
+      id: {"type": "string", "required": true, "label": "ID", "description": "Song ID."}
+    send: { method: POST, path: /api/GetRealTimeSongKey, query: { token: "{settings.token}" }, content_type: application/json, body: '{"id":{id:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_real_time_song_key:
+    summary: "SetRealTimeSongKey (SetRealTimeSongKey, v2.24.0)"
+    params:
+      id: {"type": "string", "required": true, "label": "ID", "description": "Song ID."}
+      key: {"type": "enum", "values": ["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab", "A", "A#", "Bb", "B", "Cm", "C#m", "Dbm", "Dm", "D#m", "Ebm", "Em", "Fm", "F#m", "Gbm", "Gm", "G#m", "Abm", "Am", "A#m", "Bbm", "Bm"], "required": true, "label": "Key", "description": "C C# Db D D# Eb E F F# Gb G G# Ab A A# Bb B Cm C#m Dbm Dm D#m Ebm Em Fm F#m Gbm Gm G#m Abm Am A#m Bbm Bm."}
+    send: { method: POST, path: /api/SetRealTimeSongKey, query: { token: "{settings.token}" }, content_type: application/json, body: '{"id":{id:json},"key":{key:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  action_next_quick_presentation:
+    summary: "Method does not return value (ActionNextQuickPresentation, v2.24.0)"
+    send: { method: POST, path: /api/ActionNextQuickPresentation, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  action_previous_quick_presentation:
+    summary: "Method does not return value (ActionPreviousQuickPresentation, v2.24.0)"
+    send: { method: POST, path: /api/ActionPreviousQuickPresentation, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  close_current_quick_presentation:
+    summary: "Method does not return value (CloseCurrentQuickPresentation, v2.24.0)"
+    send: { method: POST, path: /api/CloseCurrentQuickPresentation, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_current_quick_presentation:
+    summary: "GetCurrentQuickPresentation (GetCurrentQuickPresentation, v2.24.0)"
+    send: { method: POST, path: /api/GetCurrentQuickPresentation, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_triggers:
+    summary: "Returns the list of saved triggers (GetTriggers, v2.24.0)"
+    send: { method: POST, path: /api/GetTriggers, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_trigger_tags:
+    summary: "Returns the list of trigger tags (GetTriggerTags, v2.27.0)"
+    send: { method: POST, path: /api/GetTriggerTags, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_trigger_pause_state_for_tag:
+    summary: "Returns the 'pause' state of the execution of triggers for a specific tag (GetTriggerPauseStateForTag, v2.27.0)"
+    params:
+      tag: {"type": "string", "required": true, "label": "Tag", "description": "The trigger tag."}
+    send: { method: POST, path: /api/GetTriggerPauseStateForTag, query: { token: "{settings.token}" }, content_type: application/json, body: '{"tag":{tag:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_trigger_pause_state_for_tag:
+    summary: "Changes the 'pause' state of the execution of triggers for a specific tag (SetTriggerPauseStateForTag, v2.27.0)"
+    params:
+      tag: {"type": "string", "required": true, "label": "Tag", "description": "The trigger tag."}
+      pause: {"type": "bool", "required": true, "label": "Paused", "description": "True to pause the triggers, false to resume them."}
+    send: { method: POST, path: /api/SetTriggerPauseStateForTag, query: { token: "{settings.token}" }, content_type: application/json, body: '{"tag":{tag:json},"pause":{pause}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_trigger_pause_state_for_receiver:
+    summary: "Returns the 'pause' state of the trigger execution of a specific receiver (GetTriggerPauseStateForReceiver, v2.27.0)"
+    params:
+      receiver: {"type": "string", "required": true, "label": "Receiver", "description": "Receiver ID."}
+    send: { method: POST, path: /api/GetTriggerPauseStateForReceiver, query: { token: "{settings.token}" }, content_type: application/json, body: '{"receiver":{receiver:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_trigger_pause_state_for_receiver:
+    summary: "Changes the 'pause' state of the execution of triggers for a specific receiver (SetTriggerPauseStateForReceiver, v2.27.0)"
+    params:
+      receiver: {"type": "string", "required": true, "label": "Receiver", "description": "Receiver ID."}
+      pause: {"type": "bool", "required": true, "label": "Paused", "description": "True to pause the triggers, false to resume them."}
+    send: { method: POST, path: /api/SetTriggerPauseStateForReceiver, query: { token: "{settings.token}" }, content_type: application/json, body: '{"receiver":{receiver:json},"pause":{pause}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  get_scheduled_tasks:
+    summary: "Returns the list of scheduled tasks (GetScheduledTasks, v2.26.0)"
+    send: { method: POST, path: /api/GetScheduledTasks, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_global_settings:
+    summary: "GetGlobalSettings (GetGlobalSettings, v2.25.0)"
+    params:
+      request: {"type": "json", "default": {}, "label": "Request", "description": "The request object as the Holyrics API documents it for GetGlobalSettings, with filter (optional)."}
+    send: { method: POST, path: /api/GetGlobalSettings, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_global_settings:
+    summary: "SetGlobalSettings (SetGlobalSettings, v2.25.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for SetGlobalSettings, with input."}
+    send: { method: POST, path: /api/SetGlobalSettings, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_styled_models:
+    summary: "GetStyledModels (GetStyledModels, v2.25.0)"
+    send: { method: POST, path: /api/GetStyledModels, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_styled_models_as_map:
+    summary: "GetStyledModelsAsMap (GetStyledModelsAsMap, v2.25.0)"
+    send: { method: POST, path: /api/GetStyledModelsAsMap, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_midi_settings:
+    summary: "GetMidiSettings (GetMidiSettings, v2.26.0)"
+    send: { method: POST, path: /api/GetMidiSettings, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_rule_group_list:
+    summary: "Returns the saved rule groups (GetRuleGroupList, v2.26.0)"
+    send: { method: POST, path: /api/GetRuleGroupList, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_rule_group:
+    summary: "Returns a saved group of rules (GetRuleGroup, v2.26.0)"
+    params:
+      id: {"type": "string", "required": true, "label": "ID", "description": "Rule group ID."}
+    send: { method: POST, path: /api/GetRuleGroup, query: { token: "{settings.token}" }, content_type: application/json, body: '{"id":{id:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  test_rule_group:
+    summary: "Returns the result of the test of a group of saved rules (or a specific rule from the respective group) (TestRuleGroup, v2.26.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for TestRuleGroup, with id, rule_id (optional)."}
+    send: { method: POST, path: /api/TestRuleGroup, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_transition_effect_template_settings_list:
+    summary: "Returns the list of transition effect models (GetTransitionEffectTemplateSettingsList, v2.26.0)"
+    send: { method: POST, path: /api/GetTransitionEffectTemplateSettingsList, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  get_transition_effect_template_settings:
+    summary: "Returns a transition effect model (GetTransitionEffectTemplateSettings, v2.26.0)"
+    params:
+      id: {"type": "string", "required": true, "label": "ID", "description": "Model ID."}
+    send: { method: POST, path: /api/GetTransitionEffectTemplateSettings, query: { token: "{settings.token}" }, content_type: application/json, body: '{"id":{id:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  set_transition_effect_template_settings:
+    summary: "Change the settings of a transition effect template (SetTransitionEffectTemplateSettings, v2.26.0)"
+    params:
+      request: {"type": "json", "required": true, "label": "Request", "description": "The request object as the Holyrics API documents it for SetTransitionEffectTemplateSettings, with id, settings."}
+    send: { method: POST, path: /api/SetTransitionEffectTemplateSettings, query: { token: "{settings.token}" }, content_type: application/json, body: '{request}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  create_item:
+    summary: "Create a new item This action requires a Holyrics Plan subscription to be executed To use this action, you need to enable permission in the settings file menu > settings > advanced > javascript > settings > advanced permissions Or if you are using the implementation of a module, grant permission in the module settings and use the hly method of the Module class module.hly(action, input) The structure of the object passed as a parameter must be according to the table below <table><tr><td><p align=\"right\">Action</p></td><td>Type</td></tr><tr><td><p align=\"right\">CreateSong</p></td><td>Lyrics</td></tr><tr><td><p align=\"right\">CreateText</p></td><td>Text</td></tr><tr><td><p align=\"right\">CreateTheme</p></td><td>Theme</td></tr><tr><td><p align=\"right\">CreateTeam</p></td><td>Team</td></tr><tr><td><p align=\"right\">CreateRole</p></td><td>Role</td></tr><tr><td><p align=\"right\">CreateMember</p></td><td>Member</td></tr><tr><td><p align=\"right\">CreateEvent</p></td><td>Event</td></tr><tr><td><p align=\"right\">CreateSongGroup</p></td><td>Group</td></tr></table> (CreateItem, v2.25.0)"
+    send: { method: POST, path: /api/CreateItem, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.data" }
+    returns: value
+  edit_item:
+    summary: "Edit an existing item This action requires a Holyrics Plan subscription to be executed To use this action, you need to enable permission in the settings file menu > settings > advanced > javascript > settings > advanced permissions Or if you are using the implementation of a module, grant permission in the module settings and use the hly method of the Module class module.hly(action, input) All parameters are optional except: id Only the declared parameters will be changed that is, it is not necessary to provide the complete object to change just one parameter (EditItem, v2.25.0)"
+    send: { method: POST, path: /api/EditItem, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  delete_item:
+    summary: "Deletes an existing item This action requires a Holyrics Plan subscription to be executed To use this action, you need to enable permission in the settings file menu > settings > advanced > javascript > settings > advanced permissions Or if you are using the implementation of a module, grant permission in the module settings and use the hly method of the Module class module.hly(action, input) Provide the id of the respective item to remove it (DeleteItem, v2.25.0)"
+    params:
+      id: {"type": "string", "required": true, "label": "ID", "description": "ID of the respective item."}
+    send: { method: POST, path: /api/DeleteItem, query: { token: "{settings.token}" }, content_type: application/json, body: '{"id":{id:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  add_songs_to_song_group:
+    summary: "Adiciona músicas a um grupo This action requires a Holyrics Plan subscription to be executed To use this action, you need to enable permission in the settings file menu > settings > advanced > javascript > settings > advanced permissions Or if you are using the implementation of a module, grant permission in the module settings and use the hly method of the Module class module.hly(action, input) (AddSongsToSongGroup, v2.25.0)"
+    params:
+      group: {"type": "string", "required": true, "label": "Group", "description": "Group name."}
+      songs: {"type": "string", "required": true, "label": "Songs", "description": "List with the id of the songs separated by comma."}
+    send: { method: POST, path: /api/AddSongsToSongGroup, query: { token: "{settings.token}" }, content_type: application/json, body: '{"group":{group:json},"songs":{songs:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  remove_songs_from_song_group:
+    summary: "Remove músicas de um grupo This action requires a Holyrics Plan subscription to be executed To use this action, you need to enable permission in the settings file menu > settings > advanced > javascript > settings > advanced permissions Or if you are using the implementation of a module, grant permission in the module settings and use the hly method of the Module class module.hly(action, input) (RemoveSongsFromSongGroup, v2.25.0)"
+    params:
+      group: {"type": "string", "required": true, "label": "Group", "description": "Group name."}
+      songs: {"type": "string", "required": true, "label": "Songs", "description": "List with the id of the songs separated by comma."}
+    send: { method: POST, path: /api/RemoveSongsFromSongGroup, query: { token: "{settings.token}" }, content_type: application/json, body: '{"group":{group:json},"songs":{songs:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  set_current_schedule:
+    summary: "Alterar o culto ou evento atualmente selecionado na interface This action requires a Holyrics Plan subscription to be executed (SetCurrentSchedule, v2.26.0)"
+    params:
+      event_id: {"type": "string", "required": true, "label": "Event", "description": "Event ID Can be obtained from a Schedule object."}
+    send: { method: POST, path: /api/SetCurrentSchedule, query: { token: "{settings.token}" }, content_type: application/json, body: '{"event_id":{event_id:json}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  disable_hue:
+    summary: "Turn the hue off (SetHue with hue null, v2.19.0)"
+    send: { method: POST, path: /api/SetHue, query: { token: "{settings.token}" }, content_type: application/json, body: '{"hue":null}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+
+state:
+  presentation.id: { type: string, description: "Item ID" }
+  presentation.type: { type: string, description: "Type of item. It can be: song verse text audio image announcement automaticpresentation quickpresentation" }
+  presentation.name: { type: string, description: "Item name" }
+  presentation.slide_number: { type: int, description: "Starts at 1" }
+  presentation.total_slides: { type: int, description: "Total slides" }
+  presentation.slide_type: { type: string, description: "One of the following values: default wallpaper blank black final_slide" }
+  media_player.name: { type: string, description: "Name of current media in player" }
+  media_player.path: { type: string, description: "Full path of media in player" }
+  media_player.relative_path: { type: string, description: "Relative path of the media in the player. Can be null." }
+  media_player.playing: { type: bool, description: "Checks if the player is running" }
+  media_player.duration_ms: { type: int, description: "Total time in milliseconds" }
+  media_player.time_ms: { type: int, description: "Current media time in milliseconds" }
+  media_player.time_elapsed: { type: string, description: "Elapsed time in format HH:MM:SS" }
+  media_player.time_remaining: { type: string, description: "Remaining time in format HH:MM:SS" }
+  media_player.volume: { type: int, description: "Current player volume. Minimum=0, Maximum=100" }
+  media_player.mute: { type: bool, description: "Checks if the mute option is enabled" }
+  media_player.repeat: { type: bool, description: "Checks if the repeat option is enabled" }
+  media_player.execute_single: { type: bool, description: "Checks if the player is set to play only the current list item" }
+  media_player.shuffle: { type: bool, description: "Checks if the random option is enabled" }
+  media_player.fullscreen: { type: bool, description: "Checks if the full screen option is enabled" }
+  automatic_presentation_player.name: { type: string, description: "Item name" }
+  automatic_presentation_player.playing: { type: bool, description: "Checks if the player is running" }
+  automatic_presentation_player.time_ms: { type: int, description: "Current media time in milliseconds" }
+  automatic_presentation_player.volume: { type: int, description: "Current player volume. Minimum=0, Maximum=100" }
+  automatic_presentation_player.mute: { type: bool, description: "Checks if the mute option is enabled" }
+  automatic_presentation_player.duration_ms: { type: int, description: "Total time in milliseconds" }
+  communication_panel.text: { type: string, description: "Current text" }
+  communication_panel.show: { type: bool, description: "Whether the current text is displayed" }
+  communication_panel.display_ahead: { type: bool, description: "Whether the *'display in front of all'* option is enabled" }
+  communication_panel.alert_text: { type: string, description: "Current alert text" }
+  communication_panel.alert_show: { type: bool, description: "Whether the alert display is enabled" }
+  communication_panel.countdown_show: { type: bool, description: "If a countdown is on display" }
+  communication_panel.countdown_time: { type: float, description: "The current countdown time displayed (in seconds)" }
+  communication_panel.stopwatch_show: { type: bool, description: "If a timer is on display" }
+  communication_panel.stopwatch_time: { type: float, description: "The current time of the timer on display (in seconds)" }
+  communication_panel.theme: { type: string, description: "Theme ID" }
+  communication_panel.countdown_font_relative_size: { type: float, description: "Relative size of the countdown" }
+  communication_panel.countdown_font_color: { type: string, description: "Color of the countdown font" }
+  communication_panel.stopwatch_font_color: { type: string, description: "Color of the stopwatch font" }
+  communication_panel.time_font_color: { type: string, description: "Color of the time font" }
+  communication_panel.display_clock_as_background: { type: bool, description: "Display clock as background" }
+  communication_panel.display_clock_on_alert: { type: bool, description: "Display clock in the alert" }
+  communication_panel.countdown_display_location: { type: string, description: "Location of the countdown or stopwatch display. FULLSCREEN FULLSCREENORALERT ALERT" }
+  communication_panel.display_clock_with_countdown_fullscreen: { type: bool, description: "Display clock along with the countdown or stopwatch when displayed in full screen" }
+  communication_panel.display_vlc_player_remaining_time: { type: bool, description: "Display remaining time of the media playing in VLC Player" }
+  communication_panel.attention_icon_color: { type: string, description: "Icon color of the Attention button" }
+  communication_panel.attention_background_color: { type: string, description: "Background color of the Attention button icon" }
+  communication_panel.countdown_hide_zero_minute: { type: bool, description: "Hide the display of minutes when it is zero" }
+  communication_panel.countdown_hide_zero_hour: { type: bool, description: "Hide the display of hours when it is zero" }
+  communication_panel.stopwatch_hide_zero_minute: { type: bool, description: "Hide the display of minutes when it is zero" }
+  communication_panel.stopwatch_hide_zero_hour: { type: bool, description: "Hide the display of hours when it is zero" }
+  alert.text: { type: string, description: "Current alert text" }
+  alert.show: { type: bool, description: "Whether the alert display is enabled" }
+  alert.display_ahead: { type: bool, description: "Whether the *'display in front of all'* option is enabled" }
+  quick_presentation.id: { type: string, description: "Current verse ID" }
+  quick_presentation.slide_number: { type: int, description: "Starts at 1" }
+  quick_presentation.total_slides: { type: int, description: "Total verses" }
+  quick_presentation.slide_type: { type: string, description: "One of the following values: default wallpaper blank black final_slide" }
+  sync.enabled: { type: bool, description: "If sync is turned on" }
+  sync.started: { type: bool, description: "Whether synchronization has started (internet available for example)" }
+  sync.progress: { type: float, description: "Sync progress from 0 to 100" }
+  program.version: { type: string, description: "Program version" }
+  program.platform: { type: string, description: "Operational system. Can be: win uni osx" }
+  program.platform_description: { type: string, description: "Detailed operating system name" }
+  program.base_dir: { type: string, description: "Base dir" }
+  program.language: { type: string, description: "Language" }
+  program.platform_language: { type: string, description: "Platform language" }
+  program.theme: { type: string, description: "One of the following values: DEFAULT DARKSOFT DARKMEDIUM DARK_STRONG" }
+  program.jsc_version: { type: string, description: "JS Community Version y.m.d" }
+  token.version: { type: string, description: "Version in the format: X.Y.Z" }
+  token.permissions: { type: string, description: "Allowed actions for the token, separated by commas" }
+  api_server.enabled_local: { type: bool, description: "If it is enabled for local access" }
+  api_server.enabled_web: { type: bool, description: "If it is enabled for internet access" }
+  api_server.port: { type: int, description: "Port" }
+  plan.type: { type: string, description: "none basic advanced advanced_content" }
+  plan.name: { type: string, description: "Name" }
+  screen.f8: { type: bool, description: "Whether the wallpaper (F8) option is on" }
+  screen.f9: { type: bool, description: "Whether the empty screen (F9) option is on" }
+  screen.f10: { type: bool, description: "Whether the black screen (F10) option is on" }
+  bpm: { type: float, description: "The program's current BPM" }
+  hue: { type: int, description: "The program's current hue, 0 to 360 (absent when off)" }
+  runtime_environment: { type: string, description: "Name of the current runtime environment" }
+  song_playlist.*.id: { type: string, description: "Song ID of a song playlist item, keyed by its place from 0" }
+  song_playlist.*.title: { type: string, description: "Title of a song playlist item" }
+  song_playlist.*.artist: { type: string, description: "Artist of a song playlist item" }
+  media_playlist.*.id: { type: string, description: "Item ID of a media playlist item, keyed by its place from 0" }
+  media_playlist.*.type: { type: string, description: "Type of a media playlist item (title, song, verse, text, audio, video, image and the others the API lists)" }
+  media_playlist.*.name: { type: string, description: "Name of a media playlist item" }
+
+telemetry:
+  # Holyrics pushes nothing to an API client: what changes live is polled
+  # every second, the rest every five, the program's facts once.
+  poll:
+    - every_ms: 1000
+      send:
+        - { method: POST, path: /api/GetCurrentPresentation, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/GetMediaPlayerInfo, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/GetCommunicationPanelInfo, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/GetF8, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/GetF9, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/GetF10, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    - every_ms: 5000
+      send:
+        - { method: POST, path: /api/GetAlert, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/GetAutomaticPresentationPlayerInfo, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/GetCurrentQuickPresentation, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/GetBpm, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/GetHue, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/GetRuntimeEnvironment, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/GetSyncStatus, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/GetLyricsPlaylist, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/GetMediaPlaylist, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+    - send:
+        - { method: POST, path: /api/GetVersion, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/GetTokenInfo, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/GetAPIServerInfo, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/GetHolyricsPlanInfo, query: { token: "{settings.token}" }, content_type: application/json, body: '{}' }
+  updates:
+    - path: "^/api/GetCurrentPresentation(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json: {"id": "$.data.id", "type": "$.data.type", "name": "$.data.name", "slide_number": "$.data.slide_number", "total_slides": "$.data.total_slides", "slide_type": "$.data.slide_type"}
+      replace: presentation
+      state:
+        presentation.id: "{id}"
+        presentation.type: "{type}"
+        presentation.name: "{name}"
+        presentation.slide_number: "{slide_number}"
+        presentation.total_slides: "{total_slides}"
+        presentation.slide_type: "{slide_type}"
+    - path: "^/api/GetMediaPlayerInfo(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json: {"name": "$.data.name", "path": "$.data.path", "relative_path": "$.data.relative_path", "playing": "$.data.playing", "duration_ms": "$.data.duration_ms", "time_ms": "$.data.time_ms", "time_elapsed": "$.data.time_elapsed", "time_remaining": "$.data.time_remaining", "volume": "$.data.volume", "mute": "$.data.mute", "repeat": "$.data.repeat", "execute_single": "$.data.execute_single", "shuffle": "$.data.shuffle", "fullscreen": "$.data.fullscreen"}
+      state:
+        media_player.name: "{name}"
+        media_player.path: "{path}"
+        media_player.relative_path: "{relative_path}"
+        media_player.playing: "{playing}"
+        media_player.duration_ms: "{duration_ms}"
+        media_player.time_ms: "{time_ms}"
+        media_player.time_elapsed: "{time_elapsed}"
+        media_player.time_remaining: "{time_remaining}"
+        media_player.volume: "{volume}"
+        media_player.mute: "{mute}"
+        media_player.repeat: "{repeat}"
+        media_player.execute_single: "{execute_single}"
+        media_player.shuffle: "{shuffle}"
+        media_player.fullscreen: "{fullscreen}"
+    - path: "^/api/GetAutomaticPresentationPlayerInfo(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json: {"name": "$.data.name", "playing": "$.data.playing", "time_ms": "$.data.time_ms", "volume": "$.data.volume", "mute": "$.data.mute", "duration_ms": "$.data.duration_ms"}
+      state:
+        automatic_presentation_player.name: "{name}"
+        automatic_presentation_player.playing: "{playing}"
+        automatic_presentation_player.time_ms: "{time_ms}"
+        automatic_presentation_player.volume: "{volume}"
+        automatic_presentation_player.mute: "{mute}"
+        automatic_presentation_player.duration_ms: "{duration_ms}"
+    - path: "^/api/GetCommunicationPanelInfo(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json: {"text": "$.data.text", "show": "$.data.show", "display_ahead": "$.data.display_ahead", "alert_text": "$.data.alert_text", "alert_show": "$.data.alert_show", "countdown_show": "$.data.countdown_show", "countdown_time": "$.data.countdown_time", "stopwatch_show": "$.data.stopwatch_show", "stopwatch_time": "$.data.stopwatch_time", "theme": "$.data.theme", "countdown_font_relative_size": "$.data.countdown_font_relative_size", "countdown_font_color": "$.data.countdown_font_color", "stopwatch_font_color": "$.data.stopwatch_font_color", "time_font_color": "$.data.time_font_color", "display_clock_as_background": "$.data.display_clock_as_background", "display_clock_on_alert": "$.data.display_clock_on_alert", "countdown_display_location": "$.data.countdown_display_location", "display_clock_with_countdown_fullscreen": "$.data.display_clock_with_countdown_fullscreen", "display_vlc_player_remaining_time": "$.data.display_vlc_player_remaining_time", "attention_icon_color": "$.data.attention_icon_color", "attention_background_color": "$.data.attention_background_color", "countdown_hide_zero_minute": "$.data.countdown_hide_zero_minute", "countdown_hide_zero_hour": "$.data.countdown_hide_zero_hour", "stopwatch_hide_zero_minute": "$.data.stopwatch_hide_zero_minute", "stopwatch_hide_zero_hour": "$.data.stopwatch_hide_zero_hour"}
+      state:
+        communication_panel.text: "{text}"
+        communication_panel.show: "{show}"
+        communication_panel.display_ahead: "{display_ahead}"
+        communication_panel.alert_text: "{alert_text}"
+        communication_panel.alert_show: "{alert_show}"
+        communication_panel.countdown_show: "{countdown_show}"
+        communication_panel.countdown_time: "{countdown_time}"
+        communication_panel.stopwatch_show: "{stopwatch_show}"
+        communication_panel.stopwatch_time: "{stopwatch_time}"
+        communication_panel.theme: "{theme}"
+        communication_panel.countdown_font_relative_size: "{countdown_font_relative_size}"
+        communication_panel.countdown_font_color: "{countdown_font_color}"
+        communication_panel.stopwatch_font_color: "{stopwatch_font_color}"
+        communication_panel.time_font_color: "{time_font_color}"
+        communication_panel.display_clock_as_background: "{display_clock_as_background}"
+        communication_panel.display_clock_on_alert: "{display_clock_on_alert}"
+        communication_panel.countdown_display_location: "{countdown_display_location}"
+        communication_panel.display_clock_with_countdown_fullscreen: "{display_clock_with_countdown_fullscreen}"
+        communication_panel.display_vlc_player_remaining_time: "{display_vlc_player_remaining_time}"
+        communication_panel.attention_icon_color: "{attention_icon_color}"
+        communication_panel.attention_background_color: "{attention_background_color}"
+        communication_panel.countdown_hide_zero_minute: "{countdown_hide_zero_minute}"
+        communication_panel.countdown_hide_zero_hour: "{countdown_hide_zero_hour}"
+        communication_panel.stopwatch_hide_zero_minute: "{stopwatch_hide_zero_minute}"
+        communication_panel.stopwatch_hide_zero_hour: "{stopwatch_hide_zero_hour}"
+    - path: "^/api/GetAlert(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json: {"text": "$.data.text", "show": "$.data.show", "display_ahead": "$.data.display_ahead"}
+      state:
+        alert.text: "{text}"
+        alert.show: "{show}"
+        alert.display_ahead: "{display_ahead}"
+    - path: "^/api/GetCurrentQuickPresentation(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json: {"id": "$.data.id", "slide_number": "$.data.slide_number", "total_slides": "$.data.total_slides", "slide_type": "$.data.slide_type"}
+      replace: quick_presentation
+      state:
+        quick_presentation.id: "{id}"
+        quick_presentation.slide_number: "{slide_number}"
+        quick_presentation.total_slides: "{total_slides}"
+        quick_presentation.slide_type: "{slide_type}"
+    - path: "^/api/GetSyncStatus(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json: {"enabled": "$.data.enabled", "started": "$.data.started", "progress": "$.data.progress"}
+      state:
+        sync.enabled: "{enabled}"
+        sync.started: "{started}"
+        sync.progress: "{progress}"
+    - path: "^/api/GetVersion(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json: {"version": "$.data.version", "platform": "$.data.platform", "platform_description": "$.data.platformDescription", "base_dir": "$.data.baseDir", "language": "$.data.language", "platform_language": "$.data.platformLanguage", "theme": "$.data.theme", "jsc_version": "$.data.jscVersion"}
+      state:
+        program.version: "{version}"
+        program.platform: "{platform}"
+        program.platform_description: "{platform_description}"
+        program.base_dir: "{base_dir}"
+        program.language: "{language}"
+        program.platform_language: "{platform_language}"
+        program.theme: "{theme}"
+        program.jsc_version: "{jsc_version}"
+    - path: "^/api/GetTokenInfo(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json: {"version": "$.data.version", "permissions": "$.data.permissions"}
+      state:
+        token.version: "{version}"
+        token.permissions: "{permissions}"
+    - path: "^/api/GetAPIServerInfo(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json: {"enabled_local": "$.data.enabled_local", "enabled_web": "$.data.enabled_web", "port": "$.data.port"}
+      state:
+        api_server.enabled_local: "{enabled_local}"
+        api_server.enabled_web: "{enabled_web}"
+        api_server.port: "{port}"
+    - path: "^/api/GetHolyricsPlanInfo(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json: {"type": "$.data.type", "name": "$.data.name"}
+      state:
+        plan.type: "{type}"
+        plan.name: "{name}"
+    - path: "^/api/GetF8(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json: { state: "$.data" }
+      state: { screen.f8: "{state}" }
+    - path: "^/api/GetF9(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json: { state: "$.data" }
+      state: { screen.f9: "{state}" }
+    - path: "^/api/GetF10(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json: { state: "$.data" }
+      state: { screen.f10: "{state}" }
+    - path: "^/api/GetBpm(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { bpm: "{v}" }
+    - path: "^/api/GetHue(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      replace: hue
+      state: { hue: "{v}" }
+    - path: "^/api/GetRuntimeEnvironment(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { runtime_environment: "{v}" }
+    - path: "^/api/GetLyricsPlaylist(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", title: "$.title", artist: "$.artist" }
+      replace: song_playlist
+      state:
+        "song_playlist.{index}.id": "{id}"
+        "song_playlist.{index}.title": "{title}"
+        "song_playlist.{index}.artist": "{artist}"
+    - path: "^/api/GetMediaPlaylist(\\?|$)"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", type: "$.type", name: "$.name" }
+      replace: media_playlist
+      state:
+        "media_playlist.{index}.id": "{id}"
+        "media_playlist.{index}.type": "{type}"
+        "media_playlist.{index}.name": "{name}"
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The token goes in the URL of every request (?token=), as the
+      documentation's first method gives it, over plain HTTP on the local
+      network. The documentation's hash method (a nonce from Auth, then a
+      sha256 dtoken per request with a growing request id) is not used, nor
+      the internet relay (api.holyrics.com.br with an API key). A token
+      allows only the actions its permissions list: the others answer with
+      status error, and a poll of one it lacks fills no state.
+  - models: [all]
+    severity: info
+    text: >
+      Actions whose parameters are all required and scalar take typed
+      parameters; the others, with optional fields or objects (themes,
+      settings, items), take the request object itself, which Holyrics
+      validates, since an optional field cannot be left out of a template.
+      Synonym actions (GetSong for GetLyrics, GetCPInfo for
+      GetCommunicationPanelInfo, GetAP for GetAutomaticPresentation and the
+      others) are sent under the first name.
+  - models: [all]
+    severity: info
+    text: >
+      Holyrics pushes nothing over this API: the current presentation, media
+      player, communication panel and F8, F9 and F10 are polled every second;
+      the alert, automatic presentation player, quick presentation, BPM, hue,
+      runtime environment, sync and both playlists every five; the version,
+      token, API Server and plan once. A presentation or quick presentation
+      that closes empties its state. Only the response fields the
+      documentation gives in its tables are kept in state; everything else
+      is in each command's returned data.
+  - models: [all]
+    severity: info
+    text: >
+      The documentation gives no default port; 8091 is the port in its
+      GetAPIServerInfo example. Thumbnails and slide previews come back as
+      base64 text in the data, as Holyrics sends them.
+  - models: [all]
+    severity: critical
+    text: >
+      Show, play and close actions, the F8, F9 and F10 screens, the
+      communication panel, alerts and settings changes act on the projection
+      at once; delete_item deletes an item, and set_global_settings,
+      set_display_settings and the other settings actions change the
+      program's configuration.
