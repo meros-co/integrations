@@ -1534,6 +1534,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Send mtrstart IO:Current/InCh/InputLevel 100 and confirm the unit answers OK mtrstart, the address it accepts (with or without /Meter), and the NOTIFY mtr line's form (address, a type word or none, eight two-digit hex values); record what 0-127 means in dB, and the shortest interval accepted. ([specs/focusrite-rednet-rcp.yaml:254](specs/focusrite-rednet-rcp.yaml#L254))
 - [ ] Check whether the meters stop by themselves (as Yamaha meters time out) and need mtrstart again, and what mtrstop answers. ([specs/focusrite-rednet-rcp.yaml:349](specs/focusrite-rednet-rcp.yaml#L349))
 
+## foscam-ptz — Foscam HD IP cameras (CGI)
+
+- [ ] Check how current firmware answers a wrong password (result -2 with HTTP 200 assumed) and whether it locks the account out after repeated failures. ([specs/foscam-ptz.yaml:813](specs/foscam-ptz.yaml#L813))
+- [ ] Check whether setContrast takes "contrast" (the parameter table) or "constrast" (the guide's example). ([specs/foscam-ptz.yaml:827](specs/foscam-ptz.yaml#L827))
+- [ ] Record getPTZPresetPointList and ptzGetCruiseMapList replies to confirm the cnt then pointN or mapN element order the rules read. ([specs/foscam-ptz.yaml:737](specs/foscam-ptz.yaml#L737))
+- [ ] Check which commands newer firmware adds or renames against the V1.0.4 guide (PTZ position, IR modes, newer image settings). ([specs/foscam-ptz.yaml:834](specs/foscam-ptz.yaml#L834))
+
 ## freeshow — FreeShow
 
 - [ ] Record the status code and body FreeShow's REST API answers to an action (204 assumed) and to a get_ query (200 with JSON assumed), and to an unknown action. ([specs/freeshow.yaml:1492](specs/freeshow.yaml#L1492))

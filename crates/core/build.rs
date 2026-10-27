@@ -127,6 +127,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-focusrite",
         &["focusrite-rednet", "focusrite-rednet-rcp"],
     ),
+    ("vendor-foscam", &["foscam-ptz"]),
     (
         "vendor-generic",
         &[

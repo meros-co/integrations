@@ -1,0 +1,844 @@
+spec: 1
+id: foscam-ptz
+name: Foscam HD IP cameras (CGI)
+vendor: Foscam
+category: camera
+
+# Foscam's HD cameras answer CGI requests at /cgi-bin/CGIProxy.fcgi?cmd=...,
+# the user name and password passed as the usr and pwd query arguments (the
+# only authentication the CGI takes), on the camera's HTTP port, 88 by
+# default. Every answer is an XML CGI_Result whose result element is 0 on
+# success.
+
+source:
+  - title: Foscam IPCamera CGI User Guide, V1.0.4
+    author: Shenzhen Foscam Intelligent Technology Limited
+    url: https://community.jeedom.com/uploads/short-url/kBTc3QYALDiATROJMuBjAj04yNo.pdf
+    note: >
+      Manufacturer document (a community copy of the guide Foscam distributes with its SDK; the
+      revision history ends at V1.0.4), read 2026-10-27. General description (usr and pwd in the
+      request; GET; XML CGI_Result with result 0 success, -1 format error, -2 user name or password
+      error, -3 access denied, -4 execute fail, -5 timeout, -7 unknown); AV Function
+      (getImageSetting, setBrightness, setContrast, setHue, setSaturation, setSharpness,
+      resetImageSetting, getMirrorAndFlipSetting, mirrorVideo, flipVideo, setPwrFreq,
+      getVideoStreamParam, setVideoStreamParam, getMainVideoStreamType, getSubVideoStreamType,
+      setMainVideoStreamType, setSubStreamFormat, getOSDSetting, setOSDSetting, getOsdMaskArea,
+      setOsdMaskArea, getOSDMask, setOSDMask); PTZ Control (the eight moves, ptzStopRun, ptzReset,
+      PTZ speed 0-4, preset points (16 at most, names), cruise maps (8 at most, 8 points each),
+      zoom with speed 0-2, self-test mode and preset, RS-485 settings); Device manage
+      (setSystemTime, getSystemTime, openInfraLed, closeInfraLed, getInfraLedConfig,
+      setInfraLedConfig, getDevState, getDevName, setDevName, getDevInfo); System (rebootSystem,
+      restoreToFactorySetting).
+  - title: companion-module-foscam-ptz (MIT licence)
+    author: Bitfocus contributors
+    url: https://github.com/bitfocus/companion-module-foscam-ptz
+    note: >
+      Read for corroboration only (index.js), retrieved 2026-10-27: requests to
+      /cgi-bin/CGIProxy.fcgi with cmd, usr and pwd, port 88 by default. No code taken.
+
+transport:
+  type: http
+  port: 88
+  https_port: 443
+  scheme: { setting: scheme }
+  accept_invalid_certs: true
+  auth: none
+  timeout_ms: 5000
+  probe: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getDevName&usr={settings.username:url}&pwd={settings.password:url}" }
+
+settings:
+  username: { type: string, default: admin, max_length: 64, label: Username, description: "A camera account: visitor reads, operator moves the camera, admin changes settings." }
+  password: { type: string, default: "", secret: true, max_length: 64, label: Password, description: "The account's password, sent in each request as the CGI requires." }
+  scheme: { type: enum, values: [http, https], default: http, label: Connection, description: "http on the camera's HTTP port (88 by default), or https on its HTTPS port (443)." }
+
+ports:
+  - { port: 88, protocol: http, role: control, when: "scheme http", note: "the camera's HTTP port, 88 by default" }
+  - { port: 443, protocol: https, role: control, when: "scheme https" }
+
+models:
+  - id: foscam-ptz
+    name: Foscam HD PTZ camera
+    supports: &all
+      [get_image_settings, set_brightness, set_contrast, set_hue, set_saturation, set_sharpness, reset_image_settings, get_mirror_flip, set_mirror, set_flip, set_power_frequency, get_video_streams, set_video_stream, get_main_stream_type, get_sub_stream_type, set_main_stream_type, set_sub_stream_format, get_osd, set_osd, get_mask_areas, set_mask_areas, get_mask_enabled, set_mask_enabled, move, stop, reset_position, get_ptz_speed, set_ptz_speed, get_presets, add_preset, delete_preset, goto_preset, get_cruise_maps, get_cruise_map, set_cruise_map, delete_cruise_map, start_cruise, stop_cruise, zoom_in, zoom_out, zoom_stop, get_zoom_speed, set_zoom_speed, get_self_test_mode, set_self_test_mode, get_self_test_preset, set_self_test_preset, get_rs485, set_rs485, get_device_state, get_device_info, get_device_name, set_device_name, ir_led_on, ir_led_off, get_ir_led_mode, set_ir_led_mode, get_system_time, set_time_from_ntp, set_time_manually, reboot, factory_reset]
+    verification: none
+  - id: foscam-fixed
+    name: Foscam HD camera without pan/tilt
+    supports:
+      [get_image_settings, set_brightness, set_contrast, set_hue, set_saturation, set_sharpness, reset_image_settings, get_mirror_flip, set_mirror, set_flip, set_power_frequency, get_video_streams, set_video_stream, get_main_stream_type, get_sub_stream_type, set_main_stream_type, set_sub_stream_format, get_osd, set_osd, get_mask_areas, set_mask_areas, get_mask_enabled, set_mask_enabled, get_device_state, get_device_info, get_device_name, set_device_name, ir_led_on, ir_led_off, get_ir_led_mode, set_ir_led_mode, get_system_time, set_time_from_ntp, set_time_manually, reboot, factory_reset]
+    verification: none
+
+commands:
+  # ── Image ──────────────────────────────────────────────────────────────
+  get_image_settings:
+    summary: "Read brightness, contrast, hue, saturation and sharpness"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getImageSetting&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  set_brightness:
+    summary: "Set the brightness, 0 to 100, then read the image settings back"
+    params:
+      level: { type: int, min: 0, max: 100, required: true, label: Brightness, description: "Brightness, 0 to 100." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setBrightness&brightness={level}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getImageSetting&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  set_contrast:
+    summary: "Set the contrast, 0 to 100, then read the image settings back"
+    params:
+      level: { type: int, min: 0, max: 100, required: true, label: Contrast, description: "Contrast, 0 to 100." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setContrast&contrast={level}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getImageSetting&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  set_hue:
+    summary: "Set the hue, 0 to 100, then read the image settings back"
+    params:
+      level: { type: int, min: 0, max: 100, required: true, label: Hue, description: "Hue, 0 to 100." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setHue&hue={level}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getImageSetting&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  set_saturation:
+    summary: "Set the saturation, 0 to 100, then read the image settings back"
+    params:
+      level: { type: int, min: 0, max: 100, required: true, label: Saturation, description: "Saturation, 0 to 100." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setSaturation&saturation={level}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getImageSetting&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  set_sharpness:
+    summary: "Set the sharpness, 0 to 100, then read the image settings back"
+    params:
+      level: { type: int, min: 0, max: 100, required: true, label: Sharpness, description: "Sharpness, 0 to 100." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setSharpness&sharpness={level}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getImageSetting&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  reset_image_settings:
+    summary: "Reset the image settings to their defaults"
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=resetImageSetting&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getImageSetting&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  get_mirror_flip:
+    summary: "Read whether the picture is mirrored and flipped"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getMirrorAndFlipSetting&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  set_mirror:
+    summary: "Mirror the picture or not"
+    params:
+      mirrored: { type: bool, required: true, label: Mirror, description: "On mirrors the picture left to right." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=mirrorVideo&isMirror={mirrored:bool01}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getMirrorAndFlipSetting&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  set_flip:
+    summary: "Flip the picture or not"
+    params:
+      flipped: { type: bool, required: true, label: Flip, description: "On flips the picture upside down." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=flipVideo&isFlip={flipped:bool01}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getMirrorAndFlipSetting&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  set_power_frequency:
+    summary: "Set the sensor's mains frequency against flicker"
+    params:
+      frequency: { type: enum, values: ["60", "50"], required: true, label: Mains frequency, description: "Mains frequency of the lighting: 60 or 50 Hz." }
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setPwrFreq&freq={frequency:map.power_frequency}&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  get_video_streams:
+    summary: "Read the four stream types' resolution, bitrate, frame rate and GOP"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getVideoStreamParam&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  set_video_stream:
+    summary: "Set a stream type's resolution, bitrate, frame rate and GOP"
+    params:
+      stream: { type: int, min: 0, max: 3, required: true, label: Stream type, description: "Stream type to set, 0 to 3." }
+      resolution: { type: int, min: 0, max: 31, required: true, label: Resolution, description: "Resolution number as the camera lists its resolutions." }
+      bitrate: { type: int, min: 20480, max: 2097152, required: true, label: Bitrate, description: "Bitrate in bits per second, 20480 to 2097152." }
+      frame_rate: { type: int, min: 1, max: 60, required: true, label: Frame rate, description: "Frames per second." }
+      gop: { type: int, min: 1, max: 300, required: true, label: GOP, description: "P frames between I frames; the guide suggests a multiple of the frame rate." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setVideoStreamParam&streamType={stream}&resolution={resolution}&bitRate={bitrate}&frameRate={frame_rate}&GOP={gop}&isVBR=0&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getVideoStreamParam&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  get_main_stream_type:
+    summary: "Read which stream type the main stream uses"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getMainVideoStreamType&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  get_sub_stream_type:
+    summary: "Read which stream type the sub stream uses"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getSubVideoStreamType&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  set_main_stream_type:
+    summary: "Choose the stream type the main stream uses"
+    params:
+      stream: { type: int, min: 0, max: 3, required: true, label: Stream type, description: "Stream type 0 to 3." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setMainVideoStreamType&streamType={stream}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getMainVideoStreamType&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  set_sub_stream_format:
+    summary: "Encode the sub stream as H.264 or Motion JPEG"
+    params:
+      format: { type: enum, values: ["h264", "mjpeg"], required: true, label: Format, description: "h264, or mjpeg for a Motion JPEG stream a web page can show." }
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setSubStreamFormat&format={format:map.sub_format}&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  get_osd:
+    summary: "Read the on-screen display settings"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getOSDSetting&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  set_osd:
+    summary: "Show the time stamp and camera name on the picture or not, and use the masks or not"
+    params:
+      time_stamp: { type: bool, required: true, label: Time stamp, description: "On shows the date and time on the picture." }
+      name: { type: bool, required: true, label: Camera name, description: "On shows the camera name on the picture." }
+      masks: { type: bool, required: true, label: Masks, description: "On blanks the mask areas." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setOSDSetting&isEnableTimeStamp={time_stamp:bool01}&isEnableDevName={name:bool01}&dispPos=0&isEnableOSDMask={masks:bool01}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getOSDSetting&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  get_mask_areas:
+    summary: "Read the four mask areas"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getOsdMaskArea&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  set_mask_areas:
+    summary: "Set the four mask areas (top-left and bottom-right corners)"
+    params:
+      x1_0: { type: int, min: 0, max: 10000, required: true, label: Mask 1 left, description: "Mask area 1's left edge in pixels; all four 0 for no mask." }
+      y1_0: { type: int, min: 0, max: 10000, required: true, label: Mask 1 top, description: "Mask area 1's top edge in pixels; all four 0 for no mask." }
+      x2_0: { type: int, min: 0, max: 10000, required: true, label: Mask 1 right, description: "Mask area 1's right edge in pixels; all four 0 for no mask." }
+      y2_0: { type: int, min: 0, max: 10000, required: true, label: Mask 1 bottom, description: "Mask area 1's bottom edge in pixels; all four 0 for no mask." }
+      x1_1: { type: int, min: 0, max: 10000, required: true, label: Mask 2 left, description: "Mask area 2's left edge in pixels; all four 0 for no mask." }
+      y1_1: { type: int, min: 0, max: 10000, required: true, label: Mask 2 top, description: "Mask area 2's top edge in pixels; all four 0 for no mask." }
+      x2_1: { type: int, min: 0, max: 10000, required: true, label: Mask 2 right, description: "Mask area 2's right edge in pixels; all four 0 for no mask." }
+      y2_1: { type: int, min: 0, max: 10000, required: true, label: Mask 2 bottom, description: "Mask area 2's bottom edge in pixels; all four 0 for no mask." }
+      x1_2: { type: int, min: 0, max: 10000, required: true, label: Mask 3 left, description: "Mask area 3's left edge in pixels; all four 0 for no mask." }
+      y1_2: { type: int, min: 0, max: 10000, required: true, label: Mask 3 top, description: "Mask area 3's top edge in pixels; all four 0 for no mask." }
+      x2_2: { type: int, min: 0, max: 10000, required: true, label: Mask 3 right, description: "Mask area 3's right edge in pixels; all four 0 for no mask." }
+      y2_2: { type: int, min: 0, max: 10000, required: true, label: Mask 3 bottom, description: "Mask area 3's bottom edge in pixels; all four 0 for no mask." }
+      x1_3: { type: int, min: 0, max: 10000, required: true, label: Mask 4 left, description: "Mask area 4's left edge in pixels; all four 0 for no mask." }
+      y1_3: { type: int, min: 0, max: 10000, required: true, label: Mask 4 top, description: "Mask area 4's top edge in pixels; all four 0 for no mask." }
+      x2_3: { type: int, min: 0, max: 10000, required: true, label: Mask 4 right, description: "Mask area 4's right edge in pixels; all four 0 for no mask." }
+      y2_3: { type: int, min: 0, max: 10000, required: true, label: Mask 4 bottom, description: "Mask area 4's bottom edge in pixels; all four 0 for no mask." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setOsdMaskArea&x1_0={x1_0}&y1_0={y1_0}&x2_0={x2_0}&y2_0={y2_0}&x1_1={x1_1}&y1_1={y1_1}&x2_1={x2_1}&y2_1={y2_1}&x1_2={x1_2}&y1_2={y1_2}&x2_2={x2_2}&y2_2={y2_2}&x1_3={x1_3}&y1_3={y1_3}&x2_3={x2_3}&y2_3={y2_3}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getOsdMaskArea&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  get_mask_enabled:
+    summary: "Read whether the masks are used"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getOSDMask&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  set_mask_enabled:
+    summary: "Use the mask areas or not"
+    params:
+      enabled: { type: bool, required: true, label: Masks, description: "On blanks the mask areas." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setOSDMask&isEnableOSDMask={enabled:bool01}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getOSDMask&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+
+  # ── Pan/tilt and zoom ──────────────────────────────────────────────────
+  move:
+    summary: "Move the pan/tilt head in a direction until stop"
+    params:
+      direction: { type: enum, values: ["up", "down", "left", "right", "top_left", "top_right", "bottom_left", "bottom_right"], required: true, label: Direction, description: "Direction of the move, including the four diagonals." }
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd={direction:map.ptz_move}&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  stop:
+    summary: "Stop the pan/tilt move"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=ptzStopRun&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  reset_position:
+    summary: "Move the pan/tilt head to its default position"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=ptzReset&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  get_ptz_speed:
+    summary: "Read the pan/tilt speed"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getPTZSpeed&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  set_ptz_speed:
+    summary: "Set the pan/tilt speed"
+    params:
+      speed: { type: enum, values: ["very_slow", "slow", "normal", "fast", "very_fast"], required: true, label: Speed, description: "Pan/tilt speed from very_slow to very_fast." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setPTZSpeed&speed={speed:map.ptz_speed}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getPTZSpeed&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  get_presets:
+    summary: "List the preset points"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getPTZPresetPointList&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  add_preset:
+    summary: "Save the current position as a named preset point"
+    params:
+      name: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_-]+$", required: true, label: Preset, description: "Preset point name." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=ptzAddPresetPoint&name={name}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getPTZPresetPointList&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  delete_preset:
+    summary: "Delete a preset point by name"
+    params:
+      name: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_-]+$", required: true, label: Preset, description: "Preset point name." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=ptzDeletePresetPoint&name={name}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getPTZPresetPointList&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  goto_preset:
+    summary: "Move to a preset point by name"
+    params:
+      name: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_-]+$", required: true, label: Preset, description: "Preset point name." }
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=ptzGotoPresetPoint&name={name}&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  get_cruise_maps:
+    summary: "List the cruise maps"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=ptzGetCruiseMapList&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  get_cruise_map:
+    summary: "Read the preset points of a cruise map"
+    params:
+      name: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_-]+$", required: true, label: Cruise, description: "Cruise map name." }
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=ptzGetCruiseMapInfo&name={name}&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  set_cruise_map:
+    summary: "Create or replace a cruise map of up to eight preset points"
+    params:
+      name: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_-]+$", required: true, label: Cruise, description: "Cruise map name." }
+      point0: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_-]*$", required: true, label: Point 1, description: "Preset point name at step 1; empty for none." }
+      point1: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_-]*$", required: true, label: Point 2, description: "Preset point name at step 2; empty for none." }
+      point2: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_-]*$", required: true, label: Point 3, description: "Preset point name at step 3; empty for none." }
+      point3: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_-]*$", required: true, label: Point 4, description: "Preset point name at step 4; empty for none." }
+      point4: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_-]*$", required: true, label: Point 5, description: "Preset point name at step 5; empty for none." }
+      point5: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_-]*$", required: true, label: Point 6, description: "Preset point name at step 6; empty for none." }
+      point6: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_-]*$", required: true, label: Point 7, description: "Preset point name at step 7; empty for none." }
+      point7: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_-]*$", required: true, label: Point 8, description: "Preset point name at step 8; empty for none." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=ptzSetCruiseMap&name={name}&point0={point0}&point1={point1}&point2={point2}&point3={point3}&point4={point4}&point5={point5}&point6={point6}&point7={point7}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=ptzGetCruiseMapList&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  delete_cruise_map:
+    summary: "Delete a cruise map"
+    params:
+      name: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_-]+$", required: true, label: Cruise, description: "Cruise map name." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=ptzDelCruiseMap&name={name}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=ptzGetCruiseMapList&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  start_cruise:
+    summary: "Start a cruise"
+    params:
+      name: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_-]+$", required: true, label: Cruise, description: "Cruise map name." }
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=ptzStartCruise&mapName={name}&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  stop_cruise:
+    summary: "Stop the cruise"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=ptzStopCruise&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  zoom_in:
+    summary: "Zoom in until zoom_stop"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=zoomIn&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  zoom_out:
+    summary: "Zoom out until zoom_stop"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=zoomOut&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  zoom_stop:
+    summary: "Stop zooming"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=zoomStop&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  get_zoom_speed:
+    summary: "Read the zoom speed"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getZoomSpeed&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  set_zoom_speed:
+    summary: "Set the zoom speed"
+    params:
+      speed: { type: enum, values: ["slow", "normal", "fast"], required: true, label: Zoom speed, description: "Zoom speed: slow, normal or fast." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setZoomSpeed&speed={speed:map.zoom_speed}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getZoomSpeed&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  get_self_test_mode:
+    summary: "Read what the head does at power-up"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getPTZSelfTestMode&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  set_self_test_mode:
+    summary: "Set what the head does at power-up"
+    params:
+      mode: { type: enum, values: ["none", "normal", "normal_then_preset"], required: true, label: Power-up, description: "none skips the self-test, normal runs it, normal_then_preset runs it then goes to the power-up preset." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setPTZSelfTestMode&mode={mode:map.self_test}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getPTZSelfTestMode&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  get_self_test_preset:
+    summary: "Read the preset the head goes to after its power-up self-test"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getPTZPrePointForSelfTest&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  set_self_test_preset:
+    summary: "Set the preset the head goes to after its power-up self-test"
+    params:
+      name: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_-]+$", required: true, label: Preset, description: "Preset point name." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setPTZPrePointForSelfTest&name={name}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getPTZPrePointForSelfTest&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  get_rs485:
+    summary: "Read the RS-485 port settings"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=get485Info&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  set_rs485:
+    summary: "Set the RS-485 port's protocol, address and line settings"
+    params:
+      protocol: { type: int, min: 0, max: 255, required: true, label: Protocol, description: "Protocol number as the camera lists its RS-485 protocols." }
+      address: { type: int, min: 0, max: 255, required: true, label: Address, description: "Address of the device on the RS-485 bus." }
+      baud: { type: enum, values: ["1200", "2400", "4800", "9600", "19200", "38400", "57600", "115200"], required: true, label: Baud rate, description: "Line speed in bits per second." }
+      data_bits: { type: int, min: 5, max: 8, required: true, label: Data bits, description: "Data bits, 5 to 8." }
+      stop_bits: { type: int, min: 1, max: 2, required: true, label: Stop bits, description: "Stop bits, 1 or 2." }
+      parity: { type: int, min: 0, max: 4, required: true, label: Parity, description: "Parity number as the camera lists it (0 none)." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=set485Info&rs485Protocol={protocol}&rs485Addr={address}&rs485Baud={baud}&rs485DataBit={data_bits}&rs485StopBit={stop_bits}&rs485Check={parity}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=get485Info&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+
+  # ── Device ─────────────────────────────────────────────────────────────
+  get_device_state:
+    summary: "Read alarms, recording, SD card, NTP, DDNS, UPnP, Wi-Fi and IR LED state"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getDevState&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  get_device_info:
+    summary: "Read the model, serial number, name, MAC, firmware and hardware version"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getDevInfo&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  get_device_name:
+    summary: "Read the camera name"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getDevName&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  set_device_name:
+    summary: "Set the camera name"
+    params:
+      name: { type: string, max_length: 20, required: true, label: Camera name, description: "Name the camera shows." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setDevName&devName={name:url}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getDevName&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  ir_led_on:
+    summary: "Turn the infrared LEDs on (manual IR mode)"
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=openInfraLed&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getDevState&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  ir_led_off:
+    summary: "Turn the infrared LEDs off (manual IR mode)"
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=closeInfraLed&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getDevState&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  get_ir_led_mode:
+    summary: "Read whether the infrared LEDs switch automatically"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getInfraLedConfig&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  set_ir_led_mode:
+    summary: "Switch the infrared LEDs automatically or by command"
+    params:
+      mode: { type: enum, values: ["auto", "manual"], required: true, label: IR LED mode, description: "auto switches with the light; manual leaves them to ir_led_on and ir_led_off." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setInfraLedConfig&mode={mode:map.ir_mode}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getInfraLedConfig&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  get_system_time:
+    summary: "Read the date, time, time zone and NTP settings"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getSystemTime&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
+  set_time_from_ntp:
+    summary: "Take the time from an NTP server"
+    params:
+      server: { type: enum, values: ["time.nist.gov", "time.kriss.re.kr", "time.windows.com", "time.nuri.net"], required: true, label: NTP server, description: "One of the NTP servers the camera supports." }
+      date_format: { type: enum, values: ["YYYY-MM-DD", "DD/MM/YYYY", "MM/DD/YYYY"], required: true, label: Date format, description: "Date shown as YYYY-MM-DD, DD/MM/YYYY or MM/DD/YYYY." }
+      time_format: { type: enum, values: ["12", "24"], required: true, label: Time format, description: "12-hour or 24-hour clock." }
+      time_zone: { type: int, min: -50400, max: 50400, required: true, label: Time zone, description: "Seconds between local time and GMT, as the camera counts them: 3600 is GMT-01:00, -3600 is GMT+01:00." }
+      dst: { type: bool, required: true, label: Daylight saving, description: "On applies daylight saving time." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setSystemTime&timeSource=0&ntpServer={server}&dateFormat={date_format:map.date_format}&timeFormat={time_format:map.time_format}&timeZone={time_zone}&isDst={dst:bool01}&dst=0&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getSystemTime&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  set_time_manually:
+    summary: "Set the date and time by hand"
+    params:
+      date_format: { type: enum, values: ["YYYY-MM-DD", "DD/MM/YYYY", "MM/DD/YYYY"], required: true, label: Date format, description: "Date shown as YYYY-MM-DD, DD/MM/YYYY or MM/DD/YYYY." }
+      time_format: { type: enum, values: ["12", "24"], required: true, label: Time format, description: "12-hour or 24-hour clock." }
+      time_zone: { type: int, min: -50400, max: 50400, required: true, label: Time zone, description: "Seconds between local time and GMT, as the camera counts them: 3600 is GMT-01:00, -3600 is GMT+01:00." }
+      dst: { type: bool, required: true, label: Daylight saving, description: "On applies daylight saving time." }
+      year: { type: int, min: 2000, max: 2099, required: true, label: Year, description: "Year, four digits." }
+      month: { type: int, min: 1, max: 12, required: true, label: Month, description: "Month, 1 to 12." }
+      day: { type: int, min: 1, max: 31, required: true, label: Day, description: "Day of the month, 1 to 31." }
+      hour: { type: int, min: 0, max: 23, required: true, label: Hour, description: "Hour, 0 to 23." }
+      minute: { type: int, min: 0, max: 59, required: true, label: Minute, description: "Minute, 0 to 59." }
+      second: { type: int, min: 0, max: 59, required: true, label: Second, description: "Second, 0 to 59." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=setSystemTime&timeSource=1&ntpServer=&dateFormat={date_format:map.date_format}&timeFormat={time_format:map.time_format}&timeZone={time_zone}&isDst={dst:bool01}&dst=0&year={year}&mon={month}&day={day}&hour={hour}&minute={minute}&sec={second}&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getSystemTime&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  reboot:
+    summary: "Restart the camera"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=rebootSystem&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+  factory_reset:
+    summary: "Restore the factory settings"
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=restoreToFactorySetting&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: ack
+
+maps:
+  power_frequency: { "60": "0", "50": "1" }
+  sub_format: { h264: "0", mjpeg: "1" }
+  ptz_move: { up: ptzMoveUp, down: ptzMoveDown, left: ptzMoveLeft, right: ptzMoveRight, top_left: ptzMoveTopLeft,
+              top_right: ptzMoveTopRight, bottom_left: ptzMoveBottomLeft, bottom_right: ptzMoveBottomRight }
+  ptz_speed: { very_slow: "0", slow: "1", normal: "2", fast: "3", very_fast: "4" }
+  zoom_speed: { slow: "0", normal: "1", fast: "2" }
+  self_test: { none: "0", normal: "1", normal_then_preset: "2" }
+  ir_mode: { auto: "0", manual: "1" }
+  date_format: { "YYYY-MM-DD": "0", "DD/MM/YYYY": "1", "MM/DD/YYYY": "2" }
+  time_format: { "12": "0", "24": "1" }
+
+telemetry:
+  # The CGI pushes nothing: the device state every 2 s, the rest every 30 s.
+  poll:
+    - every_ms: 2000
+      send:
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getDevState&usr={settings.username:url}&pwd={settings.password:url}" }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getDevInfo&usr={settings.username:url}&pwd={settings.password:url}" }
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getDevName&usr={settings.username:url}&pwd={settings.password:url}" }
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getImageSetting&usr={settings.username:url}&pwd={settings.password:url}" }
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getMirrorAndFlipSetting&usr={settings.username:url}&pwd={settings.password:url}" }
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getVideoStreamParam&usr={settings.username:url}&pwd={settings.password:url}" }
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getMainVideoStreamType&usr={settings.username:url}&pwd={settings.password:url}" }
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getSubVideoStreamType&usr={settings.username:url}&pwd={settings.password:url}" }
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getOSDSetting&usr={settings.username:url}&pwd={settings.password:url}" }
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getOsdMaskArea&usr={settings.username:url}&pwd={settings.password:url}" }
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getOSDMask&usr={settings.username:url}&pwd={settings.password:url}" }
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getPTZSpeed&usr={settings.username:url}&pwd={settings.password:url}" }
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getPTZPresetPointList&usr={settings.username:url}&pwd={settings.password:url}" }
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=ptzGetCruiseMapList&usr={settings.username:url}&pwd={settings.password:url}" }
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getZoomSpeed&usr={settings.username:url}&pwd={settings.password:url}" }
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getPTZSelfTestMode&usr={settings.username:url}&pwd={settings.password:url}" }
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getPTZPrePointForSelfTest&usr={settings.username:url}&pwd={settings.password:url}" }
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=get485Info&usr={settings.username:url}&pwd={settings.password:url}" }
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getInfraLedConfig&usr={settings.username:url}&pwd={settings.password:url}" }
+        - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getSystemTime&usr={settings.username:url}&pwd={settings.password:url}" }
+  updates:
+    - path: '^/cgi-bin/CGIProxy\.fcgi\?cmd=getDevState&'
+      xml_each: CGI_Result
+      state:
+        alarms.io: { value: "{IOAlarm}", map: { "0": disabled, "1": none, "2": alarm } }
+        alarms.motion: { value: "{motionDetectAlarm}", map: { "0": disabled, "1": none, "2": alarm } }
+        alarms.sound: { value: "{soundAlarm}", map: { "0": disabled, "1": none, "2": alarm } }
+        recording: { value: "{record}", map: { "0": false, "1": true } }
+        sd.state: { value: "{sdState}", map: { "0": none, "1": ok, "2": read_only } }
+        sd.free_kb: "{sdFreeSpace}"
+        sd.total_kb: "{sdTotalSpace}"
+        ntp_state: { value: "{ntpState}", map: { "0": disabled, "1": updated, "2": failed } }
+        ddns.state: { value: "{ddnspState}", map: { "0": disabled, "1": updated, "2": failed } }
+        ddns.url: "{url}"
+        upnp_state: { value: "{upnpState}", map: { "0": disabled, "1": updated, "2": failed } }
+        wifi.connected: { value: "{isWifiConnected}", map: { "0": false, "1": true } }
+        wifi.ssid: "{wifiConnectedAP}"
+        ir_led: { value: "{infraLedState}", map: { "0": false, "1": true } }
+    - path: '^/cgi-bin/CGIProxy\.fcgi\?cmd=getDevInfo&'
+      xml_each: CGI_Result
+      state:
+        device.model: "{productName}"
+        device.serial: "{serialNo}"
+        device.name: "{devName}"
+        device.mac: "{mac}"
+        device.firmware: "{firmwareVer}"
+        device.hardware: "{hardwareVer}"
+    - path: '^/cgi-bin/CGIProxy\.fcgi\?cmd=getDevName&'
+      xml_each: CGI_Result
+      state:
+        device.name: "{devName}"
+    - path: '^/cgi-bin/CGIProxy\.fcgi\?cmd=getImageSetting&'
+      xml_each: CGI_Result
+      state:
+        image.brightness: "{brightness}"
+        image.contrast: "{contrast}"
+        image.hue: "{hue}"
+        image.saturation: "{saturation}"
+        image.sharpness: "{sharpness}"
+    - path: '^/cgi-bin/CGIProxy\.fcgi\?cmd=getMirrorAndFlipSetting&'
+      xml_each: CGI_Result
+      state:
+        image.mirrored: { value: "{isMirror}", map: { "0": false, "1": true } }
+        image.flipped: { value: "{isFlip}", map: { "0": false, "1": true } }
+    - path: '^/cgi-bin/CGIProxy\.fcgi\?cmd=getVideoStreamParam&'
+      xml_each: CGI_Result
+      state:
+        "streams.0.resolution": "{resolution0}"
+        "streams.0.bitrate": "{bitRate0}"
+        "streams.0.frame_rate": "{frameRate0}"
+        "streams.0.gop": "{GOP0}"
+        "streams.1.resolution": "{resolution1}"
+        "streams.1.bitrate": "{bitRate1}"
+        "streams.1.frame_rate": "{frameRate1}"
+        "streams.1.gop": "{GOP1}"
+        "streams.2.resolution": "{resolution2}"
+        "streams.2.bitrate": "{bitRate2}"
+        "streams.2.frame_rate": "{frameRate2}"
+        "streams.2.gop": "{GOP2}"
+        "streams.3.resolution": "{resolution3}"
+        "streams.3.bitrate": "{bitRate3}"
+        "streams.3.frame_rate": "{frameRate3}"
+        "streams.3.gop": "{GOP3}"
+    - path: '^/cgi-bin/CGIProxy\.fcgi\?cmd=getMainVideoStreamType&'
+      xml_each: CGI_Result
+      state:
+        main_stream_type: "{streamType}"
+    - path: '^/cgi-bin/CGIProxy\.fcgi\?cmd=getSubVideoStreamType&'
+      xml_each: CGI_Result
+      state:
+        sub_stream_type: "{streamType}"
+    - path: '^/cgi-bin/CGIProxy\.fcgi\?cmd=getOSDSetting&'
+      xml_each: CGI_Result
+      state:
+        osd.time_stamp: { value: "{isEnableTimeStamp}", map: { "0": false, "1": true } }
+        osd.name: { value: "{isEnableDevName}", map: { "0": false, "1": true } }
+        osd.masks: { value: "{isEnableOSDMask}", map: { "0": false, "1": true } }
+    - path: '^/cgi-bin/CGIProxy\.fcgi\?cmd=getOsdMaskArea&'
+      xml_each: CGI_Result
+      state:
+        "masks.1.x1": "{x1_0}"
+        "masks.1.y1": "{y1_0}"
+        "masks.1.x2": "{x2_0}"
+        "masks.1.y2": "{y2_0}"
+        "masks.2.x1": "{x1_1}"
+        "masks.2.y1": "{y1_1}"
+        "masks.2.x2": "{x2_1}"
+        "masks.2.y2": "{y2_1}"
+        "masks.3.x1": "{x1_2}"
+        "masks.3.y1": "{y1_2}"
+        "masks.3.x2": "{x2_2}"
+        "masks.3.y2": "{y2_2}"
+        "masks.4.x1": "{x1_3}"
+        "masks.4.y1": "{y1_3}"
+        "masks.4.x2": "{x2_3}"
+        "masks.4.y2": "{y2_3}"
+    - path: '^/cgi-bin/CGIProxy\.fcgi\?cmd=getOSDMask&'
+      xml_each: CGI_Result
+      state:
+        osd.masks: { value: "{isEnableOSDMask}", map: { "0": false, "1": true } }
+    - path: '^/cgi-bin/CGIProxy\.fcgi\?cmd=getPTZSpeed&'
+      xml_each: CGI_Result
+      state:
+        ptz_speed: { value: "{speed}", map: { "0": very_slow, "1": slow, "2": normal, "3": fast, "4": very_fast } }
+    - path: '^/cgi-bin/CGIProxy\.fcgi\?cmd=getZoomSpeed&'
+      xml_each: CGI_Result
+      state:
+        zoom_speed: { value: "{speed}", map: { "0": slow, "1": normal, "2": fast } }
+    - path: '^/cgi-bin/CGIProxy\.fcgi\?cmd=getPTZSelfTestMode&'
+      xml_each: CGI_Result
+      state:
+        self_test.mode: { value: "{mode}", map: { "0": none, "1": normal, "2": normal_then_preset } }
+    - path: '^/cgi-bin/CGIProxy\.fcgi\?cmd=getPTZPrePointForSelfTest&'
+      xml_each: CGI_Result
+      state:
+        self_test.preset: "{name}"
+    - path: '^/cgi-bin/CGIProxy\.fcgi\?cmd=get485Info&'
+      xml_each: CGI_Result
+      state:
+        rs485.protocol: "{rs485Protocol}"
+        rs485.address: "{rs485Addr}"
+        rs485.baud: "{rs485Baud}"
+        rs485.data_bits: "{rs485DataBit}"
+        rs485.stop_bits: "{rs485StopBit}"
+        rs485.parity: "{rs485Check}"
+    - path: '^/cgi-bin/CGIProxy\.fcgi\?cmd=getInfraLedConfig&'
+      xml_each: CGI_Result
+      state:
+        ir_led_mode: { value: "{mode}", map: { "0": auto, "1": manual } }
+    - path: '^/cgi-bin/CGIProxy\.fcgi\?cmd=getSystemTime&'
+      xml_each: CGI_Result
+      state:
+        time.source: { value: "{timeSource}", map: { "0": ntp, "1": manual } }
+        time.ntp_server: "{ntpServer}"
+        time.zone: "{timeZone}"
+        time.dst: { value: "{isDst}", map: { "0": false, "1": true } }
+        time.year: "{year}"
+        time.month: "{mon}"
+        time.day: "{day}"
+        time.hour: "{hour}"
+        time.minute: "{minute}"
+        time.second: "{sec}"
+    # Preset points: cnt, then point0, point1... (the cruise map info's
+    # points come with getResult, not cnt).
+    - match: '(?s)<CGI_Result>\s*<result>0</result>\s*<cnt>\d+</cnt>((?:\s*<point\d+>[^<]*</point\d+>)*)'
+      match_each_in: 1
+      match_each: '<point(\d+)>([^<]*)</point\d+>'
+      replace: presets
+      state: { "presets.{index:+1}.name": "{3}" }
+    - match: '(?s)<CGI_Result>\s*<result>0</result>\s*<cnt>\d+</cnt>((?:\s*<map\d+>[^<]*</map\d+>)*)'
+      match_each_in: 1
+      match_each: '<map(\d+)>([^<]*)</map\d+>'
+      replace: cruise_maps
+      state: { "cruise_maps.{index:+1}.name": "{3}" }
+
+state:
+  alarms.io: { type: string, description: "I/O alarm: disabled, none or alarm" }
+  alarms.motion: { type: string, description: "Motion detection alarm: disabled, none or alarm" }
+  alarms.sound: { type: string, description: "Sound alarm: disabled, none or alarm" }
+  recording: { type: bool, description: "The camera is recording" }
+  sd.state: { type: string, description: "SD card: none, ok or read_only" }
+  sd.free_kb: { type: int, unit: KiB, description: "Free space on the SD card" }
+  sd.total_kb: { type: int, unit: KiB, description: "Size of the SD card" }
+  ntp_state: { type: string, description: "NTP: disabled, updated or failed" }
+  ddns.state: { type: string, description: "DDNS: disabled, updated or failed" }
+  ddns.url: { type: string, description: "DDNS address" }
+  upnp_state: { type: string, description: "UPnP: disabled, updated or failed" }
+  wifi.connected: { type: bool, description: "Connected to a Wi-Fi network" }
+  wifi.ssid: { type: string, description: "SSID of the Wi-Fi network connected to" }
+  ir_led: { type: bool, description: "The infrared LEDs are on" }
+  ir_led_mode: { type: string, description: "Infrared LED switching: auto or manual" }
+  device.model: { type: string, description: "Camera model (product name)" }
+  device.serial: { type: string, description: "Serial number" }
+  device.name: { type: string, description: "Camera name" }
+  device.mac: { type: string, description: "MAC address" }
+  device.firmware: { type: string, description: "Firmware version" }
+  device.hardware: { type: string, description: "Hardware version" }
+  image.brightness: { type: int, description: "Brightness, 0 to 100" }
+  image.contrast: { type: int, description: "Contrast, 0 to 100" }
+  image.hue: { type: int, description: "Hue, 0 to 100" }
+  image.saturation: { type: int, description: "Saturation, 0 to 100" }
+  image.sharpness: { type: int, description: "Sharpness, 0 to 100" }
+  image.mirrored: { type: bool, description: "The picture is mirrored" }
+  image.flipped: { type: bool, description: "The picture is flipped" }
+  streams.*.resolution: { type: int, description: "Resolution number of stream type 0 to 3" }
+  streams.*.bitrate: { type: int, unit: "bit/s", description: "Bitrate of the stream type" }
+  streams.*.frame_rate: { type: int, unit: fps, description: "Frame rate of the stream type" }
+  streams.*.gop: { type: int, description: "P frames between I frames of the stream type" }
+  main_stream_type: { type: int, description: "Stream type the main stream uses, 0 to 3" }
+  sub_stream_type: { type: int, description: "Stream type the sub stream uses, 0 to 3" }
+  osd.time_stamp: { type: bool, description: "The time stamp is shown on the picture" }
+  osd.name: { type: bool, description: "The camera name is shown on the picture" }
+  osd.masks: { type: bool, description: "The mask areas are blanked" }
+  masks.*.x1: { type: int, unit: px, description: "Left edge of mask area 1 to 4" }
+  masks.*.y1: { type: int, unit: px, description: "Top edge of the mask area" }
+  masks.*.x2: { type: int, unit: px, description: "Right edge of the mask area" }
+  masks.*.y2: { type: int, unit: px, description: "Bottom edge of the mask area" }
+  ptz_speed: { type: string, description: "Pan/tilt speed: very_slow, slow, normal, fast or very_fast" }
+  zoom_speed: { type: string, description: "Zoom speed: slow, normal or fast" }
+  presets.*.name: { type: string, description: "Name of preset point 1 to 16, in the camera's order" }
+  cruise_maps.*.name: { type: string, description: "Name of cruise map 1 to 8, in the camera's order" }
+  self_test.mode: { type: string, description: "Power-up behavior: none, normal or normal_then_preset" }
+  self_test.preset: { type: string, description: "Preset the head goes to after its power-up self-test" }
+  rs485.protocol: { type: int, description: "RS-485 protocol number" }
+  rs485.address: { type: int, description: "RS-485 address" }
+  rs485.baud: { type: int, unit: "bit/s", description: "RS-485 baud rate" }
+  rs485.data_bits: { type: int, description: "RS-485 data bits" }
+  rs485.stop_bits: { type: int, description: "RS-485 stop bits" }
+  rs485.parity: { type: int, description: "RS-485 parity number" }
+  time.source: { type: string, description: "Time source: ntp or manual" }
+  time.ntp_server: { type: string, description: "NTP server" }
+  time.zone: { type: int, unit: s, description: "Seconds between local time and GMT (3600 is GMT-01:00)" }
+  time.dst: { type: bool, description: "Daylight saving time is on" }
+  time.year: { type: int, description: "Year of the camera's clock" }
+  time.month: { type: int, description: "Month of the camera's clock" }
+  time.day: { type: int, description: "Day of the camera's clock" }
+  time.hour: { type: int, description: "Hour of the camera's clock" }
+  time.minute: { type: int, description: "Minute of the camera's clock" }
+  time.second: { type: int, description: "Second of the camera's clock" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The CGI takes the user name and password only as the usr and pwd query arguments of each
+      request, so they travel in clear over http and appear in the camera's request logs; use
+      https where the camera offers it. A wrong password answers result -2 with HTTP 200, which
+      fails the command (and is not treated as a refusal of the credential).
+  - models: [all]
+    severity: info
+    text: >
+      Every answer is HTTP 200 with an XML CGI_Result; a command succeeds only on result 0. The
+      CGI pushes nothing, so the device state is read every 2 s and the settings every 30 s.
+      Preset points and cruise maps are named, not numbered; their numbers in state follow the
+      camera's order.
+  - models: [all]
+    severity: info
+    text: >
+      The guide's example for setContrast spells the argument "constrast" while its parameter
+      table says contrast; the table is followed. Zoom commands are only for cameras with a zoom
+      lens, the self-test commands for cameras that offer it, and RS-485 for cameras with the
+      port. The pan/tilt head's position cannot be read (an API limit).
+  - models: [all]
+    severity: info
+    text: >
+      Not covered: network, Wi-Fi, port, UPnP, DDNS, FTP, SMTP and P2P settings, user accounts,
+      motion detection and alarm configuration, snapshots and the MJPEG stream, multi-device
+      lists, the firewall, the log, configuration export and import and firmware upgrade (the last
+      three move files the spec format cannot fetch or post as the camera expects).
+  - models: [all]
+    severity: critical
+    text: >
+      factory_reset restores every setting; delete_preset, set_cruise_map and delete_cruise_map
+      overwrite or delete stored positions; reboot drops the video.
