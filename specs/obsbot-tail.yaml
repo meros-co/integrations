@@ -1,0 +1,428 @@
+spec: 1
+id: obsbot-tail
+name: OBSBOT Tail 2 and Tail Air (OSC)
+vendor: OBSBOT
+category: camera
+
+# OBSBOT's PTZ streaming cameras take OSC 1.0 on port 57110, over UDP or TCP.
+# Over UDP the camera answers from, and to, port 57120: the core sends from
+# feedback_port (57120 by default) and hears the camera's answers there. The
+# camera acknowledges no command; its zoom, gimbal position and device
+# information come back as replies to the Get* queries and to Connected,
+# which telemetry sends on a schedule.
+
+source:
+  - title: OBSBOT Tail 2 OSC Definition (obsbot_tail_2_osc_definition.xlsx)
+    author: OBSBOT
+    url: https://resource-cdn.obsbothk.com/download/obsbot-tail-2/osc/obsbot_tail_2_osc_definition.xlsx
+    note: >
+      Manufacturer spreadsheet, linked from https://www.obsbot.com/explore/obsbot-webcam/osc,
+      retrieved 2026-10-27. Ports (row 4: the camera receives on 57110, TCP and UDP alike, and sends
+      on 57120 over UDP; TCP is OSC 1.0 only); General commands (Connected, ConnectedResp,
+      Disconnected, ResetGimbal, SetZoom 0-100, SetZoomSpeed 0-100 with speed 0-10, SetZoomMax,
+      SetZoomMin, SetGimbalUp/Down/Left/Right 0-100, SetGimMotorDegree speed 0-90, pan -159 to 159,
+      pitch -62 to 62, SetMirror); General-Image (SetAutoFocus, SetManualFocus 0-100,
+      SetAutoExposure, SetExposureCompensate -30 to 30 in listed steps, SetShutterSpeed in listed
+      values, SetISO 100-6400, SetAutoWhiteBalance, SetColorTemperature 2000-10000); Tail 2
+      (SetAiEnable, SetAiMode, SetTrackingSpeed with five ints, SetAutoZoom 0-7, SetOnlyMe,
+      SetRecording, Snapshot, TriggerPreset 0-2); queries GetDeviceInfo (DeviceInfo isisisisiii),
+      GetZoomInfo (ZoomInfo ii: zoom, field of view 0-2), GetGimbalPosInfo (GetGimbalPosInfoResp
+      iii: roll, pitch, yaw).
+  - title: OBSBOT Tail Air OSC Definition (OBSBOT Tail Air- OSC Definition.xlsx)
+    author: OBSBOT
+    url: https://resource-cdn.obsbothk.com/download/obsbot-tail-air/osc/OBSBOT%20Tail%20Air-%20OSC%20Definition.xlsx
+    note: >
+      Manufacturer spreadsheet, same page, retrieved 2026-10-27. Same ports and General and
+      General-Image commands as the Tail 2, except SetZoomSpeed speed 0-11 and SetGimMotorDegree
+      pan -129 to 129 and pitch -59 to 59; Tail Air commands SetAiMode (0, 1, 2, 3, 6, 7),
+      SetTrackingSpeed (0-2), SetRecording, Snapshot, TriggerPreset 0-2; the same three queries.
+  - title: companion-module-obsbot-osc (MIT licence)
+    author: Bitfocus contributors
+    url: https://github.com/bitfocus/companion-module-obsbot-osc
+    note: >
+      Read for corroboration only (src/api.ts), retrieved 2026-10-27: it binds UDP 57120 and sends
+      from it, sends Connected on opening, polls GetDeviceInfo, GetZoomInfo and GetGimbalPosInfo,
+      and notes that a Tail 2 ignores the Get* queries but answers each Connected with its full
+      state. No code taken.
+
+transport:
+  type: osc-udp
+  port: 57110
+  reply: none
+  listen_port: { setting: feedback_port }
+
+settings:
+  feedback_port: { type: int, min: 1, max: 65535, default: 57120,
+    label: Feedback port,
+    description: "Local UDP port the core sends from and hears the camera's answers on; the camera sends its replies on 57120." }
+
+ports:
+  - { port: 57110, protocol: udp, role: control, note: "the camera's OSC port, the same for UDP and TCP" }
+  - { port: 57120, protocol: udp, role: feedback, listener: core, setting: feedback_port,
+      note: "the camera's OSC replies over UDP" }
+
+models:
+  - id: tail-2
+    name: OBSBOT Tail 2
+    supports: [connect, disconnect, reset_gimbal, set_zoom, set_zoom_with_speed, zoom_max, zoom_min,
+               gimbal_up, gimbal_down, gimbal_left, gimbal_right, gimbal_stop, set_gimbal_angles,
+               set_mirror, set_auto_focus, set_manual_focus, set_auto_exposure, set_exposure_compensation,
+               set_shutter_speed, set_iso, set_auto_white_balance, set_color_temperature,
+               set_ai_enabled, set_ai_mode_tail_2, set_tracking_speed_tail_2, set_auto_zoom, set_only_me,
+               set_recording, snapshot, trigger_preset, get_device_info, get_zoom_info, get_gimbal_position]
+    verification: none
+  - id: tail-air
+    name: OBSBOT Tail Air
+    supports: [connect, disconnect, reset_gimbal, set_zoom, set_zoom_with_speed_tail_air, zoom_max, zoom_min,
+               gimbal_up, gimbal_down, gimbal_left, gimbal_right, gimbal_stop, set_gimbal_angles_tail_air,
+               set_mirror, set_auto_focus, set_manual_focus, set_auto_exposure, set_exposure_compensation,
+               set_shutter_speed, set_iso, set_auto_white_balance, set_color_temperature,
+               set_ai_mode_tail_air, set_tracking_speed_tail_air, set_recording, snapshot, trigger_preset,
+               get_device_info, get_zoom_info, get_gimbal_position]
+    verification: none
+    notes: >
+      OSC needs Tail Air firmware 5.0.9.1 or later.
+
+commands:
+  # ── Connection ───────────────────────────────────────────────────────────
+  connect:
+    summary: Tell the camera a client is here; it answers ConnectedResp and its device information
+    send: { address: /OBSBOT/WebCam/General/Connected, args: [ { value: "0", type: int } ] }
+    returns: none
+  disconnect:
+    summary: Tell the camera this client stops working
+    send: { address: /OBSBOT/WebCam/General/Disconnected, args: [ { value: "0", type: int } ] }
+    returns: none
+
+  # ── Gimbal and zoom ──────────────────────────────────────────────────────
+  reset_gimbal:
+    summary: Reset the gimbal to its initial position
+    send: { address: /OBSBOT/WebCam/General/ResetGimbal, args: [ { value: "0", type: int } ] }
+    returns: none
+  set_zoom:
+    summary: Zoom to a position, 0 (wide) to 100 (full zoom) percent of the range
+    params:
+      zoom: &zoom { type: int, min: 0, max: 100, required: true, label: Zoom,
+                    description: "Zoom position in percent of the zoom range, 0 at full wide and 100 at full zoom." }
+    send: { address: /OBSBOT/WebCam/General/SetZoom, args: [ { value: "{zoom}", type: int } ] }
+    returns: none
+  set_zoom_with_speed:
+    summary: Zoom to a position at a given speed (Tail 2, speed 0-10)
+    params:
+      zoom: *zoom
+      speed: { type: int, min: 0, max: 10, default: 0, label: Zoom speed,
+               description: "Zoom speed, 1 (slowest) to 10 (fastest); 0 is the camera's default speed." }
+    send: { address: /OBSBOT/WebCam/General/SetZoomSpeed, args: [ { value: "{zoom}", type: int }, { value: "{speed}", type: int } ] }
+    returns: none
+  set_zoom_with_speed_tail_air:
+    summary: Zoom to a position at a given speed (Tail Air, speed 0-11)
+    params:
+      zoom: *zoom
+      speed: { type: int, min: 0, max: 11, default: 0, label: Zoom speed,
+               description: "Zoom speed, 1 (slowest) to 11 (fastest); 0 is the camera's default speed." }
+    send: { address: /OBSBOT/WebCam/General/SetZoomSpeed, args: [ { value: "{zoom}", type: int }, { value: "{speed}", type: int } ] }
+    returns: none
+  zoom_max:
+    summary: Zoom fully in
+    send: { address: /OBSBOT/WebCam/General/SetZoomMax, args: [ { value: "0", type: int } ] }
+    returns: none
+  zoom_min:
+    summary: Zoom fully out
+    send: { address: /OBSBOT/WebCam/General/SetZoomMin, args: [ { value: "0", type: int } ] }
+    returns: none
+  gimbal_up:
+    summary: Move the gimbal up until stopped (speed 0 stops)
+    params:
+      speed: &gimbal_speed { type: int, min: 0, max: 100, default: 50, label: Speed,
+                             description: "Movement speed, 1 (slowest) to 100 (fastest); 0 stops the gimbal." }
+    send: { address: /OBSBOT/WebCam/General/SetGimbalUp, args: [ { value: "{speed}", type: int } ] }
+    returns: none
+  gimbal_down:
+    summary: Move the gimbal down until stopped (speed 0 stops)
+    params: { speed: *gimbal_speed }
+    send: { address: /OBSBOT/WebCam/General/SetGimbalDown, args: [ { value: "{speed}", type: int } ] }
+    returns: none
+  gimbal_left:
+    summary: Move the gimbal left until stopped (speed 0 stops)
+    params: { speed: *gimbal_speed }
+    send: { address: /OBSBOT/WebCam/General/SetGimbalLeft, args: [ { value: "{speed}", type: int } ] }
+    returns: none
+  gimbal_right:
+    summary: Move the gimbal right until stopped (speed 0 stops)
+    params: { speed: *gimbal_speed }
+    send: { address: /OBSBOT/WebCam/General/SetGimbalRight, args: [ { value: "{speed}", type: int } ] }
+    returns: none
+  gimbal_stop:
+    summary: Stop the gimbal (SetGimbalUp and SetGimbalLeft with speed 0)
+    send:
+      - { address: /OBSBOT/WebCam/General/SetGimbalUp, args: [ { value: "0", type: int } ] }
+      - { address: /OBSBOT/WebCam/General/SetGimbalLeft, args: [ { value: "0", type: int } ] }
+    returns: none
+  set_gimbal_angles:
+    summary: Move the gimbal to a pan and pitch angle (Tail 2)
+    params:
+      speed: &angle_speed { type: int, min: 0, max: 90, default: 45, label: Speed,
+                            description: "Speed of the move, 0 to 90; higher is faster." }
+      pan: { type: int, min: -159, max: 159, required: true, label: Pan,
+             description: "Pan angle in degrees, -159 to 159." }
+      pitch: { type: int, min: -62, max: 62, required: true, label: Pitch,
+               description: "Pitch angle in degrees, -62 to 62." }
+    send: { address: /OBSBOT/WebCam/General/SetGimMotorDegree,
+            args: [ { value: "{speed}", type: int }, { value: "{pan}", type: int }, { value: "{pitch}", type: int } ] }
+    returns: none
+  set_gimbal_angles_tail_air:
+    summary: Move the gimbal to a pan and pitch angle (Tail Air)
+    params:
+      speed: *angle_speed
+      pan: { type: int, min: -129, max: 129, required: true, label: Pan,
+             description: "Pan angle in degrees, -129 to 129." }
+      pitch: { type: int, min: -59, max: 59, required: true, label: Pitch,
+               description: "Pitch angle in degrees, -59 to 59." }
+    send: { address: /OBSBOT/WebCam/General/SetGimMotorDegree,
+            args: [ { value: "{speed}", type: int }, { value: "{pan}", type: int }, { value: "{pitch}", type: int } ] }
+    returns: none
+  set_mirror:
+    summary: Mirror the picture or not
+    params:
+      mirrored: { type: bool, required: true, label: Mirror, description: "On mirrors the picture, off shows it as shot." }
+    send: { address: /OBSBOT/WebCam/General/SetMirror, args: [ { value: "{mirrored:bool01}", type: int } ] }
+    returns: none
+
+  # ── Image ────────────────────────────────────────────────────────────────
+  set_auto_focus:
+    summary: Auto focus or manual focus
+    params:
+      enabled: { type: bool, required: true, label: Auto focus, description: "On focuses automatically, off focuses manually." }
+    send: { address: /OBSBOT/WebCam/General/SetAutoFocus, args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+  set_manual_focus:
+    summary: Set the manual focus position
+    params:
+      focus: { type: int, min: 0, max: 100, required: true, label: Focus, description: "Manual focus position, 0 to 100." }
+    send: { address: /OBSBOT/WebCam/General/SetManualFocus, args: [ { value: "{focus}", type: int } ] }
+    returns: none
+  set_auto_exposure:
+    summary: Auto exposure or manual exposure
+    params:
+      enabled: { type: bool, required: true, label: Auto exposure, description: "On sets exposure automatically, off manually." }
+    send: { address: /OBSBOT/WebCam/General/SetAutoExposure, args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+  set_exposure_compensation:
+    summary: Set exposure compensation in tenths of a stop, -3.0 to +3.0 EV in the camera's steps
+    params:
+      value: { type: enum, values: ["-30", "-27", "-23", "-20", "-17", "-13", "-10", "-7", "-3", "0", "3", "7", "10", "13", "17", "20", "23", "27", "30"],
+               required: true, label: Exposure compensation,
+               description: "Compensation in tenths of an EV: -30 is -3.0 EV, 0 is none, 30 is +3.0 EV." }
+    send: { address: /OBSBOT/WebCam/General/SetExposureCompensate, args: [ { value: "{value}", type: int } ] }
+    returns: none
+  set_shutter_speed:
+    summary: Set the shutter speed as the denominator of 1/n seconds
+    params:
+      speed: { type: enum, values: ["6400", "5000", "3200", "2500", "2000", "1600", "1250", "1000", "800", "640", "500", "400", "320", "240", "200", "160", "120", "100", "80", "60", "50", "40", "30", "25", "20", "15", "10", "8", "5", "4", "3"],
+               required: true, label: Shutter speed,
+               description: "Denominator of the shutter time: 6400 is 1/6400 s, 30 is 1/30 s." }
+    send: { address: /OBSBOT/WebCam/General/SetShutterSpeed, args: [ { value: "{speed}", type: int } ] }
+    returns: none
+  set_iso:
+    summary: Set the ISO, 100 to 6400
+    params:
+      iso: { type: int, min: 100, max: 6400, required: true, label: ISO, description: "Sensor sensitivity, ISO 100 to 6400." }
+    send: { address: /OBSBOT/WebCam/General/SetISO, args: [ { value: "{iso}", type: int } ] }
+    returns: none
+  set_auto_white_balance:
+    summary: Auto white balance or manual white balance
+    params:
+      enabled: { type: bool, required: true, label: Auto white balance, description: "On sets white balance automatically, off uses the color temperature." }
+    send: { address: /OBSBOT/WebCam/General/SetAutoWhiteBalance, args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+  set_color_temperature:
+    summary: Set the manual white balance color temperature, 2000 K to 10000 K
+    params:
+      kelvin: { type: int, min: 2000, max: 10000, required: true, label: Color temperature, description: "White balance color temperature in kelvin, 2000 to 10000." }
+    send: { address: /OBSBOT/WebCam/General/SetColorTemperature, args: [ { value: "{kelvin}", type: int } ] }
+    returns: none
+
+  # ── Tracking, recording and presets ──────────────────────────────────────
+  set_ai_enabled:
+    summary: Turn AI tracking on or off (Tail 2)
+    params:
+      enabled: { type: bool, required: true, label: AI tracking, description: "On turns AI tracking on, off turns it off." }
+    send: { address: /OBSBOT/Camera/Tail2/SetAiEnable, args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+  set_ai_mode_tail_2:
+    summary: Track one person or a group (Tail 2)
+    params:
+      mode: { type: enum, values: [single, multi], required: true, label: AI mode,
+              description: "single tracks one person, multi tracks several people." }
+    send: { address: /OBSBOT/Camera/Tail2/SetAiMode, args: [ { value: "{mode:map.tail2_ai_mode}", type: int } ] }
+    returns: none
+  set_tracking_speed_tail_2:
+    summary: Set the tracking speed, with pan and pitch speeds for the custom setting (Tail 2)
+    params:
+      speed: { type: enum, values: [super_lazy, lazy, slow, fast, crazy, custom], required: true, label: Tracking speed,
+               description: "Preset tracking speed from super_lazy to crazy, or custom to use the pan and pitch settings below." }
+      pan_auto: { type: bool, default: true, label: Pan automatic, description: "With custom: on lets the camera choose the pan speed, off uses the pan speed." }
+      pan_speed: { type: int, min: 1, max: 10, default: 5, label: Pan speed, description: "With custom and pan automatic off: pan speed, 1 (slowest) to 10." }
+      pitch_auto: { type: bool, default: true, label: Pitch automatic, description: "With custom: on lets the camera choose the pitch speed, off uses the pitch speed." }
+      pitch_speed: { type: int, min: 1, max: 10, default: 5, label: Pitch speed, description: "With custom and pitch automatic off: pitch speed, 1 (slowest) to 10." }
+    send: { address: /OBSBOT/Camera/Tail2/SetTrackingSpeed,
+            args: [ { value: "{speed:map.tail2_tracking_speed}", type: int }, { value: "{pan_auto:bool01}", type: int },
+                    { value: "{pan_speed}", type: int }, { value: "{pitch_auto:bool01}", type: int }, { value: "{pitch_speed}", type: int } ] }
+    returns: none
+  set_auto_zoom:
+    summary: Set the auto-zoom framing (Tail 2)
+    params:
+      framing: { type: enum, values: [none, close_up, half_body, above_the_knees, nine_head_portrait, full_body, long_shot_1, long_shot_2],
+                 required: true, label: Framing,
+                 description: "Shot the camera frames while tracking; close_up is for single-person tracking only." }
+    send: { address: /OBSBOT/Camera/Tail2/SetAutoZoom, args: [ { value: "{framing:map.tail2_auto_zoom}", type: int } ] }
+    returns: none
+  set_only_me:
+    summary: Turn Only Me tracking on or off (Tail 2)
+    params:
+      enabled: { type: bool, required: true, label: Only Me, description: "On tracks only the selected person, off tracks as the AI mode says." }
+    send: { address: /OBSBOT/Camera/Tail2/SetOnlyMe, args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+  set_ai_mode_tail_air:
+    summary: Set the AI tracking mode (Tail Air)
+    params:
+      mode: { type: enum, values: [none, normal, upper_body, close_up, animal, group], required: true, label: AI mode,
+              description: "none stops tracking; normal, upper_body and close_up track a person at that framing; animal tracks an animal; group tracks several people." }
+    send: { address: /OBSBOT/Camera/TailAir/SetAiMode, args: [ { value: "{mode:map.tail_air_ai_mode}", type: int } ] }
+    returns: none
+  set_tracking_speed_tail_air:
+    summary: Set the tracking speed (Tail Air)
+    params:
+      speed: { type: enum, values: [slow, standard, fast], required: true, label: Tracking speed,
+               description: "How fast the camera follows its subject." }
+    send: { address: /OBSBOT/Camera/TailAir/SetTrackingSpeed, args: [ { value: "{speed:map.tail_air_tracking_speed}", type: int } ] }
+    returns: none
+  set_recording:
+    summary: Start or stop recording to the camera's card
+    params:
+      recording: { type: bool, required: true, label: Recording, description: "On starts recording, off stops it." }
+    send:
+      - { models: [tail-2], address: /OBSBOT/Camera/Tail2/SetRecording, args: [ { value: "{recording:bool01}", type: int } ] }
+      - { models: [tail-air], address: /OBSBOT/Camera/TailAir/SetRecording, args: [ { value: "{recording:bool01}", type: int } ] }
+    returns: none
+  snapshot:
+    summary: Take a still photo
+    send:
+      - { models: [tail-2], address: /OBSBOT/Camera/Tail2/Snapshot, args: [ { value: "1", type: int } ] }
+      - { models: [tail-air], address: /OBSBOT/Camera/TailAir/Snapshot, args: [ { value: "1", type: int } ] }
+    returns: none
+  trigger_preset:
+    summary: Move to preset position 1, 2 or 3
+    params:
+      preset: { type: int, min: 1, max: 3, required: true, label: Preset, description: "Preset position, 1 to 3." }
+    send:
+      - { models: [tail-2], address: /OBSBOT/Camera/Tail2/TriggerPreset, args: [ { value: "{preset:-1}", type: int } ] }
+      - { models: [tail-air], address: /OBSBOT/Camera/TailAir/TriggerPreset, args: [ { value: "{preset:-1}", type: int } ] }
+    returns: none
+
+  # ── Queries (the answers update state) ───────────────────────────────────
+  get_device_info:
+    summary: Ask for the device information; the DeviceInfo answer updates state
+    send: { address: /OBSBOT/WebCam/General/GetDeviceInfo, args: [ { value: "0", type: int } ] }
+    returns: none
+  get_zoom_info:
+    summary: Ask for the zoom position and field of view; the ZoomInfo answer updates state
+    send: { address: /OBSBOT/WebCam/General/GetZoomInfo, args: [ { value: "0", type: int } ] }
+    returns: none
+  get_gimbal_position:
+    summary: Ask for the gimbal angles; the GetGimbalPosInfoResp answer updates state
+    send: { address: /OBSBOT/WebCam/General/GetGimbalPosInfo, args: [ { value: "0", type: int } ] }
+    returns: none
+
+maps:
+  tail2_ai_mode: { single: "0", multi: "1" }
+  tail2_tracking_speed: { super_lazy: "0", lazy: "1", slow: "2", fast: "3", crazy: "4", custom: "5" }
+  tail2_auto_zoom: { none: "0", close_up: "1", half_body: "2", above_the_knees: "3", nine_head_portrait: "4",
+                     full_body: "5", long_shot_1: "6", long_shot_2: "7" }
+  tail_air_ai_mode: { none: "0", normal: "1", upper_body: "2", close_up: "3", animal: "6", group: "7" }
+  tail_air_tracking_speed: { slow: "0", standard: "1", fast: "2" }
+
+telemetry:
+  # The camera pushes nothing on its own: Connected (answered with
+  # ConnectedResp and the device information) and the three queries are sent
+  # every 5 seconds, and their answers update state.
+  subscribe:
+    send:
+      - { address: /OBSBOT/WebCam/General/Connected, args: [ { value: "0", type: int } ] }
+      - { address: /OBSBOT/WebCam/General/GetDeviceInfo, args: [ { value: "0", type: int } ] }
+      - { address: /OBSBOT/WebCam/General/GetZoomInfo, args: [ { value: "0", type: int } ] }
+      - { address: /OBSBOT/WebCam/General/GetGimbalPosInfo, args: [ { value: "0", type: int } ] }
+    every_ms: 5000
+  updates:
+    - address: "^/OBSBOT/WebCam/General/ConnectedResp$"
+      state: { connected: { value: "{arg0}", map: { "1": true, "0": false } } }
+    - address: "^/OBSBOT/WebCam/General/DeviceInfo$"
+      arg_types: isisisisiii
+      state:
+        "devices.1.connected": { value: "{arg0}", map: { "1": true, "0": false } }
+        "devices.1.name": "{arg1}"
+        "devices.2.connected": { value: "{arg2}", map: { "1": true, "0": false } }
+        "devices.2.name": "{arg3}"
+        "devices.3.connected": { value: "{arg4}", map: { "1": true, "0": false } }
+        "devices.3.name": "{arg5}"
+        "devices.4.connected": { value: "{arg6}", map: { "1": true, "0": false } }
+        "devices.4.name": "{arg7}"
+        selected_device: "{arg8:+1}"
+        running: { value: "{arg9}", map: { "1": true, "0": false } }
+        device_type: "{arg10}"
+    - address: "^/OBSBOT/WebCam/General/ZoomInfo$"
+      state:
+        zoom.position: "{arg0}"
+        zoom.field_of_view: { value: "{arg1}", map: { "0": 86, "1": 78, "2": 65 } }
+    - address: "^/OBSBOT/WebCam/General/GetGimbalPosInfoResp$"
+      state:
+        gimbal.roll: "{arg0}"
+        gimbal.pitch: "{arg1}"
+        gimbal.yaw: "{arg2}"
+
+state:
+  connected: { type: bool, description: "The camera answered Connected with ConnectedResp 1" }
+  devices.*.connected: { type: bool, description: "Whether device 1 to 4 of the DeviceInfo answer is connected" }
+  devices.*.name: { type: string, description: "Name of device 1 to 4 of the DeviceInfo answer" }
+  selected_device: { type: int, description: "Device currently selected, 1 to 4" }
+  running: { type: bool, description: "The selected device is running (true) or asleep (false)" }
+  device_type: { type: int, description: "Type number of the selected device, as the camera reports it (the spreadsheet lists 0 Tiny, 1 Tiny 4K, 2 Meet, 3 Meet 4K)" }
+  zoom.position: { type: int, unit: "%", description: "Zoom position, 0 to 100 percent of the range" }
+  zoom.field_of_view: { type: int, unit: "°", description: "Field of view setting the camera reports: 86, 78 or 65 degrees" }
+  gimbal.roll: { type: int, unit: "°", description: "Gimbal roll angle (not used by the camera at present)" }
+  gimbal.pitch: { type: int, unit: "°", description: "Gimbal pitch angle, -90 to 90 degrees" }
+  gimbal.yaw: { type: int, unit: "°", description: "Gimbal yaw (pan) angle, -140 to 140 degrees" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The camera acknowledges no command, so every command reports unverified. Only the zoom
+      position and field of view, the gimbal angles and the device information can be read back;
+      focus, exposure, ISO, shutter, white balance, mirror, tracking, recording and preset state
+      have no query in the OSC definition, so they are not kept in state (an API limit).
+  - models: [all]
+    severity: info
+    text: >
+      Over UDP the camera answers on port 57120. The core sends from feedback_port and hears the
+      answers there; the spreadsheet does not say whether the camera answers to the sender's port
+      or always to 57120, so feedback_port defaults to 57120 to be right either way. OSC over TCP
+      (OSC 1.0, the same port 57110) is not used by this spec.
+  - models: [tail-2]
+    severity: info
+    text: >
+      A third-party integration reports that a Tail 2 ignores the Get* queries and answers each
+      Connected with its full state instead; telemetry sends Connected with every round of queries
+      so the state stays current either way.
+  - models: [all]
+    severity: info
+    text: >
+      The spreadsheet's argument column says int for SetShutterSpeed but lists 12.5, 6.25 and 2.5
+      among the values, which an OSC int cannot carry; set_shutter_speed offers the whole-number
+      values only. The DeviceInfo device type list (Tiny, Tiny 4K, Meet, Meet 4K) is copied from the
+      webcam application's definition and gives no number for the Tail cameras.
+  - models: [all]
+    severity: info
+    text: >
+      gimbal_stop sends SetGimbalUp and SetGimbalLeft with speed 0; the spreadsheet defines speed 0
+      as stop for each of the four directions and gives no separate stop command.

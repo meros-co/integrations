@@ -2416,6 +2416,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether QLActive lines have the same form as QLList lines on ONYX Manager 4.x. ([specs/obsidian-onyx.yaml:304](specs/obsidian-onyx.yaml#L304))
 - [ ] Check whether QLName answers on current versions. ([specs/obsidian-onyx.yaml:322](specs/obsidian-onyx.yaml#L322))
 
+## obsbot-tail — OBSBOT Tail 2 and Tail Air (OSC)
+
+- [ ] Check whether the camera sends its UDP replies to the sender's port or always to port 57120, and that replies arrive when the core sends from feedback_port 57120. ([specs/obsbot-tail.yaml:405](specs/obsbot-tail.yaml#L405))
+- [ ] Check that a Tail 2 answers GetDeviceInfo, GetZoomInfo and GetGimbalPosInfo, or only answers Connected with its full state (as a third-party integration reports), and which messages that state comes in. ([specs/obsbot-tail.yaml:412](specs/obsbot-tail.yaml#L412))
+- [ ] Check the DeviceInfo device type number a Tail 2 and a Tail Air report, and whether SetShutterSpeed takes 12.5, 6.25 and 2.5 in any form. ([specs/obsbot-tail.yaml:418](specs/obsbot-tail.yaml#L418))
+- [ ] Check that SetGimbalUp and SetGimbalLeft with speed 0 together stop a move in any direction. ([specs/obsbot-tail.yaml:425](specs/obsbot-tail.yaml#L425))
+
 ## obsidian-onyx-osc — Obsidian ONYX (OSC)
 
 - [ ] Find ONYX's default OSC ports (the port ONYX listens on and the device's incoming port). ([specs/obsidian-onyx-osc.yaml:1027](specs/obsidian-onyx-osc.yaml#L1027))
