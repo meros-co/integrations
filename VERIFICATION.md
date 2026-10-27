@@ -3224,6 +3224,36 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether gotoSlide and gotoSchedule count from 1, and what pres_no, slide_no and rectype hold. ([specs/softouch-easyworship.yaml:134](specs/softouch-easyworship.yaml#L134))
 - [ ] Check whether UTF-8 is accepted where the Companion module sends Latin-1 (only the controller name can hold non-ASCII text, and it is limited to ASCII here). ([specs/softouch-easyworship.yaml:62](specs/softouch-easyworship.yaml#L62))
 
+## softron-movierecorder — Softron MovieRecorder
+
+- [ ] Confirm PUT /sources/record, /pause, /resume and /stop take a JSON list of source ids, as the Companion module sends them (not in Softron's public material). ([specs/softron-movierecorder.yaml:89](specs/softron-movierecorder.yaml#L89))
+- [ ] Confirm GET /sources/<id>/lock, /unlock and /manual_split (from the Companion module). ([specs/softron-movierecorder.yaml:119](specs/softron-movierecorder.yaml#L119))
+- [ ] Confirm PUT /sources/<id>/recording_name {recording_name} and PUT /sources/<id>/destinations with a list of ids (from the Companion module). ([specs/softron-movierecorder.yaml:137](specs/softron-movierecorder.yaml#L137))
+- [ ] Confirm PUT /scheduled_recordings/<id> with duration and start_time in minutes, and stopped_by_user false (fields from the Companion module and the 4.6.0 release note). ([specs/softron-movierecorder.yaml:155](specs/softron-movierecorder.yaml#L155))
+- [ ] Confirm PUT /restore_configuration and its restore_* keys, restore_vtr_bach_list as spelled. ([specs/softron-movierecorder.yaml:180](specs/softron-movierecorder.yaml#L180))
+- [ ] Confirm the password goes as ?password= on every request, that an empty one is accepted when none is set, and the answer to a wrong one (401 assumed). ([specs/softron-movierecorder.yaml:61](specs/softron-movierecorder.yaml#L61))
+- [ ] Confirm the /remote websocket needs no password, and the source fields of its messages (unique_id, display_name, is_recording, is_paused, is_locked, recording_name, video_format, recording_start_date, recording_end_date). ([specs/softron-movierecorder.yaml:256](specs/softron-movierecorder.yaml#L256))
+- [ ] Confirm the scheduled recording fields (unique_id, name, source_unique_id, start_time, duration, is_enabled, weekly_repeated, date, stopped_by_user). ([specs/softron-movierecorder.yaml:295](specs/softron-movierecorder.yaml#L295))
+- [ ] Confirm the statuses the commands answer with (200, 201 or 202 assumed). ([specs/softron-movierecorder.yaml:94](specs/softron-movierecorder.yaml#L94))
+
+## softron-mreplay — Softron M|Replay
+
+- [ ] Confirm the playback rate call: GET /playbackrate?rate= as the 2.2 release note gives it, or /set_playback_rate?rate= as the Companion module sends it. ([specs/softron-mreplay.yaml:137](specs/softron-mreplay.yaml#L137))
+- [ ] Confirm GET /set_position?position=&reference= and its references (from the Companion module). ([specs/softron-mreplay.yaml:144](specs/softron-mreplay.yaml#L144))
+- [ ] Confirm PUT /outputs/<id> with {selected: true} or {input_unique_id} (from the Companion module). ([specs/softron-mreplay.yaml:152](specs/softron-mreplay.yaml#L152))
+- [ ] Confirm POST /clips and its keys (name, unique_name, reference_in_point, in_point, reference_out_point, out_point, duration) (from the Companion module). ([specs/softron-mreplay.yaml:100](specs/softron-mreplay.yaml#L100))
+- [ ] Confirm the playlist calls /playlists/<id>/play, pause, stop, skip_previous, skip_next and /items/<n>/play and pause (from the Companion module). ([specs/softron-mreplay.yaml:177](specs/softron-mreplay.yaml#L177))
+- [ ] Confirm the /status fields and their types (playback_rate, the *_time and *_timecode pairs, remaining_space, framerate, drop_frame, loop_recording). ([specs/softron-mreplay.yaml:291](specs/softron-mreplay.yaml#L291))
+- [ ] Confirm the /inputs, /outputs, /playlists and /info fields (unique_id, name, enabled, selected, input_unique_id; application_version and the others). ([specs/softron-mreplay.yaml:317](specs/softron-mreplay.yaml#L317))
+- [ ] Confirm the password goes as ?password= on every request and an empty one is accepted when none is set; and the port, 8090 (the marker article gives 8082). ([specs/softron-mreplay.yaml:56](specs/softron-mreplay.yaml#L56))
+
+## softron-multicam-logger — Softron Multicam Logger
+
+- [ ] Confirm add_marker and angle_changes are served at /add_marker and /angle_changes (the guide writes them without a leading slash). ([specs/softron-multicam-logger.yaml:66](specs/softron-multicam-logger.yaml#L66))
+- [ ] Confirm the status and body Multicam Logger answers the commands with, and its answer when no document is open. ([specs/softron-multicam-logger.yaml:45](specs/softron-multicam-logger.yaml#L45))
+- [ ] Confirm GET /angle_changes answers a JSON list (the guide's example also wraps it in braces). ([specs/softron-multicam-logger.yaml:165](specs/softron-multicam-logger.yaml#L165))
+- [ ] Confirm /status gives program and preview as numbers in strings, and logging_state as a boolean. ([specs/softron-multicam-logger.yaml:105](specs/softron-multicam-logger.yaml#L105))
+
 ## sony-9pin — Sony 9-pin (RS-422 VTR protocol) decks and servers
 
 - [ ] Check the jog, var and shuttle speeds the device runs at for the speed bytes sent (10^(N/32-2) times play speed, a second byte for finer steps), and whether speed 0 pauses it or creeps. ([specs/sony-9pin.yaml:121](specs/sony-9pin.yaml#L121))

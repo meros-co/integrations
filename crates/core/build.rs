@@ -297,6 +297,14 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-sofie", &["sofie-chef"]),
     ("vendor-softouch", &["softouch-easyworship"]),
     (
+        "vendor-softron",
+        &[
+            "softron-movierecorder",
+            "softron-mreplay",
+            "softron-multicam-logger",
+        ],
+    ),
+    (
         "vendor-sony",
         &[
             "sony-9pin",

@@ -1,0 +1,356 @@
+spec: 1
+id: softron-mreplay
+name: Softron M|Replay (REST API)
+vendor: Softron
+category: playback
+
+# M|Replay's REST API on port 8090 (set in its HTTP Remote Control settings): markers, clips, playback rate and
+# position, output and input assignment, playlists. Softron documents the API only inside the running app (api.html
+# on that port); this spec takes the calls Softron's support articles and release notes name, and the rest from
+# the Bitfocus Companion module, each one marked inferred.
+source:
+  - title: "HOW TO: Control M|Replay with the REST API, Softron support article 360010146720 (updated 2025-11-17)"
+    author: Softron Media Services
+    url: https://softron.zendesk.com/hc/en-us/articles/360010146720-HOW-TO-Control-M-Replay-with-the-REST-API
+    note: "Manufacturer document (retrieved 2026-10-27). The API's documentation in the app at http://localhost:8090/api.html; a markers page at /markers.html (2.1 and later)."
+  - title: "HOW TO: Create a marker in M|Replay using the REST API, Softron support article 115000048614 (updated 2024-05-23)"
+    author: Softron Media Services
+    url: https://softron.zendesk.com/hc/en-us/articles/115000048614-HOW-TO-Create-a-marker-in-M-Replay-using-the-REST-API
+    note: >
+      Manufacturer document. POST markers {"name"} adds a marker where the playhead is; with a password required,
+      ?password= on the request (1234 by default); GET markers lists them [{name, start}]. It gives port 8082, which
+      Softron's port list replaces with 8090.
+  - title: "List of port numbers of our applications using a REST API, Softron support article 360013226694 (updated 2026-08-24)"
+    author: Softron Media Services
+    url: https://softron.zendesk.com/hc/en-us/articles/360013226694-List-of-port-numbers-of-our-applications-using-a-REST-API
+    note: "Manufacturer document. M|Replay 8090."
+  - title: "M|Replay release notes (softron.tv)"
+    author: Softron Media Services
+    url: https://softron.tv/support/release-notes?category=M%7CReplay
+    note: >
+      Manufacturer document (retrieved 2026-10-27). 2.2: GET /playbackrate?rate= (0 stopped, 1 forward, -1
+      backward). 2.2.2: inputs assigned to outputs, going to the in or out points. 2.3.1: clips and markers
+      modified through the API. 2.3.2 and 2.3.4: playlists and clips addressed by name, uniqueID or index. 2.3.5:
+      GET /inputs/pause and /inputs/resume. 2.3.8: GET /info with the licensed options; durations as numbers or
+      timecodes.
+  - title: "bitfocus/companion-module-softron-mreplay (MIT)"
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-softron-mreplay
+    note: >
+      Corroboration and the source of the inferred calls, not copied (retrieved 2026-10-27): ?password= on each
+      request; PUT /outputs/<id> {selected: true} or {input_unique_id}; POST /markers {name, reference live,
+      playhead or absolute, offset or time}; POST /clips {name, unique_name, reference_in_point, in_point,
+      reference_out_point, out_point, duration}; GET /set_playback_rate?rate=; GET /set_position?position=&reference=
+      (live, playhead, absolute, in_point, out_point); GET /playlists/<id>/play, pause, stop, skip_previous,
+      skip_next and /playlists/<id>/items/<n>/play and pause; GET /inputs, /outputs, /playlists, /status, /markers
+      and /info, with the fields it reads.
+
+transport:
+  type: http
+  port: 8090
+  https_port: 8090
+  scheme: { setting: scheme }
+  accept_invalid_certs: true
+  auth: none
+  timeout_ms: 5000
+  probe: { method: GET, path: /info, query: { password: "{settings.password}" } }
+
+settings:
+  password: { type: string, secret: true, default: "", max_length: 128, label: Password,
+    description: "The remote control password set in M|Replay (1234 when first enabled); leave empty when none is required." }
+  scheme: { type: enum, values: [http, https], default: http, label: Connection,
+    description: "http, or https once HTTPS is enabled in M|Replay (a self-signed certificate is accepted)." }
+
+ports:
+  - { port: 8090, protocol: http, role: control, when: "scheme http", note: "set in M|Replay's HTTP Remote Control settings" }
+  - { port: 8090, protocol: https, role: control, when: "scheme https" }
+
+models:
+  - id: mreplay
+    name: Softron M|Replay
+    supports: [add_marker, add_marker_at, create_clip_in_duration, create_clip_in_out, create_clip_out_duration,
+      set_playback_rate, set_position, select_output, assign_input, pause_inputs, resume_inputs, play_playlist,
+      pause_playlist, stop_playlist, playlist_previous, playlist_next, play_playlist_item, pause_playlist_item,
+      get_info, get_status, get_inputs, get_outputs, get_playlists, get_markers]
+    verification: none
+
+maps:
+  marker_reference: { live: live, playhead: playhead }
+  position_reference: { live: live, playhead: playhead, absolute: absolute, in_point: in_point, out_point: out_point }
+  playlist_action: { play: play, pause: pause, stop: stop }
+
+commands:
+  add_marker:
+    summary: Add a marker where the playhead is (POST /markers {name})
+    params:
+      name: &name { type: string, max_length: 1024, required: true, label: Name, description: "The marker's name." }
+    send: { method: POST, path: /markers, query: { password: "{settings.password}" }, content_type: application/json, body: '{"name":{name:json}}' }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  add_marker_at:
+    summary: Add a marker at an offset from live or the playhead (POST /markers {name, reference, offset})
+    params:
+      name: *name
+      reference: { type: enum, values: [live, playhead], required: true, label: Reference, description: "live or playhead." }
+      offset: &offset { type: string, max_length: 32, pattern: "^-?[0-9:;.]+$", required: true, label: Offset, description: "Seconds or a timecode from the reference; negative for earlier." }
+    send: { method: POST, path: /markers, query: { password: "{settings.password}" }, content_type: application/json,
+            body: '{"name":{name:json},"reference":"{reference:map.marker_reference}","offset":{offset:json}}' }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  create_clip_in_duration:
+    summary: Create a clip from an in point and a duration (POST /clips)
+    params:
+      name: &clip_name { type: string, max_length: 1024, required: true, label: Name, description: "The clip's name." }
+      in_reference: &in_ref { type: enum, values: [live, playhead, absolute], required: true, label: In point from, description: "What the in point is measured from: live, playhead or absolute." }
+      in_point: &in_point { type: string, max_length: 32, pattern: "^-?[0-9:;.]+$", required: true, label: In point, description: "Seconds or a timecode." }
+      duration: &duration { type: string, max_length: 32, pattern: "^[0-9:;.]+$", required: true, label: Duration, description: "Seconds or a timecode." }
+      unique_name: &unique { type: bool, default: false, label: Unique name, description: "On refuses a name another clip has." }
+    send: { method: POST, path: /clips, query: { password: "{settings.password}" }, content_type: application/json,
+            body: '{"name":{name:json},"unique_name":{unique_name},"reference_in_point":"{in_reference}","in_point":{in_point:json},"duration":{duration:json}}' }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  create_clip_in_out:
+    summary: Create a clip from an in point and an out point (POST /clips)
+    params:
+      name: *clip_name
+      in_reference: *in_ref
+      in_point: *in_point
+      out_reference: &out_ref { type: enum, values: [live, playhead, absolute], required: true, label: Out point from, description: "What the out point is measured from: live, playhead or absolute." }
+      out_point: &out_point { type: string, max_length: 32, pattern: "^-?[0-9:;.]+$", required: true, label: Out point, description: "Seconds or a timecode." }
+      unique_name: *unique
+    send: { method: POST, path: /clips, query: { password: "{settings.password}" }, content_type: application/json,
+            body: '{"name":{name:json},"unique_name":{unique_name},"reference_in_point":"{in_reference}","in_point":{in_point:json},"reference_out_point":"{out_reference}","out_point":{out_point:json}}' }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  create_clip_out_duration:
+    summary: Create a clip from an out point and a duration (POST /clips)
+    params:
+      name: *clip_name
+      out_reference: *out_ref
+      out_point: *out_point
+      duration: *duration
+      unique_name: *unique
+    send: { method: POST, path: /clips, query: { password: "{settings.password}" }, content_type: application/json,
+            body: '{"name":{name:json},"unique_name":{unique_name},"reference_out_point":"{out_reference}","out_point":{out_point:json},"duration":{duration:json}}' }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  set_playback_rate:
+    summary: Set the playback rate of the selected output (GET /playbackrate?rate=)
+    params:
+      rate: { type: float, min: -32, max: 32, required: true, label: Rate, description: "0 stopped, 1 forward at normal speed, -1 backward, fractions slower." }
+    send: { method: GET, path: /playbackrate, query: { rate: "{rate:.2f}", password: "{settings.password}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  set_position:
+    summary: Go to a position from live, the playhead, an absolute time, or the in or out point (GET /set_position)
+    params:
+      reference: { type: enum, values: [live, playhead, absolute, in_point, out_point], required: true, label: Reference, description: "What the position is measured from." }
+      position: { type: string, max_length: 32, pattern: "^-?[0-9:;.]+$", required: true, label: Position, description: "Seconds or a timecode; negative for earlier." }
+    send: { method: GET, path: /set_position, query: { position: "{position}", reference: "{reference:map.position_reference}", password: "{settings.password}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  select_output:
+    summary: Select an output (PUT /outputs/<id> {selected true}), then read the outputs back
+    params:
+      output: &output { type: string, max_length: 256, required: true, label: Output, description: "The output's unique id, as outputs in state are keyed." }
+    send: { method: PUT, path: "/outputs/{output}", query: { password: "{settings.password}" }, content_type: application/json, body: '{"selected":true}' }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  assign_input:
+    summary: Feed an output from an input (PUT /outputs/<id> {input_unique_id}), then read the outputs back
+    params:
+      output: *output
+      input: { type: string, max_length: 256, required: true, label: Input, description: "The input's unique id, as inputs in state are keyed." }
+    send: { method: PUT, path: "/outputs/{output}", query: { password: "{settings.password}" }, content_type: application/json, body: '{"input_unique_id":{input:json}}' }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  pause_inputs:
+    summary: Pause the inputs' recording (GET /inputs/pause)
+    send: { method: GET, path: /inputs/pause, query: { password: "{settings.password}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  resume_inputs:
+    summary: Resume the inputs' recording (GET /inputs/resume)
+    send: { method: GET, path: /inputs/resume, query: { password: "{settings.password}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  play_playlist:
+    summary: Play a playlist (GET /playlists/<id>/play)
+    params:
+      playlist: &playlist { type: string, max_length: 256, required: true, label: Playlist, description: "The playlist's unique id, name or index." }
+    send: { method: GET, path: "/playlists/{playlist}/play", query: { password: "{settings.password}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  pause_playlist:
+    summary: Pause a playlist (GET /playlists/<id>/pause)
+    params: { playlist: *playlist }
+    send: { method: GET, path: "/playlists/{playlist}/pause", query: { password: "{settings.password}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  stop_playlist:
+    summary: Stop a playlist (GET /playlists/<id>/stop)
+    params: { playlist: *playlist }
+    send: { method: GET, path: "/playlists/{playlist}/stop", query: { password: "{settings.password}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  playlist_previous:
+    summary: Skip to a playlist's previous item (GET /playlists/<id>/skip_previous)
+    params: { playlist: *playlist }
+    send: { method: GET, path: "/playlists/{playlist}/skip_previous", query: { password: "{settings.password}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  playlist_next:
+    summary: Skip to a playlist's next item (GET /playlists/<id>/skip_next)
+    params: { playlist: *playlist }
+    send: { method: GET, path: "/playlists/{playlist}/skip_next", query: { password: "{settings.password}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  play_playlist_item:
+    summary: Play one item of a playlist (GET /playlists/<id>/items/<n>/play)
+    params:
+      playlist: *playlist
+      item: &item { type: string, max_length: 256, required: true, label: Item, description: "The item's index, unique id or name." }
+    send: { method: GET, path: "/playlists/{playlist}/items/{item}/play", query: { password: "{settings.password}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  pause_playlist_item:
+    summary: Pause one item of a playlist (GET /playlists/<id>/items/<n>/pause)
+    params: { playlist: *playlist, item: *item }
+    send: { method: GET, path: "/playlists/{playlist}/items/{item}/pause", query: { password: "{settings.password}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  get_info:
+    summary: Read the application, computer and license information (GET /info)
+    send: { method: GET, path: /info, query: { password: "{settings.password}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_status:
+    summary: Read the playback status (GET /status)
+    send: { method: GET, path: /status, query: { password: "{settings.password}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_inputs:
+    summary: List the inputs (GET /inputs)
+    send: { method: GET, path: /inputs, query: { password: "{settings.password}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_outputs:
+    summary: List the outputs (GET /outputs)
+    send: { method: GET, path: /outputs, query: { password: "{settings.password}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_playlists:
+    summary: List the playlists (GET /playlists)
+    send: { method: GET, path: /playlists, query: { password: "{settings.password}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_markers:
+    summary: List the markers (GET /markers)
+    send: { method: GET, path: /markers, query: { password: "{settings.password}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+state:
+  status.playback_rate: { type: float, description: "The playback rate: 0 stopped, 1 forward, negative backward" }
+  status.current_time: { type: string, description: "The current (live) position, as M|Replay gives it" }
+  status.current_timecode: { type: string, description: "The current position as a timecode" }
+  status.playhead_time: { type: string, description: "The playhead's position" }
+  status.playhead_timecode: { type: string, description: "The playhead's position as a timecode" }
+  status.delay_time: { type: string, description: "The playhead's delay behind live" }
+  status.delay_timecode: { type: string, description: "The delay as a timecode" }
+  status.remaining_time: { type: string, description: "Recording time remaining" }
+  status.remaining_timecode: { type: string, description: "Recording time remaining as a timecode" }
+  status.remaining_space: { type: string, description: "Disk space remaining" }
+  status.framerate: { type: string, description: "The frame rate" }
+  status.drop_frame: { type: bool, description: "Drop-frame timecode" }
+  status.loop_recording: { type: bool, description: "Loop recording on" }
+  info.version: { type: string, description: "M|Replay's version (info)" }
+  info.build: { type: string, description: "Its build number (info)" }
+  info.computer_name: { type: string, description: "The computer's name (info)" }
+  info.demo: { type: bool, description: "Whether it runs in demo mode (info)" }
+  inputs.*.name: { type: string, description: "An input's name, keyed by its unique id" }
+  inputs.*.enabled: { type: bool, description: "Whether the input is enabled" }
+  outputs.*.name: { type: string, description: "An output's name, keyed by its unique id" }
+  outputs.*.enabled: { type: bool, description: "Whether the output is enabled" }
+  outputs.*.selected: { type: bool, description: "Whether the output is the selected one" }
+  outputs.*.input: { type: string, description: "The unique id of the input feeding the output" }
+  playlists.*.name: { type: string, description: "A playlist's name, keyed by its unique id" }
+  markers.*.name: { type: string, description: "A marker's name, keyed by its place in the list from 0" }
+  markers.*.start: { type: float, description: "A marker's start, as M|Replay gives it" }
+
+telemetry:
+  poll:
+    - every_ms: 1000
+      send: [{ method: GET, path: /status, query: { password: "{settings.password}" } }]
+    - every_ms: 5000
+      send: [{ method: GET, path: /outputs, query: { password: "{settings.password}" } }, { method: GET, path: /markers, query: { password: "{settings.password}" } }]
+    - every_ms: 30000
+      send: [{ method: GET, path: /inputs, query: { password: "{settings.password}" } }, { method: GET, path: /playlists, query: { password: "{settings.password}" } },
+        { method: GET, path: /info, query: { password: "{settings.password}" } }]
+  updates:
+    - path: "^/status\\?"
+      json: { rate: "$.playback_rate", ct: "$.current_time", ctc: "$.current_timecode", pt: "$.playhead_time", ptc: "$.playhead_timecode",
+        dt: "$.delay_time", dtc: "$.delay_timecode", rt: "$.remaining_time", rtc: "$.remaining_timecode", space: "$.remaining_space",
+        fps: "$.framerate", df: "$.drop_frame", loop: "$.loop_recording" }
+      state:
+        status.playback_rate: "{rate}"
+        status.current_time: "{ct}"
+        status.current_timecode: "{ctc}"
+        status.playhead_time: "{pt}"
+        status.playhead_timecode: "{ptc}"
+        status.delay_time: "{dt}"
+        status.delay_timecode: "{dtc}"
+        status.remaining_time: "{rt}"
+        status.remaining_timecode: "{rtc}"
+        status.remaining_space: "{space}"
+        status.framerate: "{fps}"
+        status.drop_frame: "{df}"
+        status.loop_recording: "{loop}"
+    - path: "^/info\\?"
+      json: { version: "$.application_version", build: "$.application_build_number", computer: "$.computer_name", demo: "$.application_in_demo" }
+      state: { info.version: "{version}", info.build: "{build}", info.computer_name: "{computer}", info.demo: "{demo}" }
+    - path: "^/inputs\\?"
+      json_each: "$"
+      json: { id: "$.unique_id", name: "$.name", enabled: "$.enabled" }
+      replace: inputs
+      state: { "inputs.{id:key}.name": "{name}", "inputs.{id:key}.enabled": "{enabled}" }
+    - path: "^/outputs\\?"
+      json_each: "$"
+      json: { id: "$.unique_id", name: "$.name", enabled: "$.enabled", selected: "$.selected", input: "$.input_unique_id" }
+      replace: outputs
+      state: { "outputs.{id:key}.name": "{name}", "outputs.{id:key}.enabled": "{enabled}", "outputs.{id:key}.selected": "{selected}",
+        "outputs.{id:key}.input": "{input}" }
+    - path: "^/playlists\\?"
+      json_each: "$"
+      json: { id: "$.unique_id", name: "$.name" }
+      replace: playlists
+      state: { "playlists.{id:key}.name": "{name}" }
+    - path: "^/markers\\?"
+      json_each: "$"
+      json: { name: "$.name", start: "$.start" }
+      replace: markers
+      state: { "markers.{index}.name": "{name}", "markers.{index}.start": "{start}" }
+    # Changes made through the API are read back.
+    - path: "^/outputs/"
+      headers: {}
+      then_send: [{ method: GET, path: /outputs, query: { password: "{settings.password}" } }]
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      set_playback_rate, set_position and the playlist commands change what the selected output plays at once;
+      pause_inputs pauses the recording of every input.
+  - models: [all]
+    severity: warning
+    text: >
+      Softron documents its REST calls only inside the running app (api.html on port 8090). POST and GET /markers,
+      GET /playbackrate, /inputs/pause, /inputs/resume and /info are documented; every other call, the JSON fields
+      and the answer statuses are taken from the Bitfocus Companion module and inferred. The Companion module sets
+      the rate with /set_playback_rate; the spec uses /playbackrate as Softron's release notes give it.
+  - models: [all]
+    severity: info
+    text: >
+      The password is sent on every request as ?password=, empty when none is set. Softron's marker article gives
+      port 8082; its port list and the app use 8090. With HTTPS enabled M|Replay serves no HTTP. Clip and marker
+      editing and the in/out point navigation the release notes mention are not in the public material.
