@@ -18,6 +18,7 @@ use serde_json::{json, Value};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
+#[cfg(feature = "sony-9pin")]
 fn sum(bytes: &[u8]) -> u8 {
     bytes.iter().fold(0u8, |a, b| a.wrapping_add(*b))
 }
@@ -114,6 +115,7 @@ where
     port
 }
 
+#[cfg(feature = "sony-9pin")]
 /// A deck behind a converter: binary messages with a checksum.
 async fn binary_deck() -> (u16, Arc<Mutex<Deck>>) {
     let deck = Arc::new(Mutex::new(Deck::default()));
@@ -147,6 +149,7 @@ async fn binary_deck() -> (u16, Arc<Mutex<Deck>>) {
     (port, deck)
 }
 
+#[cfg(feature = "grassvalley-amp")]
 /// An AMP server's socket: CRAT, then CMDS messages in hexadecimal.
 async fn amp_server() -> (u16, Arc<Mutex<Deck>>) {
     let deck = Arc::new(Mutex::new(Deck::default()));
