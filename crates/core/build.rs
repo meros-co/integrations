@@ -145,11 +145,12 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-greenhippo", &["greenhippo-hippotizer"]),
     ("vendor-h2r", &["h2r-graphics"]),
     ("vendor-highend", &["highend-hog4"]),
+    ("vendor-imimot", &["imimot-mitti"]),
     (
         "vendor-irisdown",
         &["irisdown-countdown-timer", "irisdown-remote-show-control"],
     ),
-    ("vendor-imimot", &["imimot-mitti"]),
+    (
         "vendor-kiloview",
         &[
             "kiloview-cube-r1",
@@ -173,11 +174,11 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     (
         "vendor-magewell",
         &[
+            "magewell-director",
             "magewell-proconvert",
             "magewell-ultra-encode",
             "magewell-ultra-stream",
         ],
-        &["magewell-director", "magewell-proconvert"],
     ),
     ("vendor-megapixel", &["megapixel-helios"]),
     ("vendor-meros", &["meros-camera"]),
