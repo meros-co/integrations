@@ -873,6 +873,8 @@ struct Processor {
     /// An export waiting for its host file to close, or an import for its
     /// host file to be read.
     file_job: Option<(CommandId, FileOp)>,
+    /// Why the host file of a running export failed, if it did.
+    file_error: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -937,6 +939,7 @@ impl Processor {
             misses: 0,
             retry_after: RETRY_MIN,
             file_job: None,
+            file_error: None,
         }
     }
 
@@ -1107,7 +1110,10 @@ impl Processor {
             ),
             Returns::File => {
                 cx.file_close(FILE);
-                self.file_job = Some((id, FileOp::Export));
+                match self.file_error.take() {
+                    Some(message) => cx.complete(id, Err(CommandError::Transport { message })),
+                    None => self.file_job = Some((id, FileOp::Export)),
+                }
             }
         }
     }
@@ -1654,6 +1660,7 @@ impl Processor {
             (Some((id, FileOp::Import { .. })), FileInput::Failed { message }) => {
                 cx.complete(id, Err(CommandError::Transport { message }));
             }
+            (None, FileInput::Failed { message }) => self.file_error = Some(message),
             (job, _) => self.file_job = job,
         }
     }
@@ -2022,6 +2029,9 @@ impl Processor {
                 }
             }
             return;
+        }
+        if name == "export_file" {
+            self.file_error = None;
         }
         match self.plan(cx, id, name, params) {
             Ok(Some(job)) => self.enqueue(cx, job),
@@ -3257,6 +3267,32 @@ mod tests {
                 value: json!({"bytes": 3})
             }))
         );
+    }
+
+    #[test]
+    fn an_export_whose_host_file_fails_fails() {
+        let mut m = se3200(false);
+        run(
+            &mut m,
+            1,
+            "export_file",
+            json!({"type": "memory", "number": 0, "path": "/no/such/dir/m.bin"}),
+        );
+        let mut cx = Cx::new(0);
+        m.file(
+            &mut cx,
+            FILE,
+            FileInput::Failed {
+                message: "no such directory".into(),
+            },
+        );
+        data(&mut m, 0, CMD, &hex(OK));
+        data(&mut m, 0, CMD, &hex("0c 00 00 00 06 00 00 00 00 00 00 00"));
+        let a = data(&mut m, 0, CMD, &hex(OK));
+        assert!(matches!(
+            completed(&a, 1),
+            Some(Err(CommandError::Transport { .. }))
+        ));
     }
 
     fn serial_settings() -> Value {
