@@ -1,0 +1,3211 @@
+spec: 1
+id: zcam
+name: Z CAM cinema and PTZ cameras (HTTP API)
+vendor: Z CAM
+category: camera
+
+# Z CAM's cameras (E2 series, the P2 PTZ cameras and the E2-F/S/M models)
+# serve one HTTP API on port 80: /info identifies the camera, /ctrl/get and
+# /ctrl/set read and change every menu setting by key, and /ctrl/* commands
+# record, stream, drive the lens and the pan/tilt head, manage presets and
+# traces, auto framing, the card and the network. Most /ctrl/* commands need
+# the control session, which the first /ctrl/session request occupies.
+
+source:
+  - title: Z CAM HTTP API (E2/protocol/http/http.md)
+    author: Z CAM (Imagine Vision)
+    url: https://github.com/imaginevision/Z-Camera-Doc/blob/master/E2/protocol/http/http.md
+    note: >
+      Manufacturer document in Z CAM's documentation repository (last changed 2025-11-05), read
+      2026-10-27. Sections: Basic (code 0 OK, 1 NG; desc; msg), Get camera information (/info as the
+      ping: model, sw, mac, eth_ip, sn), Session (/ctrl/session, 409 when the session is held by
+      another client; action=quit; action=occupy), Date/Time, NTP (/ctrl/sntp), System control
+      (shutdown, reboot), Working mode (query, to_rec, to_pb, to_standby, exit_standby; the msg
+      values), Video record control (start, stop, remain in minutes), Camera settings (/ctrl/get
+      answers key, type 1 choice/2 range/3 string, ro, value, opts or min/max/step; /ctrl/set),
+      Network setting (Router, Direct, Static with ipaddr, netmask, gateway and dns; query; info),
+      Network streaming (send_stream, MJPEG at /mjpeg_stream, RTSP at /live_stream,
+      /ctrl/stream_setting with index, width, height, bitrate, split, fps, venc, bitwidth and
+      action=query), Focus & Zoom control (/ctrl/af, update_roi, update_roi_center, query; mf_drive;
+      lens_focus_pos; lens_zoom in/out/stop; lens_zoom_pos), Magnify (/ctrl/mag), Pan Tilt control
+      (/ctrl/pt directions and stop, speed 0-0x3F, UART role PelcoD), Card management, File management
+      (/DCIM folders and files, act=rm, thm, scr, ct, info), WebSockets (port 81, contents not
+      described), Knee/Slope (/ctrl/gamma gamma, black_level, black_gamma, knee), manual black level
+      (/ctrl/manual_blc), Black Level (/ctrl/black_level).
+  - title: Z CAM HTTP API reference code (E2/protocol/http/api.js)
+    author: Z CAM (Imagine Vision)
+    url: https://github.com/imaginevision/Z-Camera-Doc/blob/master/E2/protocol/http/api.js
+    note: >
+      The manufacturer's reference the HTTP document names as the list of current commands and
+      supported keys ("Please check the referece code for the latest command"), read 2026-10-27 as
+      documentation: every request path, its query arguments and every /ctrl/get and /ctrl/set key
+      (camera, session, ctrl getbatch, lens zoom/focus with fspeed and status, AF settings and face
+      trace, pt query/stop/stop_all/direction/pt/home/reset/limit, preset recall/set/del/get_info/
+      set_name/preset_speed, ptrace, login users, ipac allow and deny lists, rec query/remain/
+      repairing, tc query/reset/current_time/set, still capture, playback query, rtmp, srt, ndi,
+      rtsp, stream_setting performance, matrix, cc, black_level, gamma, framing, ezframing, facedb,
+      upgrade, DCIM, set?action=clear, temperature, freed, datetime get and timezone, snmp, sntp,
+      card query_format, power, usb, wifi_ctrl). No code taken; the repository has no licence file
+      and is read as documentation.
+
+transport:
+  type: http
+  port: 80
+  auth: none
+  timeout_ms: 5000
+  probe: { method: GET, path: /info }
+
+ports:
+  - { port: 80, protocol: http, role: control }
+
+models:
+  - id: zcam-e2
+    name: Z CAM E2 series (E2, E2C, E2-M4, E2-S6, E2-F6, E2-F8, E2-S6G, E2-F6 Pro and others)
+    supports: &all
+      [get_setting, set_setting, get_settings_catalog, clear_settings, set_focus, set_af_mode, set_af_area, set_af_speed, set_caf, set_caf_sens, set_live_caf, set_af_adjust_with_ptz, set_mf_mag, set_mf_recording, set_mf_drive, set_lens_focus_pos, set_lens_zoom, set_lens_zoom_pos, set_zoom_mode, set_ev, set_flicker, set_meter_mode, set_iris, set_iso, set_min_iso, set_max_iso, set_iso_ctrl, set_shutter_angle_ctrl, set_sht_operation, set_end, set_ae_speed, set_lock_ae_in_rec, set_bl_comp, set_wb, set_mwb, set_tint, set_mwb_r, set_mwb_g, set_mwb_b, set_mwb_r_offset, set_mwb_g_offset, set_mwb_b_offset, set_wb_priority, set_lock_awb_in_rec, set_lut, set_noise_reduction, set_luma_level, set_brightness, set_contrast, set_sharpness, set_saturation, set_hue, set_movfmt, set_movvfr, set_video_system, set_resolution, set_project_fps, set_vfr_ctrl, set_record_file_format, set_rotation, set_split_duration, set_rec_fps, set_raw_over_hdmi, set_rec_frame_indicator, set_preroll, set_preroll_duration, set_record_meta, set_camera_id, set_reelname, set_video_encoder, set_bitrate_level, set_compose_mode, set_photo_q, set_eis_on_off, set_vid_rot, set_record_mode, set_video_tl_interval, set_low_jello, set_primary_audio, set_audio_channel, set_audio_phantom_power, set_audio_level_display, set_ain_gain_type, set_audio_input_level, set_audio_input_gain, set_audio_in_l_gain, set_audio_in_r_gain, set_audio_output_gain, set_audio_noise_reduction, set_send_stream, set_stream_resolution, set_stream_fps, set_stream_video_encoder, set_stream_param_save, set_assitool_display, set_assitool_scope, set_assitool_peak_onoff, set_assitool_peak_color, set_assitool_frame_line, set_assitool_frame_line_color, set_assitool_frame_line_opacity, set_assitool_center_mark, set_assitool_center_mark_color, set_assitool_exposure, set_assitool_zera_th1, set_assitool_zera_th2, set_assitool_grid_line, set_assitool_safe_area, set_hdmi_focus_area, set_tc_source, set_tc_count_up, set_tc_hdmi_dispaly, set_tc_drop_frame, set_union_ae, set_union_awb, set_ezlink_mode, set_ezlink_trigger, set_genlock, set_genlock_coarse, set_genlock_fine, set_ptz_limit, set_pt_speedmode, set_pt_speed_with_zoom_pos, set_ptz_flip, set_pt_priv_mode, set_pt_pwr_pos, set_ptz_common_speed, set_ptz_common_time, set_ptz_preset_mode, set_ptz_speed_mode, set_freeze_during_preset, set_ptz_common_speed_unit, set_tally_on, set_color_bar_enable, set_led, set_desqueeze, set_auto_off, set_auto_standby, set_visca_id, set_visca_baudrate, set_visca_enable, set_https_on, set_https_auth, set_https_cert_source, set_usb_device_role, set_ir, set_ir_id, set_sdi, set_3g_sdi_mode, set_hdmi_format, set_hdmi_osd, set_osd_layout, set_wifi, set_wifi_channel, get_info, get_status, get_commit_info, get_nick_name, set_nick_name, check_session, occupy_session, quit_session, set_date_time, get_date_time, set_timezone, start_ntp, stop_ntp, get_ntp, set_ntp_interval, get_temperature, shutdown, reboot, get_mode, to_record_mode, to_playback_mode, to_standby, exit_standby, start_recording, stop_recording, get_recording, get_record_remaining, get_repair_status, capture_still, get_playback, get_timecode, reset_timecode, timecode_to_time_of_day, set_timecode, zoom_in, zoom_out, zoom_stop, get_zoom_status, focus_near, focus_far, focus_stop, get_focus_status, autofocus, set_af_roi, set_af_roi_center, get_af_roi, trace_face, enable_magnify, disable_magnify, get_magnify, one_push_white_balance, pan_tilt_move, pan_tilt_drive, pan_tilt_stop, pan_tilt_stop_all, pan_tilt_home, pan_tilt_reset, set_pan_tilt_limit, get_pan_tilt, get_pan_tilt_detail, recall_preset, save_preset, delete_preset, get_preset, rename_preset, set_preset_speed_unit, set_preset_time, set_preset_speed, delete_trace, rename_trace, start_trace_recording, stop_trace_recording, prepare_trace, play_trace, stop_trace, get_traces, get_trace, set_framing_detection, set_framing_tracking, set_framing_target, set_framing_start_position, set_framing_fov_type, set_framing_body_size, set_framing_face_height, set_framing_placement, get_framing_fov_debug, set_framing_auto_start, restart_framing, set_framing_auto_target, set_framing_target_lost_action, set_framing_target_lost_timeout, get_framing_target_lost, set_framing_detect_restart, get_framing_detect_restart, set_framing_manual_wait, get_framing_manual_wait, get_framing_status, get_framing_all_status, get_framing_info, set_framing_tally, set_framing_mask_enabled, set_framing_mask_area, get_framing_mask_area, set_framing_track_active_face, get_framing_track_active_face, set_framing_target_count, get_framing_target_count, set_framing_tilt_lock, get_framing_tilt_lock, ezframing_center, ezframing_region, get_face_database, prepare_face, add_face, update_face, delete_face, set_face_database_enabled, get_face_database_status, get_color_matrix, set_color_matrix_enabled, set_color_matrix_value, get_color_correction, set_color_correction_enabled, set_color_correction_hue, set_color_correction_saturation, get_black_level, set_black_level_enabled, set_black_level, get_gamma, set_gamma_rec709, set_gamma_srgb, set_gamma_power, get_knee_black_level, set_knee_black_level, get_black_gamma, set_black_gamma, get_knee, set_knee, get_manual_black_level, set_manual_black_level, disable_manual_black_level, get_stream_settings, set_stream_size, set_stream_bitrate, set_stream_frame_rate, set_stream_encoder, set_stream_bit_depth, set_stream_split, get_stream_performance, get_rtmp, start_rtmp, start_rtmp_to, stop_rtmp, set_rtmp_auto_restart, set_rtmp_destination, get_srt, start_srt, stop_srt, set_srt, set_srt_auto_restart, set_srt_url, get_ndi, set_ndi, get_rtsp, set_rtsp_authentication, get_network_mode, get_network_info, set_network_router, set_network_direct, set_network_static, set_network_static_dns, get_wifi, get_usb, get_ip_access, enable_allow_list, disable_allow_list, add_to_allow_list, remove_from_allow_list, enable_deny_list, disable_deny_list, add_to_deny_list, remove_from_deny_list, generate_certificate, get_certificate, delete_certificate, get_current_user, get_users, add_user, delete_user, change_password, logout, get_snmp, set_snmp_enabled, set_snmp_security, set_snmp_system_name, set_snmp_location, set_snmp_contact, get_freed, set_freed_enabled, set_freed_camera_id, set_freed_destination, check_firmware, run_firmware_update, check_ui_update, get_card_present, get_card_free, get_card_total, get_card_format, format_card, format_card_fat32, format_card_exfat, list_folders, list_files, delete_file, get_file_info, get_file_created]
+    verification: none
+  - id: zcam-p2
+    name: Z CAM P2 series PTZ cameras (P2-R1 and others)
+    supports: *all
+    verification: none
+    notes: >
+      The pan/tilt, preset, trace and framing commands are the PTZ cameras'; on an E2 the /ctrl/pt
+      directions drive a Pelco-D head on the UART when its role is set to PelcoD.
+
+commands:
+
+  # ── Settings by key (/ctrl/get, /ctrl/set) ─────────────────────────────
+  get_setting:
+    summary: "Read one setting by its key: value, type, read-only flag, options or range"
+    params:
+      key: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_]+$", required: true, label: Key, description: "Setting key as the camera names it, such as iso, wb or movfmt." }
+    send: { method: GET, path: /ctrl/get, raw_query: "k={key}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_setting:
+    summary: "Change one setting by its key, then read it back"
+    params:
+      key: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_]+$", required: true, label: Key, description: "Setting key as the camera names it, such as iso, wb or movfmt." }
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "{key}={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k={key}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_settings_catalog:
+    summary: "Read every setting of a catalog at once (/ctrl/getbatch)"
+    params:
+      catalog: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_]+$", required: true, label: Catalog, description: "Name of the settings catalog, as the camera's web interface groups its settings." }
+    send: { method: GET, path: /ctrl/getbatch, raw_query: "catalog={catalog:url}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  clear_settings:
+    summary: "Reset every setting to its default (/ctrl/set?action=clear)"
+    send: { method: GET, path: /ctrl/set, raw_query: "action=clear" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_focus:
+    summary: "Set focus method (AF or MF) (key focus), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "focus={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=focus" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_af_mode:
+    summary: "Set autofocus area type (key af_mode), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "af_mode={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=af_mode" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_af_area:
+    summary: "Set flexible autofocus area size (key af_area), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "af_area={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=af_area" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_af_speed:
+    summary: "Set autofocus speed (key af_speed), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "af_speed={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=af_speed" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_caf:
+    summary: "Set continuous autofocus (key caf), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "caf={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=caf" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_caf_sens:
+    summary: "Set continuous autofocus sensitivity (key caf_sens), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "caf_sens={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=caf_sens" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_live_caf:
+    summary: "Set live continuous autofocus (key live_caf), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "live_caf={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=live_caf" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_af_adjust_with_ptz:
+    summary: "Set autofocus after a pan/tilt move (key af_adjust_with_ptz), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "af_adjust_with_ptz={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=af_adjust_with_ptz" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_mf_mag:
+    summary: "Set manual focus assist magnification in preview (key mf_mag), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "mf_mag={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=mf_mag" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_mf_recording:
+    summary: "Set manual focus assist while recording (key mf_recording), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "mf_recording={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=mf_recording" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_mf_drive:
+    summary: "Set manual focus drive (-3 to 3, far/near steps) (key mf_drive), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "mf_drive={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=mf_drive" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_lens_focus_pos:
+    summary: "Set focus position (key lens_focus_pos), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "lens_focus_pos={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=lens_focus_pos" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_lens_zoom:
+    summary: "Set zoom drive (in, out or stop) (key lens_zoom), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "lens_zoom={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=lens_zoom" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_lens_zoom_pos:
+    summary: "Set zoom position (key lens_zoom_pos), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "lens_zoom_pos={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=lens_zoom_pos" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_zoom_mode:
+    summary: "Set zoom mode (key zoom_mode), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "zoom_mode={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=zoom_mode" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_ev:
+    summary: "Set exposure compensation (key ev), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "ev={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=ev" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_flicker:
+    summary: "Set anti-flicker (key flicker), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "flicker={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=flicker" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_meter_mode:
+    summary: "Set metering mode (key meter_mode), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "meter_mode={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=meter_mode" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_iris:
+    summary: "Set iris (aperture) (key iris), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "iris={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=iris" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_iso:
+    summary: "Set iSO (key iso), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "iso={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=iso" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_min_iso:
+    summary: "Set minimum auto ISO (key min_iso), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "min_iso={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=min_iso" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_max_iso:
+    summary: "Set maximum auto ISO (key max_iso), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "max_iso={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=max_iso" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_iso_ctrl:
+    summary: "Set iSO control mode (key iso_ctrl), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "iso_ctrl={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=iso_ctrl" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_shutter_angle_ctrl:
+    summary: "Set shutter angle control mode (key shutter_angle_ctrl), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "shutter_angle_ctrl={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=shutter_angle_ctrl" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_sht_operation:
+    summary: "Set shutter operation (angle or speed) (key sht_operation), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "sht_operation={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=sht_operation" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_end:
+    summary: "Set electronic ND (key eND), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "eND={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=eND" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_ae_speed:
+    summary: "Set auto exposure speed (key ae_speed), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "ae_speed={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=ae_speed" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_lock_ae_in_rec:
+    summary: "Set lock auto exposure while recording (key lock_ae_in_rec), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "lock_ae_in_rec={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=lock_ae_in_rec" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_bl_comp:
+    summary: "Set backlight compensation (key bl_comp), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "bl_comp={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=bl_comp" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_wb:
+    summary: "Set white balance mode (key wb), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "wb={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=wb" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_mwb:
+    summary: "Set manual white balance color temperature (key mwb), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "mwb={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=mwb" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_tint:
+    summary: "Set manual white balance tint (key tint), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "tint={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=tint" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_mwb_r:
+    summary: "Set expert white balance red gain (key mwb_r), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "mwb_r={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=mwb_r" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_mwb_g:
+    summary: "Set expert white balance green gain (key mwb_g), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "mwb_g={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=mwb_g" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_mwb_b:
+    summary: "Set expert white balance blue gain (key mwb_b), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "mwb_b={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=mwb_b" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_mwb_r_offset:
+    summary: "Set manual white balance red offset (key mwb_r_offset), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "mwb_r_offset={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=mwb_r_offset" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_mwb_g_offset:
+    summary: "Set manual white balance green offset (key mwb_g_offset), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "mwb_g_offset={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=mwb_g_offset" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_mwb_b_offset:
+    summary: "Set manual white balance blue offset (key mwb_b_offset), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "mwb_b_offset={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=mwb_b_offset" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_wb_priority:
+    summary: "Set auto white balance priority (key wb_priority), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "wb_priority={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=wb_priority" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_lock_awb_in_rec:
+    summary: "Set lock auto white balance while recording (key lock_awb_in_rec), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "lock_awb_in_rec={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=lock_awb_in_rec" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_lut:
+    summary: "Set image profile (LUT) (key lut), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "lut={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=lut" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_noise_reduction:
+    summary: "Set noise reduction (key noise_reduction), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "noise_reduction={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=noise_reduction" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_luma_level:
+    summary: "Set luma level (key luma_level), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "luma_level={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=luma_level" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_brightness:
+    summary: "Set brightness (key brightness), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "brightness={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=brightness" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_contrast:
+    summary: "Set contrast (key contrast), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "contrast={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=contrast" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_sharpness:
+    summary: "Set sharpness (key sharpness), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "sharpness={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=sharpness" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_saturation:
+    summary: "Set saturation (key saturation), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "saturation={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=saturation" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_hue:
+    summary: "Set hue (key hue), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "hue={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=hue" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_movfmt:
+    summary: "Set movie format (resolution and frame rate) (key movfmt), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "movfmt={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=movfmt" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_movvfr:
+    summary: "Set variable frame rate (key movvfr), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "movvfr={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=movvfr" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_video_system:
+    summary: "Set video system (NTSC, PAL or cinema) (key video_system), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "video_system={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=video_system" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_resolution:
+    summary: "Set recording resolution (key resolution), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "resolution={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=resolution" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_project_fps:
+    summary: "Set project frame rate (key project_fps), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "project_fps={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=project_fps" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_vfr_ctrl:
+    summary: "Set variable frame rate control (key vfr_ctrl), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "vfr_ctrl={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=vfr_ctrl" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_record_file_format:
+    summary: "Set record file format (key record_file_format), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "record_file_format={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=record_file_format" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_rotation:
+    summary: "Set recorded file rotation (key rotation), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "rotation={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=rotation" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_split_duration:
+    summary: "Set recording split duration (key split_duration), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "split_duration={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=split_duration" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_rec_fps:
+    summary: "Set recording frame rate (key rec_fps), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "rec_fps={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=rec_fps" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_raw_over_hdmi:
+    summary: "Set rAW over HDMI (key raw_over_hdmi), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "raw_over_hdmi={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=raw_over_hdmi" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_rec_frame_indicator:
+    summary: "Set recording frame indicator (key rec_frame_indicator), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "rec_frame_indicator={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=rec_frame_indicator" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_preroll:
+    summary: "Set pre-roll recording (key preroll), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "preroll={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=preroll" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_preroll_duration:
+    summary: "Set pre-roll duration (key preroll_duration), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "preroll_duration={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=preroll_duration" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_record_meta:
+    summary: "Set record metadata (key record_meta), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "record_meta={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=record_meta" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_camera_id:
+    summary: "Set camera ID in clip metadata (key camera_id), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "camera_id={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=camera_id" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_reelname:
+    summary: "Set reel name (key reelname), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "reelname={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=reelname" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_video_encoder:
+    summary: "Set video encoder (key video_encoder), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "video_encoder={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=video_encoder" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_bitrate_level:
+    summary: "Set bitrate level (key bitrate_level), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "bitrate_level={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=bitrate_level" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_compose_mode:
+    summary: "Set compose mode (key compose_mode), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "compose_mode={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=compose_mode" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_photo_q:
+    summary: "Set photo quality (key photo_q), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "photo_q={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=photo_q" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_eis_on_off:
+    summary: "Set electronic image stabilization (key eis_on_off), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "eis_on_off={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=eis_on_off" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_vid_rot:
+    summary: "Set video rotation (key vid_rot), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "vid_rot={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=vid_rot" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_record_mode:
+    summary: "Set record mode (normal or timelapse) (key record_mode), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "record_mode={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=record_mode" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_video_tl_interval:
+    summary: "Set video timelapse interval (key video_tl_interval), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "video_tl_interval={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=video_tl_interval" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_low_jello:
+    summary: "Set low jello (key low_jello), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "low_jello={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=low_jello" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_primary_audio:
+    summary: "Set audio encoder (key primary_audio), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "primary_audio={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=primary_audio" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_audio_channel:
+    summary: "Set audio input channel (key audio_channel), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "audio_channel={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=audio_channel" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_audio_phantom_power:
+    summary: "Set audio phantom power (key audio_phantom_power), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "audio_phantom_power={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=audio_phantom_power" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_audio_level_display:
+    summary: "Set audio level display (key audio_level_display), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "audio_level_display={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=audio_level_display" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_ain_gain_type:
+    summary: "Set audio input gain type (key ain_gain_type), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "ain_gain_type={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=ain_gain_type" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_audio_input_level:
+    summary: "Set audio input level (key audio_input_level), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "audio_input_level={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=audio_input_level" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_audio_input_gain:
+    summary: "Set audio input gain (key audio_input_gain), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "audio_input_gain={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=audio_input_gain" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_audio_in_l_gain:
+    summary: "Set audio input left gain (key audio_in_l_gain), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "audio_in_l_gain={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=audio_in_l_gain" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_audio_in_r_gain:
+    summary: "Set audio input right gain (key audio_in_r_gain), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "audio_in_r_gain={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=audio_in_r_gain" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_audio_output_gain:
+    summary: "Set audio output gain (key audio_output_gain), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "audio_output_gain={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=audio_output_gain" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_audio_noise_reduction:
+    summary: "Set audio noise reduction (key audio_noise_reduction), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "audio_noise_reduction={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=audio_noise_reduction" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_send_stream:
+    summary: "Set network stream source (Stream0 or Stream1) (key send_stream), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "send_stream={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=send_stream" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_stream_resolution:
+    summary: "Set stream resolution (key stream_resolution), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "stream_resolution={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=stream_resolution" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_stream_fps:
+    summary: "Set stream frame rate (key stream_fps), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "stream_fps={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=stream_fps" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_stream_video_encoder:
+    summary: "Set stream video encoder (key stream_video_encoder), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "stream_video_encoder={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=stream_video_encoder" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_stream_param_save:
+    summary: "Set keep stream parameters (key stream_param_save), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "stream_param_save={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=stream_param_save" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_assitool_display:
+    summary: "Set assist tools display (key assitool_display), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "assitool_display={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=assitool_display" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_assitool_scope:
+    summary: "Set scope (key assitool_scope), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "assitool_scope={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=assitool_scope" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_assitool_peak_onoff:
+    summary: "Set focus peaking (key assitool_peak_onoff), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "assitool_peak_onoff={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=assitool_peak_onoff" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_assitool_peak_color:
+    summary: "Set focus peaking color (key assitool_peak_color), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "assitool_peak_color={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=assitool_peak_color" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_assitool_frame_line:
+    summary: "Set frame lines (key assitool_frame_line), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "assitool_frame_line={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=assitool_frame_line" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_assitool_frame_line_color:
+    summary: "Set frame line color (key assitool_frame_line_color), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "assitool_frame_line_color={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=assitool_frame_line_color" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_assitool_frame_line_opacity:
+    summary: "Set frame line opacity (key assitool_frame_line_opacity), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "assitool_frame_line_opacity={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=assitool_frame_line_opacity" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_assitool_center_mark:
+    summary: "Set center mark (key assitool_center_mark), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "assitool_center_mark={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=assitool_center_mark" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_assitool_center_mark_color:
+    summary: "Set center mark color (key assitool_center_mark_color), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "assitool_center_mark_color={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=assitool_center_mark_color" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_assitool_exposure:
+    summary: "Set exposure tool (zebra or false color) (key assitool_exposure), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "assitool_exposure={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=assitool_exposure" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_assitool_zera_th1:
+    summary: "Set zebra threshold 1 (key assitool_zera_th1), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "assitool_zera_th1={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=assitool_zera_th1" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_assitool_zera_th2:
+    summary: "Set zebra threshold 2 (key assitool_zera_th2), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "assitool_zera_th2={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=assitool_zera_th2" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_assitool_grid_line:
+    summary: "Set grid lines (key assitool_grid_line), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "assitool_grid_line={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=assitool_grid_line" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_assitool_safe_area:
+    summary: "Set safe area (key assitool_safe_area), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "assitool_safe_area={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=assitool_safe_area" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_hdmi_focus_area:
+    summary: "Set focus area on HDMI (key hdmi_focus_area), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "hdmi_focus_area={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=hdmi_focus_area" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_tc_source:
+    summary: "Set timecode source (key tc_source), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "tc_source={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=tc_source" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_tc_count_up:
+    summary: "Set timecode count up mode (key tc_count_up), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "tc_count_up={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=tc_count_up" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_tc_hdmi_dispaly:
+    summary: "Set timecode on HDMI (key tc_hdmi_dispaly), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "tc_hdmi_dispaly={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=tc_hdmi_dispaly" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_tc_drop_frame:
+    summary: "Set drop-frame timecode (key tc_drop_frame), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "tc_drop_frame={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=tc_drop_frame" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_union_ae:
+    summary: "Set multi-camera shared auto exposure (key union_ae), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "union_ae={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=union_ae" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_union_awb:
+    summary: "Set multi-camera shared auto white balance (key union_awb), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "union_awb={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=union_awb" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_ezlink_mode:
+    summary: "Set eZLink mode (key ezlink_mode), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "ezlink_mode={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=ezlink_mode" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_ezlink_trigger:
+    summary: "Set eZLink trigger (key ezlink_trigger), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "ezlink_trigger={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=ezlink_trigger" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_genlock:
+    summary: "Set genlock (key genlock), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "genlock={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=genlock" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_genlock_coarse:
+    summary: "Set genlock coarse phase (key genlock_coarse), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "genlock_coarse={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=genlock_coarse" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_genlock_fine:
+    summary: "Set genlock fine phase (key genlock_fine), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "genlock_fine={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=genlock_fine" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_ptz_limit:
+    summary: "Set pan/tilt limits (key ptz_limit), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "ptz_limit={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=ptz_limit" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_pt_speedmode:
+    summary: "Set pan/tilt speed mode (key pt_speedmode), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "pt_speedmode={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=pt_speedmode" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_pt_speed_with_zoom_pos:
+    summary: "Set pan/tilt speed follows zoom (key pt_speed_with_zoom_pos), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "pt_speed_with_zoom_pos={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=pt_speed_with_zoom_pos" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_ptz_flip:
+    summary: "Set pan/tilt image flip (key ptz_flip), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "ptz_flip={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=ptz_flip" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_pt_priv_mode:
+    summary: "Set pan/tilt privacy mode (key pt_priv_mode), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "pt_priv_mode={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=pt_priv_mode" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_pt_pwr_pos:
+    summary: "Set pan/tilt power-on position (key pt_pwr_pos), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "pt_pwr_pos={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=pt_pwr_pos" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_ptz_common_speed:
+    summary: "Set preset recall speed (key ptz_common_speed), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "ptz_common_speed={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=ptz_common_speed" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_ptz_common_time:
+    summary: "Set preset recall time (key ptz_common_time), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "ptz_common_time={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=ptz_common_time" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_ptz_preset_mode:
+    summary: "Set preset recall mode (key ptz_preset_mode), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "ptz_preset_mode={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=ptz_preset_mode" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_ptz_speed_mode:
+    summary: "Set preset recall speed mode (key ptz_speed_mode), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "ptz_speed_mode={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=ptz_speed_mode" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_freeze_during_preset:
+    summary: "Set freeze picture during preset recall (key freeze_during_preset), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "freeze_during_preset={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=freeze_during_preset" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_ptz_common_speed_unit:
+    summary: "Set preset recall speed unit (key ptz_common_speed_unit), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "ptz_common_speed_unit={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=ptz_common_speed_unit" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_tally_on:
+    summary: "Set tally light brightness (key tally_on), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "tally_on={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=tally_on" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_color_bar_enable:
+    summary: "Set color bars (key color_bar_enable), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "color_bar_enable={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=color_bar_enable" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_led:
+    summary: "Set status LED (key led), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "led={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=led" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_desqueeze:
+    summary: "Set anamorphic desqueeze (key desqueeze), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "desqueeze={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=desqueeze" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_auto_off:
+    summary: "Set auto power off (key auto_off), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "auto_off={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=auto_off" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_auto_standby:
+    summary: "Set auto standby (key auto_standby), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "auto_standby={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=auto_standby" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_visca_id:
+    summary: "Set vISCA camera ID (key visca_id), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "visca_id={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=visca_id" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_visca_baudrate:
+    summary: "Set vISCA baud rate (key visca_baudrate), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "visca_baudrate={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=visca_baudrate" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_visca_enable:
+    summary: "Set vISCA control (key visca_enable), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "visca_enable={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=visca_enable" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_https_on:
+    summary: "Set hTTPS (key https_on), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "https_on={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=https_on" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_https_auth:
+    summary: "Set hTTPS authentication (key https_auth), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "https_auth={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=https_auth" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_https_cert_source:
+    summary: "Set hTTPS certificate source (key https_cert_source), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "https_cert_source={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=https_cert_source" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_usb_device_role:
+    summary: "Set uSB device role (key usb_device_role), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "usb_device_role={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=usb_device_role" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_ir:
+    summary: "Set iR remote control (key ir), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "ir={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=ir" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_ir_id:
+    summary: "Set iR remote ID (key ir_id), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "ir_id={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=ir_id" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_sdi:
+    summary: "Set sDI output (key sdi), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "sdi={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=sdi" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_3g_sdi_mode:
+    summary: "Set 3G-SDI mode (key 3g_sdi_mode), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "3g_sdi_mode={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=3g_sdi_mode" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_hdmi_format:
+    summary: "Set hDMI output format (key hdmi_format), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "hdmi_format={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=hdmi_format" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_hdmi_osd:
+    summary: "Set hDMI on-screen display (key hdmi_osd), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "hdmi_osd={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=hdmi_osd" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_osd_layout:
+    summary: "Set on-screen display layout (key osd_layout), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "osd_layout={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=osd_layout" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_wifi:
+    summary: "Set wi-Fi (key wifi), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "wifi={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=wifi" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_wifi_channel:
+    summary: "Set wi-Fi channel (key wifi_channel), then read it back"
+    params:
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value: one of the options the camera lists for the key, or a number within its minimum and maximum." }
+    send:
+      - { method: GET, path: /ctrl/set, raw_query: "wifi_channel={value:url}" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=wifi_channel" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  # ── Camera, session, time and power ────────────────────────────────────
+  get_info:
+    summary: "Read the camera's model, firmware, MAC and IP address and serial number (/info)"
+    send: { method: GET, path: /info }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_status:
+    summary: "Read the camera status (/camera_status)"
+    send: { method: GET, path: /camera_status }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_commit_info:
+    summary: "Read the firmware build information (/commit_info)"
+    send: { method: GET, path: /commit_info }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_nick_name:
+    summary: "Read the camera's nickname"
+    send: { method: GET, path: /ctrl/nick_name }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_nick_name:
+    summary: "Set the camera's nickname"
+    params:
+      name: { type: string, max_length: 64, required: true, label: Nickname, description: "Name the camera shows for itself on the network." }
+    send: { method: GET, path: /ctrl/nick_name, raw_query: "action=set&name={name:url}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  check_session:
+    summary: "Check or take the control session; answers 409 while another client holds it"
+    send: { method: GET, path: /ctrl/session }
+    expect: { status: 200 }
+    returns: ack
+  occupy_session:
+    summary: "Take the control session so no other client can control the camera"
+    send: { method: GET, path: /ctrl/session, raw_query: "action=occupy" }
+    expect: { status: 200 }
+    returns: ack
+  quit_session:
+    summary: "Give up the control session"
+    send: { method: GET, path: /ctrl/session, raw_query: "action=quit" }
+    expect: { status: 200 }
+    returns: ack
+  set_date_time:
+    summary: "Set the camera's date and time"
+    params:
+      date: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$", required: true, label: Date, description: "Date as YYYY-MM-DD." }
+      time: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true, label: Time, description: "Time of day as hh:mm:ss, 24-hour." }
+    send: { method: GET, path: /datetime, raw_query: "date={date}&time={time}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_date_time:
+    summary: "Read the camera's date, time and time zone"
+    send: { method: GET, path: /datetime/get }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_timezone:
+    summary: "Set the camera's time zone"
+    params:
+      timezone: { type: string, max_length: 64, required: true, label: Time zone, description: "Time zone as the camera's web interface lists it." }
+    send: { method: GET, path: /datetime, raw_query: "timezone={timezone:url}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  start_ntp:
+    summary: "Synchronize the clock with an NTP server at an interval"
+    params:
+      server: { type: string, max_length: 253, required: true, label: NTP server, description: "Address or host name of the NTP server." }
+      port: { type: int, min: 1, max: 65535, default: 123, label: Port, description: "NTP server port, 123 by default." }
+      interval: { type: int, min: 1, max: 2147483647, required: true, label: Interval, description: "Time between synchronizations, in the unit the camera uses for its NTP interval." }
+    send: { method: GET, path: /ctrl/sntp, raw_query: "action=start&ip_addr={server:url}&port={port}&interval={interval}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  stop_ntp:
+    summary: "Stop NTP synchronization"
+    send: { method: GET, path: /ctrl/sntp, raw_query: "action=stop" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_ntp:
+    summary: "Read the NTP status"
+    send: { method: GET, path: /ctrl/sntp, raw_query: "action=get" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_ntp_interval:
+    summary: "Change the NTP synchronization interval"
+    params:
+      interval: { type: int, min: 1, max: 2147483647, required: true, label: Interval, description: "Time between synchronizations, in the unit the camera uses for its NTP interval." }
+    send: { method: GET, path: /ctrl/sntp, raw_query: "action=set_interval&interval={interval}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_temperature:
+    summary: "Read the camera temperature"
+    send: { method: GET, path: /ctrl/temperature }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  shutdown:
+    summary: "Power the camera off"
+    send: { method: GET, path: /ctrl/shutdown }
+    expect: { status: 200 }
+    returns: ack
+  reboot:
+    summary: "Restart the camera"
+    send: { method: GET, path: /ctrl/reboot }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Working mode ───────────────────────────────────────────────────────
+  get_mode:
+    summary: "Read the working mode (rec, rec_ing, pb, standby and others)"
+    send: { method: GET, path: /ctrl/mode, raw_query: "action=query" }
+    expect: { status: 200, json_path: "$.msg" }
+    returns: value
+  to_record_mode:
+    summary: "Switch to video record mode"
+    send:
+      - { method: GET, path: /ctrl/mode, raw_query: "action=to_rec" }
+      - { method: GET, path: /ctrl/mode, raw_query: "action=query" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  to_playback_mode:
+    summary: "Switch to playback mode"
+    send:
+      - { method: GET, path: /ctrl/mode, raw_query: "action=to_pb" }
+      - { method: GET, path: /ctrl/mode, raw_query: "action=query" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  to_standby:
+    summary: "Put the camera in standby"
+    send:
+      - { method: GET, path: /ctrl/mode, raw_query: "action=to_standby" }
+      - { method: GET, path: /ctrl/mode, raw_query: "action=query" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  exit_standby:
+    summary: "Wake the camera from standby"
+    send:
+      - { method: GET, path: /ctrl/mode, raw_query: "action=exit_standby" }
+      - { method: GET, path: /ctrl/mode, raw_query: "action=query" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  # ── Recording and timecode ─────────────────────────────────────────────
+  start_recording:
+    summary: "Start recording (or timelapse recording)"
+    send:
+      - { method: GET, path: /ctrl/rec, raw_query: "action=start" }
+      - { method: GET, path: /ctrl/mode, raw_query: "action=query" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  stop_recording:
+    summary: "Stop recording"
+    send:
+      - { method: GET, path: /ctrl/rec, raw_query: "action=stop" }
+      - { method: GET, path: /ctrl/mode, raw_query: "action=query" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_recording:
+    summary: "Read the recording status"
+    send: { method: GET, path: /ctrl/rec, raw_query: "action=query" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_record_remaining:
+    summary: "Read the recording time left on the card, in minutes"
+    send: { method: GET, path: /ctrl/rec, raw_query: "action=remain" }
+    expect: { status: 200, json_path: "$.msg" }
+    returns: value
+  get_repair_status:
+    summary: "Read whether the camera is repairing a clip"
+    send: { method: GET, path: /ctrl/rec, raw_query: "action=query_repairing" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  capture_still:
+    summary: "Take a still photo"
+    send: { method: GET, path: /ctrl/still, raw_query: "action=cap" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_playback:
+    summary: "Read the playback status"
+    send: { method: GET, path: /ctrl/pb, raw_query: "action=query" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_timecode:
+    summary: "Read the timecode"
+    send: { method: GET, path: /ctrl/tc, raw_query: "action=query" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  reset_timecode:
+    summary: "Reset the timecode to zero"
+    send: { method: GET, path: /ctrl/tc, raw_query: "action=reset" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  timecode_to_time_of_day:
+    summary: "Set the timecode from the camera's clock"
+    send: { method: GET, path: /ctrl/tc, raw_query: "action=current_time" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_timecode:
+    summary: "Set the timecode"
+    params:
+      timecode: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}[:;][0-9]{2}$", required: true, label: Timecode, description: "Timecode as hh:mm:ss:ff (or hh:mm:ss;ff for drop frame)." }
+    send: { method: GET, path: /ctrl/tc, raw_query: "action=set&tc={timecode:url}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  # ── Lens ───────────────────────────────────────────────────────────────
+  zoom_in:
+    summary: "Zoom in at a speed until zoom_stop"
+    params:
+      speed: { type: int, min: 0, max: 100, default: 50, label: Speed, description: "Lens drive speed, as the camera's web controller sends it; higher is faster." }
+    send: { method: GET, path: /ctrl/lens, raw_query: "action=zoomin&fspeed={speed}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  zoom_out:
+    summary: "Zoom out at a speed until zoom_stop"
+    params:
+      speed: { type: int, min: 0, max: 100, default: 50, label: Speed, description: "Lens drive speed, as the camera's web controller sends it; higher is faster." }
+    send: { method: GET, path: /ctrl/lens, raw_query: "action=zoomout&fspeed={speed}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  zoom_stop:
+    summary: "Stop zooming"
+    send:
+      - { method: GET, path: /ctrl/lens, raw_query: "action=zoomstop" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=lens_zoom_pos" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_zoom_status:
+    summary: "Read the zoom drive status"
+    send: { method: GET, path: /ctrl/lens, raw_query: "action=z_status" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  focus_near:
+    summary: "Focus nearer at a speed until focus_stop"
+    params:
+      speed: { type: int, min: 0, max: 100, default: 50, label: Speed, description: "Lens drive speed, as the camera's web controller sends it; higher is faster." }
+    send: { method: GET, path: /ctrl/lens, raw_query: "action=focusnear&fspeed={speed}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  focus_far:
+    summary: "Focus farther at a speed until focus_stop"
+    params:
+      speed: { type: int, min: 0, max: 100, default: 50, label: Speed, description: "Lens drive speed, as the camera's web controller sends it; higher is faster." }
+    send: { method: GET, path: /ctrl/lens, raw_query: "action=focusfar&fspeed={speed}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  focus_stop:
+    summary: "Stop focusing"
+    send:
+      - { method: GET, path: /ctrl/lens, raw_query: "action=focusstop" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=lens_focus_pos" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_focus_status:
+    summary: "Read the focus drive status"
+    send: { method: GET, path: /ctrl/lens, raw_query: "action=f_status" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  autofocus:
+    summary: "Run autofocus once (one push)"
+    send: { method: GET, path: /ctrl/af }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_af_roi:
+    summary: "Set the autofocus area (x, y, width, height in thousandths of the image)"
+    params:
+      x: { type: int, min: 0, max: 1000, required: true, label: X, description: "Left edge of the area, in thousandths of the image." }
+      y: { type: int, min: 0, max: 1000, required: true, label: Y, description: "Top edge of the area, in thousandths of the image." }
+      width: { type: int, min: 0, max: 1000, required: true, label: Width, description: "Width of the area, in thousandths of the image." }
+      height: { type: int, min: 0, max: 1000, required: true, label: Height, description: "Height of the area, in thousandths of the image." }
+    send: { method: GET, path: /ctrl/af, raw_query: "action=update_roi&x={x}&y={y}&w={width}&h={height}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_af_roi_center:
+    summary: "Move the autofocus area's center (thousandths of the image)"
+    params:
+      x: { type: int, min: 0, max: 1000, required: true, label: X, description: "Horizontal center, in thousandths of the image." }
+      y: { type: int, min: 0, max: 1000, required: true, label: Y, description: "Vertical center, in thousandths of the image." }
+    send: { method: GET, path: /ctrl/af, raw_query: "action=update_roi_center&x={x}&y={y}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_af_roi:
+    summary: "Read the autofocus area"
+    send: { method: GET, path: /ctrl/af, raw_query: "action=query" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  trace_face:
+    summary: "Make autofocus follow a detected face"
+    params:
+      face: { type: int, min: 0, max: 2147483647, required: true, label: Face, description: "ID of the detected face to follow." }
+    send: { method: GET, path: /ctrl/af_face/trace_target, raw_query: "id={face}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  enable_magnify:
+    summary: "Magnify the preview (only while not recording)"
+    send: { method: GET, path: /ctrl/mag, raw_query: "action=enable" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  disable_magnify:
+    summary: "Stop magnifying the preview"
+    send: { method: GET, path: /ctrl/mag, raw_query: "action=disable" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_magnify:
+    summary: "Read whether the preview is magnified"
+    send: { method: GET, path: /ctrl/mag, raw_query: "action=query" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  one_push_white_balance:
+    summary: "Run a one-push white balance"
+    send:
+      - { method: GET, path: /ctrl/wb, raw_query: "action=one_push" }
+      - { method: GET, path: /ctrl/get, raw_query: "k=mwb" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  # ── Pan/tilt ───────────────────────────────────────────────────────────
+  pan_tilt_move:
+    summary: "Move the pan/tilt head in a direction until pan_tilt_stop"
+    params:
+      direction: { type: enum, values: [left, right, up, down, leftup, leftdown, rightup, rightdown], required: true, label: Direction, description: "Direction of the move, including the four diagonals." }
+      speed: { type: int, min: 0, max: 63, default: 32, label: Speed, description: "Pan/tilt speed, 0 to 63 (0x3F); higher is faster." }
+    send: { method: GET, path: /ctrl/pt, raw_query: "action={direction}&fspeed={speed}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  pan_tilt_drive:
+    summary: "Move with separate pan and tilt speeds (negative is left or down)"
+    params:
+      pan_speed: { type: int, min: -63, max: 63, required: true, label: Pan speed, description: "Pan speed, -63 to 63: positive pans right, negative left, 0 holds." }
+      tilt_speed: { type: int, min: -63, max: 63, required: true, label: Tilt speed, description: "Tilt speed, -63 to 63: positive tilts up, negative down, 0 holds." }
+    send: { method: GET, path: /ctrl/pt, raw_query: "action=pt&pan_speed={pan_speed}&tilt_speed={tilt_speed}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  pan_tilt_stop:
+    summary: "Stop the pan/tilt move"
+    send: { method: GET, path: /ctrl/pt, raw_query: "action=stop" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  pan_tilt_stop_all:
+    summary: "Stop every pan/tilt, zoom and focus move"
+    send: { method: GET, path: /ctrl/pt, raw_query: "action=stop_all" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  pan_tilt_home:
+    summary: "Move to the home position"
+    send: { method: GET, path: /ctrl/pt, raw_query: "action=home" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  pan_tilt_reset:
+    summary: "Recalibrate the pan/tilt head"
+    send: { method: GET, path: /ctrl/pt, raw_query: "action=reset" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_pan_tilt_limit:
+    summary: "Set a pan/tilt limit to a position"
+    params:
+      direction: { type: string, max_length: 16, pattern: "^[A-Za-z0-9_]+$", required: true, label: Limit, description: "Which limit to set, as the camera names it (the direction of the limit)." }
+      pan: { type: int, min: -2147483648, max: 2147483647, required: true, label: Pan position, description: "Pan position of the limit, in the camera's position units." }
+      tilt: { type: int, min: -2147483648, max: 2147483647, required: true, label: Tilt position, description: "Tilt position of the limit, in the camera's position units." }
+    send: { method: GET, path: /ctrl/pt, raw_query: "action=limit&direct={direction}&pan_pos={pan}&tilt_pos={tilt}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_pan_tilt:
+    summary: "Read the pan/tilt position"
+    send: { method: GET, path: /ctrl/pt, raw_query: "action=query" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_pan_tilt_detail:
+    summary: "Read the pan/tilt position with details"
+    send: { method: GET, path: /ctrl/pt, raw_query: "action=query&detail=y" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Presets and traces ─────────────────────────────────────────────────
+  recall_preset:
+    summary: "Move to a preset"
+    params:
+      preset: { type: int, min: 0, max: 255, required: true, label: Preset, description: "Preset number, as the camera numbers its presets." }
+    send: { method: GET, path: /ctrl/preset, raw_query: "action=recall&index={preset}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  save_preset:
+    summary: "Save the current position as a preset"
+    params:
+      preset: { type: int, min: 0, max: 255, required: true, label: Preset, description: "Preset number, as the camera numbers its presets." }
+    send: { method: GET, path: /ctrl/preset, raw_query: "action=set&index={preset}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  delete_preset:
+    summary: "Delete a preset"
+    params:
+      preset: { type: int, min: 0, max: 255, required: true, label: Preset, description: "Preset number, as the camera numbers its presets." }
+    send: { method: GET, path: /ctrl/preset, raw_query: "action=del&index={preset}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_preset:
+    summary: "Read a preset's information"
+    params:
+      preset: { type: int, min: 0, max: 255, required: true, label: Preset, description: "Preset number, as the camera numbers its presets." }
+    send: { method: GET, path: /ctrl/preset, raw_query: "action=get_info&index={preset}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  rename_preset:
+    summary: "Rename a preset"
+    params:
+      preset: { type: int, min: 0, max: 255, required: true, label: Preset, description: "Preset number, as the camera numbers its presets." }
+      name: { type: string, max_length: 64, required: true, label: Name, description: "New name." }
+    send: { method: GET, path: /ctrl/preset, raw_query: "action=set_name&index={preset}&new_name={name:url}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_preset_speed_unit:
+    summary: "Choose whether a preset's recall is set by speed or by time"
+    params:
+      preset: { type: int, min: 0, max: 255, required: true, label: Preset, description: "Preset number, as the camera numbers its presets." }
+      unit: { type: string, max_length: 16, pattern: "^[A-Za-z0-9_]+$", required: true, label: Unit, description: "Speed unit as the camera names it (speed or time)." }
+    send: { method: GET, path: /ctrl/preset, raw_query: "action=preset_speed&index={preset}&preset_speed_unit={unit:url}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_preset_time:
+    summary: "Set how long a preset's recall takes"
+    params:
+      preset: { type: int, min: 0, max: 255, required: true, label: Preset, description: "Preset number, as the camera numbers its presets." }
+      time: { type: int, min: 0, max: 2147483647, required: true, label: Duration, description: "Recall duration, in the unit of the camera's preset time setting." }
+    send: { method: GET, path: /ctrl/preset, raw_query: "action=preset_speed&index={preset}&preset_time={time}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_preset_speed:
+    summary: "Set a preset's recall speed"
+    params:
+      preset: { type: int, min: 0, max: 255, required: true, label: Preset, description: "Preset number, as the camera numbers its presets." }
+      speed: { type: int, min: 0, max: 2147483647, required: true, label: Speed, description: "Recall speed index, as the camera's preset speed setting counts it." }
+    send: { method: GET, path: /ctrl/preset, raw_query: "action=preset_speed&index={preset}&preset_speed={speed}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  delete_trace:
+    summary: "Delete a recorded PTZ trace"
+    params:
+      trace: { type: int, min: 0, max: 255, required: true, label: Trace, description: "Trace (recorded PTZ path) number." }
+    send: { method: GET, path: /ctrl/ptrace, raw_query: "action=del&index={trace}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  rename_trace:
+    summary: "Rename a PTZ trace"
+    params:
+      trace: { type: int, min: 0, max: 255, required: true, label: Trace, description: "Trace (recorded PTZ path) number." }
+      name: { type: string, max_length: 64, required: true, label: Name, description: "New name." }
+    send: { method: GET, path: /ctrl/ptrace, raw_query: "action=set_name&index={trace}&new_name={name:url}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  start_trace_recording:
+    summary: "Start recording a PTZ trace"
+    params:
+      trace: { type: int, min: 0, max: 255, required: true, label: Trace, description: "Trace (recorded PTZ path) number." }
+    send: { method: GET, path: /ctrl/ptrace, raw_query: "action=rec_start&index={trace}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  stop_trace_recording:
+    summary: "Stop recording the PTZ trace"
+    send: { method: GET, path: /ctrl/ptrace, raw_query: "action=rec_stop" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  prepare_trace:
+    summary: "Move to a trace's start, ready to play"
+    params:
+      trace: { type: int, min: 0, max: 255, required: true, label: Trace, description: "Trace (recorded PTZ path) number." }
+    send: { method: GET, path: /ctrl/ptrace, raw_query: "action=play_prepare&index={trace}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  play_trace:
+    summary: "Play the prepared trace"
+    send: { method: GET, path: /ctrl/ptrace, raw_query: "action=play_start" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  stop_trace:
+    summary: "Stop playing the trace"
+    send: { method: GET, path: /ctrl/ptrace, raw_query: "action=play_stop" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_traces:
+    summary: "Read the trace status"
+    send: { method: GET, path: /ctrl/ptrace, raw_query: "action=query" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_trace:
+    summary: "Read a trace's information"
+    params:
+      trace: { type: int, min: 0, max: 255, required: true, label: Trace, description: "Trace (recorded PTZ path) number." }
+    send: { method: GET, path: /ctrl/ptrace, raw_query: "action=get_info&index={trace}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Auto framing ───────────────────────────────────────────────────────
+  set_framing_detection:
+    summary: "Turn subject detection on or off"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+    send: { method: GET, path: /ctrl/framing/detect, raw_query: "enable={enabled:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_framing_tracking:
+    summary: "Turn auto framing tracking on or off"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+    send: { method: GET, path: /ctrl/framing/trace, raw_query: "enable={enabled:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_framing_target:
+    summary: "Track a detected subject by ID"
+    params:
+      target: { type: int, min: 0, max: 2147483647, required: true, label: Target, description: "ID of the detected subject to track." }
+    send: { method: GET, path: /ctrl/framing/trace_target, raw_query: "id={target}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_framing_start_position:
+    summary: "Set the preset framing starts from"
+    params:
+      preset: { type: int, min: 0, max: 255, required: true, label: Preset, description: "Preset number, as the camera numbers its presets." }
+    send: { method: GET, path: /ctrl/framing/start_position, raw_query: "index={preset}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_framing_fov_type:
+    summary: "Set the framing shot type"
+    params:
+      type: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_.-]+$", required: true, label: Shot type, description: "Framing shot type as the camera names it." }
+    send: { method: GET, path: /ctrl/framing/fov, raw_query: "type={type}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_framing_body_size:
+    summary: "Set the framing body size"
+    params:
+      size: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_.-]+$", required: true, label: Body size, description: "Body size in the frame, as the camera's framing settings give it." }
+    send: { method: GET, path: /ctrl/framing/fov, raw_query: "body_size={size}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_framing_face_height:
+    summary: "Set the framing face height"
+    params:
+      height: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_.-]+$", required: true, label: Face height, description: "Face height in the frame, as the camera's framing settings give it." }
+    send: { method: GET, path: /ctrl/framing/fov, raw_query: "face_height={height}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_framing_placement:
+    summary: "Set where the subject is placed in the frame"
+    params:
+      placement: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_.-]+$", required: true, label: Placement, description: "Subject placement as the camera's framing settings name it." }
+    send: { method: GET, path: /ctrl/framing/fov, raw_query: "placement={placement}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_framing_fov_debug:
+    summary: "Read the framing field-of-view debug information"
+    send: { method: GET, path: /ctrl/framing/debug_fov }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_framing_auto_start:
+    summary: "Start framing automatically at power-on or not"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+    send: { method: GET, path: /ctrl/framing/auto_start, raw_query: "enable={enabled:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  restart_framing:
+    summary: "Restart auto framing"
+    send: { method: GET, path: /ctrl/framing/restart }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_framing_auto_target:
+    summary: "Choose the tracking target automatically or not"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+    send: { method: GET, path: /ctrl/framing/auto_target, raw_query: "enable={enabled:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_framing_target_lost_action:
+    summary: "Set what framing does when the target is lost"
+    params:
+      action: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_.-]+$", required: true, label: Action, description: "Action as the camera's framing settings name it." }
+    send: { method: GET, path: /ctrl/framing/target_lost, raw_query: "action={action}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_framing_target_lost_timeout:
+    summary: "Set how long framing waits after losing the target"
+    params:
+      seconds: { type: int, min: 0, max: 86400, required: true, label: Timeout, description: "Seconds to wait after the target is lost." }
+    send: { method: GET, path: /ctrl/framing/target_lost, raw_query: "timeout_sec={seconds}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_framing_target_lost:
+    summary: "Read the target-lost settings"
+    send: { method: GET, path: /ctrl/framing/target_lost, raw_query: "action=query" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_framing_detect_restart:
+    summary: "Set the detection restart time"
+    params:
+      seconds: { type: int, min: 0, max: 86400, required: true, label: Restart time, description: "Detection restart time in seconds." }
+    send: { method: GET, path: /ctrl/framing/detect_restart, raw_query: "time={seconds}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_framing_detect_restart:
+    summary: "Read the detection restart time"
+    send: { method: GET, path: /ctrl/framing/detect_restart, raw_query: "action=query" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_framing_manual_wait:
+    summary: "Set how long framing waits after a manual move"
+    params:
+      seconds: { type: int, min: 0, max: 86400, required: true, label: Wait time, description: "Seconds framing waits after a manual move before acting again." }
+    send: { method: GET, path: /ctrl/framing/manual_target, raw_query: "wait_time={seconds}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_framing_manual_wait:
+    summary: "Read the wait after a manual move"
+    send: { method: GET, path: /ctrl/framing/manual_target, raw_query: "action=query" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_framing_status:
+    summary: "Read the framing status"
+    send: { method: GET, path: /ctrl/framing/status }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_framing_all_status:
+    summary: "Read every framing setting and status"
+    send: { method: GET, path: /ctrl/framing/all_status }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_framing_info:
+    summary: "Read the framing information"
+    send: { method: GET, path: /ctrl/framing/info }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_framing_tally:
+    summary: "Turn the framing tally on or off"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+    send: { method: GET, path: /ctrl/framing/tally, raw_query: "enable={enabled:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_framing_mask_enabled:
+    summary: "Turn the framing mask area on or off"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+    send: { method: GET, path: /ctrl/framing/mask_area, raw_query: "enable={enabled:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_framing_mask_area:
+    summary: "Set the framing mask area"
+    params:
+      left: { type: int, min: 0, max: 1000, required: true, label: Left, description: "Left edge of the mask area, in thousandths of the image." }
+      top: { type: int, min: 0, max: 1000, required: true, label: Top, description: "Top edge of the mask area, in thousandths of the image." }
+      right: { type: int, min: 0, max: 1000, required: true, label: Right, description: "Right edge of the mask area, in thousandths of the image." }
+      bottom: { type: int, min: 0, max: 1000, required: true, label: Bottom, description: "Bottom edge of the mask area, in thousandths of the image." }
+    send: { method: GET, path: /ctrl/framing/mask_area, raw_query: "left={left}&top={top}&right={right}&bottom={bottom}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_framing_mask_area:
+    summary: "Read the framing mask area"
+    send: { method: GET, path: /ctrl/framing/mask_area }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_framing_track_active_face:
+    summary: "Track the active (speaking) face or not"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+    send: { method: GET, path: /ctrl/framing/track_active_face, raw_query: "enable={enabled:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_framing_track_active_face:
+    summary: "Read whether the active face is tracked"
+    send: { method: GET, path: /ctrl/framing/track_active_face }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_framing_target_count:
+    summary: "Set how many people framing keeps in the shot"
+    params:
+      count: { type: int, min: 1, max: 64, required: true, label: People, description: "Number of people to frame." }
+    send: { method: GET, path: /ctrl/framing/target_num, raw_query: "num={count}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_framing_target_count:
+    summary: "Read how many people framing keeps in the shot"
+    send: { method: GET, path: /ctrl/framing/target_num }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_framing_tilt_lock:
+    summary: "Lock the tilt during framing or not"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+    send: { method: GET, path: /ctrl/framing/tilt_lock, raw_query: "enable={enabled:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_framing_tilt_lock:
+    summary: "Read whether the tilt is locked during framing"
+    send: { method: GET, path: /ctrl/framing/tilt_lock }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  ezframing_center:
+    summary: "Center the shot on a point of the image"
+    params:
+      x: { type: int, min: 0, max: 1000, required: true, label: X, description: "Horizontal position, in thousandths of the image." }
+      y: { type: int, min: 0, max: 1000, required: true, label: Y, description: "Vertical position, in thousandths of the image." }
+      speed: { type: int, min: 0, max: 63, default: 32, label: Speed, description: "Pan/tilt speed, 0 to 63 (0x3F); higher is faster." }
+    send: { method: GET, path: /ctrl/ezframing/center, raw_query: "x={x}&y={y}&speed={speed}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  ezframing_region:
+    summary: "Frame a region of the image"
+    params:
+      x: { type: int, min: 0, max: 1000, required: true, label: X, description: "Horizontal position, in thousandths of the image." }
+      y: { type: int, min: 0, max: 1000, required: true, label: Y, description: "Vertical position, in thousandths of the image." }
+      speed: { type: int, min: 0, max: 63, default: 32, label: Speed, description: "Pan/tilt speed, 0 to 63 (0x3F); higher is faster." }
+      ratio: { type: int, min: 0, max: 1000, required: true, label: Ratio, description: "Size of the region relative to the image, as the camera's web controller sends it." }
+    send: { method: GET, path: /ctrl/ezframing/roi, raw_query: "x={x}&y={y}&speed={speed}&ratio={ratio}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_face_database:
+    summary: "Read the face database"
+    send: { method: GET, path: /ctrl/facedb/query }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  prepare_face:
+    summary: "Prepare a detected face to be added to the database"
+    params:
+      face: { type: int, min: 0, max: 2147483647, required: true, label: Face, description: "Face ID in the face database." }
+    send: { method: GET, path: /ctrl/facedb/prepare, raw_query: "face_id={face}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  add_face:
+    summary: "Add a prepared face to the database"
+    params:
+      face: { type: int, min: 0, max: 2147483647, required: true, label: Face, description: "Face ID in the face database." }
+      name: { type: string, max_length: 64, required: true, label: Name, description: "Name stored with the face." }
+      priority: { type: int, min: 0, max: 100, required: true, label: Priority, description: "Tracking priority of the face." }
+      active: { type: bool, required: true, label: Active, description: "On uses the face for tracking, off keeps it stored only." }
+    send: { method: GET, path: /ctrl/facedb/add, raw_query: "which={face}&name={name:url}&priority={priority}&activate={active:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  update_face:
+    summary: "Change a stored face's name, priority or activation"
+    params:
+      face: { type: int, min: 0, max: 2147483647, required: true, label: Face, description: "Face ID in the face database." }
+      name: { type: string, max_length: 64, required: true, label: Name, description: "Name stored with the face." }
+      priority: { type: int, min: 0, max: 100, required: true, label: Priority, description: "Tracking priority of the face." }
+      active: { type: bool, required: true, label: Active, description: "On uses the face for tracking, off keeps it stored only." }
+    send: { method: GET, path: /ctrl/facedb/update, raw_query: "uid={face}&name={name:url}&priority={priority}&activate={active:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  delete_face:
+    summary: "Delete a stored face"
+    params:
+      face: { type: int, min: 0, max: 2147483647, required: true, label: Face, description: "Face ID in the face database." }
+    send: { method: GET, path: /ctrl/facedb/delete, raw_query: "uid={face}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_face_database_enabled:
+    summary: "Use the face database for tracking or not"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+    send: { method: GET, path: /ctrl/facedb/set, raw_query: "enable={enabled:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_face_database_status:
+    summary: "Read the face database status"
+    send: { method: GET, path: /ctrl/facedb/status }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Image tuning ───────────────────────────────────────────────────────
+  get_color_matrix:
+    summary: "Read the color matrix"
+    send: { method: GET, path: /ctrl/matrix }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_color_matrix_enabled:
+    summary: "Turn the color matrix on or off"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+    send: { method: GET, path: /ctrl/matrix, raw_query: "enable={enabled:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_color_matrix_value:
+    summary: "Set one coefficient of the color matrix"
+    params:
+      index: { type: int, min: 0, max: 8, required: true, label: Coefficient, description: "Coefficient of the 3x3 matrix, 0 to 8 in row order." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "Coefficient value in the camera's matrix units." }
+    send: { method: GET, path: /ctrl/matrix, raw_query: "index={index}&value={value}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_color_correction:
+    summary: "Read the color correction"
+    send: { method: GET, path: /ctrl/cc }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_color_correction_enabled:
+    summary: "Turn color correction on or off"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+    send: { method: GET, path: /ctrl/cc, raw_query: "enable={enabled:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_color_correction_hue:
+    summary: "Set the hue correction of one color"
+    params:
+      index: { type: int, min: 0, max: 63, required: true, label: Color, description: "Index of the color the correction applies to, as the camera numbers its color vectors." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "Correction value in the camera's units." }
+    send: { method: GET, path: /ctrl/cc, raw_query: "action=set_hue&index={index}&value={value}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_color_correction_saturation:
+    summary: "Set the saturation correction of one color"
+    params:
+      index: { type: int, min: 0, max: 63, required: true, label: Color, description: "Index of the color the correction applies to, as the camera numbers its color vectors." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "Correction value in the camera's units." }
+    send: { method: GET, path: /ctrl/cc, raw_query: "action=set_sat&index={index}&value={value}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_black_level:
+    summary: "Read the master and RGB black levels"
+    send: { method: GET, path: /ctrl/black_level }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_black_level_enabled:
+    summary: "Turn the black level adjustment on or off"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+    send: { method: GET, path: /ctrl/black_level, raw_query: "enable={enabled:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_black_level:
+    summary: "Set the master, red, green and blue black levels"
+    params:
+      master: { type: int, min: -100, max: 100, required: true, label: Master, description: "Master black level, -100 to 100." }
+      red: { type: int, min: -100, max: 100, required: true, label: Red, description: "Red black level, -100 to 100." }
+      green: { type: int, min: -100, max: 100, required: true, label: Green, description: "Green black level, -100 to 100." }
+      blue: { type: int, min: -100, max: 100, required: true, label: Blue, description: "Blue black level, -100 to 100." }
+    send: { method: GET, path: /ctrl/black_level, raw_query: "master={master}&r={red}&g={green}&b={blue}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_gamma:
+    summary: "Read the gamma base curve (Customized 2 profile)"
+    send: { method: GET, path: /ctrl/gamma, raw_query: "action=get&option=gamma" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_gamma_rec709:
+    summary: "Use the Rec709 gamma base curve (Customized 2 profile)"
+    send: { method: GET, path: /ctrl/gamma, raw_query: "action=set&option=gamma&base=0" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_gamma_srgb:
+    summary: "Use the sRGB gamma base curve (Customized 2 profile)"
+    send: { method: GET, path: /ctrl/gamma, raw_query: "action=set&option=gamma&base=1" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_gamma_power:
+    summary: "Use a power gamma base curve (Customized 2 profile)"
+    params:
+      power: { type: int, min: 1, max: 99, required: true, label: Power, description: "Exponent times ten: 22 for a 2.2 power curve." }
+    send: { method: GET, path: /ctrl/gamma, raw_query: "action=set&option=gamma&base=2&power={power}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_knee_black_level:
+    summary: "Read the gamma black level"
+    send: { method: GET, path: /ctrl/gamma, raw_query: "action=get&option=black_level" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_knee_black_level:
+    summary: "Set the gamma black level (Customized 2 profile)"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+      level: { type: int, min: -2147483648, max: 2147483647, required: true, label: Level, description: "Black level in the camera's units." }
+    send: { method: GET, path: /ctrl/gamma, raw_query: "action=set&option=black_level&enable={enabled:bool01}&level={level}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_black_gamma:
+    summary: "Read the black gamma"
+    send: { method: GET, path: /ctrl/gamma, raw_query: "action=get&option=black_gamma" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_black_gamma:
+    summary: "Set the black gamma range and level (Customized 2 profile)"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+      range: { type: int, min: -2147483648, max: 2147483647, required: true, label: Range, description: "Black gamma range in the camera's units." }
+      level: { type: int, min: -2147483648, max: 2147483647, required: true, label: Level, description: "Black gamma level in the camera's units." }
+    send: { method: GET, path: /ctrl/gamma, raw_query: "action=set&option=black_gamma&enable={enabled:bool01}&range={range}&level={level}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_knee:
+    summary: "Read the knee"
+    send: { method: GET, path: /ctrl/gamma, raw_query: "action=get&option=knee" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_knee:
+    summary: "Set the knee point and slope (Customized 2 profile)"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+      point: { type: int, min: -2147483648, max: 2147483647, required: true, label: Knee point, description: "Knee point in the camera's units." }
+      slope: { type: int, min: -2147483648, max: 2147483647, required: true, label: Slope, description: "Knee slope in the camera's units." }
+    send: { method: GET, path: /ctrl/gamma, raw_query: "action=set&option=knee&enable={enabled:bool01}&point={point}&slope={slope}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_manual_black_level:
+    summary: "Read the sensor black level calibration (dark current)"
+    send: { method: GET, path: /ctrl/manual_blc, raw_query: "action=get" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_manual_black_level:
+    summary: "Turn on the sensor black level calibration with R, Gr, Gb and B values"
+    params:
+      r: { type: int, min: 0, max: 65535, required: true, label: Red, description: "Red channel black value subtracted from the raw data." }
+      gr: { type: int, min: 0, max: 65535, required: true, label: Green-red, description: "Green-red channel black value subtracted from the raw data." }
+      gb: { type: int, min: 0, max: 65535, required: true, label: Green-blue, description: "Green-blue channel black value subtracted from the raw data." }
+      b: { type: int, min: 0, max: 65535, required: true, label: Blue, description: "Blue channel black value subtracted from the raw data." }
+    send: { method: GET, path: /ctrl/manual_blc, raw_query: "action=set&enable=1&rggb={r},{gr},{gb},{b}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  disable_manual_black_level:
+    summary: "Turn the sensor black level calibration off"
+    send: { method: GET, path: /ctrl/manual_blc, raw_query: "action=set&enable=0&rggb=0,0,0,0" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  # ── Network streams ────────────────────────────────────────────────────
+  get_stream_settings:
+    summary: "Read a stream's settings"
+    params:
+      stream: { type: enum, values: [stream0, stream1], default: stream1, label: Stream, description: "stream0 is the recording stream, stream1 the network stream." }
+    send: { method: GET, path: /ctrl/stream_setting, raw_query: "action=query&index={stream}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_stream_size:
+    summary: "Set a stream's width and height (stop streaming first)"
+    params:
+      stream: { type: enum, values: [stream0, stream1], default: stream1, label: Stream, description: "stream0 is the recording stream, stream1 the network stream." }
+      width: { type: int, min: 2, max: 8192, required: true, label: Width, description: "Width in pixels, a multiple of 2." }
+      height: { type: int, min: 2, max: 8192, required: true, label: Height, description: "Height in pixels, a multiple of 2." }
+    send: { method: GET, path: /ctrl/stream_setting, raw_query: "index={stream}&width={width}&height={height}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_stream_bitrate:
+    summary: "Set a stream's bitrate (works while streaming)"
+    params:
+      stream: { type: enum, values: [stream0, stream1], default: stream1, label: Stream, description: "stream0 is the recording stream, stream1 the network stream." }
+      bps: { type: int, min: 1, max: 2147483647, required: true, label: Bitrate, description: "Bitrate in bits per second." }
+    send: { method: GET, path: /ctrl/stream_setting, raw_query: "index={stream}&bitrate={bps}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_stream_frame_rate:
+    summary: "Set a stream's frame rate"
+    params:
+      stream: { type: enum, values: [stream0, stream1], default: stream1, label: Stream, description: "stream0 is the recording stream, stream1 the network stream." }
+      fps: { type: int, min: 1, max: 240, required: true, label: Frame rate, description: "Frames per second." }
+    send: { method: GET, path: /ctrl/stream_setting, raw_query: "index={stream}&fps={fps}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_stream_encoder:
+    summary: "Set a stream's encoder"
+    params:
+      stream: { type: enum, values: [stream0, stream1], default: stream1, label: Stream, description: "stream0 is the recording stream, stream1 the network stream." }
+      encoder: { type: enum, values: [h264, h265], required: true, label: Encoder, description: "Video encoder: H.264 or H.265." }
+    send: { method: GET, path: /ctrl/stream_setting, raw_query: "index={stream}&venc={encoder}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_stream_bit_depth:
+    summary: "Set the H.265 bit depth of a stream"
+    params:
+      stream: { type: enum, values: [stream0, stream1], default: stream1, label: Stream, description: "stream0 is the recording stream, stream1 the network stream." }
+      bits: { type: enum, values: ["8", "10"], required: true, label: Bit depth, description: "H.265 bit depth, 8 or 10." }
+    send: { method: GET, path: /ctrl/stream_setting, raw_query: "index={stream}&bitwidth={bits}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_stream_split:
+    summary: "Set the recording split duration in seconds (less than 5 minutes)"
+    params:
+      stream: { type: enum, values: [stream0, stream1], default: stream1, label: Stream, description: "stream0 is the recording stream, stream1 the network stream." }
+      seconds: { type: int, min: 1, max: 299, required: true, label: Split, description: "Split duration in seconds, under 300." }
+    send: { method: GET, path: /ctrl/stream_setting, raw_query: "index={stream}&split={seconds}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_stream_performance:
+    summary: "Read a stream's performance"
+    params:
+      stream: { type: enum, values: [stream0, stream1], default: stream1, label: Stream, description: "stream0 is the recording stream, stream1 the network stream." }
+    send: { method: GET, path: /ctrl/stream_setting, raw_query: "action=stream_performance&index={stream}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_rtmp:
+    summary: "Read an RTMP destination's status and settings"
+    params:
+      index: { type: int, min: 0, max: 3, default: 0, label: Destination, description: "RTMP destination number, from 0." }
+    send: { method: GET, path: /ctrl/rtmp, raw_query: "action=query&index={index}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  start_rtmp:
+    summary: "Start RTMP streaming with the configured URL and key"
+    send: { method: GET, path: /ctrl/rtmp, raw_query: "action=start" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  start_rtmp_to:
+    summary: "Start RTMP streaming to a URL with a key"
+    params:
+      url: { type: string, max_length: 1024, required: true, label: URL, description: "Server URL." }
+      key: { type: string, max_length: 1024, required: true, secret: true, label: Stream key, description: "Stream key." }
+    send: { method: GET, path: /ctrl/rtmp, raw_query: "action=start&url={url:url}&key={key:url}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  stop_rtmp:
+    summary: "Stop an RTMP destination"
+    params:
+      index: { type: int, min: 0, max: 3, default: 0, label: Destination, description: "RTMP destination number, from 0." }
+    send: { method: GET, path: /ctrl/rtmp, raw_query: "action=stop&index={index}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_rtmp_auto_restart:
+    summary: "Restart RTMP streaming automatically or not"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+    send: { method: GET, path: /ctrl/rtmp, raw_query: "action=set&autoRestart={enabled:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_rtmp_destination:
+    summary: "Set the RTMP URL and key"
+    params:
+      url: { type: string, max_length: 1024, required: true, label: URL, description: "Server URL." }
+      key: { type: string, max_length: 1024, required: true, secret: true, label: Stream key, description: "Stream key." }
+    send: { method: GET, path: /ctrl/rtmp, raw_query: "action=set&url={url:url}&key={key:url}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_srt:
+    summary: "Read the SRT status and settings"
+    send: { method: GET, path: /ctrl/srt, raw_query: "action=query" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  start_srt:
+    summary: "Start SRT streaming to a URL"
+    params:
+      url: { type: string, max_length: 1024, required: true, label: URL, description: "Server URL." }
+    send: { method: GET, path: /ctrl/srt, raw_query: "action=start&url={url:url}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  stop_srt:
+    summary: "Stop SRT streaming"
+    send: { method: GET, path: /ctrl/srt, raw_query: "action=stop" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_srt:
+    summary: "Set the SRT mode, passphrase, key length, latency and TTL"
+    params:
+      mode: { type: string, max_length: 16, pattern: "^[A-Za-z]+$", required: true, label: Mode, description: "SRT mode as the camera names it (caller or listener)." }
+      passphrase: { type: string, max_length: 79, required: true, secret: true, label: Passphrase, description: "Encryption passphrase; empty for none." }
+      key_length: { type: enum, values: ["16", "24", "32"], required: true, label: Key length, description: "AES key length in bytes: 16, 24 or 32." }
+      latency: { type: int, min: 0, max: 60000, required: true, label: Latency, description: "SRT latency in milliseconds." }
+      ttl: { type: int, min: 1, max: 255, required: true, label: TTL, description: "Time to live of the packets." }
+    send: { method: GET, path: /ctrl/srt, raw_query: "action=set&mode={mode:url}&passphrase={passphrase:url}&pbkeyLen={key_length}&latency={latency}&ttl={ttl}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_srt_auto_restart:
+    summary: "Restart SRT streaming automatically or not"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+    send: { method: GET, path: /ctrl/srt, raw_query: "action=set&autoRestart={enabled:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_srt_url:
+    summary: "Set the SRT URL"
+    params:
+      url: { type: string, max_length: 1024, required: true, label: URL, description: "Server URL." }
+    send: { method: GET, path: /ctrl/srt, raw_query: "action=set&url={url:url}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_ndi:
+    summary: "Read the NDI settings"
+    send: { method: GET, path: /ctrl/ndi, raw_query: "action=query" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_ndi:
+    summary: "Set the NDI names, group, multicast, discovery servers and bridge"
+    params:
+      machine: { type: string, max_length: 256, required: true, label: Machine name, description: "NDI machine name." }
+      stream: { type: string, max_length: 256, required: true, label: Stream name, description: "NDI stream name." }
+      group: { type: string, max_length: 256, required: true, label: Groups, description: "NDI groups, comma-separated; empty for the public group." }
+      ttl: { type: int, min: 1, max: 255, required: true, label: Multicast TTL, description: "Multicast time to live." }
+      multicast: { type: bool, required: true, label: Multicast, description: "On sends NDI by multicast." }
+      discovery_1: { type: string, max_length: 256, required: true, label: Discovery server 1, description: "Address of the first NDI discovery server; empty for none." }
+      discovery_2: { type: string, max_length: 256, required: true, label: Discovery server 2, description: "Address of the second NDI discovery server; empty for none." }
+      multicast_netmask: { type: string, max_length: 256, required: true, label: Multicast netmask, description: "Multicast netmask." }
+      multicast_prefix: { type: string, max_length: 256, required: true, label: Multicast prefix, description: "Multicast address prefix." }
+      bridge_name: { type: string, max_length: 256, required: true, label: Bridge name, description: "NDI Bridge name; empty for none." }
+      bridge_key: { type: string, max_length: 256, required: true, secret: true, label: Bridge key, description: "NDI Bridge encryption key." }
+      bridge_server: { type: string, max_length: 256, required: true, label: Bridge server, description: "NDI Bridge server address." }
+      bridge_port: { type: int, min: 1, max: 65535, required: true, label: Bridge port, description: "NDI Bridge server port." }
+    send: { method: GET, path: /ctrl/ndi, raw_query: "action=set&machine={machine:url}&stream={stream:url}&group={group:url}&ttl={ttl}&multicastEnable={multicast:bool01}&discoveryServer1={discovery_1:url}&discoveryServer2={discovery_2:url}&multicastNetmask={multicast_netmask:url}&multicastPrefix={multicast_prefix:url}&bridgeName={bridge_name:url}&bridgeEncryptionKey={bridge_key:url}&bridgeServer={bridge_server:url}&bridgePort={bridge_port}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_rtsp:
+    summary: "Read the RTSP settings"
+    send: { method: GET, path: /ctrl/rtsp, raw_query: "action=query" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_rtsp_authentication:
+    summary: "Require RTSP authentication or not"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+    send: { method: GET, path: /ctrl/rtsp, raw_query: "action=set&authentication={enabled:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  # ── Network, security and users ────────────────────────────────────────
+  get_network_mode:
+    summary: "Read the Ethernet IP mode"
+    send: { method: GET, path: /ctrl/network, raw_query: "action=query" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_network_info:
+    summary: "Read the Ethernet and TCP/IP configuration"
+    send: { method: GET, path: /ctrl/network, raw_query: "action=info" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_network_router:
+    summary: "Use DHCP from the local router (Router mode)"
+    send: { method: GET, path: /ctrl/network, raw_query: "action=set&mode=Router" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_network_direct:
+    summary: "Serve DHCP to a directly connected computer (Direct mode, 10.98.32.1)"
+    send: { method: GET, path: /ctrl/network, raw_query: "action=set&mode=Direct" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_network_static:
+    summary: "Use a static address"
+    params:
+      address: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: IP address, description: "Camera's IPv4 address." }
+      netmask: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: Netmask, description: "Subnet mask." }
+      gateway: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: Gateway, description: "Default gateway." }
+    send: { method: GET, path: /ctrl/network, raw_query: "action=set&mode=Static&ipaddr={address}&netmask={netmask}&gateway={gateway}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_network_static_dns:
+    summary: "Use a static address and DNS server"
+    params:
+      address: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: IP address, description: "Camera's IPv4 address." }
+      netmask: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: Netmask, description: "Subnet mask." }
+      gateway: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: Gateway, description: "Default gateway." }
+      dns: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: DNS server, description: "DNS server address." }
+    send: { method: GET, path: /ctrl/network, raw_query: "action=set&mode=Static&ipaddr={address}&netmask={netmask}&gateway={gateway}&dns={dns}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_wifi:
+    summary: "Read the Wi-Fi status"
+    send: { method: GET, path: /ctrl/wifi_ctrl, raw_query: "action=query" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_usb:
+    summary: "Read the USB status"
+    send: { method: GET, path: /ctrl/usb, raw_query: "action=query" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_ip_access:
+    summary: "Read the IP allow and deny lists"
+    send: { method: GET, path: /ipac }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  enable_allow_list:
+    summary: "Turn the IP allow list on"
+    send: { method: GET, path: /ipac/allowlist/enable }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  disable_allow_list:
+    summary: "Turn the IP allow list off"
+    send: { method: GET, path: /ipac/allowlist/disable }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  add_to_allow_list:
+    summary: "Add an address to the IP allow list"
+    params:
+      address: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: IP address, description: "IPv4 address to add." }
+    send: { method: GET, path: /ipac/allowlist/add, raw_query: "ip={address}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  remove_from_allow_list:
+    summary: "Remove an address from the IP allow list"
+    params:
+      address: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: IP address, description: "IPv4 address to remove." }
+    send: { method: GET, path: /ipac/allowlist/delete, raw_query: "ip={address}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  enable_deny_list:
+    summary: "Turn the IP deny list on"
+    send: { method: GET, path: /ipac/denylist/enable }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  disable_deny_list:
+    summary: "Turn the IP deny list off"
+    send: { method: GET, path: /ipac/denylist/disable }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  add_to_deny_list:
+    summary: "Add an address to the IP deny list"
+    params:
+      address: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: IP address, description: "IPv4 address to add." }
+    send: { method: GET, path: /ipac/denylist/add, raw_query: "ip={address}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  remove_from_deny_list:
+    summary: "Remove an address from the IP deny list"
+    params:
+      address: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: IP address, description: "IPv4 address to remove." }
+    send: { method: GET, path: /ipac/denylist/delete, raw_query: "ip={address}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  generate_certificate:
+    summary: "Generate a self-signed HTTPS certificate"
+    send: { method: GET, path: /cert/gen }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_certificate:
+    summary: "Read the HTTPS certificate information"
+    send: { method: GET, path: /cert/info }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  delete_certificate:
+    summary: "Delete the HTTPS certificate"
+    send: { method: GET, path: /cert/delete }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_current_user:
+    summary: "Read the logged-in user"
+    send: { method: GET, path: /login/me }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_users:
+    summary: "Read the user accounts"
+    send: { method: GET, path: /login/user }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  add_user:
+    summary: "Add a user account"
+    params:
+      user: { type: string, max_length: 64, required: true, label: User, description: "User name." }
+      password: { type: string, max_length: 64, required: true, secret: true, label: Password, description: "Password of the account." }
+      group: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_]+$", required: true, label: Permission, description: "Permission group as the camera names it." }
+    send: { method: GET, path: /login/adduser, raw_query: "user={user:url}&pswd={password:url}&grp={group:url}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  delete_user:
+    summary: "Delete a user account"
+    params:
+      user: { type: string, max_length: 64, required: true, label: User, description: "User name." }
+    send: { method: GET, path: /login/deluser, raw_query: "user={user:url}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  change_password:
+    summary: "Change a user's password"
+    params:
+      user: { type: string, max_length: 64, required: true, label: User, description: "User name." }
+      old_password: { type: string, max_length: 64, required: true, secret: true, label: Current password, description: "Current password of the account." }
+      new_password: { type: string, max_length: 64, required: true, secret: true, label: New password, description: "New password of the account." }
+    send: { method: GET, path: /login/pswd, raw_query: "user={user:url}&old={old_password:url}&new={new_password:url}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  logout:
+    summary: "Log the current user out"
+    send: { method: GET, path: /login/quit }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_snmp:
+    summary: "Read the SNMP settings"
+    send: { method: GET, path: /ctrl/snmp }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_snmp_enabled:
+    summary: "Turn SNMP on or off"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+    send: { method: GET, path: /ctrl/snmp, raw_query: "enable={enabled:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_snmp_security:
+    summary: "Set the SNMPv3 user, authentication, encryption and password"
+    params:
+      user: { type: string, max_length: 64, required: true, label: User, description: "User name." }
+      auth: { type: string, max_length: 16, required: true, label: Authentication, description: "Authentication protocol as the camera names it." }
+      encryption: { type: string, max_length: 16, required: true, label: Encryption, description: "Encryption protocol as the camera names it." }
+      password: { type: string, max_length: 64, required: true, secret: true, label: Password, description: "SNMPv3 password." }
+    send: { method: GET, path: /ctrl/snmp, raw_query: "user={user:url}&auth={auth:url}&enc={encryption:url}&pass={password:url}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_snmp_system_name:
+    summary: "Set the SNMP system name"
+    params:
+      name: { type: string, max_length: 128, required: true, label: System name, description: "SNMP system name." }
+    send: { method: GET, path: /ctrl/snmp, raw_query: "system={name:url}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_snmp_location:
+    summary: "Set the SNMP location"
+    params:
+      location: { type: string, max_length: 128, required: true, label: Location, description: "SNMP location." }
+    send: { method: GET, path: /ctrl/snmp, raw_query: "location={location:url}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_snmp_contact:
+    summary: "Set the SNMP contact"
+    params:
+      contact: { type: string, max_length: 128, required: true, label: Contact, description: "SNMP contact." }
+    send: { method: GET, path: /ctrl/snmp, raw_query: "contact={contact:url}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_freed:
+    summary: "Read the FreeD tracking output settings"
+    send: { method: GET, path: /ctrl/freed }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_freed_enabled:
+    summary: "Turn the FreeD output on or off"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On turns it on, off turns it off." }
+    send: { method: GET, path: /ctrl/freed, raw_query: "enable={enabled:bool01}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_freed_camera_id:
+    summary: "Set the FreeD camera ID"
+    params:
+      id: { type: int, min: 0, max: 255, required: true, label: Camera ID, description: "FreeD camera ID, 0 to 255." }
+    send: { method: GET, path: /ctrl/freed, raw_query: "camera_id={id}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  set_freed_destination:
+    summary: "Set a FreeD destination address and port"
+    params:
+      index: { type: int, min: 0, max: 7, required: true, label: Destination, description: "FreeD destination number, as the camera numbers them." }
+      address: { type: string, max_length: 253, required: true, label: Address, description: "Destination IP address." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "Destination UDP port." }
+    send: { method: GET, path: /ctrl/freed, raw_query: "ip{index}={address:url}&port{index}={port}" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  check_firmware:
+    summary: "Check for a firmware update"
+    send: { method: GET, path: /ctrl/upgrade, raw_query: "action=fw_check" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  run_firmware_update:
+    summary: "Install the firmware update the check found"
+    send: { method: GET, path: /ctrl/upgrade, raw_query: "action=run" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  check_ui_update:
+    summary: "Check for a web interface update"
+    send: { method: GET, path: /ctrl/upgrade, raw_query: "action=ui_check" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Card and files ─────────────────────────────────────────────────────
+  get_card_present:
+    summary: "Read whether a card is in the camera"
+    send: { method: GET, path: /ctrl/card, raw_query: "action=present" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_card_free:
+    summary: "Read the free space on the card"
+    send: { method: GET, path: /ctrl/card, raw_query: "action=query_free" }
+    expect: { status: 200, json_path: "$.msg" }
+    returns: value
+  get_card_total:
+    summary: "Read the card's capacity"
+    send: { method: GET, path: /ctrl/card, raw_query: "action=query_total" }
+    expect: { status: 200, json_path: "$.msg" }
+    returns: value
+  get_card_format:
+    summary: "Read the card's file system"
+    send: { method: GET, path: /ctrl/card, raw_query: "action=query_format" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  format_card:
+    summary: "Format the card, the camera choosing the file system"
+    send: { method: GET, path: /ctrl/card, raw_query: "action=format" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  format_card_fat32:
+    summary: "Format the card as FAT32"
+    send: { method: GET, path: /ctrl/card, raw_query: "action=fat32" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  format_card_exfat:
+    summary: "Format the card as exFAT"
+    send: { method: GET, path: /ctrl/card, raw_query: "action=exfat" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  list_folders:
+    summary: "List the DCIM folders on the card"
+    send: { method: GET, path: /DCIM/ }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_files:
+    summary: "List the files in a DCIM folder"
+    params:
+      folder: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_]+$", required: true, label: Folder, description: "DCIM folder name, such as 100ZCAME." }
+    send: { method: GET, path: "/DCIM/{folder}/" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  delete_file:
+    summary: "Delete a file from the card"
+    params:
+      folder: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_]+$", required: true, label: Folder, description: "DCIM folder name, such as 100ZCAME." }
+      file: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_.-]+$", required: true, label: File, description: "File name in the folder, such as ZCAM0001_0000_202601011200.MOV." }
+    send: { method: GET, path: "/DCIM/{folder}/{file}", raw_query: "act=rm" }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+  get_file_info:
+    summary: "Read a clip's width, height, timescale, packet count and duration"
+    params:
+      folder: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_]+$", required: true, label: Folder, description: "DCIM folder name, such as 100ZCAME." }
+      file: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_.-]+$", required: true, label: File, description: "File name in the folder, such as ZCAM0001_0000_202601011200.MOV." }
+    send: { method: GET, path: "/DCIM/{folder}/{file}", raw_query: "act=info" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_file_created:
+    summary: "Read when a file was created (Unix time)"
+    params:
+      folder: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_]+$", required: true, label: Folder, description: "DCIM folder name, such as 100ZCAME." }
+      file: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_.-]+$", required: true, label: File, description: "File name in the folder, such as ZCAM0001_0000_202601011200.MOV." }
+    send: { method: GET, path: "/DCIM/{folder}/{file}", raw_query: "act=ct" }
+    expect: { status: 200, json_path: "$.msg" }
+    returns: value
+
+
+telemetry:
+  # The camera's websocket on port 81 is not described, so state is polled:
+  # the control session and working mode every second (the session request
+  # also keeps this client's hold on it), the settings an operator changes
+  # during a show every 2 s, and the rest every 30 s.
+  poll:
+    - every_ms: 1000
+      send:
+        - { method: GET, path: /ctrl/session }
+        - { method: GET, path: /ctrl/mode, raw_query: "action=query" }
+        - { method: GET, path: /ctrl/tc, raw_query: "action=query" }
+    - every_ms: 2000
+      send:
+        - { method: GET, path: /ctrl/get, raw_query: "k=iso" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=iris" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=ev" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=wb" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=mwb" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=tint" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=focus" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=lens_focus_pos" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=lens_zoom_pos" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=eND" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=lut" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=movfmt" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=send_stream" }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /info }
+        - { method: GET, path: /ctrl/nick_name }
+        - { method: GET, path: /ctrl/temperature }
+        - { method: GET, path: /ctrl/rec, raw_query: "action=remain" }
+        - { method: GET, path: /ctrl/card, raw_query: "action=present" }
+        - { method: GET, path: /ctrl/card, raw_query: "action=query_free" }
+        - { method: GET, path: /ctrl/card, raw_query: "action=query_total" }
+        - { method: GET, path: /ctrl/stream_setting, raw_query: "action=query&index=stream0" }
+        - { method: GET, path: /ctrl/stream_setting, raw_query: "action=query&index=stream1" }
+        - { method: GET, path: /ctrl/rtmp, raw_query: "action=query&index=0" }
+        - { method: GET, path: /ctrl/srt, raw_query: "action=query" }
+        - { method: GET, path: /ctrl/ndi, raw_query: "action=query" }
+        - { method: GET, path: /ctrl/pt, raw_query: "action=query" }
+        - { method: GET, path: /ctrl/network, raw_query: "action=info" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=af_mode" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=af_area" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=af_speed" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=caf" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=caf_sens" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=live_caf" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=af_adjust_with_ptz" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=mf_mag" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=mf_recording" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=mf_drive" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=lens_zoom" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=zoom_mode" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=lens_focal_length" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=flicker" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=meter_mode" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=min_iso" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=max_iso" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=iso_ctrl" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=shutter_angle_ctrl" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=sht_operation" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=ae_speed" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=lock_ae_in_rec" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=bl_comp" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=mwb_r" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=mwb_g" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=mwb_b" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=mwb_r_offset" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=mwb_g_offset" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=mwb_b_offset" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=wb_priority" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=lock_awb_in_rec" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=noise_reduction" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=luma_level" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=brightness" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=contrast" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=sharpness" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=saturation" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=hue" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=movvfr" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=video_system" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=resolution" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=project_fps" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=vfr_ctrl" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=record_file_format" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=rotation" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=split_duration" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=rec_fps" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=raw_over_hdmi" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=rec_frame_indicator" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=preroll" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=preroll_duration" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=record_meta" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=camera_id" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=reelname" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=video_encoder" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=bitrate_level" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=compose_mode" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=photo_q" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=eis_on_off" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=vid_rot" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=record_mode" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=video_tl_interval" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=low_jello" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=primary_audio" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=audio_channel" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=audio_phantom_power" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=audio_level_display" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=ain_gain_type" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=audio_input_level" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=audio_input_gain" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=audio_in_l_gain" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=audio_in_r_gain" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=audio_output_gain" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=audio_noise_reduction" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=stream_resolution" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=stream_fps" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=stream_video_encoder" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=stream_param_save" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=assitool_display" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=assitool_scope" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=assitool_peak_onoff" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=assitool_peak_color" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=assitool_frame_line" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=assitool_frame_line_color" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=assitool_frame_line_opacity" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=assitool_center_mark" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=assitool_center_mark_color" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=assitool_exposure" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=assitool_zera_th1" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=assitool_zera_th2" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=assitool_grid_line" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=assitool_safe_area" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=hdmi_focus_area" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=tc_source" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=tc_count_up" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=tc_hdmi_dispaly" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=tc_drop_frame" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=union_ae" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=union_awb" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=ezlink_mode" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=ezlink_trigger" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=genlock" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=genlock_coarse" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=genlock_fine" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=ptz_limit" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=pt_speedmode" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=pt_speed_with_zoom_pos" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=ptz_flip" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=pt_priv_mode" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=pt_pwr_pos" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=ptz_common_speed" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=ptz_common_time" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=ptz_preset_mode" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=ptz_speed_mode" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=freeze_during_preset" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=ptz_common_speed_unit" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=tally_on" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=color_bar_enable" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=led" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=desqueeze" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=auto_off" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=auto_standby" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=visca_id" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=visca_baudrate" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=visca_enable" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=https_on" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=https_auth" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=https_cert_source" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=sn" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=usb_device_role" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=ir" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=ir_id" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=sdi" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=3g_sdi_mode" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=hdmi_format" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=hdmi_osd" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=osd_layout" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=eth_mode" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=wifi" }
+        - { method: GET, path: /ctrl/get, raw_query: "k=wifi_channel" }
+  updates:
+    # /ctrl/get?k=<key>: every setting the same way (type 1 choice, 2 range,
+    # 3 string).
+    - path: '^/ctrl/get\?k=([A-Za-z0-9_]+)$'
+      json_match: { "$.code": "^0$" }
+      json: { value: "$.value", type: "$.type", ro: "$.ro", opts: "$.opts", min: "$.min", max: "$.max", step: "$.step" }
+      state:
+        "settings.{1}.value": "{value}"
+        "settings.{1}.kind": { value: "{type}", map: { "1": choice, "2": range, "3": string } }
+        "settings.{1}.read_only": { value: "{ro}", map: { "0": false, "1": true } }
+        "settings.{1}.options": "{opts}"
+        "settings.{1}.min": "{min}"
+        "settings.{1}.max": "{max}"
+        "settings.{1}.step": "{step}"
+    - path: '^/ctrl/get\?k=([A-Za-z0-9_]+)$'
+      json_match: { "$.code": "^-1$" }
+      json: {}
+      state: { "settings.{1}.supported": "false" }
+    - path: '^/ctrl/get\?k=([A-Za-z0-9_]+)$'
+      json_match: { "$.code": "^0$" }
+      json: {}
+      state: { "settings.{1}.supported": "true" }
+    # /info
+    - path: '^/info$'
+      json: { model: "$.model", sw: "$.sw", mac: "$.mac", ip: "$.eth_ip", sn: "$.sn" }
+      state: { info.model: "{model}", info.firmware: "{sw}", info.mac: "{mac}", info.ip: "{ip}", info.serial: "{sn}" }
+    # Answers of the basic shape {code, desc, msg}.
+    - path: '^/ctrl/mode\?action=query$'
+      json_match: { "$.code": "^0$" }
+      json: { msg: "$.msg" }
+      state: { mode: "{msg}" }
+    - path: '^/ctrl/rec\?action=remain$'
+      json_match: { "$.code": "^0$" }
+      json: { msg: "$.msg" }
+      state: { recording.remaining_minutes: "{msg}" }
+    - path: '^/ctrl/card\?action=present$'
+      json: { all: "$" }
+      state: { card.present: "{all}" }
+    - path: '^/ctrl/card\?action=query_free$'
+      json_match: { "$.code": "^0$" }
+      json: { msg: "$.msg" }
+      state: { card.free: "{msg}" }
+    - path: '^/ctrl/card\?action=query_total$'
+      json_match: { "$.code": "^0$" }
+      json: { msg: "$.msg" }
+      state: { card.total: "{msg}" }
+    # Answers whose fields the document does not list: kept whole, as JSON text.
+    - path: '^/ctrl/tc\?action=query$'
+      json: { all: "$" }
+      state: { timecode: "{all}" }
+    - path: '^/ctrl/nick_name$'
+      json: { all: "$" }
+      state: { nick_name: "{all}" }
+    - path: '^/ctrl/temperature$'
+      json: { all: "$" }
+      state: { temperature: "{all}" }
+    - path: '^/ctrl/stream_setting\?action=query&index=(stream[01])$'
+      json: { all: "$" }
+      state: { "streams.{1}": "{all}" }
+    - path: '^/ctrl/rtmp\?action=query&index=(\d+)$'
+      json: { all: "$" }
+      state: { "rtmp.{1}": "{all}" }
+    - path: '^/ctrl/srt\?action=query$'
+      json: { all: "$" }
+      state: { srt: "{all}" }
+    - path: '^/ctrl/ndi\?action=query$'
+      json: { all: "$" }
+      state: { ndi: "{all}" }
+    - path: '^/ctrl/pt\?action=query$'
+      json: { all: "$" }
+      state: { pan_tilt: "{all}" }
+    - path: '^/ctrl/network\?action=info$'
+      json: { all: "$" }
+      state: { network: "{all}" }
+
+state:
+  settings.*.value: { type: string, description: "Current value of the setting with this key, as the camera reports it (a choice's text, a range's number, or a string)" }
+  settings.*.kind: { type: string, description: "Kind of setting: choice, range or string" }
+  settings.*.read_only: { type: bool, description: "The setting cannot be changed now" }
+  settings.*.options: { type: string, description: "A choice setting's valid values, as a JSON array" }
+  settings.*.min: { type: int, description: "A range setting's lowest value" }
+  settings.*.max: { type: int, description: "A range setting's highest value" }
+  settings.*.step: { type: int, description: "A range setting's step" }
+  settings.*.supported: { type: bool, description: "The camera knows the key (false when /ctrl/get answers code -1)" }
+  info.model: { type: string, description: "Camera model" }
+  info.firmware: { type: string, description: "Firmware version" }
+  info.mac: { type: string, description: "Ethernet MAC address" }
+  info.ip: { type: string, description: "Ethernet IP address" }
+  info.serial: { type: string, description: "Serial number" }
+  mode: { type: string, description: "Working mode: rec, rec_ing, rec_paused, cap, pb, pb_ing, pb_paused, cap_tl_idle, cap_tl_ing, cap_burst, cap_snap_idle, cap_snap_ing, rec_tl_idle, rec_tl_ing, standby or unknown (_ing means recording or playing)" }
+  recording.remaining_minutes: { type: int, unit: min, description: "Recording time left on the card, in minutes" }
+  card.present: { type: string, description: "The card presence query's answer, as JSON text" }
+  card.free: { type: string, description: "Free space on the card, as the camera reports it" }
+  card.total: { type: string, description: "Card capacity, as the camera reports it" }
+  timecode: { type: string, description: "The timecode query's answer, as JSON text (its fields are not documented)" }
+  nick_name: { type: string, description: "The nickname query's answer, as JSON text" }
+  temperature: { type: string, description: "The temperature query's answer, as JSON text" }
+  streams.*: { type: string, description: "The stream setting query's answer for stream0 or stream1, as JSON text" }
+  rtmp.*: { type: string, description: "The RTMP query's answer for the destination with this number, as JSON text" }
+  srt: { type: string, description: "The SRT query's answer, as JSON text" }
+  ndi: { type: string, description: "The NDI query's answer, as JSON text" }
+  pan_tilt: { type: string, description: "The pan/tilt query's answer, as JSON text" }
+  network: { type: string, description: "The network information query's answer, as JSON text" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Most /ctrl/* commands need the control session. The first /ctrl/session request occupies it,
+      and the camera answers 409 to a client while another holds it; telemetry asks for it every
+      second so this client keeps it, and quit_session gives it up. A camera held by another client
+      (its web page, another controller) refuses this one's commands until that client quits.
+  - models: [all]
+    severity: warning
+    text: >
+      The document leaves the camera's websocket (port 81) undescribed, so nothing is pushed: the
+      session, mode and timecode are read every second, the most-used settings every 2 s and every
+      other setting every 30 s. A key a model does not have answers code -1 and shows as
+      settings.<key>.supported false.
+  - models: [all]
+    severity: info
+    text: >
+      Every setting is a key of /ctrl/get and /ctrl/set. The valid values depend on the model,
+      firmware, video system and other settings, so the set commands take the value as text and the
+      camera's own list of options (settings.<key>.options) or range (min, max, step) is in state;
+      a value outside them is refused by the camera with code 1. movfmt and movvfr cannot change
+      while stream 0 runs, and a stream's size only while it is stopped.
+  - models: [all]
+    severity: info
+    text: >
+      Many answers' fields are not listed in the document (timecode, stream settings, RTMP, SRT,
+      NDI, pan/tilt, network, presets, framing, face database, temperature): their queries return
+      the answer as it is, and the polled ones are kept in state as JSON text. Parameter ranges
+      the document does not give (lens and pan/tilt speeds in api.js's fspeed, preset and trace
+      numbers, framing values) are those the camera's web controller is assumed to send.
+  - models: [all]
+    severity: info
+    text: >
+      Newer firmware has user accounts (/login) and HTTPS (https_on, https_auth); the document
+      does not describe how a client logs in, so this spec sends no credentials and reaches a
+      camera whose web access is open. Downloading clips, thumbnails, screennails, the MJPEG
+      preview and the profile export (/prf/export) returns files, which a command here cannot save.
+  - models: [all]
+    severity: critical
+    text: >
+      format_card, format_card_fat32, format_card_exfat, delete_file, clear_settings and
+      run_firmware_update cannot be undone; shutdown powers the camera off, and stop_recording and
+      a mode change end a take in progress.
+

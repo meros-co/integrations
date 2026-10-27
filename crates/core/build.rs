@@ -322,6 +322,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "yamaha-tf",
         ],
     ),
+    ("vendor-zcam", &["zcam"]),
     ("vendor-zinc", &["oscpoint"]),
 ];
 

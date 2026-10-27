@@ -3530,3 +3530,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## Integrations with no open items
 
 Nothing specific is listed for these yet, but test results are still welcome: generic-http, generic-osc, generic-tcp-udp, generic-websocket, http-listener, http-snapshot, obs-studio.
+
+## zcam — Z CAM cinema and PTZ cameras (HTTP API)
+
+- [ ] Check that GET /ctrl/session occupies the control session for this client, what it answers (status and body) when another client holds it, and how long a held session lasts without requests. ([specs/zcam.yaml:3169](specs/zcam.yaml#L3169))
+- [ ] Record what the websocket on port 81 sends (it could replace polling), and confirm /ctrl/get answers code -1 for a key the model does not have. ([specs/zcam.yaml:3176](specs/zcam.yaml#L3176))
+- [ ] Record the answers of /ctrl/tc, /ctrl/stream_setting?action=query, /ctrl/rtmp, /ctrl/srt, /ctrl/ndi, /ctrl/pt?action=query, /ctrl/network?action=info, /ctrl/card?action=present, /ctrl/preset?action=get_info and /ctrl/framing/all_status, so their fields can be read into state. ([specs/zcam.yaml:3191](specs/zcam.yaml#L3191))
+- [ ] Check the valid ranges of fspeed for /ctrl/lens zoom and focus, the pan/tilt speeds of action=pt, preset and trace numbers, and the framing fov, target_lost and placement values. ([specs/zcam.yaml:3191](specs/zcam.yaml#L3191))
+- [ ] Find out how a client logs in when the camera's user accounts or HTTPS authentication are on, and whether clip downloads need it. ([specs/zcam.yaml:3199](specs/zcam.yaml#L3199))
