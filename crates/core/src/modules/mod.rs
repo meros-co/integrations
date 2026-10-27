@@ -48,6 +48,10 @@ mod barco_projection;
 mod barco_projection_table;
 #[cfg(feature = "bss-london")]
 mod bss_london;
+#[cfg(feature = "datavideo-switcher")]
+mod datavideo_switcher;
+#[cfg(feature = "datavideo-switcher")]
+mod datavideo_switcher_table;
 #[cfg(feature = "dbaudio")]
 mod dbaudio;
 #[cfg(feature = "dhd-ecp")]
@@ -347,6 +351,10 @@ pub(crate) fn construct(
         },
         #[cfg(feature = "barco-projection-protocol")]
         "barco-projection-protocol" => Ok(Box::new(barco_projection::BarcoProjection::new(
+            context,
+        )?)),
+        #[cfg(feature = "datavideo-switcher")]
+        "datavideo-switcher" => Ok(Box::new(datavideo_switcher::DatavideoSwitcher::new(
             context,
         )?)),
         #[cfg(feature = "dhd-ecp")]
