@@ -48,6 +48,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-avstumpfl", &["avstumpfl-pixera"]),
     ("vendor-avolites", &["avolites-titan"]),
     ("vendor-avproedge", &["avproedge-matrix"]),
+    ("vendor-aximmetry", &["aximmetry"]),
     ("vendor-axis", &["axis-ptz"]),
     (
         "vendor-barco",

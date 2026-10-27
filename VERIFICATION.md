@@ -296,6 +296,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that replies to polled getters come back compact or spaced as the poll rules read them, with strings escaped as JSON. ([specs/avstumpfl-pixera.yaml:6802](specs/avstumpfl-pixera.yaml#L6802))
 - [ ] Confirm what utility_run_js_script answers for a script that throws, and whether it is subject to the allowlist. ([specs/avstumpfl-pixera.yaml:6743](specs/avstumpfl-pixera.yaml#L6743))
 
+## aximmetry — Aximmetry Composer
+
+- [ ] Record the default HTTP Control port (21463 is the documents' example) and the editions that offer HTTP Control. ([specs/aximmetry.yaml:31](specs/aximmetry.yaml#L31))
+- [ ] Check that an empty Document attribute is taken as the running compound, as the documents say of an omitted or empty one. ([specs/aximmetry.yaml:300](specs/aximmetry.yaml#L300))
+- [ ] Record the HTTP status of an error response (non-zero Code) and the error codes Aximmetry uses. ([specs/aximmetry.yaml:293](specs/aximmetry.yaml#L293))
+- [ ] Check whether XML character references (&amp;, &quot;) are decoded in attribute values, so values holding them could be sent. ([specs/aximmetry.yaml:298](specs/aximmetry.yaml#L298))
+
 ## axis-ptz — Axis PTZ cameras and video encoders (VAPIX PTZ API)
 
 - [ ] Check how ptz.cgi and ptzqueue.cgi behave for a client without the queue cookie when the control queue is on, and what queue_query answers for such a client. ([specs/axis-ptz.yaml:790](specs/axis-ptz.yaml#L790))
