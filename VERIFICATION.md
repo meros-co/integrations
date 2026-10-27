@@ -3442,6 +3442,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the dynamic element's input1 to input4 and value1 to value4 children. ([specs/vmix.yaml:5196](specs/vmix.yaml#L5196))
 - [ ] Confirm the video call attributes (callPassword, callConnected, callVideoSource, callAudioSource) and the VideoCallAudioSourceX and VideoCallSourceOutputN activators. ([specs/vmix.yaml:5141](specs/vmix.yaml#L5141))
 
+## wyrestorm-matrix — WyreStorm matrix switchers
+
+- [ ] Confirm SET CEC_PWR takes a space before the port on H2A and MXV matrices (the syntax line has none, the example one). ([specs/wyrestorm-matrix.yaml:497](specs/wyrestorm-matrix.yaml#L497))
+- [ ] Record the answer to GET MP: MP GET hdmiinN outN (syntax line) or MP hdmiinN outN (example), and hdmiout or out on H2A units. ([specs/wyrestorm-matrix.yaml:209](specs/wyrestorm-matrix.yaml#L209))
+- [ ] Record what GET MP all answers (assumed a line per output). ([specs/wyrestorm-matrix.yaml:884](specs/wyrestorm-matrix.yaml#L884))
+- [ ] Confirm the AUTOCEC_FN and AUTOCEC_D port names (out1 in the examples, hdmiout1 and hdbtout1 in the syntax lines). ([specs/wyrestorm-matrix.yaml:517](specs/wyrestorm-matrix.yaml#L517))
+- [ ] Confirm GET AUDIOMP takes the audio output alone on H2A and MXV units (its syntax line also names an input). ([specs/wyrestorm-matrix.yaml:273](specs/wyrestorm-matrix.yaml#L273))
+- [ ] Confirm HDCP_S takes in5 or 5 (syntax line and example differ) and record its answer. ([specs/wyrestorm-matrix.yaml:552](specs/wyrestorm-matrix.yaml#L552))
+- [ ] Record what a refused command or a parameter a model lacks answers, if anything (WyreStorm warns it can lock the unit up). ([specs/wyrestorm-matrix.yaml:15](specs/wyrestorm-matrix.yaml#L15))
+- [ ] Confirm the EXP-SW answers GET AUTOSW_FN, which its document lists under the heading Save a Scene. ([specs/wyrestorm-matrix.yaml:256](specs/wyrestorm-matrix.yaml#L256))
+- [ ] Record changes the matrix sends on its own after a front-panel or web UI change, if any. ([specs/wyrestorm-matrix.yaml:832](specs/wyrestorm-matrix.yaml#L832))
+
 ## yamaha-cl-ql — Yamaha CL / QL
 
 - [ ] Confirm the command set beyond scene recall and input fader, ON and pan (get and its reply, OK/OKm acknowledgements, ERROR codes, NOTIFY set pushes, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-cl-ql.yaml:5757](specs/yamaha-cl-ql.yaml#L5757))
