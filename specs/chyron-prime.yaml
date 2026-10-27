@@ -1,0 +1,795 @@
+spec: 1
+id: chyron-prime
+name: Chyron PRIME (Intelligent Interface)
+vendor: Chyron
+category: other
+
+# Chyron PRIME takes automation over Intelligent Interface: lines of
+# backslash-separated fields ending in two backslashes and CR LF, such as
+# P\LOAD\1\1000\\, on a TCP port the operator sets in PRIME's Automation
+# Settings (PRIME listens; there is no default port) or on a COM port. PRIME
+# answers each command at once with * (or a custom response), an error code of
+# eight hexadecimal digits, or, for a query, the result after *. Templates
+# write a backslash before a value as \\ (SPEC.md §4).
+
+source:
+  - title: Chyron PRIME Automation P Commands User Guide, version 5.1 (March 2025)
+    author: Chyron
+    url: https://help.chyron.com/hc/en-us/article_attachments/36234197917844
+    note: >
+      Manufacturer document (Chyron help centre). Syntax
+      P\<COMMAND>:<Buffer>\<Channel>:<Layer>\<SceneName>\<NameValuePairs>\\<CR><LF>;
+      Buffer 0/Preview, 1/Program, * or left out for both; Channel from 1;
+      Layer expressions >3, >=3, <=3, <3, 4, 1-3, 1,3,4, *; scene names or
+      absolute paths with forward slashes and no colon; name/value pairs
+      separated by backslashes. Default commands LOAD, PLAY, PLAY_LAYER,
+      PLAY_ACTION, PLAY_ALL, TRANSFER, TRANSFER_LAYER, UPDATE, CLEAR,
+      CLEAR_ALL, COMMAND, SCENE_PARAMETER, PROJECT_PARAMETER, CHANGE_PROJECT,
+      SET_PROJECT, APPLICATION_PARAMETER, SEQUENCE; query commands
+      PROJECT_LIST, SCENE_LIST, ACTION_LIST, CLIP_LIST, LIST_ASSETS,
+      CLIP_RECORD, SCENE_EXISTS, FILE_EXISTS, SCENE_STATE, VALIDATE_ASSETS and
+      CO with their replies; responses (* on success, immediately by default)
+      and error codes 000040B3, 00004190, 00004191, 00004192.
+  - title: Chyron PRIME Automation User Guide, version 5.1 (March 2025), Intelligent Interface
+    author: Chyron
+    url: https://help.chyron.com/hc/en-us/article_attachments/36234219779092
+    note: >
+      Manufacturer document. Intelligent Interface connections over TCP/IP
+      (default) or serial, ISO-8859-1 text by default and a matching encoding
+      required; the default heartbeat (two backslashes and CR LF); the rule
+      engine and its Respond behaviour; the clip player P commands
+      (CLEAR_CLIPS, LOAD_CLIP, PLAY_CLIP, PAUSE_CLIP, RESUME_CLIP, STOP_CLIP);
+      the deprecated P\AC, P\SP and P\PP; the B command set (AN, AV, QS, QL,
+      TH, SL, SA, SX, MX, CO, CS, SI, QE) with QS states Closed, Loaded,
+      Playing, Stopped and NonExistent; the W message command; the
+      deprecated M, U, V\5\13, V\5\3 and V\6; the error codes, including the
+      B commands' 000041D4 and 00005501 to 00005507.
+  - title: Chyron PRIME device setup sheet (Ross Video Caprica)
+    author: Ross Video
+    url: https://documentation.rossvideo.com/files/Manuals/Automation%20&%20Control/Caprica/Device%20Setup%20Sheets/Character%20Generator/Chyron%20PRIME.pdf
+    note: >
+      A controller's setup sheet, read for the connection only: PRIME's
+      Intelligent Interface connection set to TCP on a port the operator
+      chooses, the controller connecting to it as a client.
+
+transport:
+  type: line-tcp
+  port: null
+  framing: terminated
+  terminator: crlf
+  encoding: utf-8
+  timeout_ms: 5000
+  # Replies are *, *<result> or an eight-digit hexadecimal error code;
+  # anything else (an External Update X command) is not a reply.
+  reply_match: '^(\*|[0-9A-Fa-f]{8}(\\|$))'
+  probe: 'P\PROJECT_LIST\\'
+  serial:
+    baud_rate: { default: 9600, values: [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200] }
+    data_bits: { default: 8, values: [7, 8] }
+    parity: { default: none, values: [none, odd, even] }
+    stop_bits: { default: 1, values: [1, 2] }
+    flow_control: none
+
+ports:
+  - { port: null, protocol: tcp, role: control, when: "link tcp",
+      note: "The Intelligent Interface connection's TCP port, set in PRIME's Automation Settings; PRIME has no default" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial",
+      note: "A COM port of the PRIME computer, set to the same line settings" }
+
+models:
+  - id: prime
+    name: Chyron PRIME (Graphics Platform, PRIME CG) 4.x and 5.x
+    supports: [load, load_with_data, load_on_layer, load_on_layer_with_data, play, play_with_data,
+               play_on_layer, play_on_layer_with_data, play_layer, play_actions, play_all, play_all_scenes,
+               transfer, transfer_layer, update, clear, clear_layers, clear_all, clear_all_scenes,
+               execute_object_commands, set_scene_parameters, set_project_parameters, change_project,
+               set_channel_project, reset_channel_project, set_application_parameters, run_sequence,
+               clear_clips, load_clip, play_clip, pause_clip, resume_clip, stop_clip, get_project_list,
+               get_scene_list, get_channel_scene_list, get_action_list, get_channel_action_list, get_clip_list,
+               list_scene_assets, list_message_assets, record_clip, record_clip_frames, scene_exists,
+               scene_exists_in_project, file_exists, get_scene_state, validate_assets, capture_output,
+               list_scene_controls, get_object_value, query_scene_state, list_scenes_in_state,
+               get_scene_thumbnail, get_scene_names, get_scene_assets, get_scene_xml, get_message_xml,
+               capture_program, capture_screen, get_system_info, name_exists, save_message,
+               legacy_play_actions, legacy_set_scene_parameter, legacy_set_project_parameter,
+               legacy_change_project, legacy_update, legacy_load, legacy_load_v53, legacy_take]
+    verification: none
+
+commands:
+  # ── Scenes on output channels (P commands) ───────────────────────────────
+  load:
+    summary: Load a scene to Preview on a channel, on the scene's own layer (P\LOAD\<Channel>\<Scene>\\)
+    params:
+      channel: &channel { type: int, min: 1, max: 99, required: true, label: Channel,
+                          description: "Output channel, numbered from 1 as PRIME counts them." }
+      scene: &scene { type: string, max_length: 512, required: true, pattern: '^[^\\:]+$', label: Scene,
+                      description: "Scene name, or an absolute path written with forward slashes and no drive colon (I/Prime/Project 1/Scenes/1000.pbx)." }
+    send: 'P\LOAD\\{channel}\\{scene}\\'
+    expect: &ok { matches: '^\*' }
+    returns: ack
+  load_with_data:
+    summary: Load a scene to Preview and update objects in it (P\LOAD\<Channel>\<Scene>\<Name>\<Value>...\\)
+    params:
+      channel: *channel
+      scene: *scene
+      data: &data { type: string, max_length: 65536, required: true, pattern: '^.+$', label: Data,
+                    description: "Name and value pairs separated by backslashes, Name 1\\Value 1\\Name 2\\Value 2: automation ids, control panel names or object names." }
+    send: 'P\LOAD\\{channel}\\{scene}\\{data}\\'
+    expect: *ok
+    returns: ack
+  load_on_layer:
+    summary: Load a scene to Preview on a channel, overriding its layer (P\LOAD\<Channel>:<Layer>\<Scene>\\)
+    params:
+      channel: *channel
+      layer: &layer_number { type: int, min: 1, max: 999, required: true, label: Layer,
+                             description: "Layer the scene goes on, overriding the layer set in the scene." }
+      scene: *scene
+    send: 'P\LOAD\\{channel}:{layer}\\{scene}\\'
+    expect: *ok
+    returns: ack
+  load_on_layer_with_data:
+    summary: Load a scene to Preview on a layer and update objects in it (P\LOAD\<Channel>:<Layer>\<Scene>\<pairs>\\)
+    params:
+      channel: *channel
+      layer: *layer_number
+      scene: *scene
+      data: *data
+    send: 'P\LOAD\\{channel}:{layer}\\{scene}\\{data}\\'
+    expect: *ok
+    returns: ack
+  play:
+    summary: >
+      Play a scene to Program on a channel: the instance in Preview, or from
+      disk; * plays every scene loaded on the channel (P\PLAY\<Channel>\<Scene>\\)
+    params:
+      channel: *channel
+      scene: &scene_or_all { type: string, max_length: 512, required: true, pattern: '^[^\\:]+$', label: Scene,
+                             description: "Scene name, an absolute path with forward slashes and no drive colon, or * for every scene loaded." }
+    send: 'P\PLAY\\{channel}\\{scene}\\'
+    expect: *ok
+    returns: ack
+  play_with_data:
+    summary: Play a scene to Program and update objects in it (P\PLAY\<Channel>\<Scene>\<pairs>\\)
+    params:
+      channel: *channel
+      scene: *scene_or_all
+      data: *data
+    send: 'P\PLAY\\{channel}\\{scene}\\{data}\\'
+    expect: *ok
+    returns: ack
+  play_on_layer:
+    summary: Play a scene to Program on a channel, overriding its layer (P\PLAY\<Channel>:<Layer>\<Scene>\\)
+    params:
+      channel: *channel
+      layer: *layer_number
+      scene: *scene_or_all
+    send: 'P\PLAY\\{channel}:{layer}\\{scene}\\'
+    expect: *ok
+    returns: ack
+  play_on_layer_with_data:
+    summary: Play a scene to Program on a layer and update objects in it (P\PLAY\<Channel>:<Layer>\<Scene>\<pairs>\\)
+    params:
+      channel: *channel
+      layer: *layer_number
+      scene: *scene_or_all
+      data: *data
+    send: 'P\PLAY\\{channel}:{layer}\\{scene}\\{data}\\'
+    expect: *ok
+    returns: ack
+  play_layer:
+    summary: Play every scene loaded on the layers of a channel (P\PLAY_LAYER\<Channel>:<Layer>\\)
+    params:
+      channel: *channel
+      layer: &layers { type: string, max_length: 64, required: true, pattern: '^(\*|[<>]=?[0-9]+|[0-9]+(-[0-9]+)?(,[0-9]+)*)$',
+                       label: Layers,
+                       description: "Layer expression: 4, 1-3, 1,3,4, >3, >=3, <3, <=3, or * for every layer." }
+    send: 'P\PLAY_LAYER\\{channel}:{layer}\\'
+    expect: *ok
+    returns: ack
+  play_actions:
+    summary: >
+      Play one or more actions of a scene, limited to a buffer and layers
+      (P\PLAY_ACTION:<Buffer>\<Channel>:<Layer>\<Scene>\<Action>...\\)
+    params:
+      buffer: &buffer { type: enum, values: [Preview, Program, "*"], default: "*", label: Buffer,
+                        description: "Preview, Program, or * for both." }
+      channel: *channel
+      layer: &layers_all { type: string, max_length: 64, default: "*", pattern: '^(\*|[<>]=?[0-9]+|[0-9]+(-[0-9]+)?(,[0-9]+)*)$',
+                           label: Layers,
+                           description: "Layer expression limiting the scenes affected: 4, 1-3, 1,3,4, >3, >=3, <3, <=3, or * for every layer." }
+      scene: *scene_or_all
+      actions: &names { type: string, max_length: 65536, required: true, pattern: '^.+$', label: Actions,
+                        description: "Action names separated by backslashes, Action 1\\Action 2." }
+    send: 'P\PLAY_ACTION:{buffer}\\{channel}:{layer}\\{scene}\\{actions}\\'
+    expect: *ok
+    returns: ack
+  play_all:
+    summary: Play every scene loaded in Preview on a channel, or on every channel with * (P\PLAY_ALL\<Channel>:<Layer>\\)
+    params:
+      channel: &channel_or_all { type: string, max_length: 3, required: true, pattern: '^(\*|[1-9][0-9]?)$', label: Channel,
+                                 description: "Output channel from 1, or * for every channel." }
+      layer: *layers_all
+    send: 'P\PLAY_ALL\\{channel}:{layer}\\'
+    expect: *ok
+    returns: ack
+  play_all_scenes:
+    summary: >
+      Play several scenes, at once when all are loaded (per channel)
+      (P\PLAY_ALL\<Channel>:<Layer>\<Scene>\<Scene>...\\)
+    params:
+      channel: *channel_or_all
+      layer: *layers_all
+      scenes: &scenes { type: string, max_length: 65536, required: true, pattern: '^[^:]+$', label: Scenes,
+                        description: "Scene names separated by backslashes, 1000\\1002\\1003." }
+    send: 'P\PLAY_ALL\\{channel}:{layer}\\{scenes}\\'
+    expect: *ok
+    returns: ack
+  transfer:
+    summary: Take a playing scene off Program back to Preview; * for every playing scene (P\TRANSFER\<Channel>:<Layer>\<Scene>\\)
+    params:
+      channel: *channel
+      layer: *layers_all
+      scene: *scene_or_all
+    send: 'P\TRANSFER\\{channel}:{layer}\\{scene}\\'
+    expect: *ok
+    returns: ack
+  transfer_layer:
+    summary: Take every scene playing on the layers of a channel back to Preview (P\TRANSFER_LAYER\<Channel>:<Layer>\\)
+    params:
+      channel: *channel
+      layer: *layers
+    send: 'P\TRANSFER_LAYER\\{channel}:{layer}\\'
+    expect: *ok
+    returns: ack
+  update:
+    summary: >
+      Update objects in scenes on a channel, limited to a buffer and layers; *
+      updates every scene (P\UPDATE:<Buffer>\<Channel>:<Layer>\<Scene>\<pairs>\\)
+    params:
+      buffer: *buffer
+      channel: *channel
+      layer: *layers_all
+      scene: *scene_or_all
+      data: *data
+    send: 'P\UPDATE:{buffer}\\{channel}:{layer}\\{scene}\\{data}\\'
+    expect: *ok
+    returns: ack
+  clear:
+    summary: Clear a scene, or every scene with *, from a buffer and layers of a channel (P\CLEAR:<Buffer>\<Channel>:<Layer>\<Scene>\\)
+    params:
+      buffer: *buffer
+      channel: *channel
+      layer: *layers_all
+      scene: *scene_or_all
+    send: 'P\CLEAR:{buffer}\\{channel}:{layer}\\{scene}\\'
+    expect: *ok
+    returns: ack
+  clear_layers:
+    summary: Clear every scene from a buffer and layers of a channel (P\CLEAR:<Buffer>\<Channel>:<Layer>\\)
+    params:
+      buffer: *buffer
+      channel: *channel
+      layer: *layers
+    send: 'P\CLEAR:{buffer}\\{channel}:{layer}\\'
+    expect: *ok
+    returns: ack
+  clear_all:
+    summary: Clear every scene from a buffer of a channel, or of every channel with * (P\CLEAR_ALL:<Buffer>\<Channel>:<Layer>\\)
+    params:
+      buffer: *buffer
+      channel: *channel_or_all
+      layer: *layers_all
+    send: 'P\CLEAR_ALL:{buffer}\\{channel}:{layer}\\'
+    expect: *ok
+    returns: ack
+  clear_all_scenes:
+    summary: Clear the scenes named from a channel, or every channel with * (P\CLEAR_ALL:<Buffer>\<Channel>:<Layer>\<Scene>...\\)
+    params:
+      buffer: *buffer
+      channel: *channel_or_all
+      layer: *layers_all
+      scenes: *scenes
+    send: 'P\CLEAR_ALL:{buffer}\\{channel}:{layer}\\{scenes}\\'
+    expect: *ok
+    returns: ack
+  execute_object_commands:
+    summary: >
+      Run object commands in a scene, such as Data1.MoveNext or Crawl1.Restart
+      (P\COMMAND:<Buffer>\<Channel>:<Layer>\<Scene>\<Object.Command>...\\)
+    params:
+      buffer: *buffer
+      channel: *channel
+      layer: *layers_all
+      scene: *scene_or_all
+      commands: { type: string, max_length: 65536, required: true, pattern: '^[^\\.]+\.[^\\]+(\\[^\\.]+\.[^\\]+)*$',
+                  label: Object commands,
+                  description: "ObjectName.CommandName entries separated by backslashes, Data1.Home\\Data1.MoveNext." }
+    send: 'P\COMMAND:{buffer}\\{channel}:{layer}\\{scene}\\{commands}\\'
+    expect: *ok
+    returns: ack
+  set_scene_parameters:
+    summary: >
+      Set parameters of a loaded or playing scene instance, lost when it is
+      cleared (P\SCENE_PARAMETER:<Buffer>\<Channel>:<Layer>\<Scene>\<pairs>\\)
+    params:
+      buffer: *buffer
+      channel: *channel
+      layer: *layers_all
+      scene: *scene_or_all
+      data: *data
+    send: 'P\SCENE_PARAMETER:{buffer}\\{channel}:{layer}\\{scene}\\{data}\\'
+    expect: *ok
+    returns: ack
+  set_project_parameters:
+    summary: Set parameters of the project selected in PRIME, saved with it; unknown names are created (P\PROJECT_PARAMETER\<pairs>\\)
+    params:
+      data: *data
+    send: 'P\PROJECT_PARAMETER\\{data}\\'
+    expect: *ok
+    returns: ack
+  change_project:
+    summary: Change PRIME's current project, by name or absolute path (P\CHANGE_PROJECT\<Project>\\)
+    params:
+      project: &project { type: string, max_length: 512, required: true, pattern: '^[^\\:]+$', label: Project,
+                          description: "Name of a project PRIME has opened before, or its directory written with forward slashes and no drive colon." }
+    send: 'P\CHANGE_PROJECT\\{project}\\'
+    expect: *ok
+    returns: ack
+  set_channel_project:
+    summary: Assign a project to a channel for automation, kept across restarts (P\SET_PROJECT\<Channel>\<Project>\\)
+    params:
+      channel: *channel
+      project: { type: string, max_length: 256, required: true, pattern: '^[^\\/:]+$', label: Project,
+                 description: "Project name; a path is not accepted." }
+    send: 'P\SET_PROJECT\\{channel}\\{project}\\'
+    expect: *ok
+    returns: ack
+  reset_channel_project:
+    summary: Return a channel to the project selected in PRIME's interface (P\SET_PROJECT\<Channel>\\)
+    params:
+      channel: *channel
+    send: 'P\SET_PROJECT\\{channel}\\'
+    expect: *ok
+    returns: ack
+  set_application_parameters:
+    summary: Set application parameters (P\APPLICATION_PARAMETER\<pairs>\\)
+    params:
+      data: *data
+    send: 'P\APPLICATION_PARAMETER\\{data}\\'
+    expect: *ok
+    returns: ack
+  run_sequence:
+    summary: Execute the current item of a scene's command sequence (P\SEQUENCE\<Channel>\<Scene>\\)
+    params:
+      channel: *channel
+      scene: *scene_or_all
+    send: 'P\SEQUENCE\\{channel}\\{scene}\\'
+    expect: *ok
+    returns: ack
+
+  # ── Clip players ────────────────────────────────────────────────────────
+  clear_clips:
+    summary: Clear the cued and playing clip of a clip player (P\CLEAR_CLIPS\<Player>\\)
+    params:
+      player: &player { type: int, min: 1, max: 99, required: true, label: Clip player,
+                        description: "Clip player number, from 1." }
+    send: 'P\CLEAR_CLIPS\\{player}\\'
+    expect: *ok
+    returns: ack
+  load_clip:
+    summary: Load a clip to a clip player (P\LOAD_CLIP\<Player>\<Clip>\\)
+    params:
+      player: *player
+      clip: &clip { type: string, max_length: 512, required: true, pattern: '^[^\\:]+$', label: Clip,
+                    description: "Clip name, or an absolute path with forward slashes and no drive colon." }
+    send: 'P\LOAD_CLIP\\{player}\\{clip}\\'
+    expect: *ok
+    returns: ack
+  play_clip:
+    summary: Play a clip on a clip player (P\PLAY_CLIP\<Player>\<Clip>\\)
+    params:
+      player: *player
+      clip: *clip
+    send: 'P\PLAY_CLIP\\{player}\\{clip}\\'
+    expect: *ok
+    returns: ack
+  pause_clip:
+    summary: Pause a playing clip (P\PAUSE_CLIP\<Player>\<Clip>\\)
+    params:
+      player: *player
+      clip: *clip
+    send: 'P\PAUSE_CLIP\\{player}\\{clip}\\'
+    expect: *ok
+    returns: ack
+  resume_clip:
+    summary: Resume a paused clip (P\RESUME_CLIP\<Player>\<Clip>\\)
+    params:
+      player: *player
+      clip: *clip
+    send: 'P\RESUME_CLIP\\{player}\\{clip}\\'
+    expect: *ok
+    returns: ack
+  stop_clip:
+    summary: Stop a playing clip (P\STOP_CLIP\<Player>\<Clip>\\)
+    params:
+      player: *player
+      clip: *clip
+    send: 'P\STOP_CLIP\\{player}\\{clip}\\'
+    expect: *ok
+    returns: ack
+
+  # ── Queries (P) ─────────────────────────────────────────────────────────
+  get_project_list:
+    summary: List the projects PRIME knows, backslash-separated (P\PROJECT_LIST\\)
+    send: 'P\PROJECT_LIST\\'
+    expect: { matches: '^\*P\\PROJECT_LIST\\(.*?)\\?\\$' }
+    returns: value
+  get_scene_list:
+    summary: List the scenes of the current project, backslash-separated (P\SCENE_LIST\\)
+    send: 'P\SCENE_LIST\\'
+    expect: &scenelist { matches: '^\*P\\ ?SCENE_LIST\\(.*?)\\?\\$' }
+    returns: value
+  get_channel_scene_list:
+    summary: List the scenes of the project assigned to a channel (P\SCENE_LIST\<Channel>\\)
+    params:
+      channel: *channel
+    send: 'P\SCENE_LIST\\{channel}\\'
+    expect: *scenelist
+    returns: value
+  get_action_list:
+    summary: List a scene's actions in the current project; the reply names the scene first (P\ACTION_LIST\<Scene>\\)
+    params:
+      scene: *scene
+    send: 'P\ACTION_LIST\\{scene}\\'
+    expect: &actionlist { matches: '^\*P\\ACTION_LIST\\(.*?)\\?\\$' }
+    returns: value
+  get_channel_action_list:
+    summary: List a scene's actions in the project assigned to a channel (P\ACTION_LIST\<Channel>\<Scene>\\)
+    params:
+      channel: *channel
+      scene: *scene
+    send: 'P\ACTION_LIST\\{channel}\\{scene}\\'
+    expect: *actionlist
+    returns: value
+  get_clip_list:
+    summary: List the clips of the current project, backslash-separated (P\CLIP_LIST\\)
+    send: 'P\CLIP_LIST\\'
+    expect: { matches: '^\*P\\ ?CLIP_LIST\\(.*?)\\?\\$' }
+    returns: value
+  list_scene_assets:
+    summary: List the current project's scenes as paths relative to its Scenes folder (P\LIST_ASSETS\Scenes\\)
+    send: 'P\LIST_ASSETS\Scenes\\'
+    expect: &assets { matches: '^\*P\\LIST_ASSETS\\(.*?)\\?\\$' }
+    returns: value
+  list_message_assets:
+    summary: List the current project's messages as relative paths (P\LIST_ASSETS\Messages\\)
+    send: 'P\LIST_ASSETS\Messages\\'
+    expect: *assets
+    returns: value
+  record_clip:
+    summary: >
+      Start, stop or take a still on a clip recorder, recording until Stop
+      (P\CLIP_RECORD\<Recorder>\<Command>\<File>\<Encoding>\\)
+    params:
+      recorder: &recorder { type: int, min: 1, max: 99, required: true, label: Recorder,
+                            description: "Clip recorder number, from 1." }
+      command: &reccmd { type: enum, values: [Start, Stop, Still], required: true, label: Command,
+                         description: "Start a recording, stop it, or record a still image." }
+      file: &recfile { type: string, max_length: 512, default: "*", pattern: '^[^\\:]+$', label: File name,
+                       description: "Name of the clip or image, saved in the project's Clips folder; * for a generated name." }
+      encoding: &recenc { type: enum, values: ["*", Gtc, GtcJpeg, GtcLzo, QuicktimeRle, MotionJpeg, DnxHdHq, DnxHdSq,
+                                               DnxHdLb, DnxHrHq, DnxHrHqAlpha, DnxHrSq, DnxHrSqAlpha, DnxHrLb, DnxHrLbAlpha],
+                          default: "*", label: Encoding,
+                          description: "Clip encoding; * for the default, GtcJpeg." }
+    send: 'P\CLIP_RECORD\\{recorder}\\{command}\\{file}\\{encoding}\\'
+    expect: *ok
+    returns: ack
+  record_clip_frames:
+    summary: Record a set number of frames on a clip recorder (P\CLIP_RECORD\<Recorder>\Start\<File>\<Encoding>\<Frames>\\)
+    params:
+      recorder: *recorder
+      command: *reccmd
+      file: *recfile
+      encoding: *recenc
+      frames: { type: int, min: 1, required: true, label: Frames,
+                description: "Number of frames to record on Start." }
+    send: 'P\CLIP_RECORD\\{recorder}\\{command}\\{file}\\{encoding}\\{frames}\\'
+    expect: *ok
+    returns: ack
+  scene_exists:
+    summary: Check that a scene exists in the current project; fails with 00004190 if not (P\SCENE_EXISTS\<Scene>\\)
+    params:
+      scene: *scene
+    send: 'P\SCENE_EXISTS\\{scene}\\'
+    expect: *ok
+    returns: ack
+  scene_exists_in_project:
+    summary: Check that a scene exists in a project; fails with 00004190 if not (P\SCENE_EXISTS\<Project>\<Scene>\\)
+    params:
+      project: { type: string, max_length: 256, required: true, pattern: '^[^\\/:]+$', label: Project,
+                 description: "Project name; a path is not accepted." }
+      scene: *scene
+    send: 'P\SCENE_EXISTS\\{project}\\{scene}\\'
+    expect: *ok
+    returns: ack
+  file_exists:
+    summary: Check that a file exists on PRIME's file system; fails with 00004190 if not (P\FILE_EXISTS\<Path>\\)
+    params:
+      path: { type: string, max_length: 1024, required: true, pattern: '^[^\\]+$', label: Path,
+              description: "File path written with forward slashes." }
+    send: 'P\FILE_EXISTS\\{path}\\'
+    expect: *ok
+    returns: ack
+  get_scene_state:
+    summary: >
+      Read a scene's state on a channel: Closed, Loaded, Playing,
+      Loaded\Playing or NonExistent (P\SCENE_STATE\<Channel>\<Scene>\\)
+    params:
+      channel: *channel
+      scene: *scene
+    send: 'P\SCENE_STATE\\{channel}\\{scene}\\'
+    expect: { matches: '^\*P\\SCENE_STATE\\(.*?)\\?\\$' }
+    returns: value
+  validate_assets:
+    summary: >
+      Check that every asset a scene uses exists; * when all do, else the
+      missing paths (P\VALIDATE_ASSETS:<Buffer>\<Channel>:<Layer>\<Scene>\\)
+    params:
+      buffer: *buffer
+      channel: *channel
+      layer: *layers_all
+      scene: *scene
+    send: 'P\VALIDATE_ASSETS:{buffer}\\{channel}:{layer}\\{scene}\\'
+    expect: { matches: '^\*(.*)$' }
+    returns: value
+  capture_output:
+    summary: Save a still of a channel's Program or Preview to a file (P\CO:<Buffer>\<Channel>\<File>\\)
+    params:
+      buffer: { type: enum, values: [program, preview], default: program, label: Buffer,
+                description: "Program (sent as 0) or Preview (sent as 1), as CO numbers them." }
+      channel: *channel
+      file: { type: string, max_length: 1024, required: true, pattern: '^[^\\:]+$', label: File,
+              description: "File name, saved in the project's Captures folder, or a path with forward slashes." }
+    send: 'P\CO:{buffer:map.co_buffer}\\{channel}\\{file}\\'
+    expect: *ok
+    returns: ack
+
+  # ── B command set (queries) ─────────────────────────────────────────────
+  list_scene_controls:
+    summary: List the addressable control panel names of a scene (B\AN\<Scene>\\)
+    params:
+      scene: *scene
+    send: 'B\AN\\{scene}\\'
+    returns: text
+  get_object_value:
+    summary: Read the current value of an object in a scene (B\AV\<Scene>\<Object>\\)
+    params:
+      scene: *scene
+      object: { type: string, max_length: 256, required: true, pattern: '^[^\\]+$', label: Object,
+                description: "Object name in the scene." }
+    send: 'B\AV\\{scene}\\{object}\\'
+    returns: text
+  query_scene_state:
+    summary: Read a scene's state, Closed, Loaded, Playing, Stopped or NonExistent (B\QS\<Scene>\\)
+    params:
+      scene: *scene
+    send: 'B\QS\\{scene}\\'
+    returns: text
+  list_scenes_in_state:
+    summary: List the scenes in a state (B\QL\<State>\\)
+    params:
+      state: { type: enum, values: [Closed, Loaded, Playing, Stopped], required: true, label: State,
+               description: "Scene state to list." }
+    send: 'B\QL\\{state}\\'
+    returns: text
+  get_scene_thumbnail:
+    summary: Read a scene's thumbnail as base64 text (B\TH\<Scene>\\)
+    params:
+      scene: *scene
+    send: 'B\TH\\{scene}\\'
+    returns: text
+  get_scene_names:
+    summary: List the scene names of the current project (B\SL\\)
+    send: 'B\SL\\'
+    returns: text
+  get_scene_assets:
+    summary: List the assets a scene uses (B\SA\<Scene>\\)
+    params:
+      scene: *scene
+    send: 'B\SA\\{scene}\\'
+    returns: text
+  get_scene_xml:
+    summary: Read a scene's XML (B\SX\<Scene>\\)
+    params:
+      scene: *scene
+    send: 'B\SX\\{scene}\\'
+    returns: text
+  get_message_xml:
+    summary: Read a message's XML (B\MX\<Message>\\)
+    params:
+      message: &message { type: string, max_length: 512, required: true, pattern: '^[^\\:]+$', label: Message,
+                          description: "Message name, or a path with forward slashes and no drive colon." }
+    send: 'B\MX\\{message}\\'
+    returns: text
+  capture_program:
+    summary: Save a still of the active Program channel to a folder, named by time (B\CO\<Folder>\\)
+    params:
+      folder: &folder { type: string, max_length: 1024, required: true, pattern: '^[^\\]+$', label: Folder,
+                        description: "Folder on the PRIME computer, written with forward slashes." }
+    send: 'B\CO\\{folder}\\'
+    returns: text
+  capture_screen:
+    summary: Save a capture of the PRIME computer's screen to a folder, named by time (B\CS\<Folder>\\)
+    params:
+      folder: *folder
+    send: 'B\CS\\{folder}\\'
+    returns: text
+  get_system_info:
+    summary: Read PRIME's system diagnostic information (B\SI\\)
+    send: 'B\SI\\'
+    returns: text
+  name_exists:
+    summary: Check whether a scene or message exists (B\QE\<Name>\\)
+    params:
+      name: { type: string, max_length: 512, required: true, pattern: '^[^\\:]+$', label: Name,
+              description: "Scene or message name." }
+    send: 'B\QE\\{name}\\'
+    returns: text
+
+  # ── Messages ────────────────────────────────────────────────────────────
+  save_message:
+    summary: >
+      Create or update a template data message from a scene or another
+      message with values for its replaceables (W\<Message>\<Base>\<Values>\\)
+    params:
+      message: *message
+      base: { type: string, max_length: 512, required: true, pattern: '^[^\\:]+$', label: Base,
+              description: "Scene, or existing message, the message is built on." }
+      values: { type: string, max_length: 65536, required: true, pattern: '^.+$', label: Values,
+                description: "Values for the replaceables in automation id order, separated by backslashes." }
+    send: 'W\\{message}\\{base}\\{values}\\'
+    expect: *ok
+    returns: ack
+
+  # ── Deprecated command set (Lyric-era) ──────────────────────────────────
+  legacy_play_actions:
+    summary: Play actions of a scene on Program of the active channel (deprecated P\AC\<Scene>\<Actions>\\)
+    params:
+      scene: *scene
+      actions: *names
+    send: 'P\AC\\{scene}\\{actions}\\'
+    expect: *ok
+    returns: ack
+  legacy_set_scene_parameter:
+    summary: Set a scene parameter (deprecated P\SP\<Scene>\<Name>:<Value>\\)
+    params:
+      scene: *scene
+      name: &pname { type: string, max_length: 256, required: true, pattern: '^[^\\:]+$', label: Parameter,
+                     description: "Parameter name." }
+      value: &pvalue { type: string, max_length: 4096, default: "", pattern: '^[^\\]*$', label: Value,
+                       description: "Parameter value." }
+    send: 'P\SP\\{scene}\\{name}:{value}\\'
+    expect: *ok
+    returns: ack
+  legacy_set_project_parameter:
+    summary: Set a project parameter (P\PP\<Name>:<Value>\\)
+    params:
+      name: *pname
+      value: *pvalue
+    send: 'P\PP\\{name}:{value}\\'
+    expect: *ok
+    returns: ack
+  legacy_change_project:
+    summary: Change the current project (deprecated M\<Project>\\)
+    params:
+      project: *project
+    send: 'M\\{project}\\'
+    expect: *ok
+    returns: ack
+  legacy_update:
+    summary: Update an object of a scene by automation id (deprecated U\<Scene>\<Automation id>\<Value>\\)
+    params:
+      scene: *scene
+      id: { type: int, min: 0, required: true, label: Automation id,
+            description: "Automation id of the object in the scene." }
+      value: { type: string, max_length: 4096, required: true, pattern: '^[^\\]*$', label: Value,
+               description: "New value of the object." }
+    send: 'U\\{scene}\\{id}\\{value}\\'
+    expect: *ok
+    returns: ack
+  legacy_load:
+    summary: >
+      Load a scene to Preview with values in automation id order, as Channel
+      Box did (deprecated V\5\13\1\<Channel>\<Scene>\_\<Values>\\)
+    params:
+      channel: *channel
+      scene: *scene
+      values: { type: string, max_length: 65536, required: true, pattern: '^.+$', label: Values,
+                description: "Values in automation id order, separated by backslashes." }
+    send: 'V\5\13\1\\{channel}\\{scene}\_\\{values}\\'
+    expect: *ok
+    returns: ack
+  legacy_load_v53:
+    summary: Load a scene to Preview (deprecated V\5\3\1\<Channel>\<Scene>\_\\)
+    params:
+      channel: *channel
+      scene: *scene
+    send: 'V\5\3\1\\{channel}\\{scene}\_\\'
+    expect: *ok
+    returns: ack
+  legacy_take:
+    summary: Take the scene in Preview to Program, or play to the active channel (deprecated V\6\<Channel>\\)
+    params:
+      channel: *channel
+    send: 'V\6\\{channel}\\'
+    expect: *ok
+    returns: ack
+maps:
+  co_buffer: { program: "0", preview: "1" }
+
+telemetry:
+  poll:
+    every_ms: 30000
+    send: ['P\PROJECT_LIST\\', 'P\SCENE_LIST\\', 'P\CLIP_LIST\\']
+  updates:
+    - match: '^\*P\\PROJECT_LIST\\'
+      match_each: '([^\\]+)\\'
+      replace: projects
+      state: { "projects.{1:key}": "true" }
+    - match: '^\*P\\ ?SCENE_LIST\\'
+      request_match: '^P\\SCENE_LIST\\\\$'
+      match_each: '([^\\]+)\\'
+      replace: scenes
+      state: { "scenes.{1:key}": "true" }
+    - match: '^\*P\\ ?CLIP_LIST\\'
+      match_each: '([^\\]+)\\'
+      replace: clips
+      state: { "clips.{1:key}": "true" }
+
+state:
+  projects.*: { type: bool, description: "Each project PRIME knows (opened at least once), keyed by name; always true" }
+  scenes.*: { type: bool, description: "Each scene of the current project, keyed by name; always true" }
+  clips.*: { type: bool, description: "Each clip of the current project, keyed by name; always true" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      PRIME listens on the TCP port the operator gives its Intelligent
+      Interface connection; there is no default, so the port is given when
+      the device is opened. The connection's text encoding must match: set it
+      to UTF-8 in PRIME (the default is ISO-8859-1, which this spec does not
+      send). Over a COM port the line settings are the operator's choice too
+      and must match those given here; Chyron documents no defaults, so
+      9600 8N1 without flow control is assumed.
+  - models: [all]
+    severity: warning
+    text: >
+      PRIME answers each command at once with * by default ("Respond
+      Immediately"), before it runs: an ack means the command was accepted,
+      not that the scene played. A connection's rules can be customised to
+      answer after the behaviours, with other text, or with a custom message;
+      this spec expects the default rules and responses. Errors are 000040B3
+      (asset not found), 00004190 (invalid), 00004191 (malformed), 00004192
+      (unknown), and for B commands 000041D4 and 00005501 to 00005507.
+  - models: [all]
+    severity: info
+    text: >
+      State holds the project, scene and clip lists, read every 30 s. PRIME
+      pushes nothing over Intelligent Interface except External Update X
+      commands, whose format is not documented, and the replies to the B
+      queries are not documented either: those commands return the reply as
+      text. A scene's state on a channel is read with get_scene_state.
+  - models: [all]
+    severity: info
+    text: >
+      Values may not hold a backslash (it separates fields) or a line break.
+      Paths are written with forward slashes and without the drive colon
+      (I/Prime/Project 1/Scenes/1000.pbx). Commands with data (_with_data,
+      update) take name/value pairs already joined by backslashes.
+  - models: [all]
+    severity: critical
+    text: >
+      change_project and legacy_change_project switch the project of the
+      whole PRIME application; set_channel_project persists across restarts.
+      clear_all with channel * clears every channel.

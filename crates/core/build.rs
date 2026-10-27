@@ -95,6 +95,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &["christie-1dlp", "christie-spyder", "christie-trulife"],
     ),
     ("vendor-churchapps", &["freeshow"]),
+    ("vendor-chyron", &["chyron-prime"]),
     ("vendor-clock8001", &["clock-8001"]),
     ("vendor-cockos", &["cockos-reaper", "cockos-reaper-web"]),
     ("vendor-dahua", &["dahua-ptz"]),
