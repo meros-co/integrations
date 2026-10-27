@@ -1,0 +1,51 @@
+spec: epiphan-pearl
+telemetry: channel-layout-readback
+inbound_http:
+  path: /api/v2.0/channels?ids=1&publishers=true&encoders=true&active_layout=true
+  body: '{"status":"ok","result":[{"id":"1","name":"HDMI-A","publishers":[{"id":"0","type":"rtmp","name":"Stream
+    1"},{"id":"2","type":"srt","name":"Stream 3"}],"encoders":[{"id":"0","type":"video","name":"H.264","resolution":"1920x1080","framerate":30,"bitrate":3000},{"id":"1","type":"audio","name":"AAC","channels":2,"bitrate":128}],"active_layout":{"id":"1","name":"Default","sources":{"video":[{"id":"D2P0.hdmi-a","name":"HDMI-A"}],"audio":[{"id":"D2P0.hdmi-a-audio","name":"HDMI-A
+    Audio"}]}}}]}'
+expect_state:
+  channels:
+    '1':
+      name: HDMI-A
+      encoders:
+        '0':
+          type: video
+          name: H.264
+          resolution: 1920x1080
+          framerate: 30.0
+          bitrate: 3000
+        '1':
+          type: audio
+          name: AAC
+          channels: 2
+          bitrate: 128
+      active_layout:
+        id: '1'
+        name: Default
+        sources:
+          video:
+            '0':
+              id: D2P0.hdmi-a
+              name: HDMI-A
+          audio:
+            '0':
+              id: D2P0.hdmi-a-audio
+              name: HDMI-A Audio
+    '2':
+      name: SDI
+state_before:
+  channels:
+    '1':
+      name: HDMI-A
+      active_layout:
+        id: '2'
+        name: PiP
+    '2':
+      name: SDI
+expect_then_send:
+- method: GET
+  target: /api/v2.0/channels/1/publishers/0/settings
+- method: GET
+  target: /api/v2.0/channels/1/publishers/2/settings

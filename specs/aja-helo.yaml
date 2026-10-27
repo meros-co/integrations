@@ -1,0 +1,864 @@
+spec: 1
+id: aja-helo
+name: AJA HELO and HELO Plus streaming recorders
+vendor: AJA Video Systems
+category: recorder
+
+source:
+  - title: AJA REST API (gitlab.aja.com/pub/rest_api, master, CHANGELOG dated April 2026)
+    author: AJA Video Systems
+    url: https://gitlab.aja.com/pub/rest_api
+    note: >
+      Manufacturer-documented, Apache-2.0; www.aja.com/support/rest-api
+      redirects here, and both manuals below point to it. Chapter 3
+      (HELO/03_HELO_Commands.md): eParamID_ReplicatorCommand (0 no command,
+      1 record, 2 stop recording, 3 stream, 4 stop streaming, 5 shutdown),
+      eParamID_RecordingProfileSel and eParamID_StreamingProfileSel (0 to 9,
+      enum descriptors with no enum values), eParamID_FilenamePrefix (default
+      "clip", percent-encoded), eParamID_ReplicatorRecordState (0
+      eRRSUninitialized, 1 eRRSIdle, 2 eRRSRecording, 3 eRRSFailingInIdle, 4
+      eRRSFailingInRecord, 5 eRRSShutdown), eParamID_ReplicatorStreamState,
+      eParamID_RegisterRecall and eParamID_RegisterRecallResult (2 Complete),
+      eParamID_Authentication (0 Disabled, 1 Login) with the POST
+      /authenticator/login password_provided=... login, the session cookie and
+      the HTML 404 answer without it, eParamID_MediaState (0 Record-Stream, 1
+      Data-LAN) and the /media0/<file> clip download. Chapter 1
+      (01_Generic_AJA_REST_API_Control_Framework.md): /config with
+      action=get|set|connect|wait_for_config_events, the reply {paramid,
+      name, value, value_name}, desc.json, descriptors.html, mapped (root)
+      parameters per HELO streaming profile, and eParamID_VideoInSelect set to
+      HDMI with 1 on HELO. Chapter 2
+      (02_Using_the_REST_Interface_Developer_Page.md): /descriptors?paramid=,
+      the eParamID_VideoInSelect descriptor (0 SDI, 1 HDMI, 2 Test Pattern),
+      eParamID_StreamingVideoBitrate_1 (integer, 100 to 20000), Events,
+      presets 1 to 20 through eParamID_RegisterSave and
+      eParamID_RegisterRecall. Chapter 8 (08_Protobuf_Encoded_Parameters.md):
+      protobuf alarm parameters as base64, alarm.proto, error.proto and
+      helo_plus_datafile.proto (HELO and HELO Plus) served by the unit.
+  - title: AJA REST API HELO example scripts (gitlab.aja.com/pub/rest_api, HELO/HELO code, Apache-2.0)
+    author: AJA Video Systems
+    url: https://gitlab.aja.com/pub/rest_api/-/tree/master/HELO/HELO%20code
+    note: >
+      HELO bash: helo_get_param.sh, helo_get_recording_state.sh,
+      helo_get_streaming_state.sh (eParamID_ReplicatorStreamState 2 is
+      streaming), helo_set_recording_name.sh, the start/stop and profile
+      scripts. HELO python: helo_recall_preset.py (presets 1 to 20; waits for
+      an eParamID_RegisterRecallResult event over GET
+      /config?action=connect, which returns {"connectionid"}, and GET
+      /config?action=wait_for_config_events&connectionid=N, which returns a
+      list of events with param_id; then reads the result's text, "Complete"
+      or "Recalling", from its descriptor), helo_verify_streaming.py (the
+      stream state's text contains "Streaming"; allow about two seconds after
+      a command), helo_set_streaming_profile.py, helo_start_recording.py.
+  - title: AJA REST API Control Framework and Examples, Developer Guide v1.0 (January 29, 2021)
+    author: AJA Video Systems
+    url: https://gitlab.aja.com/pub/rest_api/-/blob/master/00_AJA_REST_API_Developer_Guide_v1.0.pdf
+    note: >
+      The PDF edition of chapters 1-3 (also aja.com support item 4184):
+      query parameters p.8-9, presets p.21-22, HELO commands p.23-34
+      (authentication p.30-32, clip download p.32-34).
+  - title: HELO H.264 Streaming and Recording Encoder Installation and Operation Guide, version 4.3 (April 8, 2022)
+    author: AJA Video Systems
+    url: https://www.aja.com/support/item-download/8677/AJA_HELO_Manual_v4.3.pdf
+    note: >
+      Models and features. REST API documentation pointer (p.8); front
+      panel Record and Stream buttons; web UI screens: Config (Video Source
+      HDMI or SDI), Recording Profiles and Streaming Profiles (10 each; the
+      file name prefix, default "clip", is a recording profile setting),
+      Data Transfer mode, twenty presets with Save, Recall, Export and Import
+      (p.50), User Authentication on the System screen. It names no
+      eParamID; it was used only to tell which documented parameters apply.
+  - title: HELO Plus H.264 Advanced Streaming and Recording Encoder Installation and Operation Guide, version 2.1r3 (January 6, 2026)
+    author: AJA Video Systems
+    url: https://www.aja.com/support/item-download/10154/AJA_HELO-Plus_Manual_v2.1r3.pdf
+    note: >
+      REST API pointer to rest.tmpl and the gitlab repository (p.11);
+      Record, Stream and Data Transfer buttons; Filename Prefix (default
+      "<serial>_Clip"); twenty presets and what they store (p.56-57); User
+      Authentication Disabled or Login (p.67); Encoder 1 and 2, Stream 1 and
+      2, Record Output and Layouts in place of HELO's ten recording and
+      streaming profiles. It names no eParamID.
+
+transport:
+  type: http
+  port: 80
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe:
+    method: GET
+    path: /config
+    query: { action: get, paramid: eParamID_ReplicatorRecordState }
+  # User Authentication set to Login (chapter 3): every request carries the
+  # session cookie from a form POST of the password. Only when the operator
+  # says the unit asks for a login. Without a session the unit answers an
+  # HTML 404, so a 404 drops the session and logs in again, once per request.
+  session:
+    when_set: user_authentication
+    login:
+      method: POST
+      path: /authenticator/login
+      body: "password_provided={settings.password:url}"
+      content_type: application/x-www-form-urlencoded
+    capture: { cookie: session }
+    relogin: { status: [404] }
+
+settings:
+  user_authentication: { type: bool, default: false, label: User authentication, description: "On when the unit's User Authentication is set to Login, so every request first logs in with the password; off when it is Disabled (the default)." }
+  password: { type: string, secret: true, default: "", label: Password, description: "The unit's web login password, used only with user authentication on." }
+
+# The event connection (chapter 1; helo_recall_preset.py): connect, then hold
+# a wait_for_config_events request open, again and again, with the returned
+# connection id. The extension runs that loop beside the commands, using the
+# requests of open_event_connection and wait_for_events below (with the
+# session cookie when user authentication is on), and offers each change to
+# the telemetry rules as "event <param_id> value=<value>" and "event
+# <param_id> value_name=<value_name>".
+extension: aja-config-events
+
+ports:
+  - { port: 80, protocol: http, role: control }
+  - { port: 80, protocol: http, role: push, note: "the event connection's long polls" }
+
+models:
+  - id: helo
+    name: AJA HELO
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors
+      - get_proto_definition
+      - open_event_connection
+      - wait_for_events
+      - start_recording
+      - stop_recording
+      - start_streaming
+      - stop_streaming
+      - shutdown
+      - get_record_state
+      - get_stream_state
+      - select_recording_profile
+      - get_recording_profile
+      - select_streaming_profile
+      - get_streaming_profile
+      - set_filename_prefix
+      - get_filename_prefix
+      - enter_data_lan_mode
+      - enter_record_stream_mode
+      - get_media_state
+      - enable_authentication
+      - disable_authentication
+      - get_authentication
+      - save_preset
+      - recall_preset
+      - get_recall_result
+      - set_video_input
+      - get_video_input
+      - set_streaming_video_bitrate_1
+      - get_streaming_video_bitrate_1
+    verification: none
+    notes: >
+      H.264 streaming and recording encoder with one SDI and one HDMI input
+      (manual v4.3). AJA's REST chapter 3 and its example scripts are written
+      for this model.
+  - id: helo-plus
+    name: AJA HELO Plus
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors
+      - get_proto_definition
+      - open_event_connection
+      - wait_for_events
+      - start_recording
+      - stop_recording
+      - start_streaming
+      - stop_streaming
+      - shutdown
+      - get_record_state
+      - get_stream_state
+      - set_filename_prefix
+      - get_filename_prefix
+      - enter_data_lan_mode
+      - enter_record_stream_mode
+      - get_media_state
+      - enable_authentication
+      - disable_authentication
+      - get_authentication
+      - save_preset
+      - recall_preset
+      - get_recall_result
+    verification: none
+    notes: >
+      Advanced encoder with two encoders, two streams, layouts and
+      picture-in-picture (manual v2.1r3). Its manual points to the same REST
+      documentation, and AJA's chapter 8 names a protobuf parameter shared by
+      HELO and HELO Plus, but chapter 3 is written for HELO: the replicator,
+      file name, media state, authentication and preset parameters are
+      offered here as on HELO, while HELO's profile selection, video source
+      and streaming bit rate parameters are not (HELO Plus has encoders,
+      streams and layouts instead, whose parameter ids AJA does not publish).
+
+commands:
+  # ── Generic parameter access (chapters 1-2) ─────────────────────────────
+  get_parameter:
+    summary: >
+      Read any parameter by id. Returns the unit's JSON reply, {paramid,
+      name, value, value_name}; ids and values are listed in the unit's
+      desc.json
+    params:
+      paramid: { type: string, pattern: "^eParamID_[A-Za-z0-9_]+$", required: true, label: Parameter ID, description: "Parameter id as listed in the unit's desc.json, such as eParamID_ReplicatorRecordState." }
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: "{paramid}" }
+    expect: { json_path: "$" }
+    returns: value
+
+  set_parameter:
+    summary: >
+      Set any parameter by id. Enum parameters take the enum's numeric value,
+      integers are base-10, strings are sent as they are, percent-encoded
+      (chapters 2-3). Returns the unit's JSON reply with the new value
+    params:
+      paramid: { type: string, pattern: "^eParamID_[A-Za-z0-9_]+$", required: true, label: Parameter ID, description: "Parameter id as listed in the unit's desc.json, such as eParamID_VideoInSelect." }
+      value: { type: string, required: true, label: Value, description: "New value as text: an enum's numeric value, a base-10 integer, or a string as it is." }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: "{paramid}", value: "{value}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_descriptor:
+    summary: Read one parameter's descriptor (type, enum values, range, persistence, menu number) as a JSON array
+    params:
+      paramid: { type: string, pattern: "^eParamID_[A-Za-z0-9_]+$", required: true, label: Parameter ID, description: "Parameter id as listed in the unit's desc.json, such as eParamID_ReplicatorCommand." }
+    send:
+      method: GET
+      path: /descriptors
+      query: { paramid: "{paramid}" }
+    expect: { json_path: "$" }
+    returns: value
+
+  get_all_descriptors:
+    summary: Read every parameter descriptor on the unit (desc.json), the list of every parameter it has
+    send: { method: GET, path: /desc.json }
+    expect: { json_path: "$" }
+    returns: value
+
+  get_proto_definition:
+    summary: >
+      Read one of the protobuf definitions the unit serves (chapter 8):
+      alarm.proto and error.proto for the alarm parameters, and
+      helo_plus_datafile.proto for the DataFile parameter
+    params:
+      file:
+        type: enum
+        values: [alarm.proto, error.proto, helo_plus_datafile.proto]
+        required: true
+        label: Definition file
+        description: "The proto file to read: alarm.proto, error.proto or helo_plus_datafile.proto."
+    send: { method: GET, path: "/{file}" }
+    expect: { status: 200 }
+    returns: text
+
+  open_event_connection:
+    summary: Open an event connection (action=connect); returns the connection id for wait_for_events
+    send:
+      method: GET
+      path: /config
+      query: { action: connect }
+    expect: { json_path: "$.connectionid" }
+    returns: value
+
+  wait_for_events:
+    summary: >
+      Wait on an event connection for parameter changes
+      (action=wait_for_config_events). The reply, returned whole, is a list
+      of events naming each changed parameter in param_id; it is held until a
+      change arrives
+    params:
+      connection: { type: int, min: 0, required: true, label: Event connection, description: "Connection id returned when the event connection was opened." }
+    send:
+      method: GET
+      path: /config
+      query: { action: wait_for_config_events, connectionid: "{connection}" }
+    expect: { json_path: "$" }
+    returns: value
+
+  # ── Recording and streaming (eParamID_ReplicatorCommand) ────────────────
+  start_recording:
+    summary: Start recording with the selected recording profile (eParamID_ReplicatorCommand 1)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_ReplicatorCommand, value: "1" }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_recording:
+    summary: Stop recording (eParamID_ReplicatorCommand 2)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_ReplicatorCommand, value: "2" }
+    expect: { status: 200 }
+    returns: ack
+
+  start_streaming:
+    summary: Start streaming with the selected streaming profile (eParamID_ReplicatorCommand 3)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_ReplicatorCommand, value: "3" }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_streaming:
+    summary: Stop streaming (eParamID_ReplicatorCommand 4)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_ReplicatorCommand, value: "4" }
+    expect: { status: 200 }
+    returns: ack
+
+  shutdown:
+    summary: >
+      Send the replicator's Shutdown command (eParamID_ReplicatorCommand 5),
+      which ends recording and streaming; see the quirk on what it shuts down
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_ReplicatorCommand, value: "5" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_record_state:
+    summary: >
+      Read the recording engine's state by name: eRRSUninitialized,
+      eRRSIdle, eRRSRecording, eRRSFailingInIdle, eRRSFailingInRecord or
+      eRRSShutdown (eParamID_ReplicatorRecordState)
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_ReplicatorRecordState }
+    expect: { json_path: "$.value_name" }
+    returns: value
+
+  get_stream_state:
+    summary: Read the streaming engine's state by name; 2 is streaming (eParamID_ReplicatorStreamState)
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_ReplicatorStreamState }
+    expect: { json_path: "$.value_name" }
+    returns: value
+
+  # ── Profiles (HELO) ─────────────────────────────────────────────────────
+  select_recording_profile:
+    summary: Select the recording profile the next recording uses (eParamID_RecordingProfileSel)
+    params:
+      profile: { type: int, min: 0, max: 9, required: true, label: Recording profile, description: "Recording profile as AJA numbers it on the wire, 0 to 9 for the ten profiles." }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_RecordingProfileSel, value: "{profile}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_recording_profile:
+    summary: Read the selected recording profile, 0 to 9 (eParamID_RecordingProfileSel)
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_RecordingProfileSel }
+    expect: { json_path: "$.value" }
+    returns: value
+
+  select_streaming_profile:
+    summary: Select the streaming profile the next stream uses (eParamID_StreamingProfileSel)
+    params:
+      profile: { type: int, min: 0, max: 9, required: true, label: Streaming profile, description: "Streaming profile as AJA numbers it on the wire, 0 to 9 for the ten profiles." }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_StreamingProfileSel, value: "{profile}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_streaming_profile:
+    summary: Read the selected streaming profile, 0 to 9 (eParamID_StreamingProfileSel)
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_StreamingProfileSel }
+    expect: { json_path: "$.value" }
+    returns: value
+
+  # ── Recording name ──────────────────────────────────────────────────────
+  set_filename_prefix:
+    summary: >
+      Set the base name of recorded files (eParamID_FilenamePrefix); spaces
+      and special or non-ASCII characters are percent-encoded
+    params:
+      prefix: { type: string, required: true, label: File name prefix, description: "Base name each recorded file starts with, such as Biology Lecture; the unit appends its segment numbering." }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_FilenamePrefix, value: "{prefix}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_filename_prefix:
+    summary: Read the base name of recorded files (eParamID_FilenamePrefix)
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_FilenamePrefix }
+    expect: { json_path: "$.value" }
+    returns: value
+
+  # ── Media state ─────────────────────────────────────────────────────────
+  enter_data_lan_mode:
+    summary: >
+      Put the unit in Data-LAN (data transfer) mode so clips can be
+      downloaded; recording and streaming are unavailable meanwhile
+      (eParamID_MediaState 1)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_MediaState, value: "1" }
+    expect: { status: 200 }
+    returns: ack
+
+  enter_record_stream_mode:
+    summary: >
+      Return the unit to Record-Stream mode (eParamID_MediaState 0); a
+      transfer in progress is aborted
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_MediaState, value: "0" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_media_state:
+    summary: Read the media state by name, Record-Stream or Data-LAN (eParamID_MediaState)
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_MediaState }
+    expect: { json_path: "$.value_name" }
+    returns: value
+
+  # ── User authentication ─────────────────────────────────────────────────
+  enable_authentication:
+    summary: >
+      Turn User Authentication on, Login (eParamID_Authentication 1); every
+      later request then needs the login, so turn the user_authentication
+      setting on with the unit's password
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_Authentication, value: "1" }
+    expect: { status: 200 }
+    returns: ack
+
+  disable_authentication:
+    summary: Turn User Authentication off, Disabled (eParamID_Authentication 0)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_Authentication, value: "0" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_authentication:
+    summary: Read User Authentication by name, Disabled or Login (eParamID_Authentication)
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_Authentication }
+    expect: { json_path: "$.value_name" }
+    returns: value
+
+  # ── Presets (chapter 2; chapter 3) ──────────────────────────────────────
+  save_preset:
+    summary: Store the active configuration in one of the twenty presets (eParamID_RegisterSave)
+    params:
+      preset: { type: int, min: 1, max: 20, required: true, label: Preset, description: "Preset to store the active configuration in, 1 to 20; it overwrites what the preset held." }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_RegisterSave, value: "{preset}" }
+    expect: { status: 200 }
+    returns: ack
+
+  recall_preset:
+    summary: >
+      Recall one of the twenty presets into the active configuration
+      (eParamID_RegisterRecall). The result, Complete when it succeeded,
+      follows as presets.recall_result (eParamID_RegisterRecallResult)
+    params:
+      preset: { type: int, min: 1, max: 20, required: true, label: Preset, description: "Preset to recall into the active configuration, 1 to 20." }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_RegisterRecall, value: "{preset}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_recall_result:
+    summary: Read the last preset recall's result by name; Complete (2) when it succeeded (eParamID_RegisterRecallResult)
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_RegisterRecallResult }
+    expect: { json_path: "$.value_name" }
+    returns: value
+
+  # ── Video source (HELO) ─────────────────────────────────────────────────
+  set_video_input:
+    summary: Select the video source that is recorded, streamed and passed through (eParamID_VideoInSelect)
+    params:
+      input:
+        type: enum
+        values: [sdi, hdmi, test_pattern]
+        required: true
+        label: Video source
+        description: "The video source: the SDI input, the HDMI input or the test pattern."
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_VideoInSelect, value: "{input:map.video_input}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_video_input:
+    summary: Read the video source by name, SDI, HDMI or Test Pattern (eParamID_VideoInSelect)
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_VideoInSelect }
+    expect: { json_path: "$.value_name" }
+    returns: value
+
+  # ── Streaming profile parameter AJA names (HELO) ────────────────────────
+  set_streaming_video_bitrate_1:
+    summary: >
+      Set the video bit rate of the first streaming profile's instance
+      (eParamID_StreamingVideoBitrate_1, 100 to 20000); see the quirk on
+      mapped parameters
+    params:
+      bitrate: { type: int, min: 100, max: 20000, required: true, label: Video bit rate, description: "Video bit rate the descriptor allows, 100 to 20000; AJA's chapter 2 gives the range but not the unit." }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_StreamingVideoBitrate_1, value: "{bitrate}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_streaming_video_bitrate_1:
+    summary: Read the video bit rate of the first streaming profile's instance (eParamID_StreamingVideoBitrate_1)
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_StreamingVideoBitrate_1 }
+    expect: { json_path: "$.value" }
+    returns: value
+
+maps:
+  video_input: { sdi: "0", hdmi: "1", test_pattern: "2" }
+
+telemetry:
+  # Changes arrive over the event connection (the aja-config-events
+  # extension) as "event <param_id> value=<value>" and "event <param_id>
+  # value_name=<name>" lines. Events carry changes only, so the record,
+  # stream and media state are read on connecting and every 30 seconds, and
+  # the configuration every two minutes: that fills state in at the start
+  # and corrects it if the unit has no event connection or changes were
+  # missed while it was reopened. Every command reply also goes through
+  # these rules, so this client's own changes appear at once.
+  poll:
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /config, query: { action: get, paramid: eParamID_ReplicatorRecordState } }
+        - { method: GET, path: /config, query: { action: get, paramid: eParamID_ReplicatorStreamState } }
+        - { method: GET, path: /config, query: { action: get, paramid: eParamID_MediaState } }
+    - every_ms: 120000
+      send:
+        - { method: GET, path: /config, query: { action: get, paramid: eParamID_FilenamePrefix } }
+        - { method: GET, path: /config, query: { action: get, paramid: eParamID_Authentication } }
+        - { method: GET, path: /config, query: { action: get, paramid: eParamID_RegisterRecallResult } }
+        - { models: [helo], method: GET, path: /config, query: { action: get, paramid: eParamID_RecordingProfileSel } }
+        - { models: [helo], method: GET, path: /config, query: { action: get, paramid: eParamID_StreamingProfileSel } }
+        - { models: [helo], method: GET, path: /config, query: { action: get, paramid: eParamID_VideoInSelect } }
+        - { models: [helo], method: GET, path: /config, query: { action: get, paramid: eParamID_StreamingVideoBitrate_1 } }
+  updates:
+    # Every get or set reply carries {paramid, name, value, value_name}.
+    - path: "^/config\\?action=(?:get|set)&paramid="
+      json: { name: "$.name", value: "$.value", value_name: "$.value_name" }
+      state:
+        "params.{name}.value": "{value}"
+        "params.{name}.value_name": "{value_name}"
+    # Events, as the aja-config-events extension offers them.
+    - match: "^event (\\w+) value=(.*)$"
+      state: { "params.{1}.value": "{2}" }
+    - match: "^event (\\w+) value_name=(.*)$"
+      state: { "params.{1}.value_name": "{2}" }
+
+    # Record and stream state.
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_ReplicatorRecordState(?:&|$)"
+      json: { code: "$.value", name: "$.value_name" }
+      state:
+        record.state_code: "{code}"
+        record.state: "{name}"
+    - match: "^event eParamID_ReplicatorRecordState value=(-?\\d+)$"
+      state: { record.state_code: "{1}" }
+    - match: "^event eParamID_ReplicatorRecordState value_name=(.+)$"
+      state: { record.state: "{1}" }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_ReplicatorStreamState(?:&|$)"
+      json: { code: "$.value", name: "$.value_name" }
+      state:
+        stream.state_code: "{code}"
+        stream.state: "{name}"
+    - match: "^event eParamID_ReplicatorStreamState value=(-?\\d+)$"
+      state: { stream.state_code: "{1}" }
+    - match: "^event eParamID_ReplicatorStreamState value_name=(.+)$"
+      state: { stream.state: "{1}" }
+    # A replicator command's reply: read both engines back.
+    - path: "^/config\\?action=set&paramid=eParamID_ReplicatorCommand&"
+      json: {}
+      then_send:
+        - { method: GET, path: /config, query: { action: get, paramid: eParamID_ReplicatorRecordState } }
+        - { method: GET, path: /config, query: { action: get, paramid: eParamID_ReplicatorStreamState } }
+
+    # Profiles, file name, media state, authentication, video source, bit rate.
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_RecordingProfileSel(?:&|$)"
+      json: { v: "$.value" }
+      state: { profiles.recording: "{v}" }
+    - match: "^event eParamID_RecordingProfileSel value=(-?\\d+)$"
+      state: { profiles.recording: "{1}" }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_StreamingProfileSel(?:&|$)"
+      json: { v: "$.value" }
+      state: { profiles.streaming: "{v}" }
+    - match: "^event eParamID_StreamingProfileSel value=(-?\\d+)$"
+      state: { profiles.streaming: "{1}" }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_FilenamePrefix(?:&|$)"
+      json: { v: "$.value" }
+      state: { record.filename_prefix: "{v}" }
+    - match: "^event eParamID_FilenamePrefix value=(.*)$"
+      state: { record.filename_prefix: "{1}" }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_MediaState(?:&|$)"
+      json: { code: "$.value", name: "$.value_name" }
+      state:
+        media.state: "{name}"
+        media.data_lan: { value: "{code}", map: { "0": false, "1": true } }
+    - match: "^event eParamID_MediaState value=(\\d+)$"
+      state:
+        media.data_lan: { value: "{1}", map: { "0": false, "1": true } }
+    - match: "^event eParamID_MediaState value_name=(.+)$"
+      state: { media.state: "{1}" }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_Authentication(?:&|$)"
+      json: { code: "$.value", name: "$.value_name" }
+      state:
+        authentication.mode: "{name}"
+        authentication.enabled: { value: "{code}", map: { "0": false, "1": true } }
+    - match: "^event eParamID_Authentication value=(\\d+)$"
+      state:
+        authentication.enabled: { value: "{1}", map: { "0": false, "1": true } }
+    - match: "^event eParamID_Authentication value_name=(.+)$"
+      state: { authentication.mode: "{1}" }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_VideoInSelect(?:&|$)"
+      json: { v: "$.value" }
+      state: { inputs.video: { value: "{v}", map: { "0": "sdi", "1": "hdmi", "2": "test_pattern" } } }
+    - match: "^event eParamID_VideoInSelect value=(-?\\d+)$"
+      state: { inputs.video: { value: "{1}", map: { "0": "sdi", "1": "hdmi", "2": "test_pattern" } } }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_StreamingVideoBitrate_1(?:&|$)"
+      json: { v: "$.value" }
+      state: { stream.profile_1_video_bitrate: "{v}" }
+    - match: "^event eParamID_StreamingVideoBitrate_1 value=(-?\\d+)$"
+      state: { stream.profile_1_video_bitrate: "{1}" }
+
+    # Presets: the preset saved or recalled, and the recall's result. A
+    # recall's reply reads the result back; a result of Complete (2) arriving
+    # as an event reads the configuration again, since the recall replaced it.
+    - path: "^/config\\?action=set&paramid=eParamID_RegisterSave&"
+      json: { v: "$.value" }
+      state: { presets.last_saved: "{v}" }
+    - match: "^event eParamID_RegisterSave value=(\\d+)$"
+      state: { presets.last_saved: "{1}" }
+    - path: "^/config\\?action=set&paramid=eParamID_RegisterRecall&"
+      json: { v: "$.value" }
+      state: { presets.last_recalled: "{v}" }
+      then_send:
+        - { method: GET, path: /config, query: { action: get, paramid: eParamID_RegisterRecallResult } }
+    - match: "^event eParamID_RegisterRecall value=(\\d+)$"
+      state: { presets.last_recalled: "{1}" }
+    - path: "^/config\\?action=get&paramid=eParamID_RegisterRecallResult$"
+      json: { code: "$.value", name: "$.value_name" }
+      state:
+        presets.recall_result_code: "{code}"
+        presets.recall_result: "{name}"
+    - match: "^event eParamID_RegisterRecallResult value_name=(.+)$"
+      state: { presets.recall_result: "{1}" }
+    - match: "^event eParamID_RegisterRecallResult value=(-?\\d+)$"
+      state: { presets.recall_result_code: "{1}" }
+    - match: "^event eParamID_RegisterRecallResult value=2$"
+      then_send:
+        - { method: GET, path: /config, query: { action: get, paramid: eParamID_FilenamePrefix } }
+        - { method: GET, path: /config, query: { action: get, paramid: eParamID_MediaState } }
+        - { models: [helo], method: GET, path: /config, query: { action: get, paramid: eParamID_RecordingProfileSel } }
+        - { models: [helo], method: GET, path: /config, query: { action: get, paramid: eParamID_StreamingProfileSel } }
+        - { models: [helo], method: GET, path: /config, query: { action: get, paramid: eParamID_VideoInSelect } }
+        - { models: [helo], method: GET, path: /config, query: { action: get, paramid: eParamID_StreamingVideoBitrate_1 } }
+
+state:
+  params.*.value: { type: string, description: "A parameter's last value read, set or pushed, keyed by its eParamID name: the enum's number, an integer, or a string (base64 for protobuf parameters)" }
+  params.*.value_name: { type: string, description: "A parameter's value as text: the enum's name, or the integer repeated; empty for strings and protobuf data" }
+  record.state: { type: string, description: "Recording engine state as the unit names it: eRRSUninitialized, eRRSIdle, eRRSRecording, eRRSFailingInIdle, eRRSFailingInRecord or eRRSShutdown (eParamID_ReplicatorRecordState)" }
+  record.state_code: { type: int, description: "eParamID_ReplicatorRecordState's number: 0 uninitialized, 1 idle, 2 recording, 3 failing in idle, 4 failing in record, 5 shut down" }
+  record.filename_prefix: { type: string, description: "Base name of recorded files (eParamID_FilenamePrefix); on HELO, the selected recording profile's" }
+  stream.state: { type: string, description: "Streaming engine state as the unit names it; its name contains Streaming while streaming (eParamID_ReplicatorStreamState)" }
+  stream.state_code: { type: int, description: "eParamID_ReplicatorStreamState's number; 2 is streaming" }
+  stream.profile_1_video_bitrate: { type: int, description: "eParamID_StreamingVideoBitrate_1, the first streaming profile's video bit rate, 100 to 20000 in the unit's own unit (HELO)" }
+  profiles.recording: { type: int, description: "Selected recording profile, 0 to 9 as on the wire (eParamID_RecordingProfileSel; HELO)" }
+  profiles.streaming: { type: int, description: "Selected streaming profile, 0 to 9 as on the wire (eParamID_StreamingProfileSel; HELO)" }
+  media.state: { type: string, description: "Media state as the unit names it: Record-Stream or Data-LAN (eParamID_MediaState)" }
+  media.data_lan: { type: bool, description: "True in Data-LAN (data transfer) mode, when clips can be downloaded and recording and streaming are unavailable" }
+  authentication.mode: { type: string, description: "User Authentication as the unit names it: Disabled or Login (eParamID_Authentication)" }
+  authentication.enabled: { type: bool, description: "True when User Authentication is Login, so every request needs the session from a password login" }
+  inputs.video: { type: string, description: "Video source recorded, streamed and passed through: sdi, hdmi or test_pattern (eParamID_VideoInSelect; HELO)" }
+  presets.last_saved: { type: int, description: "Preset, 1 to 20, most recently saved by this client or reported by the unit (eParamID_RegisterSave)" }
+  presets.last_recalled: { type: int, description: "Preset, 1 to 20, most recently recalled by this client or reported by the unit (eParamID_RegisterRecall)" }
+  presets.recall_result: { type: string, description: "The last recall's result as the unit names it, such as Recalling or Complete (eParamID_RegisterRecallResult)" }
+  presets.recall_result_code: { type: int, description: "eParamID_RegisterRecallResult's number; 2 is Complete" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      shutdown sends eParamID_ReplicatorCommand 5, "Shutdown". AJA documents
+      the value and a matching record state, eRRSShutdown, but not what it
+      shuts down (the replicator engine only, as Ki Pro's transport Shutdown
+      does, or the whole unit) nor how to bring it back; expect recording and
+      streaming to end and to need a power cycle.
+
+  - models: [all]
+    severity: critical
+    text: >
+      recall_preset replaces the active configuration at once with the
+      preset's (HELO Plus manual: all previous settings are lost unless saved
+      in another preset or an exported file), and save_preset overwrites the
+      register. Presets include streaming credentials. Network parameters
+      such as the IP address and DHCP are excluded from presets. AJA says to
+      wait a while after a recall and then read
+      eParamID_RegisterRecallResult, which is 2 (Complete) when it
+      succeeded; recall_preset returns once the request is accepted, its
+      reply reads the result at once (often still in progress), and the
+      result's change arrives over the event connection. A result of
+      Complete arriving as an event reads the profiles, file name, media
+      state and video source again.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Every action, including record, stream, shutdown and preset recall, is
+      an HTTP GET against /config with action=set. A logged, cached or
+      replayed URL repeats the action.
+
+  - models: [all]
+    severity: warning
+    text: >
+      With User Authentication set to Login, every request without the
+      session cookie is answered with an HTML 404 page. Turn the
+      user_authentication setting on with the password: the core then posts
+      password_provided=<password> to /authenticator/login, keeps the
+      session cookie it returns ({"login":"success"}), sends it with every
+      request and with the event connection, and logs in again once when a
+      request is answered 404. enable_authentication turns the unit's login
+      on without setting a password (the web UI sets it), and afterwards
+      every request fails until the setting is on; disable_authentication
+      needs the session. AJA does not document how a wrong password is
+      answered, so a failed login is not recognized as one; commands then
+      fail with the 404 above. The HELO Plus manual says a browser session
+      ends only when the browser quits; AJA documents no logout.
+
+  - models: [all]
+    severity: info
+    text: >
+      The unit pushes parameter changes over an event connection: GET
+      /config?action=connect returns {"connectionid": ...}, then GET
+      /config?action=wait_for_config_events&connectionid=<id> is held until
+      changes arrive and returns a list of events naming each parameter in
+      param_id (helo_recall_preset.py). The aja-config-events extension runs
+      this loop beside the commands, offering each change to the telemetry
+      rules, waits again as soon as each reply arrives, and opens a new
+      connection when the id has expired or a request fails (after 1 s,
+      doubling to 30 s). AJA documents the other event fields (param_type,
+      int_value, str_value) for Ki Pro, not HELO; they are read the same way.
+      Events carry changes only: the record, stream and media state are read
+      on connecting and every 30 seconds, and the configuration every two
+      minutes.
+
+  - models: [all]
+    severity: info
+    text: >
+      A replicator command is accepted at once, but the engines take a moment
+      to change state (AJA's helo_verify_streaming.py waits two seconds
+      before checking). The command's reply reads the record and stream state
+      back at once, which may still show the old state; the change follows
+      over the event connection, or at the latest the 30-second poll. AJA
+      names only some stream states: 2 is streaming, and its name contains
+      Streaming; the others are reported by name as the unit gives them.
+
+  - models: [helo]
+    severity: info
+    text: >
+      Profile selectors are enum parameters with no enum values: 0 to 9 by
+      their minimum and maximum (chapter 2), the ten profiles of the web UI.
+      Many profile settings are mapped (root) parameters: the web UI's Video
+      Bit Rate, for example, sets the instance of the selected streaming
+      profile (chapter 1). AJA names one instance,
+      eParamID_StreamingVideoBitrate_1 (integer, 100 to 20000, unit not
+      given), which this spec reads and sets as the first profile's; the
+      other instances and the profiles' other settings (including the file
+      name prefix, a recording profile setting in the manual) are reached by
+      their ids in the unit's desc.json with get_parameter and set_parameter.
+
+  - models: [all]
+    severity: info
+    text: >
+      AJA documents only the parameters above. Each unit lists every
+      parameter it has, with type, enum values, range, persistence and menu
+      number, at /desc.json and per parameter at /descriptors?paramid=; ids
+      vary by product and firmware. get_parameter and set_parameter reach any
+      of them, and every reply and event lands in params.<id>. The alarm
+      parameters (such as eParamID_Dropped_Frames_Alarm) and HELO's DataFile
+      parameter (helo_plus_datafile.proto: path and origin_filename) are
+      protobuf messages returned as base64, which the format cannot decode;
+      they are kept as text in params, and get_proto_definition reads their
+      definitions from the unit. AJA does not name the DataFile parameter's
+      id.
+
+  - models: [all]
+    severity: info
+    text: >
+      Clip download (GET /media0/<file name>, video/quicktime, with the unit
+      in Data-LAN mode) carries a whole video file to the host, which this
+      format cannot express; a transfer in progress is aborted by
+      enter_record_stream_mode. Preset export and import are file transfers
+      AJA does not document.
+
+  - models: [helo-plus]
+    severity: info
+    text: >
+      AJA's HELO chapter is written for HELO. On HELO Plus the replicator,
+      file name, media state, authentication and preset parameters are
+      assumed to be the same; its encoders, streams, layouts and video source
+      have parameter ids AJA does not publish (the unit's desc.json lists
+      them), so they are reached only with get_parameter and set_parameter.

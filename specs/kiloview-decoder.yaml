@@ -1,0 +1,2141 @@
+spec: 1
+id: kiloview-decoder
+name: Kiloview D-series decoders (D350, D260, RD-350, RD-260, FD-360)
+vendor: Kiloview
+category: other
+
+source:
+  - title: "Dxx Decoder API Documentation v2.2 (2025-06-23)"
+    author: Kiloview
+    url: "https://enstatic.kiloview.com/wp-content/uploads/2026/05/%E2%80%8CDxx-Decoder-API-Documentation-v2.2-20250623-1.pdf"
+    note: >
+      Manufacturer-documented, public; linked as the API of the D260, D350,
+      FD-360, RD-260 and RD-350 from their product pages
+      (https://www.kiloview.com/en/docs/d260-h-265-decoder/api/, /d350/api/,
+      /fd-360/api/, /rd-260/api/, /rd-350-rd-260/api/), retrieved 2026-10-23;
+      the same file is re-uploaded under several names (2026/05 -1, -2, -3 and
+      2026/09), none newer than v2.2. Used: section 1 (paths under /api, the
+      result/data/msg reply), 2-3 (the app header holding a JSON object with
+      username and token, the token from the login reply), 4 (error codes), 5
+      INFO (info/get), 6 USER (login, logout, list, add, remove, modify), 7
+      OVERLAY (list, select), 8 SOURCE (groups list, add, rename, remove;
+      streams add, modify, remove, copy, move, with the request body of every
+      protocol), 9 LAYOUT (template list, list, add, remove, select, modify,
+      save, resave, reload, rename), 10 OUTPUT (interfaces get and set, list,
+      get, source set and remove, resolution list and set, audiomix get, set,
+      remove, add, PTZ, audio sound, border, background, audio check), 11
+      NETWORK (get, set, maintenance address, HTTP ports, ping, routes), 12
+      SYSTIME (settings, time, time zone), 13 SYSTEM (reboot, reset, restore,
+      device name, ip get and replace), 14 FIRMWARE (upgrade), 15 PREVIEW
+      (get, source modify, source remove), 16 NDI-Discovery (all, sources,
+      auto, manual and server entries).
+  - title: "D350 and D260 product pages, and the D350/D260 Series Decoder User Manual V2.1 (2025-05-28)"
+    author: Kiloview
+    url: "https://www.kiloview.com/en/products/decoders/d350/"
+    note: >
+      Retrieved 2026-10-23 for the model names: D350 4K multi-functional
+      decoder, D260 HD decoder, RD-350 4K and RD-260 HD multi-functional
+      decoding cards, FD-360 4K multi-functional decoding card; the D350's
+      one 3G-SDI and two HDMI outputs, any two of which carry the two
+      outputs (https://www.kiloview.com/en/products/decoders/d260/,
+      https://enstatic.kiloview.com/wp-content/uploads/2025/08/D350-D260-Decoder-User-Manual-V2.120250528.pdf,
+      default login admin / admin).
+  - title: "HTTP API of Decoders (Device HTTP API), kiloview.com docs"
+    author: Kiloview
+    url: "https://www.kiloview.com/en/docs/device-http-api/"
+    note: >
+      Read and not used: an older API with paths ending in .json
+      (/api/info/get.json, /api/output/get.json?output=1), login by query
+      user and password, and modules this family has no trace of (sip/GB28181,
+      streamer publishing points, encode, platform, MsgCode). It names no
+      model, so it is a different family that this spec does not cover.
+
+settings:
+  scheme:
+    type: enum
+    values: [http, https]
+    default: http
+    label: Scheme
+    description: "http, or https where the decoder's HTTPS port is enabled; its certificate is not checked."
+  username:
+    type: string
+    default: admin
+    max_length: 64
+    label: User name
+    description: "The user the token belongs to, sent with it in the app header; admin by default."
+  token:
+    type: string
+    secret: true
+    default: ""
+    max_length: 256
+    label: Token
+    description: "The token the login command returns for that user; every request carries it in the app header (with an empty token until it is set, which only the login accepts)."
+
+ports:
+  - { port: 80, protocol: http, role: control, when: "scheme http" }
+  - { port: 443, protocol: https, role: control, setting: scheme, when: "scheme https" }
+
+transport:
+  type: http
+  port: 80
+  https_port: 443
+  scheme: { setting: scheme }
+  accept_invalid_certs: true
+  auth: none
+  timeout_ms: 5000
+  # Sections 2-3: every request carries the header app, a JSON object with
+  # the user name and the login's token (empty until the token setting is
+  # filled; only the login works then).
+  headers:
+    app: '{"username":{settings.username:json},"token":{settings.token:json}}'
+  probe: { method: GET, path: /api/info/get }
+
+maps:
+  dhcp: { "true": "y", "false": "n" }
+  rtmp_security: { none: "", token: "token" }
+  ndi_discovery_method: { public: "1", manual: "2", group: "3", server: "4" }
+  white_balance: { auto: ptz_white_balance_auto, indoor: ptz_white_balance_indoor, outdoor: ptz_white_balance_outdoor, oneshot: ptz_white_balance_oneshot }
+
+models:
+  - id: d350
+    name: Kiloview D350 4K multi-functional decoder
+    supports: &all
+      - login
+      - logout
+      - get_info
+      - list_users
+      - add_user
+      - remove_user
+      - change_password
+      - list_overlays
+      - select_overlay
+      - list_source_groups
+      - add_source_group
+      - rename_source_group
+      - remove_source_group
+      - add_streams
+      - add_rtsp_stream
+      - add_rtmp_stream
+      - add_plain_stream
+      - add_srt_stream
+      - add_srt_listener_stream
+      - add_rtmp_server_stream
+      - add_rtp_stream
+      - add_ndi_stream
+      - modify_stream
+      - modify_rtsp_stream
+      - modify_rtmp_stream
+      - modify_plain_stream
+      - modify_srt_stream
+      - modify_srt_listener_stream
+      - modify_rtmp_server_stream
+      - modify_rtp_stream
+      - modify_ndi_stream
+      - remove_stream
+      - copy_stream
+      - move_stream
+      - list_layout_templates
+      - list_layouts
+      - add_layout
+      - remove_layout
+      - select_layout
+      - modify_layout
+      - modify_layout_pane
+      - save_layout
+      - save_layout_as
+      - reload_layout
+      - rename_layout
+      - get_output_interfaces
+      - set_audio_interface
+      - list_outputs
+      - get_output
+      - set_window_source
+      - set_window_source_raw
+      - move_window_source
+      - clear_window
+      - list_resolutions
+      - set_resolution
+      - get_audio_mix
+      - set_audio_mix
+      - remove_audio_mix
+      - add_audio_mix
+      - ptz_zoom
+      - ptz_zoom_speed
+      - ptz_pan_tilt
+      - ptz_pan_tilt_speed
+      - ptz_store_preset
+      - ptz_recall_preset
+      - ptz_auto_focus
+      - ptz_focus
+      - ptz_focus_speed
+      - ptz_white_balance
+      - ptz_white_balance_manual
+      - ptz_exposure_auto
+      - ptz_exposure_manual
+      - ptz_is_supported
+      - get_audio_levels
+      - set_border
+      - get_border
+      - set_background
+      - get_background
+      - check_audio
+      - get_network
+      - set_network
+      - set_maintenance_address
+      - get_http_ports
+      - set_http_ports
+      - ping
+      - list_routes
+      - add_route
+      - modify_route
+      - set_route_enabled
+      - delete_route
+      - get_time_settings
+      - set_time
+      - set_timezone
+      - reboot
+      - reset
+      - restore_factory
+      - get_device_name
+      - set_device_name
+      - parse_url
+      - replace_url_address
+      - upgrade_firmware
+      - get_preview
+      - add_preview_source
+      - remove_preview_source
+      - get_ndi_discovery
+      - list_ndi_sources
+      - set_ndi_manual_discovery
+      - add_ndi_group_discovery
+      - remove_ndi_group_discovery
+      - add_ndi_discovery_server
+      - remove_ndi_discovery_server
+    verification: none
+  - id: d260
+    name: Kiloview D260 HD multi-functional decoder
+    supports: *all
+    verification: none
+  - id: rd-350
+    name: Kiloview RD-350 4K multi-functional decoding card
+    supports: *all
+    verification: none
+  - id: rd-260
+    name: Kiloview RD-260 HD multi-functional decoding card
+    supports: *all
+    verification: none
+  - id: fd-360
+    name: Kiloview FD-360 4K multi-functional decoding card
+    supports: *all
+    verification: none
+
+# Every reply is {"result":"ok"} with data, or {"result":"error","msg":code}
+# (section 1). Writes are read back by the telemetry rules' then_send on
+# their "ok" reply.
+commands:
+  # --- Users (section 6) ---
+  login:
+    summary: "Log in and return the token for the token setting (POST /api/users/login)"
+    params:
+      username: { type: string, default: admin, max_length: 64, label: User name, description: "The account to log in as; admin by default." }
+      password: { type: string, secret: true, required: true, max_length: 64, label: Password, description: "That account's password; admin until it is changed." }
+    send: { method: POST, path: /api/users/login, content_type: application/json,
+            body: '{"username":{username:json},"password":{password:json}}' }
+    expect: { status: 200, json_path: "$.data.token" }
+    returns: value
+  logout:
+    summary: "End the token setting's login (POST /api/users/logout)"
+    send: { method: POST, path: /api/users/logout, content_type: application/json, body: '{"token":{settings.token:json}}' }
+    expect: &ok { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+  list_users:
+    summary: "Accounts with id, user name, alias, role, phone and description (GET /api/users/list)"
+    send: { method: GET, path: /api/users/list }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  add_user:
+    summary: "Create an account (POST /api/users/add)"
+    params:
+      username: { type: string, required: true, max_length: 64, label: User name, description: "The new account's login name." }
+      password: { type: string, secret: true, required: true, max_length: 64, label: Password, description: "The new account's password." }
+      alias: { type: string, default: "", max_length: 64, label: Alias, description: "A display name for the account." }
+      role: { type: string, default: user, max_length: 32, label: Role, description: "The account's role, as the document's examples give them: admin or user." }
+      phone: { type: string, default: "", max_length: 32, label: Phone, description: "A contact number, or empty." }
+      description: { type: string, default: "", max_length: 256, label: Description, description: "A free-text description, or empty." }
+    send: { method: POST, path: /api/users/add, content_type: application/json,
+            body: '{"username":{username:json},"password":{password:json},"alias":{alias:json},"role":{role:json},"phone":{phone:json},"descript":{description:json}}' }
+    expect: *ok
+    returns: ack
+  remove_user:
+    summary: "Delete an account by id (POST /api/users/remove)"
+    params:
+      id: { type: int, min: 0, required: true, label: User id, description: "The account's id, as list_users gives it." }
+    send: { method: POST, path: /api/users/remove, content_type: application/json, body: '{"id":{id}}' }
+    expect: *ok
+    returns: ack
+  change_password:
+    summary: "Change an account's password (POST /api/users/modify)"
+    params:
+      username: { type: string, required: true, max_length: 64, label: User name, description: "The account whose password changes." }
+      password: { type: string, secret: true, required: true, max_length: 64, label: New password, description: "The new password; it is sent twice, as password and passwordAgain." }
+    send: { method: POST, path: /api/users/modify, content_type: application/json,
+            body: '{"username":{username:json},"password":{password:json},"passwordAgain":{password:json}}' }
+    expect: *ok
+    returns: ack
+
+  # --- Info and system (sections 5, 13, 14) ---
+  get_info:
+    summary: "Device name, firmware, hardware and software versions, serial number (GET /api/info/get)"
+    send: { method: GET, path: /api/info/get }
+    expect: &val { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+  get_device_name:
+    summary: "The device name (GET /api/sys/device/get)"
+    send: { method: GET, path: /api/sys/device/get }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.device_name" }
+    returns: value
+  set_device_name:
+    summary: "Set the device name (POST /api/sys/device/set)"
+    params:
+      name: { type: string, required: true, max_length: 64, label: Device name, description: "The name the decoder shows and announces." }
+    send: { method: POST, path: /api/sys/device/set, content_type: application/json, body: '{"device_name":{name:json}}' }
+    expect: *ok
+    returns: ack
+  reboot:
+    summary: "Restart the decoder; outputs stop until it is back (GET /api/sys/reboot)"
+    send: { method: GET, path: /api/sys/reboot }
+    expect: *ok
+    returns: ack
+  reset:
+    summary: "System reset (GET /api/sys/reset)"
+    send: { method: GET, path: /api/sys/reset }
+    expect: *ok
+    returns: ack
+  restore_factory:
+    summary: "Restore factory settings (GET /api/sys/restore)"
+    send: { method: GET, path: /api/sys/restore }
+    expect: *ok
+    returns: ack
+  parse_url:
+    summary: "The address, port and path of a stream URL, as the decoder reads it (POST /api/sys/ip/get)"
+    params:
+      url: { type: string, required: true, max_length: 1024, label: URL, description: "A stream URL such as ndi://10.20.30.21:5961." }
+    send: { method: POST, path: /api/sys/ip/get, content_type: application/json, body: '{"url":{url:json}}' }
+    expect: *val
+    returns: value
+  replace_url_address:
+    summary: "A stream URL with its address and port replaced (POST /api/sys/ip/replace)"
+    params:
+      url: { type: string, required: true, max_length: 1024, label: URL, description: "The stream URL to rewrite, such as srt://192.168.1.1:13?streamid=a." }
+      address: { type: string, required: true, max_length: 255, label: Address, description: "The address to put in the URL." }
+      port: { type: string, required: true, pattern: "^[0-9]{1,5}$", label: Port, description: "The port to put in the URL, as digits." }
+    send: { method: POST, path: /api/sys/ip/replace, content_type: application/json,
+            body: '{"url":{url:json},"target_ip":{address:json},"target_port":{port:json}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.url" }
+    returns: value
+  upgrade_firmware:
+    summary: "Upload a firmware file and upgrade; the decoder restarts (POST /api/firmware/upgrade)"
+    params:
+      file: { type: binary, required: true, label: Firmware file, description: "The firmware image for this model, such as firmware-D350-kiloview-x.xx.xxxx-yyyymmdd.bin." }
+      filename: { type: string, default: firmware.bin, max_length: 255, label: File name, description: "The file name sent with the upload." }
+    send:
+      method: POST
+      path: /api/firmware/upgrade
+      multipart:
+        - { name: upload, binary: file, filename: "{filename}", content_type: application/octet-stream }
+    expect: *ok
+    returns: ack
+
+  # --- Overlays (section 7) ---
+  list_overlays:
+    summary: "Overlay templates of an output, with the one selected (GET /api/overlay/list)"
+    params:
+      output: &output { type: int, min: 1, max: 2, required: true, label: Output, description: "The decoder output, 1 or 2." }
+    send: { method: GET, path: /api/overlay/list, query: { output_id: "{output}" } }
+    expect: *val
+    returns: value
+  select_overlay:
+    summary: "Select an overlay template on an output (POST /api/overlay/select)"
+    params:
+      output: *output
+      overlay: { type: int, min: 0, required: true, label: Overlay, description: "The template id, as list_overlays gives it." }
+    send: { method: POST, path: /api/overlay/select, content_type: application/json, body: '{"overlay_id":{overlay},"output_id":{output}}' }
+    expect: *ok
+    returns: ack
+
+  # --- Sources (section 8) ---
+  list_source_groups:
+    summary: "Source groups with their streams and each stream's status (POST /api/source/groups/list)"
+    send: { method: POST, path: /api/source/groups/list, content_type: application/json, body: '{"is_need_stream":true}' }
+    expect: *val
+    returns: value
+  add_source_group:
+    summary: "Create a source group (POST /api/source/groups/add)"
+    params:
+      name: { type: string, required: true, max_length: 64, label: Group name, description: "The new group's name." }
+    send: { method: POST, path: /api/source/groups/add, content_type: application/json, body: '{"name":{name:json}}' }
+    expect: *ok
+    returns: ack
+  rename_source_group:
+    summary: "Rename a source group (POST /api/source/groups/rename)"
+    params:
+      group: &group { type: string, required: true, max_length: 64, label: Group, description: "The group id, as list_source_groups gives it." }
+      name: { type: string, required: true, max_length: 64, label: Group name, description: "The group's new name." }
+    send: { method: POST, path: /api/source/groups/rename, content_type: application/json, body: '{"group_id":{group:json},"name":{name:json}}' }
+    expect: *ok
+    returns: ack
+  remove_source_group:
+    summary: "Delete a source group (POST /api/source/groups/remove)"
+    params:
+      group: *group
+    send: { method: POST, path: /api/source/groups/remove, content_type: application/json, body: '{"group_id":{group:json}}' }
+    expect: *ok
+    returns: ack
+  add_streams:
+    summary: "Add a stream with the request body of section 8 (3), POST /api/source/groups/streams/add: group_id, name, Type and the protocol's fields, or Type ndi with a data list of discovered NDI sources"
+    params:
+      body: { type: json, required: true, label: Request body, description: "The JSON object section 8 (3) gives for the stream's protocol." }
+    send: { method: POST, path: /api/source/groups/streams/add, content_type: application/json, body: "{body}" }
+    expect: *ok
+    returns: ack
+  add_rtsp_stream:
+    summary: "Add an RTSP stream to a group (POST /api/source/groups/streams/add, Type rtsp)"
+    params: &rtsp_params
+      group: *group
+      name: &stream_name { type: string, required: true, max_length: 128, label: Name, description: "The stream's name; it may not be empty." }
+      url: &stream_url { type: string, required: true, max_length: 1024, label: URL, description: "The stream address, such as rtsp://192.168.1.20:554/ch01." }
+      transport: { type: enum, values: [tcp, udp], default: tcp, label: RTSP transport, description: "Whether RTSP media comes over TCP or UDP." }
+      buffer: &buffer { type: string, default: "live:0:0:0:0:0", max_length: 64, label: Buffer, description: "The cache setting in the device's form live:a:b:c:d:e, such as live:200:200:500:0:0." }
+      connect_speed: &connect_speed { type: int, min: 0, default: 5000, label: Connection timeout, description: "The connection timeout in milliseconds; 5000 in the document's examples." }
+      audio_sync: &audio_sync { type: int, default: 0, label: Audio delay, description: "Audio synchronization compensation in milliseconds." }
+      user: &stream_user { type: string, default: "", max_length: 128, label: User, description: "The account the source asks for, or empty." }
+      password: &stream_password { type: string, secret: true, default: "", max_length: 128, label: Password, description: "That account's password, or empty." }
+    send: { method: POST, path: /api/source/groups/streams/add, content_type: application/json,
+            body: '{"group_id":{group:json},"name":{name:json},"Type":"rtsp","url":{url:json},"buffer":{buffer:json},"trans_mode":"{transport}","connect_speed":{connect_speed},"audio_sync_compst":{audio_sync},"user":{user:json},"password":{password:json}}' }
+    expect: *ok
+    returns: ack
+  add_rtmp_stream:
+    summary: "Add an RTMP or RTMPS pull stream to a group (POST /api/source/groups/streams/add, Type rtmp or rtmps)"
+    params: &rtmp_params
+      group: *group
+      type: { type: enum, values: [rtmp, rtmps], default: rtmp, label: Protocol, description: "RTMP, or RTMP over TLS." }
+      name: *stream_name
+      url: *stream_url
+      buffer: *buffer
+      connect_speed: *connect_speed
+      audio_sync: *audio_sync
+      user: *stream_user
+      password: *stream_password
+    send: { method: POST, path: /api/source/groups/streams/add, content_type: application/json,
+            body: '{"group_id":{group:json},"name":{name:json},"Type":"{type}","url":{url:json},"buffer":{buffer:json},"connect_speed":{connect_speed},"audio_sync_compst":{audio_sync},"user":{user:json},"password":{password:json}}' }
+    expect: *ok
+    returns: ack
+  add_plain_stream:
+    summary: "Add a UDP, HTTP or HTTPS stream to a group (POST /api/source/groups/streams/add, Type udp, http or https)"
+    params: &plain_params
+      group: *group
+      type: { type: enum, values: [udp, http, https], required: true, label: Protocol, description: "The stream's protocol." }
+      name: *stream_name
+      url: *stream_url
+      buffer: *buffer
+      connect_speed: *connect_speed
+      audio_sync: *audio_sync
+    send: { method: POST, path: /api/source/groups/streams/add, content_type: application/json,
+            body: '{"group_id":{group:json},"name":{name:json},"Type":"{type}","url":{url:json},"buffer":{buffer:json},"connect_speed":{connect_speed},"audio_sync_compst":{audio_sync}}' }
+    expect: *ok
+    returns: ack
+  add_srt_stream:
+    summary: "Add an SRT caller or rendezvous stream to a group (POST /api/source/groups/streams/add, Type srt)"
+    params: &srt_params
+      group: *group
+      name: *stream_name
+      mode: { type: enum, values: [Caller, Rendezvous], default: Caller, label: SRT mode, description: "Caller connects to the sender; Rendezvous meets a sender that also connects." }
+      url: { type: string, required: true, max_length: 1024, label: URL, description: "The SRT address, such as srt://192.168.1.59:1025." }
+      address: { type: string, required: true, max_length: 255, label: Address, description: "The sender's address, the same as in the URL." }
+      port: &srt_port { type: int, min: 1, max: 65535, required: true, label: Port, description: "The SRT port." }
+      latency: &srt_latency { type: int, min: 0, default: 125, label: Latency, description: "SRT latency in milliseconds." }
+      stream_id: &srt_id { type: string, default: "", max_length: 512, label: Stream ID, description: "The SRT stream id, or empty." }
+      encryption: &srt_encryption { type: enum, values: [none, AES-128, AES-192, AES-256], default: none, label: Encryption, description: "SRT encryption, none or the AES key length." }
+      passphrase: &srt_passphrase { type: string, secret: true, default: "", max_length: 79, label: Passphrase, description: "The SRT passphrase when encrypted, or empty." }
+      bandwidth: &srt_bandwidth { type: int, min: 0, default: 25, label: Bandwidth overhead, description: "SRT recovery bandwidth overhead in percent." }
+      payload_size: &srt_payload { type: int, min: 0, default: 1316, label: Payload size, description: "SRT payload size in bytes." }
+      buffer: *buffer
+      connect_speed: *connect_speed
+      audio_sync: *audio_sync
+    send: { method: POST, path: /api/source/groups/streams/add, content_type: application/json,
+            body: '{"group_id":{group:json},"name":{name:json},"Type":"srt","url":{url:json},"buffer":{buffer:json},"connection_mode":"{mode}","address":{address:json},"listener_port":{port},"latency":{latency},"connect_speed":{connect_speed},"audio_sync_compst":{audio_sync},"show_advanced":"1","srt_id":{stream_id:json},"encryption":"{encryption}","passphrase":{passphrase:json},"bandwidth":{bandwidth},"payload_size":{payload_size}}' }
+    expect: *ok
+    returns: ack
+  add_srt_listener_stream:
+    summary: "Add an SRT listener stream to a group; the URL is srt://:port (POST /api/source/groups/streams/add, Type srt, Listener)"
+    params: &srt_listener_params
+      group: *group
+      name: *stream_name
+      port: *srt_port
+      latency: *srt_latency
+      stream_id: *srt_id
+      encryption: *srt_encryption
+      passphrase: *srt_passphrase
+      bandwidth: *srt_bandwidth
+      payload_size: *srt_payload
+      buffer: *buffer
+      connect_speed: *connect_speed
+      audio_sync: *audio_sync
+    send: { method: POST, path: /api/source/groups/streams/add, content_type: application/json,
+            body: '{"group_id":{group:json},"name":{name:json},"Type":"srt","url":"srt://:{port}","buffer":{buffer:json},"connection_mode":"Listener","listener_port":{port},"latency":{latency},"connect_speed":{connect_speed},"audio_sync_compst":{audio_sync},"show_advanced":"1","srt_id":{stream_id:json},"encryption":"{encryption}","passphrase":{passphrase:json},"bandwidth":{bandwidth},"payload_size":{payload_size}}' }
+    expect: *ok
+    returns: ack
+  add_rtmp_server_stream:
+    summary: "Add an RTMP server stream that senders push to (POST /api/source/groups/streams/add, Type rtmp_server)"
+    params: &rtmp_server_params
+      group: *group
+      name: *stream_name
+      url: { type: string, required: true, max_length: 1024, label: URL, description: "The push address, such as rtmp://192.168.1.59:1935/live/session." }
+      application: { type: string, default: live, max_length: 64, label: Application, description: "The RTMP application name." }
+      session: { type: string, required: true, max_length: 128, label: Session, description: "The RTMP session (stream key) name." }
+      security: { type: enum, values: [none, token], default: none, label: Authentication, description: "Whether senders must give a token." }
+      token: { type: string, secret: true, default: "", max_length: 128, label: Token, description: "The token senders give when authentication is token." }
+      port: { type: int, min: 1026, max: 65534, default: 1935, label: RTMP port, description: "The RTMP server port; the document allows 1026 to 65534 and uses 1935 in its examples." }
+      buffer: *buffer
+      connect_speed: *connect_speed
+      audio_sync: *audio_sync
+    send: { method: POST, path: /api/source/groups/streams/add, content_type: application/json,
+            body: '{"group_id":{group:json},"name":{name:json},"Type":"rtmp_server","url":{url:json},"buffer":{buffer:json},"application":{application:json},"session":{session:json},"connect_speed":{connect_speed},"audio_sync_compst":{audio_sync},"security":"{security:map.rtmp_security}","token":{token:json},"enable":1,"rtmp_server_port":{port}}' }
+    expect: *ok
+    returns: ack
+  add_rtp_stream:
+    summary: "Add an RTP stream described by its SDP (POST /api/source/groups/streams/add, Type rtp)"
+    params: &rtp_params
+      group: *group
+      name: *stream_name
+      sdp: { type: string, multiline: true, required: true, max_length: 16384, label: SDP, description: "The session description, lines separated by line breaks, as the document's example begins it (SDP:, then v=0 ...)." }
+      buffer: { type: string, default: "live:200:200:500:0:0", max_length: 64, label: Buffer, description: "The cache setting in the device's form live:a:b:c:d:e." }
+      connect_speed: *connect_speed
+      audio_sync: *audio_sync
+    send: { method: POST, path: /api/source/groups/streams/add, content_type: application/json,
+            body: '{"group_id":{group:json},"name":{name:json},"Type":"rtp","connect_speed":{connect_speed},"audio_sync_compst":{audio_sync},"buffer":{buffer:json},"sdp_content":{sdp:json}}' }
+    expect: *ok
+    returns: ack
+  add_ndi_stream:
+    summary: "Add a discovered NDI source to a group (POST /api/source/groups/streams/add, Type ndi)"
+    params:
+      group: *group
+      name: { type: string, required: true, max_length: 128, label: Device name, description: "The source's device name, as list_ndi_sources gives it." }
+      ndi_name: { type: string, required: true, max_length: 256, label: NDI name, description: "The full NDI name, such as N60_238 (HB)." }
+      address: { type: string, required: true, max_length: 255, label: Address, description: "The source's IP address." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "The source's NDI port, such as 5961." }
+      channel: { type: string, default: "", max_length: 64, label: Channel, description: "The channel list_ndi_sources gives, such as HB, HX or FULL." }
+      ndi_group: { type: string, default: public, max_length: 128, label: NDI group, description: "The NDI group the source was found in." }
+      connect_speed: *connect_speed
+      audio_sync: *audio_sync
+    send: { method: POST, path: /api/source/groups/streams/add, content_type: application/json,
+            body: '{"group_id":{group:json},"Type":"ndi","data":[{"channel":{channel:json},"group_name":{ndi_group:json},"ip":{address:json},"name":{name:json},"ndi_name":{ndi_name:json},"connect_speed":{connect_speed},"audio_sync_compst":{audio_sync},"port":{port},"url":"{address}:{port}"}]}' }
+    expect: *ok
+    returns: ack
+  modify_stream:
+    summary: "Change a stream with the request body of section 8 (5), POST /api/source/groups/streams/modify: stream_id, name, Type and the protocol's fields"
+    params:
+      body: { type: json, required: true, label: Request body, description: "The JSON object section 8 (5) gives for the stream's protocol." }
+    send: { method: POST, path: /api/source/groups/streams/modify, content_type: application/json, body: "{body}" }
+    expect: *ok
+    returns: ack
+  modify_rtsp_stream:
+    summary: "Change an RTSP stream (POST /api/source/groups/streams/modify, Type rtsp)"
+    params: &modify_rtsp
+      stream: &stream { type: string, required: true, max_length: 64, label: Stream, description: "The stream id, as list_source_groups gives it." }
+      name: *stream_name
+      url: *stream_url
+      transport: { type: enum, values: [tcp, udp], default: tcp, label: RTSP transport, description: "Whether RTSP media comes over TCP or UDP." }
+      buffer: *buffer
+      connect_speed: *connect_speed
+      audio_sync: *audio_sync
+      user: *stream_user
+      password: *stream_password
+    send: { method: POST, path: /api/source/groups/streams/modify, content_type: application/json,
+            body: '{"stream_id":{stream:json},"name":{name:json},"Type":"rtsp","url":{url:json},"buffer":{buffer:json},"trans_mode":"{transport}","connect_speed":{connect_speed},"audio_sync_compst":{audio_sync},"user":{user:json},"password":{password:json}}' }
+    expect: *ok
+    returns: ack
+  modify_rtmp_stream:
+    summary: "Change an RTMP or RTMPS stream (POST /api/source/groups/streams/modify, Type rtmp or rtmps)"
+    params:
+      stream: *stream
+      type: { type: enum, values: [rtmp, rtmps], default: rtmp, label: Protocol, description: "RTMP, or RTMP over TLS." }
+      name: *stream_name
+      url: *stream_url
+      buffer: *buffer
+      connect_speed: *connect_speed
+      audio_sync: *audio_sync
+      user: *stream_user
+      password: *stream_password
+    send: { method: POST, path: /api/source/groups/streams/modify, content_type: application/json,
+            body: '{"stream_id":{stream:json},"name":{name:json},"Type":"{type}","connect_speed":{connect_speed},"audio_sync_compst":{audio_sync},"url":{url:json},"buffer":{buffer:json},"user":{user:json},"password":{password:json}}' }
+    expect: *ok
+    returns: ack
+  modify_plain_stream:
+    summary: "Change a UDP, HTTP or HTTPS stream (POST /api/source/groups/streams/modify, Type udp, http or https)"
+    params:
+      stream: *stream
+      type: { type: enum, values: [udp, http, https], required: true, label: Protocol, description: "The stream's protocol." }
+      name: *stream_name
+      url: *stream_url
+      buffer: *buffer
+      connect_speed: *connect_speed
+      audio_sync: *audio_sync
+    send: { method: POST, path: /api/source/groups/streams/modify, content_type: application/json,
+            body: '{"stream_id":{stream:json},"name":{name:json},"Type":"{type}","connect_speed":{connect_speed},"audio_sync_compst":{audio_sync},"url":{url:json},"buffer":{buffer:json}}' }
+    expect: *ok
+    returns: ack
+  modify_srt_stream:
+    summary: "Change an SRT caller or rendezvous stream (POST /api/source/groups/streams/modify, Type srt)"
+    params:
+      stream: *stream
+      name: *stream_name
+      mode: { type: enum, values: [Caller, Rendezvous], default: Caller, label: SRT mode, description: "Caller connects to the sender; Rendezvous meets a sender that also connects." }
+      url: { type: string, required: true, max_length: 1024, label: URL, description: "The SRT address, such as srt://192.168.1.59:1025." }
+      address: { type: string, required: true, max_length: 255, label: Address, description: "The sender's address, the same as in the URL." }
+      port: *srt_port
+      latency: *srt_latency
+      stream_id: *srt_id
+      encryption: *srt_encryption
+      passphrase: *srt_passphrase
+      bandwidth: *srt_bandwidth
+      payload_size: *srt_payload
+      buffer: *buffer
+      connect_speed: *connect_speed
+      audio_sync: *audio_sync
+    send: { method: POST, path: /api/source/groups/streams/modify, content_type: application/json,
+            body: '{"stream_id":{stream:json},"name":{name:json},"Type":"srt","url":{url:json},"buffer":{buffer:json},"connection_mode":"{mode}","address":{address:json},"listener_port":{port},"latency":{latency},"show_advanced":"1","srt_id":{stream_id:json},"encryption":"{encryption}","passphrase":{passphrase:json},"connect_speed":{connect_speed},"audio_sync_compst":{audio_sync},"bandwidth":{bandwidth},"payload_size":{payload_size}}' }
+    expect: *ok
+    returns: ack
+  modify_srt_listener_stream:
+    summary: "Change an SRT listener stream; the URL is srt://:port (POST /api/source/groups/streams/modify, Type srt, Listener)"
+    params:
+      stream: *stream
+      name: *stream_name
+      port: *srt_port
+      latency: *srt_latency
+      stream_id: *srt_id
+      encryption: *srt_encryption
+      passphrase: *srt_passphrase
+      bandwidth: *srt_bandwidth
+      payload_size: *srt_payload
+      buffer: *buffer
+      connect_speed: *connect_speed
+      audio_sync: *audio_sync
+    send: { method: POST, path: /api/source/groups/streams/modify, content_type: application/json,
+            body: '{"stream_id":{stream:json},"name":{name:json},"Type":"srt","url":"srt://:{port}","buffer":{buffer:json},"connection_mode":"Listener","listener_port":{port},"latency":{latency},"show_advanced":"1","srt_id":{stream_id:json},"encryption":"{encryption}","passphrase":{passphrase:json},"bandwidth":{bandwidth},"connect_speed":{connect_speed},"audio_sync_compst":{audio_sync},"payload_size":{payload_size}}' }
+    expect: *ok
+    returns: ack
+  modify_rtmp_server_stream:
+    summary: "Change an RTMP server stream (POST /api/source/groups/streams/modify, Type rtmp_server)"
+    params:
+      stream: *stream
+      name: *stream_name
+      url: { type: string, required: true, max_length: 1024, label: URL, description: "The push address, such as rtmp://192.168.1.59:1935/live/session." }
+      application: { type: string, default: live, max_length: 64, label: Application, description: "The RTMP application name." }
+      session: { type: string, required: true, max_length: 128, label: Session, description: "The RTMP session (stream key) name." }
+      security: { type: enum, values: [none, token], default: none, label: Authentication, description: "Whether senders must give a token." }
+      token: { type: string, secret: true, default: "", max_length: 128, label: Token, description: "The token senders give when authentication is token." }
+      port: { type: int, min: 1026, max: 65534, default: 1935, label: RTMP port, description: "The RTMP server port; the document allows 1026 to 65534 and uses 1935 in its examples." }
+      buffer: *buffer
+      connect_speed: *connect_speed
+      audio_sync: *audio_sync
+    send: { method: POST, path: /api/source/groups/streams/modify, content_type: application/json,
+            body: '{"stream_id":{stream:json},"name":{name:json},"Type":"rtmp_server","url":{url:json},"buffer":{buffer:json},"application":{application:json},"session":{session:json},"security":"{security:map.rtmp_security}","token":{token:json},"connect_speed":{connect_speed},"audio_sync_compst":{audio_sync},"enable":1,"rtmp_server_port":{port}}' }
+    expect: *ok
+    returns: ack
+  modify_rtp_stream:
+    summary: "Change an RTP stream (POST /api/source/groups/streams/modify, Type rtp)"
+    params:
+      stream: *stream
+      name: *stream_name
+      sdp: { type: string, multiline: true, required: true, max_length: 16384, label: SDP, description: "The session description, lines separated by line breaks, as the document's example begins it (SDP:, then v=0 ...)." }
+      buffer: *buffer
+      connect_speed: *connect_speed
+      audio_sync: *audio_sync
+    send: { method: POST, path: /api/source/groups/streams/modify, content_type: application/json,
+            body: '{"stream_id":{stream:json},"name":{name:json},"Type":"rtp","connect_speed":{connect_speed},"audio_sync_compst":{audio_sync},"buffer":{buffer:json},"sdp_content":{sdp:json}}' }
+    expect: *ok
+    returns: ack
+  modify_ndi_stream:
+    summary: "Change an NDI stream: its source, transport and main or preview stream (POST /api/source/groups/streams/modify, Type ndi)"
+    params:
+      stream: *stream
+      name: *stream_name
+      ndi_name: { type: string, required: true, max_length: 256, label: NDI name, description: "The full NDI name, such as N6-21-1080P60 (Channel-NDI)." }
+      url: { type: string, required: true, max_length: 255, label: Address, description: "The source's address and port, such as 192.168.36.155:5963." }
+      transport: { type: enum, values: [tcp, multicast, unicast, rudp], default: tcp, label: NDI transport, description: "How the decoder receives the NDI stream." }
+      preview_mode: { type: enum, values: [Auto, Full, Preview], default: Auto, label: Stream, description: "Full takes the main stream, Preview the sub stream, Auto chooses by the window's size." }
+      buffer: { type: string, default: "live:1000:1000:1500:0:0", max_length: 64, label: Buffer, description: "The cache setting in the device's form live:a:b:c:d:e." }
+      connect_speed: *connect_speed
+      audio_sync: *audio_sync
+    send: { method: POST, path: /api/source/groups/streams/modify, content_type: application/json,
+            body: '{"stream_id":{stream:json},"Type":"ndi","url":{url:json},"buffer":{buffer:json},"trans_mode":"{transport}","ndi_name":{ndi_name:json},"connect_speed":{connect_speed},"audio_sync_compst":{audio_sync},"name":{name:json},"preview_mode":"{preview_mode}"}' }
+    expect: *ok
+    returns: ack
+  remove_stream:
+    summary: "Delete a stream from its group (POST /api/source/groups/streams/remove)"
+    params:
+      group: *group
+      stream: *stream
+    send: { method: POST, path: /api/source/groups/streams/remove, content_type: application/json, body: '{"group_id":{group:json},"stream_id":{stream:json}}' }
+    expect: *ok
+    returns: ack
+  copy_stream:
+    summary: "Copy a stream into another group (POST /api/source/groups/streams/copy)"
+    params: &copy_params
+      from_group: { type: string, required: true, max_length: 64, label: From group, description: "The id of the group the stream is in." }
+      stream: *stream
+      to_group: { type: string, required: true, max_length: 64, label: To group, description: "The id of the group it goes to." }
+    send: { method: POST, path: /api/source/groups/streams/copy, content_type: application/json,
+            body: '{"from_group_id":{from_group:json},"from_stream_id":{stream:json},"to_group_id":{to_group:json}}' }
+    expect: *ok
+    returns: ack
+  move_stream:
+    summary: "Move a stream into another group (POST /api/source/groups/streams/move)"
+    params: *copy_params
+    send: { method: POST, path: /api/source/groups/streams/move, content_type: application/json,
+            body: '{"from_group_id":{from_group:json},"from_stream_id":{stream:json},"to_group_id":{to_group:json}}' }
+    expect: *ok
+    returns: ack
+
+  # --- Layouts (section 9) ---
+  list_layout_templates:
+    summary: "Layout templates (Single, PIP, 2x2, 3x3, 4x4) with their panes (GET /api/layout/template/list)"
+    send: { method: GET, path: /api/layout/template/list }
+    expect: *val
+    returns: value
+  list_layouts:
+    summary: "Saved layouts with their panes and the stream in each (GET /api/layout/list)"
+    send: { method: GET, path: /api/layout/list }
+    expect: *val
+    returns: value
+  add_layout:
+    summary: "Create a layout from a template (POST /api/layout/add)"
+    params:
+      template: { type: int, min: 1, required: true, label: Template, description: "The template id, as list_layout_templates gives it (1 Single to 5 4x4)." }
+      name: { type: string, required: true, max_length: 64, label: Layout name, description: "The new layout's name." }
+    send: { method: POST, path: /api/layout/add, content_type: application/json, body: '{"template_id":{template},"name":{name:json}}' }
+    expect: *ok
+    returns: ack
+  remove_layout:
+    summary: "Delete a layout (POST /api/layout/remove)"
+    params:
+      layout: &layout { type: int, min: 1, required: true, label: Layout, description: "The layout id, as list_layouts gives it." }
+    send: { method: POST, path: /api/layout/remove, content_type: application/json, body: '{"layout_id":{layout}}' }
+    expect: *ok
+    returns: ack
+  select_layout:
+    summary: "Show a layout on an output (POST /api/layout/select)"
+    params:
+      output: *output
+      layout: *layout
+    send: { method: POST, path: /api/layout/select, content_type: application/json, body: '{"output_id":"{output}","layout_id":{layout}}' }
+    expect: *ok
+    returns: ack
+  modify_layout:
+    summary: "Change a layout's panes on an output with the position list of section 9 (7) (POST /api/layout/modify)"
+    params:
+      output: *output
+      layout: *layout
+      panes: { type: json, required: true, label: Panes, description: "The position array: objects with id, number, x, y, width, height (percent) and z_index." }
+    send: { method: POST, path: /api/layout/modify, content_type: application/json, body: '{"layout_id":{layout},"position":{panes},"output_id":"{output}"}' }
+    expect: *ok
+    returns: ack
+  modify_layout_pane:
+    summary: "Move or resize one pane of a layout on an output (POST /api/layout/modify)"
+    params:
+      output: *output
+      layout: *layout
+      pane: &pane { type: int, min: 1, max: 16, required: true, label: Pane, description: "The pane (position) id, numbered from 1." }
+      number: { type: int, min: 1, max: 16, required: true, label: Pane number, description: "The pane's index in the layout, as list_layouts gives it." }
+      x: { type: int, min: 0, max: 100, required: true, label: Left, description: "The pane's left edge, percent of the output width." }
+      y: { type: int, min: 0, max: 100, required: true, label: Top, description: "The pane's top edge, percent of the output height." }
+      width: { type: int, min: 0, max: 100, required: true, label: Width, description: "The pane's width, percent of the output width." }
+      height: { type: int, min: 0, max: 100, required: true, label: Height, description: "The pane's height, percent of the output height." }
+      z_index: { type: int, min: 0, max: 15, required: true, label: Stacking order, description: "Higher panes are drawn over lower ones, from 0." }
+    send: { method: POST, path: /api/layout/modify, content_type: application/json,
+            body: '{"layout_id":{layout},"position":[{"width":{width},"height":{height},"number":{number},"z_index":{z_index},"id":{pane},"x":{x},"y":{y}}],"output_id":"{output}"}' }
+    expect: *ok
+    returns: ack
+  save_layout:
+    summary: "Save an output's changed layout into a layout (POST /api/layout/save)"
+    params:
+      output: *output
+      layout: *layout
+    send: { method: POST, path: /api/layout/save, content_type: application/json, body: '{"output_id":"{output}","layout_id":{layout}}' }
+    expect: *ok
+    returns: ack
+  save_layout_as:
+    summary: "Save an output's layout as a new layout (POST /api/layout/resave)"
+    params:
+      output: *output
+      layout: *layout
+      name: { type: string, required: true, max_length: 64, label: Layout name, description: "The name of the new layout." }
+    send: { method: POST, path: /api/layout/resave, content_type: application/json, body: '{"output_id":"{output}","layout_id":{layout},"layout_name":{name:json}}' }
+    expect: *ok
+    returns: ack
+  reload_layout:
+    summary: "Discard an output's unsaved layout changes and load the layout again (POST /api/layout/reload)"
+    params:
+      output: *output
+      layout: *layout
+      name: { type: string, required: true, max_length: 64, label: Layout name, description: "The layout's name, as list_layouts gives it." }
+    send: { method: POST, path: /api/layout/reload, content_type: application/json, body: '{"output_id":{output},"layout_name":{name:json},"layout_id":{layout}}' }
+    expect: *ok
+    returns: ack
+  rename_layout:
+    summary: "Rename a layout (POST /api/layout/rename)"
+    params:
+      layout: *layout
+      name: { type: string, required: true, max_length: 64, label: Layout name, description: "The layout's new name." }
+    send: { method: POST, path: /api/layout/rename, content_type: application/json, body: '{"layout_id":{layout},"name":{name:json}}' }
+    expect: *ok
+    returns: ack
+
+  # --- Outputs (section 10) ---
+  list_outputs:
+    summary: "Both outputs: name, layout, resolution, background, border, VU meter (GET /api/output/list)"
+    send: { method: GET, path: /api/output/list }
+    expect: *val
+    returns: value
+  get_output:
+    summary: "An output's windows: the stream in each, its status, format, bitrate, resolution, volume (GET /api/output/get)"
+    params:
+      output: *output
+    send: { method: GET, path: /api/output/get, query: { output_id: "{output}" } }
+    expect: *val
+    returns: value
+  get_output_interfaces:
+    summary: "An output's video (HDMI1, HDMI2, SDI) or audio (HDMI, SDI, line out) interfaces (POST /api/output/interfaces/get)"
+    params:
+      output: *output
+      type: { type: enum, values: [video, audio], required: true, label: Kind, description: "Video or audio interfaces." }
+    send: { method: POST, path: /api/output/interfaces/get, content_type: application/json, body: '{"output_id":{output},"Type":"{type}"}' }
+    expect: *val
+    returns: value
+  set_audio_interface:
+    summary: "Configure an output's audio interface: on or off, mute, volume, sample rate, channels (POST /api/output/interfaces/set, Type audio)"
+    params:
+      output: *output
+      interface: { type: int, min: 1, required: true, label: Interface, description: "The audio interface id, as get_output_interfaces gives it." }
+      label: { type: string, required: true, max_length: 64, label: Interface name, description: "The interface's name as get_output_interfaces gives it, such as HDMI1 or LineOut." }
+      enabled: { type: bool, required: true, label: Enabled, description: "Whether the interface carries the output's audio." }
+      muted: { type: bool, default: false, label: Muted, description: "Whether the interface is muted." }
+      volume: { type: int, default: 0, label: Gain, description: "Gain in dB." }
+      sample_rate: { type: int, min: 1, default: 48000, label: Sample rate, description: "The sample rate in Hz, such as 48000." }
+      channels: { type: int, min: 1, default: 2, label: Channels, description: "The number of audio channels." }
+      visible: { type: bool, default: true, label: Supported, description: "The interface's visible flag, as get_output_interfaces gives it." }
+    send: { method: POST, path: /api/output/interfaces/set, content_type: application/json,
+            body: '{"channels":{channels},"enable":{enabled},"id":{interface},"label":{label:json},"mute":{muted},"samplerate":{sample_rate},"visible":{visible},"volume":{volume},"output_id":"{output}","Type":"audio","intf_id":{interface}}' }
+    expect: *ok
+    returns: ack
+  set_window_source:
+    summary: "Put a source stream into a window of an output (POST /api/output/source/set)"
+    params:
+      output: *output
+      window: &window { type: int, min: 1, max: 16, required: true, label: Window, description: "The window (pane position) id on the output, numbered from 1." }
+      stream: *stream
+      stream_name: { type: string, required: true, max_length: 256, label: Stream name, description: "The stream's name, as list_source_groups gives it." }
+      stream_url: { type: string, required: true, max_length: 1024, label: Stream URL, description: "The stream's URL, as list_source_groups gives it." }
+      type: { type: string, required: true, max_length: 32, label: Stream type, description: "The stream's Type, as list_source_groups gives it: ndi, srt, rtsp, rtmp, ..." }
+    send: { method: POST, path: /api/output/source/set, content_type: application/json,
+            body: '{"from":{"Type":"source","stream_id":{stream:json},"stream_name":{stream_name:json},"stream_url":{stream_url:json},"pos_id":"","output_id":"{output}","layout_id":""},"to":{"Type":{type:json},"stream_id":{stream:json},"stream_name":{stream_name:json},"stream_url":{stream_url:json},"pos_id":{window},"output_id":"{output}","layout_id":""}}' }
+    expect: *ok
+    returns: ack
+  set_window_source_raw:
+    summary: "Set a window's source with the from and to objects of section 10 (4) (POST /api/output/source/set)"
+    params:
+      body: { type: json, required: true, label: Request body, description: "The object with from and to as section 10 (4) gives it." }
+    send: { method: POST, path: /api/output/source/set, content_type: application/json, body: "{body}" }
+    expect: *ok
+    returns: ack
+  move_window_source:
+    summary: "Move the stream of one window to another window, on the same or the other output (POST /api/output/source/set)"
+    params:
+      from_output: { type: int, min: 1, max: 2, required: true, label: From output, description: "The output the stream is on, 1 or 2." }
+      from_window: { type: int, min: 1, max: 16, required: true, label: From window, description: "The window the stream is in." }
+      to_output: { type: int, min: 1, max: 2, required: true, label: To output, description: "The output it goes to, 1 or 2." }
+      to_window: { type: int, min: 1, max: 16, required: true, label: To window, description: "The window it goes to." }
+    send: { method: POST, path: /api/output/source/set, content_type: application/json,
+            body: '{"from":{"output_id":"{from_output}","pos_id":{from_window}},"to":{"output_id":"{to_output}","pos_id":{to_window},"stream_id":""}}' }
+    expect: *ok
+    returns: ack
+  clear_window:
+    summary: "Remove the stream from a window (POST /api/output/source/remove)"
+    params:
+      output: *output
+      window: *window
+    send: { method: POST, path: /api/output/source/remove, content_type: application/json, body: '{"output_id":"{output}","pos_id":{window}}' }
+    expect: *ok
+    returns: ack
+  list_resolutions:
+    summary: "Output resolutions (timings) with their ids (GET /api/output/resolution/list)"
+    send: { method: GET, path: /api/output/resolution/list }
+    expect: *val
+    returns: value
+  set_resolution:
+    summary: "Set an output's resolution (POST /api/output/resolution/set)"
+    params:
+      output: *output
+      resolution: { type: int, min: 1, required: true, label: Resolution, description: "The resolution id, as list_resolutions gives it (5 is 1920x1080P60)." }
+    send: { method: POST, path: /api/output/resolution/set, content_type: application/json, body: '{"output_id":"{output}","res_id":{resolution},"res_index":{resolution}}' }
+    expect: *ok
+    returns: ack
+  get_audio_mix:
+    summary: "An output's audio mix: the windows' and the preview's audio sources, each enabled, muted and its gain (GET /api/output/audiomix/get)"
+    params:
+      output: *output
+    send: { method: GET, path: /api/output/audiomix/get, query: { output_id: "{output}" } }
+    expect: *val
+    returns: value
+  set_audio_mix:
+    summary: "Turn a stream's audio on or off in an output's mix, with its gain and mute (POST /api/output/audiomix/set)"
+    params:
+      output: *output
+      stream: *stream
+      enabled: { type: bool, required: true, label: Enabled, description: "Whether the stream's audio is in the mix." }
+      volume: { type: int, default: 0, label: Gain, description: "The stream's gain in dB." }
+      muted: { type: bool, default: false, label: Muted, description: "Whether the stream's audio is muted." }
+      list: &mix_list { type: enum, values: [output, preview], default: output, label: List, description: "output for the windows' audio, which follows the layout; preview for audio added from the preview." }
+    send: { method: POST, path: /api/output/audiomix/set, content_type: application/json,
+            body: '{"output_id":"{output}","stream_id":{stream:json},"enable":{enabled},"volume":{volume},"mute":{muted},"Type":"{list}"}' }
+    expect: *ok
+    returns: ack
+  remove_audio_mix:
+    summary: "Remove a stream's audio from an output's mix list (POST /api/output/audiomix/remove)"
+    params:
+      output: *output
+      stream: *stream
+      list: *mix_list
+    send: { method: POST, path: /api/output/audiomix/remove, content_type: application/json, body: '{"output_id":"{output}","stream_id":{stream:json},"Type":"{list}"}' }
+    expect: *ok
+    returns: ack
+  add_audio_mix:
+    summary: "Add a previewed stream's audio to an output's mix list (POST /api/output/audiomix/add)"
+    params:
+      output: *output
+      stream: *stream
+    send: { method: POST, path: /api/output/audiomix/add, content_type: application/json, body: '{"output_id":"{output}","stream_id":{stream:json}}' }
+    expect: *ok
+    returns: ack
+  get_audio_levels:
+    summary: "Audio levels in dB of each stream on an output (POST /api/output/audio/sound)"
+    params:
+      output: *output
+    send: { method: POST, path: /api/output/audio/sound, content_type: application/json, body: '{"output_id":"{output}"}' }
+    expect: *val
+    returns: value
+  set_border:
+    summary: "Turn an output's window borders on or off and set their color (POST /api/output/border/set)"
+    params:
+      output: *output
+      enabled: { type: bool, required: true, label: Border, description: "Whether windows have a border." }
+      color: &color { type: string, required: true, pattern: "^#[0-9A-Fa-f]{6}$", label: Color, description: "The color as #RRGGBB, such as #FF0000." }
+    send: { method: POST, path: /api/output/border/set, content_type: application/json, body: '{"output_id":"{output}","enable":{enabled},"color":"{color}"}' }
+    expect: *ok
+    returns: ack
+  get_border:
+    summary: "An output's border: on or off, color, widths (POST /api/output/border/get)"
+    params:
+      output: *output
+    send: { method: POST, path: /api/output/border/get, content_type: application/json, body: '{"output_id":{output}}' }
+    expect: *val
+    returns: value
+  set_background:
+    summary: "Turn an output's background color on or off and set it (POST /api/output/background/set)"
+    params:
+      output: *output
+      enabled: { type: bool, required: true, label: Background, description: "Whether the background color is used." }
+      color: *color
+    send: { method: POST, path: /api/output/background/set, content_type: application/json, body: '{"output_id":"{output}","enable":{enabled},"background":"{color}"}' }
+    expect: *ok
+    returns: ack
+  get_background:
+    summary: "An output's background color and whether it is on (GET /api/output/background/get)"
+    params:
+      output: *output
+    send: { method: GET, path: /api/output/background/get, query: { output_id: "{output}" } }
+    expect: *val
+    returns: value
+  check_audio:
+    summary: "Whether an audio device can be selected (POST /api/output/audio/check)"
+    params:
+      id: { type: string, required: true, max_length: 64, label: Audio device, description: "The audio device id." }
+    send: { method: POST, path: /api/output/audio/check, content_type: application/json, body: '{"id":{id:json}}' }
+    expect: *val
+    returns: value
+
+  # --- PTZ of a window's NDI source (section 10 (12)) ---
+  ptz_zoom:
+    summary: "Zoom the NDI camera in a window to a position (POST /api/ptz/set, ptz_zoom)"
+    params:
+      output: *output
+      window: *window
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: Zoom, description: "0.0 zoomed in to 1.0 zoomed out." }
+    send: { method: POST, path: /api/ptz/set, content_type: application/json,
+            body: '{"output_id":"{output}","pos_id":{window},"Type":"ptz_zoom","data":{"zoom_value":{value:.3f}}}' }
+    expect: *ok
+    returns: ack
+  ptz_zoom_speed:
+    summary: "Zoom the NDI camera in a window at a speed; send 0 to stop (POST /api/ptz/set, ptz_zoom_speed)"
+    params:
+      output: *output
+      window: *window
+      speed: { type: float, min: -1.0, max: 1.0, required: true, label: Zoom speed, description: "-1.0 zooms out, 0 stops, +1.0 zooms in." }
+    send: { method: POST, path: /api/ptz/set, content_type: application/json,
+            body: '{"output_id":"{output}","pos_id":{window},"Type":"ptz_zoom_speed","data":{"zoom_speed":{speed:.3f}}}' }
+    expect: *ok
+    returns: ack
+  ptz_pan_tilt:
+    summary: "Point the NDI camera in a window (POST /api/ptz/set, ptz_pan_tilt)"
+    params:
+      output: *output
+      window: *window
+      pan: { type: float, min: -1.0, max: 1.0, required: true, label: Pan, description: "-1.0 left, 0 centered, +1.0 right." }
+      tilt: { type: float, min: -1.0, max: 1.0, required: true, label: Tilt, description: "-1.0 bottom, 0 centered, +1.0 top." }
+    send: { method: POST, path: /api/ptz/set, content_type: application/json,
+            body: '{"output_id":"{output}","pos_id":{window},"Type":"ptz_pan_tilt","data":{"pan_value":{pan:.3f},"tilt_value":{tilt:.3f}}}' }
+    expect: *ok
+    returns: ack
+  ptz_pan_tilt_speed:
+    summary: "Move the NDI camera in a window at a speed; send 0, 0 to stop (POST /api/ptz/set, ptz_pan_tilt_speed)"
+    params:
+      output: *output
+      window: *window
+      pan_speed: { type: float, min: -1.0, max: 1.0, required: true, label: Pan speed, description: "-1.0 moves right, 0 stops, +1.0 moves left." }
+      tilt_speed: { type: float, min: -1.0, max: 1.0, required: true, label: Tilt speed, description: "-1.0 moves down, 0 stops, +1.0 moves up." }
+    send: { method: POST, path: /api/ptz/set, content_type: application/json,
+            body: '{"output_id":"{output}","pos_id":{window},"Type":"ptz_pan_tilt_speed","data":{"pan_speed":{pan_speed:.3f},"tilt_speed":{tilt_speed:.3f}}}' }
+    expect: *ok
+    returns: ack
+  ptz_store_preset:
+    summary: "Store the NDI camera's position as a preset (POST /api/ptz/set, ptz_store_preset)"
+    params:
+      output: *output
+      window: *window
+      preset: &preset { type: int, min: 0, max: 99, required: true, label: Preset, description: "The preset number, 0 to 99." }
+    send: { method: POST, path: /api/ptz/set, content_type: application/json,
+            body: '{"output_id":"{output}","pos_id":{window},"Type":"ptz_store_preset","data":{"preset_no":{preset}}}' }
+    expect: *ok
+    returns: ack
+  ptz_recall_preset:
+    summary: "Move the NDI camera to a preset (POST /api/ptz/set, ptz_recall_preset)"
+    params:
+      output: *output
+      window: *window
+      preset: *preset
+      speed: { type: float, min: 0.0, max: 1.0, default: 0.5, label: Speed, description: "0.0 as slow as possible to 1.0 as fast as possible." }
+    send: { method: POST, path: /api/ptz/set, content_type: application/json,
+            body: '{"output_id":"{output}","pos_id":{window},"Type":"ptz_recall_preset","data":{"preset_no":{preset},"speed":{speed:.3f}}}' }
+    expect: *ok
+    returns: ack
+  ptz_auto_focus:
+    summary: "Turn on the NDI camera's auto focus (POST /api/ptz/set, ptz_auto_focus)"
+    params: &ptz_window
+      output: *output
+      window: *window
+    send: { method: POST, path: /api/ptz/set, content_type: application/json,
+            body: '{"output_id":"{output}","pos_id":{window},"Type":"ptz_auto_focus","data":{}}' }
+    expect: *ok
+    returns: ack
+  ptz_focus:
+    summary: "Focus the NDI camera to a position (POST /api/ptz/set, ptz_focus)"
+    params:
+      output: *output
+      window: *window
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: Focus, description: "0.0 focused at infinity to 1.0 focused as close as possible." }
+    send: { method: POST, path: /api/ptz/set, content_type: application/json,
+            body: '{"output_id":"{output}","pos_id":{window},"Type":"ptz_focus","data":{"focus_value":{value:.3f}}}' }
+    expect: *ok
+    returns: ack
+  ptz_focus_speed:
+    summary: "Focus the NDI camera at a speed; send 0 to stop (POST /api/ptz/set, ptz_focus_speed)"
+    params:
+      output: *output
+      window: *window
+      speed: { type: float, min: -1.0, max: 1.0, required: true, label: Focus speed, description: "-1.0 focuses outwards, 0 stops, +1.0 focuses inwards." }
+    send: { method: POST, path: /api/ptz/set, content_type: application/json,
+            body: '{"output_id":"{output}","pos_id":{window},"Type":"ptz_focus_speed","data":{"focus_speed":{speed:.3f}}}' }
+    expect: *ok
+    returns: ack
+  ptz_white_balance:
+    summary: "Set the NDI camera's white balance mode (POST /api/ptz/set, ptz_white_balance_auto, _indoor, _outdoor or _oneshot)"
+    params:
+      output: *output
+      window: *window
+      mode: { type: enum, values: [auto, indoor, outdoor, oneshot], required: true, label: White balance, description: "Automatic, indoor, outdoor, or a one-time adjustment." }
+    send: { method: POST, path: /api/ptz/set, content_type: application/json,
+            body: '{"output_id":"{output}","pos_id":{window},"Type":"{mode:map.white_balance}","data":{}}' }
+    expect: *ok
+    returns: ack
+  ptz_white_balance_manual:
+    summary: "Set the NDI camera's white balance by hand (POST /api/ptz/set, ptz_white_balance_manual)"
+    params:
+      output: *output
+      window: *window
+      red: { type: float, min: 0.0, max: 1.0, required: true, label: Red, description: "0.0 not red to 1.0 very red." }
+      blue: { type: float, min: 0.0, max: 1.0, required: true, label: Blue, description: "0.0 not blue to 1.0 very blue." }
+    send: { method: POST, path: /api/ptz/set, content_type: application/json,
+            body: '{"output_id":"{output}","pos_id":{window},"Type":"ptz_white_balance_manual","data":{"red":{red:.3f},"blue":{blue:.3f}}}' }
+    expect: *ok
+    returns: ack
+  ptz_exposure_auto:
+    summary: "Turn on the NDI camera's auto exposure (POST /api/ptz/set, ptz_exposure_auto)"
+    params: *ptz_window
+    send: { method: POST, path: /api/ptz/set, content_type: application/json,
+            body: '{"output_id":"{output}","pos_id":{window},"Type":"ptz_exposure_auto","data":{}}' }
+    expect: *ok
+    returns: ack
+  ptz_exposure_manual:
+    summary: "Set the NDI camera's exposure by hand (POST /api/ptz/set, ptz_exposure_manual)"
+    params:
+      output: *output
+      window: *window
+      level: { type: float, min: 0.0, max: 1.0, required: true, label: Exposure, description: "0.0 dark to 1.0 light." }
+    send: { method: POST, path: /api/ptz/set, content_type: application/json,
+            body: '{"output_id":"{output}","pos_id":{window},"Type":"ptz_exposure_manual","data":{"exposure_level":{level:.3f}}}' }
+    expect: *ok
+    returns: ack
+  ptz_is_supported:
+    summary: "Whether the NDI source in a window supports PTZ; returns the reply (POST /api/ptz/set, ptz_is_supported)"
+    params: *ptz_window
+    send: { method: POST, path: /api/ptz/set, content_type: application/json,
+            body: '{"output_id":"{output}","pos_id":{window},"Type":"ptz_is_supported","data":{}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$" }
+    returns: value
+
+  # --- Network (section 11) ---
+  get_network:
+    summary: "Network ports with address, DHCP, gateway, DNS, MAC, link and the maintenance address (GET /api/network/get)"
+    send: { method: GET, path: /api/network/get }
+    expect: *val
+    returns: value
+  set_network:
+    summary: "Set a network port's address, DHCP, gateway and DNS (POST /api/network/set)"
+    params:
+      interface: &interface { type: string, required: true, pattern: "^[A-Za-z0-9_.-]{1,16}$", label: Network port, description: "The port's name, as get_network gives it: eth0 or eth1." }
+      dhcp: { type: bool, required: true, label: DHCP, description: "On takes the address from DHCP; off uses the address given." }
+      ip: &ipv4 { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: IP address, description: "An IPv4 address, such as 192.168.1.168." }
+      mask: &mask { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: Subnet mask, description: "The subnet mask, such as 255.255.255.0." }
+      gateway: { type: string, default: "", pattern: "^([0-9]{1,3}(\\.[0-9]{1,3}){3})?$", label: Gateway, description: "The gateway address, or empty for none." }
+      dns: { type: string, default: "", max_length: 255, label: DNS, description: "The DNS server address, or empty." }
+      mac: { type: string, required: true, pattern: "^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$", label: MAC address, description: "The port's MAC address, as get_network gives it." }
+    send: { method: POST, path: /api/network/set, content_type: application/json,
+            body: '{"device":"{interface}","dynamic":"{dhcp:map.dhcp}","ip":"{ip}","mask":"{mask}","gw":"{gateway}","dns":{dns:json},"mac":"{mac}"}' }
+    expect: *ok
+    returns: ack
+  set_maintenance_address:
+    summary: "Turn a network port's second (maintenance) address on or off and set it (POST /api/network/modify)"
+    params:
+      interface: *interface
+      enabled: { type: bool, required: true, label: Maintenance address, description: "Whether the port also answers on the maintenance address." }
+      ip: *ipv4
+      mask: *mask
+      gateway: { type: string, default: "", pattern: "^([0-9]{1,3}(\\.[0-9]{1,3}){3})?$", label: Gateway, description: "The maintenance address's gateway, or empty for none." }
+    send: { method: POST, path: /api/network/modify, content_type: application/json,
+            body: '{"device":"{interface}","enable2":{enabled},"ip2":"{ip}","mask2":"{mask}","gw2":"{gateway}"}' }
+    expect: *ok
+    returns: ack
+  get_http_ports:
+    summary: "Whether HTTP and HTTPS are on, and their ports (GET /api/network/http/get)"
+    send: { method: GET, path: /api/network/http/get }
+    expect: *val
+    returns: value
+  set_http_ports:
+    summary: "Turn HTTP and HTTPS on or off and set their ports (POST /api/network/http/set)"
+    params:
+      http: { type: bool, required: true, label: HTTP, description: "Whether the web server answers HTTP." }
+      http_port: { type: int, min: 1, max: 65535, default: 80, label: HTTP port, description: "The HTTP port, 80 by default." }
+      https: { type: bool, required: true, label: HTTPS, description: "Whether the web server answers HTTPS." }
+      https_port: { type: int, min: 1, max: 65535, default: 443, label: HTTPS port, description: "The HTTPS port, 443 by default." }
+    send: { method: POST, path: /api/network/http/set, content_type: application/json,
+            body: '{"http":{http},"httpPort":{http_port},"https":{https},"httpsPort":{https_port}}' }
+    expect: *ok
+    returns: ack
+  ping:
+    summary: "Ping an address from the decoder; returns its loss rate and whether it answered (POST /api/network/ping)"
+    params:
+      address: { type: string, required: true, max_length: 255, label: Address, description: "The address to ping." }
+    send: { method: POST, path: /api/network/ping, content_type: application/json, body: '{"ip":{address:json}}' }
+    expect: *val
+    returns: value
+  list_routes:
+    summary: "Static routes (GET /api/network/routing/get)"
+    send: { method: GET, path: /api/network/routing/get }
+    expect: *val
+    returns: value
+  add_route:
+    summary: "Add a static route (POST /api/network/routing/add)"
+    params: &route_params
+      interface: *interface
+      ip: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: Destination, description: "The route's destination address." }
+      netmask: *mask
+      gateway: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: Gateway, description: "The gateway the route goes through." }
+      mtu: { type: int, min: 1, default: 1500, label: MTU, description: "The route's MTU in bytes." }
+      metric: { type: int, min: 0, default: 0, label: Metric, description: "The route's metric; lower is preferred." }
+    send: { method: POST, path: /api/network/routing/add, content_type: application/json,
+            body: '{"device":"{interface}","ip":"{ip}","netmask":"{netmask}","gw":"{gateway}","mtu":{mtu},"metric":{metric}}' }
+    expect: *ok
+    returns: ack
+  modify_route:
+    summary: "Change a static route (POST /api/network/routing/modify)"
+    params:
+      id: &route_id { type: string, required: true, max_length: 64, label: Route, description: "The route's id, as list_routes gives it." }
+      interface: *interface
+      ip: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: Destination, description: "The route's destination address." }
+      netmask: *mask
+      gateway: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: Gateway, description: "The gateway the route goes through." }
+      mtu: { type: int, min: 1, default: 1500, label: MTU, description: "The route's MTU in bytes." }
+      metric: { type: int, min: 0, default: 0, label: Metric, description: "The route's metric; lower is preferred." }
+    send: { method: POST, path: /api/network/routing/modify, content_type: application/json,
+            body: '{"id":{id:json},"device":"{interface}","ip":"{ip}","netmask":"{netmask}","gw":"{gateway}","mtu":{mtu},"metric":{metric}}' }
+    expect: *ok
+    returns: ack
+  set_route_enabled:
+    summary: "Turn a static route on or off (POST /api/network/routing/set)"
+    params:
+      id: *route_id
+      enabled: { type: bool, required: true, label: Enabled, description: "Whether the route is used." }
+    send: { method: POST, path: /api/network/routing/set, content_type: application/json, body: '{"id":{id:json},"status":{enabled:bool01}}' }
+    expect: *ok
+    returns: ack
+  delete_route:
+    summary: "Delete a static route (POST /api/network/routing/del)"
+    params:
+      id: *route_id
+    send: { method: POST, path: /api/network/routing/del, content_type: application/json, body: '{"ids":{id:json}}' }
+    expect: *ok
+    returns: ack
+
+  # --- Time (section 12) ---
+  get_time_settings:
+    summary: "Time, time zone, offset, time source and NTP servers (GET /api/timeregion/settings)"
+    send: { method: GET, path: /api/timeregion/settings }
+    expect: *val
+    returns: value
+  set_time:
+    summary: "Set the time source and time: NTP servers, the controlling computer's time, or a manual time (POST /api/timeregion/time/set)"
+    params:
+      mode: { type: enum, values: [ntp, pc, manual], required: true, label: Time source, description: "ntp follows the NTP servers; pc and manual take the time given." }
+      time: { type: string, required: true, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$", label: Time, description: "The time as YYYY-MM-DD HH:MM:SS." }
+      offset: &tz_offset { type: int, min: -12, max: 14, required: true, label: UTC offset, description: "The time zone's offset from UTC in hours, such as 8." }
+      ntp_servers: { type: string, default: "", max_length: 512, label: NTP servers, description: "NTP server names separated by spaces; empty unless the source is ntp." }
+    send: { method: POST, path: /api/timeregion/time/set, content_type: application/json,
+            body: '{"time":"{time}","timeType":"{mode}","offset":{offset},"ntp_servers":{ntp_servers:json}}' }
+    expect: *ok
+    returns: ack
+  set_timezone:
+    summary: "Set the time zone (POST /api/timeregion/timezone/set)"
+    params:
+      timezone: { type: string, required: true, max_length: 64, label: Time zone, description: "The time zone name, such as Europe/London." }
+      offset: *tz_offset
+    send: { method: POST, path: /api/timeregion/timezone/set, content_type: application/json, body: '{"timezone":{timezone:json},"offset":{offset}}' }
+    expect: *ok
+    returns: ack
+
+  # --- Preview (section 15) ---
+  get_preview:
+    summary: "Sources in the preview, each with its status and resolution (GET /api/preview/get)"
+    send: { method: GET, path: /api/preview/get }
+    expect: *val
+    returns: value
+  add_preview_source:
+    summary: "Add a source stream to the preview (POST /api/preview/source/modify)"
+    params:
+      output: *output
+      stream: *stream
+      stream_name: { type: string, required: true, max_length: 256, label: Stream name, description: "The stream's name, as list_source_groups gives it." }
+      stream_url: { type: string, required: true, max_length: 1024, label: Stream URL, description: "The stream's URL, as list_source_groups gives it." }
+    send: { method: POST, path: /api/preview/source/modify, content_type: application/json,
+            body: '{"from":{"Type":"source","stream_id":{stream:json},"stream_name":{stream_name:json},"stream_url":{stream_url:json},"pos_id":"","output_id":"{output}","layout_id":""},"to":{"Type":"preview","stream_id":{stream:json},"stream_name":{stream_name:json},"stream_url":{stream_url:json},"output_id":"{output}","layout_id":""}}' }
+    expect: *ok
+    returns: ack
+  remove_preview_source:
+    summary: "Remove a source from the preview (POST /api/preview/source/remove)"
+    params:
+      position: { type: int, min: 1, required: true, label: Preview position, description: "The preview position id, as get_preview gives it." }
+    send: { method: POST, path: /api/preview/source/remove, content_type: application/json, body: '{"id":{position},"pos_id":{position}}' }
+    expect: *ok
+    returns: ack
+
+  # --- NDI discovery (section 16) ---
+  get_ndi_discovery:
+    summary: "NDI discovery entries: public, by group, manual addresses and discovery servers (GET /api/ndi/discovery/all)"
+    send: { method: GET, path: /api/ndi/discovery/all }
+    expect: *val
+    returns: value
+  list_ndi_sources:
+    summary: "NDI sources found by one discovery method (GET /api/ndi/discovery/sources)"
+    params:
+      method: { type: enum, values: [public, manual, group, server], default: public, label: Discovery, description: "public automatic discovery, manual addresses, automatic discovery in a group, or a discovery server." }
+      group: { type: string, default: "", max_length: 128, label: NDI group, description: "The group name; needed for group and server." }
+      server: { type: string, default: "", max_length: 255, label: Discovery server, description: "The discovery server's address; needed for server." }
+    send: { method: GET, path: /api/ndi/discovery/sources,
+            query: { dis_method: "{method:map.ndi_discovery_method}", dis_g_name: "{group}", dis_s_ip: "{server}" } }
+    expect: *val
+    returns: value
+  set_ndi_manual_discovery:
+    summary: "Replace the manual NDI discovery list (POST /api/ndi/discovery/manual/add): the entries given are all that remain"
+    params:
+      entries: { type: json, required: true, label: Entries, description: "The manuals array: objects with dis_d_ip (an address to search) and dis_g_name (its NDI group)." }
+    send: { method: POST, path: /api/ndi/discovery/manual/add, content_type: application/json, body: '{"manuals":{entries}}' }
+    expect: *ok
+    returns: ack
+  add_ndi_group_discovery:
+    summary: "Add automatic NDI discovery in a group (POST /api/ndi/discovery/auto/add)"
+    params:
+      group: { type: string, required: true, max_length: 128, label: NDI group, description: "The NDI group to discover in." }
+    send: { method: POST, path: /api/ndi/discovery/auto/add, content_type: application/json, body: '{"dis_g_name":{group:json}}' }
+    expect: *ok
+    returns: ack
+  remove_ndi_group_discovery:
+    summary: "Remove automatic NDI discovery in a group (POST /api/ndi/discovery/auto/del)"
+    params:
+      group: { type: string, required: true, max_length: 128, label: NDI group, description: "The group, as get_ndi_discovery gives it." }
+      address: { type: string, default: "", max_length: 255, label: Address, description: "The entry's dis_d_ip as get_ndi_discovery gives it, usually empty." }
+    send: { method: POST, path: /api/ndi/discovery/auto/del, content_type: application/json, body: '{"dis_d_ip":{address:json},"dis_g_name":{group:json}}' }
+    expect: *ok
+    returns: ack
+  add_ndi_discovery_server:
+    summary: "Add an NDI discovery server for a group (POST /api/ndi/discovery/server/add)"
+    params: &ndi_server
+      group: { type: string, default: public, max_length: 128, label: NDI group, description: "The NDI group." }
+      server: { type: string, required: true, max_length: 255, label: Discovery server, description: "The discovery server's address." }
+    send: { method: POST, path: /api/ndi/discovery/server/add, content_type: application/json, body: '{"dis_g_name":{group:json},"dis_s_ip":{server:json}}' }
+    expect: *ok
+    returns: ack
+  remove_ndi_discovery_server:
+    summary: "Remove an NDI discovery server entry (POST /api/ndi/discovery/server/del)"
+    params: *ndi_server
+    send: { method: POST, path: /api/ndi/discovery/server/del, content_type: application/json, body: '{"dis_s_ip":{server:json},"dis_g_name":{group:json}}' }
+    expect: *ok
+    returns: ack
+
+state:
+  device.name:              { type: string, description: "Device name (info/get, sys/device/get)" }
+  device.firmware_version:  { type: string, description: "Firmware version" }
+  device.hardware_version:  { type: string, description: "Hardware version" }
+  device.software_version:  { type: string, description: "Software (API) version, such as 2.0.0" }
+  device.serial_number:     { type: string, description: "Serial number" }
+
+  outputs.*.name:               { type: string, description: "Output name, such as output1; outputs are 1 and 2" }
+  outputs.*.layout:             { type: int, description: "Id of the layout shown on the output (see layouts)" }
+  outputs.*.layout_modified:    { type: bool, description: "The output's layout has unsaved changes" }
+  outputs.*.resolution_id:      { type: string, description: "Id of the output resolution (see resolutions)" }
+  outputs.*.resolution:         { type: string, description: "Output resolution name, such as 1920x1080P60" }
+  outputs.*.vu_meter:           { type: bool, description: "VU meters shown on the output" }
+  outputs.*.background:         { type: string, description: "Background color, #RRGGBB" }
+  outputs.*.background_enabled: { type: bool, description: "Background color in use" }
+  outputs.*.border.enabled:     { type: bool, description: "Window borders shown" }
+  outputs.*.border.color:       { type: string, description: "Border color, #RRGGBB" }
+  outputs.*.border.top_width:   { type: int, description: "Top border width, pixels" }
+  outputs.*.border.bottom_width: { type: int, description: "Bottom border width, pixels" }
+  outputs.*.border.left_width:  { type: int, description: "Left border width, pixels" }
+  outputs.*.border.right_width: { type: int, description: "Right border width, pixels" }
+
+  outputs.*.windows.*.stream_id:     { type: string, description: "Id of the stream in the window (see sources.streams), empty when none" }
+  outputs.*.windows.*.stream_name:   { type: string, description: "Name of the stream in the window" }
+  outputs.*.windows.*.stream_address: { type: string, description: "Address of the stream in the window, such as 192.168.36.238:5965" }
+  outputs.*.windows.*.type:          { type: string, description: "Protocol of the stream in the window: ndi, srt, rtsp, rtmp, ..." }
+  outputs.*.windows.*.status:        { type: string, description: "Stream status: disconnected, connecting, connected, failed or performance_limited (codes 0-4)" }
+  outputs.*.windows.*.enabled:       { type: bool, description: "The window is streaming" }
+  outputs.*.windows.*.muted:         { type: bool, description: "The window's audio is muted" }
+  outputs.*.windows.*.volume:        { type: int, description: "The window's audio gain, dB" }
+  outputs.*.windows.*.vu_meter:      { type: bool, description: "VU meter shown in the window" }
+  outputs.*.windows.*.resolution:    { type: string, description: "Decoded resolution, such as 1920x1080p60; 0x0p0 when none" }
+  outputs.*.windows.*.video_format:  { type: string, description: "Decoded format, such as NDI | HB" }
+  outputs.*.windows.*.video_bitrate: { type: float, description: "Decoded video bitrate as the decoder reports it (apparently kbit/s)" }
+  outputs.*.windows.*.number:        { type: int, description: "The window's index in the layout" }
+  outputs.*.windows.*.x:             { type: float, description: "Window left edge, percent of the output width" }
+  outputs.*.windows.*.y:             { type: float, description: "Window top edge, percent of the output height" }
+  outputs.*.windows.*.width:         { type: float, description: "Window width, percent of the output width" }
+  outputs.*.windows.*.height:        { type: float, description: "Window height, percent of the output height" }
+  outputs.*.windows.*.z_index:       { type: int, description: "Window stacking order, from 0" }
+
+  outputs.*.video_interfaces.*.label:      { type: string, description: "Video interface name: HDMI1, HDMI2, SDI" }
+  outputs.*.video_interfaces.*.mode:       { type: string, description: "Interface mode, such as HDMI" }
+  outputs.*.video_interfaces.*.colorspace: { type: string, description: "Color space, such as RGB444" }
+  outputs.*.video_interfaces.*.enabled:    { type: bool, description: "The interface carries this output" }
+  outputs.*.video_interfaces.*.supported:  { type: bool, description: "The device supports the interface" }
+  outputs.*.video_interfaces.*.visible:    { type: bool, description: "The interface is shown" }
+  outputs.*.audio_interfaces.*.label:       { type: string, description: "Audio interface name: HDMI, HDMI1, SDI, LineOut" }
+  outputs.*.audio_interfaces.*.enabled:     { type: bool, description: "The interface carries this output's audio" }
+  outputs.*.audio_interfaces.*.muted:       { type: bool, description: "The interface is muted" }
+  outputs.*.audio_interfaces.*.volume:      { type: int, description: "The interface's gain, dB" }
+  outputs.*.audio_interfaces.*.sample_rate: { type: float, description: "Sample rate as the decoder reports it (44.1 in the document's example, kHz)" }
+  outputs.*.audio_interfaces.*.channels:    { type: int, description: "Number of audio channels" }
+  outputs.*.audio_interfaces.*.visible:     { type: bool, description: "The interface is shown" }
+
+  outputs.*.audio_mix.output.*.name:     { type: string, description: "Name of a window stream in the output's mix, keyed by stream id" }
+  outputs.*.audio_mix.output.*.enabled:  { type: bool, description: "The stream's audio is in the mix" }
+  outputs.*.audio_mix.output.*.muted:    { type: bool, description: "The stream's audio is muted" }
+  outputs.*.audio_mix.output.*.volume:   { type: int, description: "The stream's gain, dB" }
+  outputs.*.audio_mix.output.*.window:   { type: int, description: "The window the stream is in" }
+  outputs.*.audio_mix.preview.*.name:    { type: string, description: "Name of a preview stream in the output's mix, keyed by stream id" }
+  outputs.*.audio_mix.preview.*.enabled: { type: bool, description: "The stream's audio is in the mix" }
+  outputs.*.audio_mix.preview.*.muted:   { type: bool, description: "The stream's audio is muted" }
+  outputs.*.audio_mix.preview.*.volume:  { type: int, description: "The stream's gain, dB" }
+
+  outputs.*.audio_levels.*.stream_id:   { type: string, description: "Stream of the nth level entry of the output (from 0)" }
+  outputs.*.audio_levels.*.channels.*:  { type: float, description: "Audio level of a channel of that stream, dB, channels from 1" }
+
+  outputs.*.overlays.*.name:       { type: string, description: "Overlay template name, keyed by template id" }
+  outputs.*.overlays.*.selected:   { type: bool, description: "The template is selected on the output" }
+  outputs.*.overlays.*.status:     { type: int, description: "The template's status number as the decoder reports it" }
+  outputs.*.overlays.*.background: { type: string, description: "The template's background, such as transparent" }
+  outputs.*.overlays.*.editing:    { type: bool, description: "The template is being edited" }
+  outputs.*.overlays.*.modified:   { type: bool, description: "The template has been modified" }
+  outputs.*.overlays.*.image:      { type: string, description: "Path of the template's preview image on the decoder" }
+
+  sources.groups.*.name:                 { type: string, description: "Source group name, keyed by group id" }
+  sources.streams.*.group:               { type: string, description: "Id of the group the stream is in; streams are keyed by stream id" }
+  sources.streams.*.name:                { type: string, description: "Stream name" }
+  sources.streams.*.type:                { type: string, description: "Protocol: ndi, srt, rtsp, rtmp, rtmps, rtmp_server, rtp, udp, http, https" }
+  sources.streams.*.url:                 { type: string, description: "Stream URL, or the NDI source's address and port" }
+  sources.streams.*.status:              { type: string, description: "Stream status: disconnected, connecting, connected, failed or performance_limited (codes 0-4)" }
+  sources.streams.*.ndi_name:            { type: string, description: "NDI source name" }
+  sources.streams.*.address:             { type: string, description: "Sender address (SRT, NDI)" }
+  sources.streams.*.buffer:              { type: string, description: "Cache setting, live:a:b:c:d:e" }
+  sources.streams.*.transport:           { type: string, description: "RTSP transport tcp or udp, or NDI transport tcp, multicast, unicast or rudp" }
+  sources.streams.*.preview_mode:        { type: string, description: "NDI stream taken: Auto, Full (main) or Preview (sub)" }
+  sources.streams.*.connect_speed:       { type: int, description: "Connection timeout, ms" }
+  sources.streams.*.audio_sync:          { type: int, description: "Audio synchronization compensation, ms" }
+  sources.streams.*.user:                { type: string, description: "Account the source asks for" }
+  sources.streams.*.srt_mode:            { type: string, description: "SRT mode: Caller, Listener or Rendezvous" }
+  sources.streams.*.srt_port:            { type: int, description: "SRT port" }
+  sources.streams.*.srt_latency:         { type: int, description: "SRT latency, ms" }
+  sources.streams.*.srt_stream_id:       { type: string, description: "SRT stream id" }
+  sources.streams.*.srt_encryption:      { type: string, description: "SRT encryption: none, AES-128, AES-192 or AES-256" }
+  sources.streams.*.srt_bandwidth:       { type: int, description: "SRT recovery bandwidth overhead, percent" }
+  sources.streams.*.srt_payload_size:    { type: int, description: "SRT payload size, bytes" }
+  sources.streams.*.rtmp_application:    { type: string, description: "RTMP server application name" }
+  sources.streams.*.rtmp_session:        { type: string, description: "RTMP server session name" }
+  sources.streams.*.rtmp_security:       { type: string, description: "RTMP server authentication: empty or token" }
+  sources.streams.*.rtmp_port:           { type: int, description: "RTMP server port" }
+  sources.streams.*.sdp:                 { type: string, description: "RTP session description" }
+
+  layouts.*.name:               { type: string, description: "Layout name, keyed by layout id" }
+  layouts.*.pane_count:         { type: int, description: "Number of panes" }
+  layouts.*.used:               { type: bool, description: "The layout is in use" }
+  layouts.*.panes.*.stream_id:  { type: string, description: "Stream in the pane, keyed by pane id; empty when none" }
+  layouts.*.panes.*.number:     { type: int, description: "The pane's index" }
+  layouts.*.panes.*.x:          { type: float, description: "Pane left edge, percent" }
+  layouts.*.panes.*.y:          { type: float, description: "Pane top edge, percent" }
+  layouts.*.panes.*.width:      { type: float, description: "Pane width, percent" }
+  layouts.*.panes.*.height:     { type: float, description: "Pane height, percent" }
+  layouts.*.panes.*.z_index:    { type: int, description: "Pane stacking order, from 0" }
+  layout_templates.*.name:            { type: string, description: "Template name (Single, PIP, 2x2, 3x3, 4x4), keyed by template id" }
+  layout_templates.*.pane_count:      { type: int, description: "Number of panes" }
+  layout_templates.*.panes.*.x:       { type: float, description: "Pane left edge, percent" }
+  layout_templates.*.panes.*.y:       { type: float, description: "Pane top edge, percent" }
+  layout_templates.*.panes.*.width:   { type: float, description: "Pane width, percent" }
+  layout_templates.*.panes.*.height:  { type: float, description: "Pane height, percent" }
+  layout_templates.*.panes.*.z_index: { type: int, description: "Pane stacking order, from 0" }
+
+  resolutions.*.name:  { type: string, description: "Output resolution name, keyed by resolution id, such as 1920x1080P60 or 1920x1080P59.94(SDI only)" }
+  resolutions.*.value: { type: string, description: "Output resolution value" }
+
+  preview.windows.*.stream_id:   { type: string, description: "Stream in a preview position, keyed by position id" }
+  preview.windows.*.stream_name: { type: string, description: "Name of that stream" }
+  preview.windows.*.stream_url:  { type: string, description: "Address of that stream" }
+  preview.windows.*.type:        { type: string, description: "Protocol of that stream" }
+  preview.windows.*.status:      { type: string, description: "Stream status: disconnected, connecting, connected, failed or performance_limited" }
+  preview.windows.*.resolution:  { type: string, description: "Decoded resolution" }
+  preview.windows.*.x:           { type: int, description: "Position left edge in the preview image, pixels" }
+  preview.windows.*.y:           { type: int, description: "Position top edge in the preview image, pixels" }
+  preview.windows.*.width:       { type: int, description: "Position width, pixels" }
+  preview.windows.*.height:      { type: int, description: "Position height, pixels" }
+
+  network.interfaces.*.enabled:       { type: bool, description: "The network port (keyed by name, eth0 or eth1) is enabled" }
+  network.interfaces.*.link:          { type: string, description: "Link state: up or down" }
+  network.interfaces.*.dhcp:          { type: bool, description: "The address comes from DHCP" }
+  network.interfaces.*.ip:            { type: string, description: "IP address" }
+  network.interfaces.*.mask:          { type: string, description: "Subnet mask" }
+  network.interfaces.*.gateway:       { type: string, description: "Gateway" }
+  network.interfaces.*.dns:           { type: string, description: "DNS server" }
+  network.interfaces.*.mac:           { type: string, description: "MAC address" }
+  network.interfaces.*.maintenance.enabled: { type: bool, description: "The maintenance (second) address is on" }
+  network.interfaces.*.maintenance.ip:      { type: string, description: "Maintenance address" }
+  network.interfaces.*.maintenance.mask:    { type: string, description: "Maintenance subnet mask" }
+  network.interfaces.*.maintenance.gateway: { type: string, description: "Maintenance gateway" }
+  network.http.enabled:   { type: bool, description: "The web server answers HTTP" }
+  network.http.port:      { type: int, description: "HTTP port" }
+  network.https.enabled:  { type: bool, description: "The web server answers HTTPS" }
+  network.https.port:     { type: int, description: "HTTPS port" }
+  network.routes.*.interface: { type: string, description: "Network port of a static route, keyed by route id" }
+  network.routes.*.ip:        { type: string, description: "Route destination" }
+  network.routes.*.netmask:   { type: string, description: "Route subnet mask" }
+  network.routes.*.gateway:   { type: string, description: "Route gateway" }
+  network.routes.*.mtu:       { type: int, description: "Route MTU, bytes" }
+  network.routes.*.metric:    { type: int, description: "Route metric" }
+  network.routes.*.enabled:   { type: bool, description: "The route is used" }
+
+  time.current:     { type: string, description: "Decoder time, YYYY-MM-DD HH:MM:SS, as of the last read" }
+  time.source:      { type: string, description: "Time source: ntp, pc or manual" }
+  time.timezone:    { type: string, description: "Time zone name, such as Asia/Shanghai" }
+  time.offset:      { type: int, description: "Time zone offset from UTC, hours" }
+  time.ntp_servers: { type: string, description: "NTP servers, separated by spaces" }
+
+  users.*.username:    { type: string, description: "Account name, keyed by user id" }
+  users.*.alias:       { type: string, description: "Account display name" }
+  users.*.role:        { type: string, description: "Account role, such as admin" }
+  users.*.phone:       { type: string, description: "Contact number" }
+  users.*.description: { type: string, description: "Account description" }
+  users.*.created:     { type: string, description: "Creation time as the decoder gives it (ms since 1970 in the list example)" }
+
+  ndi_discovery.*.*.group:  { type: string, description: "NDI group of a discovery entry; kinds auto, manual, discovery_server, public, entries numbered from 0" }
+  ndi_discovery.*.*.address: { type: string, description: "Address searched by a manual entry" }
+  ndi_discovery.*.*.server: { type: string, description: "Discovery server of a server entry" }
+  ndi_discovery.*.*.method: { type: int, description: "Discovery method: 1 public, 2 manual, 3 group, 4 server" }
+
+  ndi.sources.*.name:    { type: string, description: "Device name of an NDI source found by public discovery, keyed by full NDI name" }
+  ndi.sources.*.url:     { type: string, description: "Address and port of the source" }
+  ndi.sources.*.ip:      { type: string, description: "IP address of the source" }
+  ndi.sources.*.port:    { type: int, description: "NDI port of the source" }
+  ndi.sources.*.channel: { type: string, description: "Channel, such as FULL, HB or HX" }
+  ndi.sources.*.group:   { type: string, description: "NDI group the source is in" }
+
+telemetry:
+  poll:
+    # What moves while decoding: window status, bitrate, format, levels.
+    - every_ms: 2000
+      send:
+        - { method: GET, path: /api/output/get, query: { output_id: "1" } }
+        - { method: GET, path: /api/output/get, query: { output_id: "2" } }
+        - { method: POST, path: /api/output/audio/sound, content_type: application/json, body: '{"output_id":"1"}' }
+        - { method: POST, path: /api/output/audio/sound, content_type: application/json, body: '{"output_id":"2"}' }
+    # Source connection status and the preview.
+    - every_ms: 5000
+      send:
+        - { method: POST, path: /api/source/groups/list, content_type: application/json, body: '{"is_need_stream":true}' }
+        - { method: GET, path: /api/preview/get }
+    # Configuration.
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /api/info/get }
+        - { method: GET, path: /api/output/list }
+        - { method: GET, path: /api/layout/list }
+        - { method: GET, path: /api/layout/template/list }
+        - { method: GET, path: /api/output/resolution/list }
+        - { method: POST, path: /api/output/interfaces/get, content_type: application/json, body: '{"output_id":1,"Type":"video"}' }
+        - { method: POST, path: /api/output/interfaces/get, content_type: application/json, body: '{"output_id":1,"Type":"audio"}' }
+        - { method: POST, path: /api/output/interfaces/get, content_type: application/json, body: '{"output_id":2,"Type":"video"}' }
+        - { method: POST, path: /api/output/interfaces/get, content_type: application/json, body: '{"output_id":2,"Type":"audio"}' }
+        - { method: GET, path: /api/output/audiomix/get, query: { output_id: "1" } }
+        - { method: GET, path: /api/output/audiomix/get, query: { output_id: "2" } }
+        - { method: GET, path: /api/overlay/list, query: { output_id: "1" } }
+        - { method: GET, path: /api/overlay/list, query: { output_id: "2" } }
+        - { method: GET, path: /api/network/get }
+        - { method: GET, path: /api/network/http/get }
+        - { method: GET, path: /api/network/routing/get }
+        - { method: GET, path: /api/timeregion/settings }
+        - { method: GET, path: /api/users/list }
+        - { method: GET, path: /api/ndi/discovery/all }
+        - { method: GET, path: /api/ndi/discovery/sources, query: { dis_method: "1", dis_g_name: "", dis_s_ip: "" } }
+  updates:
+    # --- Reads (sections 5-16) ---
+    - path: "^/api/info/get$"
+      json_match: { "$.result": "^ok$" }
+      json: { name: "$.data.device_name", fw: "$.data.firmware_version", hw: "$.data.hardware_version",
+              sw: "$.data.software_version", serial: "$.data.serial_number" }
+      state:
+        device.name: "{name}"
+        device.firmware_version: "{fw}"
+        device.hardware_version: "{hw}"
+        device.software_version: "{sw}"
+        device.serial_number: "{serial}"
+    - path: "^/api/sys/device/get$"
+      json_match: { "$.result": "^ok$" }
+      json: { name: "$.data.device_name" }
+      state: { device.name: "{name}" }
+
+    - path: "^/api/output/list$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", name: "$.name", layout: "$.layout_id", modified: "$.modified", res_id: "$.res_id",
+              res: "$.res_name", vu: "$.vumeter", bg: "$.background", bg_on: "$.bg_enable",
+              b_on: "$.border.enable", b_color: "$.border.color", b_top: "$.border.top_width",
+              b_bottom: "$.border.bottom_width", b_left: "$.border.left_width", b_right: "$.border.right_width" }
+      state:
+        "outputs.{id}.name": "{name}"
+        "outputs.{id}.layout": "{layout}"
+        "outputs.{id}.layout_modified": "{modified}"
+        "outputs.{id}.resolution_id": "{res_id}"
+        "outputs.{id}.resolution": "{res}"
+        "outputs.{id}.vu_meter": "{vu}"
+        "outputs.{id}.background": "{bg}"
+        "outputs.{id}.background_enabled": "{bg_on}"
+        "outputs.{id}.border.enabled": "{b_on}"
+        "outputs.{id}.border.color": "{b_color}"
+        "outputs.{id}.border.top_width": "{b_top}"
+        "outputs.{id}.border.bottom_width": "{b_bottom}"
+        "outputs.{id}.border.left_width": "{b_left}"
+        "outputs.{id}.border.right_width": "{b_right}"
+    - path: "^/api/output/get\\?output_id=([12])$"
+      json_match: { "$.result": "^ok$" }
+      json: { name: "$.data.name", layout: "$.data.layout_id", vu: "$.data.vumeter" }
+      state:
+        "outputs.{1}.name": "{name}"
+        "outputs.{1}.layout": "{layout}"
+        "outputs.{1}.vu_meter": "{vu}"
+    - path: "^/api/output/get\\?output_id=([12])$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.position"
+      json: { id: "$.id", stream: "$.stream_id", sname: "$.stream_name", sip: "$.stream_ip", type: "$.Type",
+              status: "$.status", en: "$.enable", mute: "$.mute", vol: "$.volume", vu: "$.vu_meter",
+              res: "$.resolution", fmt: "$.video_format", kbps: "$.video_bitrate", number: "$.number",
+              x: "$.x", y: "$.y", w: "$.width", h: "$.height", z: "$.z_index" }
+      replace: "outputs.{1}.windows"
+      state:
+        "outputs.{1}.windows.{id}.stream_id": "{stream}"
+        "outputs.{1}.windows.{id}.stream_name": "{sname}"
+        "outputs.{1}.windows.{id}.stream_address": "{sip}"
+        "outputs.{1}.windows.{id}.type": "{type}"
+        "outputs.{1}.windows.{id}.status": { value: "{status}", map: &stream_status { "0": disconnected, "1": connecting, "2": connected, "3": failed, "4": performance_limited } }
+        "outputs.{1}.windows.{id}.enabled": "{en}"
+        "outputs.{1}.windows.{id}.muted": "{mute}"
+        "outputs.{1}.windows.{id}.volume": "{vol}"
+        "outputs.{1}.windows.{id}.vu_meter": "{vu}"
+        "outputs.{1}.windows.{id}.resolution": "{res}"
+        "outputs.{1}.windows.{id}.video_format": "{fmt}"
+        "outputs.{1}.windows.{id}.video_bitrate": "{kbps}"
+        "outputs.{1}.windows.{id}.number": "{number}"
+        "outputs.{1}.windows.{id}.x": "{x}"
+        "outputs.{1}.windows.{id}.y": "{y}"
+        "outputs.{1}.windows.{id}.width": "{w}"
+        "outputs.{1}.windows.{id}.height": "{h}"
+        "outputs.{1}.windows.{id}.z_index": "{z}"
+    - path: "^/api/output/interfaces/get$"
+      request_match: { "$.output_id": "^([12])$", "$.Type": "^video$" }
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", label: "$.label", mode: "$.mode", cs: "$.colorspace", en: "$.enable", sup: "$.support", vis: "$.visible" }
+      replace: "outputs.{1}.video_interfaces"
+      state:
+        "outputs.{1}.video_interfaces.{id}.label": "{label}"
+        "outputs.{1}.video_interfaces.{id}.mode": "{mode}"
+        "outputs.{1}.video_interfaces.{id}.colorspace": "{cs}"
+        "outputs.{1}.video_interfaces.{id}.enabled": "{en}"
+        "outputs.{1}.video_interfaces.{id}.supported": "{sup}"
+        "outputs.{1}.video_interfaces.{id}.visible": "{vis}"
+    - path: "^/api/output/interfaces/get$"
+      request_match: { "$.output_id": "^([12])$", "$.Type": "^audio$" }
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", label: "$.label", en: "$.enable", mute: "$.mute", vol: "$.volume", rate: "$.samplerate", ch: "$.channels", vis: "$.visible" }
+      replace: "outputs.{1}.audio_interfaces"
+      state:
+        "outputs.{1}.audio_interfaces.{id}.label": "{label}"
+        "outputs.{1}.audio_interfaces.{id}.enabled": "{en}"
+        "outputs.{1}.audio_interfaces.{id}.muted": "{mute}"
+        "outputs.{1}.audio_interfaces.{id}.volume": "{vol}"
+        "outputs.{1}.audio_interfaces.{id}.sample_rate": "{rate}"
+        "outputs.{1}.audio_interfaces.{id}.channels": "{ch}"
+        "outputs.{1}.audio_interfaces.{id}.visible": "{vis}"
+    - path: "^/api/output/audiomix/get\\?output_id=([12])$"
+      json_each: "$.data.output"
+      json: { stream: "$.stream_id", name: "$.name", en: "$.enable", mute: "$.mute", vol: "$.volume", pos: "$.pos_id" }
+      replace: "outputs.{1}.audio_mix.output"
+      state:
+        "outputs.{1}.audio_mix.output.{stream}.name": "{name}"
+        "outputs.{1}.audio_mix.output.{stream}.enabled": "{en}"
+        "outputs.{1}.audio_mix.output.{stream}.muted": "{mute}"
+        "outputs.{1}.audio_mix.output.{stream}.volume": "{vol}"
+        "outputs.{1}.audio_mix.output.{stream}.window": "{pos}"
+    - path: "^/api/output/audiomix/get\\?output_id=([12])$"
+      json_each: "$.data.preview"
+      json: { stream: "$.stream_id", name: "$.name", en: "$.enable", mute: "$.mute", vol: "$.volume" }
+      replace: "outputs.{1}.audio_mix.preview"
+      state:
+        "outputs.{1}.audio_mix.preview.{stream}.name": "{name}"
+        "outputs.{1}.audio_mix.preview.{stream}.enabled": "{en}"
+        "outputs.{1}.audio_mix.preview.{stream}.muted": "{mute}"
+        "outputs.{1}.audio_mix.preview.{stream}.volume": "{vol}"
+    - path: "^/api/output/audio/sound$"
+      request_match: { "$.output_id": "^([12])$" }
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { stream: "$.stream_id" }
+      replace: "outputs.{1}.audio_levels"
+      state: { "outputs.{1}.audio_levels.{index}.stream_id": "{stream}" }
+    - path: "^/api/output/audio/sound$"
+      request_match: { "$.output_id": "^([12])$" }
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data[*].dB"
+      json: { db: "$" }
+      state: { "outputs.{1}.audio_levels.{^index}.channels.{index:+1}": "{db}" }
+    - path: "^/api/output/border/get$"
+      request_match: { "$.output_id": "^([12])$" }
+      json_match: { "$.result": "^ok$" }
+      json: { en: "$.data.enable", color: "$.data.color", top: "$.data.top_width", bottom: "$.data.bottom_width",
+              left: "$.data.left_width", right: "$.data.right_width" }
+      state:
+        "outputs.{1}.border.enabled": "{en}"
+        "outputs.{1}.border.color": "{color}"
+        "outputs.{1}.border.top_width": "{top}"
+        "outputs.{1}.border.bottom_width": "{bottom}"
+        "outputs.{1}.border.left_width": "{left}"
+        "outputs.{1}.border.right_width": "{right}"
+    - path: "^/api/output/background/get\\?output_id=([12])$"
+      json_match: { "$.result": "^ok$" }
+      json: { bg: "$.data.background", en: "$.data.enable" }
+      state:
+        "outputs.{1}.background": "{bg}"
+        "outputs.{1}.background_enabled": "{en}"
+    - path: "^/api/overlay/list\\?output_id=([12])$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", name: "$.name", sel: "$.selected", status: "$.status", bg: "$.background",
+              edit: "$.editing", mod: "$.modified", img: "$.img_path" }
+      replace: "outputs.{1}.overlays"
+      state:
+        "outputs.{1}.overlays.{id}.name": "{name}"
+        "outputs.{1}.overlays.{id}.selected": "{sel}"
+        "outputs.{1}.overlays.{id}.status": "{status}"
+        "outputs.{1}.overlays.{id}.background": "{bg}"
+        "outputs.{1}.overlays.{id}.editing": "{edit}"
+        "outputs.{1}.overlays.{id}.modified": "{mod}"
+        "outputs.{1}.overlays.{id}.image": "{img}"
+
+    - path: "^/api/source/groups/list$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", name: "$.name" }
+      replace: [sources.groups, sources.streams]
+      state: { "sources.groups.{id:key}.name": "{name}" }
+    - path: "^/api/source/groups/list$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data[*].streams"
+      json: { group: "$^.id", id: "$.id", name: "$.name", type: "$.Type", url: "$.url", status: "$.status",
+              ndi: "$.ndi_name", addr: "$.address", buffer: "$.buffer", trans: "$.trans_mode", pm: "$.preview_mode",
+              speed: "$.connect_speed", sync: "$.audio_sync_compst", user: "$.user", mode: "$.connection_mode",
+              port: "$.listener_port", lat: "$.latency", srtid: "$.srt_id", enc: "$.encryption", bw: "$.bandwidth",
+              payload: "$.payload_size", app: "$.application", session: "$.session", sec: "$.security",
+              rport: "$.rtmp_server_port", sdp: "$.sdp_content" }
+      state:
+        "sources.streams.{id:key}.group": "{group}"
+        "sources.streams.{id:key}.name": "{name}"
+        "sources.streams.{id:key}.type": "{type}"
+        "sources.streams.{id:key}.url": "{url}"
+        "sources.streams.{id:key}.status": { value: "{status}", map: *stream_status }
+        "sources.streams.{id:key}.ndi_name": "{ndi}"
+        "sources.streams.{id:key}.address": "{addr}"
+        "sources.streams.{id:key}.buffer": "{buffer}"
+        "sources.streams.{id:key}.transport": "{trans}"
+        "sources.streams.{id:key}.preview_mode": "{pm}"
+        "sources.streams.{id:key}.connect_speed": "{speed}"
+        "sources.streams.{id:key}.audio_sync": "{sync}"
+        "sources.streams.{id:key}.user": "{user}"
+        "sources.streams.{id:key}.srt_mode": "{mode}"
+        "sources.streams.{id:key}.srt_port": "{port}"
+        "sources.streams.{id:key}.srt_latency": "{lat}"
+        "sources.streams.{id:key}.srt_stream_id": "{srtid}"
+        "sources.streams.{id:key}.srt_encryption": "{enc}"
+        "sources.streams.{id:key}.srt_bandwidth": "{bw}"
+        "sources.streams.{id:key}.srt_payload_size": "{payload}"
+        "sources.streams.{id:key}.rtmp_application": "{app}"
+        "sources.streams.{id:key}.rtmp_session": "{session}"
+        "sources.streams.{id:key}.rtmp_security": "{sec}"
+        "sources.streams.{id:key}.rtmp_port": "{rport}"
+        "sources.streams.{id:key}.sdp": "{sdp}"
+
+    - path: "^/api/layout/list$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.layout_id", name: "$.name", count: "$.layout_count", used: "$.used" }
+      replace: layouts
+      state:
+        "layouts.{id}.name": "{name}"
+        "layouts.{id}.pane_count": "{count}"
+        "layouts.{id}.used": "{used}"
+    - path: "^/api/layout/list$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data[*].position"
+      json: { layout: "$^.layout_id", id: "$.id", stream: "$.stream_id", number: "$.number", x: "$.x", y: "$.y",
+              w: "$.width", h: "$.height", z: "$.z_index" }
+      state:
+        "layouts.{layout}.panes.{id}.stream_id": "{stream}"
+        "layouts.{layout}.panes.{id}.number": "{number}"
+        "layouts.{layout}.panes.{id}.x": "{x}"
+        "layouts.{layout}.panes.{id}.y": "{y}"
+        "layouts.{layout}.panes.{id}.width": "{w}"
+        "layouts.{layout}.panes.{id}.height": "{h}"
+        "layouts.{layout}.panes.{id}.z_index": "{z}"
+    - path: "^/api/layout/template/list$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.template_id", name: "$.name", count: "$.template_count" }
+      replace: layout_templates
+      state:
+        "layout_templates.{id}.name": "{name}"
+        "layout_templates.{id}.pane_count": "{count}"
+    - path: "^/api/layout/template/list$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data[*].position"
+      json: { t: "$^.template_id", id: "$.id", x: "$.x", y: "$.y", w: "$.width", h: "$.height", z: "$.z_index" }
+      state:
+        "layout_templates.{t}.panes.{id}.x": "{x}"
+        "layout_templates.{t}.panes.{id}.y": "{y}"
+        "layout_templates.{t}.panes.{id}.width": "{w}"
+        "layout_templates.{t}.panes.{id}.height": "{h}"
+        "layout_templates.{t}.panes.{id}.z_index": "{z}"
+    - path: "^/api/output/resolution/list$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", name: "$.name", value: "$.value" }
+      replace: resolutions
+      state:
+        "resolutions.{id}.name": "{name}"
+        "resolutions.{id}.value": "{value}"
+
+    - path: "^/api/preview/get$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.position"
+      json: { id: "$.id", stream: "$.stream_id", name: "$.stream_name", url: "$.stream_url", type: "$.Type",
+              status: "$.status", res: "$.resolution", x: "$.x", y: "$.y", w: "$.width", h: "$.height" }
+      replace: preview.windows
+      state:
+        "preview.windows.{id}.stream_id": "{stream}"
+        "preview.windows.{id}.stream_name": "{name}"
+        "preview.windows.{id}.stream_url": "{url}"
+        "preview.windows.{id}.type": "{type}"
+        "preview.windows.{id}.status": { value: "{status}", map: *stream_status }
+        "preview.windows.{id}.resolution": "{res}"
+        "preview.windows.{id}.x": "{x}"
+        "preview.windows.{id}.y": "{y}"
+        "preview.windows.{id}.width": "{w}"
+        "preview.windows.{id}.height": "{h}"
+
+    - path: "^/api/network/get$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { dev: "$.device", en: "$.enable", state: "$.state", dyn: "$.dynamic", ip: "$.ip", mask: "$.mask", gw: "$.gw",
+              dns: "$.dns", mac: "$.mac", en2: "$.enable2", ip2: "$.ip2", mask2: "$.mask2", gw2: "$.gw2" }
+      replace: network.interfaces
+      state:
+        "network.interfaces.{dev:key}.enabled": { value: "{en}", map: { "1": true, "0": false } }
+        "network.interfaces.{dev:key}.link": "{state}"
+        "network.interfaces.{dev:key}.dhcp": { value: "{dyn}", map: { "y": true, "n": false } }
+        "network.interfaces.{dev:key}.ip": "{ip}"
+        "network.interfaces.{dev:key}.mask": "{mask}"
+        "network.interfaces.{dev:key}.gateway": "{gw}"
+        "network.interfaces.{dev:key}.dns": "{dns}"
+        "network.interfaces.{dev:key}.mac": "{mac}"
+        "network.interfaces.{dev:key}.maintenance.enabled": "{en2}"
+        "network.interfaces.{dev:key}.maintenance.ip": "{ip2}"
+        "network.interfaces.{dev:key}.maintenance.mask": "{mask2}"
+        "network.interfaces.{dev:key}.maintenance.gateway": "{gw2}"
+    - path: "^/api/network/http/get$"
+      json_match: { "$.result": "^ok$" }
+      json: { http: "$.data.http", hport: "$.data.httpPort", https: "$.data.https", sport: "$.data.httpsPort" }
+      state:
+        network.http.enabled: "{http}"
+        network.http.port: "{hport}"
+        network.https.enabled: "{https}"
+        network.https.port: "{sport}"
+    - path: "^/api/network/routing/get$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", dev: "$.device", ip: "$.ip", mask: "$.netmask", gw: "$.gw", mtu: "$.mtu", metric: "$.metric", status: "$.status" }
+      replace: network.routes
+      state:
+        "network.routes.{id}.interface": "{dev}"
+        "network.routes.{id}.ip": "{ip}"
+        "network.routes.{id}.netmask": "{mask}"
+        "network.routes.{id}.gateway": "{gw}"
+        "network.routes.{id}.mtu": "{mtu}"
+        "network.routes.{id}.metric": "{metric}"
+        "network.routes.{id}.enabled": { value: "{status}", map: { "1": true, "0": false } }
+
+    - path: "^/api/timeregion/settings$"
+      json_match: { "$.result": "^ok$" }
+      json: { ntp: "$.data.ntp_servers", offset: "$.data.offset", time: "$.data.time", mode: "$.data.timeType", tz: "$.data.timezone" }
+      state:
+        time.ntp_servers: "{ntp}"
+        time.offset: "{offset}"
+        time.current: "{time}"
+        time.source: "{mode}"
+        time.timezone: "{tz}"
+
+    - path: "^/api/users/list$"
+      json_each: "$.list"
+      json: { id: "$.id", user: "$.username", alias: "$.alias", role: "$.role", phone: "$.phone", desc: "$.descript", created: "$.create_time" }
+      replace: users
+      state:
+        "users.{id}.username": "{user}"
+        "users.{id}.alias": "{alias}"
+        "users.{id}.role": "{role}"
+        "users.{id}.phone": "{phone}"
+        "users.{id}.description": "{desc}"
+        "users.{id}.created": "{created}"
+
+    - path: "^/api/ndi/discovery/all$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      replace: ndi_discovery
+    - path: "^/api/ndi/discovery/all$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.auto"
+      json: &dis { group: "$.dis_g_name", addr: "$.dis_d_ip", server: "$.dis_s_ip", method: "$.dis_method" }
+      state:
+        "ndi_discovery.auto.{index}.group": "{group}"
+        "ndi_discovery.auto.{index}.address": "{addr}"
+        "ndi_discovery.auto.{index}.server": "{server}"
+        "ndi_discovery.auto.{index}.method": "{method}"
+    - path: "^/api/ndi/discovery/all$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.manual"
+      json: *dis
+      state:
+        "ndi_discovery.manual.{index}.group": "{group}"
+        "ndi_discovery.manual.{index}.address": "{addr}"
+        "ndi_discovery.manual.{index}.server": "{server}"
+        "ndi_discovery.manual.{index}.method": "{method}"
+    - path: "^/api/ndi/discovery/all$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.discovery_server"
+      json: *dis
+      state:
+        "ndi_discovery.discovery_server.{index}.group": "{group}"
+        "ndi_discovery.discovery_server.{index}.address": "{addr}"
+        "ndi_discovery.discovery_server.{index}.server": "{server}"
+        "ndi_discovery.discovery_server.{index}.method": "{method}"
+    - path: "^/api/ndi/discovery/all$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.public"
+      json: *dis
+      state:
+        "ndi_discovery.public.{index}.group": "{group}"
+        "ndi_discovery.public.{index}.address": "{addr}"
+        "ndi_discovery.public.{index}.server": "{server}"
+        "ndi_discovery.public.{index}.method": "{method}"
+    - path: "^/api/ndi/discovery/sources\\?dis_method=1&"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { ndi: "$.ndi_name", name: "$.name", url: "$.url", ip: "$.ip", port: "$.port", ch: "$.channel", group: "$.group_name" }
+      replace: ndi.sources
+      state:
+        "ndi.sources.{ndi:key}.name": "{name}"
+        "ndi.sources.{ndi:key}.url": "{url}"
+        "ndi.sources.{ndi:key}.ip": "{ip}"
+        "ndi.sources.{ndi:key}.port": "{port}"
+        "ndi.sources.{ndi:key}.channel": "{ch}"
+        "ndi.sources.{ndi:key}.group": "{group}"
+
+    # --- Read-back after writes: each write's "ok" reply asks again for
+    # what it changed. ---
+    - path: "^/api/source/groups/(?:add|rename|remove|streams/add|streams/modify|streams/remove|streams/copy|streams/move)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: POST, path: /api/source/groups/list, content_type: application/json, body: '{"is_need_stream":true}' }
+    - path: "^/api/layout/(?:add|remove|select|modify|save|resave|reload|rename)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/layout/list }
+        - { method: GET, path: /api/output/list }
+        - { method: GET, path: /api/output/get, query: { output_id: "1" } }
+        - { method: GET, path: /api/output/get, query: { output_id: "2" } }
+    - path: "^/api/output/source/(?:set|remove)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/output/get, query: { output_id: "1" } }
+        - { method: GET, path: /api/output/get, query: { output_id: "2" } }
+        - { method: GET, path: /api/layout/list }
+    - path: "^/api/output/resolution/set$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/output/list }
+    - path: "^/api/output/interfaces/set$"
+      request_match: { "$.output_id": "^([12])$", "$.Type": "^(video|audio)$" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: POST, path: /api/output/interfaces/get, content_type: application/json, body: '{"output_id":{1},"Type":"{2}"}' }
+    - path: "^/api/output/audiomix/(?:set|remove|add)$"
+      request_match: { "$.output_id": "^([12])$" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/output/audiomix/get, query: { output_id: "{1}" } }
+    - path: "^/api/output/border/set$"
+      request_match: { "$.output_id": "^([12])$" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: POST, path: /api/output/border/get, content_type: application/json, body: '{"output_id":{1}}' }
+    - path: "^/api/output/background/set$"
+      request_match: { "$.output_id": "^([12])$" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/output/background/get, query: { output_id: "{1}" } }
+    - path: "^/api/overlay/select$"
+      request_match: { "$.output_id": "^([12])$" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/overlay/list, query: { output_id: "{1}" } }
+    - path: "^/api/preview/source/(?:modify|remove)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/preview/get }
+        - { method: GET, path: /api/output/audiomix/get, query: { output_id: "1" } }
+        - { method: GET, path: /api/output/audiomix/get, query: { output_id: "2" } }
+    - path: "^/api/network/(?:set|modify)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/network/get }
+    - path: "^/api/network/routing/(?:add|set|del|modify)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/network/routing/get }
+    - path: "^/api/network/http/set$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/network/http/get }
+    - path: "^/api/timeregion/(?:time|timezone)/set$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/timeregion/settings }
+    - path: "^/api/sys/device/set$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/sys/device/get }
+    - path: "^/api/users/(?:add|remove|modify)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/users/list }
+    - path: "^/api/ndi/discovery/(?:auto|manual|server)/(?:add|del)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/ndi/discovery/all }
+        - { method: GET, path: /api/ndi/discovery/sources, query: { dis_method: "1", dis_g_name: "", dis_s_ip: "" } }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Authentication: the login (POST /api/users/login with username and
+      password, admin / admin until changed) answers the token in its JSON
+      body, and every other request must carry the header app holding the
+      JSON object {"username": ..., "token": ...}. The core cannot take a
+      token from a login's body, so the consumer runs the login command,
+      puts the token it returns into the token setting with update_settings
+      (and username if not admin), and the core then sends the header on
+      every request. The document says a token can expire without giving its
+      lifetime or how an expired token is answered; the consumer logs in
+      again when commands start failing with an authentication error.
+  - models: [all]
+    severity: info
+    text: >
+      Every reply is {"result": "ok"} with its data, or {"result": "error",
+      "msg": "<code>"} (section 1). Section 4 lists the codes in a table whose
+      columns are misaligned in the PDF; read in order they are 0 success, 1
+      parameter error, 2 authentication error, 100 output not found, 101
+      video source not found, 102 audio source not found, 103 output
+      interface not found, 104 layout template not found, 105 preset not
+      found, 106 output interface not found, 107 layout out of range, 200
+      group not found, 201 stream not found, 202 stream does not exist, 203
+      NDI server duplicate, 204 stream repeat, 205 unsupported protocol, 206
+      group already exists, 207 cache exceeds maximum, 300 user not found,
+      301 passwords do not match, 302 wrong user name or password, 400 ping
+      failed, 401 network change error, 402 network configuration error, 403
+      duplicate routes, 404 route not found, 405 port already occupied, 500
+      duplicate name, 501 in use, 502 failed to save configuration, 503 time
+      setting failed, 504 invalid video output, 505 the mixer takes only four
+      audio channels, 506 target already exists, 507 file does not exist,
+      508 PTZ setup failed, 509 insufficient performance, 1000 common error.
+      A failed command reports the reply's result; the msg code is in the
+      reply only.
+  - models: [all]
+    severity: critical
+    text: >
+      restore_factory (GET /api/sys/restore) returns the decoder to factory
+      settings, removing sources, layouts, users and network settings, and
+      cannot be undone; the decoder may come back at its default address
+      (192.168.1.168 per the user manual). reset (GET /api/sys/reset, "System
+      Reset") is not described further by the document and should be treated
+      the same way. upgrade_firmware flashes the uploaded image and restarts
+      the decoder; outputs stop meanwhile, and a wrong image may not be
+      recoverable live.
+  - models: [all]
+    severity: warning
+    text: >
+      reboot stops both outputs until the decoder is back. set_network,
+      set_maintenance_address and set_http_ports can move the decoder off
+      the address and port the core reaches it on; the core then loses it
+      until it is opened at the new address.
+  - models: [all]
+    severity: info
+    text: >
+      Two outputs, 1 and 2. On the D350 three video interfaces (two HDMI, one
+      SDI) each carry one of them (get_output_interfaces); the document does
+      not say how the cards (RD-350, RD-260, FD-360) differ, and their
+      interfaces are read from get_output_interfaces as on the others. The
+      document types output_id as a string in some requests and a number in
+      others; each request sends it as that request's example does.
+  - models: [all]
+    severity: info
+    text: >
+      Speed-type PTZ commands (ptz_zoom_speed, ptz_pan_tilt_speed,
+      ptz_focus_speed) keep the camera moving: send the same command again
+      with speed 0 to stop it. Position commands (ptz_zoom, ptz_pan_tilt,
+      ptz_focus, ptz_recall_preset) need no reset. PTZ works only for an NDI
+      source in the window (section 10 (12)).
+  - models: [all]
+    severity: info
+    text: >
+      Some request bodies differ between the document's example and its
+      field table: set_resolution's example names the resolution res_index
+      and its table res_id, and remove_preview_source's example names the
+      position id and its table pos_id; both requests send both names.
+      remove_ndi_group_discovery and remove_ndi_discovery_server send the
+      example's dis_d_ip or dis_s_ip and dis_g_name, where the table names
+      an id the discovery list does not give. The stream modify requests
+      follow the examples, without the group_id the table also lists.
+  - models: [all]
+    severity: info
+    text: >
+      set_ndi_manual_discovery replaces the whole manual discovery list: the
+      document uses the same request to delete entries, by sending the ones
+      that remain. The stream add and modify commands for each protocol send
+      the fields the document's example for that protocol gives; add_streams
+      and modify_stream take the body as a whole for anything else, such as
+      several NDI sources at once.
+  - models: [all]
+    severity: info
+    text: >
+      State is polled (the decoder pushes nothing): window status, bitrate,
+      format and audio levels every 2 s, source connection status and the
+      preview every 5 s, configuration every 30 s; a write's ok reply re-reads
+      what it changed at once. The audio levels are only as fresh as the
+      2-second poll. ndi.sources holds what public discovery finds; other
+      discovery methods are read with list_ndi_sources.
+  - models: [all]
+    severity: info
+    text: >
+      The firmware and software versions come from info/get; the document
+      gives no CPU load, temperature or uptime reading, and no way to read
+      or upload overlay templates beyond listing and selecting them (they
+      are edited in the web interface).
+  - models: [all]
+    severity: info
+    text: >
+      The document's audio interface read gives the sample rate as 44.1 (kHz)
+      while its write example sends 48000 (Hz); set_audio_interface sends Hz
+      as the write example does. The pane geometry of layouts is a percent
+      the document types as an integer, though its 3x3 template reports
+      33.33; modify_layout_pane takes whole percents.

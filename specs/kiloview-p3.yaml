@@ -1,0 +1,3056 @@
+spec: 1
+id: kiloview-p3
+name: Kiloview P3 / P3 Mini
+vendor: Kiloview
+category: other
+
+source:
+  - title: "P3/P3 Mini WEB API Manual en v1.03 (firmware Version 1.22.0010)"
+    author: Kiloview
+    url: "https://enstatic.kiloview.com/wp-content/uploads/2026/04/P3_P3-Mini-WEB-API_en-v1.03Version-1.22.0010-1.pdf"
+    note: >
+      Manufacturer-documented, public, linked from https://www.kiloview.com/en/docs/p3/api/
+      and https://www.kiloview.com/en/docs/p3mini/api/ (both pages link the same file,
+      uploaded April 2026; the Download Center lists nothing newer). Machine-translated
+      from Chinese by the vendor. The source of every command and state path here:
+      usage example with the authorization header (p.7); 1.1 users, login, login check,
+      API authentication switch, user list, add, remove, modify (p.8-14); 1.2 time zone,
+      system time, time and NTP status (p.15-19); 1.3 open-source list, host name, HTTP
+      and HTTPS switches and ports, SSL certificate read, apply, reset and upload,
+      factory reset, codec restart, reboot, ping, NIC speed, system information,
+      firmware upload, chunked upload and merge, production test switch and status
+      (p.20-36); 1.4 logs and log export (p.37-38); 2 recording files, USB drive
+      choice, storage list, recording settings, recording switch and status (p.39-47);
+      3.1 stream list, add, modify, delete, enable, NDI reset, WebRTC, media users
+      (p.47-61); 3.2 PTZ control, information, protocols, serial devices, modify
+      (p.62-68); 4.1 interfaces, link list, interface configuration, Ethernet switch,
+      small-screen interface read and write, mDNS reset, per-interface rates, interface
+      mapping, traffic statistics and clearing, current connections, NIC binding, NIC
+      list (p.69-87); 4.2 static routes (p.87-92); 4.3 Wi-Fi add, saved list, current,
+      by name, modify, forget, connect, scan, country codes (p.92-103); 4.4 hotspot,
+      advanced Wi-Fi parameters, channels, bands (p.103-108); 4.5 SIM slots, SIM by
+      slot, APN list, SIM parameters, SIM reset, SIM enable, IMEI (p.108-117); 5
+      KiloLink bonding client (p.117-125); 6.1 EDID, video input, sources, formats,
+      source choice (p.125-132); 6.2 audio input and audio encoders (p.132-139); 6.3
+      video encoder and bitrate (p.139-144); 6.4 VPSS images, still frames, rotation,
+      mirror and flip, OSD, small-screen output (p.144-160); 6.5 panel settings
+      (p.160-162). Paths are taken from each interface's request-address line, typos
+      included (see quirks).
+  - title: "E3 API Documentation, Version 1.21.0008"
+    author: Kiloview
+    url: "https://enstatic.kiloview.com/wp-content/uploads/2026/04/E3_API_enVersion-1.21.0008.pdf"
+    note: >
+      Manufacturer-documented API of the sibling E3 encoder on the same module layout.
+      Read only to corroborate: its recording switch (section 2.2.1, POST
+      /api/record/{interface}/recording) and its KiloLink server field ip, both noted in
+      quirks where the P3 document's own text is garbled. Nothing here is built from it.
+  - title: "bitfocus/companion-module-kiloview-encoder (MIT), src/e3-handler.js"
+    author: Bitfocus and contributors
+    url: "https://github.com/bitfocus/companion-module-kiloview-encoder"
+    note: >
+      MIT-licensed (top-level LICENSE checked). Corroboration only, for the same API
+      family on the E3: the login's token is sent back as it is in the Authorization
+      header with no scheme word, a 401 answers a missing or wrong token, recording
+      status is GET /api/record/<interface>/get_recording_status, and recording is
+      switched with POST /api/record/<interface>/recording. No code copied.
+
+transport:
+  type: http
+  port: 80
+  scheme: { setting: scheme }
+  https_port: 443
+  accept_invalid_certs: true
+  auth: header
+  auth_header: Authorization
+  timeout_ms: 5000
+  probe: { method: GET, path: /api/systemctrl/system/getHostname }
+
+settings:
+  scheme: { type: enum, values: [http, https], default: http,
+            label: Connection,
+            description: "Reach the web API over HTTP (port 80) or HTTPS (port 443), as switched on under the device's HTTP and HTTPS settings." }
+  token: { type: string, secret: true, default: "", max_length: 4096,
+           label: API token,
+           description: "The token the device's login issues (run the login command and pass its result here with update_settings), sent as it is in the Authorization header; leave empty while API authentication is off, which sends none." }
+
+ports:
+  - { port: 80, protocol: http, role: control, when: "scheme http" }
+  - { port: 443, protocol: https, role: control, when: "scheme https" }
+
+models:
+  - id: p3
+    name: Kiloview P3
+    supports: &all_commands
+      [login, check_session, get_api_authentication, set_api_authentication, get_users, add_user, remove_user, modify_user, set_timezone, set_time, set_time_ntp, get_time, get_ntp_status, get_components, get_hostname, set_hostname, get_web_protocols, set_web_protocols, get_ssl_certificate, apply_ssl_certificate, reset_ssl_certificate, upload_ssl_file, factory_reset, restart_codec, reboot, ping, get_nic_speed, get_system_info, upload_firmware, upload_firmware_chunk, merge_firmware, set_production_test, get_production_test, get_log, delete_recording_file, get_recording_files, choose_usb_drive, get_storage, get_recording_settings, set_recording_settings, start_recording, stop_recording, get_recording_status, get_streams, add_srt_stream, modify_srt_stream, add_rtmp_stream, modify_rtmp_stream, add_ndi_hx_stream, modify_ndi_hx_stream, add_rtp_stream, modify_rtp_stream, add_stream, modify_stream, delete_stream, set_stream_enabled, reset_ndi, get_webrtc, set_webrtc, get_media_users, add_media_user, delete_media_user, ptz_move, get_ptz, get_ptz_protocols, get_ptz_serial_devices, set_ptz_network, set_ptz_serial, set_ptz_usb, get_interfaces, get_link_list, set_interface, set_interface_enabled, get_ethernet, set_ethernet, reset_mdns, get_link_rates, get_link_data, get_interface_map, get_traffic, clear_traffic, get_current_networks, bind_network, get_network_choices, add_static_route, get_static_routes, modify_static_route, delete_static_route, set_static_route_enabled, add_wifi, get_saved_wifi, get_current_wifi, get_wifi, modify_wifi, forget_wifi, set_wifi_connected, scan_wifi, get_wifi_country_codes, set_hotspot, get_hotspot, get_wifi_parameters, set_wifi_parameters, get_wifi_channels, get_hotspot_bands, get_modems, get_modem, get_apn_list, set_modem_parameters, reset_modem, set_modem_enabled, get_imei, update_bonding_codec_info, set_bonding_streaming, get_bonding_streaming, set_bonding_connection, get_bonding_connection, get_bonding_server_stream, set_bonding_server, get_bonding_server, get_bonding_server_history, set_bonding_interface, get_edid, set_edid_priority, upload_edid, reset_edid, get_video_input, get_video_sources, get_video_formats, set_video_source, get_audio_input, set_audio_input, get_audio_sources, get_audio_encoders, add_audio_encoder, modify_audio_encoder, remove_audio_encoder, get_video_encoder, set_video_encoder, set_video_bitrate, get_images, upload_image, delete_image, get_still_frames, upload_still_frame, reset_still_frame, get_input_transform, set_input_transform, get_osd, set_osd_enabled, add_osd_item, get_osd_item, modify_osd_item, delete_osd_item, set_screen_output, get_panel_settings, set_panel_settings]
+    verification: none
+    notes: >
+      Wireless bonding encoder (cellular, Wi-Fi and Ethernet links, KiloLink bonding).
+      The API document covers the P3 and the P3 Mini together and names no difference
+      between them; the inputs, SIM slots and links a unit has are read from it.
+  - id: p3-mini
+    name: Kiloview P3 Mini
+    supports: *all_commands
+    verification: none
+    notes: >
+      Smaller sibling of the P3, covered by the same API document with no per-model
+      difference stated; the inputs, SIM slots and links a unit has are read from it.
+
+maps:
+  bool01: { "true": "1", "false": "0" }
+
+commands:
+  # ── 1.1 Users and authentication ───────────────────────────────────────
+  login:
+    summary: Log in with a user name and password and return the token the device issues (pass it as the token setting with update_settings); 1.1.1
+    params:
+      username: { type: string, required: true, max_length: 64,
+                  label: User name, description: "The device user to log in as, such as admin." }
+      password: { type: string, required: true, secret: true, max_length: 128,
+                  label: Password, description: "That user's password." }
+    send: { method: POST, path: /api/systemctrl/user/login, body: '{"username":{username:json},"password":{password:json}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.token" }
+    returns: value
+
+  check_session:
+    summary: Check that the current token is still accepted (GET /api/systemctrl/user/session, 1.1.2)
+    send: { method: GET, path: /api/systemctrl/user/session }
+    expect: &ok { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  get_api_authentication:
+    summary: Read whether API authentication is switched on (1.1.3); also kept in state
+    send: { method: GET, path: /api/systemctrl/user/auth_info }
+    expect: &data { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+
+  set_api_authentication:
+    summary: Switch API authentication on or off (1.1.4); read back after
+    params:
+      enabled: { type: bool, required: true, label: API authentication,
+                 description: "On, every request must carry a login token; off, requests need none." }
+    send: { method: POST, path: /api/systemctrl/user/auth_info, body: '{"enable":{enabled}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_users:
+    summary: List the device's users (1.1.5); also kept in state
+    send: { method: GET, path: /api/systemctrl/user/list }
+    expect: *data
+    returns: value
+
+  add_user:
+    summary: Add a user (1.1.6; the path is the document's, see quirks); the user list is read back after
+    params:
+      id: &p_user_id { type: string, required: true, max_length: 64, pattern: "^[^\\s]+$",
+                       label: User ID, description: "The user's login name." }
+      alias: { type: string, required: true, max_length: 64, label: Alias, description: "The user's display name." }
+      password: { type: string, required: true, secret: true, max_length: 128,
+                  label: Password, description: "The new user's password (sent again as the confirmation)." }
+      enable_web: { type: bool, default: true, label: Web login,
+                    description: "Whether the user may log in to the web interface." }
+      enable_api: { type: bool, default: true, label: API access,
+                    description: "Whether the user may send API requests." }
+    send: { method: POST, path: /api/systemctr/user/add,
+            body: '{"id":{id:json},"alias":{alias:json},"password":{password:json},"confirmNewPassword":{password:json},"create_time":"","role":"","enable_web":{enable_web},"enable_api":{enable_api}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  remove_user:
+    summary: Remove a user (1.1.7; the admin user cannot be removed); the user list is read back after
+    params:
+      id: *p_user_id
+    send: { method: POST, path: /api/systemctrl/user/remove, body: '{"ids":[{id:json}]}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  modify_user:
+    summary: Change a user's alias and access (1.1.8); the user list is read back after
+    params:
+      id: *p_user_id
+      alias: { type: string, required: true, max_length: 64, label: Alias, description: "The user's new display name." }
+      enable_web: { type: bool, default: true, label: Web login,
+                    description: "Whether the user may log in to the web interface." }
+      enable_api: { type: bool, default: true, label: API access,
+                    description: "Whether the user may send API requests." }
+    send: { method: POST, path: /api/systemctrl/user/modify,
+            body: '{"id":{id:json},"alias":{alias:json},"role":"","enable_web":{enable_web},"enable_api":{enable_api}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  # ── 1.2 Time ───────────────────────────────────────────────────────────
+  set_timezone:
+    summary: Set the time zone (1.2.1); the time settings are read back after
+    params:
+      timezone: { type: string, required: true, max_length: 64, pattern: "^[A-Za-z0-9_+/-]+$",
+                  label: Time zone, description: "An IANA time zone name, such as Asia/Shanghai or Europe/London." }
+      offset: &p_offset { type: int, min: -12, max: 14, required: true, label: UTC offset,
+                          description: "The zone's offset from UTC in whole hours, such as 8." }
+    send: { method: POST, path: /api/systemctrl/systime/setLocation, body: '{"timezone":{timezone:json},"offset":{offset}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  set_time:
+    summary: Set the clock to a given time (1.2.2, timetype manual, or pc for the time of the controlling computer); read back after
+    params:
+      mode: { type: enum, values: [manual, pc], default: manual, label: Time source,
+              description: "manual sets the time given; pc records it as taken from the controlling computer, as the web page does." }
+      time: { type: string, required: true, pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$",
+              label: Time, description: "The local time as YYYY-MM-DD HH:MM:SS." }
+      offset: *p_offset
+    send: { method: POST, path: /api/systemctrl/systime/setTime, body: '{"time":{time:json},"timetype":"{mode}","offset":{offset}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  set_time_ntp:
+    summary: Take the time from NTP servers (1.2.2, timetype ntp); read back after
+    params:
+      servers: { type: string, required: true, max_length: 512, pattern: "^[A-Za-z0-9.:-]+( [A-Za-z0-9.:-]+)*$",
+                 label: NTP servers, description: "One or more NTP server names or addresses separated by spaces, such as pool.ntp.org time.apple.com." }
+      offset: *p_offset
+    send: { method: POST, path: /api/systemctrl/systime/setTime, body: '{"timetype":"ntp","offset":{offset},"ntp":{servers:json}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_time:
+    summary: Read the time, time source, zone, offset and NTP servers (1.2.3); also kept in state
+    send: { method: GET, path: /api/systemctrl/systime/get }
+    expect: *data
+    returns: value
+
+  get_ntp_status:
+    summary: Read the NTP peers' status (1.2.4); also kept in state
+    send: { method: GET, path: /api/systemctrl/systime/ntpstatus }
+    expect: &bare { status: 200, json_path: "$" }
+    returns: value
+
+  # ── 1.3 System ─────────────────────────────────────────────────────────
+  get_components:
+    summary: List the open-source components and their licenses (1.3.1)
+    send: { method: GET, path: /api/systemctrl/system/components }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.components" }
+    returns: value
+
+  get_hostname:
+    summary: Read the device name (1.3.2); also kept in state
+    send: { method: GET, path: /api/systemctrl/system/getHostname }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.hostname" }
+    returns: value
+
+  set_hostname:
+    summary: Set the device name (1.3.3, a GET with the name in the query); read back after
+    params:
+      name: { type: string, required: true, max_length: 63, pattern: "^[A-Za-z0-9][A-Za-z0-9-]*$",
+              label: Device name, description: "The new device name, letters, digits and hyphens, such as P3-STAGE." }
+    send: { method: GET, path: /api/systemctrl/system/setHostname, query: { name: "{name}" } }
+    expect: *ok
+    returns: ack
+
+  get_web_protocols:
+    summary: Read whether HTTP and HTTPS are on and their ports (1.3.4); also kept in state
+    send: { method: GET, path: /api/systemctrl/system/getProtocol }
+    expect: *data
+    returns: value
+
+  set_web_protocols:
+    summary: Switch HTTP and HTTPS on or off and set their ports (1.3.5); read back after (see quirks)
+    params:
+      http: { type: bool, required: true, label: HTTP, description: "Whether the web interface and API answer over HTTP." }
+      https: { type: bool, required: true, label: HTTPS, description: "Whether the web interface and API answer over HTTPS." }
+      http_port: { type: int, min: 1, max: 65535, default: 80, label: HTTP port, description: "The TCP port HTTP listens on." }
+      https_port: { type: int, min: 1, max: 65535, default: 443, label: HTTPS port, description: "The TCP port HTTPS listens on." }
+    send: { method: POST, path: /api/systemctrl/system/setProtocol, body: '{"http":{http},"https":{https},"httpPort":{http_port},"httpsPort":{https_port}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_ssl_certificate:
+    summary: Read the HTTPS certificate, its key and whether a reset is allowed (1.3.6); the key is returned here only, never kept in state
+    send: { method: GET, path: /api/systemctrl/system/ssl }
+    expect: *data
+    returns: value
+
+  apply_ssl_certificate:
+    summary: Apply the uploaded HTTPS certificate and key (1.3.7); read back after
+    send:
+      - { method: POST, path: /api/systemctrl/system/ssl }
+      - { method: GET, path: /api/systemctrl/system/ssl }
+    expect: *ok
+    returns: ack
+
+  reset_ssl_certificate:
+    summary: Put the device's own HTTPS certificate back (1.3.8); read back after
+    send:
+      - { method: DELETE, path: /api/systemctrl/system/ssl }
+      - { method: GET, path: /api/systemctrl/system/ssl }
+    expect: *ok
+    returns: ack
+
+  upload_ssl_file:
+    summary: Upload an HTTPS certificate (.crt or .pem) or its key (.key) as form data (1.3.9; see quirks for the file type and field name)
+    params:
+      file_type: { type: enum, values: [crt, key], required: true, label: File type,
+                   description: "crt for the signing certificate (.crt or .pem), key for its private key (.key)." }
+      file: { type: binary, required: true, label: File, description: "The certificate or key file." }
+      filename: { type: string, default: "server.crt", max_length: 128, pattern: "^[^\"\\\\/]+$",
+                  label: File name, description: "The file name sent with it, ending .crt, .pem or .key." }
+    send: { method: POST, path: "/api/systemctrl/system/ssl/{file_type}",
+            multipart: [ { name: file, binary: file, filename: "{filename}", content_type: application/octet-stream } ] }
+    expect: *ok
+    returns: ack
+
+  factory_reset:
+    summary: Restore factory settings (1.3.10; see quirks, critical)
+    send: { method: GET, path: /api/systemctrl/system/reFactory }
+    expect: *ok
+    returns: ack
+
+  restart_codec:
+    summary: Restart the codec service (1.3.11, Reset; see quirks)
+    send: { method: GET, path: /api/systemctrl/system/restore }
+    expect: *ok
+    returns: ack
+
+  reboot:
+    summary: Restart the device, two seconds after the answer (1.3.12; see quirks, critical)
+    send: { method: GET, path: /api/systemctrl/system/reboot }
+    expect: *ok
+    returns: ack
+
+  ping:
+    summary: Ping an address from the device and return the loss rate and whether it is reachable (1.3.13)
+    params:
+      target: { type: string, required: true, max_length: 253, pattern: "^[A-Za-z0-9.:-]+$",
+                label: Target address, description: "The IP address or host name to ping from the device." }
+    send: { method: POST, path: /api/systemctrl/system/ping, body: '{"target_addr":{target:json}}', content_type: application/json }
+    expect: *data
+    returns: value
+
+  get_nic_speed:
+    summary: Read an Ethernet card's link speed and traffic (1.3.14); also kept in state
+    params:
+      ifname: { type: string, default: eth0, max_length: 32, pattern: "^[A-Za-z0-9_.-]+$",
+                label: Network card, description: "The network card to read, such as eth0." }
+    send: { method: GET, path: /api/systemctrl/system/getNetworkSpeed, query: { ifname: "{ifname}" } }
+    expect: *data
+    returns: value
+
+  get_system_info:
+    summary: Read versions, serial number, CPU, memory, disk, uptime and module IMEIs (1.3.15); also kept in state
+    send: &sysinfo { method: GET, path: /api/systemctrl/system/getSystemInfo,
+                     query: { version: "true", cpu: "true", memory: "true", disk: "true", persisTime: "true", imei: "true" } }
+    expect: *data
+    returns: value
+
+  upload_firmware:
+    summary: Upload a firmware package in one request (1.3.16; see quirks, critical)
+    params:
+      file: { type: binary, required: true, label: Firmware package, description: "The firmware package file from Kiloview." }
+      filename: { type: string, default: "firmware.bin", max_length: 255, pattern: "^[^\"\\\\/]+$",
+                  label: File name, description: "The package's file name, sent with it." }
+    send: { method: POST, path: /api/systemctrl/system/upload,
+            multipart: [ { name: file, binary: file, filename: "{filename}", content_type: application/octet-stream } ] }
+    expect: *ok
+    returns: ack
+
+  upload_firmware_chunk:
+    summary: Upload one numbered piece of a firmware package (1.3.17); merge_firmware joins them
+    params:
+      identifier: &p_fw_id { type: string, required: true, max_length: 255, pattern: "^[^\"\\\\/]+$",
+                             label: Package identifier, description: "A name unique to this package, the same for every piece, such as firmware-P3-kiloview-1.21.0009.0002-20250626." }
+      number: { type: int, min: 0, required: true, label: Piece number, description: "The piece's number within the package." }
+      file_type: &p_fw_type { type: string, default: bin, max_length: 16, pattern: "^[A-Za-z0-9]+$",
+                              label: Package type, description: "The package's file type, such as bin." }
+      file: { type: binary, required: true, label: Piece, description: "The piece's bytes." }
+    send:
+      method: POST
+      path: /api/systemctrl/system/uploadfile
+      multipart:
+        - { name: identifier, value: "{identifier}" }
+        - { name: file, binary: file, filename: "{identifier}", content_type: application/octet-stream }
+        - { name: number, value: "{number}" }
+        - { name: file_type, value: "{file_type}" }
+    expect: *ok
+    returns: ack
+
+  merge_firmware:
+    summary: Join the uploaded pieces of a firmware package and install it (1.3.18; see quirks, critical)
+    params:
+      identifier: *p_fw_id
+      count: { type: int, min: 1, required: true, label: Piece count, description: "How many pieces were uploaded." }
+      file_type: *p_fw_type
+    send: { method: POST, path: /api/systemctrl/system/mergefile, body: '{"identifier":{identifier:json},"number":{count},"file_type":"{file_type}"}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  set_production_test:
+    summary: Switch the factory production-test service on or off (1.3.19; see quirks); read back after
+    params:
+      enabled: { type: bool, required: true, label: Production test,
+                 description: "Whether the factory production-test service runs." }
+    send: { method: POST, path: /api/systemctrl/system/production_off, body: '{"value":{enabled}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_production_test:
+    summary: Read whether the production-test service runs (1.3.20; the path is the document's, see quirks); also kept in state
+    send: { method: GET, path: /api/ststemctrl/system/production_stat }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.value" }
+    returns: value
+
+  # ── 1.4 Logs ───────────────────────────────────────────────────────────
+  get_log:
+    summary: Read a service's log as text (1.4.1)
+    params:
+      service: { type: enum, values: [codec, streamer, record, network, system, Kilolink], required: true,
+                 label: Service, description: "The service whose log to read: codec (encoding), streamer, record, network, system or Kilolink (bonding)." }
+    send: { method: GET, path: "/api/systemctrl/system_log/get/{service}" }
+    expect: *data
+    returns: value
+
+  # ── 2 Recording ────────────────────────────────────────────────────────
+  delete_recording_file:
+    summary: Delete a recording file (2.1.1); the storage list and file lists are read back after
+    params:
+      path: { type: string, required: true, max_length: 1024, pattern: "^/",
+              label: File path, description: "The file's full path on the device, as the file list gives it." }
+    send: { method: POST, path: /api/record/record/remove_file, body: '{"path":{path:json}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_recording_files:
+    summary: List the recordings on a drive (2.1.2); also kept in state for every mounted drive
+    params:
+      device: { type: string, required: true, max_length: 255, pattern: "^/",
+                label: Mount point, description: "The drive's mount point, as the storage list gives it, such as /run/media/sdb1." }
+    send: { method: GET, path: /api/record/record/get_disk_files, query: { device: "{device}" } }
+    expect: *data
+    returns: value
+
+  choose_usb_drive:
+    summary: Choose whether a USB drive is used for recording (2.1.3); the storage list is read back after
+    params:
+      id: { type: string, required: true, max_length: 32, pattern: "^[A-Za-z0-9_-]+$",
+            label: Partition, description: "The drive partition's id, as the storage list gives it, such as sdb1." }
+      chosen: { type: bool, default: true, label: Chosen, description: "Whether recordings go to this drive." }
+    send: { method: POST, path: /api/record/record/choose_usb, body: '{"id":{id:json},"choose":{chosen}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_storage:
+    summary: List the storage drives with their space and whether each is chosen (2.1.4); also kept in state
+    send: { method: GET, path: /api/record/record/disk_list }
+    expect: *data
+    returns: value
+
+  get_recording_settings:
+    summary: Read the recording format, file prefix, split limits and full-disk policy (2.1.5); also kept in state
+    send: { method: GET, path: /api/record/record/get_record_info }
+    expect: *data
+    returns: value
+
+  set_recording_settings:
+    summary: Set the recording format, file prefix, split limits and full-disk policy (2.1.6); read back after
+    params:
+      format: { type: enum, values: [mp4, mov, ts], required: true, label: Format, description: "The recording file format." }
+      file_prefix: { type: string, default: REC, max_length: 32, pattern: "^[A-Za-z0-9_-]+$",
+                     label: File prefix, description: "The text each recording's file name starts with." }
+      limit_type: { type: enum, values: [none, size_loop, time_loop], default: none, label: Split,
+                    description: "none records one file; size_loop starts a new file at limit_size; time_loop at limit_time." }
+      limit_size: { type: int, min: 1, default: 51200, label: Size limit,
+                    description: "The file size at which size_loop starts a new file, in the device's unit (the document's example is 51200, apparently MB)." }
+      limit_time: { type: int, min: 1, default: 60, label: Time limit,
+                    description: "The duration at which time_loop starts a new file, in the device's unit (the document's example is 60, apparently minutes)." }
+      disk_policy: { type: enum, values: [noSpace, overwrite], default: noSpace, label: When the drive is full,
+                     description: "noSpace stops recording; overwrite replaces the oldest recordings." }
+      follow_timecode_start: { type: bool, default: false, label: Follow timecode,
+                               description: "Whether recording starts and stops with the input's timecode." }
+    send: { method: POST, path: /api/record/record/settings,
+            body: '{"format":"{format}","file_prefix":{file_prefix:json},"limit_type":"{limit_type}","limit_size":{limit_size},"limit_time":{limit_time},"disk_policy":"{disk_policy}","follow_timecode_start":{follow_timecode_start}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  start_recording:
+    summary: Start recording (2.2.1, as the document gives it; see quirks); the status is read back after
+    send: { method: GET, path: /api/record/v1/get_recording_status, body: '{"start":true}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  stop_recording:
+    summary: Stop recording (2.2.1, as the document gives it; see quirks); the status is read back after
+    send: { method: GET, path: /api/record/v1/get_recording_status, body: '{"start":false}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_recording_status:
+    summary: Read whether the device is recording (2.2.2); also kept in state
+    send: { method: GET, path: /api/record/v1/get_recording_status }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.status" }
+    returns: value
+
+  # ── 3.1 Streams ────────────────────────────────────────────────────────
+  get_streams:
+    summary: List the streams with their type, settings, switch and status (3.1.1); also kept in state
+    send: { method: GET, path: /api/streamer/v1/stream/list }
+    expect: *bare
+    returns: value
+
+  add_srt_stream:
+    summary: Add an SRT stream (3.1.2, SRT); the stream list is read back after
+    params: &srt_params
+      name: &p_stream_name { type: string, required: true, max_length: 64, label: Stream name, description: "The stream's display name." }
+      bind_audio: &p_bind_audio { type: int, min: 1, default: 1, label: Audio encoder,
+                                  description: "The id of the audio encoder the stream carries, as the audio encoder list gives it." }
+      bind_network: &p_bind_network { type: enum, values: [auto, eth0, wlan0, modem1, modem2, modem3, modem4], default: auto,
+                                       label: Network link, description: "The link the stream goes out on: auto, eth0 (LAN), wlan0 (Wi-Fi) or modem1 to modem4 (SIM 1 to 4)." }
+      connection_mode: { type: enum, values: [Caller, Listener, Rendezvous], default: Caller, label: Handshake mode,
+                         description: "Caller connects to address; Listener waits on listener_port; Rendezvous does both." }
+      address: { type: string, default: "", max_length: 512, label: Address,
+                 description: "Where a caller connects, as the device's web page takes it; empty for a listener." }
+      listener_port: { type: int, min: 1, max: 65535, default: 1025, label: Listening port, description: "The UDP port a listener waits on." }
+      latency: { type: int, min: 0, default: 125, label: Latency, description: "The SRT latency in milliseconds." }
+      bandwidth: { type: int, min: 0, default: 25, label: Overhead bandwidth, description: "The SRT overhead bandwidth, in percent (the device's own list shows 25)." }
+      payload_size: { type: int, min: 0, default: 1316, label: Payload size, description: "Bytes of payload per packet." }
+      encryption: { type: enum, values: ["0", AES-128, AES-192, AES-256], default: "0", label: Encryption,
+                    description: "0 for none, or the AES key length." }
+      passphrase: { type: string, default: "", secret: true, max_length: 79, label: Passphrase, description: "The encryption passphrase; empty without encryption." }
+      stream_id: { type: string, default: "", max_length: 512, label: Stream ID, description: "The SRT stream ID sent to the far end; empty for none." }
+      ts_null_multiple: { type: int, min: 0, default: 0, label: Null packet interval, description: "The transport stream's null packet interval, 0 for none." }
+      ts_pcr_period: { type: int, min: 0, default: 20, label: PCR period, description: "The PCR interval in milliseconds." }
+      ts_pts_pcr_delay: { type: int, min: 0, default: 200, label: PTS to PCR delay, description: "The delay between PTS and PCR in milliseconds." }
+      ts_transport_stream_id: { type: int, min: 0, max: 65535, default: 101, label: Transport stream ID, description: "The MPEG-TS transport stream ID." }
+    send: { method: POST, path: /api/streamer/v1/stream,
+            body: '{"type":"srt","name":{name:json},"bindAudio":{bind_audio},"bindNetwork":"{bind_network}","connectionMode":"{connection_mode}","address":{address:json},"listenerPort":{listener_port},"latency":{latency},"bandwidth":{bandwidth},"payloadSize":{payload_size},"encryption":"{encryption}","passphrase":{passphrase:json},"srt_stream_id":{stream_id:json},"ts_null_multiple":{ts_null_multiple},"ts_pcr_period":{ts_pcr_period},"ts_pts_pcr_delay":{ts_pts_pcr_delay},"ts_transport_stream_id":{ts_transport_stream_id}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  modify_srt_stream:
+    summary: Change an SRT stream (3.1.3, every field sent again); the stream list is read back after
+    params:
+      name: *p_stream_name
+      bind_audio: *p_bind_audio
+      bind_network: *p_bind_network
+      connection_mode: { type: enum, values: [Caller, Listener, Rendezvous], default: Caller, label: Handshake mode,
+                         description: "Caller connects to address; Listener waits on listener_port; Rendezvous does both." }
+      address: { type: string, default: "", max_length: 512, label: Address,
+                 description: "Where a caller connects, as the device's web page takes it; empty for a listener." }
+      listener_port: { type: int, min: 1, max: 65535, default: 1025, label: Listening port, description: "The UDP port a listener waits on." }
+      latency: { type: int, min: 0, default: 125, label: Latency, description: "The SRT latency in milliseconds." }
+      bandwidth: { type: int, min: 0, default: 25, label: Overhead bandwidth, description: "The SRT overhead bandwidth, in percent (the device's own list shows 25)." }
+      payload_size: { type: int, min: 0, default: 1316, label: Payload size, description: "Bytes of payload per packet." }
+      encryption: { type: enum, values: ["0", AES-128, AES-192, AES-256], default: "0", label: Encryption,
+                    description: "0 for none, or the AES key length." }
+      passphrase: { type: string, default: "", secret: true, max_length: 79, label: Passphrase, description: "The encryption passphrase; empty without encryption." }
+      stream_id: { type: string, default: "", max_length: 512, label: Stream ID, description: "The SRT stream ID sent to the far end; empty for none." }
+      ts_null_multiple: { type: int, min: 0, default: 0, label: Null packet interval, description: "The transport stream's null packet interval, 0 for none." }
+      ts_pcr_period: { type: int, min: 0, default: 20, label: PCR period, description: "The PCR interval in milliseconds." }
+      ts_pts_pcr_delay: { type: int, min: 0, default: 200, label: PTS to PCR delay, description: "The delay between PTS and PCR in milliseconds." }
+      ts_transport_stream_id: { type: int, min: 0, max: 65535, default: 101, label: Transport stream ID, description: "The MPEG-TS transport stream ID." }
+      id: &p_stream_id { type: string, required: true, max_length: 64, pattern: "^[0-9A-Za-z]+$",
+                         label: Stream ID, description: "The stream's id, as the stream list gives it." }
+    send: { method: PUT, path: "/api/streamer/v1/stream/{id}",
+            body: '{"id":{id:json},"type":"srt","name":{name:json},"bindAudio":{bind_audio},"bindNetwork":"{bind_network}","connectionMode":"{connection_mode}","address":{address:json},"listenerPort":{listener_port},"latency":{latency},"bandwidth":{bandwidth},"payloadSize":{payload_size},"encryption":"{encryption}","passphrase":{passphrase:json},"srt_stream_id":{stream_id:json},"ts_null_multiple":{ts_null_multiple},"ts_pcr_period":{ts_pcr_period},"ts_pts_pcr_delay":{ts_pts_pcr_delay},"ts_transport_stream_id":{ts_transport_stream_id}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  add_rtmp_stream:
+    summary: Add an RTMP or RTMPS push stream (3.1.2, RTMP/RTMPS); the stream list is read back after
+    params: &rtmp_params
+      name: *p_stream_name
+      bind_audio: *p_bind_audio
+      bind_network: *p_bind_network
+      address: { type: string, required: true, max_length: 1024, pattern: "^rtmps?://",
+                 label: Push address, description: "The rtmp:// or rtmps:// URL to push to, stream key included." }
+      user: { type: string, default: "", max_length: 128, label: User name, description: "The user name the server asks for; empty for none." }
+      password: { type: string, default: "", secret: true, max_length: 128, label: Password, description: "The password the server asks for; empty for none." }
+      reconnect_interval: { type: int, min: 0, default: 5, label: Reconnect interval,
+                            description: "How long to wait before reconnecting after a drop, in the device's unit (seconds on its web page)." }
+      connect_timeout: { type: int, min: 0, default: 10, label: Connect timeout,
+                         description: "How long a connection attempt may take, in the device's unit (seconds on its web page)." }
+    send: { method: POST, path: /api/streamer/v1/stream,
+            body: '{"type":"rtmp","name":{name:json},"bindAudio":{bind_audio},"bindNetwork":"{bind_network}","address":{address:json},"user":{user:json},"password":{password:json},"connIntv":{reconnect_interval},"connTimeout":{connect_timeout}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  modify_rtmp_stream:
+    summary: Change an RTMP or RTMPS stream (3.1.3, every field sent again); the stream list is read back after
+    params:
+      name: *p_stream_name
+      bind_audio: *p_bind_audio
+      bind_network: *p_bind_network
+      address: { type: string, required: true, max_length: 1024, pattern: "^rtmps?://",
+                 label: Push address, description: "The rtmp:// or rtmps:// URL to push to, stream key included." }
+      user: { type: string, default: "", max_length: 128, label: User name, description: "The user name the server asks for; empty for none." }
+      password: { type: string, default: "", secret: true, max_length: 128, label: Password, description: "The password the server asks for; empty for none." }
+      reconnect_interval: { type: int, min: 0, default: 5, label: Reconnect interval,
+                            description: "How long to wait before reconnecting after a drop, in the device's unit (seconds on its web page)." }
+      connect_timeout: { type: int, min: 0, default: 10, label: Connect timeout,
+                         description: "How long a connection attempt may take, in the device's unit (seconds on its web page)." }
+      id: *p_stream_id
+    send: { method: PUT, path: "/api/streamer/v1/stream/{id}",
+            body: '{"id":{id:json},"type":"rtmp","name":{name:json},"bindAudio":{bind_audio},"bindNetwork":"{bind_network}","address":{address:json},"user":{user:json},"password":{password:json},"connIntv":{reconnect_interval},"connTimeout":{connect_timeout}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  add_ndi_hx_stream:
+    summary: Add an NDI|HX stream (3.1.2, NDI|HX); the stream list is read back after
+    params: &ndi_params
+      name: *p_stream_name
+      bind_audio: *p_bind_audio
+      bind_network: *p_bind_network
+      channel_name: { type: string, default: "", max_length: 64, label: NDI channel name, description: "The NDI source's channel name; empty for the device's default." }
+      group: { type: string, default: "", max_length: 128, label: NDI groups, description: "The NDI groups the source is in; empty for public." }
+      connection: { type: enum, values: [disable_rudp, rudp, udp, multicast], default: disable_rudp, label: NDI transport,
+                    description: "disable_rudp is the default (TCP), rudp reliable UDP, udp with Multi-TCP off, multicast (see quirks)." }
+      netprefix: { type: string, default: "", max_length: 64, label: Multicast prefix, description: "The multicast address prefix, for multicast." }
+      netmask: { type: string, default: "", max_length: 64, label: Multicast mask, description: "The multicast subnet mask, for multicast." }
+      ttl: { type: int, min: 1, max: 255, default: 1, label: Multicast TTL, description: "The multicast time to live, in hops." }
+      discovery_server: { type: string, default: "", max_length: 255, label: Discovery server, description: "The NDI discovery server's address; empty for mDNS." }
+    send: { method: POST, path: /api/streamer/v1/stream,
+            body: '{"group":{group:json},"channel_name":{channel_name:json},"connection":"{connection}","netprefix":{netprefix:json},"netmask":{netmask:json},"ttl":{ttl},"discovery_server":{discovery_server:json},"bindNetwork":"{bind_network}","name":{name:json},"type":"ndi_hx","bindAudio":{bind_audio}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  modify_ndi_hx_stream:
+    summary: Change an NDI|HX stream (3.1.3, every field sent again); the stream list is read back after
+    params:
+      name: *p_stream_name
+      bind_audio: *p_bind_audio
+      bind_network: *p_bind_network
+      channel_name: { type: string, default: "", max_length: 64, label: NDI channel name, description: "The NDI source's channel name; empty for the device's default." }
+      group: { type: string, default: "", max_length: 128, label: NDI groups, description: "The NDI groups the source is in; empty for public." }
+      connection: { type: enum, values: [disable_rudp, rudp, udp, multicast], default: disable_rudp, label: NDI transport,
+                    description: "disable_rudp is the default (TCP), rudp reliable UDP, udp with Multi-TCP off, multicast (see quirks)." }
+      netprefix: { type: string, default: "", max_length: 64, label: Multicast prefix, description: "The multicast address prefix, for multicast." }
+      netmask: { type: string, default: "", max_length: 64, label: Multicast mask, description: "The multicast subnet mask, for multicast." }
+      ttl: { type: int, min: 1, max: 255, default: 1, label: Multicast TTL, description: "The multicast time to live, in hops." }
+      discovery_server: { type: string, default: "", max_length: 255, label: Discovery server, description: "The NDI discovery server's address; empty for mDNS." }
+      id: *p_stream_id
+    send: { method: PUT, path: "/api/streamer/v1/stream/{id}",
+            body: '{"id":{id:json},"group":{group:json},"channel_name":{channel_name:json},"connection":"{connection}","netprefix":{netprefix:json},"netmask":{netmask:json},"ttl":{ttl},"discovery_server":{discovery_server:json},"bindNetwork":"{bind_network}","name":{name:json},"type":"ndi_hx","bindAudio":{bind_audio}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  add_rtp_stream:
+    summary: Add an RTP stream (3.1.2, RTP); the stream list is read back after
+    params: &rtp_params
+      name: *p_stream_name
+      bind_audio: *p_bind_audio
+      bind_network: *p_bind_network
+      address: { type: string, required: true, max_length: 255, label: Destination address, description: "The IP address the stream is sent to." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Destination port, description: "The UDP port the stream is sent to." }
+      load_type: { type: string, default: ts, max_length: 16, pattern: "^[a-z0-9_]+$", label: Payload type,
+                   description: "The RTP payload, ts in the document's example." }
+      service_name: { type: string, default: Encoder, max_length: 64, label: Service name, description: "The transport stream's service name." }
+      service_provider: { type: string, default: Encoder device, max_length: 64, label: Service provider, description: "The transport stream's service provider name." }
+    send: { method: POST, path: /api/streamer/v1/stream,
+            body: '{"address":{address:json},"port":{port},"load_type":"{load_type}","ts_service_name":{service_name:json},"ts_service_provider":{service_provider:json},"bindNetwork":"{bind_network}","name":{name:json},"type":"rtp","bindAudio":{bind_audio}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  modify_rtp_stream:
+    summary: Change an RTP stream (3.1.3, the document's own example; every field sent again); the stream list is read back after
+    params:
+      name: *p_stream_name
+      bind_audio: *p_bind_audio
+      bind_network: *p_bind_network
+      address: { type: string, required: true, max_length: 255, label: Destination address, description: "The IP address the stream is sent to." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Destination port, description: "The UDP port the stream is sent to." }
+      load_type: { type: string, default: ts, max_length: 16, pattern: "^[a-z0-9_]+$", label: Payload type,
+                   description: "The RTP payload, ts in the document's example." }
+      service_name: { type: string, default: Encoder, max_length: 64, label: Service name, description: "The transport stream's service name." }
+      service_provider: { type: string, default: Encoder device, max_length: 64, label: Service provider, description: "The transport stream's service provider name." }
+      id: *p_stream_id
+    send: { method: PUT, path: "/api/streamer/v1/stream/{id}",
+            body: '{"address":{address:json},"port":{port},"load_type":"{load_type}","ts_service_name":{service_name:json},"ts_service_provider":{service_provider:json},"id":{id:json},"bindNetwork":"{bind_network}","name":{name:json},"type":"rtp","bindAudio":{bind_audio}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  add_stream:
+    summary: Add a stream of any type with the body of the document's Add Stream interface (3.1.2), for the types and fields the typed commands leave out (RTSP, HLS, TS-UDP, WHIP); the stream list is read back after
+    params:
+      config: { type: json, required: true, label: Stream settings,
+                description: "The Add Stream request body of section 3.1.2: type (ndi_hx, rtsp, rtmp, srt, hls, udp, rtp or whip), name, bindAudio, bindNetwork and that type's fields." }
+    send: { method: POST, path: /api/streamer/v1/stream, body: "{config}", content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  modify_stream:
+    summary: Change a stream of any type with the body of the document's Modify Stream interface (3.1.3, the Add Stream body plus id); the stream list is read back after
+    params:
+      id: *p_stream_id
+      config: { type: json, required: true, label: Stream settings,
+                description: "The Modify Stream request body of section 3.1.3: the stream's id and its Add Stream fields." }
+    send: { method: PUT, path: "/api/streamer/v1/stream/{id}", body: "{config}", content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  delete_stream:
+    summary: Delete a stream (3.1.4); the stream list is read back after
+    params:
+      id: *p_stream_id
+    send: { method: DELETE, path: "/api/streamer/v1/stream/{id}" }
+    expect: *ok
+    returns: ack
+
+  set_stream_enabled:
+    summary: Start or stop a stream (3.1.5); the stream list is read back after
+    params:
+      id: *p_stream_id
+      enabled: { type: bool, required: true, label: Streaming, description: "On starts the stream, off stops it." }
+    send: { method: POST, path: /api/streamer/v1/stream/enable, body: '{"id":{id:json},"enable":{enabled}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  reset_ndi:
+    summary: Reset NDI (3.1.6); the stream list is read back after
+    send: { method: POST, path: /api/streamer/v1/stream/ndi/reset }
+    expect: *ok
+    returns: ack
+
+  get_webrtc:
+    summary: Start a WebRTC preview and return its port, SDP offer and stream id (3.1.7)
+    params:
+      mode: &p_webrtc_mode { type: enum, values: ["0", "1"], default: "0", label: Preview mode,
+                             description: "0 for video, 1 for still images." }
+    send: { method: GET, path: /api/streamer/v1/stream/get_webrtc, query: { mode: "{mode}" } }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$" }
+    returns: value
+
+  set_webrtc:
+    summary: Switch a WebRTC preview between video and still images (3.1.8)
+    params:
+      mode: *p_webrtc_mode
+      stream_id: { type: string, required: true, max_length: 64, pattern: "^[0-9A-Za-z]+$",
+                   label: Preview stream ID, description: "The preview's id, as get_webrtc returns it." }
+    send: { method: GET, path: /api/streamer/v1/stream/set_webrtc, query: { mode: "{mode}", stream_id: "{stream_id}" } }
+    expect: *ok
+    returns: ack
+
+  get_media_users:
+    summary: List the media (stream login) users (3.1.9); also kept in state
+    send: { method: GET, path: /api/streamer/v1/stream/media_user }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.user_list" }
+    returns: value
+
+  add_media_user:
+    summary: Add a media user, the login an RTSP or other stream asks for (3.1.10); read back after
+    params:
+      username: &p_media_user { type: string, required: true, max_length: 64, pattern: "^[^\\s/]+$",
+                                label: User name, description: "The media user's name." }
+      password: { type: string, required: true, secret: true, max_length: 128, label: Password, description: "The media user's password." }
+    send: { method: POST, path: /api/streamer/v1/stream/media_user, body: '{"oper":"add","username":{username:json},"password":{password:json}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  delete_media_user:
+    summary: Delete a media user (3.1.11); read back after
+    params:
+      username: *p_media_user
+    send: { method: DELETE, path: "/api/streamer/v1/stream/media_user/{username}" }
+    expect: *ok
+    returns: ack
+
+  # ── 3.2 PTZ ────────────────────────────────────────────────────────────
+  ptz_move:
+    summary: Move the attached PTZ camera in a direction at a speed (3.2.1; see quirks for stopping)
+    params:
+      direction: { type: enum, values: [up, down, left, right, left-up, left-down, right-up, right-down], required: true,
+                   label: Direction, description: "The direction to move." }
+      speed: { type: int, min: 1, max: 100, default: 50, label: Speed, description: "Movement speed, 1 slowest to 100 fastest." }
+    send: { method: GET, path: /api/streamer/ptz/control, query: { action: "{direction}", speed: "{speed}" } }
+    expect: *ok
+    returns: ack
+
+  get_ptz:
+    summary: Read the PTZ control settings for network, serial and USB cameras (3.2.2); also kept in state
+    send: { method: GET, path: /api/streamer/ptz/info }
+    expect: *data
+    returns: value
+
+  get_ptz_protocols:
+    summary: List the PTZ protocols the device offers (3.2.3); also kept in state
+    send: { method: GET, path: /api/streamer/ptz/protocol }
+    expect: *data
+    returns: value
+
+  get_ptz_serial_devices:
+    summary: List the serial devices a PTZ camera can be on (3.2.4); also kept in state
+    send: { method: GET, path: /api/streamer/ptz/serial_device }
+    expect: *data
+    returns: value
+
+  set_ptz_network:
+    summary: Control a PTZ camera over the network (3.2.5, typ network); read back after
+    params:
+      enabled: &p_ptz_enabled { type: bool, default: true, label: PTZ control, description: "Whether PTZ control is on." }
+      ptz_protocol: &p_ptz_protocol { type: string, default: Sony Visca, max_length: 32,
+                                      label: PTZ protocol, description: "The camera's protocol, one the protocol list gives: Sony Visca, Pelco-d or Pelco-p." }
+      ptz_addr: &p_ptz_addr { type: int, min: 0, max: 255, default: 1, label: Camera address, description: "The camera's address in that protocol." }
+      protocol: { type: enum, values: [TCP, UDP], default: TCP, label: Transport, description: "Whether the device reaches the camera over TCP or UDP." }
+      addr: { type: string, required: true, max_length: 255, label: Camera IP address, description: "The camera's IP address." }
+      port: { type: int, min: 1, max: 65535, default: 52381, label: Camera port, description: "The camera's control port." }
+    send: { method: POST, path: /api/streamer/ptz/modify,
+            body: '{"enable":{enabled:map.bool01},"typ":"network","ptz_addr":{ptz_addr},"ptz_protocol":{ptz_protocol:json},"addr":{addr:json},"port":{port},"protocol":"{protocol}"}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  set_ptz_serial:
+    summary: Control a PTZ camera on a serial port (3.2.5, typ serial, the document's example); read back after
+    params:
+      enabled: *p_ptz_enabled
+      ptz_protocol: *p_ptz_protocol
+      ptz_addr: *p_ptz_addr
+      device: { type: string, required: true, max_length: 64, label: Serial device, description: "The serial device, as the serial device list gives it." }
+      baudrate: { type: enum, values: ["2400", "4800", "9600", "19200", "38400", "57600", "115200"], default: "9600",
+                  label: Baud rate, description: "The serial line's speed in bits per second." }
+      parity: { type: enum, values: [none, odd, even], default: none, label: Parity, description: "The serial line's parity." }
+      data_bits: { type: int, min: 5, max: 8, default: 8, label: Data bits, description: "Data bits per character." }
+      stop_bits: { type: int, min: 1, max: 2, default: 1, label: Stop bits, description: "Stop bits per character." }
+      xonxoff: { type: bool, default: false, label: XON/XOFF, description: "Software flow control." }
+      rtscts: { type: bool, default: false, label: RTS/CTS, description: "Hardware flow control." }
+    send: { method: POST, path: /api/streamer/ptz/modify,
+            body: '{"enable":{enabled:map.bool01},"typ":"serial","ptz_addr":{ptz_addr},"ptz_protocol":{ptz_protocol:json},"rtscts":{rtscts:map.bool01},"startBits":{data_bits},"endBits":{stop_bits},"xonxoff":{xonxoff:map.bool01},"device":{device:json},"parity":"{parity}","baudrate":{baudrate}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  set_ptz_usb:
+    summary: Control a USB camera's PTZ, from the web page or an external controller (3.2.5, typ usb); read back after
+    params:
+      enabled: *p_ptz_enabled
+      ptz_protocol: { type: string, default: v4l2-ctl, max_length: 32, label: PTZ protocol, description: "The USB camera's control protocol, v4l2-ctl in the device's example." }
+      ptz_addr: *p_ptz_addr
+      control_type: { type: enum, values: [virtual, USB], default: virtual, label: Control type,
+                      description: "virtual for control from the web page, USB for an external controller." }
+    send: { method: POST, path: /api/streamer/ptz/modify,
+            body: '{"enable":{enabled:map.bool01},"typ":"usb","ptz_addr":{ptz_addr},"ptz_protocol":{ptz_protocol:json},"control_type":"{control_type}"}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  # ── 4.1 Network ────────────────────────────────────────────────────────
+  get_interfaces:
+    summary: Read the Ethernet interface's status and addressing (4.1.1); also kept in state
+    send: { method: GET, path: /api/networkmanager/network/GetLinkinfo }
+    expect: *data
+    returns: value
+
+  get_link_list:
+    summary: List the network links with their status and addresses (4.1.2); also kept in state
+    send: { method: GET, path: /api/networkmanager/network/GetLinkList }
+    expect: *data
+    returns: value
+
+  set_interface:
+    summary: Configure a network interface's addressing (4.1.3); read back after (see quirks)
+    params:
+      ifname: &p_ifname { type: string, default: eth0, max_length: 32, pattern: "^[A-Za-z0-9_.-]+$",
+                          label: Interface, description: "The network interface, such as eth0." }
+      enabled: { type: bool, default: true, label: Enabled, description: "Whether the interface is used." }
+      method: &p_ip_method { type: enum, values: [dhcp, static], required: true, label: Addressing,
+                             description: "dhcp takes an address from DHCP; static uses the address given." }
+      address: &p_ip { type: string, default: "", max_length: 45, label: IP address, description: "The static IP address; ignored with DHCP." }
+      netmask: &p_mask { type: string, default: "", max_length: 45, label: Subnet mask, description: "The static subnet mask, such as 255.255.255.0." }
+      gateway: &p_gw { type: string, default: "", max_length: 45, label: Gateway, description: "The default gateway's address." }
+      dns: &p_dns { type: string, default: "", max_length: 255, label: DNS servers, description: "DNS server addresses separated by semicolons, such as 8.8.8.8;8.8.4.4." }
+      mac: &p_mac { type: string, default: "", max_length: 17, label: MAC address, description: "The interface's MAC address as the device reports it; empty to leave it." }
+    send: { method: POST, path: /api/networkmanager/network/ChangeLinkinfo,
+            body: '{"ifname":{ifname:json},"cfg":{"enable":{enabled},"method":"{method}","address":{address:json},"netmask":{netmask:json},"gw":{gateway:json},"mac":{mac:json},"dns":{dns:json}}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  set_interface_enabled:
+    summary: Switch a network interface on or off (4.1.4, Ethernet switch); read back after
+    params:
+      ifname: *p_ifname
+      enabled: { type: bool, required: true, label: Enabled, description: "Whether the interface is on." }
+    send: { method: POST, path: /api/networkmanager/network/SetSwitch, body: '{"ifname":{ifname:json},"enable":{enabled}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_ethernet:
+    summary: Read the Ethernet card's settings as the device's small screen shows them (4.1.5); also kept in state
+    send: { method: GET, path: /api/networkmanager/network/GetEthernets }
+    expect: *data
+    returns: value
+
+  set_ethernet:
+    summary: Configure the Ethernet card as the device's small screen does (4.1.6); read back after
+    params:
+      ifname: *p_ifname
+      method: *p_ip_method
+      address: *p_ip
+      netmask: *p_mask
+      gateway: *p_gw
+      dns: *p_dns
+      mac: *p_mac
+    send: { method: POST, path: /api/networkmanager/network/SetEthernets,
+            body: '{"ifname":{ifname:json},"method":"{method}","address":{address:json},"netmask":{netmask:json},"gw":{gateway:json},"dns":{dns:json},"mac":{mac:json}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  reset_mdns:
+    summary: Restart mDNS announcement (4.1.7)
+    send: { method: GET, path: /api/networkmanager/network/ResetMDNS }
+    expect: *ok
+    returns: ack
+
+  get_link_rates:
+    summary: Read every link's receive and transmit rate, signal, RSRP, SINR, SIM and connection details, and the total (4.1.8); also kept in state
+    send: { method: GET, path: /api/networkmanager/network/getNetworkSpeed }
+    expect: *data
+    returns: value
+
+  get_link_data:
+    summary: Read every link's data, the same fields as get_link_rates (4.1.9); also kept in state
+    send: { method: GET, path: /api/networkmanager/network/getNetworkInterfaceAllData }
+    expect: *data
+    returns: value
+
+  get_interface_map:
+    summary: Read how the network interfaces map to their names, aliases and addresses (4.1.10)
+    send: { method: GET, path: /api/networkmanager }
+    expect: *data
+    returns: value
+
+  get_traffic:
+    summary: Read the bytes each interface has received and sent since its counter was cleared (4.1.11); also kept in state
+    send: { method: GET, path: /api/networkmanager/network/traffic_data }
+    expect: *data
+    returns: value
+
+  clear_traffic:
+    summary: Clear one interface's traffic counters (4.1.12); read back after
+    params:
+      key: { type: string, required: true, max_length: 32, pattern: "^[A-Za-z0-9_.-]+$",
+             label: Counter, description: "The counter's key, as the traffic statistics give it, such as eth0." }
+    send: { method: POST, path: /api/networkmanager/network/traffic_data, body: '{"traffic_keys":[{key:json}]}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_current_networks:
+    summary: List the connections in use with their weight (4.1.13); also kept in state
+    send: { method: GET, path: /api/networkmanager/network/current_networks }
+    expect: *data
+    returns: value
+
+  bind_network:
+    summary: Bind a process on the device to a network card (4.1.14; see quirks)
+    params:
+      pid: { type: int, min: 0, required: true, label: Process ID, description: "The id of the device process to bind." }
+      network_name: { type: string, required: true, max_length: 32, pattern: "^[A-Za-z0-9_.-]+$",
+                      label: Network card, description: "The network card to bind it to, such as eth0." }
+    send: { method: POST, path: /api/networkmanager/network/bind_network, body: '{"pid":{pid},"network_name":{network_name:json}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_network_choices:
+    summary: List the links a stream can be bound to (AUTO, LAN, WLAN, SIM1 to SIM4) and whether each is available (4.1.15); also kept in state
+    send: { method: GET, path: /api/networkmanager/network/list_network }
+    expect: *data
+    returns: value
+
+  # ── 4.2 Static routes ──────────────────────────────────────────────────
+  add_static_route:
+    summary: Add a static route (4.2.1); the route list is read back after
+    params: &route_params
+      interface: { type: string, required: true, max_length: 32, pattern: "^[A-Za-z0-9_.-]+$", label: Interface, description: "The interface the route goes out on, such as eth0." }
+      target: { type: string, required: true, max_length: 45, label: Destination, description: "The destination network or host address." }
+      netmask: { type: string, required: true, max_length: 45, label: Subnet mask, description: "The destination's subnet mask, such as 255.255.255.255 for one host." }
+      gateway: { type: string, required: true, max_length: 45, label: Gateway, description: "The next hop's address." }
+      metric: { type: int, min: 0, default: 0, label: Metric, description: "The route's metric; lower wins." }
+      mtu: { type: int, min: 68, max: 65535, default: 1500, label: MTU, description: "The route's maximum transmission unit in bytes." }
+    send: { method: POST, path: /api/networkmanager/static/routing/add,
+            body: '{"interface":{interface:json},"target":{target:json},"netmask":{netmask:json},"gateway":{gateway:json},"metric":{metric},"mtu":{mtu}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_static_routes:
+    summary: List the static routes (4.2.2); also kept in state
+    send: { method: GET, path: /api/networkmanager/static/routing/get }
+    expect: *data
+    returns: value
+
+  modify_static_route:
+    summary: Change a static route (4.2.3); the route list is read back after
+    params:
+      id: &p_route_id { type: int, min: 0, required: true, label: Route ID, description: "The route's id, as the route list gives it." }
+      interface: { type: string, required: true, max_length: 32, pattern: "^[A-Za-z0-9_.-]+$", label: Interface, description: "The interface the route goes out on, such as eth0." }
+      target: { type: string, required: true, max_length: 45, label: Destination, description: "The destination network or host address." }
+      netmask: { type: string, required: true, max_length: 45, label: Subnet mask, description: "The destination's subnet mask, such as 255.255.255.255 for one host." }
+      gateway: { type: string, required: true, max_length: 45, label: Gateway, description: "The next hop's address." }
+      metric: { type: int, min: 0, default: 0, label: Metric, description: "The route's metric; lower wins." }
+      mtu: { type: int, min: 68, max: 65535, default: 1500, label: MTU, description: "The route's maximum transmission unit in bytes." }
+    send: { method: POST, path: /api/networkmanager/static/routing/modify,
+            body: '{"id":{id},"interface":{interface:json},"target":{target:json},"netmask":{netmask:json},"gateway":{gateway:json},"metric":{metric},"mtu":{mtu}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  delete_static_route:
+    summary: Delete a static route (4.2.4); the route list is read back after
+    params:
+      id: *p_route_id
+    send: { method: POST, path: /api/networkmanager/static/routing/del, body: '{"ids":{id}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  set_static_route_enabled:
+    summary: Switch a static route on or off (4.2.5); the route list is read back after
+    params:
+      id: *p_route_id
+      enabled: { type: bool, required: true, label: Enabled, description: "Whether the route is used." }
+    send: { method: POST, path: /api/networkmanager/static/routing/set, body: '{"id":{id},"status":{enabled:map.bool01}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  # ── 4.3 Wi-Fi ──────────────────────────────────────────────────────────
+  add_wifi:
+    summary: Save a Wi-Fi network to join (4.3.1); the saved list is read back after
+    params: &wifi_params
+      ssid: &p_ssid { type: string, required: true, max_length: 32, label: Network name, description: "The Wi-Fi network's SSID." }
+      bssid: { type: string, default: "", max_length: 17, label: BSSID, description: "The access point's BSSID; empty for any." }
+      encryption: { type: int, min: 0, max: 4, default: 4, label: Security,
+                    description: "0 none, 1 WPA, 2 WPA-PSK, 3 WPA2, 4 WPA2-PSK." }
+      password: { type: string, default: "", secret: true, max_length: 64, label: Password, description: "The network's password; empty for an open network." }
+      autoconnect: { type: bool, default: true, label: Join automatically, description: "Whether the device joins the network on its own." }
+      method: { type: enum, values: [dhcp, static], default: dhcp, label: Addressing,
+                description: "dhcp takes an address from DHCP; static uses the address given." }
+      address: *p_ip
+      netmask: *p_mask
+      gateway: *p_gw
+      dns: { type: string, default: "", max_length: 45, label: DNS server, description: "The first DNS server's address, for static addressing." }
+      dns2: { type: string, default: "", max_length: 45, label: Second DNS server, description: "The second DNS server's address, for static addressing." }
+      mac: *p_mac
+    send: { method: POST, path: /api/networkmanager/wifi/add,
+            body: '{"wifi_ssid":{ssid:json},"wifi_bssid":{bssid:json},"wifi_encryption":{encryption},"wifi_password":{password:json},"param_autoconn":{autoconnect},"param_addr_solv":"{method}","ip_address":{address:json},"netmask":{netmask:json},"gateway":{gateway:json},"dns":{dns:json},"dns2":{dns2:json},"mac_address":{mac:json}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_saved_wifi:
+    summary: List the saved Wi-Fi networks (4.3.2); also kept in state, passwords left out
+    send: { method: GET, path: /api/networkmanager/wifi/get }
+    expect: *data
+    returns: value
+
+  get_current_wifi:
+    summary: Read the Wi-Fi network in use, its signal and addressing (4.3.3); also kept in state, password left out
+    send: { method: GET, path: /api/networkmanager/wifi/getCurrentWifi }
+    expect: *data
+    returns: value
+
+  get_wifi:
+    summary: Read one saved Wi-Fi network by name (4.3.4; the path is the document's, see quirks)
+    params:
+      ssid: *p_ssid
+    send: { method: GET, path: /api/networkamanager/wifi/getWifiName, query: { wifi_ssid: "{ssid}" } }
+    expect: *data
+    returns: value
+
+  modify_wifi:
+    summary: Change a saved Wi-Fi network (4.3.5); the saved list is read back after
+    params: *wifi_params
+    send: { method: POST, path: /api/networkmanager/wifi/modify,
+            body: '{"wifi_ssid":{ssid:json},"wifi_bssid":{bssid:json},"wifi_encryption":{encryption},"wifi_password":{password:json},"param_autoconn":{autoconnect},"param_addr_solv":"{method}","ip_address":{address:json},"netmask":{netmask:json},"gateway":{gateway:json},"dns":{dns:json},"dns2":{dns2:json},"mac_address":{mac:json}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  forget_wifi:
+    summary: Forget a saved Wi-Fi network (4.3.6); the saved list is read back after
+    params:
+      ssid: *p_ssid
+    send: { method: POST, path: /api/networkmanager/wifi/del, body: '{"wifi_ssid":{ssid:json}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  set_wifi_connected:
+    summary: Join or leave a saved Wi-Fi network (4.3.7); read back after
+    params:
+      ssid: *p_ssid
+      connected: { type: bool, required: true, label: Connected, description: "On joins the network, off leaves it." }
+    send: { method: POST, path: /api/networkmanager/wifi/set, body: '{"enable":{connected},"wifi_ssid":{ssid:json}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  scan_wifi:
+    summary: Scan for Wi-Fi networks and list them with signal, security and whether saved (4.3.8); also kept in state
+    send: { method: GET, path: /api/networkmanager/wifi/getScanWIFI }
+    expect: *data
+    returns: value
+
+  get_wifi_country_codes:
+    summary: List the Wi-Fi regulatory standards the device offers (4.3.9)
+    send: { method: GET, path: /api/networkmanager/wifi/getWifiNationalCode }
+    expect: *data
+    returns: value
+
+  # ── 4.4 Hotspot ────────────────────────────────────────────────────────
+  set_hotspot:
+    summary: Switch the device's own Wi-Fi hotspot on or off and set its name, password, channel and address range (4.4.1); read back after
+    params:
+      enabled: { type: bool, required: true, label: Hotspot, description: "Whether the hotspot is on." }
+      ssid: { type: string, required: true, max_length: 32, label: Hotspot name, description: "The hotspot's SSID." }
+      hidden: { type: bool, default: false, label: Hidden, description: "Whether the hotspot hides its name." }
+      password: { type: string, required: true, secret: true, max_length: 63, label: Password, description: "The hotspot's password, 8 characters or more." }
+      ip_range: { type: string, default: "192.168.140.", max_length: 16, pattern: "^(\\d{1,3}\\.){3}$",
+                  label: Address range, description: "The first three parts of the hotspot's network, ending with a dot, such as 192.168.140." }
+      channel: { type: int, min: 1, max: 196, default: 6, label: Channel, description: "The Wi-Fi channel, one the channel list gives." }
+    send: { method: POST, path: /api/networkmanager/hotspot/set,
+            body: '{"hotspot_ssid":{ssid:json},"hotspot_hidden":{hidden:map.bool01},"hotspot_password":{password:json},"ipRange":"{ip_range}","hotspot_channel":{channel},"enable":{enabled}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_hotspot:
+    summary: Read the hotspot's settings and connection count (4.4.2); also kept in state, password left out
+    send: { method: GET, path: /api/networkmanager/hotspot/get }
+    expect: *data
+    returns: value
+
+  get_wifi_parameters:
+    summary: Read the Wi-Fi country code and roaming settings (4.4.3); also kept in state
+    send: { method: GET, path: /api/networkmanager/hotspot/getWIFIParameter }
+    expect: *data
+    returns: value
+
+  set_wifi_parameters:
+    summary: Set the Wi-Fi country code and roaming settings (4.4.4); read back after
+    params:
+      country_code: { type: string, default: ALL, max_length: 16, pattern: "^[A-Za-z0-9_]+$",
+                      label: Country code, description: "The Wi-Fi regulatory standard, such as ALL, one the country code list gives." }
+      roaming: { type: bool, default: false, label: Roaming, description: "Whether the device moves between access points of one network." }
+      roaming_rssi_threshold: { type: int, default: 5, label: Roaming signal threshold, description: "The signal-strength threshold for roaming, as the device's web page takes it." }
+      roaming_scan_interval: { type: int, min: 0, default: 5, label: Roaming scan interval, description: "How often to scan while roaming, as the device's web page takes it." }
+    send: { method: POST, path: /api/networkmanager/hotspot/setWIFIParameter,
+            body: '{"country_code":{country_code:json},"roaming":{roaming},"roaming_rssi_thres":{roaming_rssi_threshold},"roaming_scan_intv":{roaming_scan_interval}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_wifi_channels:
+    summary: List the Wi-Fi channels the hotspot can use (4.4.5)
+    send: { method: GET, path: /api/networkmanager/hotspot/getWiFiChannel }
+    expect: *bare
+    returns: value
+
+  get_hotspot_bands:
+    summary: List the hotspot's frequency bands (4.4.6)
+    send: { method: GET, path: /api/networkmanager/hotspot/getHotspotFrequencyBand }
+    expect: *bare
+    returns: value
+
+  # ── 4.5 Cellular modems ────────────────────────────────────────────────
+  get_modems:
+    summary: Read every SIM slot's card, operator, signal, RSRP, SINR, network, APN and status (4.5.1); also kept in state
+    send: { method: GET, path: /api/networkmanager/modem/get }
+    expect: *data
+    returns: value
+
+  get_modem:
+    summary: Read one SIM slot (4.5.2); also kept in state
+    params:
+      modem: &p_modem { type: enum, values: [modem1, modem2, modem3, modem4], required: true,
+                        label: SIM slot, description: "The SIM slot: modem1 to modem4." }
+    send: { method: GET, path: /api/networkmanager/modem/getModemByNumber, query: { modem_number: "{modem}" } }
+    expect: *bare
+    returns: value
+
+  get_apn_list:
+    summary: List the known APNs by country and operator (4.5.3)
+    send: { method: GET, path: /api/networkmanager/modem/getAPN }
+    expect: *data
+    returns: value
+
+  set_modem_parameters:
+    summary: Configure a SIM slot's APN, login, PIN, 5G and network mode (4.5.4); read back after
+    params:
+      modem: *p_modem
+      version: { type: string, required: true, max_length: 8, label: Module type, description: "The slot's module type as the SIM list gives it, such as 4G or 5G." }
+      ccid: { type: string, default: "", max_length: 32, label: SIM CCID, description: "The SIM card's CCID as the SIM list gives it (modem_number)." }
+      device_name: { type: string, default: "", max_length: 64, label: Serial device, description: "The module's serial device as the SIM list gives it, such as /dev/ttyUSB3." }
+      ip_address: { type: string, default: "", max_length: 45, label: IP address, description: "The slot's IP address as the SIM list gives it." }
+      enable_5g: { type: bool, default: false, label: 5G, description: "Whether a 5G module uses 5G." }
+      network_mode: { type: enum, values: [AUTO, SA, NSA], default: AUTO, label: 5G mode, description: "AUTO, SA (standalone) or NSA (non-standalone)." }
+      apn: { type: string, default: "", max_length: 100, label: APN, description: "The access point name; empty for the card's default." }
+      username: { type: string, default: "", max_length: 64, label: APN user name, description: "The APN's user name; empty for none." }
+      password: { type: string, default: "", secret: true, max_length: 64, label: APN password, description: "The APN's password; empty for none." }
+      pin: { type: string, default: "", secret: true, max_length: 8, pattern: "^[0-9]*$", label: PIN, description: "The SIM card's PIN; empty for none." }
+      auth: { type: int, min: 1, max: 3, default: 1, label: Authentication, description: "1 PAP, 2 CHAP, 3 MS-CHAPv2." }
+    send: { method: POST, path: /api/networkmanager/modem/setModemParameter,
+            body: '{"version":{version:json},"modem_name":"{modem}","modem_number":{ccid:json},"device_name":{device_name:json},"ip_address":{ip_address:json},"enable_5G":{enable_5g},"network_mode":"{network_mode}","apn":{apn:json},"username":{username:json},"password":{password:json},"pin":{pin:json},"auth":{auth}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  reset_modem:
+    summary: Reset a SIM slot's modem (4.5.5; see quirks); read back after
+    params:
+      modem: *p_modem
+      wwan_name: &p_wwan { type: string, required: true, max_length: 32, pattern: "^[A-Za-z0-9_.-]+$",
+                           label: Network interface, description: "The slot's network interface as the SIM list gives it (wwan_name), such as usb0." }
+    send: { method: POST, path: /api/networkmanager/modem/modemRestore, body: '{"modem_name":"{modem}","wwan_name":{wwan_name:json}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  set_modem_enabled:
+    summary: Switch a SIM slot on or off (4.5.6); read back after
+    params:
+      modem: *p_modem
+      wwan_name: *p_wwan
+      enabled: { type: bool, required: true, label: Enabled, description: "Whether the SIM slot is used." }
+    send: { method: POST, path: /api/networkmanager/modem/modemEnable, body: '{"enable_card":{enabled},"modem_name":"{modem}","wwan_name":{wwan_name:json}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_imei:
+    summary: Read each module's IMEI, type, card and signal (4.5.7); also kept in state
+    send: { method: GET, path: /api/networkmanager/modem/imei_info }
+    expect: *data
+    returns: value
+
+  # ── 5 KiloLink bonding ─────────────────────────────────────────────────
+  update_bonding_codec_info:
+    summary: Send the current encoding settings to the KiloLink service (5.1.1)
+    send: { method: GET, path: /api/kilolink/update_codec_info }
+    expect: *ok
+    returns: ack
+
+  set_bonding_streaming:
+    summary: Start or stop the bonded stream (5.1.2); read back after
+    params:
+      enabled: { type: bool, required: true, label: Bonded streaming, description: "On starts streaming through KiloLink bonding, off stops it." }
+    send: { method: POST, path: /api/kilolink/bonding/setting_stream, body: '{"enable":{enabled}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_bonding_streaming:
+    summary: Read whether the bonded stream is on (5.1.3); also kept in state
+    send: { method: GET, path: /api/kilolink/bonding/stream_state }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.enable" }
+    returns: value
+
+  set_bonding_connection:
+    summary: Connect to or disconnect from the KiloLink server (5.1.4); read back after
+    params:
+      enabled: { type: bool, required: true, label: Server connection, description: "On connects to the KiloLink server, off disconnects." }
+    send: { method: POST, path: /api/kilolink/bonding/setting, body: '{"enable":{enabled}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_bonding_connection:
+    summary: Read whether the device is connected to the KiloLink server (5.1.5); also kept in state
+    send: { method: GET, path: /api/kilolink/bonding/state }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.enable" }
+    returns: value
+
+  get_bonding_server_stream:
+    summary: Read whether the KiloLink server is pushing or pulling the stream (5.1.6); also kept in state
+    send: { method: GET, path: /api/kilolink/bonding/server_stream_state }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.enable" }
+    returns: value
+
+  set_bonding_server:
+    summary: Set the KiloLink server address, port, key, encryption and dynamic bitrate (5.1.7; see quirks for the ip field); read back after
+    params:
+      ip: { type: string, required: true, max_length: 255, label: Server address, description: "The KiloLink server's IP address or host name." }
+      port: { type: int, min: 1, max: 65535, default: 60000, label: Server port, description: "The KiloLink server's port." }
+      key: { type: string, required: true, secret: true, max_length: 64, label: Authorization code, description: "The device's authorization code on the server." }
+      crypto: { type: bool, default: false, label: Encryption, description: "Whether the bonded link is encrypted." }
+      dynamic_bitrate: { type: bool, default: true, label: Dynamic bitrate, description: "Whether the encoder's bitrate follows the bonded links' capacity." }
+      enabled: { type: bool, default: true, label: Connect, description: "Whether to connect to this server." }
+    send: { method: POST, path: /api/kilolink/bonding/connect,
+            body: '{"ip":{ip:json},"port":{port},"crypto":{crypto},"dynamic_bitrate":{dynamic_bitrate:map.bool01},"key":{key:json},"enable":{enabled}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_bonding_server:
+    summary: Read the KiloLink server settings (5.1.8); also kept in state, the authorization code left out
+    send: { method: GET, path: /api/kilolink/bonding/server }
+    expect: *data
+    returns: value
+
+  get_bonding_server_history:
+    summary: List the last five KiloLink servers used (5.1.9); also kept in state, authorization codes left out
+    send: { method: GET, path: /api/kilolink/bonding/server_conf }
+    expect: *data
+    returns: value
+
+  set_bonding_interface:
+    summary: Add a link to, or take it out of, KiloLink bonding (5.1.10; see quirks)
+    params:
+      ifname: { type: string, required: true, max_length: 32, pattern: "^[A-Za-z0-9_.-]+$",
+                label: Link, description: "The link's interface, such as eth0, wlan0 or a modem's interface." }
+      enabled: { type: bool, required: true, label: Bonded, description: "Whether the link carries bonded traffic." }
+    send: { method: POST, path: /api/kilolink/network/select, body: '{"ifname":{ifname:json},"enable":{enabled}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  # ── 6.1 Video input ────────────────────────────────────────────────────
+  get_edid:
+    summary: Read the input's EDID (base64), EDID priority and whether a reset is allowed (6.1.1); the priority is kept in state
+    send: { method: GET, path: /api/codec/vin/edid }
+    expect: *bare
+    returns: value
+
+  set_edid_priority:
+    summary: Set the EDID priority (6.1.2); read back after
+    params:
+      priority: { type: string, required: true, max_length: 16, pattern: "^[A-Za-z0-9_-]+$",
+                  label: EDID priority, description: "The EDID priority value as the device's web page offers it, such as 2." }
+    send: { method: POST, path: /api/codec/vin/edid/priority, body: '{"edid_priority":{priority:json}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  upload_edid:
+    summary: Upload an EDID file for the input (6.1.3; see quirks for the field name); read back after
+    params:
+      file: { type: binary, required: true, label: EDID file, description: "The EDID binary (.bin)." }
+      filename: { type: string, default: "edid.bin", max_length: 128, pattern: "^[^\"\\\\/]+$", label: File name, description: "The file name sent with it." }
+    send: { method: POST, path: /api/codec/vin/edid/upload,
+            multipart: [ { name: file, binary: file, filename: "{filename}", content_type: application/octet-stream } ] }
+    expect: *ok
+    returns: ack
+
+  reset_edid:
+    summary: Put the input's default EDID back (6.1.4); read back after
+    send: { method: GET, path: /api/codec/vin/edid/reset }
+    expect: *ok
+    returns: ack
+
+  get_video_input:
+    summary: Read the input's signal, format, size, frame rate, type and source (6.1.5); also kept in state
+    send: { method: GET, path: /api/codec/v1/vin/detail }
+    expect: *bare
+    returns: value
+
+  get_video_sources:
+    summary: List the video inputs the unit has (6.1.6); also kept in state
+    send: { method: GET, path: /api/codec/v1/vin/list_source }
+    expect: *bare
+    returns: value
+
+  get_video_formats:
+    summary: List a USB camera's formats, resolutions and frame rates (6.1.7)
+    send: { method: GET, path: /api/codec/v1/vin/list_format }
+    expect: *bare
+    returns: value
+
+  set_video_source:
+    summary: Choose the video input (6.1.8); the input, encoder and audio input are read back after
+    params:
+      source: { type: enum, values: [hdmi, sdi, uvc], required: true, label: Video input,
+                description: "hdmi, sdi, or uvc for a USB camera, one the source list gives." }
+    send: { method: POST, path: /api/codec/v1/vin/source, body: '{"source":"{source}"}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  # ── 6.2 Audio ──────────────────────────────────────────────────────────
+  get_audio_input:
+    summary: Read the audio input choice, sample rate, channels, current source and each source's gain (6.2.1); also kept in state
+    send: { method: GET, path: /api/codec/v1/audio/input }
+    expect: *bare
+    returns: value
+
+  set_audio_input:
+    summary: Choose the audio input and set each source's gain (6.2.2); read back after
+    params:
+      source: { type: enum, values: [auto, hdmi, sdi, linein, uvc], required: true, label: Audio input,
+                description: "auto follows the video input; or hdmi, sdi, linein (analog line in) or uvc (USB camera)." }
+      current_source: { type: enum, values: [hdmi, sdi, linein, uvc], default: hdmi, label: Current source,
+                        description: "The source in use, sent back as the device reports it." }
+      gain_hdmi: &p_gain { type: int, min: -60, max: 60, default: 0, label: HDMI gain, description: "The HDMI audio's gain in dB, as the device's web page takes it." }
+      gain_sdi: { type: int, min: -60, max: 60, default: 0, label: SDI gain, description: "The SDI audio's gain in dB, as the device's web page takes it." }
+      gain_linein: { type: int, min: -60, max: 60, default: 0, label: Line in gain, description: "The analog line input's gain in dB, as the device's web page takes it." }
+      gain_uvc: { type: int, min: -60, max: 60, default: 0, label: USB camera gain, description: "The USB camera audio's gain in dB, as the device's web page takes it." }
+    send: { method: POST, path: /api/codec/v1/audio/input/source,
+            body: '{"source":"{source}","gain":{"hdmi":{gain_hdmi},"sdi":{gain_sdi},"linein":{gain_linein},"uvc":{gain_uvc}},"current_source":"{current_source}"}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_audio_sources:
+    summary: List the audio inputs the unit offers (6.2.3)
+    send: { method: GET, path: /api/codec/v1/audio/input/list_source }
+    expect: *bare
+    returns: value
+
+  get_audio_encoders:
+    summary: List the audio encoders with codec, sample rate, channels, bitrate and gain (6.2.4); also kept in state
+    send: { method: GET, path: /api/codec/v1/audio/encode/list }
+    expect: *bare
+    returns: value
+
+  add_audio_encoder:
+    summary: Add an audio encoder (6.2.5); the encoder list is read back after
+    params: &audio_enc_params
+      name: { type: string, required: true, max_length: 64, label: Encoder name, description: "The encoder's display name." }
+      codec: { type: enum, values: [AAC, G711, OPUS], default: AAC, label: Codec, description: "AAC, G.711 or Opus." }
+      resample: { type: enum, values: [fastest, common], default: fastest, label: Resampling,
+                  description: "fastest for average quality, common for higher quality at more CPU." }
+      sampling: { type: int, min: 8000, max: 96000, default: 48000, label: Sample rate, description: "Samples per second." }
+      channels: { type: int, min: 1, max: 8, default: 2, label: Channels, description: "Audio channels encoded." }
+      bitrate: { type: int, min: 1, default: 128000, label: Bitrate, description: "The encoded bitrate in bits per second." }
+      g711_law: { type: enum, values: [PCMU, PCMA], default: PCMU, label: G.711 law, description: "PCMU for u-law, PCMA for a-law; used with G711." }
+      channel_map: { type: string, default: "[0,1,2,3]", max_length: 64, pattern: "^\\[\\d+(,\\d+)*\\]$",
+                     label: Channel map, description: "The input channels mapped to the encoder, as a JSON list such as [0,1,2,3]." }
+    send: { method: POST, path: /api/codec/v1/audio/encode,
+            body: '{"id":"","name":{name:json},"codec":"{codec}","resample":"{resample}","sampling":{sampling},"channels":{channels},"bitrate":{bitrate},"g711Law":"{g711_law}","chn_map":{channel_map}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  modify_audio_encoder:
+    summary: Change an audio encoder (6.2.6); the encoder list is read back after
+    params:
+      id: &p_audio_id { type: int, min: 1, required: true, label: Encoder ID, description: "The encoder's id, as the encoder list gives it." }
+      name: { type: string, required: true, max_length: 64, label: Encoder name, description: "The encoder's display name." }
+      codec: { type: enum, values: [AAC, G711, OPUS], default: AAC, label: Codec, description: "AAC, G.711 or Opus." }
+      resample: { type: enum, values: [fastest, common], default: fastest, label: Resampling,
+                  description: "fastest for average quality, common for higher quality at more CPU." }
+      sampling: { type: int, min: 8000, max: 96000, default: 48000, label: Sample rate, description: "Samples per second." }
+      channels: { type: int, min: 1, max: 8, default: 2, label: Channels, description: "Audio channels encoded." }
+      bitrate: { type: int, min: 1, default: 128000, label: Bitrate, description: "The encoded bitrate in bits per second." }
+      g711_law: { type: enum, values: [PCMU, PCMA], default: PCMU, label: G.711 law, description: "PCMU for u-law, PCMA for a-law; used with G711." }
+      channel_map: { type: string, default: "[0,1,2,3]", max_length: 64, pattern: "^\\[\\d+(,\\d+)*\\]$",
+                     label: Channel map, description: "The input channels mapped to the encoder, as a JSON list such as [0,1,2,3]." }
+    send: { method: PUT, path: "/api/codec/v1/audio/encode/{id}",
+            body: '{"id":{id},"name":{name:json},"codec":"{codec}","resample":"{resample}","sampling":{sampling},"channels":{channels},"bitrate":{bitrate},"g711Law":"{g711_law}","chn_map":{channel_map}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  remove_audio_encoder:
+    summary: Remove an audio encoder (6.2.7); the encoder list is read back after
+    params:
+      id: *p_audio_id
+    send: { method: DELETE, path: "/api/codec/v1/audio/encode/{id}" }
+    expect: *ok
+    returns: ack
+
+  # ── 6.3 Video encoder ──────────────────────────────────────────────────
+  get_video_encoder:
+    summary: Read the video encoder's codec, profile, size, rate control, GOP, frame rate, bitrates, QP limits and the actual size and frame rate (6.3.1); also kept in state
+    send: { method: GET, path: /api/codec/v1/venc/settings }
+    expect: *bare
+    returns: value
+
+  set_video_encoder:
+    summary: Set the video encoder (6.3.2); read back after
+    params:
+      codec: { type: enum, values: [H264, H265], default: H264, label: Codec, description: "H.264 or H.265." }
+      grey: { type: bool, default: false, label: Grayscale, description: "Whether the picture is encoded in grayscale." }
+      profile: { type: int, min: 0, max: 2, default: 0, label: Profile, description: "0 Baseline, 1 Main, 2 High." }
+      pic_width: { type: int, min: 0, default: 1, label: Encoded width,
+                   description: "The encoded width as the device takes it (1 in the document's example, which keeps the source size; see quirks)." }
+      pic_height: { type: int, min: 0, default: 1, label: Encoded height,
+                    description: "The encoded height as the device takes it (1 in the document's example, which keeps the source size; see quirks)." }
+      mode: { type: enum, values: [CBR, VBR], default: CBR, label: Rate control, description: "CBR constant or VBR variable bitrate." }
+      gop: { type: int, min: 1, default: 60, label: Keyframe interval, description: "Frames between keyframes." }
+      fps: { type: string, default: auto, max_length: 8, pattern: "^(auto|\\d+(\\.\\d+)?)$", label: Frame rate,
+             description: "The encoded frame rate, auto to follow the input, or a number such as 30." }
+      bitrate: &p_bitrate { type: int, min: 1, default: 6000, label: Bitrate, description: "The target bitrate in kbit/s." }
+      max_bitrate: { type: int, min: 1, default: 6000, label: Maximum bitrate, description: "The highest bitrate VBR may use, in kbit/s." }
+      min_qp: { type: int, min: 0, max: 51, default: 10, label: Minimum QP, description: "The lowest quantizer." }
+      max_qp: { type: int, min: 0, max: 51, default: 40, label: Maximum QP, description: "The highest quantizer." }
+      min_iqp: { type: int, min: 0, max: 51, default: 10, label: Minimum I-frame QP, description: "The lowest quantizer of keyframes." }
+      min_ip: { type: int, default: 1, label: Minimum IP, description: "The lowest I to P quantizer difference, as the device takes it." }
+      max_ip: { type: int, default: 20, label: Maximum IP, description: "The highest I to P quantizer difference, as the device takes it." }
+      deinterlace: { type: string, default: line_doubling, max_length: 32, pattern: "^[a-z_]+$", label: Deinterlacing,
+                     description: "The deinterlacing mode, line_doubling in the document's example." }
+      timecode_type: { type: int, min: 0, default: 1, label: SEI timecode, description: "The SEI timecode type, as the device's web page offers it." }
+    send: { method: POST, path: /api/codec/v1/venc/settings,
+            body: '{"codec":"{codec}","grey":{grey},"profile":{profile},"picHeight":{pic_height},"picWidth":{pic_width},"mode":"{mode}","gop":{gop},"fps":"{fps}","bitrate":{bitrate},"maxBitrate":{max_bitrate},"minQp":{min_qp},"maxQp":{max_qp},"minIQp":{min_iqp},"minIp":{min_ip},"maxIp":{max_ip},"deinterlaceMode":"{deinterlace}","timecode_type":{timecode_type}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  set_video_bitrate:
+    summary: Set the video encoder's bitrate on its own (6.3.3); read back after
+    params:
+      bitrate: { type: int, min: 1, required: true, label: Bitrate, description: "The target bitrate in kbit/s." }
+    send: { method: POST, path: /api/codec/v1/venc/bitrate, body: '{"bitrate":{bitrate}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  # ── 6.4 Video processing ───────────────────────────────────────────────
+  get_images:
+    summary: List the uploaded overlay images (6.4.1); also kept in state
+    send: { method: GET, path: /api/codec/vpss/image }
+    expect: *bare
+    returns: value
+
+  upload_image:
+    summary: Upload an overlay image as form data (6.4.2); the image list is read back after
+    params:
+      file: { type: binary, required: true, label: Image, description: "The image file (PNG in the device's examples)." }
+      name: { type: string, required: true, max_length: 64, label: Image name, description: "The image's display name." }
+      filename: { type: string, default: "image.png", max_length: 128, pattern: "^[^\"\\\\/]+$", label: File name, description: "The file name sent with it." }
+    send:
+      method: POST
+      path: /api/codec/vpss/image
+      multipart:
+        - { name: file, binary: file, filename: "{filename}", content_type: application/octet-stream }
+        - { name: name, value: "{name}" }
+    expect: *ok
+    returns: ack
+
+  delete_image:
+    summary: Delete an overlay image (6.4.3); the image list is read back after
+    params:
+      id: { type: string, required: true, max_length: 64, pattern: "^[0-9A-Za-z_]+$", label: Image ID, description: "The image's id, as the image list gives it." }
+    send: { method: DELETE, path: "/api/codec/vpss/image/{id}" }
+    expect: *ok
+    returns: ack
+
+  get_still_frames:
+    summary: List the still frame shown when the input is lost (6.4.4); also kept in state
+    send: { method: GET, path: /api/codec/vpss/static_frame }
+    expect: *bare
+    returns: value
+
+  upload_still_frame:
+    summary: Upload the still frame image as form data (6.4.5); read back after
+    params:
+      file: { type: binary, required: true, label: Image, description: "The still frame image file." }
+      filename: { type: string, default: "static_frame.png", max_length: 128, pattern: "^[^\"\\\\/]+$", label: File name, description: "The file name sent with it." }
+    send: { method: POST, path: /api/codec/vpss/static_frame,
+            multipart: [ { name: file, binary: file, filename: "{filename}", content_type: application/octet-stream } ] }
+    expect: *ok
+    returns: ack
+
+  reset_still_frame:
+    summary: Put the default still frame back (6.4.6); read back after
+    send: { method: POST, path: /api/codec/vpss/static_frame/reset }
+    expect: *ok
+    returns: ack
+
+  get_input_transform:
+    summary: Read the input's rotation, mirror and flip (6.4.7); also kept in state
+    send: { method: GET, path: /api/codec/v1/vpss/input/rmf }
+    expect: *bare
+    returns: value
+
+  set_input_transform:
+    summary: Set the input's rotation, mirror and flip (6.4.8); read back after
+    params:
+      rotate: { type: int, min: 0, max: 359, default: 0, label: Rotation, description: "The rotation angle in degrees, as the device's web page offers it." }
+      mirror: { type: bool, default: false, label: Mirror, description: "Whether the picture is mirrored left to right." }
+      flip: { type: bool, default: false, label: Flip, description: "Whether the picture is flipped top to bottom." }
+    send: { method: POST, path: /api/codec/v1/vpss/input/rmf, body: '{"rotate":{rotate},"mirror_en":{mirror},"flip_en":{flip}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_osd:
+    summary: Read the OSD master switch and every overlay item (6.4.9); also kept in state
+    send: { method: GET, path: /api/codec/v1/vpss/osd }
+    expect: *bare
+    returns: value
+
+  set_osd_enabled:
+    summary: Switch every OSD overlay on or off (6.4.10); read back after
+    params:
+      enabled: { type: bool, required: true, label: OSD, description: "Whether overlays are drawn." }
+    send: { method: PUT, path: /api/codec/v1/vpss/osd, body: '{"enable":{enabled}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  add_osd_item:
+    summary: Add an overlay item of text, date and time, date, clock or an image (6.4.11); read back after
+    params: &osd_params
+      type: { type: enum, values: [text, time, date, clock, image], required: true, label: Item type,
+              description: "text, time (date and time), date, clock, or image (an uploaded image)." }
+      enabled: { type: bool, default: true, label: Shown, description: "Whether the item is drawn." }
+      text: { type: string, default: "", max_length: 256, label: Text, description: "The text of a text item." }
+      file_id: { type: string, default: "", max_length: 64, label: Image ID, description: "The uploaded image of an image item, as the image list gives it." }
+      position: { type: enum, values: [LeftTop, TopCenter, RightTop, LeftBottom, BottomCenter, RightBottom, Center, Manual], default: LeftTop,
+                  label: Position, description: "Where the item sits; Manual uses x and y." }
+      x: { type: int, min: 0, default: 0, label: X position, description: "The item's horizontal position, for Manual." }
+      y: { type: int, min: 0, default: 0, label: Y position, description: "The item's vertical position, for Manual." }
+      font_size: { type: int, min: 0, default: 1, label: Font size, description: "The font size, as the device's web page offers it." }
+      style: { type: enum, values: [normal, bold], default: normal, label: Font style, description: "normal or bold." }
+      font_color: { type: int, min: 0, max: 7, default: 1, label: Font color,
+                    description: "0 black, 1 white, 2 red, 3 blue, 4 green, 5 yellow, 6 purple, 7 cyan." }
+      outline: { type: int, min: 0, max: 2, default: 0, label: Outline, description: "0 none, 1 thin, 2 thick." }
+      outline_color: { type: int, min: 0, max: 7, default: 0, label: Outline color, description: "The outline's color, numbered as font_color." }
+    send: { method: POST, path: /api/codec/v1/vpss/osd,
+            body: '{"id":"","type":"{type}","file_id":{file_id:json},"text":{text:json},"x":{x},"y":{y},"position":"{position}","font_size":{font_size},"style":"{style}","outline":{outline},"font_color":{font_color},"outline_color":{outline_color},"enable":{enabled}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  get_osd_item:
+    summary: Read one overlay item (6.4.12); also kept in state
+    params:
+      id: &p_osd_id { type: string, required: true, max_length: 64, pattern: "^[0-9A-Za-z_]+$", label: Item ID, description: "The overlay item's id, as the OSD list gives it." }
+    send: { method: GET, path: "/api/codec/v1/vpss/osd/{id}" }
+    expect: *bare
+    returns: value
+
+  modify_osd_item:
+    summary: Change an overlay item (6.4.13); read back after
+    params:
+      id: *p_osd_id
+      type: { type: enum, values: [text, time, date, clock, image], required: true, label: Item type,
+              description: "text, time (date and time), date, clock, or image (an uploaded image)." }
+      enabled: { type: bool, default: true, label: Shown, description: "Whether the item is drawn." }
+      text: { type: string, default: "", max_length: 256, label: Text, description: "The text of a text item." }
+      file_id: { type: string, default: "", max_length: 64, label: Image ID, description: "The uploaded image of an image item, as the image list gives it." }
+      position: { type: enum, values: [LeftTop, TopCenter, RightTop, LeftBottom, BottomCenter, RightBottom, Center, Manual], default: LeftTop,
+                  label: Position, description: "Where the item sits; Manual uses x and y." }
+      x: { type: int, min: 0, default: 0, label: X position, description: "The item's horizontal position, for Manual." }
+      y: { type: int, min: 0, default: 0, label: Y position, description: "The item's vertical position, for Manual." }
+      font_size: { type: int, min: 0, default: 1, label: Font size, description: "The font size, as the device's web page offers it." }
+      style: { type: enum, values: [normal, bold], default: normal, label: Font style, description: "normal or bold." }
+      font_color: { type: int, min: 0, max: 7, default: 1, label: Font color,
+                    description: "0 black, 1 white, 2 red, 3 blue, 4 green, 5 yellow, 6 purple, 7 cyan." }
+      outline: { type: int, min: 0, max: 2, default: 0, label: Outline, description: "0 none, 1 thin, 2 thick." }
+      outline_color: { type: int, min: 0, max: 7, default: 0, label: Outline color, description: "The outline's color, numbered as font_color." }
+    send: { method: PUT, path: "/api/codec/v1/vpss/osd/{id}",
+            body: '{"id":{id:json},"type":"{type}","file_id":{file_id:json},"text":{text:json},"x":{x},"y":{y},"position":"{position}","font_size":{font_size},"style":"{style}","outline":{outline},"font_color":{font_color},"outline_color":{outline_color},"enable":{enabled}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  delete_osd_item:
+    summary: Delete an overlay item (6.4.14); read back after
+    params:
+      id: *p_osd_id
+    send: { method: DELETE, path: "/api/codec/v1/vpss/osd/{id}" }
+    expect: *ok
+    returns: ack
+
+  set_screen_output:
+    summary: Set the margins and rotation of the device's small screen picture (6.4.15; see quirks)
+    params:
+      left: { type: int, min: 0, required: true, label: Left, description: "The left margin, as the device takes it (800 in the document's example)." }
+      right: { type: int, min: 0, required: true, label: Right, description: "The right margin, as the device takes it (800 in the document's example)." }
+      top: { type: int, min: 0, required: true, label: Top, description: "The top margin, as the device takes it (480 in the document's example)." }
+      bottom: { type: int, min: 0, required: true, label: Bottom, description: "The bottom margin, as the device takes it (480 in the document's example)." }
+      rotation: { type: int, min: 0, max: 359, default: 0, label: Rotation, description: "The screen picture's rotation in degrees." }
+    send: { method: POST, path: /api/codec/v1/vpss/output, body: '{"left":{left},"right":{right},"top":{top},"down":{bottom},"rotation":{rotation}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  # ── 6.5 Panel ──────────────────────────────────────────────────────────
+  get_panel_settings:
+    summary: Read the settings the device's small screen shows (video and audio source, codec, size, bitrate, frame rate, gains, deinterlacing) (6.5.1); also kept in state
+    send: { method: GET, path: /api/codec/panel/settings }
+    expect: *bare
+    returns: value
+
+  set_panel_settings:
+    summary: Set the video and audio source, codec, size, bitrate, frame rate and deinterlacing as the device's small screen does (6.5.2; see quirks); read back after
+    params:
+      video_source: { type: enum, values: [HDMI, sdi, UVC], required: true, label: Video input,
+                      description: "HDMI, sdi or UVC (USB camera), spelled as the document gives them." }
+      codec: { type: enum, values: [H264, H265], default: H264, label: Codec, description: "H.264 or H.265." }
+      width: { type: int, min: 0, default: 1920, label: Width, description: "The encoded width in pixels." }
+      height: { type: int, min: 0, default: 1080, label: Height, description: "The encoded height in pixels." }
+      bitrate: { type: int, min: 1, default: 4000, label: Bitrate, description: "The video bitrate in kbit/s." }
+      fps: { type: string, default: auto, max_length: 8, pattern: "^(auto|\\d+(\\.\\d+)?)$", label: Frame rate, description: "auto, or a frame rate such as 30." }
+      audio_source: { type: enum, values: [auto, HDMI, sdi, line-in, UVC], default: auto, label: Audio input,
+                      description: "auto, HDMI, sdi, line-in or UVC, spelled as the document gives them." }
+      deinterlace: { type: string, default: line_doubling, max_length: 32, pattern: "^[a-z_]+$", label: Deinterlacing, description: "The deinterlacing mode, line_doubling in the document's example." }
+      gain: { type: int, min: -60, max: 60, default: 0, label: Audio gain, description: "The audio gain, as the document's example sends it (a single number)." }
+    send: { method: POST, path: /api/codec/panel/settings,
+            body: '{"video_source":"{video_source}","codec":"{codec}","height":{height},"width":{width},"video_bitrate":{bitrate},"fps":"{fps}","audio_source":"{audio_source}","deinterlaceMode":"{deinterlace}","gain":{gain}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Authentication. The API takes an optional token: with API authentication on
+      (set_api_authentication), each request carries the token the login issues, as it
+      is, in the Authorization header (no Bearer word). The login answers the token in
+      its JSON body, which the spec format cannot capture as a session, so the token is
+      the token setting: run the login command (as the first request, or on a second
+      instance opened for commands only, since a request refused for a missing token
+      stops the device until its settings change), then pass the result with
+      update_settings. The document's example token is a JWT whose expiry lies a
+      century ahead; it states no lifetime or refresh. With authentication off, leave
+      the setting empty.
+  - models: [all]
+    severity: warning
+    text: >
+      The document's request-address lines carry typos that are kept as written, since
+      the firmware may serve them so: add_user posts to /api/systemctr/user/add (every
+      other user path is /api/systemctrl/user/...), get_production_test reads
+      /api/ststemctrl/system/production_stat, and get_wifi reads
+      /api/networkamanager/wifi/getWifiName. The usage example names
+      /api/systemctrl/users/auth_info while section 1.1.3 gives /user/auth_info; the
+      section's path is used. Each needs checking on a unit.
+  - models: [all]
+    severity: warning
+    text: >
+      Recording on and off (section 2.2.1) is given the same address and method as
+      reading the status: GET /api/record/v1/get_recording_status, with {"start":true}
+      as its parameter. It is sent exactly so, the JSON as a GET body. The sibling E3
+      document and an MIT-licensed control module for the E3 switch recording with POST
+      /api/record/<interface>/recording, so the P3 may want POST
+      /api/record/v1/recording; a unit must show which.
+  - models: [all]
+    severity: info
+    text: >
+      Machine translation garbled some field names and values; where the device's own
+      example reply shows a spelling, that spelling is used. The KiloLink server address
+      field reads "IP address" in the document's examples and IP in its table; it is
+      sent as ip, the E3 and N60 documents' name, and read from both ip and IP. Keys
+      the translation capitalized (USB, DNS, Mac, Timezone) are read in both cases
+      where they are read. The SRT table names bindWidth where the stream list shows
+      bandwidth (bandwidth is sent); the recording example shows time-loop where the
+      option list gives time_loop (time_loop is sent); the NDI|HX multicast option has
+      no value in the document (multicast is sent); the network PTZ type has no value
+      (network, as the device's own information reply shows, is sent); the OSD date
+      type and bold style have no value (date and bold, as the device's examples show).
+  - models: [all]
+    severity: critical
+    text: >
+      factory_reset restores factory settings at once: streams, KiloLink server, Wi-Fi,
+      SIM settings, users and the network configuration are lost, and the device may
+      come back at another address. reboot restarts the device two seconds after
+      answering, which drops every stream, the bonded link and the recording.
+      upload_firmware and merge_firmware install new firmware, which the device applies
+      by restarting; neither can be undone from here.
+  - models: [all]
+    severity: warning
+    text: >
+      restart_codec (section 1.3.11, "Reset") restarts the encoding service: the
+      picture stops on every stream and recording until it is back. reset_modem resets
+      a SIM slot's modem, dropping that link. set_web_protocols can switch off the
+      protocol or move the port this integration uses, and set_interface or
+      set_ethernet can move the device's address; the read-back then fails until the
+      device is reached at its new address.
+  - models: [all]
+    severity: info
+    text: >
+      PTZ control (section 3.2.1) lists eight directions and a speed but no stop
+      action, and says nothing of how long a move lasts. Whether a move runs until the
+      next command, or for a set time, is undocumented.
+  - models: [all]
+    severity: info
+    text: >
+      API limits. The document has no read for the KiloLink network selection
+      (set_bonding_interface), the small screen's output margins (set_screen_output) or
+      the NIC binding (bind_network), so those are not read back. It documents no
+      per-link bonding statistics beyond each link's receive and transmit rate, signal,
+      RSRP and SINR (get_link_rates), no dropped-frame counter, no temperature and no
+      battery reading. Media user passwords, Wi-Fi and hotspot passwords, the KiloLink
+      authorization code and the HTTPS key are readable through their commands but kept
+      out of state. The NAS list of the storage read is documented as unsupported on
+      this device.
+  - models: [all]
+    severity: info
+    text: >
+      Units the document leaves open: the link and NIC rates (getNetworkSpeed) are
+      described as bytes received and sent but read as rates; the recording size and
+      time limits, the memory and disk figures and the uptime carry no unit. They are
+      kept as the device reports them.
+  - models: [all]
+    severity: info
+    text: >
+      The document does not distinguish the P3 from the P3 Mini. What a unit has (its
+      video and audio inputs, SIM slots, Wi-Fi interfaces) is read from the source,
+      link and SIM lists rather than assumed per model.
+  - models: [all]
+    severity: info
+    text: >
+      Form uploads: the document names the form fields of the chunked firmware upload
+      (identifier, file, number, file_type) and the overlay image upload (file, name).
+      For the one-request firmware upload, the HTTPS certificate and key upload and the
+      EDID upload it names only the file, so the field is sent as file, and the
+      certificate upload's {file_type} is sent as crt or key; both are inferred. Log
+      export (section 1.4.2) answers a compressed file and is not offered (see the
+      format gaps of this integration's documentation).
+  - models: [all]
+    severity: info
+    text: >
+      Several replies are bare JSON without the result and data wrapper (the stream
+      list, NTP status, one SIM slot, the codec, VPSS and panel reads, the Wi-Fi
+      channel and band lists); their commands check only the HTTP status. The panel
+      write (section 6.5.2) spells sources in mixed case (HDMI, sdi, UVC, line-in) and
+      sends gain as one number where the read gives one per source; it is sent as
+      documented.
+  - models: [all]
+    severity: info
+    text: >
+      Polling: link rates, recording, streams and bonding state every 2 s; system
+      load, SIM slots, input, encoder, current Wi-Fi and traffic every 5 s; storage,
+      recordings, interfaces and PTZ every 15 s; the rest of the configuration every
+      30 s. Every write is read back from the matching read once its answer reports ok.
+
+state:
+  # system
+  device.hostname:          { type: string, description: "Device name (getHostname)" }
+  device.product:           { type: string, description: "Product name, such as P3" }
+  device.oem:               { type: string, description: "Manufacturer or OEM label" }
+  device.serial_number:     { type: string, description: "Serial number" }
+  device.firmware:          { type: string, description: "Software (firmware) version" }
+  device.hardware_version:  { type: string, description: "Hardware version" }
+  device.ndi_version:       { type: string, description: "NDI library version" }
+  device.cpu_percent:       { type: float, unit: "%", description: "CPU use" }
+  device.memory_percent:    { type: float, unit: "%", description: "Memory use" }
+  device.memory_total:      { type: int, description: "Total memory, as the device reports it (no unit documented; apparently KiB)" }
+  device.memory_used:       { type: int, description: "Memory used, as the device reports it" }
+  device.disk_percent:      { type: float, unit: "%", description: "Internal disk use" }
+  device.disk_total:        { type: int, description: "Internal disk size, as the device reports it (no unit documented; apparently KiB)" }
+  device.disk_used:         { type: int, description: "Internal disk space used, as the device reports it" }
+  device.disk_free:         { type: int, description: "Internal disk space free, as the device reports it" }
+  device.uptime:            { type: float, description: "Time since start, as the device reports it (no unit documented; apparently seconds)" }
+  device.imei.*:            { type: string, description: "IMEI of the module in SIM slot 1 to 4, empty without one" }
+  auth.api_authentication:  { type: bool, description: "Whether API requests must carry a login token" }
+  users.*.alias:            { type: string, description: "User's display name, keyed by user ID" }
+  users.*.web:              { type: bool, description: "Whether the user may log in to the web interface" }
+  users.*.api:              { type: bool, description: "Whether the user may send API requests" }
+  users.*.created:          { type: string, description: "When the user was created, YYYY-MM-DD HH:MM:SS" }
+  time.time:                { type: string, description: "Device's local time when last read, YYYY-MM-DD HH:MM:SS" }
+  time.mode:                { type: string, description: "Time source: pc, manual or ntp" }
+  time.timezone:            { type: string, description: "Time zone name, such as Asia/Shanghai" }
+  time.offset:              { type: int, unit: h, description: "Offset from UTC in hours" }
+  time.ntp_servers:         { type: string, description: "NTP servers, separated by spaces" }
+  time.ntp_peers.*.remote:  { type: string, description: "NTP peer address, with ntpq's * (selected) or + (candidate) mark; keyed by its place in the list from 0" }
+  time.ntp_peers.*.refid:   { type: string, description: "NTP peer's reference source" }
+  time.ntp_peers.*.stratum: { type: int, description: "NTP peer's stratum" }
+  time.ntp_peers.*.type:    { type: string, description: "NTP peer type letter (u unicast, l local)" }
+  time.ntp_peers.*.when:    { type: int, unit: s, description: "Seconds since the peer was last heard" }
+  time.ntp_peers.*.poll:    { type: int, unit: s, description: "Polling interval" }
+  time.ntp_peers.*.reach:   { type: string, description: "Reachability register (octal)" }
+  time.ntp_peers.*.delay:   { type: float, unit: ms, description: "Round-trip delay" }
+  time.ntp_peers.*.offset:  { type: float, unit: ms, description: "Clock offset from the peer" }
+  time.ntp_peers.*.jitter:  { type: float, unit: ms, description: "Jitter" }
+  web.http:                 { type: bool, description: "Whether HTTP is on" }
+  web.https:                { type: bool, description: "Whether HTTPS is on" }
+  web.http_port:            { type: int, description: "HTTP port" }
+  web.https_port:           { type: int, description: "HTTPS port" }
+  ssl.certificate:          { type: string, description: "HTTPS certificate in use (PEM), empty for the device's own" }
+  ssl.reset_allowed:        { type: bool, description: "Whether the certificate can be reset to the device's own" }
+  system.production_test:   { type: bool, description: "Whether the factory production-test service runs" }
+  nic.*.receive:            { type: float, description: "Network card's receive figure (getNetworkSpeed of the system service), keyed by card name" }
+  nic.*.transmit:           { type: float, description: "Network card's transmit figure" }
+  nic.*.speed:              { type: int, unit: Mbit/s, description: "Network card's link speed" }
+  # recording
+  recording.active:         { type: bool, description: "Whether the device is recording" }
+  recording.disk_type:      { type: string, description: "Drive choice the recording settings report, such as largest" }
+  recording.format:         { type: string, description: "Recording format: mp4, mov or ts" }
+  recording.file_prefix:    { type: string, description: "Recording file name prefix" }
+  recording.limit_type:     { type: string, description: "File split: none, size_loop or time_loop (time-loop in the document's example)" }
+  recording.limit_size:     { type: int, description: "Size at which size_loop starts a new file, in the device's unit" }
+  recording.limit_time:     { type: int, description: "Duration at which time_loop starts a new file, in the device's unit" }
+  recording.disk_policy:    { type: string, description: "Full-drive policy: noSpace (stop) or overwrite" }
+  recording.follow_timecode: { type: bool, description: "Whether recording starts and stops with the input's timecode" }
+  recording.files.*.*.path:       { type: string, description: "Recording's full path; keyed by the drive's mount point, then by the file's place in its list from 0" }
+  recording.files.*.*.name:       { type: string, description: "Recording's file name" }
+  recording.files.*.*.size:       { type: float, description: "Recording's size, as the device reports it (apparently MB)" }
+  recording.files.*.*.current:    { type: bool, description: "Whether the file is still being written" }
+  recording.files.*.*.stream:     { type: string, description: "Stream recorded, such as main" }
+  recording.files.*.*.start_time: { type: string, description: "Recording start, YYYY-MM-DD HH:MM:SS" }
+  recording.files.*.*.end_time:   { type: string, description: "Recording end, YYYY-MM-DD HH:MM:SS" }
+  storage.usb.*.name:       { type: string, description: "USB drive partition name, keyed by partition id such as sdb1" }
+  storage.usb.*.type:       { type: string, description: "Partition type" }
+  storage.usb.*.volume:     { type: string, description: "Partition device, such as /dev/sdb1" }
+  storage.usb.*.mounted:    { type: string, description: "Mount point, such as /run/media/sdb1" }
+  storage.usb.*.filesystem: { type: string, description: "File system, such as vfat" }
+  storage.usb.*.status:     { type: string, description: "Mount status, such as mounted" }
+  storage.usb.*.chosen:     { type: bool, description: "Whether recordings go to this drive" }
+  storage.usb.*.disk_type:  { type: string, description: "Drive type, such as usb" }
+  storage.usb.*.total:      { type: int, description: "Drive size, as the device reports it (apparently MB)" }
+  storage.usb.*.used:       { type: int, description: "Space used, as the device reports it" }
+  storage.usb.*.free:       { type: int, description: "Space free, as the device reports it" }
+  storage.usb.*.percent:    { type: int, unit: "%", description: "Drive use" }
+  # streams
+  streams.*.type:           { type: string, description: "Stream type: ndi_hx, rtsp, rtmp, srt, hls, udp, rtp or whip; keyed by stream id" }
+  streams.*.name:           { type: string, description: "Stream's display name" }
+  streams.*.enabled:        { type: bool, description: "Whether the stream is switched on" }
+  streams.*.status:         { type: string, description: "Stream's status as the device reports it, such as stop" }
+  streams.*.address:        { type: string, description: "Destination or push address" }
+  streams.*.address_url:    { type: string, description: "Address the stream can be reached at, or offline" }
+  streams.*.bind_audio:     { type: int, description: "Audio encoder the stream carries" }
+  streams.*.bind_network:   { type: string, description: "Link the stream goes out on: auto, eth0, wlan0, modem1 to modem4" }
+  streams.*.auto_enable:    { type: bool, description: "Whether the stream starts by itself" }
+  streams.*.network_enable: { type: bool, description: "Whether the bound link is available" }
+  streams.*.connection_mode: { type: string, description: "SRT handshake mode: Caller, Listener or Rendezvous" }
+  streams.*.latency:        { type: int, unit: ms, description: "SRT latency" }
+  streams.*.listener_port:  { type: int, description: "SRT listening port" }
+  streams.*.encryption:     { type: string, description: "SRT encryption: 0 (none), AES-128, AES-192 or AES-256" }
+  streams.*.bandwidth:      { type: int, unit: "%", description: "SRT overhead bandwidth" }
+  streams.*.payload_size:   { type: int, unit: B, description: "SRT payload per packet" }
+  streams.*.srt_stream_id:  { type: string, description: "SRT stream ID" }
+  streams.*.port:           { type: int, description: "Destination port (RTP, TS-UDP)" }
+  streams.*.user:           { type: string, description: "RTMP user name" }
+  streams.*.channel_name:   { type: string, description: "NDI|HX channel name" }
+  streams.*.group:          { type: string, description: "NDI|HX groups" }
+  streams.*.connection:     { type: string, description: "NDI|HX transport" }
+  media_users.*:            { type: string, description: "Media (stream login) user name, keyed by its place in the list from 0" }
+  # PTZ
+  ptz.enabled:              { type: bool, description: "Whether PTZ control is on" }
+  ptz.type:                 { type: string, description: "PTZ control type: network, serial or usb" }
+  ptz.network.protocol:     { type: string, description: "Network PTZ transport: TCP or UDP" }
+  ptz.network.address:      { type: string, description: "Network PTZ camera's IP address" }
+  ptz.network.port:         { type: int, description: "Network PTZ camera's port" }
+  ptz.network.ptz_protocol: { type: string, description: "Network PTZ camera's protocol, such as Sony Visca" }
+  ptz.network.ptz_address:  { type: string, description: "Network PTZ camera's address in its protocol" }
+  ptz.serial.device:        { type: string, description: "Serial PTZ device, none when unset" }
+  ptz.serial.baudrate:      { type: int, unit: bit/s, description: "Serial PTZ baud rate" }
+  ptz.serial.parity:        { type: string, description: "Serial PTZ parity" }
+  ptz.serial.data_bits:     { type: int, description: "Serial PTZ data bits" }
+  ptz.serial.stop_bits:     { type: int, description: "Serial PTZ stop bits" }
+  ptz.serial.xonxoff:       { type: bool, description: "Serial PTZ software flow control" }
+  ptz.serial.rtscts:        { type: bool, description: "Serial PTZ hardware flow control" }
+  ptz.serial.ptz_protocol:  { type: string, description: "Serial PTZ camera's protocol" }
+  ptz.serial.ptz_address:   { type: string, description: "Serial PTZ camera's address in its protocol" }
+  ptz.usb.ptz_protocol:     { type: string, description: "USB camera's control protocol, such as v4l2-ctl" }
+  ptz.usb.ptz_address:      { type: string, description: "USB camera's address" }
+  ptz.usb.port:             { type: int, description: "USB camera's port" }
+  ptz.usb.control_type:     { type: string, description: "USB PTZ control: virtual (web page) or USB (external controller)" }
+  ptz.usb.device:           { type: string, description: "USB camera device, such as /dev/video0" }
+  ptz.protocols.*:          { type: string, description: "PTZ protocol offered, keyed by its place in the list from 0" }
+  ptz.serial_devices.*:     { type: string, description: "Serial device offered for PTZ, keyed by its place in the list from 0" }
+  # network
+  network.interfaces.*.name:    { type: string, description: "Interface's display name, keyed by interface such as eth0" }
+  network.interfaces.*.status:  { type: string, description: "Interface status: up or down" }
+  network.interfaces.*.address: { type: string, description: "Interface's IP address" }
+  network.interfaces.*.netmask: { type: string, description: "Interface's subnet mask" }
+  network.interfaces.*.gateway: { type: string, description: "Interface's gateway" }
+  network.interfaces.*.mac:     { type: string, description: "Interface's MAC address" }
+  network.interfaces.*.method:  { type: string, description: "Interface's addressing: dhcp or static" }
+  network.interfaces.*.enabled: { type: bool, description: "Whether the interface is on" }
+  network.interfaces.*.dns:     { type: string, description: "Interface's DNS servers, separated by semicolons" }
+  links.*.name:             { type: string, description: "Link's network name (Wi-Fi SSID, operator), keyed by link (total, eth0, wlan0, a modem's interface)" }
+  links.*.type:             { type: string, description: "Link type: total, eth, wlan or a cellular type" }
+  links.*.address:          { type: string, description: "Link's IP address" }
+  links.*.enabled:          { type: bool, description: "Whether the link is available" }
+  links.*.card_enabled:     { type: bool, description: "Whether the link's card or slot is switched on" }
+  links.*.card_inserted:    { type: string, description: "Whether a SIM card is in, as the device reports it (no for Ethernet and Wi-Fi)" }
+  links.*.version:          { type: string, description: "Module version, such as 4G or 5G" }
+  links.*.signal_version:   { type: string, description: "Signal type, such as 4G" }
+  links.*.operator:         { type: string, description: "Operator or interface name" }
+  links.*.signal:           { type: int, unit: dBm, description: "Signal strength (Wi-Fi RSSI or cellular)" }
+  links.*.rsrp:             { type: int, unit: dBm, description: "Cellular reference signal received power" }
+  links.*.sinr:             { type: int, unit: dB, description: "Cellular signal to interference and noise ratio" }
+  links.*.receive:          { type: float, description: "Receive rate, as the device reports it (the document calls it bytes received; apparently kbit/s)" }
+  links.*.transmit:         { type: float, description: "Transmit rate, as the device reports it (apparently kbit/s); total is the sum over links" }
+  links.*.sort:             { type: int, description: "Display order" }
+  links.*.connections:      { type: int, description: "Clients connected (a hotspot's access point count)" }
+  links.*.wwan_name:        { type: string, description: "Link's network interface name" }
+  links.*.pin_status:       { type: int, description: "SIM PIN status code, as the device reports it" }
+  network.current.*.wwan_name: { type: string, description: "Connection in use: its network interface, keyed by name" }
+  network.current.*.alias:     { type: string, description: "Connection's alias (Wi-Fi SSID)" }
+  network.current.*.sub_wwan:  { type: string, description: "Connection's sub-interface" }
+  network.current.*.address:   { type: string, description: "Connection's IP address" }
+  network.current.*.version:   { type: string, description: "Connection's module version" }
+  network.current.*.weight:    { type: int, description: "Connection's routing weight" }
+  network.traffic.*.receive:    { type: float, unit: B, description: "Bytes received since the counter was cleared, keyed by counter key such as eth0" }
+  network.traffic.*.transmit:   { type: float, unit: B, description: "Bytes sent since the counter was cleared" }
+  network.traffic.*.start_time: { type: string, description: "When the counter was cleared, YYYY/MM/DD HH:MM:SS" }
+  network.traffic.*.type:       { type: string, description: "Interface type: eth, wlan or cellular" }
+  network.traffic.*.name:       { type: string, description: "Interface's display name" }
+  network.choices.*.name:     { type: string, description: "Stream link choice's name (AUTO, LAN, WLAN, SIM1 to SIM4), keyed by its value (auto, eth0, wlan0, modem1 to modem4)" }
+  network.choices.*.type:     { type: string, description: "Link choice's type" }
+  network.choices.*.address:  { type: string, description: "Link choice's IP address" }
+  network.choices.*.operator: { type: string, description: "Link choice's operator or network name" }
+  network.choices.*.enabled:  { type: bool, description: "Whether the link choice is available" }
+  routes.*.interface:       { type: string, description: "Static route's interface, keyed by route id" }
+  routes.*.target:          { type: string, description: "Static route's destination" }
+  routes.*.netmask:         { type: string, description: "Static route's subnet mask" }
+  routes.*.gateway:         { type: string, description: "Static route's gateway" }
+  routes.*.metric:          { type: int, description: "Static route's metric" }
+  routes.*.mtu:             { type: int, unit: B, description: "Static route's MTU" }
+  routes.*.enabled:         { type: bool, description: "Whether the static route is used" }
+  # Wi-Fi
+  wifi.saved.*.bssid:       { type: string, description: "Saved Wi-Fi network's BSSID, keyed by SSID" }
+  wifi.saved.*.encryption:  { type: int, description: "Security: 0 none, 1 WPA, 2 WPA-PSK, 3 WPA2, 4 WPA2-PSK" }
+  wifi.saved.*.signal:      { type: int, unit: dBm, description: "Signal strength" }
+  wifi.saved.*.autoconnect: { type: bool, description: "Whether the device joins it on its own" }
+  wifi.saved.*.method:      { type: string, description: "Addressing: dhcp or static" }
+  wifi.saved.*.address:     { type: string, description: "IP address on that network" }
+  wifi.saved.*.netmask:     { type: string, description: "Subnet mask on that network" }
+  wifi.saved.*.gateway:     { type: string, description: "Gateway on that network" }
+  wifi.saved.*.dns:         { type: string, description: "First DNS server" }
+  wifi.saved.*.dns2:        { type: string, description: "Second DNS server" }
+  wifi.saved.*.mac:         { type: string, description: "MAC address used" }
+  wifi.saved.*.hw_mode:     { type: string, description: "Band, such as 2.4G/5G" }
+  wifi.saved.*.enabled:     { type: bool, description: "Whether the network is usable" }
+  wifi.saved.*.state:       { type: int, description: "Connection state code, as the device reports it (1 in the document's connected example)" }
+  wifi.saved.*.active_disconnect: { type: bool, description: "Whether the device was told to leave it" }
+  wifi.saved.*.network_id:  { type: int, description: "Id given when the network was saved" }
+  wifi.current.ssid:        { type: string, description: "SSID of the Wi-Fi network in use" }
+  wifi.current.bssid:       { type: string, description: "BSSID of the access point in use" }
+  wifi.current.encryption:  { type: int, description: "Security of the network in use, numbered as for saved networks" }
+  wifi.current.signal:      { type: int, unit: dBm, description: "Signal strength of the network in use" }
+  wifi.current.method:      { type: string, description: "Addressing on the network in use: dhcp or static" }
+  wifi.current.address:     { type: string, description: "IP address on the network in use" }
+  wifi.current.netmask:     { type: string, description: "Subnet mask on the network in use" }
+  wifi.current.gateway:     { type: string, description: "Gateway on the network in use" }
+  wifi.current.mac:         { type: string, description: "MAC address on the network in use" }
+  wifi.current.hw_mode:     { type: string, description: "Band of the network in use" }
+  wifi.current.state:       { type: int, description: "Connection state code, as the device reports it" }
+  wifi.scan.*.ssid:         { type: string, description: "SSID found by the last scan, keyed by its place in the list from 0" }
+  wifi.scan.*.signal:       { type: int, unit: dBm, description: "Signal strength of the network found" }
+  wifi.scan.*.secured:      { type: bool, description: "Whether the network found needs a password" }
+  wifi.scan.*.saved:        { type: bool, description: "Whether the network found is saved" }
+  wifi.country_code:        { type: string, description: "Wi-Fi regulatory standard, such as ALL" }
+  wifi.roaming:             { type: bool, description: "Whether roaming between access points is on" }
+  wifi.roaming_rssi_threshold: { type: int, description: "Roaming signal threshold, as the device reports it" }
+  wifi.roaming_scan_interval:  { type: int, description: "Roaming scan interval, as the device reports it" }
+  hotspot.enabled:          { type: bool, description: "Whether the device's hotspot is on" }
+  hotspot.ssid:             { type: string, description: "Hotspot SSID" }
+  hotspot.hidden:           { type: bool, description: "Whether the hotspot hides its name" }
+  hotspot.hw_mode:          { type: string, description: "Hotspot band code (g, a or n)" }
+  hotspot.hw_mode_name:     { type: string, description: "Hotspot band name, such as 2.4G/5G" }
+  hotspot.channel:          { type: int, description: "Hotspot channel" }
+  hotspot.ip_range:         { type: string, description: "Hotspot network's first three parts, such as 192.168.140." }
+  hotspot.ip_prefix:        { type: string, description: "Hotspot network's prefix length, such as 24" }
+  hotspot.gateway:          { type: string, description: "Hotspot's own address" }
+  hotspot.mac:              { type: string, description: "Hotspot's MAC address" }
+  hotspot.connections:      { type: int, description: "Clients connected to the hotspot" }
+  # modems
+  modems.*.operator:        { type: string, description: "SIM operator, keyed by slot (modem1 to modem4)" }
+  modems.*.card_inserted:   { type: bool, description: "Whether a SIM card is in the slot" }
+  modems.*.ccid:            { type: string, description: "SIM card CCID" }
+  modems.*.internet:        { type: string, description: "Whether the slot reaches the internet, as the device reports it (1 in its example)" }
+  modems.*.address:         { type: string, description: "Slot's IP address" }
+  modems.*.apn:             { type: string, description: "APN in use" }
+  modems.*.version:         { type: string, description: "Module type, such as 4G or 5G" }
+  modems.*.enabled:         { type: bool, description: "Whether the slot is enabled" }
+  modems.*.card_enabled:    { type: bool, description: "Whether the slot is switched on" }
+  modems.*.signal:          { type: int, unit: dBm, description: "Signal strength" }
+  modems.*.rsrp:            { type: int, unit: dBm, description: "Reference signal received power" }
+  modems.*.sinr:            { type: int, unit: dB, description: "Signal to interference and noise ratio" }
+  modems.*.signal_version:  { type: string, description: "Signal type, such as 4G" }
+  modems.*.wwan_name:       { type: string, description: "Slot's network interface, such as wwan0" }
+  modems.*.network_mode:    { type: string, description: "5G mode: AUTO, SA or NSA" }
+  modems.*.enable_5g:       { type: bool, description: "Whether 5G is enabled" }
+  modems.*.network_card:    { type: bool, description: "Whether a module is in the slot" }
+  modems.*.auth:            { type: int, description: "APN authentication: 1 PAP, 2 CHAP, 3 MS-CHAPv2" }
+  modems.*.device_name:     { type: string, description: "Module's serial device" }
+  modems.*.imei:            { type: string, description: "Module's IMEI" }
+  modems.*.pin_status:      { type: int, description: "SIM PIN status code, as the device reports it" }
+  modems.*.module_name:     { type: string, description: "Module model, such as EG25-G (read per slot)" }
+  # KiloLink
+  bonding.streaming:        { type: bool, description: "Whether the bonded stream is on" }
+  bonding.connected:        { type: bool, description: "Whether the device is connected to the KiloLink server" }
+  bonding.server_stream:    { type: bool, description: "Whether the KiloLink server is pushing or pulling the stream" }
+  bonding.server.address:   { type: string, description: "KiloLink server address" }
+  bonding.server.port:      { type: int, description: "KiloLink server port" }
+  bonding.server.crypto:    { type: bool, description: "Whether the bonded link is encrypted" }
+  bonding.server.dynamic_bitrate: { type: bool, description: "Whether the bitrate follows the links' capacity" }
+  bonding.server.enabled:   { type: bool, description: "Whether the server connection is switched on" }
+  bonding.history.*.address: { type: string, description: "Recently used KiloLink server address, keyed by its place in the list from 0" }
+  bonding.history.*.port:   { type: int, description: "Recently used KiloLink server port" }
+  # input and codec
+  input.signal:             { type: string, description: "Input signal status, such as locked" }
+  input.format:             { type: string, description: "Input format, such as 1920x1080p 60Hz" }
+  input.width:              { type: int, unit: px, description: "Input width" }
+  input.height:             { type: int, unit: px, description: "Input height" }
+  input.interlaced:         { type: bool, description: "Whether the input is interlaced" }
+  input.fps:                { type: float, unit: fps, description: "Input frame rate" }
+  input.type:               { type: string, description: "Input type, such as HDMI" }
+  input.interface:          { type: string, description: "Input interface name, such as v1" }
+  input.max_width:          { type: int, unit: px, description: "Widest input taken" }
+  input.max_height:         { type: int, unit: px, description: "Tallest input taken" }
+  input.max_fps:            { type: float, unit: fps, description: "Highest input frame rate taken" }
+  input.source:             { type: string, description: "Chosen video input: hdmi, sdi or uvc" }
+  input.usb_encode:         { type: string, description: "USB camera's input format (USB only)" }
+  input.usb_resolution:     { type: string, description: "USB camera's input resolution (USB only)" }
+  input.usb_fps:            { type: int, unit: fps, description: "USB camera's input frame rate (USB only)" }
+  input.sources.*:          { type: string, description: "Video input the unit has (hdmi, sdi, uvc), keyed by its label" }
+  input.edid_priority:      { type: string, description: "EDID priority" }
+  input.edid_reset_allowed: { type: bool, description: "Whether the EDID can be reset" }
+  audio.input.source:       { type: string, description: "Audio input choice: auto, hdmi, sdi, linein or uvc" }
+  audio.input.current_source: { type: string, description: "Audio input in use" }
+  audio.input.sampling:     { type: int, unit: Hz, description: "Audio input sample rate" }
+  audio.input.channels:     { type: int, description: "Audio input channels" }
+  audio.input.type:         { type: string, description: "Audio source type, such as AUTO" }
+  audio.input.gain.*:       { type: int, unit: dB, description: "Gain of each audio source (hdmi, sdi, linein, uvc)" }
+  audio.encoders.*.name:     { type: string, description: "Audio encoder's name, keyed by encoder id" }
+  audio.encoders.*.codec:    { type: string, description: "Audio codec: AAC, G711 or OPUS" }
+  audio.encoders.*.volume:   { type: int, unit: dB, description: "Audio encoder's gain" }
+  audio.encoders.*.resample: { type: string, description: "Resampling: fastest or common" }
+  audio.encoders.*.channels: { type: int, description: "Channels encoded" }
+  audio.encoders.*.sampling: { type: int, unit: Hz, description: "Sample rate" }
+  audio.encoders.*.real_sampling: { type: int, unit: Hz, description: "Actual sample rate" }
+  audio.encoders.*.bitrate:  { type: int, unit: bit/s, description: "Audio bitrate" }
+  audio.encoders.*.sample_width: { type: int, unit: bit, description: "Sample width" }
+  audio.encoders.*.sample_size: { type: int, description: "Samples per frame" }
+  audio.encoders.*.g711_law: { type: string, description: "G.711 law: PCMU or PCMA" }
+  audio.encoders.*.channel_id: { type: int, description: "Audio channel id" }
+  audio.encoders.*.source:   { type: string, description: "Audio source encoded" }
+  video.encoder.source:     { type: string, description: "Encoded video input" }
+  video.encoder.codec:      { type: string, description: "Video codec: H264 or H265" }
+  video.encoder.enabled:    { type: bool, description: "Whether the encoder runs" }
+  video.encoder.grey:       { type: bool, description: "Whether the picture is encoded in grayscale" }
+  video.encoder.profile:    { type: int, description: "Profile: 0 Baseline, 1 Main, 2 High" }
+  video.encoder.pic_width:  { type: int, description: "Encoded width setting, as the device reports it" }
+  video.encoder.pic_height: { type: int, description: "Encoded height setting, as the device reports it" }
+  video.encoder.mode:       { type: string, description: "Rate control: CBR or VBR" }
+  video.encoder.gop:        { type: int, description: "Frames between keyframes" }
+  video.encoder.fps:        { type: string, description: "Frame rate setting: auto or a number" }
+  video.encoder.bitrate:    { type: int, unit: kbit/s, description: "Target bitrate" }
+  video.encoder.max_bitrate: { type: int, unit: kbit/s, description: "Highest VBR bitrate" }
+  video.encoder.min_qp:     { type: int, description: "Lowest quantizer" }
+  video.encoder.max_qp:     { type: int, description: "Highest quantizer" }
+  video.encoder.min_iqp:    { type: int, description: "Lowest keyframe quantizer" }
+  video.encoder.min_ip:     { type: int, description: "Lowest I to P quantizer difference" }
+  video.encoder.max_ip:     { type: int, description: "Highest I to P quantizer difference" }
+  video.encoder.deinterlace: { type: string, description: "Deinterlacing mode" }
+  video.encoder.timecode_type: { type: int, description: "SEI timecode type" }
+  video.encoder.source_width:  { type: int, unit: px, description: "Source width" }
+  video.encoder.source_height: { type: int, unit: px, description: "Source height" }
+  video.encoder.sub_width:  { type: int, unit: px, description: "Sub-stream width" }
+  video.encoder.sub_height: { type: int, unit: px, description: "Sub-stream height" }
+  video.encoder.real_width: { type: int, unit: px, description: "Width actually encoded" }
+  video.encoder.real_height: { type: int, unit: px, description: "Height actually encoded" }
+  video.encoder.real_fps:   { type: float, unit: fps, description: "Frame rate actually encoded" }
+  vpss.rotate:              { type: int, unit: deg, description: "Input rotation" }
+  vpss.mirror:              { type: bool, description: "Whether the input is mirrored" }
+  vpss.flip:                { type: bool, description: "Whether the input is flipped" }
+  vpss.images.*.name:       { type: string, description: "Overlay image's name, keyed by image id" }
+  vpss.images.*.url:        { type: string, description: "Overlay image's path on the device's web server" }
+  vpss.images.*.width:      { type: int, unit: px, description: "Overlay image's width" }
+  vpss.images.*.height:     { type: int, unit: px, description: "Overlay image's height" }
+  vpss.still_frames.*.url:  { type: string, description: "Still frame's path on the device's web server, keyed by id" }
+  vpss.still_frames.*.width:  { type: int, unit: px, description: "Still frame's width" }
+  vpss.still_frames.*.height: { type: int, unit: px, description: "Still frame's height" }
+  osd.enabled:              { type: bool, description: "OSD master switch" }
+  osd.items.*.enabled:      { type: bool, description: "Whether the overlay item is drawn, keyed by item id" }
+  osd.items.*.type:         { type: string, description: "Item type: text, time, date, clock or image" }
+  osd.items.*.position:     { type: string, description: "Item position, such as LeftTop or Manual" }
+  osd.items.*.x:            { type: int, description: "Item's horizontal position" }
+  osd.items.*.y:            { type: int, description: "Item's vertical position" }
+  osd.items.*.font_size:    { type: int, description: "Item's font size" }
+  osd.items.*.font_color:   { type: int, description: "Item's font color (0 black to 7 cyan)" }
+  osd.items.*.style:        { type: string, description: "Item's font style: normal or bold" }
+  osd.items.*.outline:      { type: int, description: "Item's outline: 0 none, 1 thin, 2 thick" }
+  osd.items.*.outline_color: { type: int, description: "Item's outline color" }
+  osd.items.*.text:         { type: string, description: "Text item's text" }
+  osd.items.*.file_id:      { type: string, description: "Image item's image id" }
+  osd.items.*.row_spacing:  { type: int, description: "Item's line spacing" }
+  panel.video_source:       { type: string, description: "Small screen's video source" }
+  panel.width:              { type: int, description: "Small screen's encoded width setting" }
+  panel.height:             { type: int, description: "Small screen's encoded height setting" }
+  panel.video_bitrate:      { type: int, unit: kbit/s, description: "Small screen's video bitrate" }
+  panel.codec:              { type: string, description: "Small screen's codec" }
+  panel.fps:                { type: string, description: "Small screen's frame rate setting" }
+  panel.audio_source:       { type: string, description: "Small screen's audio source" }
+  panel.current_source:     { type: string, description: "Small screen's audio source in use" }
+  panel.deinterlace:        { type: string, description: "Small screen's deinterlacing mode" }
+  panel.gain.*:             { type: int, unit: dB, description: "Small screen's gain of each audio source" }
+
+telemetry:
+  poll:
+    - every_ms: 2000
+      send:
+        - { method: GET, path: /api/networkmanager/network/getNetworkSpeed }
+        - { method: GET, path: /api/record/v1/get_recording_status }
+        - { method: GET, path: /api/streamer/v1/stream/list }
+        - { method: GET, path: /api/kilolink/bonding/stream_state }
+        - { method: GET, path: /api/kilolink/bonding/state }
+        - { method: GET, path: /api/kilolink/bonding/server_stream_state }
+    - every_ms: 5000
+      send:
+        - *sysinfo
+        - { method: GET, path: /api/networkmanager/modem/get }
+        - { method: GET, path: /api/codec/v1/vin/detail }
+        - { method: GET, path: /api/codec/v1/venc/settings }
+        - { method: GET, path: /api/networkmanager/wifi/getCurrentWifi }
+        - { method: GET, path: /api/networkmanager/network/traffic_data }
+        - { method: GET, path: /api/networkmanager/hotspot/get }
+    - every_ms: 15000
+      send:
+        - { method: GET, path: /api/record/record/disk_list }
+        - { method: GET, path: /api/networkmanager/network/GetLinkinfo }
+        - { method: GET, path: /api/networkmanager/network/GetLinkList }
+        - { method: GET, path: /api/networkmanager/network/current_networks }
+        - { method: GET, path: /api/networkmanager/network/list_network }
+        - { method: GET, path: /api/networkmanager/modem/imei_info }
+        - { method: GET, path: /api/systemctrl/system/getNetworkSpeed }
+        - { method: GET, path: /api/streamer/ptz/info }
+        - { method: GET, path: /api/kilolink/bonding/server }
+        - { method: GET, path: /api/codec/v1/audio/input }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /api/systemctrl/system/getHostname }
+        - { method: GET, path: /api/systemctrl/user/auth_info }
+        - { method: GET, path: /api/systemctrl/user/list }
+        - { method: GET, path: /api/systemctrl/systime/get }
+        - { method: GET, path: /api/systemctrl/systime/ntpstatus }
+        - { method: GET, path: /api/systemctrl/system/getProtocol }
+        - { method: GET, path: /api/systemctrl/system/ssl }
+        - { method: GET, path: /api/ststemctrl/system/production_stat }
+        - { method: GET, path: /api/record/record/get_record_info }
+        - { method: GET, path: /api/streamer/v1/stream/media_user }
+        - { method: GET, path: /api/streamer/ptz/protocol }
+        - { method: GET, path: /api/streamer/ptz/serial_device }
+        - { method: GET, path: /api/networkmanager/static/routing/get }
+        - { method: GET, path: /api/networkmanager/wifi/get }
+        - { method: GET, path: /api/networkmanager/hotspot/getWIFIParameter }
+        - { method: GET, path: /api/kilolink/bonding/server_conf }
+        - { method: GET, path: /api/codec/vin/edid }
+        - { method: GET, path: /api/codec/v1/vin/list_source }
+        - { method: GET, path: /api/codec/v1/audio/encode/list }
+        - { method: GET, path: /api/codec/vpss/image }
+        - { method: GET, path: /api/codec/vpss/static_frame }
+        - { method: GET, path: /api/codec/v1/vpss/input/rmf }
+        - { method: GET, path: /api/codec/v1/vpss/osd }
+        - { method: GET, path: /api/codec/panel/settings }
+
+  updates:
+    # ── system ──
+    - path: "^/api/systemctrl/system/getHostname$"
+      json_match: { "$.result": "^ok$" }
+      json: { name: "$.data.hostname" }
+      state: { device.hostname: "{name}" }
+    - path: "^/api/systemctrl/system/getSystemInfo\\?"
+      json_match: { "$.result": "^ok$" }
+      json: { product: "$.data.version.product", oem: "$.data.version.oem", serial: "$.data.version.serialNumber",
+              fw: "$.data.version.softwareVersion", hw: "$.data.version.hardwareVersion", ndi: "$.data.version.ndiVersion",
+              mem_total: "$.data.mem.total", mem_used: "$.data.mem.used", disk_total: "$.data.disk.total",
+              disk_used: "$.data.disk.used", disk_free: "$.data.disk.free", uptime: "$.data.persisTime.uptime",
+              imei1: "$.data.imei.IMEI1", imei2: "$.data.imei.IMEI2", imei3: "$.data.imei.IMEI3", imei4: "$.data.imei.IMEI4" }
+      state:
+        device.product: "{product}"
+        device.oem: "{oem}"
+        device.serial_number: "{serial}"
+        device.firmware: "{fw}"
+        device.hardware_version: "{hw}"
+        device.ndi_version: "{ndi}"
+        device.memory_total: "{mem_total}"
+        device.memory_used: "{mem_used}"
+        device.disk_total: "{disk_total}"
+        device.disk_used: "{disk_used}"
+        device.disk_free: "{disk_free}"
+        device.uptime: "{uptime}"
+        device.imei.1: "{imei1}"
+        device.imei.2: "{imei2}"
+        device.imei.3: "{imei3}"
+        device.imei.4: "{imei4}"
+    # The document's example spells the load fields precent, its table percent.
+    - path: "^/api/systemctrl/system/getSystemInfo\\?"
+      json_match: { "$.result": "^ok$" }
+      json: { cpu: "$.data.cpu.precent", mem: "$.data.mem.precent", disk: "$.data.disk.precent" }
+      state: { device.cpu_percent: "{cpu}", device.memory_percent: "{mem}", device.disk_percent: "{disk}" }
+    - path: "^/api/systemctrl/system/getSystemInfo\\?"
+      json_match: { "$.result": "^ok$" }
+      json: { cpu: "$.data.cpu.percent", mem: "$.data.mem.percent", disk: "$.data.disk.percent" }
+      state: { device.cpu_percent: "{cpu}", device.memory_percent: "{mem}", device.disk_percent: "{disk}" }
+    - path: "^/api/systemctrl/user/auth_info$"
+      json_match: { "$.result": "^ok$", "$.data.enable": "^(true|false)$" }
+      json: { v: "$.data.enable" }
+      state: { auth.api_authentication: "{v}" }
+    - path: "^/api/systemctrl/user/list$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", alias: "$.alias", web: "$.web", api: "$.api", created: "$.create_time" }
+      replace: users
+      state:
+        "users.{id:key}.alias": "{alias}"
+        "users.{id:key}.web": "{web}"
+        "users.{id:key}.api": "{api}"
+        "users.{id:key}.created": "{created}"
+    - path: "^/api/systemctrl/systime/get$"
+      json_match: { "$.result": "^ok$" }
+      json: { time: "$.data.time", mode: "$.data.timetype", offset: "$.data.offset", ntp: "$.data.ntp" }
+      state: { time.time: "{time}", time.mode: "{mode}", time.offset: "{offset}", time.ntp_servers: "{ntp}" }
+    - path: "^/api/systemctrl/systime/get$"
+      json_match: { "$.result": "^ok$" }
+      json: { tz: "$.data.Timezone" }
+      state: { time.timezone: "{tz}" }
+    - path: "^/api/systemctrl/systime/get$"
+      json_match: { "$.result": "^ok$" }
+      json: { tz: "$.data.timezone" }
+      state: { time.timezone: "{tz}" }
+    - path: "^/api/systemctrl/systime/ntpstatus$"
+      json_each: "$"
+      json: { remote: "$.remote", refid: "$.refid", st: "$.st", t: "$.t", when: "$.when", poll: "$.poll",
+              reach: "$.reach", delay: "$.delay", offset: "$.offset", jitter: "$.jitter" }
+      replace: time.ntp_peers
+      state:
+        "time.ntp_peers.{index}.remote": "{remote}"
+        "time.ntp_peers.{index}.refid": "{refid}"
+        "time.ntp_peers.{index}.stratum": "{st}"
+        "time.ntp_peers.{index}.type": "{t}"
+        "time.ntp_peers.{index}.when": "{when}"
+        "time.ntp_peers.{index}.poll": "{poll}"
+        "time.ntp_peers.{index}.reach": "{reach}"
+        "time.ntp_peers.{index}.delay": "{delay}"
+        "time.ntp_peers.{index}.offset": "{offset}"
+        "time.ntp_peers.{index}.jitter": "{jitter}"
+    - path: "^/api/systemctrl/system/getProtocol$"
+      json_match: { "$.result": "^ok$" }
+      json: { http: "$.data.http", https: "$.data.https", hp: "$.data.httpPort", sp: "$.data.httpsPort" }
+      state: { web.http: "{http}", web.https: "{https}", web.http_port: "{hp}", web.https_port: "{sp}" }
+    - path: "^/api/systemctrl/system/ssl$"
+      json_match: { "$.result": "^ok$" }
+      json: { crt: "$.data.ssl_crt", reset: "$.data.enable_reset" }
+      state: { ssl.certificate: "{crt}", ssl.reset_allowed: "{reset}" }
+    - path: "^/api/ststemctrl/system/production_stat$"
+      json_match: { "$.result": "^ok$" }
+      json: { v: "$.data.value" }
+      state: { system.production_test: "{v}" }
+    - path: "^/api/systemctrl/system/getNetworkSpeed(\\?|$)"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.*"
+      json: { rx: "$.receive", tx: "$.transmit", speed: "$.speed" }
+      state: { "nic.{key:key}.receive": "{rx}", "nic.{key:key}.transmit": "{tx}", "nic.{key:key}.speed": "{speed}" }
+    # ── recording ──
+    - path: "^/api/record/v1/get_recording_status$"
+      json_match: { "$.result": "^ok$", "$.data.status": "^(true|false)$" }
+      json: { v: "$.data.status" }
+      state: { recording.active: "{v}" }
+    - path: "^/api/record/record/get_record_info$"
+      json_match: { "$.result": "^ok$" }
+      json: { disk_type: "$.data.disk_type", format: "$.data.format", prefix: "$.data.file_prefix", limit_type: "$.data.limit_type",
+              size: "$.data.limit_size", time: "$.data.limit_time", policy: "$.data.disk_policy", tc: "$.data.follow_timecode_start" }
+      state:
+        recording.disk_type: "{disk_type}"
+        recording.format: "{format}"
+        recording.file_prefix: "{prefix}"
+        recording.limit_type: "{limit_type}"
+        recording.limit_size: "{size}"
+        recording.limit_time: "{time}"
+        recording.disk_policy: "{policy}"
+        recording.follow_timecode: "{tc}"
+    # The storage list's USB key is upper case in the document's example (as
+    # translated); the lower-case spelling is read too.
+    - path: "^/api/record/record/disk_list$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.USB"
+      json: &disk_json { id: "$.id", name: "$.name", type: "$.type", volume: "$.volume", mounted: "$.mounted", fs: "$.filesys",
+                         status: "$.status", choose: "$.choose", disk_type: "$.disk_type", total: "$.total", used: "$.used",
+                         free: "$.free", percent: "$.percent" }
+      replace: storage.usb
+      state: &disk_state
+        "storage.usb.{id:key}.name": "{name}"
+        "storage.usb.{id:key}.type": "{type}"
+        "storage.usb.{id:key}.volume": "{volume}"
+        "storage.usb.{id:key}.mounted": "{mounted}"
+        "storage.usb.{id:key}.filesystem": "{fs}"
+        "storage.usb.{id:key}.status": "{status}"
+        "storage.usb.{id:key}.chosen": "{choose}"
+        "storage.usb.{id:key}.disk_type": "{disk_type}"
+        "storage.usb.{id:key}.total": "{total}"
+        "storage.usb.{id:key}.used": "{used}"
+        "storage.usb.{id:key}.free": "{free}"
+        "storage.usb.{id:key}.percent": "{percent}"
+      then_send: &disk_files
+        - { method: GET, path: /api/record/record/get_disk_files, query: { device: "{mounted}" } }
+    - path: "^/api/record/record/disk_list$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.usb"
+      json: *disk_json
+      replace: storage.usb
+      state: *disk_state
+      then_send: *disk_files
+    - path: "^/api/record/record/get_disk_files\\?device=(.+)$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { path: "$.path", name: "$.name", size: "$.size", current: "$.current", stream: "$.stream", start: "$.start_time", end: "$.end_time" }
+      replace: "recording.files.{1:url_decode:key}"
+      state:
+        "recording.files.{1:url_decode:key}.{index}.path": "{path}"
+        "recording.files.{1:url_decode:key}.{index}.name": "{name}"
+        "recording.files.{1:url_decode:key}.{index}.size": "{size}"
+        "recording.files.{1:url_decode:key}.{index}.current": "{current}"
+        "recording.files.{1:url_decode:key}.{index}.stream": "{stream}"
+        "recording.files.{1:url_decode:key}.{index}.start_time": "{start}"
+        "recording.files.{1:url_decode:key}.{index}.end_time": "{end}"
+    # ── streams ──
+    - path: "^/api/streamer/v1/stream/list$"
+      json_each: "$"
+      json: { id: "$.id", type: "$.type", name: "$.name", enable: "$.enable", status: "$.status", address: "$.address",
+              url: "$.addressUrl", audio: "$.bindAudio", net: "$.bindNetwork", auto: "$.auto_enable", net_on: "$.network_enable",
+              mode: "$.connectionMode", latency: "$.latency", lport: "$.listenerPort", enc: "$.encryption", bw: "$.bandwidth",
+              payload: "$.payloadSize", sid: "$.srt_stream_id", port: "$.port", user: "$.user", channel: "$.channel_name",
+              group: "$.group", conn: "$.connection" }
+      replace: streams
+      state:
+        "streams.{id:key}.type": "{type}"
+        "streams.{id:key}.name": "{name}"
+        "streams.{id:key}.enabled": "{enable}"
+        "streams.{id:key}.status": "{status}"
+        "streams.{id:key}.address": "{address}"
+        "streams.{id:key}.address_url": "{url}"
+        "streams.{id:key}.bind_audio": "{audio}"
+        "streams.{id:key}.bind_network": "{net}"
+        "streams.{id:key}.auto_enable": "{auto}"
+        "streams.{id:key}.network_enable": "{net_on}"
+        "streams.{id:key}.connection_mode": "{mode}"
+        "streams.{id:key}.latency": "{latency}"
+        "streams.{id:key}.listener_port": "{lport}"
+        "streams.{id:key}.encryption": "{enc}"
+        "streams.{id:key}.bandwidth": "{bw}"
+        "streams.{id:key}.payload_size": "{payload}"
+        "streams.{id:key}.srt_stream_id": "{sid}"
+        "streams.{id:key}.port": "{port}"
+        "streams.{id:key}.user": "{user}"
+        "streams.{id:key}.channel_name": "{channel}"
+        "streams.{id:key}.group": "{group}"
+        "streams.{id:key}.connection": "{conn}"
+    - path: "^/api/streamer/v1/stream/media_user$"
+      json_match: { "$.result": "^ok$", "$.user_list": "^\\[" }
+      json_each: "$.user_list"
+      json: { name: "$" }
+      replace: media_users
+      state: { "media_users.{index}": "{name}" }
+    # ── PTZ ──
+    - path: "^/api/streamer/ptz/info$"
+      json_match: { "$.result": "^ok$" }
+      json: { en: "$.data.enable", typ: "$.data.typ",
+              n_proto: "$.data.network.protocol", n_addr: "$.data.network.addr", n_port: "$.data.network.port",
+              n_ptz: "$.data.network.ptz_protocol", n_paddr: "$.data.network.ptz_addr",
+              s_dev: "$.data.serial.device", s_baud: "$.data.serial.baudrate", s_par: "$.data.serial.parity",
+              s_data: "$.data.serial.startBits", s_stop: "$.data.serial.endBits", s_xon: "$.data.serial.xonxoff",
+              s_rts: "$.data.serial.rtscts", s_ptz: "$.data.serial.ptz_protocol", s_paddr: "$.data.serial.ptz_addr" }
+      state:
+        ptz.enabled: { value: "{en}", map: { "0": false, "1": true } }
+        ptz.type: "{typ}"
+        ptz.network.protocol: "{n_proto}"
+        ptz.network.address: "{n_addr}"
+        ptz.network.port: "{n_port}"
+        ptz.network.ptz_protocol: "{n_ptz}"
+        ptz.network.ptz_address: "{n_paddr}"
+        ptz.serial.device: "{s_dev}"
+        ptz.serial.baudrate: "{s_baud}"
+        ptz.serial.parity: "{s_par}"
+        ptz.serial.data_bits: "{s_data}"
+        ptz.serial.stop_bits: "{s_stop}"
+        ptz.serial.xonxoff: { value: "{s_xon}", map: { "0": false, "1": true } }
+        ptz.serial.rtscts: { value: "{s_rts}", map: { "0": false, "1": true } }
+        ptz.serial.ptz_protocol: "{s_ptz}"
+        ptz.serial.ptz_address: "{s_paddr}"
+    - path: "^/api/streamer/ptz/info$"
+      json_match: { "$.result": "^ok$" }
+      json: &ptz_usb_upper { u_ptz: "$.data.USB.ptz_protocol", u_addr: "$.data.USB.ptz_addr", u_port: "$.data.USB.port",
+                             u_ctl: "$.data.USB.control_type", u_dev: "$.data.USB.device" }
+      state: &ptz_usb_state
+        ptz.usb.ptz_protocol: "{u_ptz}"
+        ptz.usb.ptz_address: "{u_addr}"
+        ptz.usb.port: "{u_port}"
+        ptz.usb.control_type: "{u_ctl}"
+        ptz.usb.device: "{u_dev}"
+    - path: "^/api/streamer/ptz/info$"
+      json_match: { "$.result": "^ok$" }
+      json: { u_ptz: "$.data.usb.ptz_protocol", u_addr: "$.data.usb.ptz_addr", u_port: "$.data.usb.port",
+              u_ctl: "$.data.usb.control_type", u_dev: "$.data.usb.device" }
+      state: *ptz_usb_state
+    - path: "^/api/streamer/ptz/protocol$"
+      json_match: { "$.result": "^ok$", "$.data": "^\\[" }
+      json_each: "$.data"
+      json: { name: "$" }
+      replace: ptz.protocols
+      state: { "ptz.protocols.{index}": "{name}" }
+    - path: "^/api/streamer/ptz/serial_device$"
+      json_match: { "$.result": "^ok$", "$.data": "^\\[" }
+      json_each: "$.data"
+      json: { name: "$" }
+      replace: ptz.serial_devices
+      state: { "ptz.serial_devices.{index}": "{name}" }
+    # ── network ──
+    - path: "^/api/networkmanager/network/GetLinkinfo$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: &iface_json { dev: "$.device", status: "$.status", address: "$.address", netmask: "$.netmask", gw: "$.gw",
+                          mac: "$.mac", method: "$.method", enable: "$.enable", dns: "$.dns" }
+      state: &iface_state
+        "network.interfaces.{dev:key}.status": "{status}"
+        "network.interfaces.{dev:key}.address": "{address}"
+        "network.interfaces.{dev:key}.netmask": "{netmask}"
+        "network.interfaces.{dev:key}.gateway": "{gw}"
+        "network.interfaces.{dev:key}.mac": "{mac}"
+        "network.interfaces.{dev:key}.method": "{method}"
+        "network.interfaces.{dev:key}.enabled": "{enable}"
+        "network.interfaces.{dev:key}.dns": "{dns}"
+    - path: "^/api/networkmanager/network/GetLinkinfo$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { dev: "$.device", dns: "$.DNS" }
+      state: { "network.interfaces.{dev:key}.dns": "{dns}" }
+    - path: "^/api/networkmanager/network/GetEthernets$"
+      json_match: { "$.result": "^ok$" }
+      json: { dev: "$.data.device", status: "$.data.status", address: "$.data.address", netmask: "$.data.netmask", gw: "$.data.gw",
+              mac: "$.data.mac", method: "$.data.method", enable: "$.data.enable", dns: "$.data.dns" }
+      state: *iface_state
+    - path: "^/api/networkmanager/network/GetEthernets$"
+      json_match: { "$.result": "^ok$" }
+      json: { dev: "$.data.device", dns: "$.data.DNS" }
+      state: { "network.interfaces.{dev:key}.dns": "{dns}" }
+    - path: "^/api/networkmanager/network/GetLinkList$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { dev: "$.device", name: "$.device_name", status: "$.status", address: "$.address", netmask: "$.netmask", gw: "$.gw", mac: "$.mac" }
+      state:
+        "network.interfaces.{dev:key}.name": "{name}"
+        "network.interfaces.{dev:key}.status": "{status}"
+        "network.interfaces.{dev:key}.address": "{address}"
+        "network.interfaces.{dev:key}.netmask": "{netmask}"
+        "network.interfaces.{dev:key}.gateway": "{gw}"
+        "network.interfaces.{dev:key}.mac": "{mac}"
+    - path: "^/api/networkmanager/network/(getNetworkSpeed|getNetworkInterfaceAllData)$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { link: "$.modems", name: "$.name", type: "$.type", address: "$.address", enable: "$.enable", card: "$.enable_card",
+              version: "$.version", sigver: "$.signal_version", op: "$.modem_Operator", signal: "$.signal", rsrp: "$.rsrp",
+              sinr: "$.sinr", rx: "$.receive", tx: "$.transmit", sort: "$.sort", inserted: "$.insert_card",
+              conns: "$.connect_number", wwan: "$.wwan_name", pin: "$.pin_status" }
+      replace: links
+      state:
+        "links.{link:key}.name": "{name}"
+        "links.{link:key}.type": "{type}"
+        "links.{link:key}.address": "{address}"
+        "links.{link:key}.enabled": "{enable}"
+        "links.{link:key}.card_enabled": "{card}"
+        "links.{link:key}.version": "{version}"
+        "links.{link:key}.signal_version": "{sigver}"
+        "links.{link:key}.operator": "{op}"
+        "links.{link:key}.signal": "{signal}"
+        "links.{link:key}.rsrp": "{rsrp}"
+        "links.{link:key}.sinr": "{sinr}"
+        "links.{link:key}.receive": "{rx}"
+        "links.{link:key}.transmit": "{tx}"
+        "links.{link:key}.sort": "{sort}"
+        "links.{link:key}.card_inserted": "{inserted}"
+        "links.{link:key}.connections": "{conns}"
+        "links.{link:key}.wwan_name": "{wwan}"
+        "links.{link:key}.pin_status": "{pin}"
+    - path: "^/api/networkmanager/network/current_networks$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { name: "$.name", wwan: "$.wwan_name", alias: "$.alias", sub: "$.sub_wwan", address: "$.address", version: "$.version", weight: "$.weight" }
+      replace: network.current
+      state:
+        "network.current.{name:key}.wwan_name": "{wwan}"
+        "network.current.{name:key}.alias": "{alias}"
+        "network.current.{name:key}.sub_wwan": "{sub}"
+        "network.current.{name:key}.address": "{address}"
+        "network.current.{name:key}.version": "{version}"
+        "network.current.{name:key}.weight": "{weight}"
+    - path: "^/api/networkmanager/network/traffic_data$"
+      json_match: { "$.result": "^ok$", "$.data": "^\\[" }
+      json_each: "$.data"
+      json: { k: "$.traffic_key", rx: "$.receive", tx: "$.transmit", start: "$.start_time", type: "$.type", name: "$.name" }
+      replace: network.traffic
+      state:
+        "network.traffic.{k:key}.receive": "{rx}"
+        "network.traffic.{k:key}.transmit": "{tx}"
+        "network.traffic.{k:key}.start_time": "{start}"
+        "network.traffic.{k:key}.type": "{type}"
+        "network.traffic.{k:key}.name": "{name}"
+    - path: "^/api/networkmanager/network/list_network$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { value: "$.value", name: "$.name", type: "$.type", address: "$.address", op: "$.modem_Operator", enable: "$.enable" }
+      replace: network.choices
+      state:
+        "network.choices.{value:key}.name": "{name}"
+        "network.choices.{value:key}.type": "{type}"
+        "network.choices.{value:key}.address": "{address}"
+        "network.choices.{value:key}.operator": "{op}"
+        "network.choices.{value:key}.enabled": "{enable}"
+    - path: "^/api/networkmanager/static/routing/get$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", iface: "$.interface", target: "$.target", netmask: "$.netmask", gw: "$.gateway", metric: "$.metric", mtu: "$.mtu", status: "$.status" }
+      replace: routes
+      state:
+        "routes.{id}.interface": "{iface}"
+        "routes.{id}.target": "{target}"
+        "routes.{id}.netmask": "{netmask}"
+        "routes.{id}.gateway": "{gw}"
+        "routes.{id}.metric": "{metric}"
+        "routes.{id}.mtu": "{mtu}"
+        "routes.{id}.enabled": { value: "{status}", map: { "0": false, "1": true } }
+    # ── Wi-Fi and hotspot ──
+    - path: "^/api/networkmanager/wifi/get$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { ssid: "$.wifi_ssid", bssid: "$.wifi_bssid", enc: "$.wifi_encryption", signal: "$.wifi_signal", auto: "$.param_autoconn",
+              mac: "$.mac_address", method: "$.param_addr_solv", netmask: "$.netmask", ip: "$.ip_address", gw: "$.gateway",
+              dns: "$.dns", dns2: "$.dns2", hw: "$.hw_mode", enable: "$.enable", st: "$.state", ad: "$.active_disconnect", nid: "$.network_id" }
+      replace: wifi.saved
+      state:
+        "wifi.saved.{ssid:key}.bssid": "{bssid}"
+        "wifi.saved.{ssid:key}.encryption": "{enc}"
+        "wifi.saved.{ssid:key}.signal": "{signal}"
+        "wifi.saved.{ssid:key}.autoconnect": "{auto}"
+        "wifi.saved.{ssid:key}.method": "{method}"
+        "wifi.saved.{ssid:key}.address": "{ip}"
+        "wifi.saved.{ssid:key}.netmask": "{netmask}"
+        "wifi.saved.{ssid:key}.gateway": "{gw}"
+        "wifi.saved.{ssid:key}.dns": "{dns}"
+        "wifi.saved.{ssid:key}.dns2": "{dns2}"
+        "wifi.saved.{ssid:key}.mac": "{mac}"
+        "wifi.saved.{ssid:key}.hw_mode": "{hw}"
+        "wifi.saved.{ssid:key}.enabled": "{enable}"
+        "wifi.saved.{ssid:key}.state": "{st}"
+        "wifi.saved.{ssid:key}.active_disconnect": "{ad}"
+        "wifi.saved.{ssid:key}.network_id": "{nid}"
+    - path: "^/api/networkmanager/wifi/getCurrentWifi$"
+      json_match: { "$.result": "^ok$" }
+      json: { ssid: "$.data.wifi_ssid", bssid: "$.data.wifi_bssid", enc: "$.data.wifi_encryption", signal: "$.data.wifi_signal",
+              method: "$.data.param_addr_solv", ip: "$.data.ip_address", netmask: "$.data.netmask", gw: "$.data.gateway",
+              mac: "$.data.mac_address", hw: "$.data.hw_mode", st: "$.data.state" }
+      state:
+        wifi.current.ssid: "{ssid}"
+        wifi.current.bssid: "{bssid}"
+        wifi.current.encryption: "{enc}"
+        wifi.current.signal: "{signal}"
+        wifi.current.method: "{method}"
+        wifi.current.address: "{ip}"
+        wifi.current.netmask: "{netmask}"
+        wifi.current.gateway: "{gw}"
+        wifi.current.mac: "{mac}"
+        wifi.current.hw_mode: "{hw}"
+        wifi.current.state: "{st}"
+    - path: "^/api/networkmanager/wifi/getScanWIFI$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { ssid: "$.wifi_ssid", signal: "$.wifi_signal", akm: "$.akm", save: "$.save" }
+      replace: wifi.scan
+      state:
+        "wifi.scan.{index}.ssid": "{ssid}"
+        "wifi.scan.{index}.signal": "{signal}"
+        "wifi.scan.{index}.secured": "{akm}"
+        "wifi.scan.{index}.saved": "{save}"
+    - path: "^/api/networkmanager/hotspot/get$"
+      json_match: { "$.result": "^ok$" }
+      json: { ssid: "$.data.hotspot_ssid", hidden: "$.data.hotspot_hidden", hw: "$.data.hw_mode", hwn: "$.data.hw_mode_name",
+              ch: "$.data.hotspot_channel", range: "$.data.ipRange", prefix: "$.data.ipPrefix", enable: "$.data.enable",
+              gw: "$.data.gateway", mac: "$.data.mac_address", conns: "$.data.connect_number" }
+      state:
+        hotspot.ssid: "{ssid}"
+        hotspot.hidden: { value: "{hidden}", map: { "0": false, "1": true } }
+        hotspot.hw_mode: "{hw}"
+        hotspot.hw_mode_name: "{hwn}"
+        hotspot.channel: "{ch}"
+        hotspot.ip_range: "{range}"
+        hotspot.ip_prefix: "{prefix}"
+        hotspot.enabled: "{enable}"
+        hotspot.gateway: "{gw}"
+        hotspot.mac: "{mac}"
+        hotspot.connections: "{conns}"
+    - path: "^/api/networkmanager/hotspot/getWIFIParameter$"
+      json_match: { "$.result": "^ok$" }
+      json: { cc: "$.data.country_code", roaming: "$.data.roaming", thres: "$.data.roaming_rssi_thres", intv: "$.data.roaming_scan_intv" }
+      state:
+        wifi.country_code: "{cc}"
+        wifi.roaming: "{roaming}"
+        wifi.roaming_rssi_threshold: "{thres}"
+        wifi.roaming_scan_interval: "{intv}"
+    # ── modems ──
+    - path: "^/api/networkmanager/modem/get$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: &modem_json { slot: "$.modem_name", op: "$.modem_Operator", ins: "$.insert_card", ccid: "$.modem_number", net: "$.modem_net_play",
+                          ip: "$.ip_address", apn: "$.apn", version: "$.version", enable: "$.enable", signal: "$.modem_signal",
+                          wwan: "$.wwan_name", mode: "$.network_mode", card: "$.network_card", auth: "$.auth", e5g: "$.enable_5G",
+                          dev: "$.device_name", cen: "$.enable_card", sigver: "$.signal_version", rsrp: "$.modem_rsrp",
+                          sinr: "$.modem_sinr", imei: "$.imei", pin: "$.pin_status", module: "$.module_name" }
+      state: &modem_state
+        "modems.{slot:key}.operator": "{op}"
+        "modems.{slot:key}.card_inserted": "{ins}"
+        "modems.{slot:key}.ccid": "{ccid}"
+        "modems.{slot:key}.internet": "{net}"
+        "modems.{slot:key}.address": "{ip}"
+        "modems.{slot:key}.apn": "{apn}"
+        "modems.{slot:key}.version": "{version}"
+        "modems.{slot:key}.enabled": "{enable}"
+        "modems.{slot:key}.signal": "{signal}"
+        "modems.{slot:key}.wwan_name": "{wwan}"
+        "modems.{slot:key}.network_mode": "{mode}"
+        "modems.{slot:key}.network_card": "{card}"
+        "modems.{slot:key}.auth": "{auth}"
+        "modems.{slot:key}.enable_5g": "{e5g}"
+        "modems.{slot:key}.device_name": "{dev}"
+        "modems.{slot:key}.card_enabled": "{cen}"
+        "modems.{slot:key}.signal_version": "{sigver}"
+        "modems.{slot:key}.rsrp": "{rsrp}"
+        "modems.{slot:key}.sinr": "{sinr}"
+        "modems.{slot:key}.imei": "{imei}"
+        "modems.{slot:key}.pin_status": "{pin}"
+        "modems.{slot:key}.module_name": "{module}"
+    - path: "^/api/networkmanager/modem/getModemByNumber\\?"
+      json_match: { "$.modem_name": "^modem[1-4]$" }
+      json: *modem_json
+      state: *modem_state
+    - path: "^/api/networkmanager/modem/imei_info$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { slot: "$.modem", imei: "$.IMEI_code", version: "$.version", ins: "$.insert_card", signal: "$.modem_signal", op: "$.modem_Operator", card: "$.network_card" }
+      state:
+        "modems.{slot:key}.imei": "{imei}"
+        "modems.{slot:key}.version": "{version}"
+        "modems.{slot:key}.card_inserted": "{ins}"
+        "modems.{slot:key}.signal": "{signal}"
+        "modems.{slot:key}.operator": "{op}"
+        "modems.{slot:key}.network_card": "{card}"
+    # ── KiloLink ──
+    - path: "^/api/kilolink/bonding/stream_state$"
+      json_match: { "$.result": "^ok$", "$.data.enable": "^(true|false)$" }
+      json: { v: "$.data.enable" }
+      state: { bonding.streaming: "{v}" }
+    - path: "^/api/kilolink/bonding/state$"
+      json_match: { "$.result": "^ok$", "$.data.enable": "^(true|false)$" }
+      json: { v: "$.data.enable" }
+      state: { bonding.connected: "{v}" }
+    - path: "^/api/kilolink/bonding/server_stream_state$"
+      json_match: { "$.result": "^ok$", "$.data.enable": "^(true|false)$" }
+      json: { v: "$.data.enable" }
+      state: { bonding.server_stream: "{v}" }
+    - path: "^/api/kilolink/bonding/server$"
+      json_match: { "$.result": "^ok$" }
+      json: { port: "$.data.port", crypto: "$.data.crypto", dyn: "$.data.dynamic_bitrate", enable: "$.data.enable" }
+      state:
+        bonding.server.port: "{port}"
+        bonding.server.crypto: "{crypto}"
+        bonding.server.dynamic_bitrate: { value: "{dyn}", map: { "0": false, "1": true } }
+        bonding.server.enabled: "{enable}"
+    - path: "^/api/kilolink/bonding/server$"
+      json_match: { "$.result": "^ok$" }
+      json: { ip: "$.data.ip" }
+      state: { bonding.server.address: "{ip}" }
+    - path: "^/api/kilolink/bonding/server$"
+      json_match: { "$.result": "^ok$" }
+      json: { ip: "$.data.IP" }
+      state: { bonding.server.address: "{ip}" }
+    - path: "^/api/kilolink/bonding/server_conf$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { ip: "$.ip", port: "$.port" }
+      replace: bonding.history
+      state: { "bonding.history.{index}.address": "{ip}", "bonding.history.{index}.port": "{port}" }
+    - path: "^/api/kilolink/bonding/server_conf$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { ip: "$.IP" }
+      state: { "bonding.history.{index}.address": "{ip}" }
+    # ── input and codec ──
+    - path: "^/api/codec/vin/edid$"
+      json: { prio: "$.edid_priority", reset: "$.reset" }
+      state: { input.edid_priority: "{prio}", input.edid_reset_allowed: "{reset}" }
+    - path: "^/api/codec/v1/vin/detail$"
+      json: { signal: "$.signal", format: "$.format", w: "$.width", h: "$.height", il: "$.interlaced", fps: "$.fps", type: "$.type",
+              iface: "$.interface", mw: "$.max_width", mh: "$.max_height", mfps: "$.max_fps", source: "$.source",
+              ue: "$.input_encode", ur: "$.input_resolution", uf: "$.input_fps" }
+      state:
+        input.signal: "{signal}"
+        input.format: "{format}"
+        input.width: "{w}"
+        input.height: "{h}"
+        input.interlaced: "{il}"
+        input.fps: "{fps}"
+        input.type: "{type}"
+        input.interface: "{iface}"
+        input.max_width: "{mw}"
+        input.max_height: "{mh}"
+        input.max_fps: "{mfps}"
+        input.source: "{source}"
+        input.usb_encode: "{ue}"
+        input.usb_resolution: "{ur}"
+        input.usb_fps: "{uf}"
+    - path: "^/api/codec/v1/vin/list_source$"
+      json_each: "$"
+      json: { label: "$.label", value: "$.value" }
+      replace: input.sources
+      state: { "input.sources.{label:key}": "{value}" }
+    - path: "^/api/codec/v1/audio/input$"
+      json: { source: "$.source", cur: "$.current_source", rate: "$.sampling", ch: "$.channels", type: "$.type" }
+      state:
+        audio.input.source: "{source}"
+        audio.input.current_source: "{cur}"
+        audio.input.sampling: "{rate}"
+        audio.input.channels: "{ch}"
+        audio.input.type: "{type}"
+    - path: "^/api/codec/v1/audio/input$"
+      json_each: "$.gain.*"
+      json: { gain: "$" }
+      state: { "audio.input.gain.{key:key}": "{gain}" }
+    - path: "^/api/codec/v1/audio/encode/list$"
+      json_each: "$"
+      json: { id: "$.id", name: "$.name", codec: "$.codec", vol: "$.volume", rs: "$.resample", ch: "$.channels", rate: "$.sampling",
+              real: "$.real_sampling", br: "$.bitrate", sw: "$.sampleWidth", ss: "$.sampleSize", law: "$.g711Law",
+              cid: "$.audio_channel_id", src: "$.audio_source" }
+      replace: audio.encoders
+      state:
+        "audio.encoders.{id}.name": "{name}"
+        "audio.encoders.{id}.codec": "{codec}"
+        "audio.encoders.{id}.volume": "{vol}"
+        "audio.encoders.{id}.resample": "{rs}"
+        "audio.encoders.{id}.channels": "{ch}"
+        "audio.encoders.{id}.sampling": "{rate}"
+        "audio.encoders.{id}.real_sampling": "{real}"
+        "audio.encoders.{id}.bitrate": "{br}"
+        "audio.encoders.{id}.sample_width": "{sw}"
+        "audio.encoders.{id}.sample_size": "{ss}"
+        "audio.encoders.{id}.g711_law": "{law}"
+        "audio.encoders.{id}.channel_id": "{cid}"
+        "audio.encoders.{id}.source": "{src}"
+    - path: "^/api/codec/v1/venc/settings$"
+      json_match: { "$.codec": "^H26[45]$" }
+      json: { source: "$.source", codec: "$.codec", enable: "$.enable", grey: "$.grey", profile: "$.profile", ph: "$.picHeight",
+              pw: "$.picWidth", mode: "$.mode", gop: "$.gop", fps: "$.fps", br: "$.bitrate", mbr: "$.maxBitrate", minqp: "$.minQp",
+              maxqp: "$.maxQp", miniqp: "$.minIQp", minip: "$.minIp", maxip: "$.maxIp", di: "$.deinterlaceMode", tc: "$.timecode_type",
+              sh: "$.srcHeight", sw: "$.srcWidth", subh: "$.subHeight", subw: "$.subWidth", rh: "$.realHeight", rw: "$.realWidth", rfps: "$.real_fps" }
+      state:
+        video.encoder.source: "{source}"
+        video.encoder.codec: "{codec}"
+        video.encoder.enabled: "{enable}"
+        video.encoder.grey: "{grey}"
+        video.encoder.profile: "{profile}"
+        video.encoder.pic_height: "{ph}"
+        video.encoder.pic_width: "{pw}"
+        video.encoder.mode: "{mode}"
+        video.encoder.gop: "{gop}"
+        video.encoder.fps: "{fps}"
+        video.encoder.bitrate: "{br}"
+        video.encoder.max_bitrate: "{mbr}"
+        video.encoder.min_qp: "{minqp}"
+        video.encoder.max_qp: "{maxqp}"
+        video.encoder.min_iqp: "{miniqp}"
+        video.encoder.min_ip: "{minip}"
+        video.encoder.max_ip: "{maxip}"
+        video.encoder.deinterlace: "{di}"
+        video.encoder.timecode_type: "{tc}"
+        video.encoder.source_height: "{sh}"
+        video.encoder.source_width: "{sw}"
+        video.encoder.sub_height: "{subh}"
+        video.encoder.sub_width: "{subw}"
+        video.encoder.real_height: "{rh}"
+        video.encoder.real_width: "{rw}"
+        video.encoder.real_fps: "{rfps}"
+    - path: "^/api/codec/vpss/image$"
+      json_each: "$"
+      json: { id: "$.id", name: "$.name", url: "$.url", w: "$.size_w", h: "$.size_h" }
+      replace: vpss.images
+      state:
+        "vpss.images.{id:key}.name": "{name}"
+        "vpss.images.{id:key}.url": "{url}"
+        "vpss.images.{id:key}.width": "{w}"
+        "vpss.images.{id:key}.height": "{h}"
+    - path: "^/api/codec/vpss/static_frame$"
+      json_each: "$"
+      json: { id: "$.id", url: "$.url", w: "$.size_w", h: "$.size_h" }
+      replace: vpss.still_frames
+      state:
+        "vpss.still_frames.{id:key}.url": "{url}"
+        "vpss.still_frames.{id:key}.width": "{w}"
+        "vpss.still_frames.{id:key}.height": "{h}"
+    - path: "^/api/codec/v1/vpss/input/rmf$"
+      json: { rotate: "$.rotate", mirror: "$.mirror_en", flip: "$.flip_en" }
+      state: { vpss.rotate: "{rotate}", vpss.mirror: "{mirror}", vpss.flip: "{flip}" }
+    - path: "^/api/codec/v1/vpss/osd$"
+      json_match: { "$.items": "^\\[" }
+      json: { v: "$.enable" }
+      state: { osd.enabled: "{v}" }
+    - path: "^/api/codec/v1/vpss/osd$"
+      json_match: { "$.items": "^\\[" }
+      json_each: "$.items"
+      json: &osd_json { id: "$.id", enable: "$.enable", type: "$.type", pos: "$.position", x: "$.x", y: "$.y", fs: "$.font_size",
+                        fc: "$.font_color", style: "$.style", ol: "$.outline", oc: "$.outline_color", text: "$.text",
+                        file: "$.file_id", rs: "$.row_spacing" }
+      replace: osd.items
+      state: &osd_state
+        "osd.items.{id:key}.enabled": "{enable}"
+        "osd.items.{id:key}.type": "{type}"
+        "osd.items.{id:key}.position": "{pos}"
+        "osd.items.{id:key}.x": "{x}"
+        "osd.items.{id:key}.y": "{y}"
+        "osd.items.{id:key}.font_size": "{fs}"
+        "osd.items.{id:key}.font_color": "{fc}"
+        "osd.items.{id:key}.style": "{style}"
+        "osd.items.{id:key}.outline": "{ol}"
+        "osd.items.{id:key}.outline_color": "{oc}"
+        "osd.items.{id:key}.text": "{text}"
+        "osd.items.{id:key}.file_id": "{file}"
+        "osd.items.{id:key}.row_spacing": "{rs}"
+    - path: "^/api/codec/v1/vpss/osd/[0-9A-Za-z_]+$"
+      json_match: { "$.id": "^[0-9A-Za-z_]+$" }
+      json: *osd_json
+      state: *osd_state
+    - path: "^/api/codec/panel/settings$"
+      json_match: { "$.codec": "^H26[45]$" }
+      json: { vs: "$.video_source", w: "$.width", h: "$.height", br: "$.video_bitrate", codec: "$.codec", fps: "$.fps",
+              as: "$.audio_source", cur: "$.current_source", di: "$.deinterlaceMode" }
+      state:
+        panel.video_source: "{vs}"
+        panel.width: "{w}"
+        panel.height: "{h}"
+        panel.video_bitrate: "{br}"
+        panel.codec: "{codec}"
+        panel.fps: "{fps}"
+        panel.audio_source: "{as}"
+        panel.current_source: "{cur}"
+        panel.deinterlace: "{di}"
+    - path: "^/api/codec/panel/settings$"
+      json_each: "$.gain.*"
+      json: { gain: "$" }
+      state: { "panel.gain.{key:key}": "{gain}" }
+
+    # ── Read-back after a write answered ok ──
+    - path: "^/api/systemctrl/user/auth_info$"
+      request_match: { "$": "^\\{" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/systemctrl/user/auth_info }]
+    - path: "^/api/systemctrl?/user/(add|remove|modify)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/systemctrl/user/list }]
+    - path: "^/api/systemctrl/systime/(setLocation|setTime)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/systemctrl/systime/get }]
+    - path: "^/api/systemctrl/system/setHostname\\?"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/systemctrl/system/getHostname }]
+    - path: "^/api/systemctrl/system/setProtocol$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/systemctrl/system/getProtocol }]
+    - path: "^/api/systemctrl/system/ssl/(crt|key)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/systemctrl/system/ssl }]
+    - path: "^/api/systemctrl/system/production_off$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/ststemctrl/system/production_stat }]
+    - path: "^/api/record/record/(remove_file|choose_usb)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/record/record/disk_list }]
+    - path: "^/api/record/record/settings$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/record/record/get_record_info }]
+    - path: "^/api/record/v1/get_recording_status$"
+      request_match: { "$": "^\\{" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/record/v1/get_recording_status }]
+    - path: "^/api/streamer/v1/stream(/enable|/ndi/reset|/[0-9A-Za-z]+)?$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/streamer/v1/stream/list }]
+    - path: "^/api/streamer/v1/stream/media_user$"
+      request_match: { "$": "^\\{" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/streamer/v1/stream/media_user }]
+    - path: "^/api/streamer/v1/stream/media_user/.+$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/streamer/v1/stream/media_user }]
+    - path: "^/api/streamer/ptz/modify$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/streamer/ptz/info }]
+    - path: "^/api/networkmanager/network/(ChangeLinkinfo|SetSwitch|SetEthernets)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/networkmanager/network/GetLinkinfo }
+        - { method: GET, path: /api/networkmanager/network/GetEthernets }
+    - path: "^/api/networkmanager/network/traffic_data$"
+      request_match: { "$": "^\\{" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/networkmanager/network/traffic_data }]
+    - path: "^/api/networkmanager/network/bind_network$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/networkmanager/network/current_networks }]
+    - path: "^/api/networkmanager/static/routing/(add|modify|del|set)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/networkmanager/static/routing/get }]
+    - path: "^/api/networkmanager/wifi/(add|modify|del|set)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/networkmanager/wifi/get }
+        - { method: GET, path: /api/networkmanager/wifi/getCurrentWifi }
+    - path: "^/api/networkmanager/hotspot/set$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/networkmanager/hotspot/get }]
+    - path: "^/api/networkmanager/hotspot/setWIFIParameter$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/networkmanager/hotspot/getWIFIParameter }]
+    - path: "^/api/networkmanager/modem/(setModemParameter|modemRestore|modemEnable)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/networkmanager/modem/get }]
+    - path: "^/api/kilolink/bonding/setting_stream$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/kilolink/bonding/stream_state }]
+    - path: "^/api/kilolink/bonding/(setting|connect)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/kilolink/bonding/state }
+        - { method: GET, path: /api/kilolink/bonding/server }
+    - path: "^/api/codec/vin/edid/(priority|upload|reset)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/codec/vin/edid }]
+    - path: "^/api/codec/v1/vin/source$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/codec/v1/vin/detail }
+        - { method: GET, path: /api/codec/v1/venc/settings }
+        - { method: GET, path: /api/codec/v1/audio/input }
+    - path: "^/api/codec/v1/audio/input/source$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/codec/v1/audio/input }]
+    - path: "^/api/codec/v1/audio/encode(/[0-9]+)?$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/codec/v1/audio/encode/list }]
+    - path: "^/api/codec/v1/venc/(settings|bitrate)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/codec/v1/venc/settings }]
+    - path: "^/api/codec/vpss/image(/[0-9A-Za-z_]+)?$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/codec/vpss/image }]
+    - path: "^/api/codec/vpss/static_frame(/reset)?$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/codec/vpss/static_frame }]
+    - path: "^/api/codec/v1/vpss/input/rmf$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/codec/v1/vpss/input/rmf }]
+    - path: "^/api/codec/v1/vpss/osd(/[0-9A-Za-z_]+)?$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/codec/v1/vpss/osd }]
+    - path: "^/api/codec/panel/settings$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/codec/panel/settings }]

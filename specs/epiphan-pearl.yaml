@@ -1,0 +1,2187 @@
+spec: 1
+id: epiphan-pearl
+name: Epiphan Pearl-2, Pearl Mini, Pearl Nano and Pearl Nexus
+vendor: Epiphan Video
+category: recorder
+
+source:
+  - title: Pearl device REST API v2.0 (OpenAPI 3.0, openapi.yml; examples state firmware 4.24.1)
+    author: Epiphan Video
+    url: https://epiphan-video.github.io/pearl_api_swagger_ui/api/v2.0/openapi.yml
+    note: >
+      Manufacturer-published, MIT-licensed (info.license), from the repository
+      github.com/epiphan-video/pearl_api_swagger_ui (api/v2.0/openapi.yml, last
+      changed 2025-06-09, git blob 7bce2916), shown in Swagger UI at
+      https://epiphan-video.github.io/pearl_api_swagger_ui/. The source of every
+      command, state value and reply shape here: server /api/v2.0; HTTP Basic
+      security; the {status, result} and {status, message} replies; the paths
+      under AFU, Publishers, Channels, Inputs, Outputs, Recorders, Events,
+      System control, Network, Firmware, Device identity, Single touch control,
+      Presets and Storages; the schemas PublisherSettings (rtsp, rtmp, rtp-udp,
+      mpegts-udp, mpegts-rtp, ndi, hls, srt and their fields and ranges),
+      PublisherStatus, Encoder, Channel, Input, InputSettings,
+      NetworkInputSettings, LocalAudioSettings, UsbSettings, RecorderStatus,
+      ArchiveFile, Event, AdhocEventKaltura, AdhocEventPanopto,
+      AdhocEventOpencast, SystemStatus, FirmwareDetails, DeviceIdentity,
+      SingleTouchControlState, Preset, StorageStatus and StorageTransferStatus;
+      and the per-input examples (which inputs answer settings requests with
+      405 notallowed).
+  - title: Security White Paper for the Pearl Family of video encoders, EPN110-2, revision 1 (January 10, 2025)
+    author: Epiphan Video
+    url: https://www.epiphan.com/wp-content/uploads/2025/03/Pearl-Security_Whitepaper_Jan2025.pdf
+    note: >
+      Manufacturer-documented. Table 1, default ports: TCP 80 inbound,
+      enabled, for the web interface and the API for third-party control;
+      TCP 443 inbound, disabled by default and user-configurable, for the
+      same over HTTPS. "Securing Web user interface and REST API access": the
+      administrator, operator and viewer roles (viewers read-only), LDAP or
+      the device's own user database, and HTTPS with TLS 1.2 only. Best
+      practices: set passwords for every role at initial setup.
+  - title: Pearl-2, Pearl Mini, Pearl Nano and Pearl API user guides (epiphan.com/userguides)
+    author: Epiphan Video
+    url: https://www.epiphan.com/userguides/pearl-api/
+    note: >
+      Not read: the pages answer automated requests with a bot-detection
+      challenge. Search-engine excerpts of "User types and privileges",
+      "Connect to the Admin panel" and the API guide's release notes say the
+      administrator's user name is admin, that firmware 4.14.2 made passwords
+      required for the admin, operator and viewer accounts, and that the
+      legacy HTTP and RS-232 APIs give way to this REST API. Those points are
+      used only for the settings' defaults, and are VERIFICATION items.
+
+transport:
+  type: http
+  port: 80
+  https_port: 443
+  scheme: { setting: scheme }
+  auth: basic
+  # A 403 refuses one request (a role without the right, for instance), not
+  # the credential: only 401 is the terminal refusal.
+  refusal_status: [401]
+  accept_invalid_certs: true
+  timeout_ms: 5000
+  probe: { method: GET, path: /api/v2.0/system/firmware }
+
+settings:
+  username: { type: string, default: admin, max_length: 128, label: Username,
+              description: "The Pearl user the requests authenticate as: admin, or operator for day-to-day control." }
+  password: { type: string, secret: true, default: "", max_length: 128, label: Password,
+              description: "That user's password, as set in the Admin panel (firmware 4.14.2 and later require one)." }
+  scheme: { type: enum, values: [http, https], default: http, label: Scheme,
+            description: "http on port 80, or https on port 443 once HTTPS is enabled in the Admin panel; the certificate is not checked." }
+
+ports:
+  - { port: 80, protocol: http, role: control, when: "scheme http" }
+  - { port: 443, protocol: https, role: control, setting: scheme, when: "scheme https" }
+
+models:
+  - id: pearl-2
+    name: Epiphan Pearl-2
+    supports: &all_commands
+      [get_channels, get_channel_name, set_channel_name, add_bookmark, set_active_layout,
+       list_publishers, get_publisher_types, get_publishers_status, get_publisher_type, get_publisher_name,
+       set_publisher_name, get_publisher_status, get_publisher_settings, add_publisher, add_rtmp_publisher,
+       delete_publisher, set_publisher_settings, patch_publisher_settings, start_publisher, stop_publisher,
+       start_channel_publishers, stop_channel_publishers, set_publisher_enabled, set_publisher_single_touch,
+       set_publisher_audio_disabled, set_rtmp_destination, set_rtmp_credentials, set_rtsp_destination,
+       set_srt_publisher_url, set_srt_publisher_port, set_srt_publisher_latency, set_srt_publisher_stream_id,
+       set_srt_publisher_encryption, clear_srt_publisher_encryption, set_ndi_publisher_name,
+       set_ndi_publisher_group, set_hls_publisher_url,
+       list_inputs, get_input_settings, create_network_input, set_input_settings, patch_input_settings,
+       set_input_audio_delay, set_input_audio_mute, set_input_audio_gain, set_input_audio_type,
+       set_input_stereo_pair, set_input_channel_gain, set_input_channel_mute, set_input_nosignal_timeout,
+       set_srt_input_latency, set_srt_input_url, set_srt_input_port, set_srt_input_stream_id,
+       set_srt_input_encryption, set_usb_camera_settings,
+       list_outputs, set_output_source,
+       list_recorders, get_recorders_status, get_recorder_status, start_recorder, stop_recorder,
+       start_all_recorders, stop_all_recorders, start_recorders, stop_recorders, list_recorder_files,
+       list_recorder_files_page,
+       list_events, list_events_by_status, get_event, create_adhoc_event, start_event, stop_event, pause_event,
+       resume_event, extend_event, get_adhoc_session, adhoc_login_kaltura, adhoc_login_panopto, adhoc_logout,
+       get_system_status, get_connectivity, run_speedtest, reboot, shutdown, factory_reset,
+       get_firmware, get_firmware_version, get_firmware_revision, get_product_id, get_product_name, get_ident,
+       list_single_touch, get_single_touch_state, toggle_single_touch,
+       list_presets, apply_preset, apply_preset_sections,
+       list_storages, get_storage_status, eject_storage, get_storage_transfer_status,
+       list_afu, get_afu_status, get_afu_destination_status]
+    verification: none
+    notes: >
+      Inputs as the document names them: hdmi-a, hdmi4k-a, sdi4k-a, analog-a
+      (stereo pair, gain and mute) and analog-b (XLR, RCA or XLR+RCA). No
+      phantom power (LocalAudioSettings lists it for Pearl Mini and Pearl
+      Nexus only).
+  - id: pearl-mini
+    name: Epiphan Pearl Mini
+    supports: &with_phantom
+      [get_channels, get_channel_name, set_channel_name, add_bookmark, set_active_layout,
+       list_publishers, get_publisher_types, get_publishers_status, get_publisher_type, get_publisher_name,
+       set_publisher_name, get_publisher_status, get_publisher_settings, add_publisher, add_rtmp_publisher,
+       delete_publisher, set_publisher_settings, patch_publisher_settings, start_publisher, stop_publisher,
+       start_channel_publishers, stop_channel_publishers, set_publisher_enabled, set_publisher_single_touch,
+       set_publisher_audio_disabled, set_rtmp_destination, set_rtmp_credentials, set_rtsp_destination,
+       set_srt_publisher_url, set_srt_publisher_port, set_srt_publisher_latency, set_srt_publisher_stream_id,
+       set_srt_publisher_encryption, clear_srt_publisher_encryption, set_ndi_publisher_name,
+       set_ndi_publisher_group, set_hls_publisher_url,
+       list_inputs, get_input_settings, create_network_input, set_input_settings, patch_input_settings,
+       set_input_audio_delay, set_input_audio_mute, set_input_audio_gain, set_input_audio_type,
+       set_input_stereo_pair, set_input_channel_gain, set_input_channel_mute, set_input_phantom_power,
+       set_input_nosignal_timeout,
+       set_srt_input_latency, set_srt_input_url, set_srt_input_port, set_srt_input_stream_id,
+       set_srt_input_encryption, set_usb_camera_settings,
+       list_outputs, set_output_source,
+       list_recorders, get_recorders_status, get_recorder_status, start_recorder, stop_recorder,
+       start_all_recorders, stop_all_recorders, start_recorders, stop_recorders, list_recorder_files,
+       list_recorder_files_page,
+       list_events, list_events_by_status, get_event, create_adhoc_event, start_event, stop_event, pause_event,
+       resume_event, extend_event, get_adhoc_session, adhoc_login_kaltura, adhoc_login_panopto, adhoc_logout,
+       get_system_status, get_connectivity, run_speedtest, reboot, shutdown, factory_reset,
+       get_firmware, get_firmware_version, get_firmware_revision, get_product_id, get_product_name, get_ident,
+       list_single_touch, get_single_touch_state, toggle_single_touch,
+       list_presets, apply_preset, apply_preset_sections,
+       list_storages, get_storage_status, eject_storage, get_storage_transfer_status,
+       list_afu, get_afu_status, get_afu_destination_status]
+    verification: none
+    notes: >
+      Inputs as the document names them: hdmi-a, sdi, analog-a (XLR/TRS:
+      gain, mute, phantom power, stereo pair) and analog-b (RCA/3.5 mm: gain,
+      mute, RCA or 3.5mm). The firmware example names product id 44 as Pearl
+      Mini.
+  - id: pearl-nano
+    name: Epiphan Pearl Nano
+    supports: *all_commands
+    verification: none
+    notes: >
+      Inputs as the document names them: hdmi, sdi and analog (XLR/RCA:
+      gain, mute, input type, stereo pair). No phantom power.
+  - id: pearl-nexus
+    name: Epiphan Pearl Nexus
+    supports: *with_phantom
+    verification: none
+    notes: >
+      Inputs as for Pearl Mini: hdmi-a, sdi, analog-a (XLR/TRS, phantom power)
+      and analog-b (RCA/3.5 mm).
+
+maps:
+  udp_section: { mpegts-udp: mpegts_udp, mpegts-rtp: mpegts_rtp, rtp-udp: rtp_udp }
+
+commands:
+  # ── Channels ────────────────────────────────────────────────────────────
+  get_channels:
+    summary: "Read every channel with its publishers (status and settings), encoders and active layout (GET /channels with every include flag)"
+    send: { method: GET, path: /api/v2.0/channels,
+            query: { publishers: "true", publishers-status: "true", publishers-settings: "true", encoders: "true", active_layout: "true" } }
+    expect: &value { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.result" }
+    returns: value
+  get_channel_name:
+    summary: "Read a channel's display name (GET /channels/{cid}/name)"
+    params:
+      channel: &channel { type: string, max_length: 64, required: true, label: Channel,
+                          description: "The channel's id (cid), the logical channel number shown in the Admin panel, e.g. 1." }
+    send: { method: GET, path: "/api/v2.0/channels/{channel}/name" }
+    expect: *value
+    returns: value
+  set_channel_name:
+    summary: "Rename a channel (PUT /channels/{cid}/name?name=), then read the name back"
+    params:
+      channel: *channel
+      name: { type: string, max_length: 128, pattern: "^.+$", required: true, label: Name,
+              description: "The channel's new display name, 1 to 128 characters." }
+    send:
+      - { method: PUT, path: "/api/v2.0/channels/{channel}/name", query: { name: "{name}" } }
+      - { method: GET, path: "/api/v2.0/channels/{channel}/name" }
+    expect: &ok { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  add_bookmark:
+    summary: "Add a bookmark to the file a channel is recording, MP4 or MOV only (POST /channels/{cid}/bookmarks?text=)"
+    params:
+      channel: *channel
+      text: { type: string, max_length: 256, required: true, label: Bookmark text,
+              description: "The bookmark's name, written into the recording at the current time." }
+    send: { method: POST, path: "/api/v2.0/channels/{channel}/bookmarks", query: { text: "{text}" } }
+    expect: *ok
+    returns: ack
+  set_active_layout:
+    summary: "Make a layout the channel's active layout (PUT /channels/{cid}/layouts/active?id=), then read the channel's active layout back"
+    params:
+      channel: *channel
+      layout: { type: string, max_length: 64, required: true, label: Layout,
+                description: "The layout's id within the channel, as the Admin panel's layout list numbers it, e.g. 1." }
+    send:
+      - { method: PUT, path: "/api/v2.0/channels/{channel}/layouts/active", query: { id: "{layout}" } }
+      - { method: GET, path: /api/v2.0/channels,
+          query: { ids: "{channel}", publishers: "true", encoders: "true", active_layout: "true" } }
+    expect: *ok
+    returns: ack
+
+  # ── Publishers (streams) ────────────────────────────────────────────────
+  list_publishers:
+    summary: "List a channel's publishers with id, type and name (GET /channels/{cid}/publishers)"
+    params: { channel: *channel }
+    send: { method: GET, path: "/api/v2.0/channels/{channel}/publishers" }
+    expect: *value
+    returns: value
+  get_publisher_types:
+    summary: "List the type of each of a channel's publishers (GET /channels/{cid}/publishers/type)"
+    params: { channel: *channel }
+    send: { method: GET, path: "/api/v2.0/channels/{channel}/publishers/type" }
+    expect: *value
+    returns: value
+  get_publishers_status:
+    summary: "Read the status of each of a channel's publishers (GET /channels/{cid}/publishers/status)"
+    params: { channel: *channel }
+    send: { method: GET, path: "/api/v2.0/channels/{channel}/publishers/status" }
+    expect: *value
+    returns: value
+  get_publisher_type:
+    summary: "Read a publisher's type (GET /channels/{cid}/publishers/{pid}/type)"
+    params:
+      channel: *channel
+      publisher: &publisher { type: string, max_length: 64, required: true, label: Publisher,
+                              description: "The publisher's id (pid) within the channel, numbered from 0, e.g. 0." }
+    send: { method: GET, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/type" }
+    expect: *value
+    returns: value
+  get_publisher_name:
+    summary: "Read a publisher's display name (GET /channels/{cid}/publishers/{pid}/name)"
+    params: { channel: *channel, publisher: *publisher }
+    send: { method: GET, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/name" }
+    expect: *value
+    returns: value
+  set_publisher_name:
+    summary: "Rename a publisher (PUT /channels/{cid}/publishers/{pid}/name?name=), then read the name back"
+    params:
+      channel: *channel
+      publisher: *publisher
+      name: { type: string, max_length: 128, pattern: "^.+$", required: true, label: Name,
+              description: "The publisher's new display name, 1 to 128 characters." }
+    send:
+      - { method: PUT, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/name", query: { name: "{name}" } }
+      - { method: GET, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/name" }
+    expect: *ok
+    returns: ack
+  get_publisher_status:
+    summary: "Read a publisher's status: state, duration, start time, reconnections, warnings and SRT statistics (GET /channels/{cid}/publishers/{pid}/status)"
+    params: { channel: *channel, publisher: *publisher }
+    send: { method: GET, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/status" }
+    expect: *value
+    returns: value
+  get_publisher_settings:
+    summary: "Read a publisher's settings in the PublisherSettings schema (GET /channels/{cid}/publishers/{pid}/settings)"
+    params: { channel: *channel, publisher: *publisher }
+    send: { method: GET, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings" }
+    expect: *value
+    returns: value
+  add_publisher:
+    summary: "Add a publisher to a channel with full settings, a PublisherSettings object (POST /channels/{cid}/publishers); returns the new publisher's id, name and settings"
+    params:
+      channel: *channel
+      name: &publisher_name { type: string, max_length: 128, pattern: "^.+$", required: true, label: Name,
+                              description: "The new publisher's display name, 1 to 128 characters." }
+      publisher_settings: { type: json, required: true, label: Settings,
+                            description: "A PublisherSettings object: type (rtsp, rtmp, rtp-udp, mpegts-udp, mpegts-rtp, ndi, hls or srt), common {enabled, single_touch} and the section of that type, as the API document gives it." }
+    send: { method: POST, path: "/api/v2.0/channels/{channel}/publishers", content_type: application/json,
+            body: '{"name":{name:json},"settings":{publisher_settings}}' }
+    expect: &created { status: 201, json_equals: { "$.status": "ok" }, json_path: "$.result" }
+    returns: value
+  add_rtmp_publisher:
+    summary: "Add an RTMP push publisher to a channel (POST /channels/{cid}/publishers, type rtmp); returns the new publisher's id, name and settings"
+    params:
+      channel: *channel
+      name: *publisher_name
+      url: &rtmp_url { type: string, max_length: 500, required: true, label: Server URL,
+                       description: "The RTMP server's URL, e.g. rtmp://a.rtmp.youtube.com/live2 (rtmps:// for secure RTMP)." }
+      stream: &rtmp_stream { type: string, max_length: 500, default: "", label: Stream key,
+                             description: "The stream name or key the server expects; empty when it is part of the URL." }
+      enabled: { type: bool, default: true, label: Enabled,
+                 description: "Whether the publisher is enabled once added; a disabled publisher does not start." }
+      single_touch: &single_touch { type: bool, default: true, label: Single Touch,
+                                    description: "Whether the publisher starts and stops with the Single Touch control." }
+    send: { method: POST, path: "/api/v2.0/channels/{channel}/publishers", content_type: application/json,
+            body: '{"name":{name:json},"settings":{"type":"rtmp","common":{"enabled":{enabled},"single_touch":{single_touch}},"rtmp":{"url":{url:json},"stream":{stream:json}}}}' }
+    expect: *created
+    returns: value
+  delete_publisher:
+    summary: "Delete a publisher from a channel (DELETE /channels/{cid}/publishers/{pid}), then read every channel's publishers back"
+    params: { channel: *channel, publisher: *publisher }
+    send:
+      - { method: DELETE, path: "/api/v2.0/channels/{channel}/publishers/{publisher}" }
+      - &read_publishers { method: GET, path: /api/v2.0/channels, query: { publishers: "true", publishers-status: "true" } }
+    expect: *ok
+    returns: ack
+  set_publisher_settings:
+    summary: "Replace a publisher's settings with a full PublisherSettings object (PUT /channels/{cid}/publishers/{pid}/settings), then read them back"
+    params:
+      channel: *channel
+      publisher: *publisher
+      publisher_settings: { type: json, required: true, label: Settings,
+                            description: "A complete PublisherSettings object (type, common and the type's section), which replaces every setting of the publisher." }
+    send:
+      - { method: PUT, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings", content_type: application/json,
+          body: "{publisher_settings}" }
+      - &read_publisher_settings { method: GET, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings" }
+    expect: *ok
+    returns: ack
+  patch_publisher_settings:
+    summary: "Change some of a publisher's settings with a partial PublisherSettings object (PATCH /channels/{cid}/publishers/{pid}/settings), then read them back"
+    params:
+      channel: *channel
+      publisher: *publisher
+      publisher_settings: { type: json, required: true, label: Settings,
+                            description: "A partial PublisherSettings object holding only the fields to change, e.g. {\"common\":{\"enabled\":true}}." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings", content_type: application/json,
+          body: "{publisher_settings}" }
+      - *read_publisher_settings
+    expect: *ok
+    returns: ack
+  start_publisher:
+    summary: "Start a publisher (POST /channels/{cid}/publishers/{pid}/control/start, asynchronous), then read every publisher's status"
+    params: { channel: *channel, publisher: *publisher }
+    send:
+      - { method: POST, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/control/start" }
+      - *read_publishers
+    expect: *ok
+    returns: ack
+  stop_publisher:
+    summary: "Stop a publisher (POST /channels/{cid}/publishers/{pid}/control/stop, asynchronous), then read every publisher's status"
+    params: { channel: *channel, publisher: *publisher }
+    send:
+      - { method: POST, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/control/stop" }
+      - *read_publishers
+    expect: *ok
+    returns: ack
+  start_channel_publishers:
+    summary: "Start every publisher of a channel (POST /channels/{cid}/publishers/control/start, asynchronous), then read every publisher's status"
+    params: { channel: *channel }
+    send:
+      - { method: POST, path: "/api/v2.0/channels/{channel}/publishers/control/start" }
+      - *read_publishers
+    expect: *ok
+    returns: ack
+  stop_channel_publishers:
+    summary: "Stop every publisher of a channel (POST /channels/{cid}/publishers/control/stop, asynchronous), then read every publisher's status"
+    params: { channel: *channel }
+    send:
+      - { method: POST, path: "/api/v2.0/channels/{channel}/publishers/control/stop" }
+      - *read_publishers
+    expect: *ok
+    returns: ack
+  set_publisher_enabled:
+    summary: "Enable or disable a publisher (PATCH settings common.enabled), then read its settings back"
+    params:
+      channel: *channel
+      publisher: *publisher
+      enabled: { type: bool, required: true, label: Enabled,
+                 description: "On enables the publisher; off disables it, so it does not start." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings", content_type: application/json,
+          body: '{"common":{"enabled":{enabled}}}' }
+      - *read_publisher_settings
+    expect: *ok
+    returns: ack
+  set_publisher_single_touch:
+    summary: "Include or leave out a publisher from Single Touch control (PATCH settings common.single_touch), then read its settings back"
+    params:
+      channel: *channel
+      publisher: *publisher
+      single_touch: { type: bool, required: true, label: Single Touch,
+                      description: "On makes the publisher start and stop with the Single Touch control; off leaves it out." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings", content_type: application/json,
+          body: '{"common":{"single_touch":{single_touch}}}' }
+      - *read_publisher_settings
+    expect: *ok
+    returns: ack
+  set_publisher_audio_disabled:
+    summary: "Send or leave out audio on an RTSP, RTMP, NDI, HLS or SRT publisher (PATCH settings <type>.disable_audio), then read its settings back"
+    params:
+      channel: *channel
+      publisher: *publisher
+      type: { type: enum, values: [rtsp, rtmp, ndi, hls, srt], required: true, label: Publisher type,
+              description: "The publisher's type, which names the settings section holding disable_audio." }
+      disabled: { type: bool, required: true, label: Audio disabled,
+                  description: "On sends video only; off sends audio too." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings", content_type: application/json,
+          body: '{"{type}":{"disable_audio":{disabled}}}' }
+      - *read_publisher_settings
+    expect: *ok
+    returns: ack
+  set_rtmp_destination:
+    summary: "Set an RTMP publisher's server URL and stream key (PATCH settings rtmp.url and rtmp.stream), then read its settings back"
+    params:
+      channel: *channel
+      publisher: *publisher
+      url: *rtmp_url
+      stream: { type: string, max_length: 500, required: true, label: Stream key,
+                description: "The stream name or key the server expects; empty when it is part of the URL." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings", content_type: application/json,
+          body: '{"rtmp":{"url":{url:json},"stream":{stream:json}}}' }
+      - *read_publisher_settings
+    expect: *ok
+    returns: ack
+  set_rtmp_credentials:
+    summary: "Set the user name and password an RTMP publisher signs in to its server with (PATCH settings rtmp.username and rtmp.password), then read its settings back"
+    params:
+      channel: *channel
+      publisher: *publisher
+      username: { type: string, max_length: 250, required: true, label: User name,
+                  description: "The RTMP server's user name, empty for none." }
+      password: { type: string, max_length: 250, secret: true, required: true, label: Password,
+                  description: "The RTMP server's password, empty for none." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings", content_type: application/json,
+          body: '{"rtmp":{"username":{username:json},"password":{password:json}}}' }
+      - *read_publisher_settings
+    expect: *ok
+    returns: ack
+  set_rtsp_destination:
+    summary: "Set an RTSP announce publisher's URL and transport (PATCH settings rtsp.url and rtsp.transport), then read its settings back"
+    params:
+      channel: *channel
+      publisher: *publisher
+      url: { type: string, max_length: 500, required: true, label: Server URL,
+             description: "The RTSP server's URL the stream is announced to, e.g. rtsp://192.168.1.50/live." }
+      transport: { type: enum, values: [udp, tcp], default: udp, label: Transport,
+                   description: "RTP over UDP (the default) or interleaved over the RTSP TCP connection." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings", content_type: application/json,
+          body: '{"rtsp":{"url":{url:json},"transport":"{transport}"}}' }
+      - *read_publisher_settings
+    expect: *ok
+    returns: ack
+  set_srt_publisher_url:
+    summary: "Set an SRT caller or rendezvous publisher's destination URL (PATCH settings srt.url), then read its settings back"
+    params:
+      channel: *channel
+      publisher: *publisher
+      url: { type: string, max_length: 500, required: true, label: SRT URL,
+             description: "The SRT destination as srt://host:port, e.g. srt://192.168.1.90:14000." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings", content_type: application/json,
+          body: '{"srt":{"url":{url:json}}}' }
+      - *read_publisher_settings
+    expect: *ok
+    returns: ack
+  set_srt_publisher_port:
+    summary: "Set the port an SRT listener publisher listens on (PATCH settings srt.port), then read its settings back"
+    params:
+      channel: *channel
+      publisher: *publisher
+      port: { type: int, min: 1024, max: 65535, required: true, label: Port,
+              description: "The UDP port the Pearl listens on for SRT callers, 1024 to 65535." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings", content_type: application/json,
+          body: '{"srt":{"port":{port}}}' }
+      - *read_publisher_settings
+    expect: *ok
+    returns: ack
+  set_srt_publisher_latency:
+    summary: "Set an SRT publisher's latency and bandwidth recovery overhead (PATCH settings srt.latency and srt.bw_recovery_overhead), then read its settings back"
+    params:
+      channel: *channel
+      publisher: *publisher
+      latency: { type: int, min: 80, max: 8000, required: true, label: Latency,
+                 description: "The SRT latency in milliseconds, 80 to 8000 (125 by default)." }
+      overhead: { type: int, min: 5, max: 100, default: 25, label: Recovery overhead,
+                  description: "Bandwidth kept for retransmission, as a percentage of the stream's rate, 5 to 100 (25 by default)." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings", content_type: application/json,
+          body: '{"srt":{"latency":{latency},"bw_recovery_overhead":{overhead}}}' }
+      - *read_publisher_settings
+    expect: *ok
+    returns: ack
+  set_srt_publisher_stream_id:
+    summary: "Set the stream id an SRT caller publisher sends (PATCH settings srt.stream_id), then read its settings back"
+    params:
+      channel: *channel
+      publisher: *publisher
+      stream_id: { type: string, max_length: 512, required: true, label: Stream id,
+                   description: "The SRT stream id sent to the listener, empty for none." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings", content_type: application/json,
+          body: '{"srt":{"stream_id":{stream_id:json}}}' }
+      - *read_publisher_settings
+    expect: *ok
+    returns: ack
+  set_srt_publisher_encryption:
+    summary: "Encrypt an SRT publisher with a passphrase and key length (PATCH settings srt.encryption), then read its settings back"
+    params:
+      channel: *channel
+      publisher: *publisher
+      passphrase: &srt_passphrase { type: string, max_length: 79, pattern: "^.{10,79}$", secret: true, required: true, label: Passphrase,
+                                    description: "The SRT passphrase both ends share, 10 to 79 characters." }
+      keylength: &srt_keylength { type: enum, values: ["128", "192", "256"], default: "128", label: Key length,
+                                  description: "The AES key length in bits: 128, 192 or 256." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings", content_type: application/json,
+          body: '{"srt":{"encryption":{"passphrase":{passphrase:json},"keylength":{keylength}}}}' }
+      - *read_publisher_settings
+    expect: *ok
+    returns: ack
+  clear_srt_publisher_encryption:
+    summary: "Turn an SRT publisher's encryption off (PATCH settings srt.encryption null), then read its settings back"
+    params: { channel: *channel, publisher: *publisher }
+    send:
+      - { method: PATCH, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings", content_type: application/json,
+          body: '{"srt":{"encryption":null}}' }
+      - *read_publisher_settings
+    expect: *ok
+    returns: ack
+  set_ndi_publisher_name:
+    summary: "Set the name an NDI publisher announces (PATCH settings ndi.ndi_name), then read its settings back"
+    params:
+      channel: *channel
+      publisher: *publisher
+      ndi_name: { type: string, max_length: 500, required: true, label: NDI name,
+                  description: "The NDI source name the publisher announces on the network." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings", content_type: application/json,
+          body: '{"ndi":{"ndi_name":{ndi_name:json}}}' }
+      - *read_publisher_settings
+    expect: *ok
+    returns: ack
+  set_ndi_publisher_group:
+    summary: "Set the NDI group an NDI publisher announces in (PATCH settings ndi.ndi_group), then read its settings back"
+    params:
+      channel: *channel
+      publisher: *publisher
+      ndi_group: { type: string, max_length: 500, required: true, label: NDI group,
+                   description: "The NDI group the source is announced in, empty for the default (public) group." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings", content_type: application/json,
+          body: '{"ndi":{"ndi_group":{ndi_group:json}}}' }
+      - *read_publisher_settings
+    expect: *ok
+    returns: ack
+  set_hls_publisher_url:
+    summary: "Set an HLS push publisher's upload URL (PATCH settings hls.url), then read its settings back"
+    params:
+      channel: *channel
+      publisher: *publisher
+      url: { type: string, max_length: 500, required: true, label: Upload URL,
+             description: "The HTTP or HTTPS URL the HLS segments and playlist are pushed to." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/channels/{channel}/publishers/{publisher}/settings", content_type: application/json,
+          body: '{"hls":{"url":{url:json}}}' }
+      - *read_publisher_settings
+    expect: *ok
+    returns: ack
+
+  # ── Inputs ──────────────────────────────────────────────────────────────
+  list_inputs:
+    summary: "List the inputs with id, name, type and whether they carry audio and video (GET /inputs)"
+    send: &read_inputs { method: GET, path: /api/v2.0/inputs }
+    expect: *value
+    returns: value
+  get_input_settings:
+    summary: "Read an input's settings in the InputSettings schema (GET /inputs/{sid}/settings); HDMI, SDI, USB, NDI and web graphics inputs answer 405"
+    params:
+      input: &input { type: string, max_length: 128, required: true, label: Input,
+                      description: "The input's id (sid) as the input list gives it, e.g. SRT1, RTSP1, USBA or analog-a." }
+    send: { method: GET, path: "/api/v2.0/inputs/{input}/settings" }
+    expect: *value
+    returns: value
+  create_network_input:
+    summary: "Create an RTSP, SRT, NDI or web graphics input with a NetworkInputSettings object (POST /inputs); returns the new input's id"
+    params:
+      type: { type: enum, values: [rtsp, srt, ndi, web-graphics], required: true, label: Type,
+              description: "The kind of network input to create." }
+      name: { type: string, max_length: 128, pattern: "^.+$", required: true, label: Name,
+              description: "The new input's display name, 1 to 128 characters." }
+      input_settings: { type: json, required: true, label: Settings,
+                        description: "A NetworkInputSettings object: audio, video and the section of the type (rtsp, srt, ndi or web_graphics), as the API document gives it." }
+    send: { method: POST, path: /api/v2.0/inputs, content_type: application/json,
+            body: '{"type":"{type}","name":{name:json},"settings":{input_settings}}' }
+    expect: *created
+    returns: value
+  set_input_settings:
+    summary: "Replace an input's settings with an InputSettings object (PUT /inputs/{sid}/settings), then read them back"
+    params:
+      input: *input
+      input_settings: { type: json, required: true, label: Settings,
+                        description: "A complete InputSettings object for the input (audio, video and its own section: hdmi, sdi, srt, rtsp, local_audio, usb, ndi or web_graphics)." }
+    send:
+      - { method: PUT, path: "/api/v2.0/inputs/{input}/settings", content_type: application/json, body: "{input_settings}" }
+      - &read_input_settings { method: GET, path: "/api/v2.0/inputs/{input}/settings" }
+    expect: *ok
+    returns: ack
+  patch_input_settings:
+    summary: "Change some of an SRT or analog audio input's settings with a partial InputSettings object (PATCH /inputs/{sid}/settings), then read them back"
+    params:
+      input: *input
+      input_settings: { type: json, required: true, label: Settings,
+                        description: "A partial InputSettings object holding only the fields to change, e.g. {\"local_audio\":{\"gain\":8}}." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/inputs/{input}/settings", content_type: application/json, body: "{input_settings}" }
+      - *read_input_settings
+    expect: *ok
+    returns: ack
+  set_input_audio_delay:
+    summary: "Set an SRT or analog audio input's audio delay (PATCH settings audio.delay), then read its settings back"
+    params:
+      input: *input
+      delay: { type: int, min: -300, max: 300, required: true, label: Audio delay,
+               description: "Audio delay in milliseconds, -300 to 300; negative plays the audio earlier." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/inputs/{input}/settings", content_type: application/json, body: '{"audio":{"delay":{delay}}}' }
+      - *read_input_settings
+    expect: *ok
+    returns: ack
+  set_input_audio_mute:
+    summary: "Mute or unmute an analog audio input's capture, both channels when paired (PATCH settings local_audio.mute), then read its settings back"
+    params:
+      input: &audio_input { type: string, max_length: 128, required: true, label: Audio input,
+                            description: "The analog audio input's id: analog-a or analog-b (Pearl-2, Pearl Mini, Pearl Nexus) or analog (Pearl Nano)." }
+      muted: { type: bool, required: true, label: Muted,
+               description: "On mutes the capture, off unmutes it." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/inputs/{input}/settings", content_type: application/json, body: '{"local_audio":{"mute":{muted}}}' }
+      - *read_input_settings
+    expect: *ok
+    returns: ack
+  set_input_audio_gain:
+    summary: "Set an analog audio input's capture gain, both channels when paired (PATCH settings local_audio.gain), then read its settings back"
+    params:
+      input: *audio_input
+      gain: { type: int, min: 0, max: 100, required: true, label: Gain,
+              description: "Capture gain, in dB or percent depending on the input (the document gives no maximum; its examples go to 41)." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/inputs/{input}/settings", content_type: application/json, body: '{"local_audio":{"gain":{gain}}}' }
+      - *read_input_settings
+    expect: *ok
+    returns: ack
+  set_input_phantom_power:
+    summary: "Turn 48 V phantom power on or off on a Pearl Mini or Pearl Nexus XLR/TRS input (PATCH settings local_audio.phantom_power), then read its settings back"
+    params:
+      input: *audio_input
+      phantom_power: { type: bool, required: true, label: Phantom power,
+                       description: "On feeds 48 V phantom power to the XLR inputs (analog-a), off turns it off." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/inputs/{input}/settings", content_type: application/json, body: '{"local_audio":{"phantom_power":{phantom_power}}}' }
+      - *read_input_settings
+    expect: *ok
+    returns: ack
+  set_input_audio_type:
+    summary: "Choose the connector an analog audio input captures from (PATCH settings local_audio.input_type), then read its settings back"
+    params:
+      input: *audio_input
+      input_type: { type: enum, values: [XLR, RCA, XLR+RCA, 3.5mm, RCA+3.5mm], required: true, label: Connector,
+                    description: "XLR, RCA or both on Pearl-2 analog-b and Pearl Nano; RCA, 3.5mm or both on Pearl Mini and Pearl Nexus analog-b." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/inputs/{input}/settings", content_type: application/json, body: '{"local_audio":{"input_type":"{input_type}"}}' }
+      - *read_input_settings
+    expect: *ok
+    returns: ack
+  set_input_stereo_pair:
+    summary: "Pair or unpair an analog audio input's two channels (PATCH settings local_audio.stereo_pair), then read its settings back"
+    params:
+      input: *audio_input
+      stereo_pair: { type: bool, required: true, label: Stereo pair,
+                     description: "On gives both channels the same gain and mute; off gives each channel its own." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/inputs/{input}/settings", content_type: application/json, body: '{"local_audio":{"stereo_pair":{stereo_pair}}}' }
+      - *read_input_settings
+    expect: *ok
+    returns: ack
+  set_input_channel_gain:
+    summary: "Set the gain of one channel of an unpaired analog audio input (PATCH settings local_audio.channels.<channel>.gain), then read its settings back"
+    params:
+      input: *audio_input
+      channel: &audio_channel { type: enum, values: [channelA, channelB], required: true, label: Audio channel,
+                                description: "The input's channel: channelA (left) or channelB (right)." }
+      gain: { type: int, min: 0, max: 100, required: true, label: Gain,
+              description: "The channel's capture gain in dB (the document gives no maximum; its examples go to 41)." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/inputs/{input}/settings", content_type: application/json,
+          body: '{"local_audio":{"channels":{"{channel}":{"gain":{gain}}}}}' }
+      - *read_input_settings
+    expect: *ok
+    returns: ack
+  set_input_channel_mute:
+    summary: "Mute or unmute one channel of an unpaired analog audio input (PATCH settings local_audio.channels.<channel>.mute), then read its settings back"
+    params:
+      input: *audio_input
+      channel: *audio_channel
+      muted: { type: bool, required: true, label: Muted,
+               description: "On mutes the channel's capture, off unmutes it." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/inputs/{input}/settings", content_type: application/json,
+          body: '{"local_audio":{"channels":{"{channel}":{"mute":{muted}}}}}' }
+      - *read_input_settings
+    expect: *ok
+    returns: ack
+  set_input_nosignal_timeout:
+    summary: "Set how long an SRT input waits without signal before showing its No Signal picture (PATCH settings video.nosignal.timeout), then read its settings back"
+    params:
+      input: *input
+      timeout: { type: int, min: 0, max: 3600, required: true, label: No signal timeout,
+                 description: "Seconds without signal before the No Signal picture shows (5 by default; the document gives no maximum)." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/inputs/{input}/settings", content_type: application/json, body: '{"video":{"nosignal":{"timeout":{timeout}}}}' }
+      - *read_input_settings
+    expect: *ok
+    returns: ack
+  set_srt_input_latency:
+    summary: "Set an SRT input's latency (PATCH settings srt.latency, with its mode), then read its settings back"
+    params:
+      input: *input
+      mode: &srt_mode { type: enum, values: [listener, caller, rendezvous], required: true, label: SRT mode,
+                        description: "The input's SRT mode as it is set; the document requires it in every srt section." }
+      latency: { type: int, min: 80, max: 8000, required: true, label: Latency,
+                 description: "The SRT latency in milliseconds, 80 to 8000 (80 by default)." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/inputs/{input}/settings", content_type: application/json,
+          body: '{"srt":{"mode":"{mode}","latency":{latency}}}' }
+      - *read_input_settings
+    expect: *ok
+    returns: ack
+  set_srt_input_url:
+    summary: "Set the URL an SRT caller or rendezvous input connects to (PATCH settings srt.url, with its mode), then read its settings back"
+    params:
+      input: *input
+      mode: { type: enum, values: [caller, rendezvous], required: true, label: SRT mode,
+              description: "The input's SRT mode as it is set: caller or rendezvous." }
+      url: { type: string, max_length: 128, required: true, label: SRT URL,
+             description: "The SRT source as srt://host:port, e.g. srt://10.2.4.6:1025." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/inputs/{input}/settings", content_type: application/json,
+          body: '{"srt":{"mode":"{mode}","url":{url:json}}}' }
+      - *read_input_settings
+    expect: *ok
+    returns: ack
+  set_srt_input_port:
+    summary: "Set the port an SRT listener input listens on (PATCH settings srt.port, mode listener), then read its settings back"
+    params:
+      input: *input
+      port: { type: int, min: 1024, max: 65535, required: true, label: Port,
+              description: "The UDP port the Pearl listens on for the SRT sender, 1024 to 65535." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/inputs/{input}/settings", content_type: application/json,
+          body: '{"srt":{"mode":"listener","port":{port}}}' }
+      - *read_input_settings
+    expect: *ok
+    returns: ack
+  set_srt_input_stream_id:
+    summary: "Set the stream id an SRT caller input asks for (PATCH settings srt.stream_id, mode caller), then read its settings back"
+    params:
+      input: *input
+      stream_id: { type: string, max_length: 512, required: true, label: Stream id,
+                   description: "The SRT stream id sent to the listener, empty for none." }
+    send:
+      - { method: PATCH, path: "/api/v2.0/inputs/{input}/settings", content_type: application/json,
+          body: '{"srt":{"mode":"caller","stream_id":{stream_id:json}}}' }
+      - *read_input_settings
+    expect: *ok
+    returns: ack
+  set_srt_input_encryption:
+    summary: "Set an SRT input's passphrase and key length (PATCH settings srt.encryption, with its mode), then read its settings back"
+    params:
+      input: *input
+      mode: *srt_mode
+      passphrase: *srt_passphrase
+      keylength: *srt_keylength
+    send:
+      - { method: PATCH, path: "/api/v2.0/inputs/{input}/settings", content_type: application/json,
+          body: '{"srt":{"mode":"{mode}","encryption":{"passphrase":{passphrase:json},"keylength":{keylength}}}}' }
+      - *read_input_settings
+    expect: *ok
+    returns: ack
+  set_usb_camera_settings:
+    summary: "Set every setting of a USB camera input at once (PUT /inputs/{sid}/settings with the usb section of UsbSettings)"
+    params:
+      input: { type: string, max_length: 128, required: true, label: USB input,
+               description: "The USB input's id, e.g. USBA or USBB." }
+      capture_mode: { type: string, max_length: 32, pattern: '^\d+x\d+@\d+$', required: true, label: Capture mode,
+                      description: "Resolution and frame rate the camera captures, as widthxheight@fps, e.g. 1920x1080@30." }
+      brightness: { type: int, min: 0, max: 100, required: true, label: Brightness, description: "Picture brightness, 0 to 100 (50 by default)." }
+      contrast: { type: int, min: 0, max: 100, required: true, label: Contrast, description: "Picture contrast, 0 to 100 (50 by default)." }
+      saturation: { type: int, min: 0, max: 100, required: true, label: Saturation, description: "Color saturation, 0 to 100." }
+      sharpness: { type: int, min: 0, max: 100, required: true, label: Sharpness, description: "Picture sharpness, 0 to 100 (50 by default)." }
+      pan: { type: int, min: -64, max: 64, required: true, label: Pan, description: "Horizontal pan, -64 to 64, 0 centered." }
+      tilt: { type: int, min: -64, max: 64, required: true, label: Tilt, description: "Vertical tilt, -64 to 64, 0 centered." }
+      power_line_frequency: { type: int, min: 0, max: 2, required: true, label: Power line frequency,
+                              description: "Flicker reduction: 0 off, 1 for 50 Hz, 2 for 60 Hz." }
+      volume: { type: int, min: 0, max: 100, required: true, label: Volume, description: "Capture volume in percent, 0 to 100 (70 by default)." }
+    send: { method: PUT, path: "/api/v2.0/inputs/{input}/settings", content_type: application/json,
+            body: '{"usb":{"capture_mode":{capture_mode:json},"brightness":{brightness},"contrast":{contrast},"saturation":{saturation},"sharpness":{sharpness},"pan":{pan},"tilt":{tilt},"power_line_frequency":{power_line_frequency},"volume":{volume}}}' }
+    expect: *ok
+    returns: ack
+
+  # ── Outputs ─────────────────────────────────────────────────────────────
+  list_outputs:
+    summary: "List the video outputs with id and name (GET /outputs)"
+    send: { method: GET, path: /api/v2.0/outputs }
+    expect: *value
+    returns: value
+  set_output_source:
+    summary: "Choose what a video output shows: an input, a channel, the multiviewer, device information or the console (PUT /outputs/{did}/settings?source=)"
+    params:
+      output: { type: string, max_length: 64, required: true, label: Output,
+                description: "The output's id (did), e.g. D1." }
+      source: { type: string, max_length: 128, pattern: "^.+$", required: true, label: Source,
+                description: "An input id (e.g. SRT1), a channel id (e.g. 1), multiview, deviceinfo or console." }
+    send: { method: PUT, path: "/api/v2.0/outputs/{output}/settings", query: { source: "{source}" } }
+    expect: *ok
+    returns: ack
+
+  # ── Recorders ───────────────────────────────────────────────────────────
+  list_recorders:
+    summary: "List the channel and multitrack recorders with id, name and whether multi-source (GET /recorders)"
+    send: { method: GET, path: /api/v2.0/recorders }
+    expect: *value
+    returns: value
+  get_recorders_status:
+    summary: "Read every recorder's status: state, duration and active and total tracks (GET /recorders/status)"
+    send: &read_recorders { method: GET, path: /api/v2.0/recorders/status }
+    expect: *value
+    returns: value
+  get_recorder_status:
+    summary: "Read a recorder's status (GET /recorders/{rid}/status)"
+    params:
+      recorder: &recorder { type: string, max_length: 64, required: true, label: Recorder,
+                            description: "The recorder's id (rid), e.g. 1; a channel's recorder or a multitrack recorder." }
+    send: { method: GET, path: "/api/v2.0/recorders/{recorder}/status" }
+    expect: *value
+    returns: value
+  start_recorder:
+    summary: "Start a recorder (POST /recorders/{rid}/control/start, asynchronous), then read every recorder's status"
+    params: { recorder: *recorder }
+    send:
+      - { method: POST, path: "/api/v2.0/recorders/{recorder}/control/start" }
+      - *read_recorders
+    expect: *ok
+    returns: ack
+  stop_recorder:
+    summary: "Stop a recorder (POST /recorders/{rid}/control/stop, asynchronous), then read every recorder's status"
+    params: { recorder: *recorder }
+    send:
+      - { method: POST, path: "/api/v2.0/recorders/{recorder}/control/stop" }
+      - *read_recorders
+    expect: *ok
+    returns: ack
+  start_all_recorders:
+    summary: "Start every recorder (POST /recorders/control/start, asynchronous), then read every recorder's status"
+    send:
+      - { method: POST, path: /api/v2.0/recorders/control/start }
+      - *read_recorders
+    expect: *ok
+    returns: ack
+  stop_all_recorders:
+    summary: "Stop every recorder (POST /recorders/control/stop, asynchronous), then read every recorder's status"
+    send:
+      - { method: POST, path: /api/v2.0/recorders/control/stop }
+      - *read_recorders
+    expect: *ok
+    returns: ack
+  start_recorders:
+    summary: "Start the recorders listed (POST /recorders/control/start?ids=, asynchronous), then read every recorder's status"
+    params:
+      ids: &recorder_ids { type: string, max_length: 512, pattern: '^[A-Za-z0-9_-]+(,[A-Za-z0-9_-]+)*$', required: true, label: Recorders,
+                           description: "Recorder ids separated by commas, e.g. 1,2." }
+    send:
+      - { method: POST, path: /api/v2.0/recorders/control/start, raw_query: "ids={ids}" }
+      - *read_recorders
+    expect: *ok
+    returns: ack
+  stop_recorders:
+    summary: "Stop the recorders listed (POST /recorders/control/stop?ids=, asynchronous), then read every recorder's status"
+    params: { ids: *recorder_ids }
+    send:
+      - { method: POST, path: /api/v2.0/recorders/control/stop, raw_query: "ids={ids}" }
+      - *read_recorders
+    expect: *ok
+    returns: ack
+  list_recorder_files:
+    summary: "List every file a recorder holds: id, name, format, size, duration, creation time and whether recording, downloaded or uploading (GET /recorders/{rid}/archive/files)"
+    params: { recorder: *recorder }
+    send: { method: GET, path: "/api/v2.0/recorders/{recorder}/archive/files" }
+    expect: *value
+    returns: value
+  list_recorder_files_page:
+    summary: "List a page of a recorder's files (GET /recorders/{rid}/archive/files?from=&limit=)"
+    params:
+      recorder: *recorder
+      from: { type: int, min: 0, default: 0, label: From, description: "Index of the first file to list, numbered from 0." }
+      limit: { type: int, min: 1, required: true, label: Limit, description: "The most files to list." }
+    send: { method: GET, path: "/api/v2.0/recorders/{recorder}/archive/files", query: { from: "{from}", limit: "{limit}" } }
+    expect: *value
+    returns: value
+
+  # ── Scheduled and ad-hoc events (CMS) ───────────────────────────────────
+  list_events:
+    summary: "List the CMS events: upcoming, ongoing, paused and completed (GET /schedule/events)"
+    send: { method: GET, path: /api/v2.0/schedule/events }
+    expect: *value
+    returns: value
+  list_events_by_status:
+    summary: "List the CMS events of one status (GET /schedule/events?status=)"
+    params:
+      status: { type: enum, values: [scheduled, running, paused, finished], required: true, label: Status,
+                description: "scheduled (upcoming), running, paused, or finished (assets may still be uploading)." }
+    send: { method: GET, path: /api/v2.0/schedule/events, query: { status: "{status}" } }
+    expect: *value
+    returns: value
+  get_event:
+    summary: "Read an event, by id or by alias (GET /schedule/events/{eventId})"
+    params:
+      event: &event { type: string, max_length: 128, required: true, label: Event,
+                      description: "The event's id, or an alias: upcoming, ongoing, running, paused or completed." }
+    send: &read_event { method: GET, path: "/api/v2.0/schedule/events/{event}" }
+    expect: *value
+    returns: value
+  create_adhoc_event:
+    summary: "Create an ad-hoc event for the configured CMS from an AdhocEventKaltura, AdhocEventPanopto or AdhocEventOpencast object (POST /schedule/events); returns the event"
+    params:
+      event: { type: json, required: true, label: Event,
+               description: "The ad-hoc event as the API document's schema for the configured CMS gives it, e.g. {\"type\":\"vod\",\"title\":\"Lecture\",\"start\":0,\"duration\":3600}." }
+    send: { method: POST, path: /api/v2.0/schedule/events, content_type: application/json, body: "{event}" }
+    expect: *created
+    returns: value
+  start_event:
+    summary: "Start a scheduled event ahead of its start time (POST /schedule/events/{eventId}/control/start), then read it back"
+    params: { event: *event }
+    send:
+      - { method: POST, path: "/api/v2.0/schedule/events/{event}/control/start" }
+      - *read_event
+    expect: *ok
+    returns: ack
+  stop_event:
+    summary: "Stop a running or paused event ahead of its finish time (POST /schedule/events/{eventId}/control/stop), then read it back"
+    params: { event: *event }
+    send:
+      - { method: POST, path: "/api/v2.0/schedule/events/{event}/control/stop" }
+      - *read_event
+    expect: *ok
+    returns: ack
+  pause_event:
+    summary: "Pause a running event (POST /schedule/events/{eventId}/control/pause), then read it back"
+    params: { event: *event }
+    send:
+      - { method: POST, path: "/api/v2.0/schedule/events/{event}/control/pause" }
+      - *read_event
+    expect: *ok
+    returns: ack
+  resume_event:
+    summary: "Resume a paused event (POST /schedule/events/{eventId}/control/resume), then read it back"
+    params: { event: *event }
+    send:
+      - { method: POST, path: "/api/v2.0/schedule/events/{event}/control/resume" }
+      - *read_event
+    expect: *ok
+    returns: ack
+  extend_event:
+    summary: "Extend a running or paused event's finish time (POST /schedule/events/{eventId}/control/extend), then read it back"
+    params:
+      event: *event
+      seconds: { type: int, min: 1, required: true, label: Extension,
+                 description: "Seconds added to the event's current finish time, e.g. 300." }
+    send:
+      - { method: POST, path: "/api/v2.0/schedule/events/{event}/control/extend", content_type: application/json,
+          body: '{"finish":{seconds}}' }
+      - *read_event
+    expect: *ok
+    returns: ack
+  get_adhoc_session:
+    summary: "Read the current ad-hoc login session for the CMS (GET /schedule/events/adhoc/session)"
+    send: &read_adhoc { method: GET, path: /api/v2.0/schedule/events/adhoc/session }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  adhoc_login_kaltura:
+    summary: "Start an ad-hoc login session with Kaltura for a user id or email (POST /schedule/events/adhoc/session); returns the session"
+    params:
+      id: { type: string, max_length: 256, required: true, label: User,
+            description: "The Kaltura user id or email address that ad-hoc events are created for." }
+    send: { method: POST, path: /api/v2.0/schedule/events/adhoc/session, content_type: application/json, body: '{"id":{id:json}}' }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  adhoc_login_panopto:
+    summary: "Start an ad-hoc login session with Panopto (POST /schedule/events/adhoc/session); returns the session"
+    params:
+      id: { type: string, max_length: 256, required: true, label: User,
+            description: "The Panopto account's login." }
+      password: { type: string, max_length: 256, secret: true, required: true, label: Password,
+                  description: "The Panopto account's password, used by the Pearl to obtain an OAuth2 token." }
+    send: { method: POST, path: /api/v2.0/schedule/events/adhoc/session, content_type: application/json,
+            body: '{"id":{id:json},"password":{password:json}}' }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  adhoc_logout:
+    summary: "End the ad-hoc login session (DELETE /schedule/events/adhoc/session), then read the session back"
+    send:
+      - { method: DELETE, path: /api/v2.0/schedule/events/adhoc/session }
+      - *read_adhoc
+    expect: { status: 200 }
+    returns: ack
+
+  # ── System ──────────────────────────────────────────────────────────────
+  get_system_status:
+    summary: "Read the system's date, uptime, CPU load and CPU temperature (GET /system/status)"
+    send: { method: GET, path: /api/v2.0/system/status }
+    expect: *value
+    returns: value
+  get_connectivity:
+    summary: "Check the network: external address, mDNS name and DNS, HTTP, HTTPS, captive portal, ICMP, Epiphan Edge and VTun reachability (GET /system/connectivity/details)"
+    send: { method: GET, path: /api/v2.0/system/connectivity/details }
+    expect: *value
+    returns: value
+  run_speedtest:
+    summary: "Measure the network's uplink or downlink speed over TCP or UDP (GET /system/connectivity/tools/speedtest); returns bandwidth and bitrate limit in bit/s"
+    params:
+      mode: { type: enum, values: [uplink, downlink], default: uplink, label: Direction,
+              description: "uplink measures sending from the Pearl, downlink receiving." }
+      protocol: { type: enum, values: [tcp, udp], default: tcp, label: Protocol,
+                  description: "Measure over TCP (the default) or UDP." }
+      timeout: { type: int, min: 1, default: 30, label: Duration limit,
+                 description: "The longest the test may run, in seconds (30 by default)." }
+    send: { method: GET, path: /api/v2.0/system/connectivity/tools/speedtest,
+            query: { mode: "{mode}", protocol: "{protocol}", timeout: "{timeout}" } }
+    expect: *value
+    returns: value
+  reboot:
+    summary: "Reboot the Pearl (POST /system/control/reboot)"
+    send: { method: POST, path: /api/v2.0/system/control/reboot }
+    expect: *ok
+    returns: ack
+  shutdown:
+    summary: "Shut the Pearl down (POST /system/control/shutdown)"
+    send: { method: POST, path: /api/v2.0/system/control/shutdown }
+    expect: *ok
+    returns: ack
+  factory_reset:
+    summary: "Delete all data and reset every setting to factory defaults (POST /system/control/factoryreset)"
+    send: { method: POST, path: /api/v2.0/system/control/factoryreset }
+    expect: *ok
+    returns: ack
+  get_firmware:
+    summary: "Read the firmware version, revision, product id and product name (GET /system/firmware)"
+    send: { method: GET, path: /api/v2.0/system/firmware }
+    expect: *value
+    returns: value
+  get_firmware_version:
+    summary: "Read the firmware version, e.g. 4.24.1 (GET /system/firmware/version)"
+    send: { method: GET, path: /api/v2.0/system/firmware/version }
+    expect: *value
+    returns: value
+  get_firmware_revision:
+    summary: "Read the firmware revision (GET /system/firmware/revision)"
+    send: { method: GET, path: /api/v2.0/system/firmware/revision }
+    expect: *value
+    returns: value
+  get_product_id:
+    summary: "Read the product identifier, e.g. 44 for Pearl Mini (GET /system/firmware/product_id)"
+    send: { method: GET, path: /api/v2.0/system/firmware/product_id }
+    expect: *value
+    returns: value
+  get_product_name:
+    summary: "Read the product name shown on the Admin panel's Info page (GET /system/firmware/product_name)"
+    send: { method: GET, path: /api/v2.0/system/firmware/product_name }
+    expect: *value
+    returns: value
+  get_ident:
+    summary: "Read the device's name, location and description (GET /system/ident)"
+    send: { method: GET, path: /api/v2.0/system/ident }
+    expect: *value
+    returns: value
+  list_single_touch:
+    summary: "List the Single Touch control objects (GET /system/singletouchcontrol)"
+    send: { method: GET, path: /api/v2.0/system/singletouchcontrol }
+    expect: *value
+    returns: value
+  get_single_touch_state:
+    summary: "Read a Single Touch control's state: pressed, all started without error, and its recorders' and publishers' totals (GET /system/singletouchcontrol/{stcid}/state)"
+    params:
+      control: &single_touch_control { type: string, max_length: 64, default: "0", label: Single Touch control,
+                                       description: "The Single Touch control object's id; 0, the only one the document shows." }
+    send: &read_single_touch { method: GET, path: "/api/v2.0/system/singletouchcontrol/{control}/state" }
+    expect: *value
+    returns: value
+  toggle_single_touch:
+    summary: "Press the Single Touch control, starting or stopping every recorder and publisher in it (POST /system/singletouchcontrol/{stcid}/control/toggle), then read its state back"
+    params: { control: *single_touch_control }
+    send:
+      - { method: POST, path: "/api/v2.0/system/singletouchcontrol/{control}/control/toggle" }
+      - *read_single_touch
+    expect: *ok
+    returns: ack
+  list_presets:
+    summary: "List the configuration presets with description, sections, hash, size and whether read-only (GET /system/presets?details=true)"
+    send: &read_presets { method: GET, path: /api/v2.0/system/presets, query: { details: "true" } }
+    expect: *value
+    returns: value
+  apply_preset:
+    summary: "Apply every section of a configuration preset (POST /system/presets/{pid}/control/apply); returns whether the Pearl reboots"
+    params:
+      preset: &preset { type: string, max_length: 128, required: true, label: Preset,
+                        description: "The preset's name as the preset list gives it, e.g. Default." }
+    send: { method: POST, path: "/api/v2.0/system/presets/{preset}/control/apply" }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.result.reboot" }
+    returns: value
+  apply_preset_sections:
+    summary: "Apply some sections of a configuration preset (POST /system/presets/{pid}/control/apply with sections); returns whether the Pearl reboots"
+    params:
+      preset: *preset
+      sections: { type: json, required: true, label: Sections,
+                  description: "A JSON array of the preset's sections to apply, e.g. [\"channels\",\"sources\"]; the preset list names each preset's sections (system, network, sources, edid, channels, afu, cms, avstudio, frontscreen, displays)." }
+    send: { method: POST, path: "/api/v2.0/system/presets/{preset}/control/apply", content_type: application/json,
+            body: '{"sections":{sections}}' }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.result.reboot" }
+    returns: value
+  list_storages:
+    summary: "List the storages: main, external and maintenance (GET /system/storages)"
+    send: { method: GET, path: /api/v2.0/system/storages }
+    expect: *value
+    returns: value
+  get_storage_status:
+    summary: "Read a storage's state and its total and free bytes (GET /system/storages/{stid}/status)"
+    params:
+      storage: &storage { type: enum, values: [main, external, maintenance], required: true, label: Storage,
+                          description: "main (internal), external (a USB drive) or maintenance." }
+    send: &read_storage { method: GET, path: "/api/v2.0/system/storages/{storage}/status" }
+    expect: *value
+    returns: value
+  eject_storage:
+    summary: "Safely eject a storage so it can be removed (POST /system/storages/{stid}/control/eject), then read its status back"
+    params: { storage: *storage }
+    send:
+      - { method: POST, path: "/api/v2.0/system/storages/{storage}/control/eject" }
+      - *read_storage
+    expect: *ok
+    returns: ack
+  get_storage_transfer_status:
+    summary: "Read the progress of files being copied to a storage, with its status (GET /system/storages/{stid}/transfer/status?storage=true)"
+    params: { storage: *storage }
+    send: { method: GET, path: "/api/v2.0/system/storages/{storage}/transfer/status", query: { storage: "true" } }
+    expect: *value
+    returns: value
+  list_afu:
+    summary: "List the Automatic File Upload destinations (GET /afu)"
+    send: { method: GET, path: /api/v2.0/afu }
+    expect: *value
+    returns: value
+  get_afu_status:
+    summary: "Read every Automatic File Upload destination's state, protocol, queue and current file (GET /afu/status)"
+    send: { method: GET, path: /api/v2.0/afu/status }
+    expect: *value
+    returns: value
+  get_afu_destination_status:
+    summary: "Read one Automatic File Upload destination's status (GET /afu/{aid}/status)"
+    params:
+      afu: { type: string, max_length: 64, default: "0", label: Upload destination,
+             description: "The upload destination's id; 0, the only one as of firmware 4.24.1." }
+    send: { method: GET, path: "/api/v2.0/afu/{afu}/status" }
+    expect: *value
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Every request carries HTTP Basic credentials; the administrator's user
+      name is admin, and an operator account can be used for day-to-day
+      control (viewers are read-only). Only a 401 is taken as a refused
+      credential; a 403 fails that request alone. Port 80 serves the API by
+      default; HTTPS on 443 is off until enabled in the Admin panel, and its
+      certificate is not checked. Every JSON reply holds status: ok, or
+      notfound, badrequest, notallowed, conflict, internalservererror,
+      unavailable or error with a message, beside the matching HTTP status.
+  - models: [all]
+    severity: info
+    text: >
+      Start and stop commands for publishers, recorders and the Single Touch
+      control return before the change happens: the read that follows them
+      can still show starting or the old state, and the 2-second poll shows
+      the result.
+  - models: [all]
+    severity: info
+    text: >
+      API limits: the REST API cannot write a channel's encoding (resolution,
+      frame rate, bitrate, codecs; read-only in encoders), the device's name,
+      location and description, network configuration, users and passwords,
+      or layouts other than choosing the active one by id, and it has no list
+      of a channel's layouts (only the active one is read). There is no
+      command to delete an input, and no way to read which source an output
+      shows: output_sources holds the last source set through this API.
+  - models: [all]
+    severity: info
+    text: >
+      A PATCH of publisher or input settings answers in a different, flattened
+      shape than the GET (publishers: started, single-touch, disable-audio...;
+      analog inputs: audio.gain, audio.mute), so every typed PATCH is followed
+      by the GET of the settings. GET /channels with publishers-settings uses
+      the same flattened shape; state takes publisher settings from each
+      publisher's own GET instead.
+  - models: [all]
+    severity: warning
+    text: >
+      Per the document's examples, input settings cannot be read (GET answers
+      405) for HDMI, SDI, HDMI 4K, SDI 4K, USB, NDI and web graphics inputs,
+      and cannot be patched (PATCH answers 405) for those and RTSP inputs.
+      state holds settings for SRT, RTSP and analog audio inputs; the others
+      are changed with set_input_settings or set_usb_camera_settings (a PUT
+      replacing the whole section) and are not read back.
+  - models: [all]
+    severity: info
+    text: >
+      Passwords and passphrases the API returns in publisher and input
+      settings (RTMP, RTSP and HLS passwords, SRT passphrases) are not kept
+      in state; the SRT key length is.
+  - models: [all]
+    severity: warning
+    text: >
+      Preview images (GET /channels/{cid}/preview, /inputs/{sid}/preview,
+      /outputs/{did}/preview) and recorded file downloads (GET
+      /recorders/{rid}/archive/files/{fid}) answer with binary bodies, which
+      this integration does not offer.
+  - models: [all]
+    severity: warning
+    text: >
+      run_speedtest can take as long as its duration limit (30 seconds by
+      default), longer than the 5-second request timeout, so its command can
+      time out while the test runs on; it also loads the network the Pearl
+      streams over. get_connectivity makes the Pearl test outside services
+      and is not polled: its state is current as of its last run.
+  - models: [all]
+    severity: critical
+    text: >
+      stop_publisher, stop_channel_publishers and stop_event end live
+      streams at once; stop_recorder, stop_recorders, stop_all_recorders and
+      stop_event end recordings mid-take; toggle_single_touch starts or stops
+      every recorder and publisher in the Single Touch control, depending on
+      its state.
+  - models: [all]
+    severity: critical
+    text: >
+      reboot and shutdown end every stream and recording (shutdown needs
+      someone at the unit to power it on again); factory_reset deletes all
+      data, recordings included, and every setting; apply_preset and
+      apply_preset_sections replace the configuration of the sections applied
+      and may reboot the Pearl (the reply says so).
+  - models: [all]
+    severity: warning
+    text: >
+      delete_publisher removes a publisher and its settings for good; eject_storage
+      unmounts the external drive, which recording to it stops using.
+  - models: [all]
+    severity: info
+    text: >
+      Channel, publisher, input, output and recorder ids are strings the
+      Pearl assigns; the ones the input list gives (e.g. D2P496187.hdmi-a)
+      are used as they are in input requests, where the document's examples
+      use short forms (hdmi-a). The publisher, input and event lists are read
+      whole and replace what state held; the ad-hoc session reply has no
+      status member in the document.
+
+state:
+  # Channels (60-second poll, and read back by set_active_layout and set_channel_name)
+  channels.*.name:                          { type: string, description: "The channel's display name, keyed by channel id" }
+  channels.*.active_layout.id:              { type: string, description: "The id of the channel's active layout" }
+  channels.*.active_layout.name:            { type: string, description: "The name of the channel's active layout" }
+  channels.*.active_layout.sources.video.*.id:   { type: string, description: "A video source of the active layout, in the layout's order from 0: its input id" }
+  channels.*.active_layout.sources.video.*.name: { type: string, description: "That video source's name" }
+  channels.*.active_layout.sources.audio.*.id:   { type: string, description: "An audio source of the active layout, in the layout's order from 0: its input id" }
+  channels.*.active_layout.sources.audio.*.name: { type: string, description: "That audio source's name" }
+  channels.*.encoders.*.type:               { type: string, description: "video or audio, keyed by encoder id" }
+  channels.*.encoders.*.name:               { type: string, description: "The codec, e.g. H.264 or AAC" }
+  channels.*.encoders.*.resolution:         { type: string, description: "Video encoding resolution, widthxheight" }
+  channels.*.encoders.*.framerate:          { type: float, unit: fps, description: "Video encoding frame rate" }
+  channels.*.encoders.*.bitrate:            { type: int, unit: kbit/s, description: "Encoding bitrate" }
+  channels.*.encoders.*.channels:           { type: int, description: "Audio channels: 1 mono, 2 stereo" }
+  # Publishers (2-second poll)
+  publishers.*.*.type:                      { type: string, description: "rtsp, rtmp, rtp-udp, mpegts-udp, mpegts-rtp, ndi, hls or srt; keyed by channel id, then publisher id" }
+  publishers.*.*.name:                      { type: string, description: "The publisher's display name" }
+  publishers.*.*.is_configured:             { type: bool, description: "The publisher is properly configured" }
+  publishers.*.*.started:                   { type: bool, description: "The publisher is running" }
+  publishers.*.*.state:                     { type: string, description: "starting, listening, started, stopped or error" }
+  publishers.*.*.description:               { type: string, description: "The error's description when state is error" }
+  publishers.*.*.duration:                  { type: int, unit: s, description: "How long the publisher has been streaming" }
+  publishers.*.*.since:                     { type: int, unit: s, description: "When the publisher started, in Unix seconds" }
+  publishers.*.*.reconnections:             { type: int, description: "Reconnections during the streaming" }
+  publishers.*.*.warnings.*.text:           { type: string, description: "A warning the publisher reports, in the device's order from 0" }
+  publishers.*.*.statistics.total.duration:      { type: int, unit: s, description: "SRT: seconds the statistics cover" }
+  publishers.*.*.statistics.total.pkt_sent:      { type: int, description: "SRT: packets sent" }
+  publishers.*.*.statistics.total.pkt_loss:      { type: int, description: "SRT: packets lost" }
+  publishers.*.*.statistics.total.pkt_retrans:   { type: int, description: "SRT: packets retransmitted" }
+  publishers.*.*.statistics.total.pkt_drop:      { type: int, description: "SRT: packets dropped" }
+  publishers.*.*.statistics.total.latency:       { type: int, unit: ms, description: "SRT: latency" }
+  publishers.*.*.statistics.total.byte_sent:     { type: int, unit: bytes, description: "SRT: bytes sent" }
+  publishers.*.*.statistics.total.byte_retrans:  { type: int, unit: bytes, description: "SRT: bytes retransmitted" }
+  publishers.*.*.statistics.total.byte_drop:     { type: int, unit: bytes, description: "SRT: bytes dropped" }
+  publishers.*.*.statistics.current.duration:    { type: int, unit: s, description: "SRT: seconds the current window covers" }
+  publishers.*.*.statistics.current.send_rate:   { type: float, unit: Mbit/s, description: "SRT: current send rate (unit not stated by the document)" }
+  publishers.*.*.statistics.current.loss_ratio:  { type: float, description: "SRT: current loss ratio" }
+  publishers.*.*.statistics.current.retrans_ratio: { type: float, description: "SRT: current retransmission ratio" }
+  publishers.*.*.statistics.current.drop_ratio:  { type: float, description: "SRT: current drop ratio" }
+  publishers.*.*.statistics.current.latency:     { type: int, unit: ms, description: "SRT: current latency" }
+  publishers.*.*.statistics.current.rtt:         { type: float, description: "SRT: current round-trip time (unit not stated by the document)" }
+  publishers.*.*.statistics.current.estimated_bandwidth: { type: float, unit: Mbit/s, description: "SRT: estimated link bandwidth (unit not stated by the document)" }
+  publishers.*.*.statistics.current.send_buffer: { type: int, description: "SRT: send buffer" }
+  publishers.*.*.statistics.current.stream_id:   { type: string, description: "SRT: the stream id in use" }
+  publishers.*.*.statistics.current.ip:          { type: string, description: "SRT: the peer's address" }
+  # Publisher settings (each publisher's GET, 60-second poll and every settings command)
+  publisher_settings.*.*.type:              { type: string, description: "The publisher's type, keyed by channel id, then publisher id" }
+  publisher_settings.*.*.common.enabled:    { type: bool, description: "The publisher is enabled" }
+  publisher_settings.*.*.common.single_touch: { type: bool, description: "The publisher starts and stops with Single Touch" }
+  publisher_settings.*.*.rtmp.url:          { type: string, description: "RTMP server URL" }
+  publisher_settings.*.*.rtmp.stream:       { type: string, description: "RTMP stream name or key" }
+  publisher_settings.*.*.rtmp.username:     { type: string, description: "RTMP user name" }
+  publisher_settings.*.*.rtmp.disable_audio: { type: bool, description: "RTMP: video only" }
+  publisher_settings.*.*.rtmp.auto_created: { type: bool, description: "RTMP: the publisher was created automatically (by a CMS event)" }
+  publisher_settings.*.*.rtsp.url:          { type: string, description: "RTSP announce URL" }
+  publisher_settings.*.*.rtsp.transport:    { type: string, description: "RTSP transport, udp or tcp" }
+  publisher_settings.*.*.rtsp.username:     { type: string, description: "RTSP user name" }
+  publisher_settings.*.*.rtsp.disable_audio: { type: bool, description: "RTSP: video only" }
+  publisher_settings.*.*.*.address:         { type: string, description: "rtp_udp, mpegts_udp or mpegts_rtp: destination address" }
+  publisher_settings.*.*.*.port:            { type: int, description: "mpegts_udp or mpegts_rtp: destination port; srt: listening port" }
+  publisher_settings.*.*.*.audio_port:      { type: int, description: "rtp_udp: audio destination port" }
+  publisher_settings.*.*.*.video_port:      { type: int, description: "rtp_udp: video destination port" }
+  publisher_settings.*.*.*.sap:             { type: bool, description: "rtp_udp, mpegts_udp or mpegts_rtp: SAP announcement on" }
+  publisher_settings.*.*.*.sap_ip:          { type: string, description: "SAP announcement address" }
+  publisher_settings.*.*.*.sap_channel:     { type: int, description: "SAP channel" }
+  publisher_settings.*.*.*.sap_play_group:  { type: string, description: "SAP play group" }
+  publisher_settings.*.*.*.limit_bandwidth: { type: bool, description: "Bandwidth limit on" }
+  publisher_settings.*.*.*.limit_bandwidth_rate: { type: int, unit: kbit/s, description: "Bandwidth limit" }
+  publisher_settings.*.*.ndi.ndi_name:      { type: string, description: "NDI source name" }
+  publisher_settings.*.*.ndi.ndi_group:     { type: string, description: "NDI group" }
+  publisher_settings.*.*.ndi.disable_audio: { type: bool, description: "NDI: video only" }
+  publisher_settings.*.*.hls.url:           { type: string, description: "HLS upload URL" }
+  publisher_settings.*.*.hls.master_pl_url: { type: string, description: "HLS master playlist URL" }
+  publisher_settings.*.*.hls.username:      { type: string, description: "HLS server user name" }
+  publisher_settings.*.*.hls.segment_duration: { type: int, unit: s, description: "HLS segment duration, 1 to 8" }
+  publisher_settings.*.*.hls.list_size:     { type: int, description: "HLS playlist length in segments" }
+  publisher_settings.*.*.hls.user_agent:    { type: string, description: "HLS HTTP user agent" }
+  publisher_settings.*.*.hls.http_method:   { type: string, description: "HLS upload method, e.g. POST" }
+  publisher_settings.*.*.hls.media_seg_tmpl: { type: string, description: "HLS media segment name template" }
+  publisher_settings.*.*.hls.disable_audio: { type: bool, description: "HLS: video only" }
+  publisher_settings.*.*.srt.mode:          { type: string, description: "SRT mode: caller, listener or rendezvous" }
+  publisher_settings.*.*.srt.url:           { type: string, description: "SRT destination URL (caller, rendezvous)" }
+  publisher_settings.*.*.srt.stream_id:     { type: string, description: "SRT stream id (caller)" }
+  publisher_settings.*.*.srt.source_port:   { type: int, description: "SRT source port (caller), 0 for any" }
+  publisher_settings.*.*.srt.latency:       { type: int, unit: ms, description: "SRT latency" }
+  publisher_settings.*.*.srt.bw_recovery_overhead: { type: int, unit: "%", description: "SRT bandwidth recovery overhead" }
+  publisher_settings.*.*.srt.keylength:     { type: int, unit: bits, description: "SRT encryption key length; absent when encryption is off" }
+  publisher_settings.*.*.srt.disable_audio: { type: bool, description: "SRT: video only" }
+  # Inputs (60-second poll)
+  inputs.*.name:                            { type: string, description: "The input's display name, keyed by input id" }
+  inputs.*.real_device_name:                { type: string, description: "The input's default device name" }
+  inputs.*.type:                            { type: string, description: "embedded, usb, rtsp, ndi, srt or web-graphics" }
+  inputs.*.audio:                           { type: bool, description: "The input carries audio" }
+  inputs.*.video:                           { type: bool, description: "The input carries video" }
+  input_settings.*.audio.delay:             { type: int, unit: ms, description: "Audio delay, keyed by input id" }
+  input_settings.*.video.nosignal.image:    { type: string, description: "File name of the No Signal picture" }
+  input_settings.*.video.nosignal.timeout:  { type: int, unit: s, description: "Seconds without signal before the No Signal picture" }
+  input_settings.*.video.force_full_color_range: { type: bool, description: "Limited range is converted to full range" }
+  input_settings.*.video.hwaccel_decoding:  { type: bool, description: "Hardware decoding" }
+  input_settings.*.srt.mode:                { type: string, description: "SRT mode: listener, caller or rendezvous" }
+  input_settings.*.srt.latency:             { type: int, unit: ms, description: "SRT latency" }
+  input_settings.*.srt.keylength:           { type: int, unit: bits, description: "SRT key length; absent when encryption is off" }
+  input_settings.*.srt.port:                { type: int, description: "SRT listening port (listener)" }
+  input_settings.*.srt.url:                 { type: string, description: "SRT source URL (caller, rendezvous)" }
+  input_settings.*.srt.stream_id:           { type: string, description: "SRT stream id (caller)" }
+  input_settings.*.srt.source_port:         { type: int, description: "SRT source port (caller), 0 for any" }
+  input_settings.*.srt.ts_utc_midnight_origin: { type: bool, description: "SRT timestamps from UTC midnight" }
+  input_settings.*.rtsp.url:                { type: string, description: "RTSP source URL" }
+  input_settings.*.rtsp.username:           { type: string, description: "RTSP user name" }
+  input_settings.*.rtsp.transport:          { type: string, description: "RTSP transport: udp, tcp or udp_multicast" }
+  input_settings.*.local_audio.gain:        { type: int, description: "Capture gain (dB or percent), both channels when paired" }
+  input_settings.*.local_audio.mute:        { type: bool, description: "Capture muted, both channels when paired" }
+  input_settings.*.local_audio.phantom_power: { type: bool, description: "48 V phantom power on" }
+  input_settings.*.local_audio.input_type:  { type: string, description: "Connector: XLR, RCA, XLR+RCA, 3.5mm or RCA+3.5mm" }
+  input_settings.*.local_audio.stereo_pair: { type: bool, description: "Both channels share gain and mute" }
+  input_settings.*.local_audio.channels.*.gain: { type: int, unit: dB, description: "A channel's gain, channelA or channelB" }
+  input_settings.*.local_audio.channels.*.mute: { type: bool, description: "A channel's capture muted" }
+  input_settings.*.ndi.group:               { type: string, description: "NDI group of the source" }
+  input_settings.*.ndi.name:                { type: string, description: "NDI source name" }
+  input_settings.*.ndi.extra_source_ip_addresses: { type: string, description: "Addresses asked for the NDI source, comma-separated" }
+  input_settings.*.ndi.ignore_timecode:     { type: bool, description: "NDI timecode ignored" }
+  input_settings.*.web_graphics.url:        { type: string, description: "Web graphics page URL" }
+  input_settings.*.web_graphics.resolution: { type: string, description: "Web graphics rendering resolution" }
+  input_settings.*.web_graphics.fps:        { type: int, unit: fps, description: "Web graphics rendering rate" }
+  input_settings.*.hdmi.deinterlacing:      { type: bool, description: "HDMI deinterlacing" }
+  input_settings.*.hdmi.downscale_4k_to_fullhd: { type: bool, description: "HDMI 4K downscaled to 1080p" }
+  input_settings.*.hdmi.scaling:            { type: string, description: "HDMI scaling resolution" }
+  input_settings.*.hdmi.audio.mute:         { type: bool, description: "HDMI audio muted" }
+  input_settings.*.hdmi.audio.delay:        { type: int, unit: ms, description: "HDMI audio delay" }
+  input_settings.*.sdi.downscale_4k_to_fullhd: { type: bool, description: "SDI 4K downscaled to 1080p" }
+  input_settings.*.sdi.scaling:             { type: string, description: "SDI scaling resolution" }
+  input_settings.*.sdi.audio.mute:          { type: bool, description: "SDI audio muted" }
+  input_settings.*.sdi.audio.delay:         { type: int, unit: ms, description: "SDI audio delay" }
+  input_settings.*.usb.capture_mode:        { type: string, description: "USB capture mode, widthxheight@fps" }
+  input_settings.*.usb.brightness:          { type: int, description: "USB camera brightness, 0 to 100" }
+  input_settings.*.usb.contrast:            { type: int, description: "USB camera contrast, 0 to 100" }
+  input_settings.*.usb.saturation:          { type: int, description: "USB camera saturation, 0 to 100" }
+  input_settings.*.usb.sharpness:           { type: int, description: "USB camera sharpness, 0 to 100" }
+  input_settings.*.usb.pan:                 { type: int, description: "USB camera pan, -64 to 64" }
+  input_settings.*.usb.tilt:                { type: int, description: "USB camera tilt, -64 to 64" }
+  input_settings.*.usb.power_line_frequency: { type: int, description: "USB flicker reduction: 0 off, 1 50 Hz, 2 60 Hz" }
+  input_settings.*.usb.volume:              { type: int, unit: "%", description: "USB capture volume" }
+  # Outputs (60-second poll; the source as last set through this API)
+  outputs.*.name:                           { type: string, description: "The output's name, keyed by output id" }
+  output_sources.*:                         { type: string, description: "The source last set on the output through this API (the API cannot read it), keyed by output id" }
+  # Recorders
+  recorders.*.name:                         { type: string, description: "The recorder's name, keyed by recorder id (60-second poll)" }
+  recorders.*.multisource:                  { type: bool, description: "A multitrack (multi-source) recorder" }
+  recorder_status.*.name:                   { type: string, description: "The recorder's name, keyed by recorder id (2-second poll)" }
+  recorder_status.*.state:                  { type: string, description: "disabled, starting, started, stopped or error" }
+  recorder_status.*.description:            { type: string, description: "The error's description when state is error" }
+  recorder_status.*.duration:               { type: int, unit: s, description: "How long the recording has run" }
+  recorder_status.*.active:                 { type: string, description: "Tracks recording" }
+  recorder_status.*.total:                  { type: string, description: "Tracks in the recorder" }
+  recorder_files.*.*.name:                  { type: string, description: "A recorded file's name, keyed by recorder id, then file id (60-second poll)" }
+  recorder_files.*.*.extension:             { type: string, description: "The file's format, e.g. mp4" }
+  recorder_files.*.*.recording:             { type: bool, description: "The file is being recorded" }
+  recorder_files.*.*.downloaded:            { type: bool, description: "The file has been downloaded" }
+  recorder_files.*.*.uploading:             { type: bool, description: "The file is being uploaded" }
+  recorder_files.*.*.created:               { type: string, description: "When the file was created, ISO 8601" }
+  recorder_files.*.*.duration:              { type: int, unit: s, description: "The file's duration" }
+  recorder_files.*.*.size:                  { type: int, unit: bytes, description: "The file's size" }
+  recorder_files.*.*.event_id:              { type: string, description: "The event the file was recorded in, empty if none" }
+  # Events (10-second poll)
+  events.*.status:                          { type: string, description: "scheduled, running, paused or finished, keyed by event id" }
+  events.*.title:                           { type: string, description: "The event's title" }
+  events.*.start:                           { type: int, unit: s, description: "Scheduled or actual start, Unix seconds" }
+  events.*.finish:                          { type: int, unit: s, description: "Scheduled or actual finish, Unix seconds" }
+  events.*.tags:                            { type: string, description: "The event's tags" }
+  events.*.recorders.*.id:                  { type: string, description: "A channel recorded by the event, in the event's order from 0" }
+  adhoc_session.id:                         { type: string, description: "The ad-hoc session's CMS user id (60-second poll)" }
+  adhoc_session.name:                       { type: string, description: "The ad-hoc session user's full name" }
+  adhoc_session.default_folder:             { type: string, description: "Panopto: the default folder" }
+  adhoc_session.created:                    { type: int, unit: s, description: "When the session was created, Unix seconds" }
+  adhoc_session.expired:                    { type: int, unit: s, description: "When the session expires, Unix seconds" }
+  # System
+  system.date:                              { type: string, description: "The Pearl's clock, ISO 8601 (10-second poll)" }
+  system.uptime:                            { type: int, unit: s, description: "Time since the last reboot" }
+  system.cpuload:                           { type: int, unit: "%", description: "CPU load" }
+  system.cpuload_high:                      { type: bool, description: "CPU load is high" }
+  system.cputemp:                           { type: float, unit: "°C", description: "CPU temperature" }
+  system.cputemp_threshold:                 { type: float, unit: "°C", description: "Temperature above which the CPU is too hot" }
+  firmware.version:                         { type: string, description: "Firmware version (60-second poll)" }
+  firmware.revision:                        { type: string, description: "Firmware revision" }
+  firmware.product_id:                      { type: int, description: "Product identifier" }
+  firmware.product_name:                    { type: string, description: "Product name" }
+  ident.name:                               { type: string, description: "The device's name (60-second poll)" }
+  ident.location:                           { type: string, description: "The device's location" }
+  ident.description:                        { type: string, description: "The device's description" }
+  connectivity.external_ip:                 { type: string, description: "External address, as of the last get_connectivity" }
+  connectivity.mdns:                        { type: string, description: "mDNS name" }
+  connectivity.dns:                         { type: string, description: "DNS: disabled, ok or error" }
+  connectivity.http:                        { type: string, description: "HTTP reachability: disabled, ok or error" }
+  connectivity.https:                       { type: string, description: "HTTPS reachability: disabled, ok or error" }
+  connectivity.captive_portal:              { type: string, description: "Captive portal check: disabled, ok or error" }
+  connectivity.icmp:                        { type: string, description: "ICMP reachability: disabled, ok or error" }
+  connectivity.epiphan_edge:                { type: string, description: "Epiphan Edge reachability: disabled, ok or error" }
+  connectivity.vtun:                        { type: string, description: "VTun reachability: disabled, ok or error" }
+  speedtest.protocol:                       { type: string, description: "The last speed test's protocol" }
+  speedtest.mode:                           { type: string, description: "The last speed test's direction" }
+  speedtest.bandwidth:                      { type: int, unit: bit/s, description: "The last speed test's bandwidth" }
+  speedtest.bitrate_limit:                  { type: int, unit: bit/s, description: "The last speed test's bitrate limit" }
+  speedtest.duration:                       { type: int, unit: s, description: "The last speed test's duration" }
+  speedtest.udp_loss:                       { type: int, description: "The last UDP speed test's loss" }
+  single_touch.*.pressed:                   { type: bool, description: "The Single Touch control is on, keyed by its id (2-second poll)" }
+  single_touch.*.status:                    { type: bool, description: "All its recorders and publishers started without error" }
+  single_touch.*.recorders.total:           { type: int, description: "Recorders in the control" }
+  single_touch.*.recorders.active:          { type: int, description: "Recorders running" }
+  single_touch.*.recorders.success:         { type: int, description: "Recorders without errors" }
+  single_touch.*.publishers.total:          { type: int, description: "Publishers in the control" }
+  single_touch.*.publishers.active:         { type: int, description: "Publishers running" }
+  single_touch.*.publishers.success:        { type: int, description: "Publishers without errors" }
+  presets.*.description:                    { type: string, description: "A preset's description, keyed by preset name (60-second poll)" }
+  presets.*.sections.*:                     { type: string, description: "A section the preset holds, in its order from 0" }
+  presets.*.hash:                           { type: string, description: "The preset's hash" }
+  presets.*.size:                           { type: int, unit: bytes, description: "The preset's size" }
+  presets.*.readonly:                       { type: bool, description: "The preset cannot be changed" }
+  storages.*.state:                         { type: string, description: "ready, nodev, dev, devro or formatting; keyed by storage id (10-second poll)" }
+  storages.*.total:                         { type: int, unit: bytes, description: "Storage size" }
+  storages.*.free:                          { type: int, unit: bytes, description: "Free space" }
+  storages.*.transfer.state:                { type: string, description: "Copy to the storage: completed, disabled, nomedia or running" }
+  storages.*.transfer.started:              { type: string, description: "When the copy session started, ISO 8601" }
+  storages.*.transfer.completed:            { type: string, description: "When it completed, ISO 8601" }
+  storages.*.transfer.total_count:          { type: int, description: "Files to copy" }
+  storages.*.transfer.total_size:           { type: int, unit: bytes, description: "Bytes to copy" }
+  storages.*.transfer.processed_count:      { type: int, description: "Files copied" }
+  storages.*.transfer.processed_size:       { type: int, unit: bytes, description: "Bytes copied" }
+  afu.*.state:                              { type: string, description: "idle, paused, uploading, error or disabled; keyed by upload destination id (10-second poll)" }
+  afu.*.protocol:                           { type: string, description: "Upload protocol, e.g. ftp, s3, webdav, usbcopy, kaltura" }
+  afu.*.queue_files:                        { type: int, description: "Files waiting to upload" }
+  afu.*.queue_size:                         { type: int, unit: bytes, description: "Bytes waiting to upload" }
+  afu.*.file.recorder:                      { type: string, description: "The uploading file's recorder" }
+  afu.*.file.id:                            { type: string, description: "The uploading file's id" }
+  afu.*.file.uploaded:                      { type: int, unit: bytes, description: "Bytes of it uploaded (not every protocol says)" }
+  afu.*.file.size:                          { type: int, unit: bytes, description: "Its size" }
+  afu.*.error:                              { type: string, description: "The upload error's message" }
+
+telemetry:
+  # The Pearl pushes nothing: status every 2 seconds, system, storage, uploads
+  # and events every 10, configuration every minute. List replies name each
+  # item, whose own reads are queued with then_send.
+  poll:
+    - every_ms: 2000
+      send:
+        - { method: GET, path: /api/v2.0/channels, query: { publishers: "true", publishers-status: "true" } }
+        - { method: GET, path: /api/v2.0/recorders/status }
+        - { method: GET, path: /api/v2.0/system/singletouchcontrol }
+    - every_ms: 10000
+      send:
+        - { method: GET, path: /api/v2.0/system/status }
+        - { method: GET, path: /api/v2.0/afu/status }
+        - { method: GET, path: /api/v2.0/system/storages }
+        - { method: GET, path: /api/v2.0/schedule/events }
+    - every_ms: 60000
+      send:
+        - { method: GET, path: /api/v2.0/channels, query: { publishers: "true", encoders: "true", active_layout: "true" } }
+        - { method: GET, path: /api/v2.0/inputs }
+        - { method: GET, path: /api/v2.0/outputs }
+        - { method: GET, path: /api/v2.0/recorders }
+        - { method: GET, path: /api/v2.0/system/firmware }
+        - { method: GET, path: /api/v2.0/system/ident }
+        - { method: GET, path: /api/v2.0/system/presets, query: { details: "true" } }
+        - { method: GET, path: /api/v2.0/schedule/events/adhoc/session }
+  updates:
+    # ── Publishers' status, every channel at once ──
+    - path: '^/api/v2\.0/channels\?publishers=true&publishers-status=true$'
+      json_match: { "$.status": "^ok$" }
+      json: {}
+      replace: publishers
+    - path: '^/api/v2\.0/channels\?publishers=true&publishers-status=true$'
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.result[*].publishers"
+      json:
+        cid: "$^.id"
+        pid: "$.id"
+        type: "$.type"
+        name: "$.name"
+        configured: "$.status.is_configured"
+        started: "$.status.started"
+        st: "$.status.state"
+        description: "$.status.description"
+        duration: "$.status.duration"
+        since: "$.status.since"
+        reconnections: "$.status.reconnections"
+        t_duration: "$.status.statistics.total.duration"
+        t_pkt_sent: "$.status.statistics.total.pkt_sent"
+        t_pkt_loss: "$.status.statistics.total.pkt_loss"
+        t_pkt_retrans: "$.status.statistics.total.pkt_retrans"
+        t_pkt_drop: "$.status.statistics.total.pkt_drop"
+        t_latency: "$.status.statistics.total.latency"
+        t_byte_sent: "$.status.statistics.total.byte_sent"
+        t_byte_retrans: "$.status.statistics.total.byte_retrans"
+        t_byte_drop: "$.status.statistics.total.byte_drop"
+        c_duration: "$.status.statistics.current.duration"
+        c_send_rate: "$.status.statistics.current.send_rate"
+        c_loss_ratio: "$.status.statistics.current.loss_ratio"
+        c_retrans_ratio: "$.status.statistics.current.retrans_ratio"
+        c_drop_ratio: "$.status.statistics.current.drop_ratio"
+        c_latency: "$.status.statistics.current.latency"
+        c_rtt: "$.status.statistics.current.rtt"
+        c_bandwidth: "$.status.statistics.current.estimated_bandwidth"
+        c_send_buffer: "$.status.statistics.current.send_buffer"
+        c_stream_id: "$.status.statistics.current.stream_id"
+        c_ip: "$.status.statistics.current.ip"
+      state:
+        "publishers.{cid}.{pid}.type": "{type}"
+        "publishers.{cid}.{pid}.name": "{name}"
+        "publishers.{cid}.{pid}.is_configured": "{configured}"
+        "publishers.{cid}.{pid}.started": "{started}"
+        "publishers.{cid}.{pid}.state": "{st}"
+        "publishers.{cid}.{pid}.description": "{description}"
+        "publishers.{cid}.{pid}.duration": "{duration}"
+        "publishers.{cid}.{pid}.since": "{since}"
+        "publishers.{cid}.{pid}.reconnections": "{reconnections}"
+        "publishers.{cid}.{pid}.statistics.total.duration": "{t_duration}"
+        "publishers.{cid}.{pid}.statistics.total.pkt_sent": "{t_pkt_sent}"
+        "publishers.{cid}.{pid}.statistics.total.pkt_loss": "{t_pkt_loss}"
+        "publishers.{cid}.{pid}.statistics.total.pkt_retrans": "{t_pkt_retrans}"
+        "publishers.{cid}.{pid}.statistics.total.pkt_drop": "{t_pkt_drop}"
+        "publishers.{cid}.{pid}.statistics.total.latency": "{t_latency}"
+        "publishers.{cid}.{pid}.statistics.total.byte_sent": "{t_byte_sent}"
+        "publishers.{cid}.{pid}.statistics.total.byte_retrans": "{t_byte_retrans}"
+        "publishers.{cid}.{pid}.statistics.total.byte_drop": "{t_byte_drop}"
+        "publishers.{cid}.{pid}.statistics.current.duration": "{c_duration}"
+        "publishers.{cid}.{pid}.statistics.current.send_rate": "{c_send_rate}"
+        "publishers.{cid}.{pid}.statistics.current.loss_ratio": "{c_loss_ratio}"
+        "publishers.{cid}.{pid}.statistics.current.retrans_ratio": "{c_retrans_ratio}"
+        "publishers.{cid}.{pid}.statistics.current.drop_ratio": "{c_drop_ratio}"
+        "publishers.{cid}.{pid}.statistics.current.latency": "{c_latency}"
+        "publishers.{cid}.{pid}.statistics.current.rtt": "{c_rtt}"
+        "publishers.{cid}.{pid}.statistics.current.estimated_bandwidth": "{c_bandwidth}"
+        "publishers.{cid}.{pid}.statistics.current.send_buffer": "{c_send_buffer}"
+        "publishers.{cid}.{pid}.statistics.current.stream_id": "{c_stream_id}"
+        "publishers.{cid}.{pid}.statistics.current.ip": "{c_ip}"
+    - path: '^/api/v2\.0/channels\?publishers=true&publishers-status=true$'
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.result[*].publishers[*].status.warnings"
+      json: { cid: "$^^.id", pid: "$^.id", text: "$.text" }
+      state: { "publishers.{cid}.{pid}.warnings.{index}.text": "{text}" }
+    # A publisher added: read every publisher again.
+    - path: '^/api/v2\.0/channels/[^/]+/publishers$'
+      json_match: { "$.status": "^ok$", "$.result.id": "." }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v2.0/channels, query: { publishers: "true", publishers-status: "true" } }
+    # A publisher deleted: its settings go too.
+    - path: '^/api/v2\.0/channels/([^/]+)/publishers/([^/]+)$'
+      json_match: { "$.status": "^ok$" }
+      json: {}
+      state: { "publisher_settings.{1}.{2}": { delete: true } }
+    - path: '^/api/v2\.0/channels/([^/]+)/publishers/([^/]+)/name(\?.*)?$'
+      json_match: { "$.status": "^ok$" }
+      json: { name: "$.result" }
+      state: { "publishers.{1}.{2}.name": "{name}" }
+    # ── Publisher settings: each publisher's own GET (and PUT reply) ──
+    - path: '^/api/v2\.0/channels/([^/]+)/publishers/([^/]+)/settings$'
+      json_match: { "$.status": "^ok$", "$.result.type": "." }
+      json:
+        type: "$.result.type"
+        enabled: "$.result.common.enabled"
+        single_touch: "$.result.common.single_touch"
+        rtmp_url: "$.result.rtmp.url"
+        rtmp_stream: "$.result.rtmp.stream"
+        rtmp_username: "$.result.rtmp.username"
+        rtmp_audio: "$.result.rtmp.disable_audio"
+        rtmp_auto: "$.result.rtmp.auto_created"
+        rtsp_url: "$.result.rtsp.url"
+        rtsp_transport: "$.result.rtsp.transport"
+        rtsp_username: "$.result.rtsp.username"
+        rtsp_audio: "$.result.rtsp.disable_audio"
+        ndi_name: "$.result.ndi.ndi_name"
+        ndi_group: "$.result.ndi.ndi_group"
+        ndi_audio: "$.result.ndi.disable_audio"
+        hls_url: "$.result.hls.url"
+        hls_master: "$.result.hls.master_pl_url"
+        hls_username: "$.result.hls.username"
+        hls_segment: "$.result.hls.segment_duration"
+        hls_list: "$.result.hls.list_size"
+        hls_agent: "$.result.hls.user_agent"
+        hls_method: "$.result.hls.http_method"
+        hls_template: "$.result.hls.media_seg_tmpl"
+        hls_audio: "$.result.hls.disable_audio"
+        srt_mode: "$.result.srt.mode"
+        srt_url: "$.result.srt.url"
+        srt_stream_id: "$.result.srt.stream_id"
+        srt_source_port: "$.result.srt.source_port"
+        srt_port: "$.result.srt.port"
+        srt_latency: "$.result.srt.latency"
+        srt_overhead: "$.result.srt.bw_recovery_overhead"
+        srt_keylength: "$.result.srt.encryption.keylength"
+        srt_audio: "$.result.srt.disable_audio"
+      replace: "publisher_settings.{1}.{2}"
+      state:
+        "publisher_settings.{1}.{2}.type": "{type}"
+        "publisher_settings.{1}.{2}.common.enabled": "{enabled}"
+        "publisher_settings.{1}.{2}.common.single_touch": "{single_touch}"
+        "publisher_settings.{1}.{2}.rtmp.url": "{rtmp_url}"
+        "publisher_settings.{1}.{2}.rtmp.stream": "{rtmp_stream}"
+        "publisher_settings.{1}.{2}.rtmp.username": "{rtmp_username}"
+        "publisher_settings.{1}.{2}.rtmp.disable_audio": "{rtmp_audio}"
+        "publisher_settings.{1}.{2}.rtmp.auto_created": "{rtmp_auto}"
+        "publisher_settings.{1}.{2}.rtsp.url": "{rtsp_url}"
+        "publisher_settings.{1}.{2}.rtsp.transport": "{rtsp_transport}"
+        "publisher_settings.{1}.{2}.rtsp.username": "{rtsp_username}"
+        "publisher_settings.{1}.{2}.rtsp.disable_audio": "{rtsp_audio}"
+        "publisher_settings.{1}.{2}.ndi.ndi_name": "{ndi_name}"
+        "publisher_settings.{1}.{2}.ndi.ndi_group": "{ndi_group}"
+        "publisher_settings.{1}.{2}.ndi.disable_audio": "{ndi_audio}"
+        "publisher_settings.{1}.{2}.hls.url": "{hls_url}"
+        "publisher_settings.{1}.{2}.hls.master_pl_url": "{hls_master}"
+        "publisher_settings.{1}.{2}.hls.username": "{hls_username}"
+        "publisher_settings.{1}.{2}.hls.segment_duration": "{hls_segment}"
+        "publisher_settings.{1}.{2}.hls.list_size": "{hls_list}"
+        "publisher_settings.{1}.{2}.hls.user_agent": "{hls_agent}"
+        "publisher_settings.{1}.{2}.hls.http_method": "{hls_method}"
+        "publisher_settings.{1}.{2}.hls.media_seg_tmpl": "{hls_template}"
+        "publisher_settings.{1}.{2}.hls.disable_audio": "{hls_audio}"
+        "publisher_settings.{1}.{2}.srt.mode": "{srt_mode}"
+        "publisher_settings.{1}.{2}.srt.url": "{srt_url}"
+        "publisher_settings.{1}.{2}.srt.stream_id": "{srt_stream_id}"
+        "publisher_settings.{1}.{2}.srt.source_port": "{srt_source_port}"
+        "publisher_settings.{1}.{2}.srt.port": "{srt_port}"
+        "publisher_settings.{1}.{2}.srt.latency": "{srt_latency}"
+        "publisher_settings.{1}.{2}.srt.bw_recovery_overhead": "{srt_overhead}"
+        "publisher_settings.{1}.{2}.srt.keylength": "{srt_keylength}"
+        "publisher_settings.{1}.{2}.srt.disable_audio": "{srt_audio}"
+    # The UDP sections share their fields; the section is named by the reply.
+    - path: '^/api/v2\.0/channels/([^/]+)/publishers/([^/]+)/settings$'
+      json_match: { "$.status": "^ok$", "$.result.type": "^(rtp-udp|mpegts-udp|mpegts-rtp)$" }
+      json_each: "$.result.*"
+      each_match: { "$.limit_bandwidth": "^(true|false)$" }
+      json:
+        address: "$.address"
+        port: "$.port"
+        audio_port: "$.audio_port"
+        video_port: "$.video_port"
+        sap: "$.sap"
+        sap_ip: "$.sap_ip"
+        sap_channel: "$.sap_channel"
+        sap_play_group: "$.sap_play_group"
+        limit: "$.limit_bandwidth"
+        rate: "$.limit_bandwidth_rate"
+      state:
+        "publisher_settings.{1}.{2}.{key}.address": "{address}"
+        "publisher_settings.{1}.{2}.{key}.port": "{port}"
+        "publisher_settings.{1}.{2}.{key}.audio_port": "{audio_port}"
+        "publisher_settings.{1}.{2}.{key}.video_port": "{video_port}"
+        "publisher_settings.{1}.{2}.{key}.sap": "{sap}"
+        "publisher_settings.{1}.{2}.{key}.sap_ip": "{sap_ip}"
+        "publisher_settings.{1}.{2}.{key}.sap_channel": "{sap_channel}"
+        "publisher_settings.{1}.{2}.{key}.sap_play_group": "{sap_play_group}"
+        "publisher_settings.{1}.{2}.{key}.limit_bandwidth": "{limit}"
+        "publisher_settings.{1}.{2}.{key}.limit_bandwidth_rate": "{rate}"
+    # ── Channels: names, encoders and active layout ──
+    - path: '^/api/v2\.0/channels\?publishers=true&encoders=true&active_layout=true$'
+      json_match: { "$.status": "^ok$" }
+      json: {}
+      replace: channels
+    - path: '^/api/v2\.0/channels\?(?:ids=[^&]*&)?publishers=true&encoders=true&active_layout=true$'
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.result"
+      json: { id: "$.id", name: "$.name", layout_id: "$.active_layout.id", layout_name: "$.active_layout.name" }
+      replace: ["channels.{id}.encoders", "channels.{id}.active_layout"]
+      state:
+        "channels.{id}.name": "{name}"
+        "channels.{id}.active_layout.id": "{layout_id}"
+        "channels.{id}.active_layout.name": "{layout_name}"
+    - path: '^/api/v2\.0/channels\?(?:ids=[^&]*&)?publishers=true&encoders=true&active_layout=true$'
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.result[*].encoders"
+      json: { cid: "$^.id", eid: "$.id", type: "$.type", name: "$.name", resolution: "$.resolution",
+              framerate: "$.framerate", bitrate: "$.bitrate", channels: "$.channels" }
+      state:
+        "channels.{cid}.encoders.{eid}.type": "{type}"
+        "channels.{cid}.encoders.{eid}.name": "{name}"
+        "channels.{cid}.encoders.{eid}.resolution": "{resolution}"
+        "channels.{cid}.encoders.{eid}.framerate": "{framerate}"
+        "channels.{cid}.encoders.{eid}.bitrate": "{bitrate}"
+        "channels.{cid}.encoders.{eid}.channels": "{channels}"
+    - path: '^/api/v2\.0/channels\?(?:ids=[^&]*&)?publishers=true&encoders=true&active_layout=true$'
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.result[*].active_layout.sources.video"
+      json: { cid: "$^.id", id: "$.id", name: "$.name" }
+      state:
+        "channels.{cid}.active_layout.sources.video.{index}.id": "{id}"
+        "channels.{cid}.active_layout.sources.video.{index}.name": "{name}"
+    - path: '^/api/v2\.0/channels\?(?:ids=[^&]*&)?publishers=true&encoders=true&active_layout=true$'
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.result[*].active_layout.sources.audio"
+      json: { cid: "$^.id", id: "$.id", name: "$.name" }
+      state:
+        "channels.{cid}.active_layout.sources.audio.{index}.id": "{id}"
+        "channels.{cid}.active_layout.sources.audio.{index}.name": "{name}"
+    # Each publisher's settings, read on each configuration poll.
+    - path: '^/api/v2\.0/channels\?(?:ids=[^&]*&)?publishers=true&encoders=true&active_layout=true$'
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.result[*].publishers"
+      json: { cid: "$^.id", pid: "$.id" }
+      then_send:
+        - { method: GET, path: "/api/v2.0/channels/{cid}/publishers/{pid}/settings" }
+    - path: '^/api/v2\.0/channels/([^/]+)/name(\?.*)?$'
+      json_match: { "$.status": "^ok$" }
+      json: { name: "$.result" }
+      state: { "channels.{1}.name": "{name}" }
+    # ── Inputs ──
+    - path: '^/api/v2\.0/inputs$'
+      json_match: { "$.status": "^ok$", "$.result": '^\[' }
+      json_each: "$.result"
+      json: { id: "$.id", name: "$.name", real: "$.real_device_name", type: "$.type", audio: "$.audio", video: "$.video" }
+      replace: inputs
+      state:
+        "inputs.{id:key}.name": "{name}"
+        "inputs.{id:key}.real_device_name": "{real}"
+        "inputs.{id:key}.type": "{type}"
+        "inputs.{id:key}.audio": "{audio}"
+        "inputs.{id:key}.video": "{video}"
+    # Settings are read where the document shows them readable: SRT and RTSP
+    # inputs, and the analog audio inputs.
+    - path: '^/api/v2\.0/inputs$'
+      json_match: { "$.status": "^ok$", "$.result": '^\[' }
+      json_each: "$.result"
+      each_match: { "$.type": "^(srt|rtsp)$" }
+      json: { id: "$.id" }
+      then_send: [{ method: GET, path: "/api/v2.0/inputs/{id}/settings" }]
+    - path: '^/api/v2\.0/inputs$'
+      json_match: { "$.status": "^ok$", "$.result": '^\[' }
+      json_each: "$.result"
+      each_match: { "$.type": "^embedded$", "$.id": '(?:^|\.)analog(?:-[ab])?$' }
+      json: { id: "$.id" }
+      then_send: [{ method: GET, path: "/api/v2.0/inputs/{id}/settings" }]
+    # An input created: read the list again.
+    - path: '^/api/v2\.0/inputs$'
+      json_match: { "$.status": "^ok$", "$.result": '^[^\[{]' }
+      json: {}
+      then_send: [{ method: GET, path: /api/v2.0/inputs }]
+    - path: '^/api/v2\.0/inputs/([^/]+)/settings$'
+      json_match: { "$.status": "^ok$" }
+      json:
+        delay: "$.result.audio.delay"
+        image: "$.result.video.nosignal.image"
+        timeout: "$.result.video.nosignal.timeout"
+        full_range: "$.result.video.force_full_color_range"
+        hwaccel: "$.result.video.hwaccel_decoding"
+        srt_mode: "$.result.srt.mode"
+        srt_latency: "$.result.srt.latency"
+        srt_keylength: "$.result.srt.encryption.keylength"
+        srt_port: "$.result.srt.port"
+        srt_url: "$.result.srt.url"
+        srt_stream_id: "$.result.srt.stream_id"
+        srt_source_port: "$.result.srt.source_port"
+        srt_utc: "$.result.srt.ts_utc_midnight_origin"
+        rtsp_url: "$.result.rtsp.url"
+        rtsp_username: "$.result.rtsp.username"
+        rtsp_transport: "$.result.rtsp.transport"
+        gain: "$.result.local_audio.gain"
+        mute: "$.result.local_audio.mute"
+        phantom: "$.result.local_audio.phantom_power"
+        input_type: "$.result.local_audio.input_type"
+        pair: "$.result.local_audio.stereo_pair"
+        ndi_group: "$.result.ndi.group"
+        ndi_name: "$.result.ndi.name"
+        ndi_extra: "$.result.ndi.extra_source_ip_addresses"
+        ndi_tc: "$.result.ndi.ignore_timecode"
+        wg_url: "$.result.web_graphics.url"
+        wg_resolution: "$.result.web_graphics.resolution"
+        wg_fps: "$.result.web_graphics.fps"
+        hdmi_deint: "$.result.hdmi.deinterlacing"
+        hdmi_down: "$.result.hdmi.downscale_4k_to_fullhd"
+        hdmi_scaling: "$.result.hdmi.scaling"
+        hdmi_mute: "$.result.hdmi.audio.mute"
+        hdmi_delay: "$.result.hdmi.audio.delay"
+        sdi_down: "$.result.sdi.downscale_4k_to_fullhd"
+        sdi_scaling: "$.result.sdi.scaling"
+        sdi_mute: "$.result.sdi.audio.mute"
+        sdi_delay: "$.result.sdi.audio.delay"
+        usb_mode: "$.result.usb.capture_mode"
+        usb_brightness: "$.result.usb.brightness"
+        usb_contrast: "$.result.usb.contrast"
+        usb_saturation: "$.result.usb.saturation"
+        usb_sharpness: "$.result.usb.sharpness"
+        usb_pan: "$.result.usb.pan"
+        usb_tilt: "$.result.usb.tilt"
+        usb_plf: "$.result.usb.power_line_frequency"
+        usb_volume: "$.result.usb.volume"
+      replace: "input_settings.{1:key}"
+      state:
+        "input_settings.{1:key}.audio.delay": "{delay}"
+        "input_settings.{1:key}.video.nosignal.image": "{image}"
+        "input_settings.{1:key}.video.nosignal.timeout": "{timeout}"
+        "input_settings.{1:key}.video.force_full_color_range": "{full_range}"
+        "input_settings.{1:key}.video.hwaccel_decoding": "{hwaccel}"
+        "input_settings.{1:key}.srt.mode": "{srt_mode}"
+        "input_settings.{1:key}.srt.latency": "{srt_latency}"
+        "input_settings.{1:key}.srt.keylength": "{srt_keylength}"
+        "input_settings.{1:key}.srt.port": "{srt_port}"
+        "input_settings.{1:key}.srt.url": "{srt_url}"
+        "input_settings.{1:key}.srt.stream_id": "{srt_stream_id}"
+        "input_settings.{1:key}.srt.source_port": "{srt_source_port}"
+        "input_settings.{1:key}.srt.ts_utc_midnight_origin": "{srt_utc}"
+        "input_settings.{1:key}.rtsp.url": "{rtsp_url}"
+        "input_settings.{1:key}.rtsp.username": "{rtsp_username}"
+        "input_settings.{1:key}.rtsp.transport": "{rtsp_transport}"
+        "input_settings.{1:key}.local_audio.gain": "{gain}"
+        "input_settings.{1:key}.local_audio.mute": "{mute}"
+        "input_settings.{1:key}.local_audio.phantom_power": "{phantom}"
+        "input_settings.{1:key}.local_audio.input_type": "{input_type}"
+        "input_settings.{1:key}.local_audio.stereo_pair": "{pair}"
+        "input_settings.{1:key}.ndi.group": "{ndi_group}"
+        "input_settings.{1:key}.ndi.name": "{ndi_name}"
+        "input_settings.{1:key}.ndi.extra_source_ip_addresses": "{ndi_extra}"
+        "input_settings.{1:key}.ndi.ignore_timecode": "{ndi_tc}"
+        "input_settings.{1:key}.web_graphics.url": "{wg_url}"
+        "input_settings.{1:key}.web_graphics.resolution": "{wg_resolution}"
+        "input_settings.{1:key}.web_graphics.fps": "{wg_fps}"
+        "input_settings.{1:key}.hdmi.deinterlacing": "{hdmi_deint}"
+        "input_settings.{1:key}.hdmi.downscale_4k_to_fullhd": "{hdmi_down}"
+        "input_settings.{1:key}.hdmi.scaling": "{hdmi_scaling}"
+        "input_settings.{1:key}.hdmi.audio.mute": "{hdmi_mute}"
+        "input_settings.{1:key}.hdmi.audio.delay": "{hdmi_delay}"
+        "input_settings.{1:key}.sdi.downscale_4k_to_fullhd": "{sdi_down}"
+        "input_settings.{1:key}.sdi.scaling": "{sdi_scaling}"
+        "input_settings.{1:key}.sdi.audio.mute": "{sdi_mute}"
+        "input_settings.{1:key}.sdi.audio.delay": "{sdi_delay}"
+        "input_settings.{1:key}.usb.capture_mode": "{usb_mode}"
+        "input_settings.{1:key}.usb.brightness": "{usb_brightness}"
+        "input_settings.{1:key}.usb.contrast": "{usb_contrast}"
+        "input_settings.{1:key}.usb.saturation": "{usb_saturation}"
+        "input_settings.{1:key}.usb.sharpness": "{usb_sharpness}"
+        "input_settings.{1:key}.usb.pan": "{usb_pan}"
+        "input_settings.{1:key}.usb.tilt": "{usb_tilt}"
+        "input_settings.{1:key}.usb.power_line_frequency": "{usb_plf}"
+        "input_settings.{1:key}.usb.volume": "{usb_volume}"
+    - path: '^/api/v2\.0/inputs/([^/]+)/settings$'
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.result.local_audio.channels.*"
+      json: { gain: "$.gain", mute: "$.mute" }
+      state:
+        "input_settings.{1:key}.local_audio.channels.{key}.gain": "{gain}"
+        "input_settings.{1:key}.local_audio.channels.{key}.mute": "{mute}"
+    # ── Outputs ──
+    - path: '^/api/v2\.0/outputs$'
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.result"
+      json: { id: "$.id", name: "$.name" }
+      replace: outputs
+      state: { "outputs.{id:key}.name": "{name}" }
+    # The source cannot be read: the one this API last set is kept.
+    - path: '^/api/v2\.0/outputs/([^/]+)/settings\?source=(.+)$'
+      json_match: { "$.status": "^ok$" }
+      json: {}
+      state: { "output_sources.{1:key}": "{2:url_decode}" }
+    # ── Recorders ──
+    - path: '^/api/v2\.0/recorders$'
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.result"
+      json: { id: "$.id", name: "$.name", multisource: "$.multisource" }
+      replace: recorders
+      state:
+        "recorders.{id:key}.name": "{name}"
+        "recorders.{id:key}.multisource": "{multisource}"
+      then_send: [{ method: GET, path: "/api/v2.0/recorders/{id}/archive/files" }]
+    - path: '^/api/v2\.0/recorders/status$'
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.result"
+      json: { id: "$.id", name: "$.name", st: "$.status.state", description: "$.status.description",
+              duration: "$.status.duration", active: "$.status.active", total: "$.status.total" }
+      replace: recorder_status
+      state:
+        "recorder_status.{id:key}.name": "{name}"
+        "recorder_status.{id:key}.state": "{st}"
+        "recorder_status.{id:key}.description": "{description}"
+        "recorder_status.{id:key}.duration": "{duration}"
+        "recorder_status.{id:key}.active": "{active}"
+        "recorder_status.{id:key}.total": "{total}"
+    - path: '^/api/v2\.0/recorders/([^/]+)/status$'
+      json_match: { "$.status": "^ok$" }
+      json: { st: "$.result.state", description: "$.result.description", duration: "$.result.duration",
+              active: "$.result.active", total: "$.result.total" }
+      replace: ["recorder_status.{1:key}.description", "recorder_status.{1:key}.duration",
+                "recorder_status.{1:key}.active", "recorder_status.{1:key}.total"]
+      state:
+        "recorder_status.{1:key}.state": "{st}"
+        "recorder_status.{1:key}.description": "{description}"
+        "recorder_status.{1:key}.duration": "{duration}"
+        "recorder_status.{1:key}.active": "{active}"
+        "recorder_status.{1:key}.total": "{total}"
+    - path: '^/api/v2\.0/recorders/([^/]+)/archive/files$'
+      json_match: { "$.status": "^ok$" }
+      json: {}
+      replace: "recorder_files.{1:key}"
+    - path: '^/api/v2\.0/recorders/([^/]+)/archive/files(\?.*)?$'
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.result"
+      json: { id: "$.id", name: "$.name", extension: "$.extension", recording: "$.recording", downloaded: "$.downloaded",
+              uploading: "$.uploading", created: "$.created", duration: "$.duration", size: "$.size", event: "$.event_id" }
+      state:
+        "recorder_files.{1:key}.{id:key}.name": "{name}"
+        "recorder_files.{1:key}.{id:key}.extension": "{extension}"
+        "recorder_files.{1:key}.{id:key}.recording": "{recording}"
+        "recorder_files.{1:key}.{id:key}.downloaded": "{downloaded}"
+        "recorder_files.{1:key}.{id:key}.uploading": "{uploading}"
+        "recorder_files.{1:key}.{id:key}.created": "{created}"
+        "recorder_files.{1:key}.{id:key}.duration": "{duration}"
+        "recorder_files.{1:key}.{id:key}.size": "{size}"
+        "recorder_files.{1:key}.{id:key}.event_id": "{event}"
+    # ── Events ──
+    - path: '^/api/v2\.0/schedule/events$'
+      json_match: { "$.status": "^ok$", "$.result": '^\[' }
+      json: {}
+      replace: events
+    - path: '^/api/v2\.0/schedule/events(\?.*)?$'
+      json_match: { "$.status": "^ok$", "$.result": '^\[' }
+      json_each: "$.result"
+      json: { id: "$.id", st: "$.status", title: "$.title", start: "$.start", finish: "$.finish", tags: "$.tags" }
+      replace: "events.{id:key}.recorders"
+      state:
+        "events.{id:key}.status": "{st}"
+        "events.{id:key}.title": "{title}"
+        "events.{id:key}.start": "{start}"
+        "events.{id:key}.finish": "{finish}"
+        "events.{id:key}.tags": "{tags}"
+    - path: '^/api/v2\.0/schedule/events(\?.*)?$'
+      json_match: { "$.status": "^ok$", "$.result": '^\[' }
+      json_each: "$.result[*].recorders"
+      json: { event: "$^.id", id: "$.id" }
+      state: { "events.{event:key}.recorders.{index}.id": "{id}" }
+    # One event: its GET, the read after a control, and a created ad-hoc event.
+    - path: '^/api/v2\.0/schedule/events(/[^/]+)?$'
+      json_match: { "$.status": "^ok$", "$.result.id": "." }
+      json: { id: "$.result.id", st: "$.result.status", title: "$.result.title", start: "$.result.start",
+              finish: "$.result.finish", tags: "$.result.tags" }
+      state:
+        "events.{id:key}.status": "{st}"
+        "events.{id:key}.title": "{title}"
+        "events.{id:key}.start": "{start}"
+        "events.{id:key}.finish": "{finish}"
+        "events.{id:key}.tags": "{tags}"
+    - path: '^/api/v2\.0/schedule/events/adhoc/session$'
+      json: { id: "$.id", name: "$.name", folder: "$.default_folder", created: "$.created", expired: "$.expired" }
+      replace: adhoc_session
+      state:
+        adhoc_session.id: "{id}"
+        adhoc_session.name: "{name}"
+        adhoc_session.default_folder: "{folder}"
+        adhoc_session.created: "{created}"
+        adhoc_session.expired: "{expired}"
+    # ── System ──
+    - path: '^/api/v2\.0/system/status$'
+      json_match: { "$.status": "^ok$" }
+      json: { date: "$.result.date", uptime: "$.result.uptime", load: "$.result.cpuload", high: "$.result.cpuload_high",
+              temp: "$.result.cputemp", threshold: "$.result.cputemp_threshold" }
+      state:
+        system.date: "{date}"
+        system.uptime: "{uptime}"
+        system.cpuload: "{load}"
+        system.cpuload_high: "{high}"
+        system.cputemp: "{temp}"
+        system.cputemp_threshold: "{threshold}"
+    - path: '^/api/v2\.0/system/firmware$'
+      json_match: { "$.status": "^ok$" }
+      json: { version: "$.result.version", revision: "$.result.revision", id: "$.result.product_id", name: "$.result.product_name" }
+      state:
+        firmware.version: "{version}"
+        firmware.revision: "{revision}"
+        firmware.product_id: "{id}"
+        firmware.product_name: "{name}"
+    - path: '^/api/v2\.0/system/firmware/(version|revision|product_id|product_name)$'
+      json_match: { "$.status": "^ok$" }
+      json: { value: "$.result" }
+      state: { "firmware.{1}": "{value}" }
+    - path: '^/api/v2\.0/system/ident$'
+      json_match: { "$.status": "^ok$" }
+      json: { name: "$.result.name", location: "$.result.location", description: "$.result.description" }
+      state:
+        ident.name: "{name}"
+        ident.location: "{location}"
+        ident.description: "{description}"
+    - path: '^/api/v2\.0/system/connectivity/details$'
+      json_match: { "$.status": "^ok$" }
+      json: { ip: "$.result.external_ip", mdns: "$.result.mdns", dns: "$.result.dns", http: "$.result.http",
+              https: "$.result.https", portal: "$.result.captive_portal", icmp: "$.result.icmp",
+              edge: "$.result.epiphan_edge", vtun: "$.result.vtun" }
+      state:
+        connectivity.external_ip: "{ip}"
+        connectivity.mdns: "{mdns}"
+        connectivity.dns: "{dns}"
+        connectivity.http: "{http}"
+        connectivity.https: "{https}"
+        connectivity.captive_portal: "{portal}"
+        connectivity.icmp: "{icmp}"
+        connectivity.epiphan_edge: "{edge}"
+        connectivity.vtun: "{vtun}"
+    - path: '^/api/v2\.0/system/connectivity/tools/speedtest(\?.*)?$'
+      json_match: { "$.status": "^ok$" }
+      json: { protocol: "$.result.protocol", mode: "$.result.mode", bandwidth: "$.result.bandwidth",
+              limit: "$.result.bitrate_limit", duration: "$.result.duration", loss: "$.result.udp.loss" }
+      replace: speedtest
+      state:
+        speedtest.protocol: "{protocol}"
+        speedtest.mode: "{mode}"
+        speedtest.bandwidth: "{bandwidth}"
+        speedtest.bitrate_limit: "{limit}"
+        speedtest.duration: "{duration}"
+        speedtest.udp_loss: "{loss}"
+    # Single Touch: the list names each control, whose state is then read.
+    - path: '^/api/v2\.0/system/singletouchcontrol$'
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.result"
+      json: { id: "$.id" }
+      then_send: [{ method: GET, path: "/api/v2.0/system/singletouchcontrol/{id}/state" }]
+    - path: '^/api/v2\.0/system/singletouchcontrol/([^/]+)/state$'
+      json_match: { "$.status": "^ok$" }
+      json: { pressed: "$.result.pressed", ok: "$.result.status",
+              r_total: "$.result.recorders.total", r_active: "$.result.recorders.active", r_success: "$.result.recorders.success",
+              p_total: "$.result.publishers.total", p_active: "$.result.publishers.active", p_success: "$.result.publishers.success" }
+      state:
+        "single_touch.{1:key}.pressed": "{pressed}"
+        "single_touch.{1:key}.status": "{ok}"
+        "single_touch.{1:key}.recorders.total": "{r_total}"
+        "single_touch.{1:key}.recorders.active": "{r_active}"
+        "single_touch.{1:key}.recorders.success": "{r_success}"
+        "single_touch.{1:key}.publishers.total": "{p_total}"
+        "single_touch.{1:key}.publishers.active": "{p_active}"
+        "single_touch.{1:key}.publishers.success": "{p_success}"
+    - path: '^/api/v2\.0/system/presets\?details=true$'
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.result"
+      json: { name: "$.name", description: "$.description", hash: "$.hash", size: "$.size", readonly: "$.readonly" }
+      replace: presets
+      state:
+        "presets.{name:key}.description": "{description}"
+        "presets.{name:key}.hash": "{hash}"
+        "presets.{name:key}.size": "{size}"
+        "presets.{name:key}.readonly": "{readonly}"
+    - path: '^/api/v2\.0/system/presets\?details=true$'
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.result[*].sections"
+      json: { name: "$^.name", section: "$" }
+      state: { "presets.{name:key}.sections.{index}": "{section}" }
+    # Storages: the list names each, whose status is then read; transfer
+    # progress only for the external drive (main answers 405).
+    - path: '^/api/v2\.0/system/storages$'
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.result"
+      json: { id: "$.id" }
+      then_send: [{ method: GET, path: "/api/v2.0/system/storages/{id}/status" }]
+    - path: '^/api/v2\.0/system/storages$'
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.result"
+      each_match: { "$.id": "^external$" }
+      json: { id: "$.id" }
+      then_send: [{ method: GET, path: "/api/v2.0/system/storages/{id}/transfer/status" }]
+    - path: '^/api/v2\.0/system/storages/([^/]+)/status$'
+      json_match: { "$.status": "^ok$" }
+      json: { st: "$.result.state", total: "$.result.total", free: "$.result.free" }
+      state:
+        "storages.{1:key}.state": "{st}"
+        "storages.{1:key}.total": "{total}"
+        "storages.{1:key}.free": "{free}"
+    - path: '^/api/v2\.0/system/storages/([^/]+)/transfer/status(\?.*)?$'
+      json_match: { "$.status": "^ok$" }
+      json: { st: "$.result.state", started: "$.result.session.started", completed: "$.result.session.completed",
+              total_count: "$.result.session.total.count", total_size: "$.result.session.total.size",
+              done_count: "$.result.session.processed.count", done_size: "$.result.session.processed.size",
+              s_state: "$.result.storage.state", s_total: "$.result.storage.total", s_free: "$.result.storage.free" }
+      replace: "storages.{1:key}.transfer"
+      state:
+        "storages.{1:key}.transfer.state": "{st}"
+        "storages.{1:key}.transfer.started": "{started}"
+        "storages.{1:key}.transfer.completed": "{completed}"
+        "storages.{1:key}.transfer.total_count": "{total_count}"
+        "storages.{1:key}.transfer.total_size": "{total_size}"
+        "storages.{1:key}.transfer.processed_count": "{done_count}"
+        "storages.{1:key}.transfer.processed_size": "{done_size}"
+        "storages.{1:key}.state": "{s_state}"
+        "storages.{1:key}.total": "{s_total}"
+        "storages.{1:key}.free": "{s_free}"
+    # ── Automatic File Upload ──
+    - path: '^/api/v2\.0/afu/status$'
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.result"
+      json: { id: "$.id", st: "$.status.state", protocol: "$.status.protocol", files: "$.status.queue.files",
+              size: "$.status.queue.size", f_recorder: "$.status.file.recorder", f_id: "$.status.file.id",
+              f_uploaded: "$.status.file.uploaded", f_size: "$.status.file.size", error: "$.status.error.message" }
+      replace: afu
+      state:
+        "afu.{id:key}.state": "{st}"
+        "afu.{id:key}.protocol": "{protocol}"
+        "afu.{id:key}.queue_files": "{files}"
+        "afu.{id:key}.queue_size": "{size}"
+        "afu.{id:key}.file.recorder": "{f_recorder}"
+        "afu.{id:key}.file.id": "{f_id}"
+        "afu.{id:key}.file.uploaded": "{f_uploaded}"
+        "afu.{id:key}.file.size": "{f_size}"
+        "afu.{id:key}.error": "{error}"
+    - path: '^/api/v2\.0/afu/([^/]+)/status$'
+      json_match: { "$.status": "^ok$" }
+      json: { st: "$.result.state", protocol: "$.result.protocol", files: "$.result.queue.files",
+              size: "$.result.queue.size", f_recorder: "$.result.file.recorder", f_id: "$.result.file.id",
+              f_uploaded: "$.result.file.uploaded", f_size: "$.result.file.size", error: "$.result.error.message" }
+      replace: "afu.{1:key}"
+      state:
+        "afu.{1:key}.state": "{st}"
+        "afu.{1:key}.protocol": "{protocol}"
+        "afu.{1:key}.queue_files": "{files}"
+        "afu.{1:key}.queue_size": "{size}"
+        "afu.{1:key}.file.recorder": "{f_recorder}"
+        "afu.{1:key}.file.id": "{f_id}"
+        "afu.{1:key}.file.uploaded": "{f_uploaded}"
+        "afu.{1:key}.file.size": "{f_size}"
+        "afu.{1:key}.error": "{error}"

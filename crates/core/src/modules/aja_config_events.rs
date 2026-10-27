@@ -1,10 +1,11 @@
-//! AJA's event connection, added to the spec-driven Ki Pro and KUMO.
+//! AJA's event connection, added to the spec-driven Ki Pro, KUMO and HELO.
 //!
 //! Commands, queries and telemetry rules are the spec's (`specs/aja-kipro.yaml`,
-//! `specs/aja-kumo.yaml`), run by the spec engine. This adds what the format
-//! cannot express: a loop that carries a value from one reply into the next
-//! request (AJA REST API chapter 1; Ki Pro REST Automation 4.1.0, api.txt and
-//! events.py; KUMO python_examples).
+//! `specs/aja-kumo.yaml`, `specs/aja-helo.yaml`), run by the spec engine. This
+//! adds what the format cannot express: a loop that carries a value from one
+//! reply into the next request (AJA REST API chapter 1; Ki Pro REST Automation
+//! 4.1.0, api.txt and events.py; KUMO python_examples; HELO
+//! helo_recall_preset.py).
 //!
 //! - `action=connect` returns `{"connectionid": "20"}`.
 //! - `action=wait_for_config_events&connectionid=20` is held by the unit until
@@ -896,5 +897,243 @@ mod tests {
             .any(|p| p["transport"]["state"] == "Recording"));
         assert!(patches.iter().any(|p| p["transport"]["state_code"] == 2));
         assert_eq!(m.retry, FIRST_RETRY);
+    }
+
+    /// HELO: the spec's /config requests without a configid, its rules, and a
+    /// recall reported Complete reading the configuration again.
+    #[cfg(feature = "aja-helo")]
+    #[test]
+    fn helo_events() {
+        let m = module("aja-helo", "helo");
+        assert_eq!(m.connect.target(None, false), "/config?action=connect");
+        assert_eq!(
+            m.wait.target(Some("20"), false),
+            "/config?action=wait_for_config_events&connectionid=20"
+        );
+
+        let st = events_state(
+            "aja-helo",
+            "helo",
+            json!([
+                {"param_id": "eParamID_ReplicatorRecordState", "param_type": "enum", "int_value": 2, "str_value": "eRRSRecording"},
+                {"param_id": "eParamID_ReplicatorStreamState", "param_type": "enum", "int_value": 2, "str_value": "Streaming"},
+                {"param_id": "eParamID_MediaState", "param_type": "enum", "int_value": 1, "str_value": "Data-LAN"},
+                {"param_id": "eParamID_Authentication", "param_type": "enum", "int_value": 1, "str_value": "Login"},
+                {"param_id": "eParamID_VideoInSelect", "param_type": "enum", "int_value": 2, "str_value": "Test Pattern"},
+                {"param_id": "eParamID_RecordingProfileSel", "param_type": "enum", "int_value": 3, "str_value": "3"},
+                {"param_id": "eParamID_StreamingProfileSel", "param_type": "enum", "int_value": 9, "str_value": "9"},
+                {"param_id": "eParamID_FilenamePrefix", "param_type": "string", "int_value": 0, "str_value": "Biology Lecture"},
+                {"param_id": "eParamID_StreamingVideoBitrate_1", "param_type": "integer", "int_value": 5000, "str_value": ""},
+                {"param_id": "eParamID_RegisterRecall", "param_type": "integer", "int_value": 2, "str_value": ""},
+                {"param_id": "eParamID_RegisterSave", "param_type": "integer", "int_value": 4, "str_value": ""},
+                {"param_id": "eParamID_RegisterRecallResult", "param_type": "enum", "int_value": 2, "str_value": "Complete"}
+            ]),
+        );
+        assert_eq!(
+            st["record"],
+            json!({"state": "eRRSRecording", "state_code": 2, "filename_prefix": "Biology Lecture"})
+        );
+        assert_eq!(
+            st["stream"],
+            json!({"state": "Streaming", "state_code": 2, "profile_1_video_bitrate": 5000})
+        );
+        assert_eq!(st["media"], json!({"state": "Data-LAN", "data_lan": true}));
+        assert_eq!(
+            st["authentication"],
+            json!({"mode": "Login", "enabled": true})
+        );
+        assert_eq!(st["inputs"]["video"], "test_pattern");
+        assert_eq!(st["profiles"], json!({"recording": 3, "streaming": 9}));
+        assert_eq!(
+            st["presets"],
+            json!({"last_recalled": 2, "last_saved": 4, "recall_result": "Complete", "recall_result_code": 2})
+        );
+        assert_eq!(
+            st["params"]["eParamID_FilenamePrefix"],
+            json!({"value": "Biology Lecture", "value_name": ""})
+        );
+
+        // A recall reported Complete queues the configuration's re-reads,
+        // once the reads made on connecting have been answered.
+        let mut m = module("aja-helo", "helo");
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        let started = cx.take();
+        let (connect, _, _) = own_requests(&started)[0].clone();
+        let mut cx = Cx::new(1);
+        m.http_response(&mut cx, connect, ok(r#"{"connectionid":"5"}"#));
+        let (wait, _, _) = own_requests(&cx.take())[0].clone();
+        let answer_all = |m: &mut AjaConfigEvents, mut actions: Vec<Action>| -> Vec<String> {
+            let mut urls = Vec::new();
+            for _ in 0..1000 {
+                let engine: Vec<(RequestId, String)> = actions
+                    .iter()
+                    .filter_map(|a| match a {
+                        Action::Http { id, request } if *id < OWN_IDS => {
+                            Some((*id, request.url.clone()))
+                        }
+                        _ => None,
+                    })
+                    .collect();
+                if engine.is_empty() {
+                    break;
+                }
+                let mut cx = Cx::new(3);
+                for (id, url) in engine {
+                    urls.push(url);
+                    m.http_response(
+                        &mut cx,
+                        id,
+                        ok(r#"{"paramid":"1","name":"x","value":"1","value_name":"1"}"#),
+                    );
+                }
+                actions = cx.take();
+            }
+            urls
+        };
+        let on_connect = answer_all(&mut m, started);
+        assert!(on_connect
+            .iter()
+            .any(|u| u.ends_with("paramid=eParamID_StreamingVideoBitrate_1")));
+        let mut cx = Cx::new(4);
+        m.http_response(
+            &mut cx,
+            wait,
+            ok(r#"[{"param_id":"eParamID_RegisterRecallResult","param_type":"enum","int_value":2,"str_value":"Complete"}]"#),
+        );
+        let actions = cx.take();
+        assert!(state(&actions)
+            .iter()
+            .any(|p| p["presets"]["recall_result"] == "Complete"));
+        assert_eq!(own_requests(&actions).len(), 1, "the next wait");
+        let reread = answer_all(&mut m, actions);
+        for id in [
+            "eParamID_FilenamePrefix",
+            "eParamID_MediaState",
+            "eParamID_RecordingProfileSel",
+            "eParamID_StreamingProfileSel",
+            "eParamID_VideoInSelect",
+            "eParamID_StreamingVideoBitrate_1",
+        ] {
+            assert!(
+                reread.iter().any(|u| u.ends_with(&format!("paramid={id}"))),
+                "{id} read again: {reread:?}"
+            );
+        }
+    }
+
+    /// With User Authentication on, the event connection carries the
+    /// session cookie the engine's login captured.
+    #[cfg(feature = "aja-helo")]
+    #[test]
+    fn helo_event_connection_carries_the_session() {
+        let catalog = Catalog::embedded();
+        let spec = catalog.device("aja-helo").unwrap().clone();
+        let mut settings = Params::new();
+        settings.insert("user_authentication".into(), json!(true));
+        settings.insert("password".into(), json!("honk"));
+        let ctx = OpenContext {
+            host: "192.0.2.10".parse().unwrap(),
+            host_name: None,
+            port: None,
+            model: "helo".into(),
+            channels: None,
+            settings,
+            monitor: true,
+        };
+        let engine = SpecEngine::new(Arc::new(spec.clone()), ctx.clone()).unwrap();
+        let mut m = AjaConfigEvents::new(engine, &spec, &ctx).unwrap();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        let started = cx.take();
+        // Before any login the connect goes without a cookie, and the unit
+        // answers it as AJA documents for a request without the session.
+        let (connect, request) = started
+            .iter()
+            .find_map(|a| match a {
+                Action::Http { id, request } if *id >= OWN_IDS => Some((*id, request.clone())),
+                _ => None,
+            })
+            .unwrap();
+        assert!(request.headers.is_empty());
+        let mut cx = Cx::new(5);
+        m.http_response(
+            &mut cx,
+            connect,
+            Ok(HttpResponse {
+                headers: Vec::new(),
+                status: 404,
+                body: b"<html><head><title>404 Not Found</title></head></html>".to_vec(),
+            }),
+        );
+        assert_eq!(retry_after(&cx.take()), Some(1_000));
+
+        // The engine logs in before its first request needing the session.
+        let mut actions = started;
+        let mut logged_in = false;
+        for _ in 0..100 {
+            let engine: Vec<(RequestId, HttpRequest)> = actions
+                .iter()
+                .filter_map(|a| match a {
+                    Action::Http { id, request } if *id < OWN_IDS => Some((*id, request.clone())),
+                    _ => None,
+                })
+                .collect();
+            if engine.is_empty() || logged_in {
+                break;
+            }
+            let mut cx = Cx::new(10);
+            for (id, request) in engine {
+                if request.url.ends_with("/authenticator/login") {
+                    assert_eq!(
+                        request.body.as_deref(),
+                        Some(&b"password_provided=honk"[..])
+                    );
+                    logged_in = true;
+                    m.http_response(
+                        &mut cx,
+                        id,
+                        Ok(HttpResponse {
+                            headers: vec![(
+                                "set-cookie".into(),
+                                "session=0000000e-5Qn9uwpiYiMpCxePZekIwjeREBsBA6k; path=/".into(),
+                            )],
+                            status: 200,
+                            body: br#"{"login":"success"}"#.to_vec(),
+                        }),
+                    );
+                } else {
+                    m.http_response(
+                        &mut cx,
+                        id,
+                        ok(r#"{"paramid":"1","name":"x","value":"1","value_name":"1"}"#),
+                    );
+                }
+            }
+            actions = cx.take();
+        }
+        assert!(logged_in, "the engine logged in");
+
+        // The reconnect carries the cookie.
+        let mut cx = Cx::new(1_005);
+        m.timer(&mut cx, RETRY);
+        let request = cx
+            .take()
+            .into_iter()
+            .find_map(|a| match a {
+                Action::Http { id, request } if id >= OWN_IDS => Some(request),
+                _ => None,
+            })
+            .unwrap();
+        assert!(request.url.ends_with("action=connect"), "{}", request.url);
+        assert!(
+            request
+                .headers
+                .iter()
+                .any(|(k, v)| k.eq_ignore_ascii_case("cookie")
+                    && v == "session=0000000e-5Qn9uwpiYiMpCxePZekIwjeREBsBA6k"),
+            "{:?}",
+            request.headers
+        );
     }
 }

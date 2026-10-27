@@ -1,0 +1,44 @@
+spec: aja-bridge-live
+telemetry: pipelines
+settings:
+  password: password
+inbound_http:
+  path: /api/pipelines
+  body: '[{"version":"0.16","id":0,"name":"Pipeline 1","runningState":"ACTIVE","inputs":[{"id":0,"source":{"streamType":"MPEG_TS","address":{"url":"srt://127.0.0.1:5001:lo"}},"video":{"format":"J2K","width":1920,"height":1080,"scanRate":"50","scan":"INTERLACED"}}],"outputs":[{"streamType":"MPEG_TS","id":0,"name":"Output
+    Stream 1","sink":{"address":{"url":"srt://0.0.0.0:6001:lo"}},"ts":{"bitrate":11000000},"video":{"format":"H264","width":720,"height":576,"bitrate":8000000}}]},{"id":1,"name":"Pipeline
+    2","runningState":"INACTIVE","inputs":[],"outputs":[]}]'
+expect_state:
+  pipelines:
+    '0':
+      name: Pipeline 1
+      running_state: ACTIVE
+      active: true
+      schema_version: '0.16'
+      inputs:
+        '0':
+          url: srt://127.0.0.1:5001:lo
+          stream_type: MPEG_TS
+          video_format: J2K
+          width: 1920
+          height: 1080
+          scan_rate: '50'
+          scan: INTERLACED
+      outputs:
+        '0':
+          name: Output Stream 1
+          url: srt://0.0.0.0:6001:lo
+          stream_type: MPEG_TS
+          video_format: H264
+          width: 720
+          height: 576
+          video_bitrate: 8000000
+          ts_bitrate: 11000000
+    '1':
+      name: Pipeline 2
+      running_state: INACTIVE
+      active: false
+expect_then_send:
+- method: GET
+  target: /api/pipeline/0/state
+- method: GET
+  target: /api/pipeline/1/state

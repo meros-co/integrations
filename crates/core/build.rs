@@ -18,7 +18,10 @@ use std::{collections::BTreeSet, env, fs, path::PathBuf};
 const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-ableton", &["ableton-live"]),
     ("vendor-aes70", &["aes70"]),
-    ("vendor-aja", &["aja-kipro", "aja-kumo"]),
+    (
+        "vendor-aja",
+        &["aja-bridge-live", "aja-helo", "aja-kipro", "aja-kumo"],
+    ),
     (
         "vendor-allenheath",
         &[
@@ -108,6 +111,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-disguise", &["disguise"]),
     ("vendor-dsan", &["dsan-limitimer", "dsan-perfectcue"]),
     ("vendor-dtvideolabs", &["dtvideolabs-playbackpro-plus"]),
+    ("vendor-epiphan", &["epiphan-pearl"]),
     ("vendor-epson", &["epson-projector"]),
     ("vendor-etc", &["etc-echo", "etc-eos", "etc-paradigm"]),
     ("vendor-evertz", &["evertz-quartz"]),
@@ -146,6 +150,17 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &["irisdown-countdown-timer", "irisdown-remote-show-control"],
     ),
     ("vendor-imimot", &["imimot-mitti"]),
+        "vendor-kiloview",
+        &[
+            "kiloview-cube-r1",
+            "kiloview-cube-x1",
+            "kiloview-decoder",
+            "kiloview-e3",
+            "kiloview-n60",
+            "kiloview-ndi",
+            "kiloview-p3",
+        ],
+    ),
     ("vendor-kramer", &["kramer-p3000"]),
     (
         "vendor-labgruppen",
@@ -157,6 +172,11 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-ma-lighting", &["grandma2", "grandma3"]),
     (
         "vendor-magewell",
+        &[
+            "magewell-proconvert",
+            "magewell-ultra-encode",
+            "magewell-ultra-stream",
+        ],
         &["magewell-director", "magewell-proconvert"],
     ),
     ("vendor-megapixel", &["megapixel-helios"]),
@@ -266,6 +286,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &["symetrix-composer", "symetrix-jupiter"],
     ),
     ("vendor-tallyarbiter", &["tally-arbiter"]),
+    ("vendor-teradek", &["teradek-prism"]),
     ("vendor-tinkerlist", &["cuez-automator"]),
     ("vendor-tsl", &["tsl-umd-display", "tsl-umd-listener"]),
     (

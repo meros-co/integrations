@@ -1,0 +1,2165 @@
+spec: 1
+id: teradek-prism
+name: Teradek Prism encoders and decoders (REST API v1)
+vendor: Teradek
+category: other
+
+source:
+  - title: Teradek Developer Docs, REST API v1, Getting Started
+    author: Teradek
+    url: https://teradekdev.com/docs/getting-started
+    note: >
+      Manufacturer document, retrieved 2026-10-23. Base URL https://<device>/api/v1,
+      Apollo OS 2.25 or later (devices with more than one encoder or decoder, and the
+      endpoints listing, adding and deleting them, need 2.26), the password grant
+      example, the response envelope (settings, timestamp, message, status ok or
+      error), and endpoint discovery: GET /api/v1 needs no token. The site's home page
+      (https://teradekdev.com/) names the supported products (Prism Jetpack, Prism
+      Flex, Prism Mobile, Prism Rack Unit), the 60 requests per 60 seconds limit and
+      the streaming protocols.
+  - title: Teradek Developer Docs, REST API v1, Authentication
+    author: Teradek
+    url: https://teradekdev.com/docs/authentication
+    note: >
+      Manufacturer document, retrieved 2026-10-23. OAuth 2.0 password grant (RFC
+      6749) on POST /oauth/token with grant_type and the device admin password, the
+      refresh grant, Authorization Bearer, token lifetimes (access 1 hour, refresh 1
+      week, all invalidated by a password change), rate limits (API 60 and OAuth 30
+      requests per 60 seconds, X-RateLimit-Limit/Remaining/Reset headers) and the
+      HTTP status codes (400, 401, 404, 405, 411, 429, 500, 504).
+  - title: Teradek Developer Docs, REST API v1, API Reference (Firmware 2.26 tab)
+    author: Teradek
+    url: https://teradekdev.com/docs/api-reference
+    note: >
+      Manufacturer document, retrieved 2026-10-23, the source of every endpoint here:
+      Response Format, Request Bodies, Query Parameters (?settings= and
+      ?command=description), Pipeline, Stream and Track IDs, Changes in 2.26, System
+      (Device Info, Firmware), Inputs, Encoders (Pipelines, Encoder Info, Video, Audio,
+      Metadata, Recording, Snapshot), Decoders (the same), Streams (Stream Pool,
+      Configuration, Status, Control), Network (Wired, WiFi, Modem) and Settings Sync
+      (Import, Push).
+  - title: Teradek Developer Docs, REST API v1, API Reference (Firmware 2.25 tab)
+    author: Teradek
+    url: https://teradekdev.com/docs/api-reference/2.25
+    note: >
+      Manufacturer document, retrieved 2026-10-23: the same paths with encoder 0,
+      decoder 0 and streams 0 to 4, the per-codec stream modes mode-h264 and
+      mode-hevc, the encoder's audio enable flag, and example replies for stream
+      settings and status in TS mode.
+  - title: Teradek Developer Docs, TypeScript SDK
+    author: Teradek
+    url: https://teradekdev.com/docs/sdk
+    note: >
+      Manufacturer document, retrieved 2026-10-23: rejectUnauthorized false for the
+      device's self-signed certificate, which resources take ?settings= and
+      ?command=description (encoder audio among them), and the error classes.
+  - title: "@teradek/sdk 0.3.0 (npm, MIT License, Teradek LLC)"
+    author: Teradek
+    url: https://www.npmjs.com/package/@teradek/sdk
+    note: >
+      Teradek's own MIT-licensed client (repository bitbucket.org/teradek/tdk-dev-sdk-js),
+      read to corroborate request shapes only: the token requests are form-encoded
+      with no Authorization header; JSON bodies are sent bare (without the settings
+      wrapper); start_all and stop_all are sent on stream 0; the encoder snapshot is
+      a GET and the decoder snapshot a POST, both read as raw bytes.
+
+transport:
+  type: http
+  port: 443
+  scheme: https
+  # The device serves HTTPS with its own certificate (the SDK's
+  # rejectUnauthorized: false).
+  accept_invalid_certs: true
+  auth: bearer
+  # A 401 fails only the request it answers: the token setting is renewed by
+  # the get_access_token and refresh_access_token commands, which must stay
+  # usable when the token has expired (see quirks).
+  refusal_status: []
+  # The device answers 504 itself when a write is not confirmed in time.
+  timeout_ms: 10000
+  # 60 requests per 60 seconds (Authentication, Rate Limiting).
+  pacing: { min_interval_ms: 1000 }
+  # GET /api/v1 needs no token (Getting Started, Endpoint Discovery).
+  probe: { method: GET, path: /api/v1 }
+  endpoints:
+    # The token endpoint, without the bearer token (the SDK sends none).
+    oauth: { port: 443, auth: none }
+
+settings:
+  token:
+    type: string
+    secret: true
+    max_length: 4096
+    label: Access token
+    description: "The OAuth access token sent as Authorization Bearer, from get_access_token or refresh_access_token; it lasts one hour, so the consumer renews it and passes the new one with update_settings."
+
+ports:
+  - { port: 443, protocol: https, role: control, note: "the REST API under /api/v1 and the token endpoint /oauth/token" }
+
+models:
+  - id: prism-jetpack
+    name: Teradek Prism Jetpack
+    supports: &all
+      [get_access_token, refresh_access_token, get_api_root,
+       get_system_info, check_firmware, get_firmware_settings, describe_firmware_settings,
+       set_firmware_settings, set_firmware_auto_check, upgrade_firmware,
+       list_inputs,
+       list_encoders, add_encoder, get_capacity, get_encoder, set_encoder, set_encoder_name,
+       set_encoder_physical_input, set_encoder_network_input, set_encoder_audio_source,
+       delete_encoder, restart_encoder, list_encoder_streams, get_encoder_info,
+       get_encoder_video_settings, describe_encoder_video_settings, set_encoder_video_settings,
+       set_encoder_codec, set_encoder_bitrate, set_encoder_gop_length,
+       list_encoder_audio_tracks, get_encoder_audio_settings, describe_encoder_audio_settings,
+       set_encoder_audio_settings, set_encoder_audio_enabled, get_encoder_audio_track,
+       describe_encoder_audio_track, set_encoder_audio_track, set_encoder_audio_track_muted,
+       get_encoder_metadata_settings, describe_encoder_metadata_settings,
+       set_encoder_metadata_settings, set_encoder_closed_captions, insert_scte_marker,
+       insert_scte_marker_with, get_encoder_record_settings, describe_encoder_record_settings,
+       set_encoder_record_settings, get_encoder_record_info, start_encoder_recording,
+       start_encoder_recording_with, stop_encoder_recording, set_encoder_snapshot_settings,
+       list_decoders, add_decoder, get_decoder, set_decoder, set_decoder_name,
+       set_decoder_failover_timeout, delete_decoder, restart_decoder, list_decoder_streams,
+       get_decoder_info, get_decoder_ingest, set_decoder_ingest, set_decoder_ingest_mode,
+       set_decoder_jitter_buffer, get_decoder_video_settings, describe_decoder_video_settings,
+       set_decoder_video_settings, get_audio_output, describe_audio_output, set_audio_output,
+       set_audio_output_enabled, get_audio_output_channel, describe_audio_output_channel,
+       set_audio_output_channel, set_audio_output_channel_muted,
+       get_decoder_metadata_settings, describe_decoder_metadata_settings,
+       set_decoder_metadata_settings, get_decoder_record_settings,
+       describe_decoder_record_settings, set_decoder_record_settings, get_decoder_record_info,
+       start_decoder_recording, stop_decoder_recording, set_decoder_snapshot_settings,
+       list_streams, add_stream, delete_stream, get_stream, set_stream, set_stream_name,
+       set_stream_mode, set_stream_codec_modes, get_stream_settings, describe_stream_settings,
+       set_stream_settings, get_stream_info, start_stream, stop_stream, start_all_streams,
+       stop_all_streams, start_preview, end_preview, complete_stream, publish_stream,
+       unpublish_stream, broadcast_stream, halt_stream, cancel_stream,
+       get_wired, get_wifi, describe_wifi, set_wifi, get_modem,
+       import_settings, push_settings, push_settings_to]
+    verification: none
+    notes: >
+      Mobile encoder with an integrated monitor (teradekdev.com, Supported Products).
+  - id: prism-flex
+    name: Teradek Prism Flex
+    supports: *all
+    verification: none
+    notes: >
+      4K HDR encoder for multi-camera production (teradekdev.com, Supported Products).
+  - id: prism-mobile
+    name: Teradek Prism Mobile
+    supports: *all
+    verification: none
+    notes: >
+      5G cellular bonding encoder (teradekdev.com, Supported Products); its modems
+      are read with get_modem.
+  - id: prism-ru
+    name: Teradek Prism Rack Unit
+    supports: *all
+    verification: none
+    notes: >
+      Rackmount encoder for permanent installation (teradekdev.com, Supported
+      Products).
+
+commands:
+  # ── Authentication (Authentication) ───────────────────────────────────
+  get_access_token:
+    summary: "Sign in with the device admin password (OAuth 2.0 password grant, POST /oauth/token); returns the token answer {access_token, refresh_token, expires_in, token_type}, whose access_token goes into the token setting"
+    params:
+      password: { type: string, required: true, secret: true, max_length: 256,
+                  label: Admin password,
+                  description: "The device's admin password, as set in its web UI; it is sent once, to the device's own token endpoint." }
+    send: { endpoint: oauth, method: POST, path: /oauth/token, body: "grant_type=password&password={password:url}",
+            content_type: application/x-www-form-urlencoded }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  refresh_access_token:
+    summary: "Get a new access token with the refresh token (OAuth 2.0 refresh grant, POST /oauth/token); returns the token answer, whose access_token goes into the token setting"
+    params:
+      refresh_token: { type: string, required: true, secret: true, max_length: 4096,
+                       label: Refresh token,
+                       description: "The refresh_token from the last token answer; it lasts one week and is invalidated when the device password changes." }
+    send: { endpoint: oauth, method: POST, path: /oauth/token, body: "grant_type=refresh_token&refresh_token={refresh_token:url}",
+            content_type: application/x-www-form-urlencoded }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_api_root:
+    summary: "The API's top-level collections (GET /api/v1, no token needed); returns the endpoints array"
+    send: { method: GET, path: /api/v1 }
+    expect: { status: 200, json_path: "$.endpoints" }
+    returns: value
+
+  # ── System (System: Device Info, Firmware) ────────────────────────────
+  get_system_info:
+    summary: "Device model, serial number and firmware version (GET /api/v1/system/info)"
+    send: { method: GET, path: /api/v1/system/info }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  check_firmware:
+    summary: "Check for a firmware update; returns the latest firmware the device knows of and keeps it, with the message, in state (GET /api/v1/system/firmware/check)"
+    send: { method: GET, path: /api/v1/system/firmware/check }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  get_firmware_settings:
+    summary: "Firmware settings: auto_check (GET /api/v1/system/firmware/settings)"
+    send: { method: GET, path: /api/v1/system/firmware/settings }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  describe_firmware_settings:
+    summary: "Each firmware setting's type, default and allowed values (GET /api/v1/system/firmware/settings?command=description)"
+    send: { method: GET, path: /api/v1/system/firmware/settings, query: { command: description } }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  set_firmware_settings:
+    summary: "Set firmware settings; values is an object of the keys GET /api/v1/system/firmware/settings returns, as described by describe_firmware_settings (PUT /api/v1/system/firmware/settings)"
+    params:
+      values: &values { type: json, required: true,
+                        label: Settings,
+                        description: "A JSON object of the keys to change and their new values, named as the matching GET returns them; the device checks every value and rejects unknown keys." }
+    send: { method: PUT, path: /api/v1/system/firmware/settings, body: '{"settings":{values}}', content_type: application/json }
+    expect: &ok { status: 200, json_equals: { "$.status": "ok" } }
+    returns: ack
+  set_firmware_auto_check:
+    summary: "Turn the automatic firmware update check on or off (PUT /api/v1/system/firmware/settings auto_check)"
+    params:
+      enabled: { type: bool, required: true,
+                 label: Check automatically,
+                 description: "True lets the device check for firmware updates by itself; false stops it." }
+    send: { method: PUT, path: /api/v1/system/firmware/settings, body: '{"settings":{"auto_check":{enabled}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  upgrade_firmware:
+    summary: "Start a firmware upgrade (POST /api/v1/system/firmware/upgrade)"
+    send: { method: POST, path: /api/v1/system/firmware/upgrade }
+    expect: *ok
+    returns: ack
+
+  # ── Inputs (Inputs, 2.26) ─────────────────────────────────────────────
+  list_inputs:
+    summary: "The video inputs with their current signal, and the audio inputs, for an encoder's physical_input and audio_source (GET /api/v1/inputs, 2.26)"
+    send: { method: GET, path: /api/v1/inputs }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Encoder pipelines (Encoders: Pipelines) ───────────────────────────
+  list_encoders:
+    summary: "Every encoder with its state, input, stream ids and audio track ids, and the device's encoder limit and minimum (GET /api/v1/encoders, 2.26)"
+    send: { method: GET, path: /api/v1/encoders }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  add_encoder:
+    summary: "Add an encoder; returns its new id (POST /api/v1/encoders, 2.26)"
+    send: { method: POST, path: /api/v1/encoders }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.id" }
+    returns: value
+  get_capacity:
+    summary: "Encode and decode capacity: budget, use and percent of each, which one limits, the last refusal and the physical inputs in use (GET /api/v1/encoders/capacity, 2.26)"
+    send: { method: GET, path: /api/v1/encoders/capacity }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  get_encoder:
+    summary: "One encoder: name, input, audio source, stream and audio track ids, state and uptime (GET /api/v1/encoders/{id}, 2.26)"
+    params:
+      encoder: &encoder { type: int, min: 0, required: true,
+                          label: Encoder,
+                          description: "The encoder pipeline's id, from list_encoders (pools.encoders); ids can have gaps, and firmware 2.25 has encoder 0 only." }
+    send: { method: GET, path: "/api/v1/encoders/{encoder}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_encoder:
+    summary: "Change an encoder's name, input or audio source; values takes only name, input_type, physical_input, network_input and audio_source (PUT /api/v1/encoders/{id}, 2.26)"
+    params:
+      encoder: *encoder
+      values: { type: json, required: true,
+                label: Encoder settings,
+                description: "A JSON object of name, input_type, physical_input, network_input and audio_source, as GET /api/v1/encoders/{id} returns them; the input ids come from list_inputs." }
+    send: { method: PUT, path: "/api/v1/encoders/{encoder}", body: '{"settings":{values}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_encoder_name:
+    summary: "Rename an encoder (PUT /api/v1/encoders/{id} name, 2.26)"
+    params:
+      encoder: *encoder
+      name: &name { type: string, required: true, max_length: 128,
+                    label: Name,
+                    description: "The display name shown in the web UI and in the lists." }
+    send: { method: PUT, path: "/api/v1/encoders/{encoder}", body: '{"settings":{"name":{name:json}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_encoder_physical_input:
+    summary: "Encode a physical video input (PUT /api/v1/encoders/{id} input_type physical and physical_input, 2.26); encoding restarts"
+    params:
+      encoder: *encoder
+      input: { type: string, required: true, max_length: 64, pattern: "^[A-Za-z0-9_-]+$",
+               label: Video input,
+               description: "The video input's id from list_inputs, such as sdi0 or hdmi0." }
+    send: { method: PUT, path: "/api/v1/encoders/{encoder}", body: '{"settings":{"input_type":"physical","physical_input":{input:json}}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_encoder_network_input:
+    summary: "Encode a network input, named as the device names it, such as Input/Stream/1 (PUT /api/v1/encoders/{id} input_type network and network_input, 2.26); encoding restarts"
+    params:
+      encoder: *encoder
+      input: { type: string, required: true, max_length: 128,
+               label: Network input,
+               description: "The device's internal name of the network input, as an encoder's network_input reads, such as Input/Stream/1." }
+    send: { method: PUT, path: "/api/v1/encoders/{encoder}", body: '{"settings":{"input_type":"network","network_input":{input:json}}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_encoder_audio_source:
+    summary: "Choose an encoder's audio input (PUT /api/v1/encoders/{id} audio_source, 2.26)"
+    params:
+      encoder: *encoder
+      source: { type: string, required: true, max_length: 64, pattern: "^[A-Za-z0-9_-]+$",
+                label: Audio input,
+                description: "The audio input's id from list_inputs, such as embedded, analog or usb." }
+    send: { method: PUT, path: "/api/v1/encoders/{encoder}", body: '{"settings":{"audio_source":{source:json}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  delete_encoder:
+    summary: "Delete an encoder (DELETE /api/v1/encoders/{id}, 2.26); the last one, a protected one, or one at the device's minimum cannot be deleted"
+    params: { encoder: *encoder }
+    send: { method: DELETE, path: "/api/v1/encoders/{encoder}" }
+    expect: *ok
+    returns: ack
+  restart_encoder:
+    summary: "Restart a running encoder (POST /api/v1/encoders/{id}/restart, 2.26)"
+    params: { encoder: *encoder }
+    send: { method: POST, path: "/api/v1/encoders/{encoder}/restart" }
+    expect: *ok
+    returns: ack
+  list_encoder_streams:
+    summary: "The streams an encoder owns, in display order, with their mode and state (GET /api/v1/encoders/{id}/streams, 2.26)"
+    params: { encoder: *encoder }
+    send: { method: GET, path: "/api/v1/encoders/{encoder}/streams" }
+    expect: { status: 200, json_path: "$.streams" }
+    returns: value
+  get_encoder_info:
+    summary: "Encoder status: video format, actual and target bitrate, generator, and the pipeline's state, uptime and start time (GET /api/v1/encoders/{id}/info)"
+    params: { encoder: *encoder }
+    send: { method: GET, path: "/api/v1/encoders/{encoder}/info" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+
+  # ── Encoder video (Encoders: Video) ───────────────────────────────────
+  get_encoder_video_settings:
+    summary: "Encoding, scaling and color settings (GET /api/v1/encoders/{id}/video/settings)"
+    params: { encoder: *encoder }
+    send: { method: GET, path: "/api/v1/encoders/{encoder}/video/settings" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  describe_encoder_video_settings:
+    summary: "Each video setting's label, default, type, choices and their display names, range and help (GET /api/v1/encoders/{id}/video/settings?command=description)"
+    params: { encoder: *encoder }
+    send: { method: GET, path: "/api/v1/encoders/{encoder}/video/settings", query: { command: description } }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  set_encoder_video_settings:
+    summary: "Set video settings; values is an object of the keys GET /api/v1/encoders/{id}/video/settings returns, as describe_encoder_video_settings describes them (PUT /api/v1/encoders/{id}/video/settings)"
+    params: { encoder: *encoder, values: *values }
+    send: { method: PUT, path: "/api/v1/encoders/{encoder}/video/settings", body: '{"settings":{values}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_encoder_codec:
+    summary: "Encode H.264 or HEVC (PUT /api/v1/encoders/{id}/video/settings codec)"
+    params:
+      encoder: *encoder
+      codec: { type: enum, values: [h264, hevc], required: true,
+               label: Codec,
+               description: "h264 for H.264 (AVC), hevc for HEVC (H.265)." }
+    send: { method: PUT, path: "/api/v1/encoders/{encoder}/video/settings", body: '{"settings":{"codec":"{codec}"}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_encoder_bitrate:
+    summary: "Set the video bitrate in kbps (PUT /api/v1/encoders/{id}/video/settings bitrate_list)"
+    params:
+      encoder: *encoder
+      kbps: { type: int, min: 100, max: 80000, required: true,
+              label: Video bitrate,
+              description: "The video bitrate in kilobits per second, 100 to 80000 as the device describes it; the device may allow less for some modes." }
+    send: { method: PUT, path: "/api/v1/encoders/{encoder}/video/settings", body: '{"settings":{"bitrate_list":{kbps}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_encoder_gop_length:
+    summary: "Set the GOP length in frames, including the I picture (PUT /api/v1/encoders/{id}/video/settings gop_length)"
+    params:
+      encoder: *encoder
+      frames: { type: int, min: 0, max: 1000, required: true,
+                label: GOP length,
+                description: "Frames from one I picture to the next, including it; the device's default is 30." }
+    send: { method: PUT, path: "/api/v1/encoders/{encoder}/video/settings", body: '{"settings":{"gop_length":{frames}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  # ── Encoder audio (Encoders: Audio) ───────────────────────────────────
+  list_encoder_audio_tracks:
+    summary: "The audio tracks attached to an encoder (up to 8) with codec, channels, bitrate, sample rate and mute (GET /api/v1/encoders/{id}/audio, 2.26)"
+    params: { encoder: *encoder }
+    send: { method: GET, path: "/api/v1/encoders/{encoder}/audio" }
+    expect: { status: 200, json_path: "$.tracks" }
+    returns: value
+  get_encoder_audio_settings:
+    summary: "The first audio track's settings (GET /api/v1/encoders/{id}/audio/settings)"
+    params: { encoder: *encoder }
+    send: { method: GET, path: "/api/v1/encoders/{encoder}/audio/settings" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  describe_encoder_audio_settings:
+    summary: "Each audio setting's type, default and allowed values (GET /api/v1/encoders/{id}/audio/settings?command=description)"
+    params: { encoder: *encoder }
+    send: { method: GET, path: "/api/v1/encoders/{encoder}/audio/settings", query: { command: description } }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  set_encoder_audio_settings:
+    summary: "Set the first audio track's settings; values is an object of the keys GET /api/v1/encoders/{id}/audio/settings returns (PUT /api/v1/encoders/{id}/audio/settings)"
+    params: { encoder: *encoder, values: *values }
+    send: { method: PUT, path: "/api/v1/encoders/{encoder}/audio/settings", body: '{"settings":{values}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_encoder_audio_enabled:
+    summary: "Turn the first audio track on or off (PUT /api/v1/encoders/{id}/audio/settings enable; on 2.26 the opposite of mute_track)"
+    params:
+      encoder: *encoder
+      enabled: { type: bool, required: true,
+                 label: Audio on,
+                 description: "True sends the first audio track's audio; false mutes it." }
+    send: { method: PUT, path: "/api/v1/encoders/{encoder}/audio/settings", body: '{"settings":{"enable":{enabled}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  get_encoder_audio_track:
+    summary: "One audio track's settings (GET /api/v1/encoders/{id}/audio/{tid}/settings, 2.26)"
+    params:
+      encoder: *encoder
+      track: &track { type: int, min: 0, required: true,
+                      label: Audio track,
+                      description: "The audio track's id, from list_encoder_audio_tracks; the track must be attached to this encoder." }
+    send: { method: GET, path: "/api/v1/encoders/{encoder}/audio/{track}/settings" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  describe_encoder_audio_track:
+    summary: "Each of an audio track's settings described (GET /api/v1/encoders/{id}/audio/{tid}/settings?command=description, 2.26)"
+    params: { encoder: *encoder, track: *track }
+    send: { method: GET, path: "/api/v1/encoders/{encoder}/audio/{track}/settings", query: { command: description } }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  set_encoder_audio_track:
+    summary: "Set one audio track's settings; values is an object of the keys its GET returns (PUT /api/v1/encoders/{id}/audio/{tid}/settings, 2.26)"
+    params: { encoder: *encoder, track: *track, values: *values }
+    send: { method: PUT, path: "/api/v1/encoders/{encoder}/audio/{track}/settings", body: '{"settings":{values}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_encoder_audio_track_muted:
+    summary: "Mute or unmute one audio track (PUT /api/v1/encoders/{id}/audio/{tid}/settings mute_track, 2.26)"
+    params:
+      encoder: *encoder
+      track: *track
+      muted: { type: bool, required: true,
+               label: Muted,
+               description: "True mutes the track; false sends its audio." }
+    send: { method: PUT, path: "/api/v1/encoders/{encoder}/audio/{track}/settings", body: '{"settings":{"mute_track":{muted}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  # ── Encoder metadata and SCTE (Encoders: Metadata) ────────────────────
+  get_encoder_metadata_settings:
+    summary: "Metadata settings: SCTE marker fields, timecode source, DPI and closed captions (GET /api/v1/encoders/{id}/metadata/settings)"
+    params: { encoder: *encoder }
+    send: { method: GET, path: "/api/v1/encoders/{encoder}/metadata/settings" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  describe_encoder_metadata_settings:
+    summary: "Each metadata setting's type, default and allowed values (GET /api/v1/encoders/{id}/metadata/settings?command=description)"
+    params: { encoder: *encoder }
+    send: { method: GET, path: "/api/v1/encoders/{encoder}/metadata/settings", query: { command: description } }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  set_encoder_metadata_settings:
+    summary: "Set metadata settings; values is an object of the keys GET /api/v1/encoders/{id}/metadata/settings returns (PUT /api/v1/encoders/{id}/metadata/settings)"
+    params: { encoder: *encoder, values: *values }
+    send: { method: PUT, path: "/api/v1/encoders/{encoder}/metadata/settings", body: '{"settings":{values}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_encoder_closed_captions:
+    summary: "Pass closed captions through or not (PUT /api/v1/encoders/{id}/metadata/settings closed-captions)"
+    params:
+      encoder: *encoder
+      enabled: { type: bool, required: true,
+                 label: Closed captions,
+                 description: "True carries the input's closed captions in the encoded stream; false leaves them out." }
+    send: { method: PUT, path: "/api/v1/encoders/{encoder}/metadata/settings", body: '{"settings":{"closed-captions":{enabled}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  insert_scte_marker:
+    summary: "Insert an SCTE marker with the saved metadata settings (POST /api/v1/encoders/{id}/metadata/scte); needs the device's SCTE license"
+    params: { encoder: *encoder }
+    send: { method: POST, path: "/api/v1/encoders/{encoder}/metadata/scte" }
+    expect: *ok
+    returns: ack
+  insert_scte_marker_with:
+    summary: "Save SCTE fields to the metadata settings, then insert a marker with them; values is an object of metadata settings keys such as break_duration and splice_type (POST /api/v1/encoders/{id}/metadata/scte)"
+    params:
+      encoder: *encoder
+      values: { type: json, required: true,
+                label: Marker fields,
+                description: "A JSON object of metadata settings keys (break_duration in ms, splice_type, event_id, pre_roll, avail_num, avail_expect, program_id, network_event); they are saved and apply to later markers too." }
+    send: { method: POST, path: "/api/v1/encoders/{encoder}/metadata/scte", body: '{"settings":{values}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  # ── Encoder recording (Encoders: Recording) ───────────────────────────
+  get_encoder_record_settings:
+    summary: "Recording settings: mode, file name pattern, format, file limits, drive, auto record and the audio tracks recorded (GET /api/v1/encoders/{id}/record/settings)"
+    params: { encoder: *encoder }
+    send: { method: GET, path: "/api/v1/encoders/{encoder}/record/settings" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  describe_encoder_record_settings:
+    summary: "Each recording setting's type, default and allowed values (GET /api/v1/encoders/{id}/record/settings?command=description)"
+    params: { encoder: *encoder }
+    send: { method: GET, path: "/api/v1/encoders/{encoder}/record/settings", query: { command: description } }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  set_encoder_record_settings:
+    summary: "Set recording settings; values is an object of the keys GET /api/v1/encoders/{id}/record/settings returns (PUT /api/v1/encoders/{id}/record/settings)"
+    params: { encoder: *encoder, values: *values }
+    send: { method: PUT, path: "/api/v1/encoders/{encoder}/record/settings", body: '{"settings":{values}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  get_encoder_record_info:
+    summary: "Recording status: state, uptime, and the drive's format, size, used and available space (GET /api/v1/encoders/{id}/record/info)"
+    params: { encoder: *encoder }
+    send: { method: GET, path: "/api/v1/encoders/{encoder}/record/info" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  start_encoder_recording:
+    summary: "Start recording (POST /api/v1/encoders/{id}/record/start); fails with Unable to record when it cannot, such as with no input signal"
+    params: { encoder: *encoder }
+    send: { method: POST, path: "/api/v1/encoders/{encoder}/record/start" }
+    expect: *ok
+    returns: ack
+  start_encoder_recording_with:
+    summary: "Save recording settings, then start recording; values is an object of the keys GET /api/v1/encoders/{id}/record/settings returns (POST /api/v1/encoders/{id}/record/start)"
+    params: { encoder: *encoder, values: *values }
+    send: { method: POST, path: "/api/v1/encoders/{encoder}/record/start", body: '{"settings":{values}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  stop_encoder_recording:
+    summary: "Stop recording (POST /api/v1/encoders/{id}/record/stop)"
+    params: { encoder: *encoder }
+    send: { method: POST, path: "/api/v1/encoders/{encoder}/record/stop" }
+    expect: *ok
+    returns: ack
+  set_encoder_snapshot_settings:
+    summary: "Set the size and JPEG quality of the encoder's periodic snapshot, applied from the next one (POST /api/v1/encoders/{id}/snapshot, 2.26); the image in the reply is not returned"
+    params:
+      encoder: *encoder
+      width: &snap_width { type: int, min: 1, max: 7680, required: true,
+                           label: Width,
+                           description: "The snapshot's width in pixels, such as 768." }
+      height: &snap_height { type: int, min: 1, max: 4320, required: true,
+                             label: Height,
+                             description: "The snapshot's height in pixels, such as 432." }
+      quality: &snap_quality { type: int, min: 1, max: 100, required: true,
+                               label: JPEG quality,
+                               description: "The JPEG quality, such as 80; higher is sharper and larger." }
+    send: { method: POST, path: "/api/v1/encoders/{encoder}/snapshot",
+            body: '{"settings":{"width":{width},"height":{height},"quality":{quality}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Decoder pipelines (Decoders: Pipelines) ───────────────────────────
+  list_decoders:
+    summary: "Every decoder with its state, ingest ids (primary first), restream ids and failover timeout, and the device's decoder limit and minimum (GET /api/v1/decoders, 2.26)"
+    send: { method: GET, path: /api/v1/decoders }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  add_decoder:
+    summary: "Add a decoder; returns its new id (POST /api/v1/decoders, 2.26)"
+    send: { method: POST, path: /api/v1/decoders }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.id" }
+    returns: value
+  get_decoder:
+    summary: "One decoder: name, failover timeout, ingest and restream ids, state and uptime (GET /api/v1/decoders/{id}, 2.26)"
+    params:
+      decoder: &decoder { type: int, min: 0, required: true,
+                          label: Decoder,
+                          description: "The decoder pipeline's id, from list_decoders (pools.decoders); ids can have gaps, and firmware 2.25 uses decoder 0 whatever is given." }
+    send: { method: GET, path: "/api/v1/decoders/{decoder}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_decoder:
+    summary: "Change a decoder's name or failover timeout; values takes only name and failover_timeout_ms (PUT /api/v1/decoders/{id}, 2.26)"
+    params:
+      decoder: *decoder
+      values: { type: json, required: true,
+                label: Decoder settings,
+                description: "A JSON object of name and failover_timeout_ms (milliseconds), as GET /api/v1/decoders/{id} returns them." }
+    send: { method: PUT, path: "/api/v1/decoders/{decoder}", body: '{"settings":{values}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_decoder_name:
+    summary: "Rename a decoder (PUT /api/v1/decoders/{id} name, 2.26)"
+    params: { decoder: *decoder, name: *name }
+    send: { method: PUT, path: "/api/v1/decoders/{decoder}", body: '{"settings":{"name":{name:json}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_decoder_failover_timeout:
+    summary: "Set how long the primary ingest may fail before the decoder switches to the failover ingest (PUT /api/v1/decoders/{id} failover_timeout_ms, 2.26)"
+    params:
+      decoder: *decoder
+      ms: { type: int, min: 0, required: true,
+            label: Failover timeout,
+            description: "Milliseconds without the primary ingest before the decoder fails over, such as 1000." }
+    send: { method: PUT, path: "/api/v1/decoders/{decoder}", body: '{"settings":{"failover_timeout_ms":{ms}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  delete_decoder:
+    summary: "Delete a decoder (DELETE /api/v1/decoders/{id}, 2.26); the last one cannot be deleted"
+    params: { decoder: *decoder }
+    send: { method: DELETE, path: "/api/v1/decoders/{decoder}" }
+    expect: *ok
+    returns: ack
+  restart_decoder:
+    summary: "Restart a running decoder (POST /api/v1/decoders/{id}/restart, 2.26)"
+    params: { decoder: *decoder }
+    send: { method: POST, path: "/api/v1/decoders/{decoder}/restart" }
+    expect: *ok
+    returns: ack
+  list_decoder_streams:
+    summary: "The streams a decoder restreams to, with their mode and state (GET /api/v1/decoders/{id}/streams, 2.26)"
+    params: { decoder: *decoder }
+    send: { method: GET, path: "/api/v1/decoders/{decoder}/streams" }
+    expect: { status: 200, json_path: "$.streams" }
+    returns: value
+  get_decoder_info:
+    summary: "Decoder status: format, status, and the pipeline's state, uptime and start time (GET /api/v1/decoders/{id}/info)"
+    params: { decoder: *decoder }
+    send: { method: GET, path: "/api/v1/decoders/{decoder}/info" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+
+  # ── Decoder ingest and video (Decoders: Video) ────────────────────────
+  get_decoder_ingest:
+    summary: "The primary ingest: mode, name, jitter buffer and whether it is restreamed (GET /api/v1/decoders/{id}/video/mode)"
+    params: { decoder: *decoder }
+    send: { method: GET, path: "/api/v1/decoders/{decoder}/video/mode" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  set_decoder_ingest:
+    summary: "Set the ingest's mode, name or jitter buffer; values is an object of the keys GET /api/v1/decoders/{id}/video/mode returns (PUT /api/v1/decoders/{id}/video/mode)"
+    params: { decoder: *decoder, values: *values }
+    send: { method: PUT, path: "/api/v1/decoders/{decoder}/video/mode", body: '{"settings":{values}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_decoder_ingest_mode:
+    summary: "Set the ingest protocol, such as TS or SRT (PUT /api/v1/decoders/{id}/video/mode mode)"
+    params:
+      decoder: *decoder
+      mode: &stream_mode { type: string, required: true, max_length: 32, pattern: "^[A-Za-z0-9._-]+$",
+                           label: Mode,
+                           description: "The protocol by the device's own name, such as Disabled, TS, SRT, RTSP, RTP, RIST, HLS, DASH, RTMP, WHIP, WHEP or Bond; describe_stream_settings and the web UI list what a unit offers." }
+    send: { method: PUT, path: "/api/v1/decoders/{decoder}/video/mode", body: '{"settings":{"mode":{mode:json}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_decoder_jitter_buffer:
+    summary: "Set the ingest's jitter buffer target and maximum delay in ms (PUT /api/v1/decoders/{id}/video/mode jitter-buffer-target-delay and jitter-buffer-max-delay)"
+    params:
+      decoder: *decoder
+      target_ms: { type: int, min: 0, required: true,
+                   label: Target delay,
+                   description: "The jitter buffer's target delay in milliseconds, such as 300." }
+      max_ms: { type: int, min: 0, required: true,
+                label: Maximum delay,
+                description: "The jitter buffer's maximum delay in milliseconds, such as 500." }
+    send: { method: PUT, path: "/api/v1/decoders/{decoder}/video/mode",
+            body: '{"settings":{"jitter-buffer-target-delay":{target_ms},"jitter-buffer-max-delay":{max_ms}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  get_decoder_video_settings:
+    summary: "The settings of the current ingest mode, such as ports and hosts (GET /api/v1/decoders/{id}/video/settings)"
+    params: { decoder: *decoder }
+    send: { method: GET, path: "/api/v1/decoders/{decoder}/video/settings" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  describe_decoder_video_settings:
+    summary: "Each of the current ingest mode's settings described (GET /api/v1/decoders/{id}/video/settings?command=description)"
+    params: { decoder: *decoder }
+    send: { method: GET, path: "/api/v1/decoders/{decoder}/video/settings", query: { command: description } }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  set_decoder_video_settings:
+    summary: "Set the current ingest mode's settings; values is an object of the keys GET /api/v1/decoders/{id}/video/settings returns (PUT /api/v1/decoders/{id}/video/settings)"
+    params: { decoder: *decoder, values: *values }
+    send: { method: PUT, path: "/api/v1/decoders/{decoder}/video/settings", body: '{"settings":{values}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  # ── Audio output, shared by all decoders (Decoders: Audio) ────────────
+  get_audio_output:
+    summary: "The physical audio output's settings, shared by all decoders (GET /api/v1/decoders/{id}/audio/settings)"
+    params: { decoder: *decoder }
+    send: { method: GET, path: "/api/v1/decoders/{decoder}/audio/settings" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  describe_audio_output:
+    summary: "Each audio output setting described (GET /api/v1/decoders/{id}/audio/settings?command=description)"
+    params: { decoder: *decoder }
+    send: { method: GET, path: "/api/v1/decoders/{decoder}/audio/settings", query: { command: description } }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  set_audio_output:
+    summary: "Set the physical audio output's settings, shared by all decoders; values is an object of the keys its GET returns (PUT /api/v1/decoders/{id}/audio/settings)"
+    params: { decoder: *decoder, values: *values }
+    send: { method: PUT, path: "/api/v1/decoders/{decoder}/audio/settings", body: '{"settings":{values}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_audio_output_enabled:
+    summary: "Turn the physical audio output on or off (PUT /api/v1/decoders/{id}/audio/settings enable)"
+    params:
+      decoder: *decoder
+      enabled: { type: bool, required: true,
+                 label: Audio output on,
+                 description: "True outputs the decoded audio; false turns the output off." }
+    send: { method: PUT, path: "/api/v1/decoders/{decoder}/audio/settings", body: '{"settings":{"enable":{enabled}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  get_audio_output_channel:
+    summary: "One output channel's mute, source track and volume (GET /api/v1/decoders/{id}/audio/{0-15})"
+    params:
+      decoder: *decoder
+      channel: &channel { type: int, min: 0, max: 15, required: true,
+                          label: Output channel,
+                          description: "The audio output channel, 0 to 15." }
+    send: { method: GET, path: "/api/v1/decoders/{decoder}/audio/{channel}" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  describe_audio_output_channel:
+    summary: "Each of an output channel's settings described (GET /api/v1/decoders/{id}/audio/{0-15}?command=description)"
+    params: { decoder: *decoder, channel: *channel }
+    send: { method: GET, path: "/api/v1/decoders/{decoder}/audio/{channel}", query: { command: description } }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  set_audio_output_channel:
+    summary: "Set an output channel's settings; values is an object of mute, track and volume as its GET returns them (PUT /api/v1/decoders/{id}/audio/{0-15})"
+    params: { decoder: *decoder, channel: *channel, values: *values }
+    send: { method: PUT, path: "/api/v1/decoders/{decoder}/audio/{channel}", body: '{"settings":{values}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_audio_output_channel_muted:
+    summary: "Mute or unmute one output channel (PUT /api/v1/decoders/{id}/audio/{0-15} mute)"
+    params:
+      decoder: *decoder
+      channel: *channel
+      muted: { type: bool, required: true,
+               label: Muted,
+               description: "True mutes the channel; false outputs it." }
+    send: { method: PUT, path: "/api/v1/decoders/{decoder}/audio/{channel}", body: '{"settings":{"mute":{muted}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  # ── Decoder metadata and recording (Decoders: Metadata, Recording) ────
+  get_decoder_metadata_settings:
+    summary: "Metadata inserted into the decoder's output: closed captions, DPI and timecode, and their lines (GET /api/v1/decoders/{id}/metadata/settings)"
+    params: { decoder: *decoder }
+    send: { method: GET, path: "/api/v1/decoders/{decoder}/metadata/settings" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  describe_decoder_metadata_settings:
+    summary: "Each decoder metadata setting described (GET /api/v1/decoders/{id}/metadata/settings?command=description)"
+    params: { decoder: *decoder }
+    send: { method: GET, path: "/api/v1/decoders/{decoder}/metadata/settings", query: { command: description } }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  set_decoder_metadata_settings:
+    summary: "Set the decoder's metadata settings; values is an object of the keys its GET returns (PUT /api/v1/decoders/{id}/metadata/settings)"
+    params: { decoder: *decoder, values: *values }
+    send: { method: PUT, path: "/api/v1/decoders/{decoder}/metadata/settings", body: '{"settings":{values}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  get_decoder_record_settings:
+    summary: "The decoder's recording settings (GET /api/v1/decoders/{id}/record/settings)"
+    params: { decoder: *decoder }
+    send: { method: GET, path: "/api/v1/decoders/{decoder}/record/settings" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  describe_decoder_record_settings:
+    summary: "Each decoder recording setting described (GET /api/v1/decoders/{id}/record/settings?command=description)"
+    params: { decoder: *decoder }
+    send: { method: GET, path: "/api/v1/decoders/{decoder}/record/settings", query: { command: description } }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  set_decoder_record_settings:
+    summary: "Set the decoder's recording settings; values is an object of the keys its GET returns (PUT /api/v1/decoders/{id}/record/settings)"
+    params: { decoder: *decoder, values: *values }
+    send: { method: PUT, path: "/api/v1/decoders/{decoder}/record/settings", body: '{"settings":{values}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  get_decoder_record_info:
+    summary: "The decoder's recording status (GET /api/v1/decoders/{id}/record/info)"
+    params: { decoder: *decoder }
+    send: { method: GET, path: "/api/v1/decoders/{decoder}/record/info" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  start_decoder_recording:
+    summary: "Start recording the decoder's output (POST /api/v1/decoders/{id}/record/start)"
+    params: { decoder: *decoder }
+    send: { method: POST, path: "/api/v1/decoders/{decoder}/record/start" }
+    expect: *ok
+    returns: ack
+  stop_decoder_recording:
+    summary: "Stop recording the decoder's output (POST /api/v1/decoders/{id}/record/stop)"
+    params: { decoder: *decoder }
+    send: { method: POST, path: "/api/v1/decoders/{decoder}/record/stop" }
+    expect: *ok
+    returns: ack
+  set_decoder_snapshot_settings:
+    summary: "Set the size and JPEG quality of the decoder's periodic snapshot, applied from the next one (POST /api/v1/decoders/{id}/snapshot, 2.26); the image in the reply is not returned"
+    params: { decoder: *decoder, width: *snap_width, height: *snap_height, quality: *snap_quality }
+    send: { method: POST, path: "/api/v1/decoders/{decoder}/snapshot",
+            body: '{"settings":{"width":{width},"height":{height},"quality":{quality}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Streams (Streams: Stream Pool, Configuration, Status, Control) ────
+  list_streams:
+    summary: "Every stream in the shared pool with its name, mode, state and owner, the pool's limit and minimum, and the protected ids (GET /api/v1/streams, 2.26)"
+    send: { method: GET, path: /api/v1/streams }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  add_stream:
+    summary: "Add a stream to the pool; returns its new id, and it has no owner until attached in the web UI (POST /api/v1/streams, 2.26)"
+    send: { method: POST, path: /api/v1/streams }
+    expect: { status: 200, json_equals: { "$.status": "ok" }, json_path: "$.id" }
+    returns: value
+  delete_stream:
+    summary: "Delete a stream from the pool (DELETE /api/v1/streams/{sid}, 2.26); stream 0 is protected"
+    params:
+      stream: &stream { type: int, min: 0, required: true,
+                        label: Stream,
+                        description: "The stream's id in the shared pool, from list_streams; Stream 1 is id 0, ids can have gaps, and firmware 2.25 has streams 0 to 4." }
+    send: { method: DELETE, path: "/api/v1/streams/{stream}" }
+    expect: *ok
+    returns: ack
+  get_stream:
+    summary: "A stream's configuration: name, mode, audio track selection and owner (GET /api/v1/streams/{sid})"
+    params: { stream: *stream }
+    send: { method: GET, path: "/api/v1/streams/{stream}" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  set_stream:
+    summary: "Set a stream's configuration; values is an object of name, mode, audio_track_selection and audio_tracks as GET /api/v1/streams/{sid} returns them (PUT /api/v1/streams/{sid})"
+    params: { stream: *stream, values: *values }
+    send: { method: PUT, path: "/api/v1/streams/{stream}", body: '{"settings":{values}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_stream_name:
+    summary: "Rename a stream (PUT /api/v1/streams/{sid} name)"
+    params: { stream: *stream, name: *name }
+    send: { method: PUT, path: "/api/v1/streams/{stream}", body: '{"settings":{"name":{name:json}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_stream_mode:
+    summary: "Set a stream's protocol, such as SRT, or Disabled (PUT /api/v1/streams/{sid} mode, 2.26)"
+    params: { stream: *stream, mode: *stream_mode }
+    send: { method: PUT, path: "/api/v1/streams/{stream}", body: '{"settings":{"mode":{mode:json}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_stream_codec_modes:
+    summary: "Set a stream's protocol for H.264 and for HEVC encoding, as firmware 2.25 keeps them (PUT /api/v1/streams/{sid} mode-h264 and mode-hevc; 2.26 writes them to mode)"
+    params:
+      stream: *stream
+      mode_h264: { type: string, required: true, max_length: 32, pattern: "^[A-Za-z0-9._-]+$",
+                   label: Mode for H.264,
+                   description: "The protocol used while encoding H.264, by the device's own name such as TS, SRT or Disabled." }
+      mode_hevc: { type: string, required: true, max_length: 32, pattern: "^[A-Za-z0-9._-]+$",
+                   label: Mode for HEVC,
+                   description: "The protocol used while encoding HEVC, by the device's own name such as TS, SRT or Disabled." }
+    send: { method: PUT, path: "/api/v1/streams/{stream}", body: '{"settings":{"mode-h264":{mode_h264:json},"mode-hevc":{mode_hevc:json}}}',
+            content_type: application/json }
+    expect: *ok
+    returns: ack
+  get_stream_settings:
+    summary: "The settings of the stream's current mode, such as the SRT connection type, ports, latency and encryption; fails with Stream is Disabled when its mode is Disabled (GET /api/v1/streams/{sid}/settings)"
+    params: { stream: *stream }
+    send: { method: GET, path: "/api/v1/streams/{stream}/settings" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  describe_stream_settings:
+    summary: "Each of the current mode's settings described: label, default, type, choices and their display names, range (GET /api/v1/streams/{sid}/settings?command=description)"
+    params: { stream: *stream }
+    send: { method: GET, path: "/api/v1/streams/{stream}/settings", query: { command: description } }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  set_stream_settings:
+    summary: "Set the current mode's settings; values is an object of the keys GET /api/v1/streams/{sid}/settings returns (PUT /api/v1/streams/{sid}/settings)"
+    params: { stream: *stream, values: *values }
+    send: { method: PUT, path: "/api/v1/streams/{stream}/settings", body: '{"settings":{values}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  get_stream_info:
+    summary: "A stream's status: state and details, uptime, URL, port, latency, encryption and traffic statistics (GET /api/v1/streams/{sid}/info)"
+    params: { stream: *stream }
+    send: { method: GET, path: "/api/v1/streams/{stream}/info" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  start_stream:
+    summary: "Start a stream: publish for RTMP, Twitch, Wowza, Facebook, DolbyIO, PhenixRTS and WHIP, broadcast for YouTubeLive, start for the others such as Bond (POST /api/v1/streams/{sid}/start)"
+    params: { stream: *stream }
+    send: { method: POST, path: "/api/v1/streams/{stream}/start" }
+    expect: *ok
+    returns: ack
+  stop_stream:
+    summary: "Stop a stream: unpublish, halt for YouTubeLive, or stop, by its mode (POST /api/v1/streams/{sid}/stop)"
+    params: { stream: *stream }
+    send: { method: POST, path: "/api/v1/streams/{stream}/stop" }
+    expect: *ok
+    returns: ack
+  start_all_streams:
+    summary: "Start all streams (POST /api/v1/streams/0/start_all)"
+    send: { method: POST, path: /api/v1/streams/0/start_all }
+    expect: *ok
+    returns: ack
+  stop_all_streams:
+    summary: "Stop all streams (POST /api/v1/streams/0/stop_all)"
+    send: { method: POST, path: /api/v1/streams/0/stop_all }
+    expect: *ok
+    returns: ack
+  start_preview:
+    summary: "Start a stream's preview (POST /api/v1/streams/{sid}/preview)"
+    params: { stream: *stream }
+    send: { method: POST, path: "/api/v1/streams/{stream}/preview" }
+    expect: *ok
+    returns: ack
+  end_preview:
+    summary: "End a stream's preview (POST /api/v1/streams/{sid}/endpreview)"
+    params: { stream: *stream }
+    send: { method: POST, path: "/api/v1/streams/{stream}/endpreview" }
+    expect: *ok
+    returns: ack
+  complete_stream:
+    summary: "Mark a stream complete (POST /api/v1/streams/{sid}/complete)"
+    params: { stream: *stream }
+    send: { method: POST, path: "/api/v1/streams/{stream}/complete" }
+    expect: *ok
+    returns: ack
+  publish_stream:
+    summary: "Send the publish action to a stream (POST /api/v1/streams/{sid}/publish, 2.26)"
+    params: { stream: *stream }
+    send: { method: POST, path: "/api/v1/streams/{stream}/publish" }
+    expect: *ok
+    returns: ack
+  unpublish_stream:
+    summary: "Send the unpublish action to a stream (POST /api/v1/streams/{sid}/unpublish, 2.26)"
+    params: { stream: *stream }
+    send: { method: POST, path: "/api/v1/streams/{stream}/unpublish" }
+    expect: *ok
+    returns: ack
+  broadcast_stream:
+    summary: "Send the broadcast action to a stream (POST /api/v1/streams/{sid}/broadcast, 2.26)"
+    params: { stream: *stream }
+    send: { method: POST, path: "/api/v1/streams/{stream}/broadcast" }
+    expect: *ok
+    returns: ack
+  halt_stream:
+    summary: "Send the halt action to a stream (POST /api/v1/streams/{sid}/halt, 2.26)"
+    params: { stream: *stream }
+    send: { method: POST, path: "/api/v1/streams/{stream}/halt" }
+    expect: *ok
+    returns: ack
+  cancel_stream:
+    summary: "Send the cancel action to a stream (POST /api/v1/streams/{sid}/cancel, 2.26)"
+    params: { stream: *stream }
+    send: { method: POST, path: "/api/v1/streams/{stream}/cancel" }
+    expect: *ok
+    returns: ack
+
+  # ── Network (Network: Wired, WiFi, Modem) ─────────────────────────────
+  get_wired:
+    summary: "A wired port's status: label, status, detail and MAC address (GET /api/v1/network/wired/{0-1})"
+    params:
+      port: { type: int, min: 0, max: 1, required: true,
+              label: Wired port,
+              description: "The wired Ethernet port, 0 or 1." }
+    send: { method: GET, path: "/api/v1/network/wired/{port}" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  get_wifi:
+    summary: "Wi-Fi settings and status: label, status, network, IP address, mask and MAC address (GET /api/v1/network/wifi)"
+    send: { method: GET, path: /api/v1/network/wifi }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  describe_wifi:
+    summary: "Each Wi-Fi setting's type, default and allowed values (GET /api/v1/network/wifi?command=description)"
+    send: { method: GET, path: /api/v1/network/wifi, query: { command: description } }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+  set_wifi:
+    summary: "Set Wi-Fi settings; values is an object of the keys GET /api/v1/network/wifi returns, such as Network and IP Address (PUT /api/v1/network/wifi)"
+    params: { values: *values }
+    send: { method: PUT, path: /api/v1/network/wifi, body: '{"settings":{values}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  get_modem:
+    summary: "A cellular modem's status: type, model, version, status, carrier report, RSSI, IMEI, IMSI and ICCID (GET /api/v1/network/modem/{0-7})"
+    params:
+      modem: { type: int, min: 0, max: 7, required: true,
+               label: Modem,
+               description: "The modem, 0 to 7." }
+    send: { method: GET, path: "/api/v1/network/modem/{modem}" }
+    expect: { status: 200, json_path: "$.settings" }
+    returns: value
+
+  # ── Settings sync (Settings Sync: Import, Push) ───────────────────────
+  import_settings:
+    summary: "Import the settings of another Teradek device into this one (POST /api/v1/settings/sync/import)"
+    params:
+      type: { type: string, default: encoder, max_length: 32, pattern: "^[a-z]+$",
+              label: Settings type,
+              description: "Which settings to import, as the document's example names them: encoder." }
+      host: &sync_host { type: string, required: true, max_length: 253, pattern: "^[A-Za-z0-9.:-]+$",
+                         label: Device address,
+                         description: "The other device's IP address or host name, such as 192.168.1.50." }
+      password: &sync_password { type: string, required: true, secret: true, max_length: 256,
+                                 label: Device password,
+                                 description: "The other device's admin password." }
+    send: { method: POST, path: /api/v1/settings/sync/import,
+            body: '{"type":{type:json},"settings":{"host":{host:json},"password":{password:json}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  push_settings:
+    summary: "Push this device's settings to up to 10 other devices; targets is the document's array of {host, password} (POST /api/v1/settings/sync/push)"
+    params:
+      targets: { type: json, required: true,
+                 label: Targets,
+                 description: "A JSON array of up to 10 objects, each the host and admin password of a device to receive the settings: [{\"host\": \"192.168.1.51\", \"password\": \"...\"}]." }
+    send: { method: POST, path: /api/v1/settings/sync/push, body: '{"targets":{targets}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  push_settings_to:
+    summary: "Push this device's settings to one other device (POST /api/v1/settings/sync/push with one target)"
+    params: { host: *sync_host, password: *sync_password }
+    send: { method: POST, path: /api/v1/settings/sync/push,
+            body: '{"targets":[{"host":{host:json},"password":{password:json}}]}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+telemetry:
+  # The API has no push. Polling is kept within the 60 requests per minute
+  # the device allows (see quirks): the stream pool every 15 s, with the
+  # status and recording of the pipeline owning the first listed stream;
+  # every pipeline's status and configuration, with its streams', every
+  # 60 s; system and network every 5 minutes. A write is read back at once.
+  poll:
+    - every_ms: 15000
+      send:
+        - { method: GET, path: /api/v1/streams }
+    - every_ms: 60000
+      send:
+        - { method: GET, path: /api/v1/encoders }
+        - { method: GET, path: /api/v1/decoders }
+        - { method: GET, path: /api/v1/inputs }
+        - { method: GET, path: /api/v1/encoders/capacity }
+    - every_ms: 300000
+      send:
+        - { method: GET, path: /api/v1/system/info }
+        - { method: GET, path: /api/v1/system/firmware/settings }
+        - { method: GET, path: /api/v1/network/wired/0 }
+        - { method: GET, path: /api/v1/network/wired/1 }
+        - { method: GET, path: /api/v1/network/wifi }
+        - { method: GET, path: /api/v1/network/modem/0 }
+        - { method: GET, path: /api/v1/network/modem/1 }
+        - { method: GET, path: /api/v1/network/modem/2 }
+        - { method: GET, path: /api/v1/network/modem/3 }
+        - { method: GET, path: /api/v1/network/modem/4 }
+        - { method: GET, path: /api/v1/network/modem/5 }
+        - { method: GET, path: /api/v1/network/modem/6 }
+        - { method: GET, path: /api/v1/network/modem/7 }
+  updates:
+    # Every API answer carries the rate limit (Authentication, Rate Limit Headers).
+    - path: "^/api/v1"
+      headers: { limit: X-RateLimit-Limit, remaining: X-RateLimit-Remaining, reset: X-RateLimit-Reset }
+      state:
+        rate_limit.limit: "{limit}"
+        rate_limit.remaining: "{remaining}"
+        rate_limit.reset: "{reset}"
+
+    # ── System ──
+    - path: "^/api/v1/system/info$"
+      json: { model: "$.settings.Device Model", serial: "$.settings.Serial", firmware: "$.settings.Firmware Version" }
+      state:
+        system.model: "{model}"
+        system.serial: "{serial}"
+        system.firmware_version: "{firmware}"
+    - path: "^/api/v1/system/firmware/check$"
+      json: { latest: "$.settings.Latest Firmware", message: "$.message" }
+      state:
+        system.latest_firmware: "{latest}"
+        system.firmware_check: "{message}"
+    - path: "^/api/v1/system/firmware/settings$"
+      json: { auto: "$.settings.auto_check" }
+      state: { system.firmware_auto_check: "{auto}" }
+    - path: "^/api/v1/system/firmware/settings$"
+      request_match: { "$": "^\\{" }
+      json: {}
+      then_send: [{ method: GET, path: /api/v1/system/firmware/settings }]
+
+    # ── Inputs (2.26): replaced whole on each read ──
+    - path: "^/api/v1/inputs$"
+      json_each: "$.video"
+      json: { id: "$.id", label: "$.label", port: "$.port", index: "$.index", format: "$.info.Input Format",
+              scan: "$.info.Input Scan", rate: "$.info.Framerate", depth: "$.info.Color Depth",
+              sub: "$.info.SubSampling", colorimetry: "$.info.Colorimetry", range: "$.info.Range",
+              eotf: "$.info.EOTF", resolution: "$.info.enc-input-resolution" }
+      replace: inputs.video
+      state:
+        "inputs.video.{id:key}.label": "{label}"
+        "inputs.video.{id:key}.port": "{port}"
+        "inputs.video.{id:key}.index": "{index}"
+        "inputs.video.{id:key}.format": "{format}"
+        "inputs.video.{id:key}.scan": "{scan}"
+        "inputs.video.{id:key}.framerate": "{rate}"
+        "inputs.video.{id:key}.color_depth": "{depth}"
+        "inputs.video.{id:key}.subsampling": "{sub}"
+        "inputs.video.{id:key}.colorimetry": "{colorimetry}"
+        "inputs.video.{id:key}.range": "{range}"
+        "inputs.video.{id:key}.eotf": "{eotf}"
+        "inputs.video.{id:key}.resolution": "{resolution}"
+    - path: "^/api/v1/inputs$"
+      json_each: "$.audio"
+      json: { id: "$.id", label: "$.label" }
+      replace: inputs.audio
+      state: { "inputs.audio.{id:key}.label": "{label}" }
+
+    # ── Capacity (2.26) ──
+    - path: "^/api/v1/encoders/capacity$"
+      json: { eb: "$.settings.encode_budget_mpixps", eu: "$.settings.encode_used_mpixps", ep: "$.settings.encode_percent",
+              db: "$.settings.decode_budget_mpixps", du: "$.settings.decode_used_mpixps", dp: "$.settings.decode_percent",
+              limiting: "$.settings.limiting", refusal: "$.settings.last_refusal",
+              used: "$.settings.physical_inputs_used", total: "$.settings.physical_inputs_total" }
+      state:
+        capacity.encode_budget_mpixps: "{eb}"
+        capacity.encode_used_mpixps: "{eu}"
+        capacity.encode_percent: "{ep}"
+        capacity.decode_budget_mpixps: "{db}"
+        capacity.decode_used_mpixps: "{du}"
+        capacity.decode_percent: "{dp}"
+        capacity.limiting: "{limiting}"
+        capacity.last_refusal: "{refusal}"
+        capacity.physical_inputs_used: "{used}"
+        capacity.physical_inputs_total: "{total}"
+
+    # ── Encoder pool (2.26) ──
+    # The list: membership in pools.encoders (replaced whole), each
+    # encoder's list fields, and its status and configuration read in turn.
+    - path: "^/api/v1/encoders$"
+      json_match: { "$.encoders": "^\\[" }
+      json_each: "$.encoders"
+      json: { id: "$.id", name: "$.name", state: "$.state", uptime: "$.uptime", input_type: "$.input_type",
+              physical: "$.physical_input", network: "$.network_input", audio: "$.audio_source",
+              streams: "$.streams", tracks: "$.audio_tracks" }
+      replace: pools.encoders
+      state:
+        "pools.encoders.{id}.name": "{name}"
+        "encoders.{id}.name": "{name}"
+        "encoders.{id}.state": "{state}"
+        "encoders.{id}.uptime": "{uptime}"
+        "encoders.{id}.input_type": "{input_type}"
+        "encoders.{id}.physical_input": "{physical}"
+        "encoders.{id}.network_input": "{network}"
+        "encoders.{id}.audio_source": "{audio}"
+        "encoders.{id}.streams": "{streams}"
+        "encoders.{id}.audio_tracks": "{tracks}"
+      then_send:
+        - { method: GET, path: "/api/v1/encoders/{id}/info" }
+        - { method: GET, path: "/api/v1/encoders/{id}/record/info" }
+        - { method: GET, path: "/api/v1/encoders/{id}/video/settings" }
+        - { method: GET, path: "/api/v1/encoders/{id}/audio" }
+        - { method: GET, path: "/api/v1/encoders/{id}/metadata/settings" }
+        - { method: GET, path: "/api/v1/encoders/{id}/record/settings" }
+    - path: "^/api/v1/encoders$"
+      json_match: { "$.encoders": "^\\[" }
+      json: { limit: "$.limit", minimum: "$.minimum" }
+      state:
+        limits.encoders: "{limit}"
+        limits.encoders_minimum: "{minimum}"
+    # Each encoder's streams: configuration, mode settings and status.
+    - path: "^/api/v1/encoders$"
+      json_each: "$.encoders[*].streams"
+      json: { sid: "$" }
+      then_send:
+        - { method: GET, path: "/api/v1/streams/{sid}" }
+        - { method: GET, path: "/api/v1/streams/{sid}/settings" }
+        - { method: GET, path: "/api/v1/streams/{sid}/info" }
+    # A pipeline or stream added: its list read again.
+    - path: "^/api/v1/(encoders|decoders|streams)$"
+      json_match: { "$.id": "^\\d+$" }
+      json: {}
+      then_send: [{ method: GET, path: "/api/v1/{1}" }]
+    # A deletion: its state removed, its list read again.
+    - path: "^/api/v1/encoders/(\\d+)$"
+      json_match: { "$.message": "^Encoder \\d+ removed$" }
+      json: {}
+      state: { "encoders.{1}": { delete: true } }
+      then_send: [{ method: GET, path: /api/v1/encoders }]
+    - path: "^/api/v1/decoders/(\\d+)$"
+      json_match: { "$.message": "^Decoder \\d+ removed$" }
+      json: {}
+      state: { "decoders.{1}": { delete: true } }
+      then_send: [{ method: GET, path: /api/v1/decoders }]
+    - path: "^/api/v1/streams/(\\d+)$"
+      json_match: { "$.message": "^Stream \\d+ removed$" }
+      json: {}
+      state: { "streams.{1}": { delete: true } }
+      then_send: [{ method: GET, path: /api/v1/streams }]
+
+    # ── One encoder (2.26) ──
+    - path: "^/api/v1/encoders/(\\d+)$"
+      json: { name: "$.settings.name", input_type: "$.settings.input_type", physical: "$.settings.physical_input",
+              network: "$.settings.network_input", audio: "$.settings.audio_source", streams: "$.settings.streams",
+              tracks: "$.settings.audio_tracks", state: "$.info.State", uptime: "$.info.Uptime", started: "$.info.StartedAt" }
+      state:
+        "encoders.{1}.name": "{name}"
+        "encoders.{1}.input_type": "{input_type}"
+        "encoders.{1}.physical_input": "{physical}"
+        "encoders.{1}.network_input": "{network}"
+        "encoders.{1}.audio_source": "{audio}"
+        "encoders.{1}.streams": "{streams}"
+        "encoders.{1}.audio_tracks": "{tracks}"
+        "encoders.{1}.state": "{state}"
+        "encoders.{1}.uptime": "{uptime}"
+        "encoders.{1}.started_at": "{started}"
+    # Writes read back: a pipeline's own settings.
+    - path: "^/api/v1/(encoders|decoders)/(\\d+)$"
+      request_match: { "$": "^\\{" }
+      json: {}
+      then_send: [{ method: GET, path: "/api/v1/{1}/{2}" }]
+    # A restart: the pipeline's status read again.
+    - path: "^/api/v1/(encoders|decoders)/(\\d+)/restart$"
+      json: {}
+      then_send: [{ method: GET, path: "/api/v1/{1}/{2}/info" }]
+    # A pipeline's streams (2.26), into each stream's state.
+    - path: "^/api/v1/(?:encoders|decoders)/\\d+/streams$"
+      json_each: "$.streams"
+      json: { id: "$.id", name: "$.name", mode: "$.mode", state: "$.state" }
+      state:
+        "streams.{id}.name": "{name}"
+        "streams.{id}.mode": "{mode}"
+        "streams.{id}.state": "{state}"
+
+    # ── Encoder status ──
+    - path: "^/api/v1/encoders/(\\d+)/info$"
+      json: { format: "$.settings.Format", status: "$.settings.Status", generator: "$.settings.Generator",
+              resolution: "$.settings.enc-output-resolution", bitrate: "$.settings.Bitrate",
+              target: "$.settings.Target Bitrate", state: "$.settings.State", uptime: "$.settings.Uptime",
+              started: "$.settings.StartedAt", audio: "$.settings.AudioSource" }
+      state:
+        "encoders.{1}.info.format": "{format}"
+        "encoders.{1}.info.status": "{status}"
+        "encoders.{1}.info.generator": "{generator}"
+        "encoders.{1}.info.output_resolution": "{resolution}"
+        "encoders.{1}.info.bitrate": "{bitrate}"
+        "encoders.{1}.info.target_bitrate": "{target}"
+        "encoders.{1}.state": "{state}"
+        "encoders.{1}.uptime": "{uptime}"
+        "encoders.{1}.started_at": "{started}"
+        "encoders.{1}.audio_source": "{audio}"
+
+    # ── Encoder video ──
+    - path: "^/api/v1/encoders/(\\d+)/video/settings$"
+      json: { codec: "$.settings.codec", p264: "$.settings.profile_h264", p265: "$.settings.profile_hevc",
+              bitrate: "$.settings.bitrate_list", rc: "$.settings.control-rate", gop: "$.settings.gop_length",
+              kfi: "$.settings.kfi_seconds", slices: "$.settings.num_slices", level: "$.settings.level",
+              tier: "$.settings.tier", entropy: "$.settings.entropy-mode", interlacer: "$.settings.interlacer",
+              resolution: "$.settings.resolution", res_common: "$.settings.resolution_common",
+              width: "$.settings.width", height: "$.settings.height", fr_setting: "$.settings.framerate_setting",
+              fr_common: "$.settings.framerate_common", fr_exact: "$.settings.framerate_exact",
+              depth: "$.settings.bit_depth", chroma: "$.settings.chroma_subsampling",
+              override: "$.settings.color_override", colorimetry: "$.settings.colorimetry",
+              eotf: "$.settings.eotf", range: "$.settings.range" }
+      state:
+        "encoders.{1}.video.codec": "{codec}"
+        "encoders.{1}.video.profile_h264": "{p264}"
+        "encoders.{1}.video.profile_hevc": "{p265}"
+        "encoders.{1}.video.bitrate_kbps": "{bitrate}"
+        "encoders.{1}.video.rate_control": "{rc}"
+        "encoders.{1}.video.gop_length": "{gop}"
+        "encoders.{1}.video.keyframe_interval_s": "{kfi}"
+        "encoders.{1}.video.slices": "{slices}"
+        "encoders.{1}.video.level": "{level}"
+        "encoders.{1}.video.tier": "{tier}"
+        "encoders.{1}.video.entropy_mode": "{entropy}"
+        "encoders.{1}.video.interlacer": "{interlacer}"
+        "encoders.{1}.video.resolution": "{resolution}"
+        "encoders.{1}.video.resolution_common": "{res_common}"
+        "encoders.{1}.video.width": "{width}"
+        "encoders.{1}.video.height": "{height}"
+        "encoders.{1}.video.framerate_setting": "{fr_setting}"
+        "encoders.{1}.video.framerate_common": "{fr_common}"
+        "encoders.{1}.video.framerate_exact": "{fr_exact}"
+        "encoders.{1}.video.bit_depth": "{depth}"
+        "encoders.{1}.video.chroma_subsampling": "{chroma}"
+        "encoders.{1}.video.color_override": "{override}"
+        "encoders.{1}.video.colorimetry": "{colorimetry}"
+        "encoders.{1}.video.eotf": "{eotf}"
+        "encoders.{1}.video.range": "{range}"
+    # The whole settings object as read (a GET, not a write's echo).
+    - path: "^/api/v1/encoders/(\\d+)/video/settings$"
+      json_match: { "$.message": "^Settings retrieved" }
+      json: { all: "$.settings" }
+      state: { "encoders.{1}.video.settings_json": "{all}" }
+
+    # ── Encoder audio ──
+    - path: "^/api/v1/encoders/(\\d+)/audio$"
+      json_each: "$.tracks"
+      json: { id: "$.id", codec: "$.codec", channels: "$.channel_mode", bitrate: "$.bitrate_list",
+              rate: "$.samplerate_list", mute: "$.mute_track", enable: "$.enable" }
+      replace: "encoders.{1}.tracks"
+      state:
+        "encoders.{1}.tracks.{id}.codec": "{codec}"
+        "encoders.{1}.tracks.{id}.channel_mode": "{channels}"
+        "encoders.{1}.tracks.{id}.bitrate_bps": "{bitrate}"
+        "encoders.{1}.tracks.{id}.samplerate_hz": "{rate}"
+        "encoders.{1}.tracks.{id}.mute_track": "{mute}"
+        "encoders.{1}.tracks.{id}.enable": "{enable}"
+      then_send: [{ method: GET, path: "/api/v1/encoders/{1}/audio/{id}/settings" }]
+    - path: "^/api/v1/encoders/(\\d+)/audio/settings$"
+      json: &audio_json { codec: "$.settings.codec", bitrate: "$.settings.bitrate_list", channels: "$.settings.channel_mode",
+                          channels2: "$.settings.channel_mode2", rate_setting: "$.settings.samplerate",
+                          rate: "$.settings.samplerate_list", map: "$.settings.default-channel-map",
+                          delay: "$.settings.delay", afterburner: "$.settings.afterburner",
+                          mute: "$.settings.mute_track", enable: "$.settings.enable" }
+      state:
+        "encoders.{1}.audio.codec": "{codec}"
+        "encoders.{1}.audio.bitrate_bps": "{bitrate}"
+        "encoders.{1}.audio.channel_mode": "{channels}"
+        "encoders.{1}.audio.channel_mode2": "{channels2}"
+        "encoders.{1}.audio.samplerate": "{rate_setting}"
+        "encoders.{1}.audio.samplerate_hz": "{rate}"
+        "encoders.{1}.audio.channel_map": "{map}"
+        "encoders.{1}.audio.delay": "{delay}"
+        "encoders.{1}.audio.afterburner": "{afterburner}"
+        "encoders.{1}.audio.mute_track": "{mute}"
+        "encoders.{1}.audio.enable": "{enable}"
+    - path: "^/api/v1/encoders/(\\d+)/audio/settings$"
+      json_match: { "$.message": "^Settings retrieved" }
+      json: { all: "$.settings" }
+      state: { "encoders.{1}.audio.settings_json": "{all}" }
+    - path: "^/api/v1/encoders/(\\d+)/audio/(\\d+)/settings$"
+      json: *audio_json
+      state:
+        "encoders.{1}.tracks.{2}.codec": "{codec}"
+        "encoders.{1}.tracks.{2}.bitrate_bps": "{bitrate}"
+        "encoders.{1}.tracks.{2}.channel_mode": "{channels}"
+        "encoders.{1}.tracks.{2}.channel_mode2": "{channels2}"
+        "encoders.{1}.tracks.{2}.samplerate": "{rate_setting}"
+        "encoders.{1}.tracks.{2}.samplerate_hz": "{rate}"
+        "encoders.{1}.tracks.{2}.channel_map": "{map}"
+        "encoders.{1}.tracks.{2}.delay": "{delay}"
+        "encoders.{1}.tracks.{2}.afterburner": "{afterburner}"
+        "encoders.{1}.tracks.{2}.mute_track": "{mute}"
+        "encoders.{1}.tracks.{2}.enable": "{enable}"
+    - path: "^/api/v1/encoders/(\\d+)/audio/(\\d+)/settings$"
+      json_match: { "$.message": "^Settings retrieved" }
+      json: { all: "$.settings" }
+      state: { "encoders.{1}.tracks.{2}.settings_json": "{all}" }
+    # A track's write read back; the first track's write also changes the
+    # track list.
+    - path: "^/api/v1/encoders/(\\d+)/audio/(\\d+)/settings$"
+      request_match: { "$": "^\\{" }
+      json: {}
+      then_send: [{ method: GET, path: "/api/v1/encoders/{1}/audio/{2}/settings" }]
+
+    # ── Encoder metadata ──
+    - path: "^/api/v1/encoders/(\\d+)/metadata/settings$"
+      json: { duration: "$.settings.break_duration", program: "$.settings.program_id", expect: "$.settings.avail_expect",
+              timecode: "$.settings.timecode", preroll: "$.settings.pre_roll", event: "$.settings.network_event",
+              num: "$.settings.avail_num", dpi: "$.settings.dpi", cc: "$.settings.closed-captions",
+              event_id: "$.settings.event_id", splice: "$.settings.splice_type" }
+      state:
+        "encoders.{1}.metadata.break_duration_ms": "{duration}"
+        "encoders.{1}.metadata.program_id": "{program}"
+        "encoders.{1}.metadata.avail_expect": "{expect}"
+        "encoders.{1}.metadata.timecode": "{timecode}"
+        "encoders.{1}.metadata.pre_roll_ms": "{preroll}"
+        "encoders.{1}.metadata.network_event": "{event}"
+        "encoders.{1}.metadata.avail_num": "{num}"
+        "encoders.{1}.metadata.dpi": "{dpi}"
+        "encoders.{1}.metadata.closed_captions": "{cc}"
+        "encoders.{1}.metadata.event_id": "{event_id}"
+        "encoders.{1}.metadata.splice_type": "{splice}"
+    # An SCTE marker with fields saves them: the settings read again.
+    - path: "^/api/v1/encoders/(\\d+)/metadata/scte$"
+      request_match: { "$": "^\\{" }
+      json: {}
+      then_send: [{ method: GET, path: "/api/v1/encoders/{1}/metadata/settings" }]
+
+    # ── Encoder recording ──
+    - path: "^/api/v1/encoders/(\\d+)/record/settings$"
+      json: &record_json { mode: "$.settings.mode", selection: "$.settings.audio_track_selection", tracks: "$.settings.audio_tracks",
+                           name: "$.settings.name", format: "$.settings.format", files: "$.settings.max-files",
+                           size_time: "$.settings.max-size-time", bonded: "$.settings.bonded_uploads",
+                           cyclic: "$.settings.cyclic", loop: "$.settings.file-loop-index",
+                           camera: "$.settings.camera_type", auto: "$.settings.auto_record",
+                           drive: "$.settings.drive_id", fragmented: "$.settings.fragmented",
+                           timecode: "$.settings.timecode", sidecar: "$.settings.sidecar" }
+      state:
+        "encoders.{1}.record.mode": "{mode}"
+        "encoders.{1}.record.audio_track_selection": "{selection}"
+        "encoders.{1}.record.audio_tracks": "{tracks}"
+        "encoders.{1}.record.name": "{name}"
+        "encoders.{1}.record.format": "{format}"
+        "encoders.{1}.record.max_files": "{files}"
+        "encoders.{1}.record.max_size_time": "{size_time}"
+        "encoders.{1}.record.bonded_uploads": "{bonded}"
+        "encoders.{1}.record.cyclic": "{cyclic}"
+        "encoders.{1}.record.file_loop_index": "{loop}"
+        "encoders.{1}.record.camera_type": "{camera}"
+        "encoders.{1}.record.auto_record": "{auto}"
+        "encoders.{1}.record.drive_id": "{drive}"
+        "encoders.{1}.record.fragmented": "{fragmented}"
+        "encoders.{1}.record.timecode": "{timecode}"
+        "encoders.{1}.record.sidecar": "{sidecar}"
+    - path: "^/api/v1/encoders/(\\d+)/record/settings$"
+      json_match: { "$.message": "^Settings retrieved" }
+      json: { all: "$.settings" }
+      state: { "encoders.{1}.record.settings_json": "{all}" }
+    - path: "^/api/v1/encoders/(\\d+)/record/info$"
+      json: &record_info_json { state: "$.settings.State", details: "$.settings.State Details", uptime: "$.settings.Uptime",
+                                format: "$.settings.Format", size: "$.settings.Size", used: "$.settings.Used",
+                                available: "$.settings.Available", percent: "$.settings.Percent Used", all: "$.settings" }
+      state:
+        "encoders.{1}.record_info.state": "{state}"
+        "encoders.{1}.record_info.state_details": "{details}"
+        "encoders.{1}.record_info.uptime": "{uptime}"
+        "encoders.{1}.record_info.format": "{format}"
+        "encoders.{1}.record_info.size": "{size}"
+        "encoders.{1}.record_info.used": "{used}"
+        "encoders.{1}.record_info.available": "{available}"
+        "encoders.{1}.record_info.percent_used": "{percent}"
+        "encoders.{1}.record_info.info_json": "{all}"
+    # Recording started or stopped: its status read again, and with a body
+    # (settings saved before starting) its settings too.
+    - path: "^/api/v1/(encoders|decoders)/(\\d+)/record/(?:start|stop)$"
+      json: {}
+      then_send: [{ method: GET, path: "/api/v1/{1}/{2}/record/info" }]
+    - path: "^/api/v1/(encoders|decoders)/(\\d+)/record/start$"
+      request_match: { "$": "^\\{" }
+      json: {}
+      then_send: [{ method: GET, path: "/api/v1/{1}/{2}/record/settings" }]
+    # A settings write read back: video, audio, metadata and recording of
+    # an encoder; ingest, video, audio output, metadata and recording of a
+    # decoder.
+    - path: "^/api/v1/(encoders|decoders)/(\\d+)/(video|audio|metadata|record)/(settings|mode)$"
+      request_match: { "$": "^\\{" }
+      json: {}
+      then_send: [{ method: GET, path: "/api/v1/{1}/{2}/{3}/{4}" }]
+    # The first track's settings change the track list (2.26).
+    - path: "^/api/v1/encoders/(\\d+)/audio/settings$"
+      request_match: { "$": "^\\{" }
+      json: {}
+      then_send: [{ method: GET, path: "/api/v1/encoders/{1}/audio" }]
+
+    # ── Decoder pool (2.26) ──
+    - path: "^/api/v1/decoders$"
+      json_match: { "$.decoders": "^\\[" }
+      json_each: "$.decoders"
+      json: { id: "$.id", name: "$.name", state: "$.state", uptime: "$.uptime", ingests: "$.ingests",
+              restreams: "$.restreams", failover: "$.failover_timeout_ms" }
+      replace: pools.decoders
+      state:
+        "pools.decoders.{id}.name": "{name}"
+        "decoders.{id}.name": "{name}"
+        "decoders.{id}.state": "{state}"
+        "decoders.{id}.uptime": "{uptime}"
+        "decoders.{id}.ingests": "{ingests}"
+        "decoders.{id}.restreams": "{restreams}"
+        "decoders.{id}.failover_timeout_ms": "{failover}"
+      then_send:
+        - { method: GET, path: "/api/v1/decoders/{id}/info" }
+        - { method: GET, path: "/api/v1/decoders/{id}/record/info" }
+        - { method: GET, path: "/api/v1/decoders/{id}/video/mode" }
+        - { method: GET, path: "/api/v1/decoders/{id}/video/settings" }
+        - { method: GET, path: "/api/v1/decoders/{id}/metadata/settings" }
+        - { method: GET, path: "/api/v1/decoders/{id}/record/settings" }
+    - path: "^/api/v1/decoders$"
+      json_match: { "$.decoders": "^\\[" }
+      json: { limit: "$.limit", minimum: "$.minimum" }
+      state:
+        limits.decoders: "{limit}"
+        limits.decoders_minimum: "{minimum}"
+    - path: "^/api/v1/decoders$"
+      json_each: "$.decoders[*].restreams"
+      json: { sid: "$" }
+      then_send:
+        - { method: GET, path: "/api/v1/streams/{sid}" }
+        - { method: GET, path: "/api/v1/streams/{sid}/settings" }
+        - { method: GET, path: "/api/v1/streams/{sid}/info" }
+    # The physical audio output, shared by all decoders, read through the
+    # first decoder listed.
+    - path: "^/api/v1/decoders$"
+      json_match: { "$.decoders[0].id": "^(\\d+)$" }
+      json: {}
+      then_send:
+        - { method: GET, path: "/api/v1/decoders/{1}/audio/settings" }
+        - { method: GET, path: "/api/v1/decoders/{1}/audio/0" }
+        - { method: GET, path: "/api/v1/decoders/{1}/audio/1" }
+        - { method: GET, path: "/api/v1/decoders/{1}/audio/2" }
+        - { method: GET, path: "/api/v1/decoders/{1}/audio/3" }
+        - { method: GET, path: "/api/v1/decoders/{1}/audio/4" }
+        - { method: GET, path: "/api/v1/decoders/{1}/audio/5" }
+        - { method: GET, path: "/api/v1/decoders/{1}/audio/6" }
+        - { method: GET, path: "/api/v1/decoders/{1}/audio/7" }
+        - { method: GET, path: "/api/v1/decoders/{1}/audio/8" }
+        - { method: GET, path: "/api/v1/decoders/{1}/audio/9" }
+        - { method: GET, path: "/api/v1/decoders/{1}/audio/10" }
+        - { method: GET, path: "/api/v1/decoders/{1}/audio/11" }
+        - { method: GET, path: "/api/v1/decoders/{1}/audio/12" }
+        - { method: GET, path: "/api/v1/decoders/{1}/audio/13" }
+        - { method: GET, path: "/api/v1/decoders/{1}/audio/14" }
+        - { method: GET, path: "/api/v1/decoders/{1}/audio/15" }
+
+    # ── One decoder ──
+    - path: "^/api/v1/decoders/(\\d+)$"
+      json: { name: "$.settings.name", failover: "$.settings.failover_timeout_ms", ingests: "$.settings.ingests",
+              restreams: "$.settings.restreams", state: "$.info.State", uptime: "$.info.Uptime", started: "$.info.StartedAt" }
+      state:
+        "decoders.{1}.name": "{name}"
+        "decoders.{1}.failover_timeout_ms": "{failover}"
+        "decoders.{1}.ingests": "{ingests}"
+        "decoders.{1}.restreams": "{restreams}"
+        "decoders.{1}.state": "{state}"
+        "decoders.{1}.uptime": "{uptime}"
+        "decoders.{1}.started_at": "{started}"
+    - path: "^/api/v1/decoders/(\\d+)/info$"
+      json: { format: "$.settings.Format", status: "$.settings.Status", state: "$.settings.State",
+              uptime: "$.settings.Uptime", started: "$.settings.StartedAt" }
+      state:
+        "decoders.{1}.info.format": "{format}"
+        "decoders.{1}.info.status": "{status}"
+        "decoders.{1}.state": "{state}"
+        "decoders.{1}.uptime": "{uptime}"
+        "decoders.{1}.started_at": "{started}"
+    - path: "^/api/v1/decoders/(\\d+)/video/mode$"
+      json: { mode: "$.settings.mode", name: "$.settings.name", target: "$.settings.jitter-buffer-target-delay",
+              max: "$.settings.jitter-buffer-max-delay", restreamed: "$.settings.restreamed" }
+      state:
+        "decoders.{1}.ingest.mode": "{mode}"
+        "decoders.{1}.ingest.name": "{name}"
+        "decoders.{1}.ingest.jitter_target_ms": "{target}"
+        "decoders.{1}.ingest.jitter_max_ms": "{max}"
+        "decoders.{1}.ingest.restreamed": "{restreamed}"
+    # A new ingest mode has its own settings: read them too.
+    - path: "^/api/v1/decoders/(\\d+)/video/mode$"
+      request_match: { "$": "^\\{" }
+      json: {}
+      then_send: [{ method: GET, path: "/api/v1/decoders/{1}/video/settings" }]
+    - path: "^/api/v1/decoders/(\\d+)/video/settings$"
+      json_match: { "$.message": "^Settings retrieved" }
+      json: { all: "$.settings" }
+      state: { "decoders.{1}.video.settings_json": "{all}" }
+    - path: "^/api/v1/decoders/\\d+/audio/settings$"
+      json: { enable: "$.settings.enable", channels: "$.settings.channel_mode", map: "$.settings.default-channel-map",
+              delay: "$.settings.delay", mute: "$.settings.embedded-output-mute", volume: "$.settings.embedded-output-volume",
+              remapping: "$.settings.remapping", selected: "$.settings.selected" }
+      state:
+        audio_output.enable: "{enable}"
+        audio_output.channel_mode: "{channels}"
+        audio_output.channel_map: "{map}"
+        audio_output.delay: "{delay}"
+        audio_output.embedded_mute: "{mute}"
+        audio_output.embedded_volume: "{volume}"
+        audio_output.remapping: "{remapping}"
+        audio_output.selected: "{selected}"
+    - path: "^/api/v1/decoders/\\d+/audio/settings$"
+      json_match: { "$.message": "^Settings retrieved" }
+      json: { all: "$.settings" }
+      state: { audio_output.settings_json: "{all}" }
+    - path: "^/api/v1/decoders/\\d+/audio/(\\d+)$"
+      json: { mute: "$.settings.mute", track: "$.settings.track", volume: "$.settings.volume" }
+      state:
+        "audio_output.channels.{1}.mute": "{mute}"
+        "audio_output.channels.{1}.track": "{track}"
+        "audio_output.channels.{1}.volume": "{volume}"
+    - path: "^/api/v1/decoders/(\\d+)/audio/(\\d+)$"
+      request_match: { "$": "^\\{" }
+      json: {}
+      then_send: [{ method: GET, path: "/api/v1/decoders/{1}/audio/{2}" }]
+    - path: "^/api/v1/decoders/(\\d+)/metadata/settings$"
+      json: { cc: "$.settings.insert_cc", cc_line: "$.settings.cc_insertion_line", dpi: "$.settings.insert_dpi",
+              dpi_line: "$.settings.dpi_insertion_line", timecode: "$.settings.insert_timecode" }
+      state:
+        "decoders.{1}.metadata.insert_cc": "{cc}"
+        "decoders.{1}.metadata.cc_insertion_line": "{cc_line}"
+        "decoders.{1}.metadata.insert_dpi": "{dpi}"
+        "decoders.{1}.metadata.dpi_insertion_line": "{dpi_line}"
+        "decoders.{1}.metadata.insert_timecode": "{timecode}"
+    - path: "^/api/v1/decoders/(\\d+)/record/settings$"
+      json: *record_json
+      state:
+        "decoders.{1}.record.mode": "{mode}"
+        "decoders.{1}.record.audio_track_selection": "{selection}"
+        "decoders.{1}.record.audio_tracks": "{tracks}"
+        "decoders.{1}.record.name": "{name}"
+        "decoders.{1}.record.format": "{format}"
+        "decoders.{1}.record.max_files": "{files}"
+        "decoders.{1}.record.max_size_time": "{size_time}"
+        "decoders.{1}.record.bonded_uploads": "{bonded}"
+        "decoders.{1}.record.cyclic": "{cyclic}"
+        "decoders.{1}.record.file_loop_index": "{loop}"
+        "decoders.{1}.record.camera_type": "{camera}"
+        "decoders.{1}.record.auto_record": "{auto}"
+        "decoders.{1}.record.drive_id": "{drive}"
+        "decoders.{1}.record.fragmented": "{fragmented}"
+        "decoders.{1}.record.timecode": "{timecode}"
+        "decoders.{1}.record.sidecar": "{sidecar}"
+    - path: "^/api/v1/decoders/(\\d+)/record/settings$"
+      json_match: { "$.message": "^Settings retrieved" }
+      json: { all: "$.settings" }
+      state: { "decoders.{1}.record.settings_json": "{all}" }
+    - path: "^/api/v1/decoders/(\\d+)/record/info$"
+      json: *record_info_json
+      state:
+        "decoders.{1}.record_info.state": "{state}"
+        "decoders.{1}.record_info.state_details": "{details}"
+        "decoders.{1}.record_info.uptime": "{uptime}"
+        "decoders.{1}.record_info.format": "{format}"
+        "decoders.{1}.record_info.size": "{size}"
+        "decoders.{1}.record_info.used": "{used}"
+        "decoders.{1}.record_info.available": "{available}"
+        "decoders.{1}.record_info.percent_used": "{percent}"
+        "decoders.{1}.record_info.info_json": "{all}"
+
+    # ── Stream pool (2.26) ──
+    - path: "^/api/v1/streams$"
+      json_match: { "$.streams": "^\\[" }
+      json_each: "$.streams"
+      json: { id: "$.id", name: "$.name", mode: "$.mode", state: "$.state", owner: "$.owner" }
+      replace: pools.streams
+      state:
+        "pools.streams.{id}.name": "{name}"
+        "streams.{id}.name": "{name}"
+        "streams.{id}.mode": "{mode}"
+        "streams.{id}.state": "{state}"
+        "streams.{id}.owner": "{owner}"
+    - path: "^/api/v1/streams$"
+      json_match: { "$.streams": "^\\[" }
+      json: { limit: "$.limit", minimum: "$.minimum", protected: "$.protected" }
+      state:
+        limits.streams: "{limit}"
+        limits.streams_minimum: "{minimum}"
+        limits.streams_protected: "{protected}"
+    # The pipeline owning the first listed stream (the base stream 0, the
+    # main encoder on most units): its status and recording on the fast poll.
+    - path: "^/api/v1/streams$"
+      json_match: { "$.streams[0].owner": "^(encoders|decoders)/(\\d+)$" }
+      json: {}
+      then_send:
+        - { method: GET, path: "/api/v1/{1}/{2}/info" }
+        - { method: GET, path: "/api/v1/{1}/{2}/record/info" }
+
+    # ── One stream ──
+    - path: "^/api/v1/streams/(\\d+)$"
+      json: { name: "$.settings.name", mode: "$.settings.mode", h264: "$.settings.mode-h264", hevc: "$.settings.mode-hevc",
+              selection: "$.settings.audio_track_selection", tracks: "$.settings.audio_tracks", owner: "$.settings.owner" }
+      state:
+        "streams.{1}.name": "{name}"
+        "streams.{1}.mode": "{mode}"
+        "streams.{1}.mode_h264": "{h264}"
+        "streams.{1}.mode_hevc": "{hevc}"
+        "streams.{1}.audio_track_selection": "{selection}"
+        "streams.{1}.audio_tracks": "{tracks}"
+        "streams.{1}.owner": "{owner}"
+    # A configuration write (possibly a new mode): configuration, mode
+    # settings and pool read again.
+    - path: "^/api/v1/streams/(\\d+)$"
+      request_match: { "$": "^\\{" }
+      json: {}
+      then_send:
+        - { method: GET, path: "/api/v1/streams/{1}" }
+        - { method: GET, path: "/api/v1/streams/{1}/settings" }
+        - { method: GET, path: /api/v1/streams }
+    - path: "^/api/v1/streams/(\\d+)/settings$"
+      json_match: { "$.message": "^Settings retrieved" }
+      json: { all: "$.settings" }
+      state: { "streams.{1}.settings_json": "{all}" }
+    - path: "^/api/v1/streams/(\\d+)/settings$"
+      request_match: { "$": "^\\{" }
+      json: {}
+      then_send: [{ method: GET, path: "/api/v1/streams/{1}/settings" }]
+    - path: "^/api/v1/streams/(\\d+)/info$"
+      json: { state: "$.settings.State", details: "$.settings.State Details", uptime: "$.settings.Uptime",
+              url: "$.settings.Stream", port: "$.settings.Port", latency: "$.settings.Latency",
+              encryption: "$.settings.Encryption", all: "$.settings" }
+      state:
+        "streams.{1}.state": "{state}"
+        "streams.{1}.info.state_details": "{details}"
+        "streams.{1}.info.uptime": "{uptime}"
+        "streams.{1}.info.url": "{url}"
+        "streams.{1}.info.port": "{port}"
+        "streams.{1}.info.latency": "{latency}"
+        "streams.{1}.info.encryption": "{encryption}"
+        "streams.{1}.info.info_json": "{all}"
+    # A stream action: its status and the pool read again.
+    - path: "^/api/v1/streams/(\\d+)/(?:start|stop|preview|endpreview|complete|publish|unpublish|broadcast|halt|cancel)$"
+      json: {}
+      then_send:
+        - { method: GET, path: "/api/v1/streams/{1}/info" }
+        - { method: GET, path: /api/v1/streams }
+    - path: "^/api/v1/streams/\\d+/(?:start_all|stop_all)$"
+      json: {}
+      then_send: [{ method: GET, path: /api/v1/streams }]
+
+    # ── Network ──
+    - path: "^/api/v1/network/wired/(\\d+)$"
+      json: { label: "$.settings.Custom Labels.intf_name", status: "$.settings.Status", detail: "$.settings.Detail",
+              mac: "$.settings.MAC Address", all: "$.settings" }
+      state:
+        "network.wired.{1}.label": "{label}"
+        "network.wired.{1}.status": "{status}"
+        "network.wired.{1}.detail": "{detail}"
+        "network.wired.{1}.mac_address": "{mac}"
+        "network.wired.{1}.status_json": "{all}"
+    - path: "^/api/v1/network/wifi$"
+      json: { label: "$.settings.Custom Labels.intf_name", status: "$.settings.Status", network: "$.settings.Network",
+              mask: "$.settings.Subnet Mask", mac: "$.settings.MAC Address", ip: "$.settings.IP Address" }
+      state:
+        network.wifi.label: "{label}"
+        network.wifi.status: "{status}"
+        network.wifi.network: "{network}"
+        network.wifi.subnet_mask: "{mask}"
+        network.wifi.mac_address: "{mac}"
+        network.wifi.ip_address: "{ip}"
+    - path: "^/api/v1/network/wifi$"
+      json_match: { "$.message": "^Statuses received" }
+      json: { all: "$.settings" }
+      state: { network.wifi.settings_json: "{all}" }
+    - path: "^/api/v1/network/wifi$"
+      request_match: { "$": "^\\{" }
+      json: {}
+      then_send: [{ method: GET, path: /api/v1/network/wifi }]
+    - path: "^/api/v1/network/modem/(\\d+)$"
+      json: { type: "$.settings.Modem Type", model: "$.settings.Model", version: "$.settings.Version",
+              status: "$.settings.Status", detail: "$.settings.Detail", report: "$.settings.Modem Report",
+              rssi: "$.settings.RSSI", imei: "$.settings.IMEI", imsi: "$.settings.IMSI", iccid: "$.settings.ICCID",
+              label: "$.settings.Custom Labels.intf_name", all: "$.settings" }
+      state:
+        "network.modems.{1}.type": "{type}"
+        "network.modems.{1}.model": "{model}"
+        "network.modems.{1}.version": "{version}"
+        "network.modems.{1}.status": "{status}"
+        "network.modems.{1}.detail": "{detail}"
+        "network.modems.{1}.report": "{report}"
+        "network.modems.{1}.rssi": "{rssi}"
+        "network.modems.{1}.imei": "{imei}"
+        "network.modems.{1}.imsi": "{imsi}"
+        "network.modems.{1}.iccid": "{iccid}"
+        "network.modems.{1}.label": "{label}"
+        "network.modems.{1}.status_json": "{all}"
+
+    # ── Settings sync ──
+    # Imported settings change the pipelines and streams: read them again.
+    - path: "^/api/v1/settings/sync/import$"
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/encoders }
+        - { method: GET, path: /api/v1/decoders }
+        - { method: GET, path: /api/v1/streams }
+
+state:
+  rate_limit.limit:              { type: int, description: "Requests allowed in the rate limit window, from X-RateLimit-Limit on the last API answer (60 per 60 s)" }
+  rate_limit.remaining:          { type: int, description: "Requests left in the current window, from X-RateLimit-Remaining on the last API answer" }
+  rate_limit.reset:              { type: int, unit: s, description: "When the window resets, Unix seconds, from X-RateLimit-Reset" }
+  system.model:                  { type: string, description: "Device model as the device names it, such as Prism-855" }
+  system.serial:                 { type: string, description: "Serial number" }
+  system.firmware_version:       { type: string, description: "Installed firmware (Apollo OS) version, such as 2.25.20260217" }
+  system.latest_firmware:        { type: string, description: "Latest firmware the last check_firmware found" }
+  system.firmware_check:         { type: string, description: "The last check_firmware's message, such as Device is up to date" }
+  system.firmware_auto_check:    { type: bool, description: "The device checks for firmware updates by itself" }
+  inputs.video.*.label:          { type: string, description: "A video input's label, such as SDI 1 (2.26); keyed by its id, such as sdi0" }
+  inputs.video.*.port:           { type: string, description: "The input's connector type, such as SDI or HDMI" }
+  inputs.video.*.index:          { type: int, description: "The input's number among the connectors of its type, from 0" }
+  inputs.video.*.format:         { type: string, description: "The signal on the input, such as 1920x1080p60, or no-video" }
+  inputs.video.*.scan:           { type: string, description: "Progressive or interlaced, as the device reports it" }
+  inputs.video.*.framerate:      { type: string, description: "The input's frame rate as the device reports it, such as 60" }
+  inputs.video.*.color_depth:    { type: int, unit: bit, description: "The input's color depth in bits" }
+  inputs.video.*.subsampling:    { type: int, description: "The input's chroma subsampling, such as 422" }
+  inputs.video.*.colorimetry:    { type: string, description: "The input's colorimetry, such as BT.709" }
+  inputs.video.*.range:          { type: string, description: "The input's range, such as Legal" }
+  inputs.video.*.eotf:           { type: string, description: "The input's transfer function, such as SDR" }
+  inputs.video.*.resolution:     { type: string, description: "The resolution the encoder takes from the input, such as 1920x1080p60" }
+  inputs.audio.*.label:          { type: string, description: "An audio input's label, such as Embedded (2.26); keyed by its id, such as embedded" }
+  capacity.encode_budget_mpixps: { type: float, unit: Mpixel/s, description: "The device's encode capacity" }
+  capacity.encode_used_mpixps:   { type: float, unit: Mpixel/s, description: "Encode capacity in use" }
+  capacity.encode_percent:       { type: float, unit: "%", description: "Encode capacity in use, as a percentage" }
+  capacity.decode_budget_mpixps: { type: float, unit: Mpixel/s, description: "The device's decode capacity" }
+  capacity.decode_used_mpixps:   { type: float, unit: Mpixel/s, description: "Decode capacity in use" }
+  capacity.decode_percent:       { type: float, unit: "%", description: "Decode capacity in use, as a percentage" }
+  capacity.limiting:             { type: string, description: "Which capacity limits adding a pipeline, such as Encode capacity" }
+  capacity.last_refusal:         { type: string, description: "Why the device last refused to add a pipeline, as it says it" }
+  capacity.physical_inputs_used: { type: int, description: "Physical inputs in use" }
+  capacity.physical_inputs_total: { type: int, description: "Physical inputs on the device" }
+  limits.encoders:               { type: int, description: "The most encoders the device allows (2.26)" }
+  limits.encoders_minimum:       { type: int, description: "The fewest encoders the device keeps" }
+  limits.decoders:               { type: int, description: "The most decoders the device allows (2.26)" }
+  limits.decoders_minimum:       { type: int, description: "The fewest decoders the device keeps" }
+  limits.streams:                { type: int, description: "The most streams the pool allows (2.26)" }
+  limits.streams_minimum:        { type: int, description: "The fewest streams the pool keeps" }
+  limits.streams_protected:      { type: string, description: "The ids of the streams that cannot be deleted, as JSON text, such as [0]" }
+  pools.encoders.*.name:         { type: string, description: "The encoders the device has now, keyed by id (replaced on each list read: the authority on which encoders exist)" }
+  pools.decoders.*.name:         { type: string, description: "The decoders the device has now, keyed by id (replaced on each list read)" }
+  pools.streams.*.name:          { type: string, description: "The streams in the pool now, keyed by id (replaced on each list read)" }
+  encoders.*.name:               { type: string, description: "The encoder's name, such as Encoder 1" }
+  encoders.*.state:              { type: string, description: "The pipeline's state, such as Encoding" }
+  encoders.*.uptime:             { type: string, description: "How long the pipeline has run, hh:mm:ss" }
+  encoders.*.started_at:         { type: int, unit: s, description: "When the pipeline started, Unix seconds" }
+  encoders.*.input_type:         { type: string, description: "The input kind, such as physical" }
+  encoders.*.physical_input:     { type: string, description: "The physical video input's id, such as sdi0" }
+  encoders.*.network_input:      { type: string, description: "The network input's internal name, such as Input/Stream/4, or empty" }
+  encoders.*.audio_source:       { type: string, description: "The audio input's id, such as embedded" }
+  encoders.*.streams:            { type: string, description: "The ids of the streams the encoder owns, as JSON text, such as [6,3,0]" }
+  encoders.*.audio_tracks:       { type: string, description: "The ids of the encoder's audio tracks, as JSON text, such as [0]" }
+  encoders.*.info.format:        { type: string, description: "The encoded video format, such as 1920x1080p60" }
+  encoders.*.info.status:        { type: string, description: "The encoder's status, such as OK" }
+  encoders.*.info.generator:     { type: string, description: "The test generator, such as Off" }
+  encoders.*.info.output_resolution: { type: string, description: "The encoder's output resolution, such as 1920x1080p60" }
+  encoders.*.info.bitrate:       { type: int, unit: bit/s, description: "The measured video bitrate" }
+  encoders.*.info.target_bitrate: { type: int, unit: bit/s, description: "The target video bitrate" }
+  encoders.*.video.codec:        { type: string, description: "h264 or hevc" }
+  encoders.*.video.profile_h264: { type: string, description: "The H.264 profile, such as AVC_HIGH" }
+  encoders.*.video.profile_hevc: { type: string, description: "The HEVC profile, such as HEVC_MAIN" }
+  encoders.*.video.bitrate_kbps: { type: int, unit: kbit/s, description: "The video bitrate setting (bitrate_list)" }
+  encoders.*.video.rate_control: { type: string, description: "The rate control (control-rate), such as CBR" }
+  encoders.*.video.gop_length:   { type: int, description: "GOP length in frames, including the I picture" }
+  encoders.*.video.keyframe_interval_s: { type: float, unit: s, description: "Seconds between key frames (kfi_seconds)" }
+  encoders.*.video.slices:       { type: int, description: "Slices per picture (num_slices)" }
+  encoders.*.video.level:        { type: float, description: "The codec level, such as 5.1" }
+  encoders.*.video.tier:         { type: string, description: "The HEVC tier, such as MAIN_TIER" }
+  encoders.*.video.entropy_mode: { type: string, description: "The H.264 entropy coding, such as MODE_CABAC" }
+  encoders.*.video.interlacer:   { type: string, description: "Progressive or interlaced output, such as progressive" }
+  encoders.*.video.resolution:   { type: string, description: "The resolution setting, such as auto" }
+  encoders.*.video.resolution_common: { type: int, description: "The chosen common resolution's line count, such as 1080" }
+  encoders.*.video.width:        { type: int, unit: px, description: "The output width" }
+  encoders.*.video.height:       { type: int, unit: px, description: "The output height" }
+  encoders.*.video.framerate_setting: { type: string, description: "The frame rate setting, such as auto" }
+  encoders.*.video.framerate_common: { type: float, unit: fps, description: "The chosen common frame rate, such as 30 or 59.94" }
+  encoders.*.video.framerate_exact: { type: float, unit: fps, description: "The exact frame rate" }
+  encoders.*.video.bit_depth:    { type: int, unit: bit, description: "The encoded bit depth, 8 or 10" }
+  encoders.*.video.chroma_subsampling: { type: int, description: "The encoded chroma subsampling, such as 420" }
+  encoders.*.video.color_override: { type: bool, description: "The color settings below override the input's" }
+  encoders.*.video.colorimetry:  { type: string, description: "The output colorimetry, such as default" }
+  encoders.*.video.eotf:         { type: string, description: "The output transfer function (2.26), such as Default" }
+  encoders.*.video.range:        { type: string, description: "The output range, such as Default" }
+  encoders.*.video.settings_json: { type: string, description: "Every video setting as last read, as JSON text, including the fields not listed here" }
+  encoders.*.audio.codec:        { type: string, description: "The first audio track's codec, such as aac" }
+  encoders.*.audio.bitrate_bps:  { type: int, unit: bit/s, description: "The first track's audio bitrate (bitrate_list), such as 128000" }
+  encoders.*.audio.channel_mode: { type: string, description: "The first track's channels, such as Stereo or 5.1" }
+  encoders.*.audio.channel_mode2: { type: string, description: "The first track's second channel mode, such as Stereo" }
+  encoders.*.audio.samplerate:   { type: string, description: "The first track's sample rate setting, such as auto" }
+  encoders.*.audio.samplerate_hz: { type: int, unit: Hz, description: "The first track's sample rate, such as 48000" }
+  encoders.*.audio.channel_map:  { type: string, description: "The first track's channel map (default-channel-map), such as remap or smpte" }
+  encoders.*.audio.delay:        { type: int, description: "The first track's audio delay, as the device gives it" }
+  encoders.*.audio.afterburner:  { type: bool, description: "The first track's AAC afterburner" }
+  encoders.*.audio.mute_track:   { type: bool, description: "The first track is muted (2.26)" }
+  encoders.*.audio.enable:       { type: bool, description: "The first track is on (the opposite of mute_track on 2.26)" }
+  encoders.*.audio.settings_json: { type: string, description: "Every setting of the first audio track as last read, as JSON text" }
+  encoders.*.tracks.*.codec:     { type: string, description: "An audio track's codec (2.26), keyed by track id" }
+  encoders.*.tracks.*.bitrate_bps: { type: int, unit: bit/s, description: "The track's audio bitrate" }
+  encoders.*.tracks.*.channel_mode: { type: string, description: "The track's channels, such as 5.1" }
+  encoders.*.tracks.*.channel_mode2: { type: string, description: "The track's second channel mode" }
+  encoders.*.tracks.*.samplerate: { type: string, description: "The track's sample rate setting" }
+  encoders.*.tracks.*.samplerate_hz: { type: int, unit: Hz, description: "The track's sample rate" }
+  encoders.*.tracks.*.channel_map: { type: string, description: "The track's channel map" }
+  encoders.*.tracks.*.delay:     { type: int, description: "The track's audio delay, as the device gives it" }
+  encoders.*.tracks.*.afterburner: { type: bool, description: "The track's AAC afterburner" }
+  encoders.*.tracks.*.mute_track: { type: bool, description: "The track is muted" }
+  encoders.*.tracks.*.enable:    { type: bool, description: "The track is on (the opposite of mute_track)" }
+  encoders.*.tracks.*.settings_json: { type: string, description: "Every setting of the track as last read, as JSON text" }
+  encoders.*.metadata.break_duration_ms: { type: int, unit: ms, description: "The SCTE break duration" }
+  encoders.*.metadata.program_id: { type: int, description: "The SCTE program id" }
+  encoders.*.metadata.avail_expect: { type: int, description: "The SCTE avails expected" }
+  encoders.*.metadata.timecode:  { type: string, description: "The timecode source, such as sdi-hdmi-timecode" }
+  encoders.*.metadata.pre_roll_ms: { type: int, unit: ms, description: "The SCTE pre-roll" }
+  encoders.*.metadata.network_event: { type: string, description: "The SCTE network event, such as out-of-network" }
+  encoders.*.metadata.avail_num: { type: int, description: "The SCTE avail number" }
+  encoders.*.metadata.dpi:       { type: bool, description: "DPI (SCTE-104) from the input is passed on" }
+  encoders.*.metadata.closed_captions: { type: bool, description: "Closed captions are carried in the stream" }
+  encoders.*.metadata.event_id:  { type: string, description: "The SCTE event id" }
+  encoders.*.metadata.splice_type: { type: string, description: "The SCTE splice type, such as normal" }
+  encoders.*.record.mode:        { type: string, description: "The recording mode, such as RECUpload" }
+  encoders.*.record.audio_track_selection: { type: string, description: "Which audio tracks are recorded, such as all" }
+  encoders.*.record.audio_tracks: { type: string, description: "The audio tracks recorded when the selection is custom, as JSON text" }
+  encoders.*.record.name:        { type: string, description: "The file name pattern, such as $PN_$DATE_$TIME_$CAM" }
+  encoders.*.record.format:      { type: string, description: "The file format, such as mp4" }
+  encoders.*.record.max_files:   { type: int, description: "The most files kept (max-files)" }
+  encoders.*.record.max_size_time: { type: int, description: "The file split size or time (max-size-time), as the device gives it" }
+  encoders.*.record.bonded_uploads: { type: bool, description: "Recordings are uploaded over the bonded link" }
+  encoders.*.record.cyclic:      { type: bool, description: "Cyclic recording overwrites the oldest files" }
+  encoders.*.record.file_loop_index: { type: int, description: "The current file index of cyclic recording" }
+  encoders.*.record.camera_type: { type: string, description: "The camera type used for record triggering and names, such as canon" }
+  encoders.*.record.auto_record: { type: string, description: "Automatic recording, such as off" }
+  encoders.*.record.drive_id:    { type: string, description: "The drive recorded to, such as sd2 or nfs2" }
+  encoders.*.record.fragmented:  { type: bool, description: "Fragmented MP4 files" }
+  encoders.*.record.timecode:    { type: bool, description: "Timecode is written to the files" }
+  encoders.*.record.sidecar:     { type: bool, description: "A sidecar file is written" }
+  encoders.*.record.settings_json: { type: string, description: "Every recording setting as last read, as JSON text" }
+  encoders.*.record_info.state:  { type: string, description: "The recording state, such as Ready, Recording or Disabled" }
+  encoders.*.record_info.state_details: { type: string, description: "Why the recording is in its state, such as Recording is Disabled" }
+  encoders.*.record_info.uptime: { type: string, description: "How long the recording has run, hh:mm:ss" }
+  encoders.*.record_info.format: { type: string, description: "The drive's file system, such as ext4 or NFS4" }
+  encoders.*.record_info.size:   { type: string, description: "The drive's size, such as 1.8T" }
+  encoders.*.record_info.used:   { type: string, description: "Space used on the drive, such as 1.1T" }
+  encoders.*.record_info.available: { type: string, description: "Space left on the drive, such as 615.5G" }
+  encoders.*.record_info.percent_used: { type: string, description: "Share of the drive used, such as 65%" }
+  encoders.*.record_info.info_json: { type: string, description: "The whole recording status as last read, as JSON text" }
+  decoders.*.name:               { type: string, description: "The decoder's name, such as Decoder 1" }
+  decoders.*.state:              { type: string, description: "The pipeline's state, such as Inactive" }
+  decoders.*.uptime:             { type: string, description: "How long the pipeline has run, hh:mm:ss" }
+  decoders.*.started_at:         { type: int, unit: s, description: "When the pipeline started, Unix seconds, 0 when not running" }
+  decoders.*.ingests:            { type: string, description: "The ids of the decoder's ingests, primary first, then failover, as JSON text" }
+  decoders.*.restreams:          { type: string, description: "The ids of the streams the decoder restreams to, as JSON text" }
+  decoders.*.failover_timeout_ms: { type: int, unit: ms, description: "How long the primary ingest may fail before failover" }
+  decoders.*.info.format:        { type: string, description: "The decoded format, such as 1920x1080p59" }
+  decoders.*.info.status:        { type: string, description: "The decoder's status, such as OK" }
+  decoders.*.ingest.mode:        { type: string, description: "The primary ingest's protocol, such as TS or SRT" }
+  decoders.*.ingest.name:        { type: string, description: "The ingest's name, such as Ingest 2" }
+  decoders.*.ingest.jitter_target_ms: { type: int, unit: ms, description: "The jitter buffer's target delay" }
+  decoders.*.ingest.jitter_max_ms: { type: int, unit: ms, description: "The jitter buffer's maximum delay" }
+  decoders.*.ingest.restreamed:  { type: bool, description: "The ingest is restreamed" }
+  decoders.*.video.settings_json: { type: string, description: "The current ingest mode's settings as last read, as JSON text (they differ by mode)" }
+  decoders.*.metadata.insert_cc: { type: string, description: "Closed caption insertion, such as off" }
+  decoders.*.metadata.cc_insertion_line: { type: int, description: "The line closed captions are inserted on" }
+  decoders.*.metadata.insert_dpi: { type: bool, description: "DPI is inserted into the output" }
+  decoders.*.metadata.dpi_insertion_line: { type: int, description: "The line DPI is inserted on" }
+  decoders.*.metadata.insert_timecode: { type: string, description: "Timecode insertion, as the device gives it, such as 0" }
+  decoders.*.record.mode:        { type: string, description: "The recording mode, such as RECUpload" }
+  decoders.*.record.audio_track_selection: { type: string, description: "Which audio tracks are recorded" }
+  decoders.*.record.audio_tracks: { type: string, description: "The audio tracks recorded when the selection is custom, as JSON text" }
+  decoders.*.record.name:        { type: string, description: "The file name pattern, such as $PN_$DATE_$TIME" }
+  decoders.*.record.format:      { type: string, description: "The file format, such as mp4" }
+  decoders.*.record.max_files:   { type: int, description: "The most files kept (max-files)" }
+  decoders.*.record.max_size_time: { type: int, description: "The file split size or time (max-size-time), as the device gives it" }
+  decoders.*.record.bonded_uploads: { type: bool, description: "Recordings are uploaded over the bonded link" }
+  decoders.*.record.cyclic:      { type: bool, description: "Cyclic recording overwrites the oldest files" }
+  decoders.*.record.file_loop_index: { type: int, description: "The current file index of cyclic recording" }
+  decoders.*.record.camera_type: { type: string, description: "The camera type used for record triggering and names" }
+  decoders.*.record.auto_record: { type: string, description: "Automatic recording, such as off" }
+  decoders.*.record.drive_id:    { type: string, description: "The drive recorded to, such as sd1" }
+  decoders.*.record.fragmented:  { type: bool, description: "Fragmented MP4 files" }
+  decoders.*.record.timecode:    { type: bool, description: "Timecode is written to the files" }
+  decoders.*.record.sidecar:     { type: bool, description: "A sidecar file is written" }
+  decoders.*.record.settings_json: { type: string, description: "Every recording setting as last read, as JSON text" }
+  decoders.*.record_info.state:  { type: string, description: "The recording state, such as Disabled" }
+  decoders.*.record_info.state_details: { type: string, description: "Why the recording is in its state" }
+  decoders.*.record_info.uptime: { type: string, description: "How long the recording has run, hh:mm:ss" }
+  decoders.*.record_info.format: { type: string, description: "The drive's file system" }
+  decoders.*.record_info.size:   { type: string, description: "The drive's size, such as 13.8G" }
+  decoders.*.record_info.used:   { type: string, description: "Space used on the drive" }
+  decoders.*.record_info.available: { type: string, description: "Space left on the drive" }
+  decoders.*.record_info.percent_used: { type: string, description: "Share of the drive used" }
+  decoders.*.record_info.info_json: { type: string, description: "The whole recording status as last read, as JSON text" }
+  audio_output.enable:           { type: bool, description: "The physical audio output (shared by all decoders) is on" }
+  audio_output.channel_mode:     { type: string, description: "The output's channel count or mode, such as 8" }
+  audio_output.channel_map:      { type: string, description: "The output's channel map (default-channel-map), such as smpte" }
+  audio_output.delay:            { type: int, description: "The output's audio delay, as the device gives it" }
+  audio_output.embedded_mute:    { type: bool, description: "The embedded audio output is muted" }
+  audio_output.embedded_volume:  { type: int, description: "The embedded audio output's volume, as the device gives it" }
+  audio_output.remapping:        { type: bool, description: "Channel remapping is on" }
+  audio_output.selected:         { type: int, description: "The selected audio, as the device gives it" }
+  audio_output.settings_json:    { type: string, description: "Every audio output setting as last read, as JSON text" }
+  audio_output.channels.*.mute:  { type: bool, description: "An output channel (0-15) is muted" }
+  audio_output.channels.*.track: { type: int, description: "The track the output channel takes" }
+  audio_output.channels.*.volume: { type: int, description: "The output channel's volume, as the device gives it" }
+  streams.*.name:                { type: string, description: "The stream's name, such as Stream 1" }
+  streams.*.mode:                { type: string, description: "The stream's protocol, such as SRT, TS or Disabled (on 2.25 read from mode_h264 and mode_hevc)" }
+  streams.*.mode_h264:           { type: string, description: "The protocol while encoding H.264 (2.25; on 2.26 the same as mode)" }
+  streams.*.mode_hevc:           { type: string, description: "The protocol while encoding HEVC (2.25; on 2.26 the same as mode)" }
+  streams.*.state:               { type: string, description: "The stream's state, such as Running or Error; kept as last reported while the device gives none (a Disabled stream)" }
+  streams.*.owner:               { type: string, description: "The pipeline the stream belongs to, encoders/<id> or decoders/<id>; kept as last reported while it has none" }
+  streams.*.audio_track_selection: { type: string, description: "Which audio tracks the stream carries, such as all" }
+  streams.*.audio_tracks:        { type: string, description: "The tracks carried when the selection is custom, as JSON text of internal names such as Encoder/AudioTrack/0/Config" }
+  streams.*.settings_json:       { type: string, description: "The current mode's settings as last read, as JSON text (they differ by mode; secrets come back masked)" }
+  streams.*.info.state_details:  { type: string, description: "Details of the stream's state" }
+  streams.*.info.uptime:         { type: string, description: "How long the stream has run, hh:mm:ss" }
+  streams.*.info.url:            { type: string, description: "The stream's URL, such as srt://@:9710?mode=listener" }
+  streams.*.info.port:           { type: int, description: "The stream's port" }
+  streams.*.info.latency:        { type: string, description: "The stream's latency as the device gives it, such as 500 ms" }
+  streams.*.info.encryption:     { type: string, description: "The stream's encryption, such as Disabled" }
+  streams.*.info.info_json:      { type: string, description: "The whole stream status as last read, as JSON text, with peers and traffic statistics" }
+  network.wired.*.label:         { type: string, description: "A wired port's label (0-1), such as Wired 1" }
+  network.wired.*.status:        { type: string, description: "The port's status, such as No Cable" }
+  network.wired.*.detail:        { type: string, description: "The port's status detail" }
+  network.wired.*.mac_address:   { type: string, description: "The port's MAC address" }
+  network.wired.*.status_json:   { type: string, description: "The port's whole status as last read, as JSON text" }
+  network.wifi.label:            { type: string, description: "The Wi-Fi interface's label" }
+  network.wifi.status:           { type: string, description: "The Wi-Fi status, such as Established Access Point" }
+  network.wifi.network:          { type: string, description: "The Wi-Fi network name" }
+  network.wifi.subnet_mask:      { type: string, description: "The Wi-Fi subnet mask" }
+  network.wifi.mac_address:      { type: string, description: "The Wi-Fi MAC address" }
+  network.wifi.ip_address:       { type: string, description: "The Wi-Fi IP address" }
+  network.wifi.settings_json:    { type: string, description: "Every Wi-Fi setting and status as last read, as JSON text" }
+  network.modems.*.type:         { type: string, description: "A modem's type (0-7), such as multislot" }
+  network.modems.*.model:        { type: string, description: "The modem's model, such as Node II-CBRS" }
+  network.modems.*.version:      { type: string, description: "The modem's firmware version" }
+  network.modems.*.status:       { type: string, description: "The modem's status, such as No Carrier" }
+  network.modems.*.detail:       { type: string, description: "The modem's status detail" }
+  network.modems.*.report:       { type: string, description: "The modem's own report, such as EMM attach failed" }
+  network.modems.*.rssi:         { type: int, unit: dBm, description: "The received signal strength" }
+  network.modems.*.imei:         { type: string, description: "The modem's IMEI" }
+  network.modems.*.imsi:         { type: string, description: "The SIM's IMSI" }
+  network.modems.*.iccid:        { type: string, description: "The SIM's ICCID" }
+  network.modems.*.label:        { type: string, description: "The modem's label, such as Modem 1" }
+  network.modems.*.status_json:  { type: string, description: "The modem's whole status as last read, as JSON text, with its slot labels" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Authentication is OAuth 2.0 against the device's own /oauth/token, which the
+      core's oauth2 support cannot reach (it refreshes only, against a fixed
+      token_url). The spec sends the token setting as Authorization Bearer and
+      offers the grants as commands: get_access_token (the password grant) and
+      refresh_access_token (the refresh grant) each return the token answer, and
+      the consumer passes its access_token with update_settings. An access token
+      lasts one hour and a refresh token one week; changing the device password
+      invalidates them all. The token commands go to the token endpoint without
+      the bearer token, as Teradek's SDK sends them, and are not paced (they have
+      their own limit of 30 per 60 seconds). A 401 is not a terminal refusal here,
+      so an expired token never blocks the token commands: requests answered 401
+      fail on their own (commands with HTTP 401, polls logged) until a new token
+      is set. GET /api/v1 needs no token, so the device is reported connected
+      without one.
+  - models: [all]
+    severity: info
+    text: >
+      The device serves HTTPS with a certificate of its own, which is accepted
+      without checking (the link is encrypted, the device not authenticated), as
+      Teradek's SDK does with rejectUnauthorized false. The token endpoint is
+      reached on port 443 even when the device is opened on another port.
+  - models: [all]
+    severity: warning
+    text: >
+      The API allows 60 requests per 60 seconds and answers 429 beyond it. The
+      core spaces requests one second apart, so it alone never exceeds the limit,
+      and polls sparingly: the stream pool every 15 s, with the status and
+      recording of the pipeline owning the first listed stream; every encoder's
+      and decoder's status and configuration, the streams they own, the inputs
+      and the capacity every 60 s; system, Wi-Fi, wired ports and modems every 5
+      minutes. A unit with many pipelines and streams needs more than a minute
+      for a round, and its reads then lag; commands go ahead of queued reads.
+      Writes are read back at once. The rate limit headers of each answer are
+      kept in rate_limit.
+  - models: [all]
+    severity: warning
+    text: >
+      A 504 means the device did not confirm a write or an action in time, but it
+      may still have applied it: the command fails, and the value is read again
+      by the next poll, or at once with the matching get command, before
+      retrying.
+  - models: [all]
+    severity: warning
+    text: >
+      Firmware: Apollo OS 2.25 or later. The lists of encoders, decoders and
+      streams, adding, deleting and restarting pipelines, the inputs, the
+      capacity, the audio track endpoints, a pipeline's streams, the snapshot,
+      and the publish, unpublish, broadcast, halt and cancel actions need 2.26;
+      2.25 answers them 404. On 2.25 a unit has encoder 0, decoder 0 and streams 0
+      to 4, every other endpoint works with those ids, and the stream mode is
+      kept per codec (set_stream_codec_modes, mode-h264 and mode-hevc). Since
+      the pipelines are found through the 2.26 lists, a 2.25 unit's telemetry
+      keeps only system and network state current; its pipelines' and streams'
+      state comes from the replies to the get commands.
+  - models: [all]
+    severity: info
+    text: >
+      Encoder, decoder and stream ids are pool ids and can have gaps after a
+      deletion; read them from the lists. pools.encoders, pools.decoders and
+      pools.streams are replaced on each list read and say what exists now. A
+      pipeline or stream deleted through this API leaves state at once; one
+      deleted in the web UI keeps its last values under encoders, decoders or
+      streams until the device is opened again. A stream with no state (a
+      Disabled stream) or no owner keeps the last one reported.
+  - models: [all]
+    severity: critical
+    text: >
+      A change to a setting that belongs to a pipeline makes the device apply the
+      pipeline again, and encoding restarts, as in the web UI: changing an
+      encoder's input does (set_encoder, set_encoder_physical_input,
+      set_encoder_network_input), and so may other encoder video, audio and
+      decoder ingest settings. restart_encoder and restart_decoder restart a
+      pipeline at once. Every stream of the pipeline drops while it restarts.
+  - models: [all]
+    severity: critical
+    text: >
+      delete_encoder, delete_decoder and delete_stream remove the pipeline or
+      stream and its configuration for good; the last pipeline, stream 0 and
+      anything at the device's minimum cannot be deleted. stop_stream,
+      stop_all_streams, unpublish_stream, halt_stream, cancel_stream and
+      complete_stream end live output (complete is taken to end the broadcast
+      on platforms that have one), and stop_encoder_recording and
+      stop_decoder_recording end the take.
+  - models: [all]
+    severity: critical
+    text: >
+      upgrade_firmware starts a firmware upgrade, which stops the device's
+      output while it runs. import_settings replaces this device's settings with
+      another's, and push_settings and push_settings_to replace the settings of
+      up to 10 other devices; the other devices' admin passwords are sent in the
+      request body.
+  - models: [all]
+    severity: info
+    text: >
+      start_stream and stop_stream send the action the stream's mode takes
+      (publish or unpublish for RTMP, Twitch, Wowza, Facebook, DolbyIO,
+      PhenixRTS and WHIP; broadcast or halt for YouTubeLive; start or stop for the
+      others such as Bond). TS, SRT, RTSP, RTP, RIST, HLS, DASH and WHEP streams
+      run whenever their pipeline runs and answer start and stop with 400. An
+      action the mode or state does not offer answers 400 with "Invalid: ...".
+      The owner of a stream cannot be changed through the API: attach a stream
+      to a pipeline in the web UI; a stream added here has no owner.
+  - models: [all]
+    severity: info
+    text: >
+      Settings writes are checked value by value: an invalid value or an unknown
+      key fails the whole write with the reason (such as "bitrate_list: Invalid
+      choice"). The describe commands (?command=description) give each setting's
+      label, default, type, choices, range and help for building a form, and
+      never change state. The keys each endpoint takes differ by product,
+      firmware and, for streams and decoder ingests, by mode; the settings_json
+      state keeps every key last read. A stream's secrets read back masked.
+  - models: [all]
+    severity: info
+    text: >
+      Units: the video bitrate (bitrate_list) is in kbit/s (100 to 80000 as the
+      device describes it), the audio bitrate in bit/s, and the measured Bitrate
+      in encoder info in bit/s. On 2.26 an encoder's audio enable is the opposite
+      of mute_track and is mapped to it; send one of them, not both with
+      different meanings (400). An encoder has up to 8 audio tracks (2.26), and
+      the audio settings endpoint without a track id is the first one.
+  - models: [all]
+    severity: info
+    text: >
+      The physical audio output, and its 16 channels, are shared by all decoders:
+      the decoder id in their path picks no output of its own, and the core reads
+      them through the first decoder listed. Every decoder path answers 404
+      Decoder not available while the device is in encoder-only mode. SCTE
+      markers are not supported on decoders (the API always refuses them), so
+      no command sends one.
+  - models: [all]
+    severity: info
+    text: >
+      Snapshots: the device saves a JPEG of each pipeline every 5 seconds and
+      returns the latest (up to 5 s old) as image/jpeg. The core cannot return a
+      binary image as a command result, so there is no snapshot command;
+      set_encoder_snapshot_settings and set_decoder_snapshot_settings save the
+      width, height and quality for the next snapshot, and the image in their
+      reply is dropped. The API has no read of the snapshot settings. The wired
+      ports and modems are read-only in the API.
+  - models: [all]
+    severity: info
+    text: >
+      A POST without a body must carry Content-Length 0, or the device answers
+      411; the actions here (record start and stop, stream actions, restarts,
+      adding, the firmware upgrade, a plain SCTE marker) are sent without a body.
+      The insert_scte_marker_with and start_encoder_recording_with commands save
+      their fields to the settings first, so they apply to later markers and
+      recordings too.
