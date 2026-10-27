@@ -155,6 +155,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &["irisdown-countdown-timer", "irisdown-remote-show-control"],
     ),
     ("vendor-joy", &["joy-playdeck"]),
+    ("vendor-jvc", &["jvc-camera"]),
     (
         "vendor-kiloview",
         &[

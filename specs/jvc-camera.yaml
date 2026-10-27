@@ -1,0 +1,1380 @@
+spec: 1
+id: jvc-camera
+name: JVC camcorders and PTZ cameras (Camcorder Web API)
+vendor: JVC
+category: camera
+
+# JVC's Camcorder Web API: the client logs in at /api.php with HTTP Digest,
+# the camera answers with a SessionID cookie, and every command is a JSON
+# request POSTed to /cgi-bin/api.cgi carrying that SessionID. Answers are
+# JSON with a Result of Success or an error name. The same API serves the
+# GY-HM and GY-HC camcorders and the KY-PZ PTZ cameras; which commands each
+# model takes is the document's per-model table.
+
+source:
+  - title: JVC Camcorder Web API Reference, Version 1.18
+    author: JVC KENWOOD Corporation
+    url: https://github.com/bitfocus/companion-module-jvc-ptz/blob/main/docs/JvcCamcorderApiReferenceV118_public.pdf
+    note: >
+      Manufacturer document marked public, read 2026-10-27 from the copy an integrator's repository
+      redistributes. 2 Interface (HTTP on port 80, or the camera's web port; Digest authentication at
+      /api.php returning a SessionID cookie; requests POSTed to /cgi-bin/api.cgi as
+      {"Request":{"Command","SessionID","Params"}} with no spaces or line breaks; answers
+      {"Response":{"Requested","Result","Data"}}, Result Success, DisableError, RequestedError,
+      FormatError, CommandError, SessionError, DualExeError or Failed); the per-model support table
+      of every command; 3.1 streaming settings, servers and video settings; 3.2 system information,
+      preset zoom positions, NTP and SystemRequest; 3.3 GetCamStatus (recommended no more often than
+      every 500 ms), SetCamCtrl, SetZoomCtrl, SetStreamingCtrl, SetTallyLampCtrl, SetWebButtonEvent
+      (kinds and buttons per model), SetWebSliderEvent, SetWebXYFieldEvent, GetGPSInfo,
+      SeesawSwitchOperation; 3.4 SetPTCtrl, JoyStickOperation, ZoomSwitchOperation, SetPTZPreset,
+      GetCamStatusMinimum, GetPTPosition; 3.5 JpegEncode and SetJpegEncodeSize; 3.6 IFB; 3.7 studio
+      tally (SetStudioTally, SetTallyLampPriority); 3.8 Return over IP.
+  - title: companion-module-jvc-ptz (MIT licence)
+    author: Bitfocus contributors
+    url: https://github.com/bitfocus/companion-module-jvc-ptz
+    note: >
+      Read for corroboration only (index.js), retrieved 2026-10-27: it logs in with Digest at
+      /api.php, takes the SessionID cookie, sends each command with the SessionID in its body, and
+      logs in again when a command answers SessionError. No code taken.
+
+transport:
+  type: http
+  port: 80
+  auth: digest
+  timeout_ms: 5000
+  probe:
+    method: POST
+    path: /cgi-bin/api.cgi
+    content_type: "application/x-www-form-urlencoded; charset=UTF-8"
+    body: '{"Request":{"Command":"GetSystemInfo"}}'
+  session:
+    login: { method: GET, path: /api.php }
+    capture: { cookie: SessionID }
+    login_status: [302]
+    relogin: { json: { "$.Response.Result": "^SessionError$" } }
+
+settings:
+  username: { type: string, required: true, max_length: 64, label: Username, description: "The camera's web user name, as set in its network menu." }
+  password: { type: string, required: true, secret: true, max_length: 64, label: Password, description: "The camera's web password." }
+
+ports:
+  - { port: 80, protocol: http, role: control, note: "the camera's web port, 80 unless changed in its menu" }
+
+models:
+  - id: gy-hm650
+    name: JVC GY-HM650
+    supports: 
+      [get_streaming_settings, set_streaming_resolution, set_streaming_bitrate, get_available_resolutions, get_available_bitrates, get_streaming_server, set_streaming_server, get_streaming_server_settings, set_server_udp, set_server_tcp, set_server_rtsp, set_server_zixi, set_server_rtmp, get_system_info, get_zoom_presets, set_zoom_preset, clear_zoom_preset, get_camera_status, start_recording, stop_recording, set_zoom_position, start_streaming, stop_streaming, set_tally_lamp, full_auto_button, iris_button, gain_button, ae_level_button, shutter_button, white_balance_button, zoom_button, focus_button, user_switch_button, display_button, menu_button, record_button, set_zoom_slider, set_iris_slider, set_white_paint, get_gps, start_jpeg_encoding, stop_jpeg_encoding, set_tally_priority]
+    verification: none
+  - id: gy-hm660
+    name: JVC GY-HM660
+    supports: 
+      [get_streaming_settings, set_streaming_resolution, set_streaming_frame_rate, set_streaming_bitrate, get_available_resolutions, get_available_frame_rates, get_available_bitrates, get_streaming_server, set_streaming_server, get_streaming_server_settings, set_server_udp, set_server_rtsp, set_server_zixi, set_server_rtmp, set_server_rtp, get_system_info, get_zoom_presets, set_zoom_preset, clear_zoom_preset, get_ntp_status, set_ntp_server, set_ntp_timecode_sync, get_camera_status, start_recording, stop_recording, set_zoom_position, start_streaming, stop_streaming, set_tally_lamp, full_auto_button, iris_button, gain_button, ae_level_button, shutter_button, white_balance_button, zoom_button, focus_button, user_switch_button, display_button, menu_button, record_button, master_black_button, detail_button, set_zoom_slider, set_iris_slider, set_white_paint, get_gps, zoom_seesaw, iris_seesaw, master_black_seesaw, focus_seesaw, zoom_switch, start_jpeg_encoding, stop_jpeg_encoding, get_ifb_settings, set_ifb_settings, start_ifb, stop_ifb, set_studio_tally, set_tally_priority]
+    verification: none
+  - id: gy-hm8x0
+    name: JVC GY-HM850 / GY-HM890
+    supports: 
+      [get_streaming_settings, set_streaming_resolution, set_streaming_frame_rate, set_streaming_bitrate, get_available_resolutions, get_available_frame_rates, get_available_bitrates, get_streaming_server, set_streaming_server, get_streaming_server_settings, set_server_udp, set_server_rtsp, set_server_zixi, set_server_rtmp, set_server_rtp, get_system_info, get_zoom_presets, set_zoom_preset, clear_zoom_preset, get_ntp_status, set_ntp_server, set_ntp_timecode_sync, get_camera_status, start_recording, stop_recording, set_zoom_position, start_streaming, stop_streaming, set_tally_lamp, full_auto_button, iris_button, gain_button, ae_level_button, shutter_button, white_balance_button, zoom_button, focus_button, user_switch_button, display_button, menu_button, record_button, master_black_button, detail_button, set_zoom_slider, set_iris_slider, set_white_paint, get_gps, zoom_seesaw, iris_seesaw, master_black_seesaw, focus_seesaw, zoom_switch, start_jpeg_encoding, stop_jpeg_encoding, get_ifb_settings, set_ifb_settings, start_ifb, stop_ifb, set_studio_tally, set_tally_priority]
+    verification: none
+  - id: gy-hm200
+    name: JVC GY-HM200
+    supports: 
+      [get_streaming_settings, set_streaming_resolution, set_streaming_frame_rate, set_streaming_bitrate, get_available_resolutions, get_available_frame_rates, get_available_bitrates, get_streaming_server, set_streaming_server, get_streaming_server_settings, set_server_udp, set_server_rtsp, set_server_zixi, set_server_rtmp, set_server_rtp, get_system_info, get_zoom_presets, set_zoom_preset, clear_zoom_preset, get_ntp_status, set_ntp_server, set_ntp_timecode_sync, get_camera_status, start_recording, stop_recording, set_zoom_position, start_streaming, stop_streaming, set_tally_lamp, full_auto_button, iris_button, gain_button, ae_level_button, shutter_button, white_balance_button, zoom_button, focus_button, user_switch_button, display_button, menu_button, record_button, master_black_button, detail_button, set_zoom_slider, set_iris_slider, set_white_paint, zoom_seesaw, iris_seesaw, master_black_seesaw, focus_seesaw, zoom_switch, start_jpeg_encoding, stop_jpeg_encoding, set_studio_tally, set_tally_priority]
+    verification: none
+  - id: gy-hm25x
+    name: JVC GY-HM250 / GY-HM258
+    supports: 
+      [get_streaming_settings, set_streaming_resolution, set_streaming_frame_rate, set_streaming_bitrate, get_available_resolutions, get_available_frame_rates, get_available_bitrates, get_streaming_server, set_streaming_server, get_streaming_server_settings, set_server_udp, set_server_rtsp, set_server_zixi, set_server_rtmp, set_server_rtmps, set_server_rtp, get_system_info, get_zoom_presets, set_zoom_preset, clear_zoom_preset, get_ntp_status, set_ntp_server, set_ntp_timecode_sync, get_camera_status, start_recording, stop_recording, set_zoom_position, start_streaming, stop_streaming, set_tally_lamp, full_auto_button, iris_button, gain_button, ae_level_button, shutter_button, white_balance_button, zoom_button, focus_button, user_switch_button, display_button, menu_button, record_button, master_black_button, detail_button, set_zoom_slider, set_iris_slider, set_white_paint, zoom_seesaw, iris_seesaw, master_black_seesaw, focus_seesaw, zoom_switch, start_jpeg_encoding, stop_jpeg_encoding, set_studio_tally, set_tally_priority]
+    verification: none
+  - id: gy-hm280
+    name: JVC GY-HM280
+    supports: 
+      [get_streaming_settings, set_streaming_resolution, set_streaming_frame_rate, set_streaming_bitrate, get_available_resolutions, get_available_frame_rates, get_available_bitrates, get_streaming_server, set_streaming_server, get_streaming_server_settings, set_server_udp, set_server_rtsp, set_server_zixi, set_server_rtmp, set_server_rtmps, set_server_rtp, get_system_info, get_zoom_presets, set_zoom_preset, clear_zoom_preset, get_ntp_status, set_ntp_server, set_ntp_timecode_sync, get_camera_status, start_recording, stop_recording, set_zoom_position, start_streaming, stop_streaming, set_tally_lamp, full_auto_button, iris_button, gain_button, ae_level_button, shutter_button, white_balance_button, zoom_button, focus_button, user_switch_button, display_button, menu_button, record_button, master_black_button, detail_button, set_zoom_slider, set_iris_slider, set_white_paint, zoom_seesaw, iris_seesaw, master_black_seesaw, focus_seesaw, zoom_switch, start_jpeg_encoding, stop_jpeg_encoding, set_studio_tally, set_tally_priority]
+    verification: none
+  - id: gy-ls300
+    name: JVC GY-LS300
+    supports: 
+      [get_streaming_settings, set_streaming_resolution, set_streaming_frame_rate, set_streaming_bitrate, get_available_resolutions, get_available_frame_rates, get_available_bitrates, get_streaming_server, set_streaming_server, get_streaming_server_settings, set_server_udp, set_server_rtsp, set_server_zixi, set_server_rtmp, set_server_rtp, get_system_info, get_zoom_presets, set_zoom_preset, clear_zoom_preset, get_camera_status, start_recording, stop_recording, set_zoom_position, start_streaming, stop_streaming, set_tally_lamp, full_auto_button, iris_button, gain_button, ae_level_button, shutter_button, white_balance_button, zoom_button, focus_button, user_switch_button, display_button, menu_button, record_button, set_zoom_slider, set_iris_slider, set_white_paint, start_jpeg_encoding, stop_jpeg_encoding, set_tally_priority]
+    verification: none
+  - id: ky-pz100
+    name: JVC KY-PZ100
+    supports: 
+      [get_streaming_settings, set_streaming_resolution, set_streaming_frame_rate, set_streaming_bitrate, get_available_resolutions, get_available_frame_rates, get_available_bitrates, get_streaming_server, set_streaming_server, get_streaming_server_settings, set_server_udp, set_server_rtsp, set_server_zixi, set_server_rtmp, set_server_rtmps, set_server_rtp, get_system_info, get_ntp_status, set_ntp_server, set_ntp_timecode_sync, get_camera_status, start_recording, stop_recording, set_zoom_position, start_streaming, stop_streaming, set_tally_lamp, exposure_button, iris_button, gain_button, ae_level_button, shutter_button, white_balance_button, zoom_button, focus_button, user_switch_button, display_button, menu_button, record_button, detail_button, speed_with_zoom_button, set_zoom_slider, set_iris_slider, set_white_paint, pan_tilt, joystick, zoom_switch, recall_preset, store_preset, delete_preset, get_camera_status_minimum, get_pan_tilt_position, start_jpeg_encoding, stop_jpeg_encoding, set_jpeg_size, set_studio_tally, set_tally_priority]
+    verification: none
+  - id: gy-hc900
+    name: JVC GY-HC900
+    supports: 
+      [get_streaming_settings, set_streaming_resolution, set_streaming_frame_rate, set_streaming_bitrate, get_available_resolutions, get_available_frame_rates, get_available_bitrates, get_streaming_server, set_streaming_server, get_streaming_server_settings, set_server_udp, set_server_tcp, set_server_rtsp, set_server_zixi, set_server_rtmp, set_server_rtmps, set_server_rtp, set_server_srt, get_system_info, get_ntp_status, set_ntp_server, get_camera_status, start_recording, stop_recording, start_streaming, stop_streaming, set_tally_lamp, full_auto_button, iris_button, gain_button, ae_level_button, shutter_button, white_balance_button, zoom_button, focus_button, user_switch_button, display_button, menu_button, record_button, master_black_button, detail_button, set_zoom_slider, set_iris_slider, set_white_paint, get_gps, zoom_seesaw, iris_seesaw, master_black_seesaw, focus_seesaw, zoom_switch, start_jpeg_encoding, stop_jpeg_encoding, set_studio_tally, set_tally_priority, get_return_server, set_return_server, get_return_server_settings, get_return_types, get_return_frame_rates, set_return_rtsp, set_return_zixi, set_return_icecast, set_return_srt, start_return, stop_return]
+    verification: none
+  - id: gy-hc5x0
+    name: JVC GY-HC500 / GY-HC550
+    supports: 
+      [get_streaming_settings, set_streaming_resolution, set_streaming_frame_rate, set_streaming_bitrate, get_available_resolutions, get_available_frame_rates, get_available_bitrates, get_streaming_server, set_streaming_server, get_streaming_server_settings, set_server_udp, set_server_tcp, set_server_rtsp, set_server_zixi, set_server_rtmp, set_server_rtmps, set_server_rtp, set_server_srt, get_system_info, get_zoom_presets, set_zoom_preset, clear_zoom_preset, get_ntp_status, set_ntp_server, get_camera_status, start_recording, stop_recording, set_zoom_position, start_streaming, stop_streaming, set_tally_lamp, full_auto_button, iris_button, gain_button, ae_level_button, shutter_button, white_balance_button, zoom_button, focus_button, user_switch_button, display_button, menu_button, record_button, master_black_button, detail_button, set_zoom_slider, set_iris_slider, set_white_paint, get_gps, zoom_seesaw, iris_seesaw, master_black_seesaw, focus_seesaw, zoom_switch, start_jpeg_encoding, stop_jpeg_encoding, set_studio_tally, set_tally_priority, get_return_server, set_return_server, get_return_server_settings, get_return_types, get_return_frame_rates, set_return_rtsp, set_return_zixi, set_return_icecast, set_return_srt, start_return, stop_return]
+    verification: none
+  - id: ky-pz400
+    name: JVC KY-PZ400
+    supports: 
+      [get_streaming_settings, set_streaming_resolution, set_streaming_frame_rate, set_streaming_bitrate_and_quality, get_available_resolutions, get_available_frame_rates, get_available_bitrates, get_streaming_server_settings_of_type, set_server_rtsp, set_server_rtmp, set_server_rtmps, set_server_srt, set_encode_protocol, set_key_frame_interval, get_video_settings, set_video_output, set_video_format, set_video_encode_level, set_multicast, set_ndi, get_system_info, set_ntp_settings, get_ntp_settings, reboot, get_camera_status, set_zoom_position, start_streaming, stop_streaming, set_tally_lamp, exposure_button, iris_button, gain_button, shutter_button, white_balance_button, zoom_button, focus_button, menu_button, speed_with_zoom_button, bright_button, luminance_button, saturation_button, contrast_button, sharpness_button, hue_button, flip_button, mirror_button, set_zoom_slider, set_iris_slider, set_white_paint, pan_tilt, joystick, zoom_switch, recall_preset, store_preset, delete_preset, get_camera_status_minimum, get_pan_tilt_position, set_studio_tally]
+    verification: none
+  - id: ky-pz200
+    name: JVC KY-PZ200 / KY-PZ200N
+    supports: 
+      [get_streaming_settings, set_streaming_resolution, set_streaming_frame_rate, set_streaming_bitrate_and_quality, get_available_resolutions, get_available_frame_rates, get_available_bitrates, get_streaming_server_settings_of_type, set_server_rtsp, set_server_rtmp, set_server_rtmps, set_server_srt, set_encode_protocol, set_key_frame_interval, get_video_settings, set_video_output, set_video_format, set_video_encode_level, set_multicast, set_ndi, get_system_info, set_ntp_settings, get_ntp_settings, reboot, get_camera_status, set_zoom_position, start_streaming, stop_streaming, exposure_button, iris_button, gain_button, shutter_button, white_balance_button, zoom_button, focus_button, menu_button, speed_with_zoom_button, bright_button, luminance_button, saturation_button, contrast_button, sharpness_button, hue_button, flip_button, mirror_button, set_zoom_slider, set_iris_slider, set_white_paint, pan_tilt, joystick, zoom_switch, recall_preset, store_preset, delete_preset, get_camera_status_minimum, get_pan_tilt_position]
+    verification: none
+
+commands:
+  # ── Streaming settings (3.1) ───────────────────────────────────────────
+  get_streaming_settings:
+    summary: "Read a stream's resolution, frame rate, bitrate, quality, encoding and key frame interval"
+    params:
+      stream: { type: int, min: 0, max: 1, default: 0, label: Stream, description: "Stream on a KY-PZ400 or KY-PZ200: 0 for the first, 1 for the second; other models have one stream." }
+    send:
+      - { models: [gy-hm650, gy-hm660, gy-hm8x0, gy-hm200, gy-hm25x, gy-hm280, gy-ls300, ky-pz100, gy-hc900, gy-hc5x0], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingSettings\",\"SessionID\":{session.id:json}}}" }
+      - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Stream\":{stream}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  set_streaming_resolution:
+    summary: "Set the streaming resolution (HM650, HM660 and HM8x0 restart to apply it)"
+    params:
+      stream: { type: int, min: 0, max: 1, default: 0, label: Stream, description: "Stream on a KY-PZ400 or KY-PZ200: 0 for the first, 1 for the second; other models have one stream." }
+      resolution: { type: enum, values: ["3840x2160", "1920x1080", "1440x1080", "1280x720", "1024x576", "720x480", "720x576", "720x408", "640x480", "640x360", "480x320", "480x270", "320x240", "1080x1080", "606x1080", "720x720", "404x720"], required: true, label: Resolution, description: "Streaming resolution; which are available depends on the model and the recording format." }
+    send:
+      - { models: [gy-hm650, gy-hm660, gy-hm8x0, gy-hm200, gy-hm25x, gy-hm280, gy-ls300, ky-pz100, gy-hc900, gy-hc5x0], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStreamingResolution\",\"SessionID\":{session.id:json},\"Params\":{\"Resolution\":\"{resolution}\"}}}" }
+      - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStreamingResolution\",\"SessionID\":{session.id:json},\"Params\":{\"Stream\":{stream},\"Resolution\":\"{resolution}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_streaming_frame_rate:
+    summary: "Set the streaming frame rate"
+    params:
+      stream: { type: int, min: 0, max: 1, default: 0, label: Stream, description: "Stream on a KY-PZ400 or KY-PZ200: 0 for the first, 1 for the second; other models have one stream." }
+      frame_rate: { type: string, pattern: "^(60p|50p|60i|50i|30p|25p|422_10bit_60p|422_10bit_50p|[1-9]|[1-5][0-9]|60)$", required: true, label: Frame rate, description: "60p, 50p, 60i, 50i, 30p, 25p, 422_10bit_60p or 422_10bit_50p, or a number 1 to 60 on a KY-PZ400 or KY-PZ200." }
+    send:
+      - { models: [gy-hm660, gy-hm8x0, gy-hm200, gy-hm25x, gy-hm280, gy-ls300, ky-pz100, gy-hc900, gy-hc5x0], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStreamingFramerate\",\"SessionID\":{session.id:json},\"Params\":{\"Framerate\":\"{frame_rate}\"}}}" }
+      - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStreamingFramerate\",\"SessionID\":{session.id:json},\"Params\":{\"Stream\":{stream},\"Framerate\":\"{frame_rate}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_streaming_bitrate:
+    summary: "Set the streaming bitrate (camcorders and KY-PZ100)"
+    params:
+      bitrate: { type: enum, values: ["0.2M", "0.3M", "0.8M", "1.5M", "2.5M", "3.0M", "5.0M", "8.0M", "10M", "12M", "16M", "20M", "24M"], required: true, label: Bitrate, description: "Streaming bitrate in Mbit/s; which are available depends on the format." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStreamingBitrate\",\"SessionID\":{session.id:json},\"Params\":{\"Bitrate\":\"{bitrate}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_streaming_bitrate_and_quality:
+    summary: "Set a stream's bitrate, MJPEG quality and rate control (KY-PZ400, KY-PZ200; applied after a restart)"
+    params:
+      stream: { type: int, min: 0, max: 1, default: 0, label: Stream, description: "Stream on a KY-PZ400 or KY-PZ200: 0 for the first, 1 for the second; other models have one stream." }
+      kbps: { type: int, min: 32, max: 61440, required: true, label: Bitrate, description: "Bitrate in kbit/s for H.264 and H.265, 32 to 61440." }
+      quality: { type: int, min: 1, max: 99, required: true, label: Quality, description: "MJPEG quality factor, 1 to 99." }
+      control: { type: enum, values: ["CBR", "VBR"], required: true, label: Rate control, description: "Constant or variable bitrate." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStreamingBitrate\",\"SessionID\":{session.id:json},\"Params\":{\"Stream\":{stream},\"Bitrate\":\"{kbps}K\",\"Qfactor\":\"{quality}\",\"BitRateControl\":\"{control}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  get_available_resolutions:
+    summary: "List which streaming resolutions can be chosen now"
+    params:
+      stream: { type: int, min: 0, max: 1, default: 0, label: Stream, description: "Stream on a KY-PZ400 or KY-PZ200: 0 for the first, 1 for the second; other models have one stream." }
+    send:
+      - { models: [gy-hm650, gy-hm660, gy-hm8x0, gy-hm200, gy-hm25x, gy-hm280, gy-ls300, ky-pz100, gy-hc900, gy-hc5x0], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"AvailableStreamingResolutionSettings\",\"SessionID\":{session.id:json}}}" }
+      - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"AvailableStreamingResolutionSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Stream\":{stream}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  get_available_frame_rates:
+    summary: "List which streaming frame rates can be chosen for a resolution"
+    params:
+      stream: { type: int, min: 0, max: 1, default: 0, label: Stream, description: "Stream on a KY-PZ400 or KY-PZ200: 0 for the first, 1 for the second; other models have one stream." }
+      resolution: { type: enum, values: ["3840x2160", "1920x1080", "1440x1080", "1280x720", "1024x576", "720x480", "720x576", "720x408", "640x480", "640x360", "480x320", "480x270", "320x240", "1080x1080", "606x1080", "720x720", "404x720"], required: true, label: Resolution, description: "Streaming resolution; which are available depends on the model and the recording format." }
+    send:
+      - { models: [gy-hm660, gy-hm8x0, gy-hm200, gy-hm25x, gy-hm280, gy-ls300, ky-pz100, gy-hc900, gy-hc5x0], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"AvailableStreamingFramerateSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Resolution\":\"{resolution}\"}}}" }
+      - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"AvailableStreamingFramerateSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Stream\":{stream},\"Resolution\":\"{resolution}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  get_available_bitrates:
+    summary: "List which streaming bitrates can be chosen for a type, resolution and frame rate"
+    params:
+      stream: { type: int, min: 0, max: 1, default: 0, label: Stream, description: "Stream on a KY-PZ400 or KY-PZ200: 0 for the first, 1 for the second; other models have one stream." }
+      type: { type: enum, values: ["UDP", "UDPN", "UDPL", "TCP", "RTSP", "ZIXIM", "ZIXIL", "ZIXI", "RTMP", "RTMPS", "RTP", "Facebook", "YouTube", "SRT"], required: true, label: Type, description: "Streaming type (UDPN and UDPL: UDP with normal or low PCR jitter; ZIXIM and ZIXIL: Zixi latency classes)." }
+      resolution: { type: enum, values: ["3840x2160", "1920x1080", "1440x1080", "1280x720", "1024x576", "720x480", "720x576", "720x408", "640x480", "640x360", "480x320", "480x270", "320x240", "1080x1080", "606x1080", "720x720", "404x720"], required: true, label: Resolution, description: "Streaming resolution; which are available depends on the model and the recording format." }
+      frame_rate: { type: string, pattern: "^(60p|50p|60i|50i|30p|25p|422_10bit_60p|422_10bit_50p|[1-9]|[1-5][0-9]|60)$", required: true, label: Frame rate, description: "60p, 50p, 60i, 50i, 30p, 25p, 422_10bit_60p or 422_10bit_50p, or a number 1 to 60 on a KY-PZ400 or KY-PZ200." }
+    send:
+      - { models: [gy-hm650, gy-hm660, gy-hm8x0, gy-hm200, gy-hm25x, gy-hm280, gy-ls300, ky-pz100, gy-hc900, gy-hc5x0], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"AvailableStreamingBitrateSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Type\":\"{type}\",\"Resolution\":\"{resolution}\",\"Framerate\":\"{frame_rate}\"}}}" }
+      - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"AvailableStreamingBitrateSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Stream\":{stream},\"Type\":\"{type}\",\"Resolution\":\"{resolution}\",\"Framerate\":\"{frame_rate}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  get_streaming_server:
+    summary: "Read which of the four streaming server settings is in use"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetCurrentStreamingServerID\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  set_streaming_server:
+    summary: "Choose which of the four streaming server settings to stream to"
+    params:
+      server: { type: int, min: 1, max: 4, required: true, label: Server, description: "Streaming server setting, 1 to 4." }
+    send:
+      - { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetCurrentStreamingServerID\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":{server:-1}}}}" }
+      - { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetCurrentStreamingServerID\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  get_streaming_server_settings:
+    summary: "Read a streaming server setting (camcorders and KY-PZ100)"
+    params:
+      server: { type: int, min: 1, max: 4, required: true, label: Server, description: "Streaming server setting, 1 to 4." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingServerSettings\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":{server:-1}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  get_streaming_server_settings_of_type:
+    summary: "Read the server settings of a streaming type (KY-PZ400, KY-PZ200)"
+    params:
+      type: { type: enum, values: ["RTSP", "RTSP2", "RTMP", "RTMP2", "RTMPS", "RTMPS2", "SRT", "ONVIF", "Multicast", "NDI"], required: true, label: Type, description: "Streaming type whose settings to read; the 2 types are the second stream's." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingServerSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Type\":\"{type}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  set_server_udp:
+    summary: "Set a streaming server setting to MPEG-TS over UDP"
+    params:
+      server: { type: int, min: 1, max: 4, required: true, label: Server, description: "Streaming server setting, 1 to 4." }
+      alias: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Alias, description: "Name of the server setting." }
+      address: { type: string, max_length: 64, pattern: "^[0-9A-Za-z.:-]*$", required: true, label: Address, description: "IP address." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "Port number." }
+      pcr_mode: { type: enum, values: ["standard", "fast"], required: true, label: PCR mode, description: "Standard or fast PCR." }
+      pcr_jitter: { type: enum, values: ["normal", "low"], required: true, label: PCR jitter, description: "Normal or low PCR jitter." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStreamingServerSettingsUDP\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":{server:-1},\"Alias\":\"{alias}\",\"DstAddress\":\"{address}\",\"DstPort\":{port},\"PcrMode\":{pcr_mode:map.pcr_mode},\"PcrJitter\":{pcr_jitter:map.pcr_jitter}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_server_tcp:
+    summary: "Set a streaming server setting to MPEG-TS over TCP"
+    params:
+      server: { type: int, min: 1, max: 4, required: true, label: Server, description: "Streaming server setting, 1 to 4." }
+      alias: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Alias, description: "Name of the server setting." }
+      address: { type: string, max_length: 64, pattern: "^[0-9A-Za-z.:-]*$", required: true, label: Address, description: "IP address." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "Port number." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStreamingServerSettingsTCP\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":{server:-1},\"Alias\":\"{alias}\",\"DstAddress\":\"{address}\",\"DstPort\":{port}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_server_rtsp:
+    summary: "Set a streaming server setting to RTSP/RTP served by the camera"
+    params:
+      server: { type: int, min: 1, max: 4, required: true, label: Server, description: "Streaming server setting, 1 to 4." }
+      alias: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Alias, description: "Name of the server setting." }
+      username: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: RTSP user, description: "User name RTSP clients log in with." }
+      password: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, secret: true, label: RTSP password, description: "Password RTSP clients log in with." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "Port number." }
+      auth: { type: bool, required: true, label: Authentication, description: "On makes RTSP clients log in." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStreamingServerSettingsRTSP\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":{server:-1},\"Alias\":\"{alias}\",\"Username\":\"{username}\",\"Password\":\"{password}\",\"DstPort\":{port},\"Auth\":{auth:bool01}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_server_zixi:
+    summary: "Set a streaming server setting to Zixi"
+    params:
+      server: { type: int, min: 1, max: 4, required: true, label: Server, description: "Streaming server setting, 1 to 4." }
+      alias: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Alias, description: "Name of the server setting." }
+      address: { type: string, max_length: 64, pattern: "^[0-9A-Za-z.:-]*$", required: true, label: Address, description: "IP address." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "Port number." }
+      stream_id: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Stream ID, description: "Zixi stream ID." }
+      password: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, secret: true, label: Password, description: "Zixi password." }
+      latency: { type: enum, values: ["low", "medium", "minimum", "high"], required: true, label: Latency, description: "Zixi latency: low, medium, minimum (Zixi off) or high." }
+      pcr_mode: { type: enum, values: ["standard", "fast"], required: true, label: PCR mode, description: "Standard or fast PCR." }
+      adaptive: { type: bool, required: true, label: Adaptive bitrate, description: "On lets Zixi adapt the bitrate." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStreamingServerSettingsZIXI\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":{server:-1},\"Alias\":\"{alias}\",\"DstAddress\":\"{address}\",\"DstPort\":{port},\"StreamId\":\"{stream_id}\",\"Password\":\"{password}\",\"Latency\":{latency:map.zixi_latency},\"PcrMode\":{pcr_mode:map.pcr_mode},\"AdaptiveBitrate\":{adaptive:bool01}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_server_rtmp:
+    summary: "Set a streaming server setting to RTMP"
+    params:
+      server: { type: int, min: 1, max: 4, required: true, label: Server, description: "Streaming server setting, 1 to 4." }
+      alias: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Alias, description: "Name of the server setting." }
+      stream: { type: int, min: 0, max: 1, default: 0, label: Stream, description: "Stream on a KY-PZ400 or KY-PZ200: 0 for the first, 1 for the second; other models have one stream." }
+      url: { type: string, max_length: 512, pattern: "^[^\"\\\\]*$", required: true, label: URL, description: "Server URL to deliver to." }
+      key: { type: string, max_length: 512, pattern: "^[^\"\\\\]*$", required: true, secret: true, label: Stream key, description: "Stream key." }
+      enabled: { type: bool, required: true, label: Enabled, description: "On uses this setting; off ignores the others." }
+      video: { type: bool, required: true, label: Video, description: "On sends video." }
+      audio: { type: bool, required: true, label: Audio, description: "On sends audio." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStreamingServerSettingsRTMP\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":{server:-1},\"Alias\":\"{alias}\",\"Stream\":{stream},\"DstUrl\":\"{url}\",\"StreamKey\":\"{key}\",\"Status\":{enabled:bool01},\"Video\":{video:bool01},\"Audio\":{audio:bool01}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_server_rtmps:
+    summary: "Set a streaming server setting to RTMPS"
+    params:
+      server: { type: int, min: 1, max: 4, required: true, label: Server, description: "Streaming server setting, 1 to 4." }
+      alias: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Alias, description: "Name of the server setting." }
+      stream: { type: int, min: 0, max: 1, default: 0, label: Stream, description: "Stream on a KY-PZ400 or KY-PZ200: 0 for the first, 1 for the second; other models have one stream." }
+      url: { type: string, max_length: 512, pattern: "^[^\"\\\\]*$", required: true, label: URL, description: "Server URL to deliver to." }
+      key: { type: string, max_length: 512, pattern: "^[^\"\\\\]*$", required: true, secret: true, label: Stream key, description: "Stream key." }
+      enabled: { type: bool, required: true, label: Enabled, description: "On uses this setting; off ignores the others." }
+      video: { type: bool, required: true, label: Video, description: "On sends video." }
+      audio: { type: bool, required: true, label: Audio, description: "On sends audio." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStreamingServerSettingsRTMPS\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":{server:-1},\"Alias\":\"{alias}\",\"Stream\":{stream},\"DstUrl\":\"{url}\",\"StreamKey\":\"{key}\",\"Status\":{enabled:bool01},\"Video\":{video:bool01},\"Audio\":{audio:bool01}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_server_rtp:
+    summary: "Set a streaming server setting to RTP, with SMPTE 2022 FEC"
+    params:
+      server: { type: int, min: 1, max: 4, required: true, label: Server, description: "Streaming server setting, 1 to 4." }
+      alias: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Alias, description: "Name of the server setting." }
+      address: { type: string, max_length: 64, pattern: "^[0-9A-Za-z.:-]*$", required: true, label: Address, description: "IP address." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "Port number." }
+      pcr_mode: { type: enum, values: ["standard", "fast"], required: true, label: PCR mode, description: "Standard or fast PCR." }
+      fec: { type: bool, required: true, label: SMPTE 2022 FEC, description: "On adds forward error correction." }
+      fec_l: { type: int, min: 4, max: 20, required: true, label: FEC L, description: "FEC matrix L, 4 to 20; L times D must not exceed 100." }
+      fec_d: { type: int, min: 4, max: 20, required: true, label: FEC D, description: "FEC matrix D, 4 to 20; L times D must not exceed 100." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStreamingServerSettingsRTP\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":{server:-1},\"Alias\":\"{alias}\",\"DstAddress\":\"{address}\",\"DstPort\":{port},\"PcrMode\":{pcr_mode:map.pcr_mode},\"Smpte2022Fec\":{fec:bool01},\"FecMatrixL\":{fec_l},\"FecMatrixD\":{fec_d}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_server_srt:
+    summary: "Set a streaming server setting to SRT"
+    params:
+      server: { type: int, min: 1, max: 4, required: true, label: Server, description: "Streaming server setting, 1 to 4." }
+      alias: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Alias, description: "Name of the server setting." }
+      address: { type: string, max_length: 64, pattern: "^[0-9A-Za-z.:-]*$", required: true, label: Address, description: "IP address." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "Port number." }
+      stream_id: { type: string, max_length: 512, pattern: "^[^\"\\\\]*$", required: true, label: Stream ID, description: "SRT stream ID." }
+      mode: { type: enum, values: ["caller", "listener", "rendezvous"], required: true, label: Connection mode, description: "SRT caller, listener or rendezvous." }
+      overhead: { type: int, min: 5, max: 100, required: true, label: Bandwidth overhead, description: "Bandwidth overhead in percent, 5 to 100." }
+      latency: { type: int, min: 20, max: 8000, required: true, label: Latency, description: "SRT latency in milliseconds, 20 to 8000." }
+      encryption: { type: enum, values: ["off", "aes128", "aes192", "aes256"], required: true, label: Encryption, description: "Off, or AES with a 128, 192 or 256-bit key." }
+      fec: { type: enum, values: ["off", "10x10", "8x8", "6x6"], required: true, label: FEC, description: "SRT forward error correction: off, 10x10, 8x8 or 6x6." }
+      adaptive: { type: bool, required: true, label: Adaptive bitrate, description: "On lets the bitrate adapt." }
+      pcr_mode: { type: enum, values: ["standard", "fast"], required: true, label: PCR mode, description: "Standard or fast PCR." }
+      passphrase: { type: string, max_length: 79, pattern: "^[ -!#-\\[\\]-~]{10,79}$", required: true, secret: true, label: Passphrase, description: "Encryption passphrase, 10 to 79 ASCII characters." }
+      enabled: { type: bool, required: true, label: Enabled, description: "On uses this setting; off ignores the others." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStreamingServerSettingsSRT\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":{server:-1},\"Alias\":\"{alias}\",\"DstAddress\":\"{address}\",\"DstPort\":{port},\"StreamId\":\"{stream_id}\",\"ConnectionMode\":{mode:map.srt_mode},\"BandwidthOverhead\":{overhead},\"Latency\":{latency},\"Encryption\":{encryption:map.srt_encryption},\"FEC\":{fec:map.srt_fec},\"AdaptiveBitrate\":{adaptive:bool01},\"PcrMode\":{pcr_mode:map.pcr_mode},\"Passphrase\":\"{passphrase}\",\"Status\":{enabled:bool01}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_encode_protocol:
+    summary: "Set a stream's encoding: H.264, H.265 or MJPEG (applied after a restart)"
+    params:
+      stream: { type: int, min: 0, max: 1, default: 0, label: Stream, description: "Stream on a KY-PZ400 or KY-PZ200: 0 for the first, 1 for the second; other models have one stream." }
+      protocol: { type: enum, values: ["H264", "H265", "MJPEG"], required: true, label: Encoding, description: "Video encoding of the stream." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStreamingEncodeProtocol\",\"SessionID\":{session.id:json},\"Params\":{\"Stream\":{stream},\"EncodeProtocol\":\"{protocol}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_key_frame_interval:
+    summary: "Set a stream's I key frame interval, 2 to 60 (applied after a restart)"
+    params:
+      stream: { type: int, min: 0, max: 1, default: 0, label: Stream, description: "Stream on a KY-PZ400 or KY-PZ200: 0 for the first, 1 for the second; other models have one stream." }
+      interval: { type: int, min: 2, max: 60, required: true, label: Interval, description: "Frames between I frames, 2 to 60." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStreamingIKeyFrameInterval\",\"SessionID\":{session.id:json},\"Params\":{\"Stream\":{stream},\"Interval\":{interval}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  get_video_settings:
+    summary: "Read the HDMI/SDI output, video format and encode level"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetVideoSettings\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  set_video_output:
+    summary: "Choose the SDI or HDMI output (applied after a restart)"
+    params:
+      output: { type: enum, values: ["SDI", "HDMI"], required: true, label: Output, description: "Output the video on SDI or HDMI." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetVideoHdmiSdiOutput\",\"SessionID\":{session.id:json},\"Params\":{\"Output\":\"{output}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_video_format:
+    summary: "Set the video system: 50 Hz, 60 Hz or the dial (applied after a restart)"
+    params:
+      format: { type: enum, values: ["50Hz", "60Hz", "DialPriority"], required: true, label: Video format, description: "50Hz, 60Hz, or DialPriority to follow the camera's dial." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetVideoFormat\",\"SessionID\":{session.id:json},\"Params\":{\"VideoFormat\":\"{format}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_video_encode_level:
+    summary: "Set the encode profile (applied after a restart)"
+    params:
+      level: { type: enum, values: ["mainprofile", "highprofile"], required: true, label: Encode level, description: "Main or high profile." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetVideoEncodeLevel\",\"SessionID\":{session.id:json},\"Params\":{\"EncodeLevel\":\"{level}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_multicast:
+    summary: "Set the network multicast output (applied after a restart)"
+    params:
+      enabled: { type: bool, required: true, label: Multicast, description: "On sends the stream by multicast." }
+      address: { type: string, max_length: 64, pattern: "^[0-9A-Za-z.:-]*$", required: true, label: Address, description: "IP address." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "Port number." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetNetworkMulticastSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Status\":{enabled:bool01},\"DstAddress\":\"{address}\",\"DstPort\":{port}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_ndi:
+    summary: "Set the NDI device and group names (KY-PZ200N, KY-PZ400; applied after a restart)"
+    params:
+      device_name: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Device name, description: "NDI device name." }
+      group: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Group, description: "NDI group name." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetNDISettings\",\"SessionID\":{session.id:json},\"Params\":{\"DeviceName\":\"{device_name}\",\"GroupName\":\"{group}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+
+  # ── System (3.2) ───────────────────────────────────────────────────────
+  get_system_info:
+    summary: "Read the model, destination, API version, serial number and options"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetSystemInfo\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  get_zoom_presets:
+    summary: "Read the three preset zoom positions"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetPresetZoomPosition\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  set_zoom_preset:
+    summary: "Store a preset zoom position, 0 to 499"
+    params:
+      preset: { type: enum, values: ["A", "B", "C"], required: true, label: Preset, description: "Preset zoom position A, B or C." }
+      position: { type: int, min: 0, max: 499, required: true, label: Position, description: "Zoom position, 0 (wide) to 499 (tele)." }
+    send:
+      - { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetPresetZoomPosition\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":\"{preset}\",\"Position\":{position}}}}" }
+      - { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetPresetZoomPosition\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  clear_zoom_preset:
+    summary: "Delete a preset zoom position"
+    params:
+      preset: { type: enum, values: ["A", "B", "C"], required: true, label: Preset, description: "Preset zoom position A, B or C." }
+    send:
+      - { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetPresetZoomPosition\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":\"{preset}\",\"Position\":-1}}}" }
+      - { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetPresetZoomPosition\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  get_ntp_status:
+    summary: "Read the NTP server, timecode sync and sync status"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetNTPStatus\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  set_ntp_server:
+    summary: "Set the NTP server address"
+    params:
+      address: { type: string, max_length: 64, pattern: "^[0-9A-Za-z.:-]*$", required: true, label: Address, description: "IP address." }
+    send:
+      - { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetNTPServer\",\"SessionID\":{session.id:json},\"Params\":{\"Address\":\"{address}\"}}}" }
+      - { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetNTPStatus\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_ntp_timecode_sync:
+    summary: "Synchronize the timecode to NTP or not"
+    params:
+      enabled: { type: bool, required: true, label: Timecode sync, description: "On sets the timecode from NTP." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetNTPSettings\",\"SessionID\":{session.id:json},\"Params\":{\"TcSync\":\"{enabled:map.on_off}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_ntp_settings:
+    summary: "Set time synchronization, time zone, server, interval and the time display (KY-PZ400, KY-PZ200)"
+    params:
+      enabled: { type: bool, required: true, label: Time sync, description: "On synchronizes the clock with NTP; the other settings apply only then." }
+      time_zone: { type: string, pattern: "^GMT[+-](0[0-9]|1[0-3])[0-5][0-9]$", required: true, label: Time zone, description: "GMT-1100 to GMT+1300." }
+      server: { type: string, max_length: 64, pattern: "^[0-9A-Za-z.:-]*$", required: true, label: Address, description: "IP address." }
+      interval: { type: int, min: 1, max: 100000, required: true, label: Interval, description: "Minutes between synchronizations." }
+      main_show: { type: bool, required: true, label: Time on main stream, description: "On shows the time on the first stream." }
+      main_x: { type: int, min: 0, max: 10000, required: true, label: Main X, description: "Horizontal position of the time on the first stream." }
+      main_y: { type: int, min: 0, max: 10000, required: true, label: Main Y, description: "Vertical position of the time on the first stream." }
+      sub_show: { type: bool, required: true, label: Time on sub stream, description: "On shows the time on the second stream." }
+      sub_x: { type: int, min: 0, max: 10000, required: true, label: Sub X, description: "Horizontal position of the time on the second stream." }
+      sub_y: { type: int, min: 0, max: 10000, required: true, label: Sub Y, description: "Vertical position of the time on the second stream." }
+    send:
+      - { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetNTPSettings\",\"SessionID\":{session.id:json},\"Params\":{\"TimeSync\":{enabled:bool01},\"TimeZone\":\"{time_zone}\",\"ServerAddress\":\"{server}\",\"TimeInterval\":{interval},\"MainTimeShow\":{\"Status\":{main_show:bool01},\"XPosition\":{main_x},\"YPosition\":{main_y}},\"SubTimeShow\":{\"Status\":{sub_show:bool01},\"XPosition\":{sub_x},\"YPosition\":{sub_y}}}}}" }
+      - { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetNTPSettings\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  get_ntp_settings:
+    summary: "Read the time synchronization settings (KY-PZ400, KY-PZ200)"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetNTPSettings\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  reboot:
+    summary: "Restart the camera (KY-PZ400, KY-PZ200)"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SystemRequest\",\"SessionID\":{session.id:json},\"Params\":{\"Request\":\"Reboot\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+
+  # ── Camera control (3.3) ───────────────────────────────────────────────
+  get_camera_status:
+    summary: "Read the camera's whole status"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetCamStatus\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  start_recording:
+    summary: "Start recording"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetCamCtrl\",\"SessionID\":{session.id:json},\"Params\":{\"CamCtrl\":\"Rec\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  stop_recording:
+    summary: "Stop recording"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetCamCtrl\",\"SessionID\":{session.id:json},\"Params\":{\"CamCtrl\":\"Stop\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_zoom_position:
+    summary: "Zoom to a position at the camera's preset zoom speed, 0 (wide) to 499 (tele)"
+    params:
+      position: { type: int, min: 0, max: 499, required: true, label: Zoom position, description: "Zoom position, 0 (wide) to 499 (tele)." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetZoomCtrl\",\"SessionID\":{session.id:json},\"Params\":{\"Position\":{position}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  start_streaming:
+    summary: "Start live streaming (not while a menu or status screen is shown)"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStreamingCtrl\",\"SessionID\":{session.id:json},\"Params\":{\"Streaming\":\"On\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  stop_streaming:
+    summary: "Stop live streaming"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStreamingCtrl\",\"SessionID\":{session.id:json},\"Params\":{\"Streaming\":\"Off\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_tally_lamp:
+    summary: "Light the tally lamp or not (tally priority Web; not with the studio tally)"
+    params:
+      lit: { type: bool, required: true, label: Tally lamp, description: "On lights the tally lamp." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetTallyLampCtrl\",\"SessionID\":{session.id:json},\"Params\":{\"Sw\":\"{lit:map.on_off}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  full_auto_button:
+    summary: "Full auto on, off or preset (a web button event)"
+    params:
+      button: { type: enum, values: ["On", "Off", "Preset"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Fullauto\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  exposure_button:
+    summary: "Choose the exposure mode (a web button event)"
+    params:
+      button: { type: enum, values: ["Auto", "Manual", "IrisPriority", "ShutterPriority", "Bright"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Exposure\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  iris_button:
+    summary: "Iris: auto or manual, open or close in steps, push auto (a web button event)"
+    params:
+      button: { type: enum, values: ["Manual", "Auto", "Open1", "Open2", "Open3", "Close1", "Close2", "Close3", "PushAuto"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Iris\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  gain_button:
+    summary: "Gain: ALC, LoLux, L/M/H, variable, up or down (a web button event)"
+    params:
+      button: { type: enum, values: ["Alc", "Lolux", "L", "M", "H", "Variable", "Up1", "Up2", "Down1", "Down2", "Manual", "Auto"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Gain\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  ae_level_button:
+    summary: "AE level up or down, adjustment on or off (a web button event)"
+    params:
+      button: { type: enum, values: ["AeLevelUp", "AeLevelDown", "AdjustOn", "AdjustOff", "Up", "Down"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"AeLevel\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  shutter_button:
+    summary: "Shutter mode, slower or faster (a web button event)"
+    params:
+      button: { type: enum, values: ["Off", "Step", "Variable", "Manual", "Eei", "Slower", "Faster"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Shutter\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  white_balance_button:
+    summary: "White balance mode, trigger, or white paint red and blue up or down (a web button event)"
+    params:
+      button: { type: enum, values: ["Faw", "Preset", "A", "B", "Adjust", "WhPaintRP", "WhPaintRM", "WhPaintBP", "WhPaintBM", "Awb", "3200K", "5600K", "Manual", "Auto", "Indoor", "Outdoor", "OnePush"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Whb\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  zoom_button:
+    summary: "Zoom tele or wide at three speeds, or stop (a PTZ camera needs Stop) (a web button event)"
+    params:
+      button: { type: enum, values: ["Tele1", "Tele2", "Tele3", "Wide1", "Wide2", "Wide3", "Stop"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Zoom\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  focus_button:
+    summary: "Focus auto or manual, far or near at three speeds, infinity, push auto, or stop (a web button event)"
+    params:
+      button: { type: enum, values: ["Manual", "Auto", "Far1", "Far2", "Far3", "Near1", "Near2", "Near3", "Infinity", "PushAuto", "Stop"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Focus\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  user_switch_button:
+    summary: "Press a user (assignable) switch (a web button event)"
+    params:
+      button: { type: enum, values: ["Sw0", "Sw1", "Sw2", "Sw3", "Sw4", "Sw5", "Sw6", "Sw7", "Sw8", "Sw9", "Sw10", "Sw11", "Sw12", "Sw13", "LensRet", "Sub1", "Sub2", "Sub3", "VfSw1", "VfSw2"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"User\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  display_button:
+    summary: "Display on the TV output on or off, or toggle character mix on SDI, HDMI or video (a web button event)"
+    params:
+      button: { type: enum, values: ["On", "Off", "Sdi", "Hdmi", "Video"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Disptv\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  menu_button:
+    summary: "Press a menu button (a web button event)"
+    params:
+      button: { type: enum, values: ["Display", "Status", "Menu", "Cancel", "Set", "Up", "Down", "Left", "Right"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Menu\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  record_button:
+    summary: "Press the record button: start or stop (a web button event)"
+    params:
+      button: { type: enum, values: ["Start", "Stop"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Rec\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  master_black_button:
+    summary: "Master black up or down in three steps (a web button event)"
+    params:
+      button: { type: enum, values: ["Up1", "Up2", "Up3", "Down1", "Down2", "Down3"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"MasterBlack\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  detail_button:
+    summary: "Detail up or down (a web button event)"
+    params:
+      button: { type: enum, values: ["Up", "Down"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Detail\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  speed_with_zoom_button:
+    summary: "Pan/tilt speed with zoom on or off (a web button event)"
+    params:
+      button: { type: enum, values: ["On", "Off"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"SpeedWithZoom\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  bright_button:
+    summary: "Bright up or down (a web button event)"
+    params:
+      button: { type: enum, values: ["Up", "Down"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Bright\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  luminance_button:
+    summary: "Luminance up or down (a web button event)"
+    params:
+      button: { type: enum, values: ["Up", "Down"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Luminance\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  saturation_button:
+    summary: "Saturation up or down (a web button event)"
+    params:
+      button: { type: enum, values: ["Up", "Down"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Saturation\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  contrast_button:
+    summary: "Contrast up or down (a web button event)"
+    params:
+      button: { type: enum, values: ["Up", "Down"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Contrast\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  sharpness_button:
+    summary: "Sharpness up or down (a web button event)"
+    params:
+      button: { type: enum, values: ["Up", "Down"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Sharpness\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  hue_button:
+    summary: "Hue up or down (a web button event)"
+    params:
+      button: { type: enum, values: ["Up", "Down"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Hue\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  flip_button:
+    summary: "Flip the picture on or off (a web button event)"
+    params:
+      button: { type: enum, values: ["On", "Off"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Flip\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  mirror_button:
+    summary: "Mirror the picture on or off (a web button event)"
+    params:
+      button: { type: enum, values: ["On", "Off"], required: true, label: Button, description: "Button to press; which a model has is in the document's table and in buttons in state." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebButtonEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"Mirror\",\"Button\":\"{button}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_zoom_slider:
+    summary: "Zoom to a position at full speed, 0 (wide) to 499 (tele)"
+    params:
+      position: { type: int, min: 0, max: 499, required: true, label: Zoom position, description: "Zoom position, 0 (wide) to 499 (tele)." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebSliderEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"ZoomBar\",\"Position\":{position}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_iris_slider:
+    summary: "Set the iris position, 0 to 255"
+    params:
+      position: { type: int, min: 0, max: 255, required: true, label: Iris position, description: "Iris position, 0 to 255." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebSliderEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"IrisBar\",\"Position\":{position}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_white_paint:
+    summary: "Set white paint blue (X) and red (Y) together"
+    params:
+      blue: { type: int, min: 0, max: 255, required: true, label: Blue, description: "White paint blue position: 0 to 64 (KY-PZ100 manual and KY-PZ400/200 manual up to 255, KY-PZ400/200 auto up to 20)." }
+      red: { type: int, min: 0, max: 255, required: true, label: Red, description: "White paint red position, with the same range as blue." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetWebXYFieldEvent\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"WhPaintRB\",\"XPosition\":{blue},\"YPosition\":{red}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  get_gps:
+    summary: "Read the GPS antenna level and location"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetGPSInfo\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  zoom_seesaw:
+    summary: "Zoom wide or tele at a speed until stopped, as a seesaw switch"
+    params:
+      direction: { type: enum, values: ["Wide", "Tele", "Stop"], required: true, label: Direction, description: "Direction, or Stop." }
+      speed: { type: int, min: 0, max: 8, required: true, label: Speed, description: "Speed 1 to 8; 0 stops." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SeesawSwitchOperation\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"ZoomSeesaw\",\"Direction\":\"{direction}\",\"Speed\":{speed}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  iris_seesaw:
+    summary: "Open or close the iris at a speed until stopped, as a seesaw switch"
+    params:
+      direction: { type: enum, values: ["Open", "Close", "Stop"], required: true, label: Direction, description: "Direction, or Stop." }
+      speed: { type: int, min: 0, max: 8, required: true, label: Speed, description: "Speed 1 to 8; 0 stops." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SeesawSwitchOperation\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"IrisSeesaw\",\"Direction\":\"{direction}\",\"Speed\":{speed}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  master_black_seesaw:
+    summary: "Move master black up or down at a speed until stopped, as a seesaw switch"
+    params:
+      direction: { type: enum, values: ["Up", "Down", "Stop"], required: true, label: Direction, description: "Direction, or Stop." }
+      speed: { type: int, min: 0, max: 8, required: true, label: Speed, description: "Speed 1 to 8; 0 stops." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SeesawSwitchOperation\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"MasterBlackSeesaw\",\"Direction\":\"{direction}\",\"Speed\":{speed}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  focus_seesaw:
+    summary: "Focus far or near at a speed until stopped, as a seesaw switch"
+    params:
+      direction: { type: enum, values: ["Far", "Near", "Stop"], required: true, label: Direction, description: "Direction, or Stop." }
+      speed: { type: int, min: 0, max: 8, required: true, label: Speed, description: "Speed 1 to 8; 0 stops." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SeesawSwitchOperation\",\"SessionID\":{session.id:json},\"Params\":{\"Kind\":\"FocusSeesaw\",\"Direction\":\"{direction}\",\"Speed\":{speed}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+
+  # ── PTZ cameras (3.4) ──────────────────────────────────────────────────
+  pan_tilt:
+    summary: "Move pan and tilt: in a direction, home, or to a position"
+    params:
+      pan: { type: enum, values: ["Stop", "Left", "Right", "Home", "Position"], required: true, label: Pan, description: "Stop, Left, Right, Home, or Position to go to the pan position." }
+      pan_position: { type: int, min: 0, max: 35080, default: 17540, label: Pan position, description: "With Position: 0 (back left limit) to 35080 (back right limit), 17540 to the front." }
+      pan_speed: { type: int, min: 0, max: 30, required: true, label: Pan speed, description: "Pan speed 1 to 30; 0 stops." }
+      tilt: { type: enum, values: ["Stop", "Up", "Down", "Home", "Position"], required: true, label: Tilt, description: "Stop, Up, Down, Home, or Position to go to the tilt position." }
+      tilt_position: { type: int, min: 0, max: 12080, default: 9040, label: Tilt position, description: "With Position: 0 (straight up) to 12080 (diagonally down), 9040 level." }
+      tilt_speed: { type: int, min: 0, max: 30, required: true, label: Tilt speed, description: "Tilt speed 1 to 30; 0 stops." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetPTCtrl\",\"SessionID\":{session.id:json},\"Params\":{\"PanDirection\":\"{pan}\",\"PanPosition\":{pan_position},\"PanSpeed\":{pan_speed},\"TiltDirection\":\"{tilt}\",\"TiltPosition\":{tilt_position},\"TiltSpeed\":{tilt_speed}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  joystick:
+    summary: "Drive pan and tilt like a joystick (moves the cursor while a menu is shown)"
+    params:
+      pan: { type: enum, values: ["Stop", "Left", "Right"], required: true, label: Pan, description: "Stop, Left or Right." }
+      pan_speed: { type: int, min: 0, max: 30, required: true, label: Pan speed, description: "Pan speed 1 to 30; 0 stops." }
+      tilt: { type: enum, values: ["Stop", "Up", "Down"], required: true, label: Tilt, description: "Stop, Up or Down." }
+      tilt_speed: { type: int, min: 0, max: 30, required: true, label: Tilt speed, description: "Tilt speed 1 to 30; 0 stops." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"JoyStickOperation\",\"SessionID\":{session.id:json},\"Params\":{\"PanDirection\":\"{pan}\",\"PanSpeed\":{pan_speed},\"TiltDirection\":\"{tilt}\",\"TiltSpeed\":{tilt_speed}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  zoom_switch:
+    summary: "Zoom wide or tele at a speed until stopped, as a zoom switch"
+    params:
+      direction: { type: enum, values: ["Wide", "Tele", "Stop"], required: true, label: Direction, description: "Wide, Tele or Stop." }
+      speed: { type: int, min: 0, max: 8, required: true, label: Speed, description: "Zoom speed 1 to 8; 0 stops." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"ZoomSwitchOperation\",\"SessionID\":{session.id:json},\"Params\":{\"Direction\":\"{direction}\",\"Speed\":{speed}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  recall_preset:
+    summary: "Move to a PTZ preset"
+    params:
+      preset: { type: int, min: 1, max: 255, required: true, label: Preset, description: "PTZ preset number: 1 to 100, or 1 to 255 on a KY-PZ400 or KY-PZ200." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetPTZPreset\",\"SessionID\":{session.id:json},\"Params\":{\"No\":{preset},\"Operation\":\"Move\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  store_preset:
+    summary: "Store the current position as a PTZ preset"
+    params:
+      preset: { type: int, min: 1, max: 255, required: true, label: Preset, description: "PTZ preset number: 1 to 100, or 1 to 255 on a KY-PZ400 or KY-PZ200." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetPTZPreset\",\"SessionID\":{session.id:json},\"Params\":{\"No\":{preset},\"Operation\":\"Set\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  delete_preset:
+    summary: "Delete a PTZ preset"
+    params:
+      preset: { type: int, min: 1, max: 255, required: true, label: Preset, description: "PTZ preset number: 1 to 100, or 1 to 255 on a KY-PZ400 or KY-PZ200." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetPTZPreset\",\"SessionID\":{session.id:json},\"Params\":{\"No\":{preset},\"Operation\":\"Delete\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  get_camera_status_minimum:
+    summary: "Read the short status made for remote controllers"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetCamStatusMinimum\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  get_pan_tilt_position:
+    summary: "Read the pan and tilt position"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetPTPosition\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+
+  # ── JPEG, IFB, studio tally, return over IP (3.5-3.8) ──────────────────
+  start_jpeg_encoding:
+    summary: "Start JPEG encoding, so stills can be fetched from /cgi-bin/get_jpg.cgi"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"JpegEncode\",\"SessionID\":{session.id:json},\"Params\":{\"Operate\":\"Start\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  stop_jpeg_encoding:
+    summary: "Stop JPEG encoding (other clients may be fetching stills)"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"JpegEncode\",\"SessionID\":{session.id:json},\"Params\":{\"Operate\":\"Stop\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_jpeg_size:
+    summary: "Set the JPEG still size"
+    params:
+      size: { type: enum, values: ["640x360", "320x180"], required: true, label: Size, description: "Still size." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetJpegEncodeSize\",\"SessionID\":{session.id:json},\"Params\":{\"Size\":\"{size}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  get_ifb_settings:
+    summary: "Read the interruptible feedback (return audio) settings"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetIFBSettings\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  set_ifb_settings:
+    summary: "Set the interruptible feedback server"
+    params:
+      enabled: { type: bool, required: true, label: IFB, description: "On enables return audio." }
+      address: { type: string, max_length: 64, pattern: "^[0-9A-Za-z.:-]*$", required: true, label: Address, description: "IP address." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "Port number." }
+      mountpoint: { type: string, max_length: 62, pattern: "^[^\"\\\\]*$", required: true, label: Mountpoint, description: "Mountpoint on the IFB server, at most 62 characters." }
+    send:
+      - { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetIFBSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Function\":\"{enabled:map.enable_disable}\",\"Address\":\"{address}\",\"Port\":{port},\"Mountpoint\":\"{mountpoint}\"}}}" }
+      - { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetIFBSettings\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  start_ifb:
+    summary: "Start interruptible feedback streaming"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetIFBCtrl\",\"SessionID\":{session.id:json},\"Params\":{\"Streaming\":\"Start\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  stop_ifb:
+    summary: "Stop interruptible feedback streaming"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetIFBCtrl\",\"SessionID\":{session.id:json},\"Params\":{\"Streaming\":\"Stop\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_studio_tally:
+    summary: "Show the studio tally (program, preview or off) on the camera"
+    params:
+      indication: { type: enum, values: ["Off", "Program", "Preview"], required: true, label: Tally, description: "Program shows PGM, Preview shows PVW, Off shows neither." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetStudioTally\",\"SessionID\":{session.id:json},\"Params\":{\"Indication\":\"{indication}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_tally_priority:
+    summary: "Give the tally lamp to the camera's own settings or to web control"
+    params:
+      priority: { type: enum, values: ["Camera", "Web"], required: true, label: Priority, description: "Camera lets the camera's menu settings drive the lamp; Web gives it to these commands." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetTallyLampPriority\",\"SessionID\":{session.id:json},\"Params\":{\"Priority\":\"{priority}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  get_return_server:
+    summary: "Read which return-over-IP server setting is in use"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetCurrentReturnOverIpServerID\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  set_return_server:
+    summary: "Choose the return-over-IP server setting"
+    params:
+      server: { type: int, min: 1, max: 4, required: true, label: Server, description: "Streaming server setting, 1 to 4." }
+    send:
+      - { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetCurrentReturnOverIpServerID\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":{server:-1}}}}" }
+      - { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetCurrentReturnOverIpServerID\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  get_return_server_settings:
+    summary: "Read a return-over-IP server setting"
+    params:
+      server: { type: int, min: 1, max: 4, required: true, label: Server, description: "Streaming server setting, 1 to 4." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetReturnOverIpServerSettings\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":{server:-1}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  get_return_types:
+    summary: "List which return-over-IP types can be chosen"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"AvailableTypeOfReturnOverIP\",\"SessionID\":{session.id:json}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  get_return_frame_rates:
+    summary: "List which return frame rates go with a recording frame rate"
+    params:
+      recording: { type: enum, values: ["60p", "50p", "60i", "50i", "30p", "25p"], required: true, label: Recording frame rate, description: "The camera's recording frame rate." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"AvailableFrameRateOfReturnOverIP\",\"SessionID\":{session.id:json},\"Params\":{\"RecordingFrameRate\":\"{recording}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" }, json_path: "$.Response.Data" }
+    returns: value
+  set_return_rtsp:
+    summary: "Set a return-over-IP server setting to RTSP/RTP"
+    params:
+      server: { type: int, min: 1, max: 4, required: true, label: Server, description: "Streaming server setting, 1 to 4." }
+      alias: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Alias, description: "Name of the server setting." }
+      protocol: { type: enum, values: ["UDP", "TCP"], required: true, label: Protocol, description: "RTP over UDP or TCP." }
+      address: { type: string, max_length: 64, pattern: "^[0-9A-Za-z.:-]*$", required: true, label: Address, description: "IP address." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "Port number." }
+      stream_id: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Stream ID, description: "Stream ID." }
+      username: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: User, description: "RTSP user name." }
+      password: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, secret: true, label: Password, description: "RTSP password." }
+      frame_rate: { type: enum, values: ["60p", "30p", "50p", "25p"], required: true, label: Frame rate, description: "Return video frame rate." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetReturnOverIpServerSettingsRTSP\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":{server:-1},\"Alias\":\"{alias}\",\"Protocol\":\"{protocol}\",\"SrcAddress\":\"{address}\",\"SrcPort\":{port},\"StreamId\":\"{stream_id}\",\"Username\":\"{username}\",\"Password\":\"{password}\",\"FrameRate\":{frame_rate:map.return_frame_rate}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_return_zixi:
+    summary: "Set a return-over-IP server setting to Zixi"
+    params:
+      server: { type: int, min: 1, max: 4, required: true, label: Server, description: "Streaming server setting, 1 to 4." }
+      alias: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Alias, description: "Name of the server setting." }
+      address: { type: string, max_length: 64, pattern: "^[0-9A-Za-z.:-]*$", required: true, label: Address, description: "IP address." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "Port number." }
+      stream_id: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Stream ID, description: "Zixi stream ID." }
+      password: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, secret: true, label: Password, description: "Zixi password." }
+      name: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Name, description: "Zixi name." }
+      latency: { type: enum, values: ["low", "medium", "minimum", "high"], required: true, label: Latency, description: "Zixi latency: low, medium, minimum (Zixi off) or high." }
+      frame_rate: { type: enum, values: ["60p", "30p", "50p", "25p"], required: true, label: Frame rate, description: "Return video frame rate." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetReturnOverIpServerSettingsZIXI\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":{server:-1},\"Alias\":\"{alias}\",\"SrcAddress\":\"{address}\",\"SrcPort\":{port},\"StreamId\":\"{stream_id}\",\"Password\":\"{password}\",\"Name\":\"{name}\",\"Latency\":{latency:map.zixi_latency},\"FrameRate\":{frame_rate:map.return_frame_rate}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_return_icecast:
+    summary: "Set a return-over-IP server setting to Icecast"
+    params:
+      server: { type: int, min: 1, max: 4, required: true, label: Server, description: "Streaming server setting, 1 to 4." }
+      alias: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Alias, description: "Name of the server setting." }
+      address: { type: string, max_length: 64, pattern: "^[0-9A-Za-z.:-]*$", required: true, label: Address, description: "IP address." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "Port number." }
+      mountpoint: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Mountpoint, description: "Icecast mountpoint." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetReturnOverIpServerSettingsIcecast\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":{server:-1},\"Alias\":\"{alias}\",\"SrcAddress\":\"{address}\",\"SrcPort\":{port},\"Mountpoint\":\"{mountpoint}\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  set_return_srt:
+    summary: "Set a return-over-IP server setting to SRT"
+    params:
+      server: { type: int, min: 1, max: 4, required: true, label: Server, description: "Streaming server setting, 1 to 4." }
+      alias: { type: string, max_length: 64, pattern: "^[^\"\\\\]*$", required: true, label: Alias, description: "Name of the server setting." }
+      address: { type: string, max_length: 64, pattern: "^[0-9A-Za-z.:-]*$", required: true, label: Address, description: "IP address." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "Port number." }
+      mode: { type: enum, values: ["caller", "listener", "rendezvous"], required: true, label: Connection mode, description: "SRT caller, listener or rendezvous." }
+      latency: { type: int, min: 20, max: 8000, required: true, label: Latency, description: "SRT latency in milliseconds, 20 to 8000." }
+      encryption: { type: bool, required: true, label: Encryption, description: "On encrypts with the passphrase." }
+      passphrase: { type: string, max_length: 79, pattern: "^[^\"\\\\]*$", required: true, secret: true, label: Passphrase, description: "SRT passphrase." }
+      frame_rate: { type: enum, values: ["60p", "30p", "50p", "25p"], required: true, label: Frame rate, description: "Return video frame rate." }
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetReturnOverIpServerSettingsSRT\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":{server:-1},\"Alias\":\"{alias}\",\"SrcAddress\":\"{address}\",\"Port\":{port},\"ConnectionMode\":{mode:map.srt_mode},\"Latency\":{latency},\"Encryption\":{encryption:bool01},\"Passphrase\":\"{passphrase}\",\"FrameRate\":{frame_rate:map.return_frame_rate}}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  start_return:
+    summary: "Start return over IP"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetReturnOverIpCtrl\",\"SessionID\":{session.id:json},\"Params\":{\"Operate\":\"Start\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+  stop_return:
+    summary: "Stop return over IP"
+    send: { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"SetReturnOverIpCtrl\",\"SessionID\":{session.id:json},\"Params\":{\"Operate\":\"Stop\"}}}" }
+    expect: { status: 200, json_equals: { "$.Response.Result": "Success" } }
+    returns: ack
+
+maps:
+  on_off: { "true": "On", "false": "Off" }
+  enable_disable: { "true": "Enable", "false": "Disable" }
+  pcr_mode: { standard: "0", fast: "1" }
+  pcr_jitter: { normal: "0", low: "1" }
+  zixi_latency: { low: "0", medium: "1", minimum: "2", high: "3" }
+  srt_mode: { caller: "0", listener: "1", rendezvous: "2" }
+  srt_encryption: { "off": "0", aes128: "1", aes192: "2", aes256: "3" }
+  srt_fec: { "off": "0", "10x10": "1", "8x8": "2", "6x6": "3" }
+  return_frame_rate: { "60p": "1", "30p": "2", "50p": "4", "25p": "5" }
+
+telemetry:
+  # The camera pushes nothing: its status is read every second (the document
+  # asks for no more than every 500 ms), the pan/tilt position of a PTZ
+  # camera every second, and the settings every 30 s.
+  poll:
+    - every_ms: 1000
+      send:
+        - { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetCamStatus\",\"SessionID\":{session.id:json}}}" }
+        - { models: [ky-pz100, ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetPTPosition\",\"SessionID\":{session.id:json}}}" }
+    - every_ms: 30000
+      send:
+        - { method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetSystemInfo\",\"SessionID\":{session.id:json}}}" }
+        - { models: [gy-hm650, gy-hm660, gy-hm8x0, gy-hm200, gy-hm25x, gy-hm280, gy-ls300, ky-pz100, gy-hc900, gy-hc5x0], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingSettings\",\"SessionID\":{session.id:json}}}" }
+        - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Stream\":0}}}" }
+        - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Stream\":1}}}" }
+        - { models: [gy-hm650, gy-hm660, gy-hm8x0, gy-hm200, gy-hm25x, gy-hm280, gy-ls300, ky-pz100, gy-hc900, gy-hc5x0], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetCurrentStreamingServerID\",\"SessionID\":{session.id:json}}}" }
+        - { models: [gy-hm650, gy-hm660, gy-hm8x0, gy-hm200, gy-hm25x, gy-hm280, gy-ls300, ky-pz100, gy-hc900, gy-hc5x0], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingServerSettings\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":0}}}" }
+        - { models: [gy-hm650, gy-hm660, gy-hm8x0, gy-hm200, gy-hm25x, gy-hm280, gy-ls300, ky-pz100, gy-hc900, gy-hc5x0], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingServerSettings\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":1}}}" }
+        - { models: [gy-hm650, gy-hm660, gy-hm8x0, gy-hm200, gy-hm25x, gy-hm280, gy-ls300, ky-pz100, gy-hc900, gy-hc5x0], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingServerSettings\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":2}}}" }
+        - { models: [gy-hm650, gy-hm660, gy-hm8x0, gy-hm200, gy-hm25x, gy-hm280, gy-ls300, ky-pz100, gy-hc900, gy-hc5x0], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingServerSettings\",\"SessionID\":{session.id:json},\"Params\":{\"ID\":3}}}" }
+        - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingServerSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Type\":\"RTSP\"}}}" }
+        - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingServerSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Type\":\"RTSP2\"}}}" }
+        - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingServerSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Type\":\"RTMP\"}}}" }
+        - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingServerSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Type\":\"RTMP2\"}}}" }
+        - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingServerSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Type\":\"RTMPS\"}}}" }
+        - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingServerSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Type\":\"RTMPS2\"}}}" }
+        - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingServerSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Type\":\"SRT\"}}}" }
+        - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingServerSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Type\":\"ONVIF\"}}}" }
+        - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingServerSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Type\":\"Multicast\"}}}" }
+        - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetStreamingServerSettings\",\"SessionID\":{session.id:json},\"Params\":{\"Type\":\"NDI\"}}}" }
+        - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetVideoSettings\",\"SessionID\":{session.id:json}}}" }
+        - { models: [gy-hm650, gy-hm660, gy-hm8x0, gy-hm200, gy-hm25x, gy-hm280, gy-ls300, gy-hc5x0], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetPresetZoomPosition\",\"SessionID\":{session.id:json}}}" }
+        - { models: [gy-hm660, gy-hm8x0, gy-hm200, gy-hm25x, gy-hm280, ky-pz100, gy-hc900, gy-hc5x0], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetNTPStatus\",\"SessionID\":{session.id:json}}}" }
+        - { models: [ky-pz400, ky-pz200], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetNTPSettings\",\"SessionID\":{session.id:json}}}" }
+        - { models: [gy-hm660, gy-hm8x0], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetIFBSettings\",\"SessionID\":{session.id:json}}}" }
+        - { models: [gy-hc900, gy-hc5x0], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetCurrentReturnOverIpServerID\",\"SessionID\":{session.id:json}}}" }
+        - { models: [gy-hm650, gy-hm660, gy-hm8x0, gy-hc900, gy-hc5x0], method: POST, path: /cgi-bin/api.cgi, content_type: "application/x-www-form-urlencoded; charset=UTF-8", body: "{\"Request\":{\"Command\":\"GetGPSInfo\",\"SessionID\":{session.id:json}}}" }
+  updates:
+    - path: '^/cgi-bin/api\.cgi$'
+      json_match: { "$.Response.Requested": "^GetCamStatus\\s*$", "$.Response.Result": "^Success$" }
+      json: { v0: "$.Response.Data.Camera.Status", v1: "$.Response.Data.Camera.Mode", v2: "$.Response.Data.Camera.RecMode", v3: "$.Response.Data.Camera.TC", v4: "$.Response.Data.Camera.AspectRatio", v5: "$.Response.Data.Camera.WebAccess", v6: "$.Response.Data.Camera.VideoOutputStatus", v7: "$.Response.Data.Camera.MenuStatus", v8: "$.Response.Data.Camera.MenuOutput", v9: "$.Response.Data.FullAuto.Status", v10: "$.Response.Data.Exposure.Status", v11: "$.Response.Data.Iris.Status", v12: "$.Response.Data.Iris.Value", v13: "$.Response.Data.Iris.Position", v14: "$.Response.Data.Gain.Status", v15: "$.Response.Data.Gain.Value", v16: "$.Response.Data.AeLevel.Status", v17: "$.Response.Data.AeLevel.Adjust", v18: "$.Response.Data.AeLevel.Value", v19: "$.Response.Data.Shutter.Status", v20: "$.Response.Data.Shutter.Value", v21: "$.Response.Data.Whb.Status", v22: "$.Response.Data.Whb.Value", v23: "$.Response.Data.Whb.WhPRScale", v24: "$.Response.Data.Whb.WhPBScale", v25: "$.Response.Data.Whb.WhPRPosition", v26: "$.Response.Data.Whb.WhPBPosition", v27: "$.Response.Data.Whb.WhPRValue", v28: "$.Response.Data.Whb.WhPBValue", v29: "$.Response.Data.Bright.Value", v30: "$.Response.Data.Zoom.Dynamic", v31: "$.Response.Data.Zoom.DynamicPos", v32: "$.Response.Data.Zoom.Position", v33: "$.Response.Data.Zoom.DisplayValue", v34: "$.Response.Data.PanTilt.SpeedWithZoom", v35: "$.Response.Data.PanTilt.PresetSpeed", v36: "$.Response.Data.Focus.Status", v37: "$.Response.Data.Focus.Value", v38: "$.Response.Data.MasterBlack.Value", v39: "$.Response.Data.Detail.Value", v40: "$.Response.Data.Streaming.Status", v41: "$.Response.Data.ReturnOverIP.Status", v42: "$.Response.Data.Disptv.Status", v43: "$.Response.Data.CharacterMix.Sdi", v44: "$.Response.Data.CharacterMix.Hdmi", v45: "$.Response.Data.CharacterMix.Video", v46: "$.Response.Data.TallyLamp.Priority", v47: "$.Response.Data.TallyLamp.Lighting", v48: "$.Response.Data.TallyLamp.StudioTally", v49: "$.Response.Data.SlotA.Status", v50: "$.Response.Data.SlotA.Protect", v51: "$.Response.Data.SlotA.Remain", v52: "$.Response.Data.SlotA.ClipNum", v53: "$.Response.Data.SlotA.RemainWarning", v54: "$.Response.Data.SlotB.Status", v55: "$.Response.Data.SlotB.Protect", v56: "$.Response.Data.SlotB.Remain", v57: "$.Response.Data.SlotB.ClipNum", v58: "$.Response.Data.SlotB.RemainWarning", v59: "$.Response.Data.SlotExt.Status", v60: "$.Response.Data.SlotExt.Protect", v61: "$.Response.Data.SlotExt.Remain", v62: "$.Response.Data.SlotExt.ClipNum", v63: "$.Response.Data.SlotExt.RemainWarning", v64: "$.Response.Data.Battery.Info", v65: "$.Response.Data.Battery.Level", v66: "$.Response.Data.Battery.Value", v67: "$.Response.Data.Luminance.Value", v68: "$.Response.Data.Saturation.Value", v69: "$.Response.Data.Contrast.Value", v70: "$.Response.Data.Sharpness.Value", v71: "$.Response.Data.Hue.Value", v72: "$.Response.Data.Flip.Status", v73: "$.Response.Data.Mirror.Status" }
+      state:
+        camera.status: "{v0}"
+        camera.mode: "{v1}"
+        camera.rec_mode: "{v2}"
+        camera.timecode: "{v3}"
+        camera.aspect_ratio: "{v4}"
+        camera.web_access: "{v5}"
+        camera.video_output: "{v6}"
+        camera.menu: "{v7}"
+        camera.menu_output: "{v8}"
+        full_auto: "{v9}"
+        exposure: "{v10}"
+        iris.mode: "{v11}"
+        iris.value: "{v12}"
+        iris.position: "{v13}"
+        gain.mode: "{v14}"
+        gain.value: "{v15}"
+        ae_level.mode: "{v16}"
+        ae_level.adjust: "{v17}"
+        ae_level.value: "{v18}"
+        shutter.mode: "{v19}"
+        shutter.value: "{v20}"
+        white_balance.mode: "{v21}"
+        white_balance.value: "{v22}"
+        white_balance.paint_red.scale: "{v23}"
+        white_balance.paint_blue.scale: "{v24}"
+        white_balance.paint_red.position: "{v25}"
+        white_balance.paint_blue.position: "{v26}"
+        white_balance.paint_red.value: "{v27}"
+        white_balance.paint_blue.value: "{v28}"
+        bright: "{v29}"
+        zoom.dynamic: "{v30}"
+        zoom.dynamic_position: "{v31}"
+        zoom.position: "{v32}"
+        zoom.display: "{v33}"
+        pan_tilt.speed_with_zoom: "{v34}"
+        pan_tilt.preset_speed: "{v35}"
+        focus.mode: "{v36}"
+        focus.value: "{v37}"
+        master_black: "{v38}"
+        detail: "{v39}"
+        streaming.status: "{v40}"
+        return_over_ip.status: "{v41}"
+        display_tv: "{v42}"
+        character_mix.sdi: "{v43}"
+        character_mix.hdmi: "{v44}"
+        character_mix.video: "{v45}"
+        tally.priority: "{v46}"
+        tally.lighting: "{v47}"
+        tally.studio: "{v48}"
+        slots.a.status: "{v49}"
+        slots.a.protect: "{v50}"
+        slots.a.remaining_minutes: "{v51}"
+        slots.a.clips: "{v52}"
+        slots.a.low: { value: "{v53}", map: { "0": false, "1": true } }
+        slots.b.status: "{v54}"
+        slots.b.protect: "{v55}"
+        slots.b.remaining_minutes: "{v56}"
+        slots.b.clips: "{v57}"
+        slots.b.low: { value: "{v58}", map: { "0": false, "1": true } }
+        slots.ext.status: "{v59}"
+        slots.ext.protect: "{v60}"
+        slots.ext.remaining_minutes: "{v61}"
+        slots.ext.clips: "{v62}"
+        slots.ext.low: { value: "{v63}", map: { "0": false, "1": true } }
+        battery.info: "{v64}"
+        battery.level: "{v65}"
+        battery.value: "{v66}"
+        luminance: "{v67}"
+        saturation: "{v68}"
+        contrast: "{v69}"
+        sharpness: "{v70}"
+        hue: "{v71}"
+        flip: "{v72}"
+        mirror: "{v73}"
+    - path: '^/cgi-bin/api\.cgi$'
+      json_match: { "$.Response.Requested": "^GetCamStatus\\s*$", "$.Response.Result": "^Success$" }
+      json_each: "$.Response.Data.Enable.*.*"
+      json: { enabled: "$" }
+      state: { "buttons.{^key}.{key}": { value: "{enabled}", map: { "0": false, "1": true } } }
+    - path: '^/cgi-bin/api\.cgi$'
+      json_match: { "$.Response.Requested": "^GetCamStatus\\s*$", "$.Response.Result": "^Success$" }
+      json_each: "$.Response.Data.ButtonString.*.*"
+      json: { name: "$" }
+      state: { "button_names.{^key}.{key}": "{name}" }
+    - path: '^/cgi-bin/api\.cgi$'
+      json_match: { "$.Response.Requested": "^GetPTPosition\\s*$", "$.Response.Result": "^Success$" }
+      json: { pan: "$.Response.Data.Pan", tilt: "$.Response.Data.Tilt" }
+      state:
+        position.pan: "{pan}"
+        position.tilt: "{tilt}"
+    - path: '^/cgi-bin/api\.cgi$'
+      json_match: { "$.Response.Requested": "^GetSystemInfo\\s*$", "$.Response.Result": "^Success$" }
+      json: { m: "$.Response.Data.Model", d: "$.Response.Data.Destination", a: "$.Response.Data.ApiVersion", s: "$.Response.Data.Serial", r: "$.Response.Data.Resolution", o: "$.Response.Data.Overlay", t: "$.Response.Data.Tagging", z: "$.Response.Data.Zixi", srt: "$.Response.Data.Srt", ka: "$.Response.Data.KA_EN200" }
+      state:
+        system.model: "{m}"
+        system.destination: "{d}"
+        system.api_version: "{a}"
+        system.serial: "{s}"
+        system.recording_resolution: "{r}"
+        system.overlay: "{o}"
+        system.tagging: "{t}"
+        system.zixi: "{z}"
+        system.srt: "{srt}"
+        system.ka_en200: "{ka}"
+    - models: [gy-hm650, gy-hm660, gy-hm8x0, gy-hm200, gy-hm25x, gy-hm280, gy-ls300, ky-pz100, gy-hc900, gy-hc5x0]
+      path: '^/cgi-bin/api\.cgi$'
+      json_match: { "$.Response.Requested": "^GetStreamingSettings\\s*$", "$.Response.Result": "^Success$" }
+      json: { r: "$.Response.Data.Resolution", f: "$.Response.Data.Framerate", b: "$.Response.Data.Bitrate" }
+      state:
+        "streams.1.resolution": "{r}"
+        "streams.1.frame_rate": "{f}"
+        "streams.1.bitrate": "{b}"
+    - models: [ky-pz400, ky-pz200]
+      path: '^/cgi-bin/api\.cgi$'
+      json_match: { "$.Response.Requested": "^GetStreamingSettings\\s*$", "$.Response.Result": "^Success$" }
+      json: { r: "$.Response.Data.Resolution", f: "$.Response.Data.Framerate", b: "$.Response.Data.Bitrate", q: "$.Response.Data.Qfactor", e: "$.Response.Data.EncodeProtocol", i: "$.Response.Data.IKeyFrameInterval", c: "$.Response.Data.BitRateControl", n: "$.Response.Data.Stream" }
+      state:
+        "streams.{n:+1}.resolution": "{r}"
+        "streams.{n:+1}.frame_rate": "{f}"
+        "streams.{n:+1}.bitrate": "{b}"
+        "streams.{n:+1}.quality": "{q}"
+        "streams.{n:+1}.encoding": "{e}"
+        "streams.{n:+1}.key_frame_interval": "{i}"
+        "streams.{n:+1}.rate_control": "{c}"
+    - path: '^/cgi-bin/api\.cgi$'
+      json_match: { "$.Response.Requested": "^GetCurrentStreamingServerID\\s*$", "$.Response.Result": "^Success$" }
+      json: { id: "$.Response.Data.ID" }
+      state:
+        streaming.server: "{id:+1}"
+    - path: '^/cgi-bin/api\.cgi$'
+      request_match: { "$.Request.Params.ID": "^([0-3])$" }
+      json_match: { "$.Response.Requested": "^GetStreamingServerSettings\\s*$", "$.Response.Result": "^Success$" }
+      json: { alias: "$.Response.Data.Alias", type: "$.Response.Data.Type", all: "$.Response.Data" }
+      state:
+        "servers.{1:+1}.alias": "{alias}"
+        "servers.{1:+1}.type": "{type}"
+        "servers.{1:+1}.settings": "{all}"
+    - path: '^/cgi-bin/api\.cgi$'
+      request_match: { "$.Request.Params.Type": "^([A-Za-z0-9]+)$" }
+      json_match: { "$.Response.Requested": "^GetStreamingServerSettings\\s*$", "$.Response.Result": "^Success$" }
+      json: { all: "$.Response.Data" }
+      state: { "server_types.{1}": "{all}" }
+    - path: '^/cgi-bin/api\.cgi$'
+      json_match: { "$.Response.Requested": "^GetVideoSettings\\s*$", "$.Response.Result": "^Success$" }
+      json: { o: "$.Response.Data.Output", f: "$.Response.Data.VideoFormat", e: "$.Response.Data.EncodeLevel" }
+      state:
+        video.output: "{o}"
+        video.format: "{f}"
+        video.encode_level: "{e}"
+    - path: '^/cgi-bin/api\.cgi$'
+      json_match: { "$.Response.Requested": "^GetPresetZoomPosition\\s*$", "$.Response.Result": "^Success$" }
+      json: { a: "$.Response.Data.A", b: "$.Response.Data.B", c: "$.Response.Data.C" }
+      state:
+        zoom_presets.a: "{a}"
+        zoom_presets.b: "{b}"
+        zoom_presets.c: "{c}"
+    - path: '^/cgi-bin/api\.cgi$'
+      json_match: { "$.Response.Requested": "^GetNTPStatus\\s*$", "$.Response.Result": "^Success$" }
+      json: { a: "$.Response.Data.Address", t: "$.Response.Data.TcSync", s: "$.Response.Data.Status" }
+      state:
+        ntp.server: "{a}"
+        ntp.timecode_sync: "{t}"
+        ntp.status: "{s}"
+    - path: '^/cgi-bin/api\.cgi$'
+      json_match: { "$.Response.Requested": "^GetNTPSettings\\s*$", "$.Response.Result": "^Success$" }
+      json: { ts: "$.Response.Data.TimeSync", tz: "$.Response.Data.TimeZone", sa: "$.Response.Data.ServerAddress", ti: "$.Response.Data.TimeInterval", ms: "$.Response.Data.MainTimeShow.Status", ss: "$.Response.Data.SubTimeShow.Status" }
+      state:
+        ntp.time_sync: { value: "{ts}", map: { "0": false, "1": true } }
+        ntp.time_zone: "{tz}"
+        ntp.server: "{sa}"
+        ntp.interval_minutes: "{ti}"
+        ntp.main_time_shown: { value: "{ms}", map: { "0": false, "1": true } }
+        ntp.sub_time_shown: { value: "{ss}", map: { "0": false, "1": true } }
+    - path: '^/cgi-bin/api\.cgi$'
+      json_match: { "$.Response.Requested": "^GetIFBSettings\\s*$", "$.Response.Result": "^Success$" }
+      json: { f: "$.Response.Data.Function", a: "$.Response.Data.Address", p: "$.Response.Data.Port", m: "$.Response.Data.Mountpoint" }
+      state:
+        ifb.function: "{f}"
+        ifb.address: "{a}"
+        ifb.port: "{p}"
+        ifb.mountpoint: "{m}"
+    - path: '^/cgi-bin/api\.cgi$'
+      json_match: { "$.Response.Requested": "^GetCurrentReturnOverIpServerID\\s*$", "$.Response.Result": "^Success$" }
+      json: { id: "$.Response.Data.ID" }
+      state:
+        return_over_ip.server: "{id:+1}"
+    - path: '^/cgi-bin/api\.cgi$'
+      json_match: { "$.Response.Requested": "^GetGPSInfo\\s*$", "$.Response.Result": "^Success$" }
+      json: { a: "$.Response.Data.AntennaLevel", l: "$.Response.Data.Location" }
+      state:
+        gps.antenna: "{a}"
+        gps.location: "{l}"
+
+state:
+  camera.status: { type: string, description: "Recording status: NoCard, Stop, Standby, Rec or RecPause (KY-PZ400/200 always NoCard)" }
+  camera.mode: { type: string, description: "Camera mode: Camera, Thmubnail (the camera's spelling), Play, Review, USB or EditMetadata" }
+  camera.rec_mode: { type: string, description: "Record mode: Normal, Pre, Clip, Frame, Interval or Variable" }
+  camera.timecode: { type: string, description: "Recording time in seconds, as the camera's text" }
+  camera.aspect_ratio: { type: string, description: "Aspect ratio: 16:9 or 4:3" }
+  camera.web_access: { type: string, description: "Web access: On or Off" }
+  camera.video_output: { type: string, description: "Video output: On or Off" }
+  camera.menu: { type: string, description: "Camera menu open: On or Off" }
+  camera.menu_output: { type: string, description: "Where the menu shows: All or Web" }
+  full_auto: { type: string, description: "Full auto: Off, On or Preset" }
+  exposure: { type: string, description: "Exposure mode: Auto, Manual, IrisPriority, ShutterPriority or Bright" }
+  iris.mode: { type: string, description: "Iris mode as the camera reports it (Manual, Auto, AutoAELock)" }
+  iris.value: { type: string, description: "Iris as the camera displays it" }
+  gain.mode: { type: string, description: "Gain mode as the camera reports it (ManualL, ManualM, ManualH, Alc or AGC, AlcAELock, Lolux, Variable, Auto, Manual)" }
+  gain.value: { type: string, description: "Gain as the camera displays it" }
+  ae_level.mode: { type: string, description: "AE level mode: AeOff, AeOn or AeOnFace" }
+  ae_level.adjust: { type: string, description: "AE level adjustment: On or Off" }
+  ae_level.value: { type: string, description: "AE level as the camera displays it" }
+  shutter.mode: { type: string, description: "Shutter mode as the camera reports it (Off, Manual, Step, Variable, Eei, EeiAELock, Auto)" }
+  shutter.value: { type: string, description: "Shutter as the camera displays it" }
+  white_balance.mode: { type: string, description: "White balance mode as the camera reports it" }
+  white_balance.value: { type: string, description: "White balance as the camera displays it" }
+  white_balance.paint_red.value: { type: string, description: "White paint red as the camera displays it" }
+  white_balance.paint_blue.value: { type: string, description: "White paint blue as the camera displays it" }
+  bright: { type: string, description: "Bright as the camera displays it" }
+  zoom.dynamic: { type: string, description: "Dynamic zoom: On or Off" }
+  zoom.display: { type: string, description: "Zoom as the camera displays it (Z0 to Z149, or the focal length)" }
+  pan_tilt.speed_with_zoom: { type: string, description: "Pan/tilt speed follows the zoom: On or Off" }
+  focus.mode: { type: string, description: "Focus mode as the camera reports it (AFFace, AF, MFOnePush, MF, MFFace, Auto, Manual)" }
+  focus.value: { type: string, description: "Focus as the camera displays it" }
+  master_black: { type: string, description: "Master black as the camera displays it" }
+  detail: { type: string, description: "Detail as the camera displays it" }
+  streaming.status: { type: string, description: "Streaming: Stop, Stopping, Start, Starting, Waiting or Error" }
+  return_over_ip.status: { type: string, description: "Return over IP: Stop, Stopping, Start, Starting or Error" }
+  display_tv: { type: string, description: "Display on the TV output: On or Off" }
+  character_mix.sdi: { type: string, description: "Characters mixed on SDI: On or Off" }
+  character_mix.hdmi: { type: string, description: "Characters mixed on HDMI: On or Off" }
+  character_mix.video: { type: string, description: "Characters mixed on the video output: On or Off" }
+  tally.priority: { type: string, description: "Tally lamp control: Camera or Web" }
+  tally.lighting: { type: string, description: "Tally lamp lit: On or Off" }
+  tally.studio: { type: string, description: "Studio tally: Off, Program or Preview" }
+  battery.info: { type: string, description: "What the battery value is: Time (minutes), Capacity (%) or Voltage (V)" }
+  battery.level: { type: string, description: "Battery icon number, 0 (no battery) to 14, as the document lists them" }
+  battery.value: { type: string, description: "Battery remaining, in the unit battery.info names (65535 when unknown)" }
+  flip: { type: string, description: "Picture flipped: On or Off" }
+  mirror: { type: string, description: "Picture mirrored: On or Off" }
+  system.model: { type: string, description: "Model code (HM650, HM850, PZ400...)" }
+  system.destination: { type: string, description: "Market the camera is made for (JP, US, EU...)" }
+  system.api_version: { type: string, description: "Web API version" }
+  system.serial: { type: string, description: "Serial number" }
+  system.recording_resolution: { type: string, description: "Recording resolution" }
+  system.overlay: { type: string, description: "Overlay option: On or Off" }
+  system.tagging: { type: string, description: "Tagging option: On or Off" }
+  system.zixi: { type: string, description: "Zixi option: On or Off" }
+  system.srt: { type: string, description: "SRT option: On or Off" }
+  system.ka_en200: { type: string, description: "KA-EN200 adaptor: On or Off" }
+  video.output: { type: string, description: "Video output: SDI or HDMI" }
+  video.format: { type: string, description: "Video format: 50Hz, 60Hz or DialPriority" }
+  video.encode_level: { type: string, description: "Encode profile: mainprofile or highprofile" }
+  ntp.server: { type: string, description: "NTP server address" }
+  ntp.timecode_sync: { type: string, description: "Timecode follows NTP: On or Off" }
+  ntp.status: { type: string, description: "NTP status as the camera reports it (Syncronized, NotSyncronized, Master)" }
+  ntp.time_zone: { type: string, description: "Time zone, GMT-1100 to GMT+1300" }
+  ifb.function: { type: string, description: "IFB: Enable or Disable" }
+  ifb.address: { type: string, description: "IFB server address" }
+  ifb.mountpoint: { type: string, description: "IFB mountpoint" }
+  gps.antenna: { type: string, description: "GPS antenna: None, Lost, Searching, Level1, Level2 or Level3" }
+  gps.location: { type: string, description: "GPS location as +latitude+longitude+altitude/, valid at Level1 to Level3" }
+  iris.position: { type: int, description: "Iris position, 0 to 255" }
+  white_balance.paint_red.scale: { type: int, description: "Length of the white paint red scale" }
+  white_balance.paint_blue.scale: { type: int, description: "Length of the white paint blue scale" }
+  white_balance.paint_red.position: { type: int, description: "White paint red position" }
+  white_balance.paint_blue.position: { type: int, description: "White paint blue position" }
+  zoom.dynamic_position: { type: int, description: "Dynamic zoom position, 0 to 499" }
+  zoom.position: { type: int, description: "Zoom position, 0 (wide) to 499 (tele)" }
+  pan_tilt.preset_speed: { type: int, description: "Pan/tilt/preset speed, 1 to 30" }
+  luminance: { type: int, description: "Luminance" }
+  saturation: { type: int, description: "Saturation" }
+  contrast: { type: int, description: "Contrast" }
+  sharpness: { type: int, description: "Sharpness" }
+  hue: { type: int, description: "Hue" }
+  position.pan: { type: int, description: "Pan position: 0 back left limit, 17540 front, 35080 back right limit" }
+  position.tilt: { type: int, description: "Tilt position: 0 straight up, 9040 level, 12080 diagonally down" }
+  streaming.server: { type: int, description: "Streaming server setting in use, 1 to 4" }
+  zoom_presets.a: { type: int, description: "Preset zoom A, 0 to 499; -1 when not set" }
+  zoom_presets.b: { type: int, description: "Preset zoom B, 0 to 499; -1 when not set" }
+  zoom_presets.c: { type: int, description: "Preset zoom C, 0 to 499; -1 when not set" }
+  ntp.interval_minutes: { type: int, description: "Minutes between NTP synchronizations" }
+  ifb.port: { type: int, description: "IFB server port" }
+  return_over_ip.server: { type: int, description: "Return over IP server setting in use, 1 to 4" }
+  slots.a.status: { type: string, description: "Slot A: Select, NoSelect, NoCard, SelectRec, NoSelectRec, Invalid or Unknown" }
+  slots.a.protect: { type: string, description: "Slot A protection: Unlock or Lock" }
+  slots.a.remaining_minutes: { type: int, unit: min, description: "Recording time left on slot A" }
+  slots.a.clips: { type: int, description: "Clips on slot A" }
+  slots.a.low: { type: bool, description: "Slot A is nearly full" }
+  slots.b.status: { type: string, description: "Slot B: Select, NoSelect, NoCard, SelectRec, NoSelectRec, Invalid or Unknown" }
+  slots.b.protect: { type: string, description: "Slot B protection: Unlock or Lock" }
+  slots.b.remaining_minutes: { type: int, unit: min, description: "Recording time left on slot B" }
+  slots.b.clips: { type: int, description: "Clips on slot B" }
+  slots.b.low: { type: bool, description: "Slot B is nearly full" }
+  slots.ext.status: { type: string, description: "Slot Ext: Select, NoSelect, NoCard, SelectRec, NoSelectRec, Invalid or Unknown" }
+  slots.ext.protect: { type: string, description: "Slot Ext protection: Unlock or Lock" }
+  slots.ext.remaining_minutes: { type: int, unit: min, description: "Recording time left on slot Ext" }
+  slots.ext.clips: { type: int, description: "Clips on slot Ext" }
+  slots.ext.low: { type: bool, description: "Slot Ext is nearly full" }
+  ntp.time_sync: { type: bool, description: "The clock follows NTP (KY-PZ400, KY-PZ200)" }
+  ntp.main_time_shown: { type: bool, description: "The time is shown on the first stream" }
+  ntp.sub_time_shown: { type: bool, description: "The time is shown on the second stream" }
+  streams.*.resolution: { type: string, description: "Resolution of stream 1 or 2" }
+  streams.*.frame_rate: { type: string, description: "Frame rate of the stream" }
+  streams.*.bitrate: { type: string, description: "Bitrate of the stream, as the camera writes it (3.0M, 4096K)" }
+  streams.*.quality: { type: string, description: "MJPEG quality factor of the stream" }
+  streams.*.encoding: { type: string, description: "Encoding of the stream: H264, H265 or MJPEG" }
+  streams.*.key_frame_interval: { type: int, description: "Frames between I frames of the stream" }
+  streams.*.rate_control: { type: string, description: "Rate control of the stream: CBR or VBR" }
+  servers.*.alias: { type: string, description: "Name of streaming server setting 1 to 4" }
+  servers.*.type: { type: string, description: "Streaming type of the server setting" }
+  servers.*.settings: { type: string, description: "The server setting as the camera reports it, as JSON text" }
+  server_types.*: { type: string, description: "A KY-PZ400 or KY-PZ200's settings for a streaming type (RTSP, RTMP, SRT, NDI...), as JSON text" }
+  buttons.*.*: { type: bool, description: "Whether a web button can be pressed now, by kind and button (Iris Open1, Whb Faw...)" }
+  button_names.*.*: { type: string, description: "What a configurable button does, by kind and button (User Sw1 Focus Assist, Gain L 0dB...)" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The client logs in at /api.php with HTTP Digest and the camera answers with a SessionID
+      cookie (the document shows a 302); every request then carries it in its JSON body and its
+      cookie. A request answered SessionError logs in again and is sent once more. The document
+      also says another client cannot connect while one is using the API, so a second controller
+      (or the camera's web page) can lock this one out.
+  - models: [all]
+    severity: info
+    text: >
+      Many settings are changed by pressing the camera's web buttons (SetWebButtonEvent): the
+      result is read back from GetCamStatus every second. Which buttons a model has is the
+      document's table; which can be pressed now is buttons.<kind>.<button> in state. Values such
+      as iris, gain, shutter and white balance are the camera's display text, not numbers.
+  - models: [all]
+    severity: info
+    text: >
+      The document asks that requests hold no spaces or line breaks; the requests here have none of
+      their own, but text a command is given (an alias, a URL, a name) is sent as it is. Text holding
+      a double quote or a backslash is refused, since the body is not escaped.
+  - models: [ky-pz100, ky-pz400, ky-pz200]
+    severity: info
+    text: >
+      On a KY-PZ100 the zoom Tele/Wide and focus Far/Near button events keep moving until a Stop
+      event (zoom_button and focus_button with Stop); the KY-PZ400 and KY-PZ200 need it for zoom.
+  - models: [all]
+    severity: info
+    text: >
+      Fetching a JPEG still (/cgi-bin/get_jpg.cgi) returns an image, which a command here cannot
+      save; start_jpeg_encoding and stop_jpeg_encoding only control the encoder. Several streaming,
+      video, multicast and NDI settings take effect after a restart, and set_streaming_resolution
+      restarts a GY-HM650, GY-HM660 or GY-HM8x0.
+  - models: [all]
+    severity: critical
+    text: >
+      stop_recording and record_button Stop end a take; stop_streaming ends a live stream; store_preset
+      and delete_preset overwrite or remove a stored position; reboot drops the video.

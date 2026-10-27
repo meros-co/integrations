@@ -1697,6 +1697,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that blocks and clips in the project are listed in playlist order, so their place from 1 is the block and clip number the cue, play and select routes take. ([specs/joy-playdeck.yaml:1244](specs/joy-playdeck.yaml#L1244))
 - [ ] Confirm POST /api/v1/commands accepts args given as strings for numeric arguments (the schema says numbers as strings are fine) and what it answers an unknown command with. ([specs/joy-playdeck.yaml:491](specs/joy-playdeck.yaml#L491))
 
+## jvc-camera — JVC camcorders and PTZ cameras (Camcorder Web API)
+
+- [ ] Check the login exchange: whether /api.php answers 302 or 200 with the SessionID cookie, how many cookies it sets, and whether api.cgi needs the cookie, the body's SessionID or both. ([specs/jvc-camera.yaml:53](specs/jvc-camera.yaml#L53))
+- [ ] Check whether a second API client is refused while one holds a session, and what a session left idle does (the document says SessionRenewal is no longer needed). ([specs/jvc-camera.yaml:1344](specs/jvc-camera.yaml#L1344))
+- [ ] Record a full GetCamStatus answer on a camcorder and a KY-PZ camera, to check the Enable and ButtonString members the rules read and the field names the examples spell differently (AspectRetio, Sw, Agc). ([specs/jvc-camera.yaml:1102](specs/jvc-camera.yaml#L1102))
+- [ ] Check how the camera answers text with a space (an alias or a name), given the document's rule against spaces in requests. ([specs/jvc-camera.yaml:1359](specs/jvc-camera.yaml#L1359))
+
 ## kiloview-cube-r1 — Kiloview CUBE R1
 
 - [ ] Find out how the CUBE R1 takes the login token back (the API document does not say): confirm that the token sent as it is in Authorization is accepted, or that the cookie user=<user>; token=<token> is, and which one the web interface uses. ([specs/kiloview-cube-r1.yaml:52](specs/kiloview-cube-r1.yaml#L52))
