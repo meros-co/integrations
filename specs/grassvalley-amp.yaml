@@ -1,0 +1,367 @@
+spec: 1
+id: grassvalley-amp
+name: Grass Valley AMP (Advanced Media Protocol) video servers
+vendor: Grass Valley
+category: recorder
+implementation: native
+reason: >
+  AMP extends the Sony 9-pin protocol with clip and folder commands whose names travel with a two-byte length,
+  and runs it over TCP 3811 as ASCII: a channel request (CRAT) answered before any command, then each message as
+  CMDS, a four-digit length and its bytes in hexadecimal, answered in hexadecimal with no delimiter, so a reply's
+  length comes from its own first bytes (and, for name returns, from a length inside it). Clip and folder lists
+  are read with a first request and then next requests until one comes back empty. On a serial port the same
+  messages are binary with a checksum.
+
+# AMP channels are named by the server (Vtr1, Vtr2, ... on K2; PGM1 on some); a channel-less session takes the
+# clip and folder commands that need no channel. The full AMP Specification document is Grass Valley's and is
+# not published; the layouts here are those the public documents below give.
+source:
+  - title: "T2 Intelligent Digital Disk Recorder Users Manual - AMP Remote Control - (F2431110173, October 2011)"
+    author: Grass Valley K.K.
+    url: https://web.archive.org/web/20150122061119/http://www.grassvalley.com:80/docs/Manuals/iddr/t2/T2_UsersManual_AMP_E_0111_2011.pdf
+    note: >
+      Manufacturer document (Grass Valley's own copy refuses automated fetches; read from the Internet Archive's
+      copy, retrieved 2026-10-27). AMP over Ethernet only on the T2; the AMP command list by family (device
+      management, transport, timeline, stored clips, clip data) with which the T2 supports in each mode; the
+      status bytes 0-4, 9, A and D bit by bit; current time sense's supported requests (1 LTC, 4 timer, 8
+      Windows time, 40 LTC from the source). Refers to Grass Valley's AMP Specification for each command's data.
+  - title: "SimplyLive Advanced Media Protocol (AMP) Support (SimplyLive 2.1)"
+    author: Riedel Communications
+    url: https://manuals.riedel.net/simplylive/2.1/simplylive-advanced-media-protocol-amp-support
+    note: >
+      A server maker's public AMP documentation (retrieved 2026-10-27), quoting the AMP Specification for each
+      command it implements: CRAT with a channel (CRAT0007204Vtr4) or channel-less (CRAT00014), STOP0000, CMDS
+      with a decimal length and lower-case hexadecimal, no checksum over TCP, the message format and the
+      extended name format (a two-byte length), timecode in BCD frames first, and the layouts of 01.06, 20.xx,
+      2X.11/12/21/22, 41.36, 41.42, 61.0C (with 74.0A Windows time, 74.0B and 74.0C from the source), 61.20 (0F
+      for every byte), AX.02, 4X.14, 4X.15, 40.20, 4X.21, AX.04-07, A0.16/8X.16, A2.25/84.25, A0.0F/82.0F,
+      A2.0E, A0.2A/2B, AX.14/15 with 8X.14, AX.18/81.18, AA.13/8A.13 and A2.09/82.09.
+  - title: "Ross Video Caprica device setup sheet: Grass Valley K2 Summit Media Server (4910DR-608-02, May 2026)"
+    author: Ross Video
+    url: "https://documentation.rossvideo.com/files/Manuals/Automation%20&%20Control/Caprica/Device%20Setup%20Sheets/Server%20VTR/GVG%20K2%20Summit.pdf"
+    note: "A controller maker's document: AMP over TCP to port 3811 with long (variable) IDs; the K2 AppCenter channel set to Remote and protocol AMP."
+  - title: "bitfocus/companion-module-grassvalley-amp (MIT)"
+    author: Bitfocus AS, William Viker, Håkon Nessjøen
+    url: https://github.com/bitfocus/companion-module-grassvalley-amp
+    note: >
+      Corroboration only, not copied: port 3811, the channel request answered 1001 (1111 when refused), replies in
+      hexadecimal without a prefix or line end, List First ID sent as a2140000.
+
+settings:
+  link: { type: enum, values: [tcp, serial], default: tcp, label: Link,
+    description: "tcp reaches the server's AMP socket over the network; serial uses an RS-422 port of the host wired to a channel's 9-pin port." }
+  channel: { type: string, max_length: 32, pattern: "^[!-~]*$", default: Vtr1, label: AMP channel,
+    description: "The channel to control over TCP, as the server names it (Vtr1 for a K2's first channel); empty opens a channel-less session for clip and folder commands." }
+  serial_port: { type: string, max_length: 256, label: Serial port,
+    description: "With link serial, the host's serial port wired to the channel's RS-422 port: COM3 on Windows, /dev/ttyUSB0 on Linux." }
+  baud_rate: { type: enum, values: ["38400"], default: "38400", label: Baud rate, description: "38400 bit/s, as the 9-pin protocol." }
+  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "8 data bits." }
+  parity: { type: enum, values: [odd], default: odd, label: Parity, description: "Odd parity." }
+  stop_bits: { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "1 stop bit." }
+  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "No flow control." }
+
+ports:
+  - { port: 3811, protocol: tcp, role: control, when: "link tcp", note: "the AMP socket (IANA assigned); one channel per connection" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "a channel's RS-422 9-pin port" }
+
+models:
+  - id: k2
+    name: Grass Valley K2 Summit, K2 Solo and K2 Dyno servers
+    supports: &all [local_disable, local_enable, get_device_type, set_drop_frame, standby, full_ee, set_mute, get_device_id,
+      stop, play, record, stop_at, play_at, record_at, eject, fast_forward, rewind, jog, var, shuttle, jog_fields, cue_up,
+      reset_in, reset_out, auto_mode, set_timecode_mode, set_loop, get_time, get_status, load_clip, cue_clip, set_point,
+      set_clip_out, preview_clip, preview_clip_at, set_preview_out, reset_preview_in, reset_preview_out, record_cue,
+      record_cue_at, get_loaded_clip, get_clip_start, get_clip_duration, get_working_folder, set_working_folder,
+      list_folders, list_clips, get_clip_status, get_clip_data, erase_clip, create_folder, delete_folder, get_point,
+      send_raw]
+    verification: none
+  - id: t2
+    name: Grass Valley T2 and T2 Pro disk recorders (AMP over Ethernet)
+    supports: [local_disable, local_enable, get_device_type, set_drop_frame, full_ee, set_mute, get_device_id, stop, play,
+      record, eject, fast_forward, rewind, jog, var, shuttle, cue_up, reset_in, reset_out, auto_mode, set_timecode_mode,
+      set_loop, get_time, get_status, load_clip, cue_clip, set_point, set_clip_out, preview_clip, preview_clip_at,
+      set_preview_out, reset_preview_in, reset_preview_out, record_cue, get_loaded_clip, get_clip_start,
+      get_clip_duration, get_working_folder, set_working_folder, list_folders, list_clips, get_clip_status,
+      get_clip_data, erase_clip, create_folder, delete_folder, get_point, send_raw]
+    verification: none
+  - id: ross-server
+    name: Ross Video servers controlled over AMP (Tria, Mira, Kiva)
+    supports: *all
+    verification: none
+  - id: generic
+    name: Any server or replay system with an AMP socket (SimplyLive, and others)
+    supports: *all
+    verification: none
+
+commands:
+  local_disable:
+    summary: Disable local control of the channel (00.0C)
+    returns: ack
+  local_enable:
+    summary: Enable local control of the channel (0X.1D)
+    returns: ack
+  get_device_type:
+    summary: "Read the device type (00.11, answered 12.11) as hex"
+    returns: value
+  set_drop_frame:
+    summary: Drop-frame mode on or off (01.06)
+    params:
+      enabled: &enabled { type: bool, required: true, label: Enabled, description: "On turns the mode on, off turns it off." }
+    returns: ack
+  standby:
+    summary: Standby on (20.05) or off (20.04)
+    params: { enabled: *enabled }
+    returns: ack
+  full_ee:
+    summary: EE on (20.61, the input to the output) or off (20.60)
+    params: { enabled: *enabled }
+    returns: ack
+  set_mute:
+    summary: Mute mode on or off (21.62)
+    params: { enabled: *enabled }
+    returns: ack
+  get_device_id:
+    summary: "Read the device ID (A0.21, answered 88.21: eight characters)"
+    returns: value
+  stop:
+    summary: Stop (20.00)
+    returns: ack
+  play:
+    summary: Play the loaded clip (20.01)
+    returns: ack
+  record:
+    summary: Record into the clip cued for recording (20.02)
+    returns: ack
+  stop_at:
+    summary: Stop at a timecode (24.00, an event schedule)
+    params:
+      timecode: &tc { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}[:;.][0-9]{2}$", required: true, label: Timecode, description: "Hours, minutes, seconds and frames, HH:MM:SS:FF." }
+    returns: ack
+  play_at:
+    summary: Play at a timecode (24.01, an event schedule)
+    params: { timecode: *tc }
+    returns: ack
+  record_at:
+    summary: Record at a timecode (24.02, a scheduled recording)
+    params: { timecode: *tc }
+    returns: ack
+  eject:
+    summary: "Eject (20.0F): unload the channel's clip"
+    returns: ack
+  fast_forward:
+    summary: Fast forward (20.10)
+    returns: ack
+  rewind:
+    summary: Rewind (20.20)
+    returns: ack
+  jog:
+    summary: Jog forward or back at a speed (2X.11, 2X.21)
+    params:
+      direction: &direction { type: enum, values: [forward, reverse], required: true, label: Direction, description: "forward or reverse." }
+      rate: &rate { type: float, min: 0, max: 95, required: true, label: Speed, description: "Times play speed, sent as the 9-pin speed bytes (10^(N/32-2)); 0 sends speed byte 0." }
+    returns: ack
+  var:
+    summary: Play forward or back at a variable speed (2X.12, 2X.22)
+    params: { direction: *direction, rate: *rate }
+    returns: ack
+  shuttle:
+    summary: Shuttle forward or back at a speed (2X.13, 2X.23)
+    params: { direction: *direction, rate: *rate }
+    returns: ack
+  jog_fields:
+    summary: Jog by a number of fields, forward or back (24.11, 24.21 with a four-byte field count)
+    params:
+      fields: { type: int, min: -16777215, max: 16777215, required: true, label: Fields, description: "Fields to move: positive forward, negative back." }
+    returns: ack
+  cue_up:
+    summary: Cue the loaded clip to a timecode (24.31)
+    params: { timecode: *tc }
+    returns: ack
+  reset_in:
+    summary: Clear the in preset's clip and position (40.20)
+    returns: ack
+  reset_out:
+    summary: Clear the out preset (40.21)
+    returns: ack
+  auto_mode:
+    summary: Auto mode on (40.41, playing the in presets one after another) or off (40.40)
+    params: { enabled: *enabled }
+    returns: ack
+  set_timecode_mode:
+    summary: Select the timecode the channel uses (41.36)
+    params:
+      mode: { type: enum, values: [ltc, timer, vitc, time_of_day], required: true, label: Timecode, description: "ltc, timer, vitc or time_of_day." }
+    returns: ack
+  set_loop:
+    summary: Loop playback on or off (41.42)
+    params: { enabled: *enabled }
+    returns: ack
+  get_time:
+    summary: "Read a time (61.0C, answered 74.xx or 78.xx)"
+    params:
+      source: { type: enum, values: [ltc, vitc, timer1, ltc_user_bits, vitc_user_bits, windows_time, ltc_source], required: true, label: Source,
+        description: "ltc, vitc, timer1, the LTC or VITC user bits, windows_time (the server's clock) or ltc_source (the LTC input)." }
+    returns: value
+  get_status:
+    summary: "Read every status byte (61.20 0F, answered 7F.20): each status bit, and the transport in one word"
+    returns: value
+  load_clip:
+    summary: Load clips onto the timeline from their start (4A.14, In Preset, names with their lengths), then read the loaded clip
+    params:
+      clip: &clip { type: string, max_length: 255, pattern: "^[^\\x00-\\x1F]+$", default: "", label: Clip, description: "The clip's name in the working folder, or a path." }
+      clips: { type: json, label: Clips, description: "Instead of clip, a list of clip names to load one after another (In Preset's list form)." }
+    returns: ack
+  cue_clip:
+    summary: Load a clip onto the timeline at a timecode (4E.14), then read the loaded clip
+    params:
+      clip: &clipreq { type: string, max_length: 255, pattern: "^[^\\x00-\\x1F]+$", required: true, label: Clip, description: "The clip's name in the working folder, or a path." }
+      timecode: *tc
+    returns: ack
+  set_point:
+    summary: Preset the in point (44.14) or out point (44.15) of the loaded clip to a timecode
+    params:
+      point: { type: enum, values: [in, out], required: true, label: Point, description: "in or out." }
+      timecode: *tc
+    returns: ack
+  set_clip_out:
+    summary: Set a clip's out point on the timeline to a timecode (4E.15)
+    params: { clip: *clipreq, timecode: *tc }
+    returns: ack
+  preview_clip:
+    summary: Load clips into the preview (next) position from their start (AA.04, Preview In Preset)
+    params:
+      clip: *clip
+      clips: { type: json, label: Clips, description: "Instead of clip, a list of clip names." }
+    returns: ack
+  preview_clip_at:
+    summary: Load a clip into the preview position at a timecode (AE.04)
+    params: { clip: *clipreq, timecode: *tc }
+    returns: ack
+  set_preview_out:
+    summary: Set the preview out point to a timecode (A4.05)
+    params: { timecode: *tc }
+    returns: ack
+  reset_preview_in:
+    summary: Clear the preview in preset (A0.06)
+    returns: ack
+  reset_preview_out:
+    summary: Clear the preview out preset (A0.07)
+    returns: ack
+  record_cue:
+    summary: Create and load a clip for recording, to record from its start (AA.02); record then starts it
+    params: { clip: *clipreq }
+    returns: ack
+  record_cue_at:
+    summary: Create and load a clip for recording at a timecode (AE.02)
+    params: { clip: *clipreq, timecode: *tc }
+    returns: ack
+  get_loaded_clip:
+    summary: "Read the clip loaded on the channel (A0.16, answered 8X.16); empty when none"
+    returns: value
+  get_clip_start:
+    summary: "Read a clip's start timecode (A2.25, answered 84.25)"
+    params: { clip: *clipreq }
+    returns: value
+  get_clip_duration:
+    summary: "Read a clip's duration (A2.17, answered 84.17)"
+    params: { clip: *clipreq }
+    returns: value
+  get_working_folder:
+    summary: "Read the working folder (A0.0F, answered 82.0F)"
+    returns: value
+  set_working_folder:
+    summary: Change the working folder (A2.0E), then read it back
+    params:
+      folder: &folder { type: string, max_length: 255, pattern: "^[^\\x00-\\x1F]+$", required: true, label: Folder, description: "The folder's path, as the server names it (V:/default on a K2)." }
+    returns: ack
+  list_folders:
+    summary: "List the folders (A0.2A, then A0.2B until none is left), into state"
+    returns: value
+  list_clips:
+    summary: "List the clips of the working folder (A2.14, then A1.15 ten at a time until none is left), into state"
+    returns: value
+  get_clip_status:
+    summary: "Read a clip's status byte (AA.18, answered 81.18)"
+    params: { clip: *clipreq }
+    returns: value
+  get_clip_data:
+    summary: "Read a clip's data (AA.13 'C', answered 8A.13): creation and modification times, duration, compression, format, track counts and flags"
+    params: { clip: *clipreq }
+    returns: value
+  erase_clip:
+    summary: Delete a clip (A2.10, Erase ID)
+    params: { clip: *clipreq }
+    returns: ack
+  create_folder:
+    summary: Create a folder (A2.31)
+    params: { folder: *folder }
+    returns: ack
+  delete_folder:
+    summary: Delete a folder (A2.29)
+    params: { folder: *folder }
+    returns: ack
+  get_point:
+    summary: "Read the in or out point (60.10, 60.11)"
+    params:
+      point: { type: enum, values: [in, out], required: true, label: Point, description: "in or out." }
+    returns: value
+  send_raw:
+    summary: Send any AMP message (as hex bytes, with no CMDS framing) and return the reply's bytes as hex
+    params:
+      message: { type: string, pattern: "^([0-9A-Fa-f]{2} ?)+$", max_length: 1024, required: true, label: Message, description: "CMD-1, CMD-2 and the data as hexadecimal bytes, such as a0 21; an extended message gives its own two-byte count." }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      erase_clip deletes a clip (a K2 moves it to the recycle bin or deletes it, as configured), delete_folder
+      deletes a folder, and record_cue creates a clip that replaces any clip of the same name. record, record_at
+      and eject act at once on air.
+  - models: [all]
+    severity: warning
+    text: >
+      Grass Valley's AMP Specification is not published: the layouts of erase_clip (A2.10), create_folder (A2.31),
+      delete_folder (A2.29), get_clip_duration (A2.17, read as 84.17), set_mute's data byte (21.62) and
+      get_clip_status's byte are inferred from the documented commands of the same form, and A2.xx single-name
+      commands are sent as the two-byte length followed by the name. Rename folder, new copy, storage, ID count,
+      changed IDs, transfers, thumbnails and audio gain are not offered; send_raw reaches them.
+  - models: [all]
+    severity: info
+    text: >
+      Over TCP the server's replies are hexadecimal digits with no prefix or line end; a reply's length comes from
+      its first byte's count nibble, and for 8X returns with 2, A or E there from the two bytes after CMD-2. No
+      checksum is sent or expected over TCP. A refused channel request (any answer but 1001) disconnects and is
+      tried again with backoff.
+  - models: [all]
+    severity: info
+    text: >
+      Nothing is pushed: monitored, the core asks every status byte and the LTC time every 250 ms, and the in and
+      out points, the loaded clip and the working folder every 5 s; opened for commands only, the device type
+      every 10 s while idle. Clip and folder lists are read only when asked (list_clips, list_folders).
+  - models: [t2]
+    severity: info
+    text: >
+      The T2 takes AMP over Ethernet only, plays only in its P1/P2 remote modes, records only in R1, ignores jog,
+      var and shuttle speeds other than 0, and returns user bits as zero.
+
+state:
+  device.device_type: { type: string, description: "The device type's two bytes as hex (12.11)" }
+  device.model: { type: string, description: "The model the device type code stands for, where it is one the 9-pin documents name" }
+  device.line_625: { type: bool, description: "Whether a known model code says a 625-line model" }
+  device_id: { type: string, description: "The device ID (88.21)" }
+  transport: { type: string, description: "The transport from the status bits: eject, record, fast_forward, rewind, shuttle, jog, var, play, still, stop, standby or unknown" }
+  status.*: { type: bool, description: "Each AMP status bit by name (local, remote_and_local, busy, play, record, stop, cue_complete, in_point, out_point, loop, ee, id_not_found, folder_not_found, ltc, drop_frame, tape_end...)" }
+  timecode: { type: string, description: "The current time from the last time sense, HH:MM:SS:FF" }
+  timecode_source: { type: string, description: "ltc, vitc, ltc_source, vitc_source or other" }
+  drop_frame: { type: bool, description: "The time's drop-frame flag" }
+  timer1: { type: string, description: "Timer 1 (74.00)" }
+  windows_time: { type: string, description: "The server's clock (74.0A)" }
+  user_bits.ltc: { type: string, description: "LTC user bits" }
+  user_bits.vitc: { type: string, description: "VITC user bits" }
+  points.in: { type: string, description: "The in point (74.10)" }
+  points.out: { type: string, description: "The out point (74.11)" }
+  clip.loaded: { type: string, description: "The clip loaded on the channel; empty when none (8X.16)" }
+  working_folder: { type: string, description: "The working folder (82.0F)" }
+  clips.*: { type: string, description: "The working folder's clips from the last list_clips, numbered from 1 in the server's order" }
+  folders.*: { type: string, description: "The folders from the last list_folders, numbered from 1" }

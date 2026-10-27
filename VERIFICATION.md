@@ -1672,6 +1672,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the fader_fade fade argument (two integers) and any upper bound on fade time. ([specs/grandma3.yaml:1807](specs/grandma3.yaml#L1807))
 - [ ] Check the upper bounds of cue and pool numbers (four digits, 9999, 99999 assumed). ([specs/grandma3.yaml:1831](specs/grandma3.yaml#L1831))
 
+## grassvalley-amp — Grass Valley AMP video servers
+
+- [ ] Confirm a K2's replies over TCP: hexadecimal digits with no prefix, line end or checksum, one reply per command, and lower or upper case. ([specs/grassvalley-amp.yaml:332](specs/grassvalley-amp.yaml#L332))
+- [ ] Confirm the channel request (CRAT0007204Vtr1) is answered 1001, a refused one 1111, and the channel-less form (CRAT00014). ([specs/grassvalley-amp.yaml:53](specs/grassvalley-amp.yaml#L53))
+- [ ] Check the inferred layouts: erase_clip (A2.10), create_folder (A2.31), delete_folder (A2.29), get_clip_duration (A2.17 answered 84.17) and A2.xx single-name commands sent as the name's length then the name. ([specs/grassvalley-amp.yaml:324](specs/grassvalley-amp.yaml#L324))
+- [ ] Check set_mute's data byte (21.62 with 1 on, 0 off). ([specs/grassvalley-amp.yaml:119](specs/grassvalley-amp.yaml#L119))
+- [ ] Confirm List Next ID (A1.15 with a count of ten) answers 8X.14 with more names and 80.14 when none are left, and List First ID as a2140000. ([specs/grassvalley-amp.yaml:280](specs/grassvalley-amp.yaml#L280))
+- [ ] Check the status bits a K2 sets (the names follow the T2's AMP manual) and whether 61.20 0F returns fifteen bytes. ([specs/grassvalley-amp.yaml:354](specs/grassvalley-amp.yaml#L354))
+- [ ] Check which AMP commands Ross Tria, Mira and Kiva servers take over TCP 3811 and what their channels are called. ([specs/grassvalley-amp.yaml:87](specs/grassvalley-amp.yaml#L87))
+- [ ] Check the times a K2 answers for 61.0C 01, 04, 08 and 40, and whether 02 (VITC) is answered or 70.0D. ([specs/grassvalley-amp.yaml:199](specs/grassvalley-amp.yaml#L199))
+
 ## greenhippo-hippotizer — Green Hippo Hippotizer
 
 - [ ] Check whether mix, layer and timeline indexes start at 0 or 1 (mix and layer from 1, timeline by iD are assumed). ([specs/greenhippo-hippotizer.yaml:682](specs/greenhippo-hippotizer.yaml#L682))
@@ -3203,6 +3214,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check what a status sent with only the logo, black and clear flags (before EasyWorship's first status) does. ([specs/softouch-easyworship.yaml:101](specs/softouch-easyworship.yaml#L101))
 - [ ] Check whether gotoSlide and gotoSchedule count from 1, and what pres_no, slide_no and rectype hold. ([specs/softouch-easyworship.yaml:134](specs/softouch-easyworship.yaml#L134))
 - [ ] Check whether UTF-8 is accepted where the Companion module sends Latin-1 (only the controller name can hold non-ASCII text, and it is limited to ASCII here). ([specs/softouch-easyworship.yaml:62](specs/softouch-easyworship.yaml#L62))
+
+## sony-9pin — Sony 9-pin (RS-422 VTR protocol) decks and servers
+
+- [ ] Check the jog, var and shuttle speeds the device runs at for the speed bytes sent (10^(N/32-2) times play speed, a second byte for finer steps), and whether speed 0 pauses it or creeps. ([specs/sony-9pin.yaml:121](specs/sony-9pin.yaml#L121))
+- [ ] Check how many status bytes the device returns for 61.20 0A (ten asked; a NAK makes the core ask four), and which bits it sets. ([specs/sony-9pin.yaml:299](specs/sony-9pin.yaml#L299))
+- [ ] Check what 61.0C 03 (the best of LTC and VITC) returns on the device (74.04, 74.06, 74.14 or 74.16), and the 70.0D answer when a time is missing. ([specs/sony-9pin.yaml:302](specs/sony-9pin.yaml#L302))
+- [ ] Confirm the user bits' byte and nibble order (Drastic's example: 06364454 is sent 60 63 44 45) on a deck's generator and in its 74.05 returns. ([specs/sony-9pin.yaml:201](specs/sony-9pin.yaml#L201))
+- [ ] Check whether the device steps a frame on 20.14 and 20.24 (documented by Drastic as an extension, not in Sony's table). ([specs/sony-9pin.yaml:135](specs/sony-9pin.yaml#L135))
+- [ ] Record the device type code the device returns, and whether its model is named. ([specs/sony-9pin.yaml:95](specs/sony-9pin.yaml#L95))
+- [ ] Check a serial-to-Ethernet converter at 38400 8-O-1 carries the bytes and the 9-pin timing (a reply within about 10 ms, no gap over 10 ms inside a message) closely enough for the device. ([specs/sony-9pin.yaml:351](specs/sony-9pin.yaml#L351))
+- [ ] Confirm the DA-6400's 9-pin subset (shuttle by its first speed byte, cue up then pause, edit on and off) and its device type F0 1A. ([specs/sony-9pin.yaml:82](specs/sony-9pin.yaml#L82))
 
 ## sony-bravia — Sony BRAVIA Professional Displays (REST API and IRCC-IP)
 

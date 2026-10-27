@@ -155,6 +155,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-google", &["youtube-live"]),
+    ("vendor-grassvalley", &["grassvalley-amp"]),
     ("vendor-greenhippo", &["greenhippo-hippotizer"]),
     ("vendor-h2r", &["h2r-graphics"]),
     ("vendor-highend", &["highend-hog4"]),
@@ -292,6 +293,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     (
         "vendor-sony",
         &[
+            "sony-9pin",
             "sony-bravia",
             "sony-bravia-ip",
             "sony-bravia-serial",

@@ -203,6 +203,8 @@ mod visca;
 mod vmix;
 #[cfg(feature = "vmix")]
 mod vmix_functions;
+#[cfg(any(feature = "sony-9pin", feature = "grassvalley-amp"))]
+mod vtr;
 #[cfg(any(feature = "generic-ping", feature = "samsung-mdc"))]
 mod wol;
 
@@ -381,6 +383,10 @@ pub(crate) fn construct(
         "samsung-mdc" => Ok(Box::new(samsung_mdc::SamsungMdc::new(context)?)),
         #[cfg(feature = "sony-bravia-serial")]
         "sony-bravia-serial" => Ok(Box::new(sony_bravia_serial::SonyBraviaSerial::new(context)?)),
+        #[cfg(feature = "sony-9pin")]
+        "sony-9pin" => Ok(Box::new(vtr::Vtr::new(vtr::Dialect::Sony, context)?)),
+        #[cfg(feature = "grassvalley-amp")]
+        "grassvalley-amp" => Ok(Box::new(vtr::Vtr::new(vtr::Dialect::Amp, context)?)),
         #[cfg(feature = "generic-osc")]
         "generic-osc" => Ok(Box::new(generic_osc::GenericOsc::new(context)?)),
         #[cfg(feature = "generic-tcp-udp")]
