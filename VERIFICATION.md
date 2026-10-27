@@ -2448,6 +2448,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the websocket sends a message for every change of the live item, slide and service, so re-reading on each one keeps the live item and service list current, and that the one-minute safety poll is enough for anything it misses. ([specs/openlp.yaml:388](specs/openlp.yaml#L388))
 - [ ] Confirm live-item answers {} (status 200) while nothing is live, the case that removes live_item from state. ([specs/openlp.yaml:416](specs/openlp.yaml#L416))
 
+## opensong — OpenSong
+
+- [ ] Confirm what OpenSong expects in Authorization for POST requests: Basic followed by the base64 of the key alone, as the API page says (not of user:password), and what it answers a wrong key with (a Basic challenge, 401, is assumed). ([specs/opensong.yaml:40](specs/opensong.yaml#L40))
+- [ ] Confirm the API's default port (8082; the page also says 8080 once) and where it is enabled and the key set in OpenSong's settings. ([specs/opensong.yaml:37](specs/opensong.yaml#L37))
+- [ ] Confirm that percent-encoded names (spaces as %20, commas as %2C) in path segments and param:value parts are decoded by OpenSong, and what a POST answers on success (status 200 with an XML response is assumed). ([specs/opensong.yaml:152](specs/opensong.yaml#L152))
+- [ ] Record the screen mode codes and names in the status for black, white, hide, logo and freeze (only N, normal, is documented). ([specs/opensong.yaml:401](specs/opensong.yaml#L401))
+- [ ] Confirm the status reply while no presentation runs carries presentation running="0" with no children. ([specs/opensong.yaml:415](specs/opensong.yaml#L415))
+- [ ] Check whether an alert message may hold a slash once percent-encoded (refused here), and which characters OpenSong's path parsing otherwise rejects. ([specs/opensong.yaml:381](specs/opensong.yaml#L381))
+- [ ] Record the XML of the slide list, song list, song folders, set list and set slide list, so they can be read into state. ([specs/opensong.yaml:73](specs/opensong.yaml#L73))
+
 ## osc-listener — OSC received from any sender
 
 - [ ] Check which TCP framing TouchOSC and Lemur send when set to TCP (SLIP as in OSC 1.1 is the default here, an int32 length prefix the alternative). ([specs/osc-listener.yaml:31](specs/osc-listener.yaml#L31))

@@ -198,6 +198,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-ontime", &["ontime", "ontime-osc"]),
     ("vendor-openlp", &["openlp"]),
     ("vendor-omt", &["omt", "omt-discovery"]),
+    ("vendor-opensong", &["opensong"]),
     (
         "vendor-panasonic",
         &[
