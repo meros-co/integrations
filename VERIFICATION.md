@@ -2176,6 +2176,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the equalizer byte (band in bits 7-5, step in bits 4-0) on a commercial TV. ([specs/lg-display.yaml:814](specs/lg-display.yaml#L814))
 - [ ] Drive an LG display on its RS-232C port (link serial) and confirm the acknowledgements are those of TCP 9761; confirm a commercial TV (UV340C, UL3E) runs at 9600 bps, 8N1, no flow control as the signage guides state. ([specs/lg-display.yaml:107](specs/lg-display.yaml#L107))
 
+## lightkey — Lightkey (OSC)
+
+- [ ] Confirm Lightkey sends nothing back over OSC (no feedback or replies), so no state can be read. ([specs/lightkey.yaml:288](specs/lightkey.yaml#L288))
+- [ ] Check that commands sent over UDP to 21600 act, and how Lightkey frames OSC over TCP on the same port. ([specs/lightkey.yaml:295](specs/lightkey.yaml#L295))
+- [ ] Check the value ranges Lightkey accepts for modifiers, fixture properties, fade times and tempo. ([specs/lightkey.yaml:302](specs/lightkey.yaml#L302))
+
 ## lightware-lw2 — Lightware LW2 (bracket protocol) matrices and switchers
 
 - [ ] Confirm that a CR LF after the closing bracket is accepted (Companion's module sends it; the manuals give no terminator). ([specs/lightware-lw2.yaml:696](specs/lightware-lw2.yaml#L696))

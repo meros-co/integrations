@@ -1,0 +1,312 @@
+spec: 1
+id: lightkey
+name: Lightkey (OSC)
+vendor: Lightkey
+category: lighting
+
+# Written from the OSC section of the Lightkey User Guide. Lightkey (macOS)
+# takes OSC on port 21600 over UDP and TCP; each controllable element has an
+# address built from object names, with spaces written as underscores and
+# OSC address patterns allowed. It sends no OSC feedback.
+source:
+  - title: Lightkey User Guide, External Control, "Open Sound Control (OSC)" and "OSC addresses"
+    author: Lightkey
+    url: "https://lightkeyapp.com/media/pages/help/manual/0def2c007d-1786370894/Lightkey%20User%20Guide.pdf"
+    note: >
+      Linked from https://lightkeyapp.com/en/help/manual, retrieved 2026-10-27, pp. 301-312.
+      "Lightkey receives incoming OSC messages through UDP and TCP"; port 21600; Enable OSC in
+      Settings, External Control. Names are case-sensitive, spaces become underscores, the
+      characters #*,/?[]{} are not allowed in names, and address patterns (? * [] {} !) match
+      several. Live view: /live/pageName/select [fadeTime];
+      /live/pageName/cue/cueName/activate|deactivate|toggle [fadeTime] (pageName or "selected",
+      cueName or "active"); /live/pageName/cue/cueName/intensity 0-1;
+      /live/pageName/frame/frameName/cue/cueName/...; /live/pageName/frame/frameName/previousCue|
+      nextCue [fadeTime]; /live/cuelistName[/groupName...]/cueName/...; cue and frame modifiers
+      (speed, beatMultiplier, timeOffset, fadeTime, dimmer, hue, xfadeToColor, panAngle,
+      colorTemperature, greenSaturation, zoomAngle, irisSize, tiltAngle, focus, frostAmount,
+      fogAmount; numbers, percent as 0.0-1.0, "neutral", "default", "/6", "x12");
+      /live/start, stop, toggle, pause, resume, togglePaused, nextCue, previousCue [fadeTime];
+      /live/xfade 0-1; /live/cuelistName/cue/cueName/skip|unskip. Preset Palette:
+      /palette/address/of/preset/activate|deactivate|toggle and .../sequence/start|stop|toggle,
+      with // for any depth. Output: /output/enterBlind, exitBlind, cancelBlind, toggleBlind,
+      freeze, unfreeze, toggleFreeze; /output/master 0-1. Beat: /beat/tap, sync, syncDownbeat,
+      halve, double; /beat/tempo bpm. Fixtures: /fixture/fixtureName/overrides/propertyName
+      value (the property table, custom properties by name, two arguments for an option with a
+      slider), /fixture/fixtureName/overrides/clear and .../propertyName/clear,
+      /fixture/fixtureName/lamp/on|off, /fixture/fixtureName/command/commandName,
+      /fixture/fixtureName/select|deselect. External Control Log for checking what arrived.
+
+transport:
+  type: osc-udp
+  port: 21600
+  reply: none
+
+ports:
+  - { port: 21600, protocol: udp, role: control, note: "Lightkey's OSC port (UDP; TCP on the same port is not used here)" }
+
+models:
+  - id: lightkey
+    name: Lightkey
+    supports: [select_page, select_page_fade, cue, cue_fade, cue_intensity, frame_step,
+      frame_step_fade, live_path, live_path_fade, modifier, modifier_text, cuelist,
+      cuelist_fade, xfade, cue_skip, palette, output, set_master, beat, set_tempo,
+      fixture_override, fixture_override_text, fixture_override_rgb, fixture_override_option,
+      fixture_clear_overrides, fixture_clear_override, fixture_lamp, fixture_command,
+      fixture_select]
+    verification: none
+
+commands:
+  select_page:
+    summary: "Select a Live view page (\"/live/<page>/select\")"
+    params:
+      page: &page { type: string, pattern: "^[^/#\\s]+$", max_length: 128, required: true, label: Page, description: "Live view page name with spaces as underscores, case as in Lightkey; address patterns such as * match several." }
+    send: { address: "/live/{page}/select" }
+    returns: none
+
+  select_page_fade:
+    summary: "Select a Live view page with a fade time in seconds (\"/live/<page>/select <fadeTime>\")"
+    params:
+      page: *page
+      fade: &fade { type: float, min: 0, max: 3600, required: true, label: Fade time, description: "Fade time in seconds, overriding the page's or cue's own fade time." }
+    send: { address: "/live/{page}/select", args: [ { value: "{fade}", type: float } ] }
+    returns: none
+
+  cue:
+    summary: "Activate, deactivate or toggle cues on a Live page (\"/live/<page>/cue/<cue>/<action>\")"
+    params:
+      page: &livepage { type: string, pattern: "^[^/#\\s]+$", max_length: 128, required: true, label: Page, description: "Live view page name with spaces as underscores, \"selected\" for the selected page, or a pattern such as *." }
+      cue: &cuename { type: string, pattern: "^[^/#\\s]+$", max_length: 128, required: true, label: Cue, description: "Cue name with spaces as underscores, \"active\" for every active cue, or a pattern such as 071*." }
+      action: &cueaction { type: enum, values: [activate, deactivate, toggle], required: true, label: Action, description: "activate, deactivate or toggle the cue." }
+    send: { address: "/live/{page}/cue/{cue}/{action}" }
+    returns: none
+
+  cue_fade:
+    summary: "Activate, deactivate or toggle cues with a fade time (\"/live/<page>/cue/<cue>/<action> <fadeTime>\")"
+    params: { page: *livepage, cue: *cuename, action: *cueaction, fade: *fade }
+    send: { address: "/live/{page}/cue/{cue}/{action}", args: [ { value: "{fade}", type: float } ] }
+    returns: none
+
+  cue_intensity:
+    summary: "Set the intensity of fader buttons, 0 to 1 (\"/live/<page>/cue/<cue>/intensity <value>\")"
+    params:
+      page: *livepage
+      cue: *cuename
+      value: &unit { type: float, min: 0, max: 1, required: true, label: Level, description: "Level from 0.0 (0%) to 1.0 (100%)." }
+    send: { address: "/live/{page}/cue/{cue}/intensity", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  frame_step:
+    summary: "Activate the previous or next cue in a frame (\"/live/<page>/frame/<frame>/previousCue|nextCue\")"
+    params:
+      page: *livepage
+      frame: &frame { type: string, pattern: "^[^/#\\s]+$", max_length: 128, required: true, label: Frame, description: "Frame name with spaces as underscores, or a pattern." }
+      direction: &direction { type: enum, values: [previousCue, nextCue], required: true, label: Direction, description: "previousCue or nextCue." }
+    send: { address: "/live/{page}/frame/{frame}/{direction}" }
+    returns: none
+
+  frame_step_fade:
+    summary: "Activate the previous or next cue in a frame with a fade time"
+    params: { page: *livepage, frame: *frame, direction: *direction, fade: *fade }
+    send: { address: "/live/{page}/frame/{frame}/{direction}", args: [ { value: "{fade}", type: float } ] }
+    returns: none
+
+  live_path:
+    summary: "Send a cue command to any Live view address, such as a cue in a frame (\"/live/<path>/<action>\")"
+    params:
+      path: &livepath { type: string, pattern: "^[^/#\\s][^#\\s]*$", max_length: 512, required: true, label: Address, description: "The address after /live/ up to the cue, such as selected/frame/Backlight/cue/* or selected/Song_1/001_Intro." }
+      action: *cueaction
+    send: { address: "/live/{path}/{action}" }
+    returns: none
+
+  live_path_fade:
+    summary: "Send a cue command with a fade time to any Live view address"
+    params: { path: *livepath, action: *cueaction, fade: *fade }
+    send: { address: "/live/{path}/{action}", args: [ { value: "{fade}", type: float } ] }
+    returns: none
+
+  modifier:
+    summary: "Set a cue or frame modifier to a number (\"/live/<target>/<modifier> <value>\")"
+    params:
+      target: &target { type: string, pattern: "^[^/#\\s][^#\\s]*$", max_length: 512, required: true, label: Target, description: "The cue or frame after /live/, such as selected/cue/Waterfall, selected/frame/Movers or selected/frame/Movers/cue/active." }
+      modifier: &modifier { type: enum, values: [speed, beatMultiplier, timeOffset, fadeTime, dimmer, hue, xfadeToColor, panAngle, tiltAngle, colorTemperature, greenSaturation, zoomAngle, irisSize, focus, frostAmount, fogAmount], required: true, label: Modifier, description: "The modifier to set, as Lightkey names it." }
+      value: { type: float, min: -100000, max: 100000, required: true, label: Value, description: "The modifier's value: percentages as 0.0 to 1.0, angles in degrees, color temperature in kelvin, speed as a factor." }
+    send: { address: "/live/{target}/{modifier}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  modifier_text:
+    summary: "Set a cue or frame modifier to a word, such as neutral, default, /6 or x12"
+    params:
+      target: *target
+      modifier: *modifier
+      value: { type: string, pattern: "^(neutral|default|[x/][0-9]+)$", max_length: 8, required: true, label: Value, description: "neutral or default to reset the modifier, or a beat multiplier such as /6 or x12." }
+    send: { address: "/live/{target}/{modifier}", args: [ { value: "{value}", type: string } ] }
+    returns: none
+
+  cuelist:
+    summary: "Control cuelist playback: start, stop, toggle, pause, resume, togglePaused, nextCue or previousCue (\"/live/<action>\")"
+    params:
+      action: &cuelistaction { type: enum, values: [start, stop, toggle, pause, resume, togglePaused, nextCue, previousCue], required: true, label: Action, description: "The cuelist action; only available while a cuelist is selected." }
+    send: { address: "/live/{action}" }
+    returns: none
+
+  cuelist_fade:
+    summary: "Go to the next or previous cue of the cuelist with a fade time (\"/live/nextCue|previousCue <fadeTime>\")"
+    params:
+      direction: *direction
+      fade: *fade
+    send: { address: "/live/{direction}", args: [ { value: "{fade}", type: float } ] }
+    returns: none
+
+  xfade:
+    summary: "Set the cuelist's Xfade slider for a manual crossfade, 0 to 1 (\"/live/xfade <level>\")"
+    params: { level: *unit }
+    send: { address: /live/xfade, args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  cue_skip:
+    summary: "Skip or unskip a cue in a cuelist (\"/live/<cuelist>/cue/<cue>/skip|unskip\")"
+    params:
+      cuelist: { type: string, pattern: "^[^/#\\s]+$", max_length: 128, required: true, label: Cuelist, description: "Cuelist name with spaces as underscores." }
+      cue: *cuename
+      skip: { type: enum, values: [skip, unskip], required: true, label: Skip, description: "skip clears the cue's checkmark, unskip sets it." }
+    send: { address: "/live/{cuelist}/cue/{cue}/{skip}" }
+    returns: none
+
+  palette:
+    summary: "Activate, deactivate or toggle presets, or start, stop or toggle sequences, in the Preset Palette (\"/palette/<path>/<action>\")"
+    params:
+      path: { type: string, pattern: "^[^#\\s]+$", max_length: 512, required: true, label: Palette address, description: "The item's address after /palette/, with its enclosing groups, such as Movers/Colors/Indigo or //Indigo for any depth." }
+      action: { type: enum, values: [activate, deactivate, toggle, start, stop], required: true, label: Action, description: "activate, deactivate or toggle for presets; start, stop or toggle for sequences." }
+    send: { address: "/palette/{path}/{action}" }
+    returns: none
+
+  output:
+    summary: "Blind or freeze the DMX output (\"/output/<action>\")"
+    params:
+      action: { type: enum, values: [enterBlind, exitBlind, cancelBlind, toggleBlind, freeze, unfreeze, toggleFreeze], required: true, label: Action, description: "Enter, exit, cancel or toggle blind mode, or freeze, unfreeze or toggle freezing the output." }
+    send: { address: "/output/{action}" }
+    returns: none
+
+  set_master:
+    summary: "Set the Master Dimmer, 0 to 1 (\"/output/master <value>\")"
+    params: { level: *unit }
+    send: { address: /output/master, args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  beat:
+    summary: "Tap, sync, halve or double the beat (\"/beat/<action>\")"
+    params:
+      action: { type: enum, values: [tap, sync, syncDownbeat, halve, double], required: true, label: Action, description: "tap (four times on the beat), sync, syncDownbeat, halve or double." }
+    send: { address: "/beat/{action}" }
+    returns: none
+
+  set_tempo:
+    summary: "Set the tempo in beats per minute (\"/beat/tempo <bpm>\")"
+    params:
+      bpm: { type: float, min: 1, max: 999, required: true, label: Tempo, description: "Tempo in beats per minute." }
+    send: { address: /beat/tempo, args: [ { value: "{bpm}", type: float } ] }
+    returns: none
+
+  fixture_override:
+    summary: "Set a fixture property to a number (\"/fixture/<fixture>/overrides/<property> <value>\")"
+    params:
+      fixture: &fixture { type: string, pattern: "^[^/#\\s]+$", max_length: 128, required: true, label: Fixture, description: "Fixture short name, \"selected\" for the selected fixtures, or a pattern." }
+      property: &property { type: string, pattern: "^[^/#\\s]+$", max_length: 128, required: true, label: Property, description: "Property name such as dimmer, hue, panAngle or strobeSpeed, or a custom property's name with spaces as underscores." }
+      value: { type: float, min: -100000, max: 100000, required: true, label: Value, description: "The property's value in its unit: 0 to 1 for levels, degrees, kelvin, Hz, revolutions per second, a wheel index or a DMX value." }
+    send: { address: "/fixture/{fixture}/overrides/{property}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  fixture_override_text:
+    summary: "Set a fixture property to a word or hex color (\"/fixture/<fixture>/overrides/<property> <text>\")"
+    params:
+      fixture: *fixture
+      property: *property
+      value: { type: string, pattern: "^[^\\s]+$", max_length: 128, required: true, label: Value, description: "A named state such as on, strobe or rotatingCW, an option name such as Program_1, or an RGB color in hex such as 4b0082." }
+    send: { address: "/fixture/{fixture}/overrides/{property}", args: [ { value: "{value}", type: string } ] }
+    returns: none
+
+  fixture_override_rgb:
+    summary: "Set a fixture color property to red, green and blue, each 0 to 1"
+    params:
+      fixture: *fixture
+      property: *property
+      red: { type: float, min: 0, max: 1, required: true, label: Red, description: "Red from 0.0 to 1.0." }
+      green: { type: float, min: 0, max: 1, required: true, label: Green, description: "Green from 0.0 to 1.0." }
+      blue: { type: float, min: 0, max: 1, required: true, label: Blue, description: "Blue from 0.0 to 1.0." }
+    send: { address: "/fixture/{fixture}/overrides/{property}", args: [ { value: "{red}", type: float }, { value: "{green}", type: float }, { value: "{blue}", type: float } ] }
+    returns: none
+
+  fixture_override_option:
+    summary: "Set a custom property that has options and a slider (\"/fixture/<fixture>/overrides/<property> <option> <value>\")"
+    params:
+      fixture: *fixture
+      property: *property
+      option: { type: string, pattern: "^[^\\s]+$", max_length: 128, required: true, label: Option, description: "The option's name with spaces as underscores, such as Effect_7." }
+      value: { type: float, min: 0, max: 255, required: true, label: Slider, description: "The slider value: 0 to 1 for a percentage slider, 0 to 255 for a DMX slider." }
+    send: { address: "/fixture/{fixture}/overrides/{property}", args: [ { value: "{option}", type: string }, { value: "{value}", type: float } ] }
+    returns: none
+
+  fixture_clear_overrides:
+    summary: "Clear every overridden property of fixtures (\"/fixture/<fixture>/overrides/clear\")"
+    params: { fixture: *fixture }
+    send: { address: "/fixture/{fixture}/overrides/clear" }
+    returns: none
+
+  fixture_clear_override:
+    summary: "Clear one overridden property of fixtures (\"/fixture/<fixture>/overrides/<property>/clear\")"
+    params:
+      fixture: *fixture
+      property: { type: string, pattern: "^[^/#\\s]+$", max_length: 128, required: true, label: Property, description: "dimmer, colorWheel1, color, position, speed, goboWheel1, shutter, prismWheel1, focus, zoom, iris, frost, fog or a custom property's name." }
+    send: { address: "/fixture/{fixture}/overrides/{property}/clear" }
+    returns: none
+
+  fixture_lamp:
+    summary: "Send Lamp On or Lamp Off to fixtures (\"/fixture/<fixture>/lamp/on|off\")"
+    params:
+      fixture: *fixture
+      lamp: { type: enum, values: ["on", "off"], required: true, label: Lamp, description: "on or off." }
+    send: { address: "/fixture/{fixture}/lamp/{lamp}" }
+    returns: none
+
+  fixture_command:
+    summary: "Send a fixture command such as Reset (\"/fixture/<fixture>/command/<name>\")"
+    params:
+      fixture: *fixture
+      command: { type: string, pattern: "^[^/#\\s]+$", max_length: 128, required: true, label: Command, description: "A command the fixture understands, such as Reset." }
+    send: { address: "/fixture/{fixture}/command/{command}" }
+    returns: none
+
+  fixture_select:
+    summary: "Select or deselect fixtures (\"/fixture/<fixture>/select|deselect\")"
+    params:
+      fixture: *fixture
+      action: { type: enum, values: [select, deselect], required: true, label: Action, description: "select or deselect." }
+    send: { address: "/fixture/{fixture}/{action}" }
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Lightkey sends no OSC feedback and answers nothing, so every command reports unverified and
+      no state is kept: cue, page, output and fixture states cannot be read over OSC. Enable OSC
+      in Lightkey's Settings, External Control. The External Control Log (Window menu) shows what
+      arrived and its effect.
+  - models: [all]
+    severity: info
+    text: >
+      Objects are addressed by name: case-sensitive, spaces written as underscores, and the
+      characters # * , / ? [ ] { } not allowed in names (they are address pattern syntax, which
+      Lightkey accepts to match several objects). Messages go over UDP; Lightkey's TCP input on
+      the same port is not used, as the guide does not say how it frames messages.
+  - models: [all]
+    severity: info
+    text: >
+      Fade times are optional arguments in the guide; commands with and without one are
+      separate (the _fade forms). Numeric ranges the guide leaves open (modifier and property
+      values, fade times up to 3600 s, tempo 1-999 BPM) are bounds of this spec, not Lightkey's.
+  - models: [all]
+    severity: info
+    text: >
+      Lightkey runs on macOS. QLab 5's built-in "Lightkey 4" network patch targets the same OSC
+      interface, which the guide says also works with newer versions.
