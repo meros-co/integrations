@@ -1,0 +1,123 @@
+spec: 1
+id: dahua-ptz
+name: Dahua and Amcrest PTZ cameras (HTTP CGI, public subset)
+vendor: Dahua
+category: camera
+
+# Dahua's HTTP API moves PTZ cameras through /cgi-bin/ptz.cgi with an
+# action, a channel, a code and three arguments. Dahua distributes its HTTP
+# API document to registered integration partners only, so this spec holds
+# the subset a public, MIT-licensed integration uses: the eight moves, zoom,
+# focus, stop and preset recall. Dahua cameras also speak ONVIF, which the
+# onvif-ptz integration covers in full (status, presets, imaging).
+
+source:
+  - title: Dahua HTTP API for IPC & SD — not used
+    author: Zhejiang Dahua Technology
+    url: https://www.dahuasecurity.com/
+    note: >
+      Dahua's HTTP API document is listed among its integration protocols for partners and, by
+      integrators' accounts, given out on request under an NDA; it was not read. Copies on file
+      sharing sites are not the manufacturer's publication and were not used.
+  - title: companion-module-dahuasecurity-ptz (MIT licence)
+    author: Bitfocus contributors
+    url: https://github.com/bitfocus/companion-module-dahuasecurity-ptz
+    note: >
+      Read for its use of the API (index.js), retrieved 2026-10-27; no code taken. GET
+      /cgi-bin/ptz.cgi?action=start|stop&channel=1&code=<code>&arg1=..&arg2=..&arg3=0 with the
+      camera's user name and password (Basic or Digest, answered on challenge), port 80; codes Up,
+      Down, Left, Right, LeftUp, RightUp, LeftDown, RightDown with the speed (1 slow to 8 fast) in
+      arg1 and arg2; ZoomTele, ZoomWide, FocusNear, FocusFar with 0; GotoPreset with the preset
+      number in arg2; a stop is action=stop for a move code with speed 1, and for ZoomWide and
+      FocusFar with 0; a success answers "OK".
+
+transport:
+  type: http
+  port: 80
+  auth: digest
+  timeout_ms: 4000
+
+settings:
+  username: { type: string, default: admin, max_length: 64, label: Username, description: "A camera account allowed to control PTZ." }
+  password: { type: string, secret: true, max_length: 64, label: Password, description: "The account's password." }
+  channel: { type: int, min: 1, max: 64, default: 1, label: Channel, description: "Video channel the commands control, numbered as the camera's ptz.cgi takes it (1 for a single camera)." }
+
+ports:
+  - { port: 80, protocol: http, role: control }
+
+models:
+  - id: dahua-ptz
+    name: Dahua or Amcrest PTZ camera (speed dome)
+    supports: [move, stop, zoom_in, zoom_out, zoom_stop, focus_near, focus_far, focus_stop, goto_preset]
+    verification: none
+
+commands:
+  move:
+    summary: Move in a direction at a speed until stop
+    params:
+      direction: { type: enum, values: [Up, Down, Left, Right, LeftUp, RightUp, LeftDown, RightDown], required: true,
+                   label: Direction, description: "Direction of the move, including the four diagonals." }
+      speed: { type: int, min: 1, max: 8, default: 4, label: Speed, description: "Speed, 1 (slowest) to 8 (fastest)." }
+    send: { method: GET, path: /cgi-bin/ptz.cgi, raw_query: "action=start&channel={settings.channel}&code={direction}&arg1={speed}&arg2={speed}&arg3=0" }
+    expect: { status: 200, matches: '^\s*OK' }
+    returns: ack
+  stop:
+    summary: Stop pan/tilt, zoom and focus movement
+    send:
+      - { method: GET, path: /cgi-bin/ptz.cgi, raw_query: "action=stop&channel={settings.channel}&code=Left&arg1=1&arg2=1&arg3=0" }
+      - { method: GET, path: /cgi-bin/ptz.cgi, raw_query: "action=stop&channel={settings.channel}&code=ZoomWide&arg1=0&arg2=0&arg3=0" }
+      - { method: GET, path: /cgi-bin/ptz.cgi, raw_query: "action=stop&channel={settings.channel}&code=FocusFar&arg1=0&arg2=0&arg3=0" }
+    expect: { status: 200, matches: '^\s*OK' }
+    returns: ack
+  zoom_in:
+    summary: Zoom in (tele) until zoom_stop
+    send: { method: GET, path: /cgi-bin/ptz.cgi, raw_query: "action=start&channel={settings.channel}&code=ZoomTele&arg1=0&arg2=0&arg3=0" }
+    expect: { status: 200, matches: '^\s*OK' }
+    returns: ack
+  zoom_out:
+    summary: Zoom out (wide) until zoom_stop
+    send: { method: GET, path: /cgi-bin/ptz.cgi, raw_query: "action=start&channel={settings.channel}&code=ZoomWide&arg1=0&arg2=0&arg3=0" }
+    expect: { status: 200, matches: '^\s*OK' }
+    returns: ack
+  zoom_stop:
+    summary: Stop zooming
+    send: { method: GET, path: /cgi-bin/ptz.cgi, raw_query: "action=stop&channel={settings.channel}&code=ZoomWide&arg1=0&arg2=0&arg3=0" }
+    expect: { status: 200, matches: '^\s*OK' }
+    returns: ack
+  focus_near:
+    summary: Focus nearer until focus_stop
+    send: { method: GET, path: /cgi-bin/ptz.cgi, raw_query: "action=start&channel={settings.channel}&code=FocusNear&arg1=0&arg2=0&arg3=0" }
+    expect: { status: 200, matches: '^\s*OK' }
+    returns: ack
+  focus_far:
+    summary: Focus farther until focus_stop
+    send: { method: GET, path: /cgi-bin/ptz.cgi, raw_query: "action=start&channel={settings.channel}&code=FocusFar&arg1=0&arg2=0&arg3=0" }
+    expect: { status: 200, matches: '^\s*OK' }
+    returns: ack
+  focus_stop:
+    summary: Stop focusing
+    send: { method: GET, path: /cgi-bin/ptz.cgi, raw_query: "action=stop&channel={settings.channel}&code=FocusFar&arg1=0&arg2=0&arg3=0" }
+    expect: { status: 200, matches: '^\s*OK' }
+    returns: ack
+  goto_preset:
+    summary: Move to a preset
+    params:
+      preset: { type: int, min: 1, max: 300, required: true, label: Preset, description: "Preset number stored on the camera." }
+    send: { method: GET, path: /cgi-bin/ptz.cgi, raw_query: "action=start&channel={settings.channel}&code=GotoPreset&arg1=0&arg2={preset}&arg3=0" }
+    expect: { status: 200, matches: '^\s*OK' }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Dahua's HTTP API document is for registered partners and was not read: these commands are
+      the subset a public integration uses, and their argument meanings, ranges and channel
+      numbering need checking (see VERIFICATION.md). Position, presets' names, preset storing,
+      tours and imaging are in the partner document; on a Dahua camera they are reachable through
+      ONVIF (onvif-ptz) instead.
+  - models: [all]
+    severity: info
+    text: >
+      The CGI pushes nothing and this subset reads nothing back, so there is no state: a move or
+      preset recall is confirmed only by the camera's OK.

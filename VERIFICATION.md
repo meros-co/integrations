@@ -1081,6 +1081,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a step index counts the trigger itself as 0, and what /api/trigger/step/<n> answers past the last step. ([specs/cuez-automator.yaml:104](specs/cuez-automator.yaml#L104))
 - [ ] Record the shapes of /api/timer, /api/macro/ and /api/trigger/current so timers, macros and the current trigger can be kept in state. ([specs/cuez-automator.yaml:241](specs/cuez-automator.yaml#L241))
 
+## dahua-ptz — Dahua and Amcrest PTZ cameras (HTTP CGI, public subset)
+
+- [ ] Check whether ptz.cgi numbers the first channel 1 (as the public integration sends) or 0. ([specs/dahua-ptz.yaml:43](specs/dahua-ptz.yaml#L43))
+- [ ] Check which of arg1 and arg2 carry the vertical and horizontal speeds for each move code, and the speed range. ([specs/dahua-ptz.yaml:61](specs/dahua-ptz.yaml#L61))
+- [ ] Check the stop, zoom, focus and GotoPreset argument forms, and what the camera answers on success and on an unknown preset. ([specs/dahua-ptz.yaml:112](specs/dahua-ptz.yaml#L112))
+
 ## dataton-watchout6 — Dataton WATCHOUT 6
 
 - [ ] Confirm that every ID-tagged command ([m]) gets a tagged reply on WATCHOUT 6 (production and display) as the guide says, including an empty [m] for a successful action; WATCHOUT 7 documents the empty tag, the 6.x guide does not. ([specs/dataton-watchout6.yaml:489](specs/dataton-watchout6.yaml#L489))

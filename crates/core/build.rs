@@ -94,6 +94,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-churchapps", &["freeshow"]),
     ("vendor-clock8001", &["clock-8001"]),
     ("vendor-cockos", &["cockos-reaper", "cockos-reaper-web"]),
+    ("vendor-dahua", &["dahua-ptz"]),
     ("vendor-digico", &["digico-sd"]),
     (
         "vendor-dataton",
