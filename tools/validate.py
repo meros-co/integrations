@@ -146,7 +146,12 @@ def check_template(
         name, raw_directives = match.group(1), match.group(2)
         directives = [d for d in raw_directives.split(":") if d]
 
-        if name.startswith("settings."):
+        if name == "session.id":
+            # The session held (`transport.session`), a string; whether the
+            # spec has one is session_checks'.
+            decl = {"type": "string"}
+            always_present = True
+        elif name.startswith("settings."):
             key = name[len("settings."):]
             decl = settings.get(key)
             if decl is None:
@@ -803,6 +808,8 @@ def session_checks(doc: dict) -> list[str]:
             errors.append(f"transport.session.when_set names unknown setting '{session['when_set']}'")
         for i, item in enumerate(items_of(session.get("login"))):
             for context, text in template_strings(item):
+                if "{session.id" in text:
+                    errors.append(f"transport.session.login[{i}]: the login has no session to send")
                 errors += check_template(context, text, {}, settings, f"transport.session.login[{i}]")
         for key in ("relogin", "refused"):
             for jpath, pattern in ((session.get(key) or {}).get("json") or {}).items():
@@ -812,6 +819,8 @@ def session_checks(doc: dict) -> list[str]:
                     re.compile(pattern)
                 except re.error as e:
                     errors.append(f"transport.session.{key}.json: {e}")
+    if session is None and "{session.id" in json.dumps({k: doc.get(k) for k in ("commands", "telemetry", "on_connect")}):
+        errors.append("{session.id} names the session, which needs transport.session")
     # `scheme: tls` on line-tcp, and `tls_port` (SPEC.md §2, TLS).
     if "scheme" in transport and transport.get("type") not in ("http", "ws", "line-tcp"):
         errors.append(f"transport.scheme is not for {transport.get('type')}")

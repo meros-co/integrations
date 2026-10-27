@@ -765,6 +765,33 @@ the time, so `update_settings` turns it on or off:
       capture: { cookie: session }
 ```
 
+A device that answers its login with a redirect carrying the session (JVC's
+camcorders answer `GET /api.php` with `302 Found` and a `SessionID`
+cookie) lists that status in `login_status`: an answer with a status
+listed there, or any 2xx, holds the session when it carries it. A device
+that wants the session in a request's body as well, not only in the header
+it is sent back in, names it there as `{session.id}`: the value alone (a
+named cookie's value without its name, or the header's or the JSON
+string), a string, rendered with any directive a string takes. JVC's
+requests carry it in their JSON:
+
+```yaml
+transport:
+  type: http
+  auth: digest
+  session:
+    login: { method: GET, path: /api.php }
+    capture: { cookie: SessionID }
+    login_status: [302]
+commands:
+  get_system_info:
+    send: { method: POST, path: /cgi-bin/api.cgi,
+            body: '{"Request":{"Command":"GetSystemInfo","SessionID":{session.id:json}}}' }
+```
+
+`{session.id}` needs `transport.session`, and the login itself cannot
+name it; `tools/validate.py` checks both.
+
 The session is a secret: the login's answer is never offered to the
 telemetry rules, and the session is never logged or kept in state.
 `update_settings` drops it, so the next request logs in with the new

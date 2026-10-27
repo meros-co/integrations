@@ -339,6 +339,9 @@ struct SessionSpec {
     /// `when_set`: the session is used only while this setting is set
     /// (non-empty, and not false): a login the operator turns on.
     when_set: Option<String>,
+    /// `login_status`: statuses besides 2xx a login answer holding the
+    /// session may have (JVC answers its login 302 with the cookie).
+    login_status: Vec<u16>,
 }
 
 /// What of the login's answer is the session.
@@ -418,7 +421,36 @@ impl SessionSpec {
             refused_status: statuses("refused"),
             refused_json: json("refused")?,
             when_set: str_field(v, "when_set").map(str::to_string),
+            login_status: v
+                .get("login_status")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_u64)
+                .map(|s| s as u16)
+                .collect(),
         })
+    }
+
+    /// The cookie the session is captured from, when it names one.
+    #[cfg(test)]
+    fn cookie_name(&self) -> Option<&str> {
+        match &self.capture {
+            Capture::Cookie(Some(name)) => Some(name),
+            _ => None,
+        }
+    }
+
+    /// The session alone, as `{session.id}` gives it: a named cookie's
+    /// value without its name, or the header's or JSON's value.
+    fn value_of(&self, (_, sent): &(String, String)) -> String {
+        match &self.capture {
+            Capture::Cookie(Some(_)) => sent
+                .split_once('=')
+                .map_or(sent.as_str(), |(_, v)| v)
+                .to_string(),
+            _ => sent.clone(),
+        }
     }
 
     /// The session in a login's answer, as the header to send it in.
@@ -869,6 +901,10 @@ pub(crate) struct SpecEngine {
     /// The session held: the header it is sent in and its value. A secret,
     /// never logged, offered to the rules or kept in state.
     session_token: Option<(String, String)>,
+    /// The session's value alone (a named cookie's value, the header's or
+    /// the JSON string), for `{session.id}` in templates. Held and dropped
+    /// with `session_token`.
+    session_value: Option<Value>,
     /// `telemetry.websocket`: a push channel beside the transport.
     push: Option<Push>,
     push_backoff: Millis,
@@ -1751,6 +1787,7 @@ impl SpecEngine {
                         setting_specs: &spec.settings,
                         conversions: &conversions,
                         maps: &maps,
+                        session: None,
                     },
                 )?
             }
@@ -1987,6 +2024,7 @@ impl SpecEngine {
                             setting_specs: &spec.settings,
                             conversions: &conversions,
                             maps: &maps,
+                            session: None,
                         };
                         Some(render(template, &values, no_escape)?.into_bytes())
                     }
@@ -2073,6 +2111,7 @@ impl SpecEngine {
             maps,
             session,
             session_token: None,
+            session_value: None,
             push,
             push_backoff: RECONNECT_MIN,
             events,
@@ -2116,6 +2155,7 @@ impl SpecEngine {
             setting_specs: &self.spec.settings,
             conversions: &self.conversions,
             maps: &self.maps,
+            session: self.session_value.as_ref(),
         }
     }
 
@@ -3167,11 +3207,12 @@ impl SpecEngine {
                     self.refuse(cx, format!("the device refused the login ({detail})"));
                     return;
                 }
-                let captured = (200..300)
-                    .contains(&response.status)
-                    .then(|| session.captured(&response))
-                    .flatten();
+                let captured = ((200..300).contains(&response.status)
+                    || session.login_status.contains(&response.status))
+                .then(|| session.captured(&response))
+                .flatten();
                 if let Some(token) = captured {
+                    self.session_value = Some(Value::String(session.value_of(&token)));
                     self.session_token = Some(token);
                     self.heard(cx);
                     self.pump(cx);
@@ -4522,6 +4563,7 @@ impl Module for SpecEngine {
                     "the device ended the session: logging in again",
                 );
                 self.session_token = None;
+                self.session_value = None;
                 self.queue.push_front(Job {
                     relogged: true,
                     ..flight.job
@@ -4743,6 +4785,7 @@ impl Module for SpecEngine {
         // logs in with the new one.
         self.session = fresh.session;
         self.session_token = None;
+        self.session_value = None;
         if let (Some(push), Some(new)) = (self.push.as_mut(), fresh.push) {
             push.request = new.request;
             push.credentialed = new.credentialed;
@@ -7641,6 +7684,66 @@ mod tests {
             matches!(&done[..], [(2, Err(CommandError::DeviceError { code: Some(c), message }))]
                 if c == "37" && message == "not logged in"),
             "{done:?}"
+        );
+    }
+
+    #[test]
+    fn a_session_can_be_sent_in_a_body_after_a_redirecting_login() {
+        // JVC's camcorders answer the login 302 with the SessionID cookie,
+        // and take the session again in each request's JSON body.
+        let mut spec = Catalog::source_tree()
+            .device("kramer-p3000")
+            .unwrap()
+            .clone();
+        spec.transport = Some(json!({
+            "type": "http", "port": 80, "auth": "none", "timeout_ms": 1000,
+            "session": {
+                "login": {"method": "GET", "path": "/api.php"},
+                "capture": {"cookie": "SessionID"},
+                "login_status": [302],
+            },
+        }));
+        spec.settings = BTreeMap::new();
+        spec.on_connect = Vec::new();
+        spec.commands = serde_json::from_value(json!({
+            "get_info": {
+                "send": {"method": "POST", "path": "/cgi-bin/api.cgi",
+                         "body": r#"{"Request":{"Command":"GetSystemInfo","SessionID":{session.id:json}}}"#},
+                "expect": {"status": 200},
+                "returns": "ack",
+            },
+        }))
+        .unwrap();
+        spec.models[0].supports = vec!["get_info".into()];
+        spec.state = BTreeMap::new();
+        spec.telemetry = None;
+        let mut e = open_spec(spec, "p3000-generic", json!({}));
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        cx.take();
+        let mut cx = Cx::new(1);
+        e.command(&mut cx, 1, "get_info", &Params::new());
+        let (login, request) = requests(&cx.take()).remove(0);
+        assert!(request.url.ends_with("/api.php"), "{}", request.url);
+        let mut cx = Cx::new(2);
+        e.http_response(
+            &mut cx,
+            login,
+            Ok(HttpResponse {
+                status: 302,
+                headers: vec![
+                    ("set-cookie".into(), "lang=en; path=/".into()),
+                    ("set-cookie".into(), "SessionID=10ffa8dc; path=/".into()),
+                ],
+                body: Vec::new(),
+            }),
+        );
+        let (_, request) = requests(&cx.take()).remove(0);
+        assert!(request.url.ends_with("/cgi-bin/api.cgi"), "{}", request.url);
+        assert_eq!(cookie_of(&request), Some("SessionID=10ffa8dc"));
+        assert_eq!(
+            request.body.as_deref(),
+            Some(&br#"{"Request":{"Command":"GetSystemInfo","SessionID":"10ffa8dc"}}"#[..])
         );
     }
 

@@ -1482,6 +1482,7 @@ impl Telemetry {
             setting_specs: &BTreeMap::new(),
             conversions: &self.conversions,
             maps: &Default::default(),
+            session: None,
         };
         for template in &rule.replace {
             let Some(path) = render_path(template, &ctx) else {
@@ -1557,6 +1558,7 @@ impl Telemetry {
             setting_specs: &empty_specs,
             conversions: &self.conversions,
             maps: &Default::default(),
+            session: None,
         };
         let mut any = false;
         for a in assigns {

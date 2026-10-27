@@ -33,6 +33,10 @@ pub(crate) struct Values<'a> {
     pub(crate) conversions: &'a Conversions,
     /// The spec's value tables, for `map.<name>`.
     pub(crate) maps: &'a Maps,
+    /// The session held (`transport.session`), for `{session.id}`: a device
+    /// that wants it in a request's body as well as in its header (JVC's
+    /// `SessionID`).
+    pub(crate) session: Option<&'a Value>,
 }
 
 /// A spec's named value tables (SPEC.md §4, "Value tables"): a parameter's
@@ -191,6 +195,12 @@ impl Values<'_> {
     }
 
     fn lookup(&self, name: &str) -> Result<(&Value, ParamType), String> {
+        if name == "session.id" {
+            return self
+                .session
+                .map(|v| (v, ParamType::String))
+                .ok_or_else(|| "'session.id': no session is held".to_string());
+        }
         let (values, specs, key) = match name.strip_prefix("settings.") {
             Some(key) => (self.settings, self.setting_specs, key),
             None => (self.params, self.param_specs, name),
@@ -722,6 +732,7 @@ mod tests {
                 &json!({"level": {"smpte": "20", "ebu": 14}, "flag": {"true": "on"}}),
             ))
             .unwrap(),
+            session: None,
         };
         render(template, &v, no_escape)
     }
@@ -826,6 +837,7 @@ n: { type: int }",
             setting_specs: &empty_specs,
             conversions: &conversions,
             maps: &maps,
+            session: None,
         };
         assert_eq!(
             render("/VOL/{x:signed:.2f}/{n:signed}", &v, percent_encode).unwrap(),

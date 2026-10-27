@@ -638,6 +638,14 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     // HTTP polls and the probe go one at a time: each answered request lets
     // the next go.
     let mut pending = http_ids(&started);
+    // The cookie the spec's session is captured from (`session` when it
+    // names none), so `{session.id}` renders as `vector`.
+    let session_cookie = engine
+        .session
+        .as_ref()
+        .and_then(|s| s.cookie_name())
+        .unwrap_or("session")
+        .to_string();
     while let Some(id) = pending.pop() {
         let mut step = Cx::new(1);
         engine.http_response(
@@ -646,7 +654,10 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
             // With a session cookie, for a spec whose requests need a
             // session (`transport.session`): its login is answered too.
             Ok(HttpResponse {
-                headers: vec![("set-cookie".into(), "session=vector; path=/".into())],
+                headers: vec![(
+                    "set-cookie".into(),
+                    format!("{session_cookie}=vector; path=/"),
+                )],
                 status: 200,
                 body: b"{}".to_vec(),
             }),
