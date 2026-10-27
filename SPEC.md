@@ -2105,6 +2105,12 @@ both hold `tt:PanTilt` positions:
       state: { "presets.{^^token}.pan": "{x}" }
 ```
 
+Where two vocabularies use one name, a name written `{uri}name` matches
+only an element in that namespace, whatever prefix the document binds it
+to: ONVIF's PTZ and imaging services both answer `GetPresetsResponse`, and
+`"{http://www.onvif.org/ver20/imaging/wsdl}GetPresetsResponse/Preset"` is
+an imaging preset only.
+
 #### Keys holding dots
 
 A state path's segments are separated by dots, so a captured value holding

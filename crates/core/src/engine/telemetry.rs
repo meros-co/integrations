@@ -270,24 +270,54 @@ fn each_path(each: &str, settings: &Params) -> Option<String> {
 /// Whether an element is the one `xml_each` names (SPEC.md §8, "XML
 /// elements"): a local name, or a path of them separated by `/` that ends
 /// with the element and names its enclosing elements outward, so
-/// `Position/PanTilt` is a `PanTilt` directly inside a `Position`. Names are
-/// compared without their namespace prefix.
+/// `Position/PanTilt` is a `PanTilt` directly inside a `Position`. A name is
+/// compared without its namespace prefix, or, written `{uri}name`, with its
+/// namespace too, whatever prefix the document gives it.
 fn xml_element_is(node: &roxmltree::Node, path: &str) -> bool {
     if !node.is_element() {
         return false;
     }
-    let mut names = path.rsplit('/');
-    if !names.next().is_some_and(|n| node.has_tag_name(n)) {
+    let mut names = xml_path_names(path).into_iter().rev();
+    if !names.next().is_some_and(|n| xml_name_is(node, n)) {
         return false;
     }
     let mut at = *node;
     for name in names {
         match at.parent_element() {
-            Some(parent) if parent.has_tag_name(name) => at = parent,
+            Some(parent) if xml_name_is(&parent, name) => at = parent,
             _ => return false,
         }
     }
     true
+}
+
+/// An `xml_each` path's names: split at the `/` outside a `{uri}`.
+fn xml_path_names(path: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let (mut start, mut in_uri) = (0, false);
+    for (i, c) in path.char_indices() {
+        match c {
+            '{' => in_uri = true,
+            '}' => in_uri = false,
+            '/' if !in_uri => {
+                out.push(&path[start..i]);
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    out.push(&path[start..]);
+    out
+}
+
+/// One element name: `name`, any namespace, or `{uri}name`.
+fn xml_name_is(node: &roxmltree::Node, name: &str) -> bool {
+    match name.strip_prefix('{').and_then(|rest| rest.split_once('}')) {
+        Some((uri, local)) => {
+            node.tag_name().namespace() == Some(uri) && node.tag_name().name() == local
+        }
+        None => node.has_tag_name(name),
+    }
 }
 
 fn xml_text(node: roxmltree::Node) -> Value {
@@ -2908,6 +2938,34 @@ mod tests {
                 r#"<s:Envelope xmlns:s="s" xmlns:tt="t" xmlns:tptz="p"><s:Body><tptz:GetPresetsResponse><tptz:Preset token="1"><tt:Name>A</tt:Name><tt:PTZPosition><tt:PanTilt x="-0.25" y="0"/></tt:PTZPosition></tptz:Preset></tptz:GetPresetsResponse></s:Body></s:Envelope>"#
             ),
             Some(json!({"presets": {"1": {"pan": -0.25}}}))
+        );
+        // A namespace tells apart elements of one name from two services.
+        let t2 = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"path": "^/x$", "xml_each": "{urn:img}GetPresetsResponse/Preset",
+                 "state": {"imaging.{token}": "{Name}"}},
+            ]})),
+            &state(json!({"imaging.*": {"type": "string", "description": "x"}})),
+            Conversions::new(),
+        )
+        .unwrap();
+        let body = |b: &'static str| Inbound::Http {
+            path: "/x",
+            headers: &[],
+            body: b.as_bytes(),
+            request: None,
+        };
+        assert_eq!(
+            t2.apply(&body(
+                r#"<a:GetPresetsResponse xmlns:a="urn:img" xmlns:t="t"><a:Preset token="p1"><t:Name>Day</t:Name></a:Preset></a:GetPresetsResponse>"#
+            )),
+            Some(json!({"imaging": {"p1": "Day"}}))
+        );
+        assert_eq!(
+            t2.apply(&body(
+                r#"<a:GetPresetsResponse xmlns:a="urn:ptz"><a:Preset token="p1"><Name>Home</Name></a:Preset></a:GetPresetsResponse>"#
+            )),
+            None
         );
         // A path that does not fit the element's enclosing elements matches nothing.
         assert_eq!(
