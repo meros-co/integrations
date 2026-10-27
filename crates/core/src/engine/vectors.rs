@@ -760,14 +760,24 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
                 format!("{line}\r\n")
             }
         }
-        // A JSON stream's messages are JSON values (Barco Pulse).
+        // A JSON stream's messages are JSON values: JSON-RPC (Barco Pulse),
+        // or a bare {"result": ...} where the reply must start with it
+        // (NewBlue Captivate).
         super::Transport::LineTcp {
             reply: super::ReplyFraming::Json,
+            reply_match,
             ..
-        } => format!(
-            "{{\"jsonrpc\":\"2.0\",\"result\":{}}}",
-            Value::String(line.into())
-        ),
+        } => {
+            let bare = format!("{{\"result\":{}}}", Value::String(line.into()));
+            let rpc = format!(
+                "{{\"jsonrpc\":\"2.0\",\"result\":{}}}",
+                Value::String(line.into())
+            );
+            match reply_match {
+                Some(re) if !re.is_match(&rpc) && re.is_match(&bare) => bare,
+                _ => rpc,
+            }
+        }
         _ => format!("{line}\r\n"),
     }
     .into_bytes();
