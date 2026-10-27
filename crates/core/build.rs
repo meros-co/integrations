@@ -326,6 +326,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-ventuz", &["ventuz-director"]),
     ("vendor-videolan", &["videolan-vlc"]),
     ("vendor-vimeo", &["vimeo-live"]),
+    ("vendor-vioso", &["vioso-exaplay"]),
     ("vendor-wyrestorm", &["wyrestorm-matrix"]),
     (
         "vendor-yamaha",

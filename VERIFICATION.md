@@ -3499,6 +3499,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record which ingest.status values occur in practice through a stream's life (0 to 5 documented). ([specs/vimeo-live.yaml:578](specs/vimeo-live.yaml#L578))
 - [ ] Record whether GET /me/live_events/{id}/destinations answers a bare array or a page {total, page, per_page, data}: a bare array, or a first page of 25 whose total fits on it, replaces the event's destinations. ([specs/vimeo-live.yaml:664](specs/vimeo-live.yaml#L664))
 
+## vioso-exaplay — VIOSO EXAPLAY
+
+- [ ] Confirm what EXAPLAY answers to a command it refuses or does not know (the documentation gives no error reply). ([specs/vioso-exaplay.yaml:118](specs/vioso-exaplay.yaml#L118))
+- [ ] Confirm hello's reply text (documented as hallo) and that get cue answers without the argument the documentation's example shows (get cue 012345). ([specs/vioso-exaplay.yaml:51](specs/vioso-exaplay.yaml#L51))
+- [ ] Check whether the composition-addressed commands of later versions (get:status,comp1 and the like on port 8100) replace the documented ones, and on which versions each works. ([specs/vioso-exaplay.yaml:124](specs/vioso-exaplay.yaml#L124))
+- [ ] Confirm get cue's fields and their order (status, cue, frame, time, duration, fps) and the volume range 0-100. ([specs/vioso-exaplay.yaml:144](specs/vioso-exaplay.yaml#L144))
+
 ## visca — VISCA over IP
 
 - [ ] On Sony VISCA over IP, confirm the sequence number the camera expects after RESET (the core sends 1). ([specs/visca.yaml:940](specs/visca.yaml#L940))
