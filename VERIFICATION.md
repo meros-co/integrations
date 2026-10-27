@@ -2472,6 +2472,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm /ontime/auxtimer/2/... and /3/... act on auxiliary timers 2 and 3. ([specs/ontime-osc.yaml:355](specs/ontime-osc.yaml#L355))
 - [ ] Check whether integer arguments sent as OSC int32 are taken for millisecond values and indexes, or must be floats or strings. ([specs/ontime-osc.yaml:78](specs/ontime-osc.yaml#L78))
 
+## onvif-ptz — ONVIF PTZ cameras (PTZ, imaging, media and device services)
+
+- [ ] Check which cameras in use accept HTTP Digest for every service, and which accept only WS-Security UsernameToken. ([specs/onvif-ptz.yaml:871](specs/onvif-ptz.yaml#L871))
+- [ ] Collect the PTZ, media and imaging service paths common cameras list in GetServices (ptz_service, PTZ, services and others) to choose the defaults. ([specs/onvif-ptz.yaml:76](specs/onvif-ptz.yaml#L76))
+- [ ] Confirm that a move naming no space uses the generic spaces on common cameras, and how a missing profile_token is answered (SOAP fault status). ([specs/onvif-ptz.yaml:888](specs/onvif-ptz.yaml#L888))
+- [ ] Check that a camera's SOAP replies use the element names the rules read (GetServicesResponse/Service, PTZStatus, FocusStatus20, ImagingSettings) with any namespace prefix. ([specs/onvif-ptz.yaml:626](specs/onvif-ptz.yaml#L626))
+- [ ] Record an imaging GetStatus reply: FocusStatus20 is read here; check whether older devices answer FocusStatus instead. ([specs/onvif-ptz.yaml:774](specs/onvif-ptz.yaml#L774))
+
 ## openlp — OpenLP
 
 - [ ] Confirm that POST endpoints take their arguments as a JSON body with Content-Type application/json. ([specs/openlp.yaml:91](specs/openlp.yaml#L91))

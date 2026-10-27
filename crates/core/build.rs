@@ -200,6 +200,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-obsbot", &["obsbot-tail"]),
     ("vendor-obsidian", &["obsidian-onyx", "obsidian-onyx-osc"]),
     ("vendor-ontime", &["ontime", "ontime-osc"]),
+    ("vendor-onvif", &["onvif-ptz"]),
     ("vendor-openlp", &["openlp"]),
     ("vendor-omt", &["omt", "omt-discovery"]),
     ("vendor-opensong", &["opensong"]),

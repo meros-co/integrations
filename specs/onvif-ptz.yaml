@@ -1,0 +1,913 @@
+spec: 1
+id: onvif-ptz
+name: ONVIF PTZ cameras (PTZ, imaging, media and device services)
+vendor: ONVIF
+category: camera
+
+# ONVIF's web services over SOAP 1.2 and HTTP: the device management service
+# at the fixed /onvif/device_service, and the media, PTZ and imaging services
+# at the addresses the device lists (GetServices; the device's paths under
+# /onvif/ are settings here). Commands act on one media profile (the
+# profile_token setting) and one video source (video_source_token), both
+# listed in state from GetProfiles and GetVideoSources. Authentication is HTTP
+# Digest, as the Core Specification requires of conformant devices.
+
+source:
+  - title: ONVIF Core Specification, version 26.06
+    author: ONVIF
+    url: https://www.onvif.org/specs/core/ONVIF-Core-Specification.pdf
+    note: >
+      Read 2026-10-27. 5.1.1 (the device management service's entry point is fixed to
+      /onvif/device_service), 5.9.1 (services over HTTP shall be protected by HTTP digest
+      authentication, legacy WS-UsernameToken devices excepted; without credentials a request that
+      needs them is answered 401), the device management operations GetServices, GetDeviceInformation,
+      GetHostname, SetHostname, SystemReboot, SetSystemFactoryDefault, GetRelayOutputs and
+      SetRelayOutputState, and SOAP 1.2 with application/soap+xml.
+  - title: ONVIF PTZ Service Specification, version 26.06
+    author: ONVIF
+    url: https://www.onvif.org/specs/srv/ptz/ONVIF-PTZ-Service-Spec.pdf
+    note: >
+      Read 2026-10-27. 5.1 GetNodes (name, maximum number of presets, home supported); 5.3
+      AbsoluteMove, RelativeMove, ContinuousMove (with an optional timeout), Stop (PanTilt and Zoom
+      flags), GetStatus (position, move status, error, UTC time); 5.4 SetPreset, GetPresets,
+      GotoPreset, RemovePreset; 5.5 GotoHomePosition, SetHomePosition; 5.6 SendAuxiliaryCommand;
+      5.7 the generic spaces (pan/tilt position -1 to 1, zoom position 0 to 1, translations and
+      velocities -1 to 1, speeds 0 to 1) used when a request names no space; 5.8 GetPresetTours and
+      OperatePresetTour (Start, Stop, Pause, Extended), RemovePresetTour.
+  - title: ONVIF Imaging Service Specification, version 22.06
+    author: ONVIF
+    url: https://www.onvif.org/specs/srv/img/ONVIF-Imaging-Service-Spec.pdf
+    note: >
+      Read 2026-10-27. 5.1 the ImagingSettings20 parameters (BacklightCompensation, Brightness,
+      ColorSaturation, Contrast, Exposure with Mode, ExposureTime, Gain and Iris, Focus with
+      AutoFocusMode, IrCutFilter ON/OFF/AUTO, Sharpness, WideDynamicRange, WhiteBalance with Mode,
+      CrGain and CbGain), GetImagingSettings, SetImagingSettings, GetOptions; 5.2 GetPresets,
+      GetCurrentPreset, SetCurrentPreset; 5.3 focus Move (absolute, relative, continuous), Stop,
+      GetStatus.
+  - title: ONVIF Media Service Specification, version 24.12
+    author: ONVIF
+    url: https://www.onvif.org/specs/srv/media/ONVIF-Media-Service-Spec.pdf
+    note: >
+      Read 2026-10-27. GetProfiles (profile tokens, names, video source, encoder and PTZ
+      configurations), GetVideoSources, GetStreamUri (RTP-Unicast over RTSP) and GetSnapshotUri.
+
+transport:
+  type: http
+  port: 80
+  https_port: 443
+  scheme: { setting: scheme }
+  accept_invalid_certs: true
+  auth: digest
+  timeout_ms: 8000
+  probe:
+    method: POST
+    path: /onvif/device_service
+    content_type: "application/soap+xml; charset=utf-8"
+    body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tds=\"http://www.onvif.org/ver10/device/wsdl\"><s:Body><tds:GetSystemDateAndTime/></s:Body></s:Envelope>"
+
+settings:
+  username: { type: string, default: admin, label: Username, description: "An ONVIF user of the device with operator rights (administrator for settings and reboot)." }
+  password: { type: string, secret: true, label: Password, description: "The ONVIF user's password." }
+  scheme: { type: enum, values: [http, https], default: http, label: Connection, description: "http on port 80, or https on port 443 with the device's certificate accepted unchecked." }
+  profile_token: { type: string, default: "", max_length: 64, pattern: '^[^<>&"\x27]*$', label: Media profile,
+                   description: "Token of the media profile the PTZ commands act on, from profiles in state (GetProfiles)." }
+  video_source_token: { type: string, default: "", max_length: 64, pattern: '^[^<>&"\x27]*$', label: Video source,
+                        description: "Token of the video source the imaging commands act on, from video_sources in state." }
+  ptz_path: { type: string, default: ptz_service, max_length: 64, pattern: '^[A-Za-z0-9_.-]+$', label: PTZ service path,
+              description: "Path of the PTZ service under /onvif/, as the device's GetServices lists it (ptz_service, PTZ, services...)." }
+  media_path: { type: string, default: media_service, max_length: 64, pattern: '^[A-Za-z0-9_.-]+$', label: Media service path,
+                description: "Path of the media service under /onvif/, as the device's GetServices lists it." }
+  imaging_path: { type: string, default: imaging_service, max_length: 64, pattern: '^[A-Za-z0-9_.-]+$', label: Imaging service path,
+                  description: "Path of the imaging service under /onvif/, as the device's GetServices lists it." }
+
+ports:
+  - { port: 80, protocol: http, role: control, when: "scheme http" }
+  - { port: 443, protocol: https, role: control, when: "scheme https" }
+
+models:
+  - id: onvif-ptz
+    name: ONVIF Profile S or T camera with PTZ
+    supports: &all
+      [get_device_information, get_services, get_system_date_and_time, get_hostname, set_hostname, reboot, factory_default, get_relay_outputs, set_relay_output, get_profiles, get_video_sources, get_stream_uri, get_snapshot_uri, absolute_move, absolute_move_at_speed, absolute_pan_tilt, absolute_zoom, relative_move, continuous_move, continuous_move_for, stop, stop_pan_tilt, stop_zoom, get_status, goto_preset, goto_preset_at_speed, save_preset, update_preset, remove_preset, get_presets, goto_home, set_home, send_auxiliary_command, get_nodes, get_configurations, get_preset_tours, operate_preset_tour, remove_preset_tour, get_imaging_settings, get_imaging_options, set_brightness, set_color_saturation, set_contrast, set_sharpness, set_ir_cut_filter, set_backlight_compensation, set_backlight_compensation_level, set_wide_dynamic_range, set_wide_dynamic_range_level, set_exposure_mode, set_exposure_time, set_gain, set_iris, set_focus_mode, set_white_balance_mode, set_white_balance_gains, focus_move_absolute, focus_move_relative, focus_move_continuous, focus_stop, get_focus_status, get_imaging_presets, set_imaging_preset, get_current_imaging_preset]
+    verification: none
+  - id: onvif-fixed
+    name: ONVIF Profile S or T camera without PTZ (imaging, media and device only)
+    supports:
+      [get_device_information, get_services, get_system_date_and_time, get_hostname, set_hostname, reboot, factory_default, get_relay_outputs, set_relay_output, get_profiles, get_video_sources, get_stream_uri, get_snapshot_uri, get_imaging_settings, get_imaging_options, set_brightness, set_color_saturation, set_contrast, set_sharpness, set_ir_cut_filter, set_backlight_compensation, set_backlight_compensation_level, set_wide_dynamic_range, set_wide_dynamic_range_level, set_exposure_mode, set_exposure_time, set_gain, set_iris, set_focus_mode, set_white_balance_mode, set_white_balance_gains, focus_move_absolute, focus_move_relative, focus_move_continuous, focus_stop, get_focus_status, get_imaging_presets, set_imaging_preset, get_current_imaging_preset]
+    verification: none
+
+commands:
+
+  # ── Device management (/onvif/device_service) ─────────────────────────
+  get_device_information:
+    summary: "Read the manufacturer, model, firmware, serial number and hardware ID"
+    send: { method: POST, path: /onvif/device_service, content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tds=\"http://www.onvif.org/ver10/device/wsdl\"><s:Body><tds:GetDeviceInformation/></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+  get_services:
+    summary: "List the device's services and their addresses"
+    send: { method: POST, path: /onvif/device_service, content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tds=\"http://www.onvif.org/ver10/device/wsdl\"><s:Body><tds:GetServices><tds:IncludeCapability>false</tds:IncludeCapability></tds:GetServices></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+  get_system_date_and_time:
+    summary: "Read the device's date, time and time zone"
+    send: { method: POST, path: /onvif/device_service, content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tds=\"http://www.onvif.org/ver10/device/wsdl\"><s:Body><tds:GetSystemDateAndTime/></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+  get_hostname:
+    summary: "Read the device's host name"
+    send: { method: POST, path: /onvif/device_service, content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tds=\"http://www.onvif.org/ver10/device/wsdl\"><s:Body><tds:GetHostname/></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+  set_hostname:
+    summary: "Set the device's host name, then read it back"
+    params:
+      name: { type: string, max_length: 63, pattern: "^[A-Za-z0-9-]+$", required: true, label: Host name, description: "New host name: letters, digits and hyphens." }
+    send:
+      - { method: POST, path: /onvif/device_service, content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tds=\"http://www.onvif.org/ver10/device/wsdl\"><s:Body><tds:SetHostname><tds:Name>{name}</tds:Name></tds:SetHostname></s:Body></s:Envelope>" }
+      - { method: POST, path: /onvif/device_service, content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tds=\"http://www.onvif.org/ver10/device/wsdl\"><s:Body><tds:GetHostname/></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  reboot:
+    summary: "Restart the device"
+    send: { method: POST, path: /onvif/device_service, content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tds=\"http://www.onvif.org/ver10/device/wsdl\"><s:Body><tds:SystemReboot/></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  factory_default:
+    summary: "Reset the device to factory defaults (soft keeps the network settings, hard resets everything)"
+    params:
+      kind: { type: enum, values: ["Soft", "Hard"], required: true, label: Reset, description: "Soft keeps network settings that would cut the device off; Hard resets everything." }
+    send: { method: POST, path: /onvif/device_service, content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tds=\"http://www.onvif.org/ver10/device/wsdl\"><s:Body><tds:SetSystemFactoryDefault><tds:FactoryDefault>{kind}</tds:FactoryDefault></tds:SetSystemFactoryDefault></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  get_relay_outputs:
+    summary: "List the relay outputs and their settings"
+    send: { method: POST, path: /onvif/device_service, content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tds=\"http://www.onvif.org/ver10/device/wsdl\"><s:Body><tds:GetRelayOutputs/></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+  set_relay_output:
+    summary: "Switch a relay output active or inactive"
+    params:
+      relay: { type: string, max_length: 64, pattern: "^[^<>&\"\\x27]*$", required: true, label: Relay, description: "Token of the relay output, from relays in state." }
+      state: { type: enum, values: ["active", "inactive"], required: true, label: State, description: "active energizes the relay as configured, inactive releases it." }
+    send: { method: POST, path: /onvif/device_service, content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tds=\"http://www.onvif.org/ver10/device/wsdl\"><s:Body><tds:SetRelayOutputState><tds:RelayOutputToken>{relay}</tds:RelayOutputToken><tds:LogicalState>{state}</tds:LogicalState></tds:SetRelayOutputState></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Media (profiles, sources, stream addresses) ──────────────────────
+  get_profiles:
+    summary: "List the media profiles with their video source, encoder and PTZ configuration"
+    send: { method: POST, path: "/onvif/{settings.media_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:trt=\"http://www.onvif.org/ver10/media/wsdl\"><s:Body><trt:GetProfiles/></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+  get_video_sources:
+    summary: "List the video sources with their resolution and frame rate"
+    send: { method: POST, path: "/onvif/{settings.media_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:trt=\"http://www.onvif.org/ver10/media/wsdl\"><s:Body><trt:GetVideoSources/></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+  get_stream_uri:
+    summary: "Read the RTSP address of the media profile's stream"
+    send: { method: POST, path: "/onvif/{settings.media_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:trt=\"http://www.onvif.org/ver10/media/wsdl\"><s:Body><trt:GetStreamUri><trt:StreamSetup><tt:Stream>RTP-Unicast</tt:Stream><tt:Transport><tt:Protocol>RTSP</tt:Protocol></tt:Transport></trt:StreamSetup><trt:ProfileToken>{settings.profile_token}</trt:ProfileToken></trt:GetStreamUri></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+  get_snapshot_uri:
+    summary: "Read the JPEG snapshot address of the media profile"
+    send: { method: POST, path: "/onvif/{settings.media_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:trt=\"http://www.onvif.org/ver10/media/wsdl\"><s:Body><trt:GetSnapshotUri><trt:ProfileToken>{settings.profile_token}</trt:ProfileToken></trt:GetSnapshotUri></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+
+  # ── PTZ ────────────────────────────────────────────────────────────────
+  absolute_move:
+    summary: "Move pan, tilt and zoom to absolute positions (generic spaces)"
+    params:
+      pan: { type: float, min: -1, max: 1, required: true, label: Pan, description: "Pan position in the generic space: -1 at one end of travel, 1 at the other." }
+      tilt: { type: float, min: -1, max: 1, required: true, label: Tilt, description: "Tilt position in the generic space: -1 at one end of travel, 1 at the other." }
+      zoom: { type: float, min: 0, max: 1, required: true, label: Zoom, description: "Zoom position in the generic space: 0 at full wide, 1 at full tele." }
+    send: { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:AbsoluteMove><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken><tptz:Position><tt:PanTilt x=\"{pan:.4f}\" y=\"{tilt:.4f}\"/><tt:Zoom x=\"{zoom:.4f}\"/></tptz:Position></tptz:AbsoluteMove></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  absolute_move_at_speed:
+    summary: "Move pan, tilt and zoom to absolute positions at given speeds"
+    params:
+      pan: { type: float, min: -1, max: 1, required: true, label: Pan, description: "Pan position in the generic space: -1 at one end of travel, 1 at the other." }
+      tilt: { type: float, min: -1, max: 1, required: true, label: Tilt, description: "Tilt position in the generic space: -1 at one end of travel, 1 at the other." }
+      zoom: { type: float, min: 0, max: 1, required: true, label: Zoom, description: "Zoom position in the generic space: 0 at full wide, 1 at full tele." }
+      pan_tilt_speed: { type: float, min: 0, max: 1, required: true, label: Pan/tilt speed, description: "Pan/tilt speed as a fraction of the maximum, 0 to 1." }
+      zoom_speed: { type: float, min: 0, max: 1, required: true, label: Zoom speed, description: "Zoom speed as a fraction of the maximum, 0 to 1." }
+    send: { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:AbsoluteMove><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken><tptz:Position><tt:PanTilt x=\"{pan:.4f}\" y=\"{tilt:.4f}\"/><tt:Zoom x=\"{zoom:.4f}\"/></tptz:Position><tptz:Speed><tt:PanTilt x=\"{pan_tilt_speed:.4f}\" y=\"{pan_tilt_speed:.4f}\"/><tt:Zoom x=\"{zoom_speed:.4f}\"/></tptz:Speed></tptz:AbsoluteMove></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  absolute_pan_tilt:
+    summary: "Move pan and tilt to absolute positions, leaving the zoom"
+    params:
+      pan: { type: float, min: -1, max: 1, required: true, label: Pan, description: "Pan position in the generic space: -1 at one end of travel, 1 at the other." }
+      tilt: { type: float, min: -1, max: 1, required: true, label: Tilt, description: "Tilt position in the generic space: -1 at one end of travel, 1 at the other." }
+    send: { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:AbsoluteMove><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken><tptz:Position><tt:PanTilt x=\"{pan:.4f}\" y=\"{tilt:.4f}\"/></tptz:Position></tptz:AbsoluteMove></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  absolute_zoom:
+    summary: "Move the zoom to an absolute position, leaving pan and tilt"
+    params:
+      zoom: { type: float, min: 0, max: 1, required: true, label: Zoom, description: "Zoom position in the generic space: 0 at full wide, 1 at full tele." }
+    send: { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:AbsoluteMove><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken><tptz:Position><tt:Zoom x=\"{zoom:.4f}\"/></tptz:Position></tptz:AbsoluteMove></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  relative_move:
+    summary: "Move pan, tilt and zoom by a translation from the current position (generic spaces)"
+    params:
+      pan: { type: float, min: -1, max: 1, required: true, label: Pan, description: "Pan translation, -1 to 1 of the generic space." }
+      tilt: { type: float, min: -1, max: 1, required: true, label: Tilt, description: "Tilt translation, -1 to 1 of the generic space." }
+      zoom: { type: float, min: -1, max: 1, required: true, label: Zoom, description: "Zoom translation, -1 to 1 of the generic space." }
+    send: { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:RelativeMove><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken><tptz:Translation><tt:PanTilt x=\"{pan:.4f}\" y=\"{tilt:.4f}\"/><tt:Zoom x=\"{zoom:.4f}\"/></tptz:Translation></tptz:RelativeMove></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  continuous_move:
+    summary: "Move pan, tilt and zoom at velocities until stop"
+    params:
+      pan: { type: float, min: -1, max: 1, required: true, label: Pan velocity, description: "Pan velocity, -1 to 1: positive pans right, 0 holds." }
+      tilt: { type: float, min: -1, max: 1, required: true, label: Tilt velocity, description: "Tilt velocity, -1 to 1: positive tilts up, 0 holds." }
+      zoom: { type: float, min: -1, max: 1, required: true, label: Zoom velocity, description: "Zoom velocity, -1 to 1: positive zooms in, 0 holds." }
+    send: { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:ContinuousMove><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken><tptz:Velocity><tt:PanTilt x=\"{pan:.4f}\" y=\"{tilt:.4f}\"/><tt:Zoom x=\"{zoom:.4f}\"/></tptz:Velocity></tptz:ContinuousMove></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  continuous_move_for:
+    summary: "Move pan, tilt and zoom at velocities for a time, or until stop"
+    params:
+      pan: { type: float, min: -1, max: 1, required: true, label: Pan velocity, description: "Pan velocity, -1 to 1: positive pans right, 0 holds." }
+      tilt: { type: float, min: -1, max: 1, required: true, label: Tilt velocity, description: "Tilt velocity, -1 to 1: positive tilts up, 0 holds." }
+      zoom: { type: float, min: -1, max: 1, required: true, label: Zoom velocity, description: "Zoom velocity, -1 to 1: positive zooms in, 0 holds." }
+      seconds: { type: int, min: 1, max: 86400, required: true, label: Duration, description: "Seconds the move lasts unless stopped first." }
+    send: { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:ContinuousMove><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken><tptz:Velocity><tt:PanTilt x=\"{pan:.4f}\" y=\"{tilt:.4f}\"/><tt:Zoom x=\"{zoom:.4f}\"/></tptz:Velocity><tptz:Timeout>PT{seconds}S</tptz:Timeout></tptz:ContinuousMove></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  stop:
+    summary: "Stop pan/tilt and zoom movement"
+    send:
+      - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:Stop><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken><tptz:PanTilt>true</tptz:PanTilt><tptz:Zoom>true</tptz:Zoom></tptz:Stop></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GetStatus><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken></tptz:GetStatus></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  stop_pan_tilt:
+    summary: "Stop pan/tilt movement only"
+    send:
+      - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:Stop><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken><tptz:PanTilt>true</tptz:PanTilt><tptz:Zoom>false</tptz:Zoom></tptz:Stop></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GetStatus><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken></tptz:GetStatus></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  stop_zoom:
+    summary: "Stop zoom movement only"
+    send:
+      - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:Stop><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken><tptz:PanTilt>false</tptz:PanTilt><tptz:Zoom>true</tptz:Zoom></tptz:Stop></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GetStatus><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken></tptz:GetStatus></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  get_status:
+    summary: "Read the position, move status and error of the PTZ unit"
+    send: { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GetStatus><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken></tptz:GetStatus></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+  goto_preset:
+    summary: "Move to a preset"
+    params:
+      preset: { type: string, max_length: 64, pattern: "^[^<>&\"\\x27]*$", required: true, label: Preset, description: "Preset token, from presets in state." }
+    send: { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GotoPreset><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken><tptz:PresetToken>{preset}</tptz:PresetToken></tptz:GotoPreset></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  goto_preset_at_speed:
+    summary: "Move to a preset at given speeds"
+    params:
+      preset: { type: string, max_length: 64, pattern: "^[^<>&\"\\x27]*$", required: true, label: Preset, description: "Preset token, from presets in state." }
+      pan_tilt_speed: { type: float, min: 0, max: 1, required: true, label: Pan/tilt speed, description: "Pan/tilt speed as a fraction of the maximum, 0 to 1." }
+      zoom_speed: { type: float, min: 0, max: 1, required: true, label: Zoom speed, description: "Zoom speed as a fraction of the maximum, 0 to 1." }
+    send: { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GotoPreset><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken><tptz:PresetToken>{preset}</tptz:PresetToken><tptz:Speed><tt:PanTilt x=\"{pan_tilt_speed:.4f}\" y=\"{pan_tilt_speed:.4f}\"/><tt:Zoom x=\"{zoom_speed:.4f}\"/></tptz:Speed></tptz:GotoPreset></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  save_preset:
+    summary: "Save the current position as a new preset with a name, then read the presets back"
+    params:
+      name: { type: string, max_length: 64, pattern: "^[^<>&\"\\x27]*$", required: true, label: Name, description: "Preset name." }
+    send:
+      - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:SetPreset><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken><tptz:PresetName>{name}</tptz:PresetName></tptz:SetPreset></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GetPresets><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken></tptz:GetPresets></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  update_preset:
+    summary: "Save the current position into an existing preset, renaming it, then read the presets back"
+    params:
+      preset: { type: string, max_length: 64, pattern: "^[^<>&\"\\x27]*$", required: true, label: Preset, description: "Preset token, from presets in state." }
+      name: { type: string, max_length: 64, pattern: "^[^<>&\"\\x27]*$", required: true, label: Name, description: "Preset name." }
+    send:
+      - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:SetPreset><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken><tptz:PresetName>{name}</tptz:PresetName><tptz:PresetToken>{preset}</tptz:PresetToken></tptz:SetPreset></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GetPresets><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken></tptz:GetPresets></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  remove_preset:
+    summary: "Remove a preset, then read the presets back"
+    params:
+      preset: { type: string, max_length: 64, pattern: "^[^<>&\"\\x27]*$", required: true, label: Preset, description: "Preset token, from presets in state." }
+    send:
+      - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:RemovePreset><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken><tptz:PresetToken>{preset}</tptz:PresetToken></tptz:RemovePreset></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GetPresets><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken></tptz:GetPresets></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  get_presets:
+    summary: "List the presets"
+    send: { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GetPresets><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken></tptz:GetPresets></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+  goto_home:
+    summary: "Move to the home position"
+    send: { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GotoHomePosition><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken></tptz:GotoHomePosition></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  set_home:
+    summary: "Make the current position the home position"
+    send: { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:SetHomePosition><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken></tptz:SetHomePosition></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  send_auxiliary_command:
+    summary: "Send an auxiliary command the PTZ node lists (wiper, washer, IR lamp...)"
+    params:
+      command: { type: string, max_length: 128, pattern: "^[^<>&\"\\x27]*$", required: true, label: Command, description: "Auxiliary command as the PTZ node lists it, such as tt:Wiper|On." }
+    send: { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:SendAuxiliaryCommand><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken><tptz:AuxiliaryData>{command}</tptz:AuxiliaryData></tptz:SendAuxiliaryCommand></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  get_nodes:
+    summary: "List the PTZ nodes and what they support"
+    send: { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GetNodes/></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+  get_configurations:
+    summary: "List the PTZ configurations"
+    send: { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GetConfigurations/></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+  get_preset_tours:
+    summary: "List the preset tours"
+    send: { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GetPresetTours><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken></tptz:GetPresetTours></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+  operate_preset_tour:
+    summary: "Start, stop or pause a preset tour, then read the tours back"
+    params:
+      tour: { type: string, max_length: 64, pattern: "^[^<>&\"\\x27]*$", required: true, label: Preset tour, description: "Token of the preset tour, from preset_tours in state." }
+      operation: { type: enum, values: ["Start", "Stop", "Pause", "Extended"], required: true, label: Operation, description: "Start, Stop or Pause the tour (Extended for a vendor operation)." }
+    send:
+      - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:OperatePresetTour><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken><tptz:PresetTourToken>{tour}</tptz:PresetTourToken><tptz:Operation>{operation}</tptz:Operation></tptz:OperatePresetTour></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GetPresetTours><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken></tptz:GetPresetTours></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  remove_preset_tour:
+    summary: "Remove a preset tour, then read the tours back"
+    params:
+      tour: { type: string, max_length: 64, pattern: "^[^<>&\"\\x27]*$", required: true, label: Preset tour, description: "Token of the preset tour, from preset_tours in state." }
+    send:
+      - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:RemovePresetTour><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken><tptz:PresetTourToken>{tour}</tptz:PresetTourToken></tptz:RemovePresetTour></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GetPresetTours><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken></tptz:GetPresetTours></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Imaging ────────────────────────────────────────────────────────────
+  get_imaging_settings:
+    summary: "Read the video source's imaging settings"
+    send: { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetImagingSettings></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+  get_imaging_options:
+    summary: "Read the ranges and modes the video source's imaging settings take"
+    send: { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetOptions><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetOptions></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+  set_brightness:
+    summary: "Set the brightness, then read the imaging settings back"
+    params:
+      level: { type: float, min: -1000000, max: 1000000, required: true, label: Brightness, description: "Brightness in the device's range (imaging options in state give its minimum and maximum)." }
+    send:
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:SetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:ImagingSettings><tt:Brightness>{level:.2f}</tt:Brightness></timg:ImagingSettings></timg:SetImagingSettings></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetImagingSettings></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  set_color_saturation:
+    summary: "Set the color saturation"
+    params:
+      level: { type: float, min: -1000000, max: 1000000, required: true, label: Color saturation, description: "Color saturation in the device's range (imaging options in state give its minimum and maximum)." }
+    send:
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:SetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:ImagingSettings><tt:ColorSaturation>{level:.2f}</tt:ColorSaturation></timg:ImagingSettings></timg:SetImagingSettings></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetImagingSettings></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  set_contrast:
+    summary: "Set the contrast"
+    params:
+      level: { type: float, min: -1000000, max: 1000000, required: true, label: Contrast, description: "Contrast in the device's range (imaging options in state give its minimum and maximum)." }
+    send:
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:SetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:ImagingSettings><tt:Contrast>{level:.2f}</tt:Contrast></timg:ImagingSettings></timg:SetImagingSettings></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetImagingSettings></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  set_sharpness:
+    summary: "Set the sharpness"
+    params:
+      level: { type: float, min: -1000000, max: 1000000, required: true, label: Sharpness, description: "Sharpness in the device's range (imaging options in state give its minimum and maximum)." }
+    send:
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:SetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:ImagingSettings><tt:Sharpness>{level:.2f}</tt:Sharpness></timg:ImagingSettings></timg:SetImagingSettings></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetImagingSettings></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  set_ir_cut_filter:
+    summary: "Set the IR cut filter on (day), off (night) or auto"
+    params:
+      mode: { type: enum, values: ["ON", "OFF", "AUTO"], required: true, label: IR cut filter, description: "ON blocks infrared (day), OFF lets it through (night), AUTO switches with the light." }
+    send:
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:SetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:ImagingSettings><tt:IrCutFilter>{mode}</tt:IrCutFilter></timg:ImagingSettings></timg:SetImagingSettings></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetImagingSettings></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  set_backlight_compensation:
+    summary: "Turn backlight compensation on or off"
+    params:
+      mode: { type: enum, values: ["ON", "OFF"], required: true, label: Backlight compensation, description: "ON or OFF." }
+    send:
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:SetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:ImagingSettings><tt:BacklightCompensation><tt:Mode>{mode}</tt:Mode></tt:BacklightCompensation></timg:ImagingSettings></timg:SetImagingSettings></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetImagingSettings></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  set_backlight_compensation_level:
+    summary: "Turn backlight compensation on at a level"
+    params:
+      level: { type: float, min: -1000000, max: 1000000, required: true, label: Backlight compensation level, description: "Backlight compensation level in the device's range (imaging options in state give its minimum and maximum)." }
+    send:
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:SetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:ImagingSettings><tt:BacklightCompensation><tt:Mode>ON</tt:Mode><tt:Level>{level:.2f}</tt:Level></tt:BacklightCompensation></timg:ImagingSettings></timg:SetImagingSettings></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetImagingSettings></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  set_wide_dynamic_range:
+    summary: "Turn wide dynamic range on or off"
+    params:
+      mode: { type: enum, values: ["ON", "OFF"], required: true, label: Wide dynamic range, description: "ON or OFF." }
+    send:
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:SetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:ImagingSettings><tt:WideDynamicRange><tt:Mode>{mode}</tt:Mode></tt:WideDynamicRange></timg:ImagingSettings></timg:SetImagingSettings></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetImagingSettings></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  set_wide_dynamic_range_level:
+    summary: "Turn wide dynamic range on at a level"
+    params:
+      level: { type: float, min: -1000000, max: 1000000, required: true, label: Wide dynamic range level, description: "Wide dynamic range level in the device's range (imaging options in state give its minimum and maximum)." }
+    send:
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:SetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:ImagingSettings><tt:WideDynamicRange><tt:Mode>ON</tt:Mode><tt:Level>{level:.2f}</tt:Level></tt:WideDynamicRange></timg:ImagingSettings></timg:SetImagingSettings></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetImagingSettings></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  set_exposure_mode:
+    summary: "Set the exposure mode to auto or manual"
+    params:
+      mode: { type: enum, values: ["AUTO", "MANUAL"], required: true, label: Exposure mode, description: "AUTO lets the camera expose; MANUAL uses the exposure time, gain and iris." }
+    send:
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:SetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:ImagingSettings><tt:Exposure><tt:Mode>{mode}</tt:Mode></tt:Exposure></timg:ImagingSettings></timg:SetImagingSettings></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetImagingSettings></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  set_exposure_time:
+    summary: "Expose manually with an exposure time in microseconds"
+    params:
+      microseconds: { type: float, min: 0, max: 100000000, required: true, label: Exposure time, description: "Exposure time in microseconds, within the device's range." }
+    send:
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:SetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:ImagingSettings><tt:Exposure><tt:Mode>MANUAL</tt:Mode><tt:ExposureTime>{microseconds:.2f}</tt:ExposureTime></tt:Exposure></timg:ImagingSettings></timg:SetImagingSettings></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetImagingSettings></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  set_gain:
+    summary: "Expose manually with a gain in dB"
+    params:
+      db: { type: float, min: -1000, max: 1000, required: true, label: Gain, description: "Sensor gain in dB, within the device's range." }
+    send:
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:SetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:ImagingSettings><tt:Exposure><tt:Mode>MANUAL</tt:Mode><tt:Gain>{db:.2f}</tt:Gain></tt:Exposure></timg:ImagingSettings></timg:SetImagingSettings></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetImagingSettings></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  set_iris:
+    summary: "Expose manually with an iris attenuation in dB (0 is fully open)"
+    params:
+      db: { type: float, min: -1000, max: 0, required: true, label: Iris, description: "Iris attenuation in dB: 0 is fully open, negative values close it." }
+    send:
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:SetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:ImagingSettings><tt:Exposure><tt:Mode>MANUAL</tt:Mode><tt:Iris>{db:.2f}</tt:Iris></tt:Exposure></timg:ImagingSettings></timg:SetImagingSettings></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetImagingSettings></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  set_focus_mode:
+    summary: "Set autofocus or manual focus"
+    params:
+      mode: { type: enum, values: ["AUTO", "MANUAL"], required: true, label: Focus mode, description: "AUTO focuses automatically, MANUAL holds the focus." }
+    send:
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:SetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:ImagingSettings><tt:Focus><tt:AutoFocusMode>{mode}</tt:AutoFocusMode></tt:Focus></timg:ImagingSettings></timg:SetImagingSettings></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetImagingSettings></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  set_white_balance_mode:
+    summary: "Set the white balance mode to auto or manual"
+    params:
+      mode: { type: enum, values: ["AUTO", "MANUAL"], required: true, label: White balance, description: "AUTO balances automatically, MANUAL uses the Cr and Cb gains." }
+    send:
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:SetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:ImagingSettings><tt:WhiteBalance><tt:Mode>{mode}</tt:Mode></tt:WhiteBalance></timg:ImagingSettings></timg:SetImagingSettings></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetImagingSettings></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  set_white_balance_gains:
+    summary: "Set manual white balance with Cr (red) and Cb (blue) gains"
+    params:
+      cr: { type: float, min: -1000000, max: 1000000, required: true, label: Cr gain, description: "Cr gain in the device's range (imaging options in state give its minimum and maximum)." }
+      cb: { type: float, min: -1000000, max: 1000000, required: true, label: Cb gain, description: "Cb gain in the device's range (imaging options in state give its minimum and maximum)." }
+    send:
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:SetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:ImagingSettings><tt:WhiteBalance><tt:Mode>MANUAL</tt:Mode><tt:CrGain>{cr:.2f}</tt:CrGain><tt:CbGain>{cb:.2f}</tt:CbGain></tt:WhiteBalance></timg:ImagingSettings></timg:SetImagingSettings></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetImagingSettings></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  focus_move_absolute:
+    summary: "Move the focus to a position (manual focus)"
+    params:
+      position: { type: float, min: -1000000, max: 1000000, required: true, label: Focus position, description: "Focus position in the device's range (imaging options in state give its minimum and maximum)." }
+    send: { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:Move><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:Focus><tt:Absolute><tt:Position>{position:.4f}</tt:Position></tt:Absolute></timg:Focus></timg:Move></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  focus_move_relative:
+    summary: "Move the focus by a distance (manual focus)"
+    params:
+      distance: { type: float, min: -1000000, max: 1000000, required: true, label: Focus distance, description: "Focus distance in the device's range (imaging options in state give its minimum and maximum)." }
+    send: { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:Move><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:Focus><tt:Relative><tt:Distance>{distance:.4f}</tt:Distance></tt:Relative></timg:Focus></timg:Move></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  focus_move_continuous:
+    summary: "Move the focus at a speed until focus_stop (manual focus)"
+    params:
+      speed: { type: float, min: -1000000, max: 1000000, required: true, label: Focus speed, description: "Focus speed in the device's range (imaging options in state give its minimum and maximum)." }
+    send: { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:Move><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:Focus><tt:Continuous><tt:Speed>{speed:.4f}</tt:Speed></tt:Continuous></timg:Focus></timg:Move></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  focus_stop:
+    summary: "Stop a focus move"
+    send: { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:Stop><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:Stop></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  get_focus_status:
+    summary: "Read the focus position and move status"
+    send: { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetStatus><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetStatus></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+  get_imaging_presets:
+    summary: "List the video source's imaging presets"
+    send: { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetPresets><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetPresets></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+  set_imaging_preset:
+    summary: "Apply an imaging preset, then read the current one back"
+    params:
+      preset: { type: string, max_length: 64, pattern: "^[^<>&\"\\x27]*$", required: true, label: Imaging preset, description: "Token of the imaging preset, from imaging_presets in state." }
+    send:
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:SetCurrentPreset><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken><timg:PresetToken>{preset}</timg:PresetToken></timg:SetCurrentPreset></s:Body></s:Envelope>" }
+      - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetCurrentPreset><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetCurrentPreset></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+  get_current_imaging_preset:
+    summary: "Read the imaging preset in use"
+    send: { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetCurrentPreset><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetCurrentPreset></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: text
+
+telemetry:
+  # ONVIF over HTTP pushes nothing without an event subscription: the PTZ
+  # status is read every second, focus every 2 s, imaging settings every 5 s,
+  # and the lists every 30 s.
+  poll:
+    - every_ms: 1000
+      send:
+        - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GetStatus><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken></tptz:GetStatus></s:Body></s:Envelope>" }
+    - every_ms: 2000
+      send:
+        - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetStatus><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetStatus></s:Body></s:Envelope>" }
+    - every_ms: 5000
+      send:
+        - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetImagingSettings><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetImagingSettings></s:Body></s:Envelope>" }
+    - every_ms: 30000
+      send:
+        - { method: POST, path: /onvif/device_service, content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tds=\"http://www.onvif.org/ver10/device/wsdl\"><s:Body><tds:GetDeviceInformation/></s:Body></s:Envelope>" }
+        - { method: POST, path: /onvif/device_service, content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tds=\"http://www.onvif.org/ver10/device/wsdl\"><s:Body><tds:GetHostname/></s:Body></s:Envelope>" }
+        - { method: POST, path: /onvif/device_service, content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tds=\"http://www.onvif.org/ver10/device/wsdl\"><s:Body><tds:GetServices><tds:IncludeCapability>false</tds:IncludeCapability></tds:GetServices></s:Body></s:Envelope>" }
+        - { method: POST, path: /onvif/device_service, content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tds=\"http://www.onvif.org/ver10/device/wsdl\"><s:Body><tds:GetRelayOutputs/></s:Body></s:Envelope>" }
+        - { method: POST, path: "/onvif/{settings.media_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:trt=\"http://www.onvif.org/ver10/media/wsdl\"><s:Body><trt:GetProfiles/></s:Body></s:Envelope>" }
+        - { method: POST, path: "/onvif/{settings.media_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:trt=\"http://www.onvif.org/ver10/media/wsdl\"><s:Body><trt:GetVideoSources/></s:Body></s:Envelope>" }
+        - { method: POST, path: "/onvif/{settings.media_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:trt=\"http://www.onvif.org/ver10/media/wsdl\"><s:Body><trt:GetStreamUri><trt:StreamSetup><tt:Stream>RTP-Unicast</tt:Stream><tt:Transport><tt:Protocol>RTSP</tt:Protocol></tt:Transport></trt:StreamSetup><trt:ProfileToken>{settings.profile_token}</trt:ProfileToken></trt:GetStreamUri></s:Body></s:Envelope>" }
+        - { method: POST, path: "/onvif/{settings.media_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:trt=\"http://www.onvif.org/ver10/media/wsdl\"><s:Body><trt:GetSnapshotUri><trt:ProfileToken>{settings.profile_token}</trt:ProfileToken></trt:GetSnapshotUri></s:Body></s:Envelope>" }
+        - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GetPresets><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken></tptz:GetPresets></s:Body></s:Envelope>" }
+        - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GetNodes/></s:Body></s:Envelope>" }
+        - { method: POST, path: "/onvif/{settings.ptz_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\"><s:Body><tptz:GetPresetTours><tptz:ProfileToken>{settings.profile_token}</tptz:ProfileToken></tptz:GetPresetTours></s:Body></s:Envelope>" }
+        - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetOptions><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetOptions></s:Body></s:Envelope>" }
+        - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetPresets><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetPresets></s:Body></s:Envelope>" }
+        - { method: POST, path: "/onvif/{settings.imaging_path}", content_type: "application/soap+xml; charset=utf-8", body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:timg=\"http://www.onvif.org/ver20/imaging/wsdl\"><s:Body><timg:GetCurrentPreset><timg:VideoSourceToken>{settings.video_source_token}</timg:VideoSourceToken></timg:GetCurrentPreset></s:Body></s:Envelope>" }
+  updates:
+    # Device management
+    - path: '^/onvif/'
+      xml_each: GetDeviceInformationResponse
+      state:
+        device.manufacturer: "{Manufacturer}"
+        device.model: "{Model}"
+        device.firmware: "{FirmwareVersion}"
+        device.serial: "{SerialNumber}"
+        device.hardware_id: "{HardwareId}"
+    - path: '^/onvif/'
+      xml_each: GetHostnameResponse/HostnameInformation
+      state:
+        hostname.name: "{Name}"
+        hostname.from_dhcp: "{FromDHCP}"
+    - path: '^/onvif/'
+      xml_each: GetServicesResponse
+      replace: services
+    - path: '^/onvif/'
+      xml_each: GetServicesResponse/Service
+      state: { "services.{Namespace:key}.address": "{XAddr}" }
+    - path: '^/onvif/'
+      xml_each: GetRelayOutputsResponse
+      replace: relays
+    - path: '^/onvif/'
+      xml_each: GetRelayOutputsResponse/RelayOutputs/Properties
+      state:
+        "relays.{^token:key}.mode": "{Mode}"
+        "relays.{^token:key}.delay_time": "{DelayTime}"
+        "relays.{^token:key}.idle_state": "{IdleState}"
+    # Media
+    - path: '^/onvif/'
+      xml_each: GetProfilesResponse
+      replace: profiles
+    - path: '^/onvif/'
+      xml_each: GetProfilesResponse/Profiles
+      state: { "profiles.{token:key}.name": "{Name}" }
+    - path: '^/onvif/'
+      xml_each: Profiles/VideoSourceConfiguration
+      state: { "profiles.{^token:key}.video_source": "{SourceToken}" }
+    - path: '^/onvif/'
+      xml_each: Profiles/VideoEncoderConfiguration
+      state: { "profiles.{^token:key}.encoding": "{Encoding}" }
+    - path: '^/onvif/'
+      xml_each: Profiles/VideoEncoderConfiguration/Resolution
+      state:
+        "profiles.{^^token:key}.width": "{Width}"
+        "profiles.{^^token:key}.height": "{Height}"
+    - path: '^/onvif/'
+      xml_each: Profiles/PTZConfiguration
+      state: { "profiles.{^token:key}.ptz_configuration": "{token}" }
+    - path: '^/onvif/'
+      xml_each: GetVideoSourcesResponse
+      replace: video_sources
+    - path: '^/onvif/'
+      xml_each: GetVideoSourcesResponse/VideoSources
+      state: { "video_sources.{token:key}.frame_rate": "{Framerate}" }
+    - path: '^/onvif/'
+      xml_each: GetVideoSourcesResponse/VideoSources/Resolution
+      state:
+        "video_sources.{^token:key}.width": "{Width}"
+        "video_sources.{^token:key}.height": "{Height}"
+    - path: '^/onvif/'
+      xml_each: GetStreamUriResponse/MediaUri
+      state: { stream_uri: "{Uri}" }
+    - path: '^/onvif/'
+      xml_each: GetSnapshotUriResponse/MediaUri
+      state: { snapshot_uri: "{Uri}" }
+    # PTZ status
+    - path: '^/onvif/'
+      xml_each: PTZStatus/Position/PanTilt
+      state: { position.pan: "{x}", position.tilt: "{y}" }
+    - path: '^/onvif/'
+      xml_each: PTZStatus/Position/Zoom
+      state: { position.zoom: "{x}" }
+    - path: '^/onvif/'
+      xml_each: PTZStatus/MoveStatus
+      state: { move_status.pan_tilt: "{PanTilt}", move_status.zoom: "{Zoom}" }
+    - path: '^/onvif/'
+      xml_each: GetStatusResponse/PTZStatus
+      state: { ptz_error: "{Error}", ptz_time: "{UtcTime}" }
+    # PTZ presets, nodes and tours
+    - path: '^/onvif/'
+      xml_each: "{http://www.onvif.org/ver20/ptz/wsdl}GetPresetsResponse"
+      replace: presets
+    - path: '^/onvif/'
+      xml_each: "{http://www.onvif.org/ver20/ptz/wsdl}GetPresetsResponse/Preset"
+      state: { "presets.{token:key}.name": "{Name}" }
+    - path: '^/onvif/'
+      xml_each: Preset/PTZPosition/PanTilt
+      state: { "presets.{^^token:key}.pan": "{x}", "presets.{^^token:key}.tilt": "{y}" }
+    - path: '^/onvif/'
+      xml_each: Preset/PTZPosition/Zoom
+      state: { "presets.{^^token:key}.zoom": "{x}" }
+    - path: '^/onvif/'
+      xml_each: GetNodesResponse/PTZNode
+      state:
+        "nodes.{token:key}.name": "{Name}"
+        "nodes.{token:key}.maximum_presets": "{MaximumNumberOfPresets}"
+        "nodes.{token:key}.home_supported": "{HomeSupported}"
+    - path: '^/onvif/'
+      xml_each: GetPresetToursResponse
+      replace: preset_tours
+    - path: '^/onvif/'
+      xml_each: GetPresetToursResponse/PresetTour
+      state: { "preset_tours.{token:key}.name": "{Name}", "preset_tours.{token:key}.auto_start": "{AutoStart}" }
+    - path: '^/onvif/'
+      xml_each: PresetTour/Status
+      state: { "preset_tours.{^token:key}.state": "{State}" }
+    # Imaging settings
+    - path: '^/onvif/'
+      xml_each: GetImagingSettingsResponse/ImagingSettings
+      state:
+        imaging.brightness: "{Brightness}"
+        imaging.color_saturation: "{ColorSaturation}"
+        imaging.contrast: "{Contrast}"
+        imaging.sharpness: "{Sharpness}"
+        imaging.ir_cut_filter: "{IrCutFilter}"
+    - path: '^/onvif/'
+      xml_each: GetImagingSettingsResponse/ImagingSettings/BacklightCompensation
+      state: { imaging.backlight_compensation.mode: "{Mode}", imaging.backlight_compensation.level: "{Level}" }
+    - path: '^/onvif/'
+      xml_each: GetImagingSettingsResponse/ImagingSettings/WideDynamicRange
+      state: { imaging.wide_dynamic_range.mode: "{Mode}", imaging.wide_dynamic_range.level: "{Level}" }
+    - path: '^/onvif/'
+      xml_each: GetImagingSettingsResponse/ImagingSettings/Exposure
+      state:
+        imaging.exposure.mode: "{Mode}"
+        imaging.exposure.time: "{ExposureTime}"
+        imaging.exposure.gain: "{Gain}"
+        imaging.exposure.iris: "{Iris}"
+    - path: '^/onvif/'
+      xml_each: GetImagingSettingsResponse/ImagingSettings/Focus
+      state: { imaging.focus_mode: "{AutoFocusMode}" }
+    - path: '^/onvif/'
+      xml_each: GetImagingSettingsResponse/ImagingSettings/WhiteBalance
+      state: { imaging.white_balance.mode: "{Mode}", imaging.white_balance.cr_gain: "{CrGain}", imaging.white_balance.cb_gain: "{CbGain}" }
+    # Imaging options: the ranges
+    - path: '^/onvif/'
+      xml_each: GetOptionsResponse/ImagingOptions/Brightness
+      state: { imaging_options.brightness.min: "{Min}", imaging_options.brightness.max: "{Max}" }
+    - path: '^/onvif/'
+      xml_each: GetOptionsResponse/ImagingOptions/ColorSaturation
+      state: { imaging_options.color_saturation.min: "{Min}", imaging_options.color_saturation.max: "{Max}" }
+    - path: '^/onvif/'
+      xml_each: GetOptionsResponse/ImagingOptions/Contrast
+      state: { imaging_options.contrast.min: "{Min}", imaging_options.contrast.max: "{Max}" }
+    - path: '^/onvif/'
+      xml_each: GetOptionsResponse/ImagingOptions/Sharpness
+      state: { imaging_options.sharpness.min: "{Min}", imaging_options.sharpness.max: "{Max}" }
+    - path: '^/onvif/'
+      xml_each: ImagingOptions/Exposure/ExposureTime
+      state: { imaging_options.exposure_time.min: "{Min}", imaging_options.exposure_time.max: "{Max}" }
+    - path: '^/onvif/'
+      xml_each: ImagingOptions/Exposure/Gain
+      state: { imaging_options.gain.min: "{Min}", imaging_options.gain.max: "{Max}" }
+    - path: '^/onvif/'
+      xml_each: ImagingOptions/Exposure/Iris
+      state: { imaging_options.iris.min: "{Min}", imaging_options.iris.max: "{Max}" }
+    - path: '^/onvif/'
+      xml_each: ImagingOptions/WhiteBalance/YrGain
+      state: { imaging_options.cr_gain.min: "{Min}", imaging_options.cr_gain.max: "{Max}" }
+    - path: '^/onvif/'
+      xml_each: ImagingOptions/WhiteBalance/YbGain
+      state: { imaging_options.cb_gain.min: "{Min}", imaging_options.cb_gain.max: "{Max}" }
+    # Focus status
+    - path: '^/onvif/'
+      xml_each: Status/FocusStatus20
+      state: { focus.position: "{Position}", focus.move_status: "{MoveStatus}", focus.error: "{Error}" }
+    # Imaging presets
+    - path: '^/onvif/'
+      xml_each: "{http://www.onvif.org/ver20/imaging/wsdl}GetPresetsResponse"
+      replace: imaging_presets
+    - path: '^/onvif/'
+      xml_each: "{http://www.onvif.org/ver20/imaging/wsdl}GetPresetsResponse/Preset"
+      state: { "imaging_presets.{token:key}.type": "{type}", "imaging_presets.{token:key}.name": "{Name}" }
+    - path: '^/onvif/'
+      xml_each: GetCurrentPresetResponse/Preset
+      state: { imaging_preset: "{token}" }
+
+state:
+  device.manufacturer: { type: string, description: "Manufacturer" }
+  device.model: { type: string, description: "Model" }
+  device.firmware: { type: string, description: "Firmware version" }
+  device.serial: { type: string, description: "Serial number" }
+  device.hardware_id: { type: string, description: "Hardware ID" }
+  hostname.name: { type: string, description: "Host name" }
+  hostname.from_dhcp: { type: bool, description: "The host name comes from DHCP" }
+  services.*.address: { type: string, description: "Address (XAddr) of the service with this namespace, such as http://www.onvif.org/ver20/ptz/wsdl" }
+  relays.*.mode: { type: string, description: "Relay output mode: Monostable or Bistable" }
+  relays.*.delay_time: { type: string, description: "Time a monostable relay stays active, as an XML duration" }
+  relays.*.idle_state: { type: string, description: "Relay output idle state: closed or open" }
+  profiles.*.name: { type: string, description: "Name of the media profile with this token" }
+  profiles.*.video_source: { type: string, description: "Token of the profile's video source" }
+  profiles.*.encoding: { type: string, description: "The profile's video encoding: JPEG, MPEG4 or H264" }
+  profiles.*.width: { type: int, unit: px, description: "Width of the profile's encoded video" }
+  profiles.*.height: { type: int, unit: px, description: "Height of the profile's encoded video" }
+  profiles.*.ptz_configuration: { type: string, description: "Token of the profile's PTZ configuration; absent when the profile has no PTZ" }
+  video_sources.*.frame_rate: { type: float, unit: fps, description: "Frame rate of the video source with this token" }
+  video_sources.*.width: { type: int, unit: px, description: "Width of the video source" }
+  video_sources.*.height: { type: int, unit: px, description: "Height of the video source" }
+  stream_uri: { type: string, description: "RTSP address of the media profile's stream" }
+  snapshot_uri: { type: string, description: "JPEG snapshot address of the media profile" }
+  position.pan: { type: float, description: "Pan position in the generic space, -1 to 1" }
+  position.tilt: { type: float, description: "Tilt position in the generic space, -1 to 1" }
+  position.zoom: { type: float, description: "Zoom position in the generic space, 0 (wide) to 1 (tele)" }
+  move_status.pan_tilt: { type: string, description: "Pan/tilt move status: IDLE, MOVING or UNKNOWN" }
+  move_status.zoom: { type: string, description: "Zoom move status: IDLE, MOVING or UNKNOWN" }
+  ptz_error: { type: string, description: "Error the PTZ unit reports, as its text" }
+  ptz_time: { type: string, description: "UTC time of the last PTZ status" }
+  presets.*.name: { type: string, description: "Name of the PTZ preset with this token" }
+  presets.*.pan: { type: float, description: "The preset's pan position in the generic space" }
+  presets.*.tilt: { type: float, description: "The preset's tilt position in the generic space" }
+  presets.*.zoom: { type: float, description: "The preset's zoom position in the generic space" }
+  nodes.*.name: { type: string, description: "Name of the PTZ node with this token" }
+  nodes.*.maximum_presets: { type: int, description: "Most presets the node holds" }
+  nodes.*.home_supported: { type: bool, description: "The node has a home position" }
+  preset_tours.*.name: { type: string, description: "Name of the preset tour with this token" }
+  preset_tours.*.auto_start: { type: bool, description: "The tour starts on its own at power-up" }
+  preset_tours.*.state: { type: string, description: "Tour state: Idle, Touring, Paused or Extended" }
+  imaging.brightness: { type: float, description: "Brightness, in the device's range" }
+  imaging.color_saturation: { type: float, description: "Color saturation, in the device's range" }
+  imaging.contrast: { type: float, description: "Contrast, in the device's range" }
+  imaging.sharpness: { type: float, description: "Sharpness, in the device's range" }
+  imaging.ir_cut_filter: { type: string, description: "IR cut filter: ON, OFF or AUTO" }
+  imaging.backlight_compensation.mode: { type: string, description: "Backlight compensation: ON or OFF" }
+  imaging.backlight_compensation.level: { type: float, description: "Backlight compensation level" }
+  imaging.wide_dynamic_range.mode: { type: string, description: "Wide dynamic range: ON or OFF" }
+  imaging.wide_dynamic_range.level: { type: float, description: "Wide dynamic range level" }
+  imaging.exposure.mode: { type: string, description: "Exposure mode: AUTO or MANUAL" }
+  imaging.exposure.time: { type: float, unit: µs, description: "Exposure time in microseconds" }
+  imaging.exposure.gain: { type: float, unit: dB, description: "Sensor gain in dB" }
+  imaging.exposure.iris: { type: float, unit: dB, description: "Iris attenuation in dB, 0 fully open" }
+  imaging.focus_mode: { type: string, description: "Focus mode: AUTO or MANUAL" }
+  imaging.white_balance.mode: { type: string, description: "White balance mode: AUTO or MANUAL" }
+  imaging.white_balance.cr_gain: { type: float, description: "Manual white balance Cr (red) gain" }
+  imaging.white_balance.cb_gain: { type: float, description: "Manual white balance Cb (blue) gain" }
+  imaging_options.brightness.min: { type: float, description: "Lowest brightness the source takes" }
+  imaging_options.brightness.max: { type: float, description: "Highest brightness the source takes" }
+  imaging_options.color_saturation.min: { type: float, description: "Lowest color saturation" }
+  imaging_options.color_saturation.max: { type: float, description: "Highest color saturation" }
+  imaging_options.contrast.min: { type: float, description: "Lowest contrast" }
+  imaging_options.contrast.max: { type: float, description: "Highest contrast" }
+  imaging_options.sharpness.min: { type: float, description: "Lowest sharpness" }
+  imaging_options.sharpness.max: { type: float, description: "Highest sharpness" }
+  imaging_options.exposure_time.min: { type: float, unit: µs, description: "Shortest exposure time" }
+  imaging_options.exposure_time.max: { type: float, unit: µs, description: "Longest exposure time" }
+  imaging_options.gain.min: { type: float, unit: dB, description: "Lowest gain" }
+  imaging_options.gain.max: { type: float, unit: dB, description: "Highest gain" }
+  imaging_options.iris.min: { type: float, unit: dB, description: "Most closed iris" }
+  imaging_options.iris.max: { type: float, unit: dB, description: "Most open iris" }
+  imaging_options.cr_gain.min: { type: float, description: "Lowest Cr gain" }
+  imaging_options.cr_gain.max: { type: float, description: "Highest Cr gain" }
+  imaging_options.cb_gain.min: { type: float, description: "Lowest Cb gain" }
+  imaging_options.cb_gain.max: { type: float, description: "Highest Cb gain" }
+  focus.position: { type: float, description: "Focus position" }
+  focus.move_status: { type: string, description: "Focus move status: IDLE, MOVING or UNKNOWN" }
+  focus.error: { type: string, description: "Focus error the device reports, as its text" }
+  imaging_presets.*.type: { type: string, description: "Type of the imaging preset with this token (such as Custom, Indoor, Outdoor)" }
+  imaging_presets.*.name: { type: string, description: "Name of the imaging preset with this token" }
+  imaging_preset: { type: string, description: "Token of the imaging preset in use" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Authentication is HTTP Digest, which the Core Specification requires of conformant devices.
+      Legacy devices that accept only WS-Security UsernameToken (a SHA-1 digest of a fresh nonce,
+      the time and the password in the SOAP header) cannot be reached with credentials: the spec
+      format has no nonce, clock or SHA-1 for a message body. Such a device works only with
+      authentication turned off.
+  - models: [all]
+    severity: info
+    text: >
+      Only the device management service has a fixed address (/onvif/device_service). The media,
+      PTZ and imaging services are at the addresses GetServices lists (in state under services);
+      set ptz_path, media_path and imaging_path to the last part of each when they are not the
+      defaults. Every command acts on the profile_token and video_source_token settings, which
+      come from profiles and video_sources in state; until they are set, the PTZ and imaging
+      requests are answered with a SOAP fault.
+  - models: [all]
+    severity: info
+    text: >
+      Moves use the generic spaces (pan/tilt -1 to 1, zoom 0 to 1, speeds 0 to 1) by naming no
+      space, which a PTZ configuration's defaults then set; their mapping to degrees and
+      magnification is the device's. The imaging levels (brightness, contrast, saturation,
+      sharpness, gains) are in each device's own range, read into imaging_options.
+  - models: [all]
+    severity: info
+    text: >
+      Nothing is pushed: ONVIF's events need a subscription (WS-BaseNotification or a pull point),
+      which this spec does not open. The PTZ status is read every second, the focus status every
+      2 s, the imaging settings every 5 s and the lists every 30 s. Relay outputs report their
+      configuration but not their present state (an API limit).
+  - models: [all]
+    severity: info
+    text: >
+      Values placed in the SOAP body (tokens, names, the auxiliary command) are refused when they
+      hold <, >, &, a double quote or an apostrophe, since the body is not escaped. The PTZ
+      configuration (SetConfiguration), preset tour creation and editing, network, user and
+      time settings, and media configuration editing are not covered by this spec.
+  - models: [all]
+    severity: critical
+    text: >
+      factory_default resets the device (Hard also its network settings, which can cut it off);
+      reboot drops the video; update_preset and remove_preset overwrite or delete a stored
+      position.
