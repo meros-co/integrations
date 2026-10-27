@@ -1,0 +1,1690 @@
+spec: 1
+id: denon-dn500bd
+name: Denon Professional DN-500BD / DN-500BD MKII Blu-ray players (RS-232C / IP control)
+vendor: Denon Professional
+category: playback
+
+# Denon Professional's serial command protocol for the DN-500BD and DN-500BD MKII: the same messages on the RS-232C
+# port and, for IP control, on TCP port 9030. Every message is "@0" (the start character and ID), a command, then
+# CR. The player answers each command with the ACK byte (06H), or NACK (15H) when it cannot take it; a status
+# request is answered ACK and then the status ("@0?ST" is answered "@0STPL"). Status notifications it sends by
+# itself expect the host's ACK. "Track" is a chapter (DVD, BD) or a file; "group" a title (DVD, BD) or a folder.
+source:
+  - title: "[DV04] DN-500BD Serial Command Protocol Guide, Ver. 2.00 (March 16th, 2016)"
+    author: inMusic Brands, Inc.
+    url: https://cdn.inmusicbrands.com/DenonPro/cdn/1453/documents/DV04_Protocol_Guide2.0.pdf
+    note: >
+      Manufacturer document (retrieved 2026-10-27). RS-232C at 9600, 38400 or 115200 bit/s (115200 for every command
+      to work), 8N1, no flow control (§2-1); IP control on TCP port 9030 (§2-2); packets from "@" to CR (§3-1); ACK
+      06H and NACK 15H and when each is sent (§3-2); a new command only after ACK, NACK or the 30 ms (IP) or 300 ms
+      (RS-232C) timeout, at least 30 ms between commands, BUSY (@0BDERBUSY) otherwise (§3-3); the control, status
+      request and notification flows (§3-4); the key control, menu setting and current status tables, with the
+      status requests for each setting (§4-1); the BUSY error (§4-2).
+  - title: "Denon Professional DN-500BD MKII Serial Command Protocol Guide, Manual Version 1.1"
+    author: inMusic Brands, Inc.
+    url: https://cdn.inmusicbrands.com/DenonPro/cdn/1841/documents/DN-500BD_MKII_Protocol_Guide_v1.1.pdf
+    note: >
+      Manufacturer document. The same "@0" commands for the DN-500BD MKII (control commands pp.6-15, status requests
+      pp.16-19), with ACK/NACK, BUSY, one second after power on before the next command, automatic statuses
+      answered ACK by the host (p.5); RS-232C at 9600, 38400 or 115200 bit/s, 115200 for every command to work, 8N1,
+      no flow control (p.21). It lists no status requests for the menu settings.
+  - title: "Denon Professional DN-500BD MKII User Guide v1.8"
+    author: inMusic Brands, Inc.
+    url: https://cdn.inmusicbrands.com/DenonPro/cdn/1841/documents/DN-500BD_MKII_-_User_Guide_-_v1.8.pdf
+    note: >
+      Manufacturer document. The LAN port lets a host control the player with commands, the Remote input does over
+      RS-232C (rear panel, p.5); Serial Bit Rate 9600, 38400 or 115200 in the System Setting menu.
+  - title: "Denon Professional DN-500BD User Guide v1.4"
+    author: inMusic Brands, Inc.
+    url: https://cdn.inmusicbrands.com/DenonPro/cdn/1453/documents/DN-500BD%20-%20User%20Guide%20-%20v1.4.pdf
+    note: "Manufacturer document. LAN port control by a host; Serial Bit Rate 9600 or 38400 in the System Setting menu."
+  - title: "bitfocus/companion-module-denon-dn-500bd-mkii (MIT)"
+    author: Andreas H. Thomsen and contributors
+    url: https://github.com/bitfocus/companion-module-denon-dn-500bd-mkii
+    note: "Corroboration only, not copied: controls the DN-500BD MKII over TCP, port 9030 by default."
+
+transport:
+  type: line-tcp
+  port: 9030
+  framing: terminated
+  terminator: cr
+  encoding: utf-8
+  timeout_ms: 1000
+  reply: expected
+  # The player's messages: the ACK or NACK byte alone, and statuses from "@0" to CR.
+  reply_framing: terminated
+  reply_terminators: ["\r", "\u0006", "\u0015"]
+  reply_match: '^(\x06|\x15|@0)'
+  error_match: '^(\x15|@0BDERBUSY)'
+  probe: "@0?PW"
+  # At least 30 ms between commands (§3-3-6), one second after power on (MKII p.5).
+  pacing:
+    min_interval_ms: 30
+    groups:
+      power_on:
+        match: "^@0PW00$"
+        after_ms: 1000
+  serial:
+    baud_rate: { default: 115200, values: [9600, 38400, 115200] }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
+
+ports:
+  - { port: 9030, protocol: tcp, role: control, when: "link tcp", note: "IP control (DN-500BD guide §2-2)" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232C, D-sub 9-pin female; pin 7 can supply 5 V, 500 mA" }
+
+models:
+  - id: dn-500bd
+    name: Denon Professional DN-500BD
+    supports: [power_on, power_off, get_power, stop, play, pause, locate_track, skip_track, locate_group, skip_group,
+      panel_lock, ab_repeat_a, ab_repeat_b, ab_repeat_exit, random_mode, get_random, setup_menu, top_menu,
+      option_menu, popup_menu, menu_return, audio_dialog, subtitle, angle, get_angle, cursor, enter, tray,
+      display_info, color_key, pip_mode, home, number_key, search, get_search, set_rating, get_rating,
+      set_area_code, get_area_code, change_password, set_osd_language, get_osd_language, set_menu_language,
+      get_menu_language, set_audio_language, get_audio_language, set_subtitle_language, get_subtitle_language,
+      set_brightness, get_brightness, set_contrast, get_contrast, set_hue, get_hue, set_saturation, get_saturation,
+      set_speaker_config, set_speaker, get_speaker, set_crossover, get_crossover, set_output_volume,
+      set_output_volume_off, set_output_fixed, get_output_volume, set_max_volume, get_max_volume, firmware_upgrade,
+      get_mac_address, backup_settings, restore_settings, factory_reset, get_buda_size, set_ip_auto,
+      set_ip_address, get_ip_address, set_subnet_mask, get_subnet_mask, set_gateway, get_gateway, set_dns,
+      get_dns, set_proxy, set_proxy_off, get_proxy, connection_test, get_disc_status, get_status, get_track_count,
+      get_track, get_group_count, get_group, get_elapsed, get_remaining, get_media_type, get_audio_format,
+      get_audio_channels, get_audio_dialog, get_subtitle_code, get_version, get_track_time, get_sample_rate,
+      get_artist, get_title, get_album,
+      set_auto_play, get_auto_play, set_auto_resume, get_auto_resume, set_pip_mark, get_pip_mark, set_hdmi_3d,
+      get_hdmi_3d, set_aspect, get_aspect, set_tv_system, get_tv_system, set_hdmi_1080p24, get_hdmi_1080p24,
+      set_dvd_24p, get_dvd_24p, set_color_space, get_color_space, set_deep_color, get_deep_color, set_cc_attribute,
+      get_cc_attribute, set_cc_font_color, get_cc_font_color, set_cc_font_size, get_cc_font_size, set_cc_font_style,
+      get_cc_font_style, set_cc_font_opacity, get_cc_font_opacity, set_cc_font_edge, get_cc_font_edge,
+      set_cc_edge_color, get_cc_edge_color, set_cc_background_color, get_cc_background_color,
+      set_cc_background_opacity, get_cc_background_opacity, set_cc_window_color, get_cc_window_color,
+      set_cc_window_opacity, get_cc_window_opacity, set_secondary_audio_mark, get_secondary_audio_mark,
+      set_hdmi_audio, get_hdmi_audio, set_digital_out, get_digital_out, set_drc, get_drc, set_remote_code,
+      get_remote_code, set_hdmi_cec, get_hdmi_cec, set_bd_live, get_bd_live, set_buda, get_buda,
+      set_network_interface, get_network_interface, set_ir_lock, get_ir_lock, set_program, get_program,
+      set_time_display, get_time_display, set_osd_hidden, get_osd_hidden, set_resolution, get_resolution, set_mute,
+      get_mute]
+    verification: none
+  - id: dn-500bd-mkii
+    name: Denon Professional DN-500BD MKII
+    supports: [power_on, power_off, get_power, stop, play, pause, locate_track, skip_track, locate_group, skip_group,
+      panel_lock, ab_repeat_a, ab_repeat_b, ab_repeat_exit, random_mode, get_random, setup_menu, top_menu,
+      option_menu, popup_menu, menu_return, audio_dialog, subtitle, angle, cursor, enter, tray, display_info,
+      color_key, pip_mode, home, number_key, search, rewind, set_rating, set_area_code, change_password,
+      set_brightness, set_contrast, set_hue, set_saturation, set_speaker_config, set_speaker, set_crossover,
+      set_output_volume, set_output_volume_off, set_output_fixed, set_max_volume, firmware_upgrade, backup_settings,
+      restore_settings, factory_reset, set_ip_auto, set_ip_address, set_subnet_mask, set_gateway, set_dns, set_proxy,
+      set_proxy_off, connection_test, get_disc_status, get_status, get_track_count, get_track, get_group_count,
+      get_group, get_elapsed, get_remaining, get_media_type, get_audio_format, get_audio_channels, get_audio_dialog,
+      get_subtitle_code, get_version, get_track_time, get_sample_rate, get_artist, get_title, get_album,
+      set_auto_play, set_auto_resume, set_pip_mark, set_hdmi_3d, set_aspect, set_tv_system, set_hdmi_1080p24,
+      set_dvd_24p, set_color_space, set_deep_color, set_cc_attribute, set_cc_font_color, set_cc_font_size,
+      set_cc_font_style, set_cc_font_opacity, set_cc_font_edge, set_cc_edge_color, set_cc_background_color,
+      set_cc_background_opacity, set_cc_window_color, set_cc_window_opacity, set_secondary_audio_mark,
+      set_hdmi_audio, set_digital_out, set_drc, set_remote_code, set_hdmi_cec, set_bd_live, set_buda,
+      set_network_interface, set_ir_lock, set_program, set_time_display, set_osd_hidden, set_resolution, set_mute]
+    verification: none
+
+maps:
+  next_previous: { next: NX, previous: PV }
+  locked: { "true": 23KL, "false": 23KU }
+  dialog: { primary: "+", secondary: "-" }
+  cursor: { left: "1", right: "2", up: "3", down: "4" }
+  tray: { open: OP, close: CL }
+  color: { red: "1", green: "2", blue: "3", yellow: "4" }
+  direction: { forward: F, reverse: R }
+  speed: { fast: f, slow: s }
+  rating: { "off": "OFF", kid_safe: KIDSAFE, g: G, pg: PG, pg13: PG13, r: R, nc17: NC-17, adult: ADULT }
+  picture16: { "-16": "-16", "-15": "-15", "-14": "-14", "-13": "-13", "-12": "-12", "-11": "-11", "-10": "-10",
+    "-9": "-09", "-8": "-08", "-7": "-07", "-6": "-06", "-5": "-05", "-4": "-04", "-3": "-03", "-2": "-02", "-1": "-01",
+    "0": "000", "1": "+01", "2": "+02", "3": "+03", "4": "+04", "5": "+05", "6": "+06", "7": "+07", "8": "+08",
+    "9": "+09", "10": "+10", "11": "+11", "12": "+12", "13": "+13", "14": "+14", "15": "+15", "16": "+16" }
+  picture9: { "-9": "-9", "-8": "-8", "-7": "-7", "-6": "-6", "-5": "-5", "-4": "-4", "-3": "-3", "-2": "-2",
+    "-1": "-1", "0": "00", "1": "+1", "2": "+2", "3": "+3", "4": "+4", "5": "+5", "6": "+6", "7": "+7", "8": "+8",
+    "9": "+9" }
+  speaker_config: { lt_rt: LR, stereo: ST, "2.1": "21", "3.1": "31", "4.1": "41", "5.1": "51", "6.1": "61", "7.1": "71" }
+  speaker: { center: C, left: L, right: R, surround_left: l, surround_right: r }
+  size: { large: "0", small: "1" }
+  level10: { "-10": "-10", "-9": "-09", "-8": "-08", "-7": "-07", "-6": "-06", "-5": "-05", "-4": "-04", "-3": "-03",
+    "-2": "-02", "-1": "-01", "0": "+00", "1": "+01", "2": "+02", "3": "+03", "4": "+04", "5": "+05", "6": "+06",
+    "7": "+07", "8": "+08", "9": "+09", "10": "+10" }
+  firmware: { usb: US, disc: DS, network: NT }
+  track_skip: { next: "32", previous: "33" }
+  output_volume: { "-90": "-90", "-89": "-89", "-88": "-88", "-87": "-87", "-86": "-86", "-85": "-85", "-84": "-84",
+    "-83": "-83", "-82": "-82", "-81": "-81", "-80": "-80", "-79": "-79", "-78": "-78", "-77": "-77", "-76": "-76",
+    "-75": "-75", "-74": "-74", "-73": "-73", "-72": "-72", "-71": "-71", "-70": "-70", "-69": "-69", "-68": "-68",
+    "-67": "-67", "-66": "-66", "-65": "-65", "-64": "-64", "-63": "-63", "-62": "-62", "-61": "-61", "-60": "-60",
+    "-59": "-59", "-58": "-58", "-57": "-57", "-56": "-56", "-55": "-55", "-54": "-54", "-53": "-53", "-52": "-52",
+    "-51": "-51", "-50": "-50", "-49": "-49", "-48": "-48", "-47": "-47", "-46": "-46", "-45": "-45", "-44": "-44",
+    "-43": "-43", "-42": "-42", "-41": "-41", "-40": "-40", "-39": "-39", "-38": "-38", "-37": "-37", "-36": "-36",
+    "-35": "-35", "-34": "-34", "-33": "-33", "-32": "-32", "-31": "-31", "-30": "-30", "-29": "-29", "-28": "-28",
+    "-27": "-27", "-26": "-26", "-25": "-25", "-24": "-24", "-23": "-23", "-22": "-22", "-21": "-21", "-20": "-20",
+    "-19": "-19", "-18": "-18", "-17": "-17", "-16": "-16", "-15": "-15", "-14": "-14", "-13": "-13", "-12": "-12",
+    "-11": "-11", "-10": "-10", "-9": "-09", "-8": "-08", "-7": "-07", "-6": "-06", "-5": "-05", "-4": "-04", "-3":
+    "-03", "-2": "-02", "-1": "-01", "0": "000", "1": "+01", "2": "+02", "3": "+03", "4": "+04", "5": "+05", "6":
+    "+06", "7": "+07", "8": "+08", "9": "+09", "10": "+10" }
+  auto_play: { "true": "00", "false": "01" }
+  auto_resume: { "true": "00", "false": "01" }
+  pip_mark: { "true": "00", "false": "01" }
+  hdmi_3d: { auto: "AT", "off": "01" }
+  aspect: { "16_9_wide": "9W", "16_9_auto": "9A", "4_3_pan_scan": "3P", "4_3_letterbox": "3L" }
+  tv_system: { ntsc: "NT", pal: "PL", multi: "MS" }
+  hdmi_1080p24: { "true": "00", "false": "01" }
+  dvd_24p: { "true": "00", "false": "01" }
+  color_space: { rgb_video: "RV", rgb_pc: "RP", ycbcr444: "Y4", ycbcr422: "Y2" }
+  deep_color: { "48": "48", "36": "36", "30": "30", "off": "OF" }
+  cc_attribute: { auto: "AT", custom: "CT" }
+  cc_font_color: { default: "DF", white: "WT", black: "BK", red: "RD", green: "GR", blue: "BL", yellow: "YL", magenta: "MA", cyan: "CY" }
+  cc_font_size: { default: "DF", standard: "ST", small: "SM", large: "LG" }
+  cc_font_style: { default: "DEF", mono_serif: "MNS", mono_sans: "MNN", proportional_serif: "PTS", proportional_sans: "PTN", casual: "CAS", cursive: "CUR", small_capitals: "SCA" }
+  cc_font_opacity: { solid: "SD", translucent: "TL", transparent: "TP" }
+  cc_font_edge: { default: "DE", none: "NN", raised: "RS", depressed: "DP", uniform: "UF", left_drop: "LS", right_drop: "RD" }
+  cc_edge_color: { white: "WT", black: "BK", red: "RD", green: "GR" }
+  cc_background_color: { white: "WT", black: "BK", red: "RD", green: "GR" }
+  cc_background_opacity: { solid: "SD", translucent: "TL", transparent: "TP" }
+  cc_window_color: { white: "WT", black: "BK", red: "RD", green: "GR" }
+  cc_window_opacity: { solid: "SD", translucent: "TL", transparent: "TP" }
+  secondary_audio_mark: { "true": "00", "false": "01" }
+  hdmi_audio: { stereo: "ST", lpcm: "LP", bitstream: "BS" }
+  digital_out: { lpcm48: "48", lpcm96: "96", lpcm192: "19", bitstream: "BS" }
+  drc: { auto: "AT", "on": "00", "off": "01" }
+  remote_code: { code1: "C1", code2: "C2", code3: "C3" }
+  hdmi_cec: { hdmi1: "H1", "off": "OF" }
+  bd_live: { permitted: "00", limited: "LT", prohibited: "01" }
+  buda: { internal: "IN", external: "EX" }
+  network_interface: { ethernet: "ET", wifi: "WF" }
+  ir_lock: { "true": "00", "false": "01" }
+  program: { "true": "00", "false": "01" }
+  time_display: { elapsed: "EL", remaining: "RM", total_elapsed: "TL", total_remaining: "TR" }
+  osd_hidden: { "true": "00", "false": "01" }
+  resolution: { auto: "1", "480i": "2", "480p": "3", "720p": "4", "1080i": "5", "1080p": "6" }
+  mute: { "true": "00", "false": "01" }
+
+commands:
+  power_on:
+    summary: Power on (PW00); the next command waits a second
+    send: "@0PW00"
+    expect: &ack { reply_contains: "\u0006", contains: "\u0006" }
+    returns: ack
+  power_off:
+    summary: Power off (PW01)
+    send: "@0PW01"
+    expect: *ack
+    returns: ack
+  get_power:
+    summary: "Ask whether the player is on (?PW): answered ACK when on, nothing when off"
+    send: "@0?PW"
+    expect: *ack
+    returns: ack
+  stop:
+    summary: Stop (2354)
+    send: "@02354"
+    expect: *ack
+    returns: ack
+  play:
+    summary: Play (2353)
+    send: "@02353"
+    expect: *ack
+    returns: ack
+  pause:
+    summary: Pause playback (2348)
+    send: "@02348"
+    expect: *ack
+    returns: ack
+  locate_track:
+    summary: Go to a track (chapter or file) by number (Tr)
+    params:
+      track: { type: int, min: 1, max: 2000, required: true, label: Track, description: "The chapter's or file's number, 1-2000." }
+    send: "@0Tr{track:04d}"
+    expect: *ack
+    returns: ack
+  skip_track:
+    summary: Skip to the next track, or restart the current one or skip to the previous (2332, 2333)
+    params:
+      to: &to { type: enum, values: [next, previous], required: true, label: Skip to, description: "next or previous." }
+    send: "@023{to:map.track_skip}"
+    expect: *ack
+    returns: ack
+  locate_group:
+    summary: Go to a group (title or folder) by number (PCGp)
+    params:
+      group: { type: int, min: 1, max: 2000, required: true, label: Group, description: "The title's or folder's number, 1-2000." }
+    send: "@0PCGp{group:04d}"
+    expect: *ack
+    returns: ack
+  skip_group:
+    summary: Skip to the next or previous group (PCGPNX, PCGPPV)
+    params: { to: *to }
+    send: "@0PCGP{to:map.next_previous}"
+    expect: *ack
+    returns: ack
+  panel_lock:
+    summary: Lock or unlock the front panel keys (23KL, 23KU); the player has no request to read it back
+    params:
+      locked: { type: bool, required: true, label: Locked, description: "On locks the front panel keys, off unlocks them." }
+    send: "@0{locked:map.locked}"
+    expect: *ack
+    returns: ack
+  ab_repeat_a:
+    summary: Set the A point of an A-B repeat (PCRPAF)
+    send: "@0PCRPAF"
+    expect: *ack
+    returns: ack
+  ab_repeat_b:
+    summary: Set the B point and start the A-B repeat (PCRPBF)
+    send: "@0PCRPBF"
+    expect: *ack
+    returns: ack
+  ab_repeat_exit:
+    summary: Leave A-B repeat (PCEXRP)
+    send: "@0PCEXRP"
+    expect: *ack
+    returns: ack
+  random_mode:
+    summary: Step the random or shuffle playback mode (PCPMR), then read it back
+    send: ["@0PCPMR", "@0?PCPMR"]
+    expect: *ack
+    returns: ack
+  get_random:
+    summary: "Read the random mode (?PCPMR): S shuffle or R random, then OF off, SI sub item, IT item or AL all"
+    send: "@0?PCPMR"
+    expect: { reply_contains: "@0PCPMR", matches: '^@0PCPMR([SR][A-Z]{2})\r?$' }
+    returns: value
+  setup_menu:
+    summary: Show the setup menu (PCSU)
+    send: "@0PCSU"
+    expect: *ack
+    returns: ack
+  top_menu:
+    summary: Show a BD's or DVD's title menu (DVTP)
+    send: "@0DVTP"
+    expect: *ack
+    returns: ack
+  option_menu:
+    summary: Show the playback option menu (DVOP)
+    send: "@0DVOP"
+    expect: *ack
+    returns: ack
+  popup_menu:
+    summary: Show the disc's pop-up menu (DVPU)
+    send: "@0DVPU"
+    expect: *ack
+    returns: ack
+  menu_return:
+    summary: Go back to the previous menu screen (PCRTN)
+    send: "@0PCRTN"
+    expect: *ack
+    returns: ack
+  audio_dialog:
+    summary: Change to the next primary or secondary audio stream of a BD or DVD (DVADLG)
+    params:
+      stream: { type: enum, values: [primary, secondary], required: true, label: Audio stream, description: "primary or secondary audio." }
+    send: "@0DVADLG{stream:map.dialog}"
+    expect: *ack
+    returns: ack
+  subtitle:
+    summary: Change the subtitle language of a BD or DVD (DVSBTL1)
+    send: "@0DVSBTL1"
+    expect: *ack
+    returns: ack
+  angle:
+    summary: Step to the next video angle of a BD or DVD that has several (DVANGL+)
+    send: "@0DVANGL+"
+    expect: *ack
+    returns: ack
+  get_angle:
+    summary: "Read the video angle's number (?DVANGL)"
+    send: "@0?DVANGL"
+    expect: { reply_contains: "@0DVANGL", matches: '^@0DVANGL([0-9]+)\r?$' }
+    returns: value
+  cursor:
+    summary: Move the menu cursor (PCCUSR)
+    params:
+      direction: { type: enum, values: [left, right, up, down], required: true, label: Direction, description: "left, right, up or down." }
+    send: "@0PCCUSR{direction:map.cursor}"
+    expect: *ack
+    returns: ack
+  enter:
+    summary: Confirm the selected item (PCENTR)
+    send: "@0PCENTR"
+    expect: *ack
+    returns: ack
+  tray:
+    summary: Open or close the disc tray (PCDTRY)
+    params:
+      action: { type: enum, values: [open, close], required: true, label: Tray, description: "open or close the disc tray." }
+    send: "@0PCDTRY{action:map.tray}"
+    expect: *ack
+    returns: ack
+  display_info:
+    summary: Show the bit rate and media information on screen (DVDSIF)
+    send: "@0DVDSIF"
+    expect: *ack
+    returns: ack
+  color_key:
+    summary: Press a color key, whose function the disc gives (DVFCLR)
+    params:
+      color: { type: enum, values: [red, green, blue, yellow], required: true, label: Color, description: "red, green, blue or yellow." }
+    send: "@0DVFCLR{color:map.color}"
+    expect: *ack
+    returns: ack
+  pip_mode:
+    summary: Step through the picture-in-picture modes (DVMO)
+    send: "@0DVMO"
+    expect: *ack
+    returns: ack
+  home:
+    summary: Show the home menu (PCHM)
+    send: "@0PCHM"
+    expect: *ack
+    returns: ack
+  number_key:
+    summary: Press a number key (PCTKEY)
+    params:
+      digit: { type: int, min: 0, max: 9, required: true, label: Digit, description: "The number key, 0-9." }
+    send: "@0PCTKEY{digit}"
+    expect: *ack
+    returns: ack
+  search:
+    summary: Search fast or play slow (PCSLS), each press stepping the speed, then read it back on the DN-500BD
+    params:
+      direction: { type: enum, values: [forward, reverse], required: true, label: Direction, description: "forward, or reverse (fast only on the DN-500BD MKII's rewind)." }
+      speed: { type: enum, values: [fast, slow], required: true, label: Speed, description: "fast search or slow play." }
+    send:
+      - "@0PCSLS{direction:map.direction}{speed:map.speed}"
+      - { models: [dn-500bd], message: "@0?PCSLS" }
+    expect: *ack
+    returns: ack
+  rewind:
+    summary: Rewind the current track (PCSLSR)
+    send: "@0PCSLSR"
+    expect: *ack
+    returns: ack
+  get_search:
+    summary: "Read the search or slow play (?PCSLS): the direction F or R, then f fast or s slow"
+    send: "@0?PCSLS"
+    expect: { reply_contains: "@0PCSLS", matches: '^@0PCSLS([FR][fs])\r?$' }
+    returns: value
+  set_rating:
+    summary: Set the highest BD or DVD rating that plays (DVPCRT), then read it back on the DN-500BD
+    params:
+      password: &password { type: string, pattern: "^[0-9]{4}$", secret: true, required: true, label: Password, description: "The player's four-digit parental lock password." }
+      rating: { type: enum, values: ["off", kid_safe, g, pg, pg13, r, nc17, adult], required: true, label: Rating, description: "The highest rating that plays, or off for no limit." }
+    send:
+      - "@0DVPCRT{password}{rating:map.rating}"
+      - { models: [dn-500bd], message: "@0?DVPCRT" }
+    expect: *ack
+    returns: ack
+  get_rating:
+    summary: "Read the rating limit (?DVPCRT): OFF, KIDSAFE, G, PG, PG13, R, NC-17 or ADULT"
+    send: "@0?DVPCRT"
+    expect: { reply_contains: "@0DVPCRT", matches: '^@0DVPCRT([A-Z0-9-]+)\r?$' }
+    returns: value
+  set_area_code:
+    summary: Set the country whose ratings apply (DVPCAC), then read it back on the DN-500BD
+    params:
+      password: *password
+      country: { type: string, pattern: "^[A-Za-z0-9 ]{1,32}$", required: true, label: Country, description: "The country's name as the player lists it." }
+    send:
+      - "@0DVPCAC{password}{country}"
+      - { models: [dn-500bd], message: "@0?DVPCAC" }
+    expect: *ack
+    returns: ack
+  get_area_code:
+    summary: "Read the area code's country (?DVPCAC)"
+    send: "@0?DVPCAC"
+    expect: { reply_contains: "@0DVPCAC", matches: '^@0DVPCAC([^\r]*)\r?$' }
+    returns: value
+  change_password:
+    summary: Change the parental lock password (DVPCCP)
+    params:
+      password: *password
+      new_password: { type: string, pattern: "^[0-9]{4}$", secret: true, required: true, label: New password, description: "The new four-digit password." }
+    send: "@0DVPCCP{password}{new_password}"
+    expect: *ack
+    returns: ack
+  set_osd_language:
+    summary: Set the on-screen menu language (DVLGOS), then read it back
+    params:
+      language: &language { type: string, pattern: "^[A-Za-z]{3}$", required: true, label: Language, description: "The three-letter language code (ISO 639-2), or OFF." }
+    send: ["@0DVLGOS{language}", "@0?DVLGOS"]
+    expect: *ack
+    returns: ack
+  get_osd_language:
+    summary: "Read the on-screen menu language (?DVLGOS)"
+    send: "@0?DVLGOS"
+    expect: { reply_contains: "@0DVLGOS", matches: '^@0DVLGOS([A-Za-z]{3})\r?$' }
+    returns: value
+  set_menu_language:
+    summary: Set the preferred disc menu language (DVLGDM), then read it back
+    params: { language: *language }
+    send: ["@0DVLGDM{language}", "@0?DVLGDM"]
+    expect: *ack
+    returns: ack
+  get_menu_language:
+    summary: "Read the disc menu language (?DVLGDM)"
+    send: "@0?DVLGDM"
+    expect: { reply_contains: "@0DVLGDM", matches: '^@0DVLGDM([A-Za-z]{3})\r?$' }
+    returns: value
+  set_audio_language:
+    summary: Set the preferred audio language (DVLGAD), then read it back
+    params: { language: *language }
+    send: ["@0DVLGAD{language}", "@0?DVLGAD"]
+    expect: *ack
+    returns: ack
+  get_audio_language:
+    summary: "Read the audio language (?DVLGAD)"
+    send: "@0?DVLGAD"
+    expect: { reply_contains: "@0DVLGAD", matches: '^@0DVLGAD([A-Za-z]{3})\r?$' }
+    returns: value
+  set_subtitle_language:
+    summary: Set the preferred subtitle language (DVLGST), then read it back
+    params: { language: *language }
+    send: ["@0DVLGST{language}", "@0?DVLGST"]
+    expect: *ack
+    returns: ack
+  get_subtitle_language:
+    summary: "Read the subtitle language (?DVLGST)"
+    send: "@0?DVLGST"
+    expect: { reply_contains: "@0DVLGST", matches: '^@0DVLGST([A-Za-z]{3})\r?$' }
+    returns: value
+  set_brightness:
+    summary: Set the video brightness (DVPABN), then read it back on the DN-500BD
+    params:
+      level: { type: int, min: -16, max: 16, required: true, label: Brightness, description: "Brightness, -16 to +16." }
+    send:
+      - "@0DVPABN{level:map.picture16}"
+      - { models: [dn-500bd], message: "@0?DVPABN" }
+    expect: *ack
+    returns: ack
+  get_brightness:
+    summary: "Read the video brightness (?DVPABN): -16 to +16"
+    send: "@0?DVPABN"
+    expect: { reply_contains: "@0DVPABN", matches: '^@0DVPABN([-+0-9]{3})\r?$' }
+    returns: value
+  set_contrast:
+    summary: Set the video contrast (DVPACT), then read it back on the DN-500BD
+    params:
+      level: { type: int, min: -16, max: 16, required: true, label: Contrast, description: "Contrast, -16 to +16." }
+    send:
+      - "@0DVPACT{level:map.picture16}"
+      - { models: [dn-500bd], message: "@0?DVPACT" }
+    expect: *ack
+    returns: ack
+  get_contrast:
+    summary: "Read the video contrast (?DVPACT): -16 to +16"
+    send: "@0?DVPACT"
+    expect: { reply_contains: "@0DVPACT", matches: '^@0DVPACT([-+0-9]{3})\r?$' }
+    returns: value
+  set_hue:
+    summary: Set the video hue (DVPAHU), then read it back on the DN-500BD
+    params:
+      level: { type: int, min: -9, max: 9, required: true, label: Hue, description: "Hue, -9 to +9." }
+    send:
+      - "@0DVPAHU{level:map.picture9}"
+      - { models: [dn-500bd], message: "@0?DVPAHU" }
+    expect: *ack
+    returns: ack
+  get_hue:
+    summary: "Read the video hue (?DVPAHU): -9 to +9"
+    send: "@0?DVPAHU"
+    expect: { reply_contains: "@0DVPAHU", matches: '^@0DVPAHU([-+0-9]{2})\r?$' }
+    returns: value
+  set_saturation:
+    summary: Set the video saturation (DVPASR), then read it back on the DN-500BD
+    params:
+      level: { type: int, min: -9, max: 9, required: true, label: Saturation, description: "Saturation, -9 to +9." }
+    send:
+      - "@0DVPASR{level:map.picture9}"
+      - { models: [dn-500bd], message: "@0?DVPASR" }
+    expect: *ack
+    returns: ack
+  get_saturation:
+    summary: "Read the video saturation (?DVPASR): -9 to +9"
+    send: "@0?DVPASR"
+    expect: { reply_contains: "@0DVPASR", matches: '^@0DVPASR([-+0-9]{2})\r?$' }
+    returns: value
+  set_speaker_config:
+    summary: Set the speaker configuration or downmix (DVSCCh); the player has no request to read it back
+    params:
+      channels: { type: enum, values: [lt_rt, stereo, "2.1", "3.1", "4.1", "5.1", "6.1", "7.1"], required: true, label: Speakers,
+        description: "Downmix to lt_rt (Lt/Rt) or stereo, or 2.1 to 7.1 speakers with one subwoofer." }
+    send: "@0DVSCCh{channels:map.speaker_config}"
+    expect: *ack
+    returns: ack
+  set_speaker:
+    summary: Set one speaker's size, level and delay (DVSCSt), then read it back on the DN-500BD
+    params:
+      speaker: &speaker { type: enum, values: [center, left, right, surround_left, surround_right], required: true, label: Speaker, description: "center, left, right, surround_left or surround_right." }
+      size: { type: enum, values: [large, small], required: true, label: Size, description: "large or small." }
+      level: { type: int, min: -10, max: 10, required: true, label: Level, description: "The speaker's level in dB, -10 to +10." }
+      delay: { type: int, min: 0, max: 9999, required: true, label: Delay, description: "The speaker's delay in milliseconds, as four digits." }
+    send:
+      - "@0DVSCSt{speaker:map.speaker}{size:map.size}{level:map.level10}{delay:04d}"
+      - { models: [dn-500bd], message: "@0?DVSCSt{speaker:map.speaker}" }
+    expect: *ack
+    returns: ack
+  get_speaker:
+    summary: "Read one speaker's setting (?DVSCSt): its size (0 large, 1 small), level (a sign and two digits) and delay (four digits)"
+    params: { speaker: *speaker }
+    send: "@0?DVSCSt{speaker:map.speaker}"
+    expect: { reply_contains: "@0DVSCSt{speaker:map.speaker}", matches: '^@0DVSCSt[A-Za-z]([^\r]+)\r?$' }
+    returns: value
+  set_crossover:
+    summary: Set the crossover frequency (DVCO), then read it back on the DN-500BD
+    params:
+      frequency: { type: string, pattern: "^(OFF|[0-9]{3})$", required: true, label: Crossover, description: "The crossover in Hz as three digits (100 for 100 Hz), or OFF." }
+    send:
+      - "@0DVCO{frequency}"
+      - { models: [dn-500bd], message: "@0?DVCO" }
+    expect: *ack
+    returns: ack
+  get_crossover:
+    summary: "Read the crossover frequency (?DVCO): three digits in Hz, or OFF"
+    send: "@0?DVCO"
+    expect: { reply_contains: "@0DVCO", matches: '^@0DVCO([0-9A-Z]{3})\r?$' }
+    returns: value
+  set_output_volume:
+    summary: Set the audio output level (DVOV), then read it back on the DN-500BD
+    params:
+      level: { type: int, min: -90, max: 10, required: true, label: Output level, description: "The output level in dB, -90 to +10." }
+    send:
+      - "@0DVOV{level:map.output_volume}"
+      - { models: [dn-500bd], message: "@0?DVOV" }
+    expect: *ack
+    returns: ack
+  set_output_volume_off:
+    summary: Set the audio output level to minus infinity (DVOVinf), then read it back on the DN-500BD
+    send:
+      - "@0DVOVinf"
+      - { models: [dn-500bd], message: "@0?DVOV" }
+    expect: *ack
+    returns: ack
+  set_output_fixed:
+    summary: Fix the audio output at the maximum volume (DVOVFX), then read it back on the DN-500BD
+    send:
+      - "@0DVOVFX"
+      - { models: [dn-500bd], message: "@0?DVOV" }
+    expect: *ack
+    returns: ack
+  get_output_volume:
+    summary: "Read the audio output level (?DVOV): a sign and two digits in dB, 000, inf or FX (fixed)"
+    send: "@0?DVOV"
+    expect: { reply_contains: "@0DVOV", matches: '^@0DVOV([-+0-9a-zA-Z]{2,3})\r?$' }
+    returns: value
+  set_max_volume:
+    summary: Set the maximum volume, the level a fixed output takes (DVMV), then read it back on the DN-500BD
+    params:
+      level: { type: int, min: -10, max: 10, required: true, label: Maximum volume, description: "The maximum volume in dB, -10 to +10." }
+    send:
+      - "@0DVMV{level:map.level10}"
+      - { models: [dn-500bd], message: "@0?DVMV" }
+    expect: *ack
+    returns: ack
+  get_max_volume:
+    summary: "Read the maximum volume (?DVMV): a sign and two digits in dB"
+    send: "@0?DVMV"
+    expect: { reply_contains: "@0DVMV", matches: '^@0DVMV([-+0-9]{3})\r?$' }
+    returns: value
+  firmware_upgrade:
+    summary: Start a firmware upgrade from USB, a disc or the network (DVFU)
+    params:
+      source: { type: enum, values: [usb, disc, network], required: true, label: Source, description: "usb, disc or network." }
+    send: "@0DVFU{source:map.firmware}"
+    expect: *ack
+    returns: ack
+  get_mac_address:
+    summary: "Read the MAC address (?MA): twelve hexadecimal digits"
+    send: "@0?MA"
+    expect: { reply_contains: "@0MA", matches: '^@0MA([0-9A-Fa-f]{12})\r?$' }
+    returns: value
+  backup_settings:
+    summary: Back up the menu settings (DVBS)
+    send: "@0DVBS"
+    expect: *ack
+    returns: ack
+  restore_settings:
+    summary: Restore the backed-up menu settings (DVRS)
+    send: "@0DVRS"
+    expect: *ack
+    returns: ack
+  factory_reset:
+    summary: Reset the player to its factory defaults (DVFD)
+    send: "@0DVFD"
+    expect: *ack
+    returns: ack
+  get_buda_size:
+    summary: "Read the free BD-Live storage (?DVBUDASZ)"
+    send: "@0?DVBUDASZ"
+    expect: { reply_contains: "@0DVBUDASZ", matches: '^@0DVBUDASZ([^\r]+)\r?$' }
+    returns: value
+  set_ip_auto:
+    summary: Get the IP address by DHCP (IpAUTO), then read it back on the DN-500BD
+    send:
+      - "@0IpAUTO00000000"
+      - { models: [dn-500bd], message: "@0?Ip" }
+    expect: *ack
+    returns: ack
+  set_ip_address:
+    summary: Set a fixed IP address (Ip), then read it back on the DN-500BD
+    params:
+      address: &address { type: string, pattern: "^[0-9]{12}$", required: true, label: IP address, description: "The address as twelve digits, three per part: 192168000100 for 192.168.0.100." }
+    send:
+      - "@0Ip{address}"
+      - { models: [dn-500bd], message: "@0?Ip" }
+    expect: *ack
+    returns: ack
+  get_ip_address:
+    summary: "Read the IP address (?Ip): twelve digits, or AUTO00000000 for DHCP"
+    send: "@0?Ip"
+    expect: { reply_contains: "@0Ip", matches: '^@0Ip([0-9A-Z]{12,15})\r?$' }
+    returns: value
+  set_subnet_mask:
+    summary: Set the subnet mask (SM), then read it back on the DN-500BD
+    params:
+      address: { type: string, pattern: "^[0-9]{12}$", required: true, label: Subnet mask, description: "The mask as twelve digits, three per part: 255255255000 for 255.255.255.0." }
+    send:
+      - "@0SM{address}"
+      - { models: [dn-500bd], message: "@0?SM" }
+    expect: *ack
+    returns: ack
+  get_subnet_mask:
+    summary: "Read the subnet mask (?SM): twelve digits"
+    send: "@0?SM"
+    expect: { reply_contains: "@0SM", matches: '^@0SM([0-9]{12})\r?$' }
+    returns: value
+  set_gateway:
+    summary: Set the gateway (GW), then read it back on the DN-500BD
+    params:
+      address: { type: string, pattern: "^[0-9]{12}$", required: true, label: Gateway, description: "The gateway's address as twelve digits, three per part." }
+    send:
+      - "@0GW{address}"
+      - { models: [dn-500bd], message: "@0?GW" }
+    expect: *ack
+    returns: ack
+  get_gateway:
+    summary: "Read the gateway (?GW): twelve digits"
+    send: "@0?GW"
+    expect: { reply_contains: "@0GW", matches: '^@0GW([0-9]{12})\r?$' }
+    returns: value
+  set_dns:
+    summary: Set the DNS server (DN), then read it back on the DN-500BD
+    params:
+      address: { type: string, pattern: "^[0-9]{12}$", required: true, label: DNS server, description: "The DNS server's address as twelve digits, three per part." }
+    send:
+      - "@0DN{address}"
+      - { models: [dn-500bd], message: "@0?DN" }
+    expect: *ack
+    returns: ack
+  get_dns:
+    summary: "Read the DNS server (?DN): twelve digits"
+    send: "@0?DN"
+    expect: { reply_contains: "@0DN", matches: '^@0DN([0-9]{12})\r?$' }
+    returns: value
+  set_proxy:
+    summary: Use a proxy server for internet access (PCPX), then read it back on the DN-500BD
+    params:
+      host: { type: string, pattern: "^[A-Za-z0-9.-]{1,64}$", required: true, label: Proxy host, description: "The proxy server's host name or address." }
+      port: { type: int, min: 0, max: 65535, required: true, label: Proxy port, description: "The proxy server's port, 0-65535." }
+    send:
+      - "@0PCPX{host}:{port:05d}"
+      - { models: [dn-500bd], message: "@0?PCPX" }
+    expect: *ack
+    returns: ack
+  set_proxy_off:
+    summary: Use no proxy server (PCPXOF), then read it back on the DN-500BD
+    send:
+      - "@0PCPXOF"
+      - { models: [dn-500bd], message: "@0?PCPX" }
+    expect: *ack
+    returns: ack
+  get_proxy:
+    summary: "Read the proxy (?PCPX): host:port, or OF"
+    send: "@0?PCPX"
+    expect: { reply_contains: "@0PCPX", matches: '^@0PCPX([^\r]+)\r?$' }
+    returns: value
+  connection_test:
+    summary: "Test the internet connection (?PCCT): 00 success, 01 failure"
+    send: "@0?PCCT"
+    expect: { reply_contains: "@0PCCT", matches: '^@0PCCT([0-9]{2})\r?$' }
+    returns: value
+  get_disc_status:
+    summary: "Read the media status (?CD): NC no disc, CI disc, UF unformatted, TO tray open, TC tray closed, TE tray error"
+    send: "@0?CD"
+    expect: { reply_contains: "@0CD", matches: '^@0CD([A-Z]{2})\r?$' }
+    returns: value
+  get_status:
+    summary: "Read the playback status (?ST): PL, PP, DVSF/DVSR slow, DVFF/DVFR fast, DVSP step, DVFS, ED menu, DVSU setup, DVTR track menu, DVHM home"
+    send: "@0?ST"
+    expect: { reply_contains: "@0ST", matches: '^@0ST([A-Z]+)\r?$' }
+    returns: value
+  get_track_count:
+    summary: "Read the number of tracks (?Tt): four digits, or UNKN"
+    send: "@0?Tt"
+    expect: { reply_contains: "@0Tt", matches: '^@0Tt ?([0-9]{4}|UNKN)\r?$' }
+    returns: value
+  get_track:
+    summary: "Read the current track (?Tr): four digits, or UNKN"
+    send: "@0?Tr"
+    expect: { reply_contains: "@0Tr", matches: '^@0Tr ?([0-9]{4}|UNKN)\r?$' }
+    returns: value
+  get_group_count:
+    summary: "Read the number of groups (?PCTG): four digits, or UNKN"
+    send: "@0?PCTG"
+    expect: { reply_contains: "@0?PCTG", matches: '^@0\?PCTG ?([0-9]{4}|UNKN)\r?$' }
+    returns: value
+  get_group:
+    summary: "Read the current group (?PCGp): four digits, or UNKN"
+    send: "@0?PCGp"
+    expect: { reply_contains: "@0?PCGp", matches: '^@0\?PCGp ?([0-9]{4}|UNKN)\r?$' }
+    returns: value
+  get_elapsed:
+    summary: "Read the elapsed time (?ET): hhhmmss"
+    send: "@0?ET"
+    expect: { reply_contains: "@0ET", matches: '^@0ET([0-9]{7})\r?$' }
+    returns: value
+  get_remaining:
+    summary: "Read the remaining time (?RM): hhhmmss"
+    send: "@0?RM"
+    expect: { reply_contains: "@0RM", matches: '^@0RM([0-9]{7})\r?$' }
+    returns: value
+  get_media_type:
+    summary: "Read the media type (?PCTYP): DVV, DVA, CDA, CDR, SAC, DVR, BDM, BDA, AVH, DLN, EXT or UKN"
+    send: "@0?PCTYP"
+    expect: { reply_contains: "@0PCTYP", matches: '^@0PCTYP([A-Z]{3})\r?$' }
+    returns: value
+  get_audio_format:
+    summary: "Read the audio format (?PCAFMT): DBD, DTS, MPG, LPC, PPC, DSD, DD+, DTH, DHM, DLH, MP3, AAC, WMA or UKN"
+    send: "@0?PCAFMT"
+    expect: { reply_contains: "@0PCAFMT", matches: '^@0PCAFMT([A-Z0-9+]{3})\r?$' }
+    returns: value
+  get_audio_channels:
+    summary: "Read the audio channels (?PCACH, answered BDACH): 1CH to 8CH, 21C to 71C, L/R, RCH, LCH or UKN"
+    send: "@0?PCACH"
+    expect: { reply_contains: "@0BDACH", matches: '^@0BDACH([A-Z0-9/]{3})\r?$' }
+    returns: value
+  get_audio_dialog:
+    summary: "Read the primary or secondary audio language (?PCDG): an ISO 639-2 code, or UKN"
+    params: { stream: { type: enum, values: [primary, secondary], required: true, label: Audio stream, description: "primary or secondary audio." } }
+    send: "@0?PCDG{stream:map.dialog}"
+    expect: { reply_contains: "@0PCDG{stream:map.dialog}", matches: '^@0PCDG[-+]([A-Za-z]{3})\r?$' }
+    returns: value
+  get_subtitle_code:
+    summary: "Read the subtitle language (?DVSTC): an ISO 639-2 code, or UKN"
+    send: "@0?DVSTC"
+    expect: { reply_contains: "@0DVSTC", matches: '^@0DVSTC ?([A-Za-z]{3})\r?$' }
+    returns: value
+  get_version:
+    summary: "Read the version and model name (?VN): eight version digits, then the model name"
+    send: "@0?VN"
+    expect: { reply_contains: "@0VN", matches: '^@0VN ?([^\r]+)\r?$' }
+    returns: value
+  get_track_time:
+    summary: "Read the current track's time (?tl): MMMSSFF (minutes, seconds, frames)"
+    send: "@0?tl"
+    expect: { reply_contains: "@0tl", matches: '^@0tl ?([0-9]{5,7})\r?$' }
+    returns: value
+  get_sample_rate:
+    summary: "Read the current track's sampling rate (?fs, answered Fs): kHz, or UKN"
+    send: "@0?fs"
+    expect: { reply_contains: "@0Fs", matches: '^@0Fs ?([0-9A-Z.]+)\r?$' }
+    returns: value
+  get_artist:
+    summary: "Read the current track's artist (?at): up to 64 bytes"
+    send: "@0?at"
+    expect: { reply_contains: "@0at", matches: '^@0at ?([^\r]*)\r?$' }
+    returns: value
+  get_title:
+    summary: "Read the current track's title (?ti): up to 64 bytes"
+    send: "@0?ti"
+    expect: { reply_contains: "@0ti", matches: '^@0ti ?([^\r]*)\r?$' }
+    returns: value
+  get_album:
+    summary: "Read the current track's album (?al): up to 64 bytes"
+    send: "@0?al"
+    expect: { reply_contains: "@0al", matches: '^@0al ?([^\r]*)\r?$' }
+    returns: value
+  set_auto_play:
+    summary: "Set auto play (PCAP), then read it back on the DN-500BD"
+    params: { enabled: { type: bool, required: true, label: "Auto play", description: "On starts playing a DVD or CD when it is loaded." } }
+    send:
+      - "@0PCAP{enabled:map.auto_play}"
+      - { models: [dn-500bd], message: "@0?PCAP" }
+    expect: *ack
+    returns: ack
+  get_auto_play:
+    summary: "Read auto play (?PCAP): 00 on, 01 off"
+    send: "@0?PCAP"
+    expect: { reply_contains: "@0PCAP", matches: '^@0PCAP([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_auto_resume:
+    summary: "Set auto resume (PCAR), then read it back on the DN-500BD"
+    params: { enabled: { type: bool, required: true, label: "Auto resume", description: "On resumes a disc where it was last played (up to five discs)." } }
+    send:
+      - "@0PCAR{enabled:map.auto_resume}"
+      - { models: [dn-500bd], message: "@0?PCAR" }
+    expect: *ack
+    returns: ack
+  get_auto_resume:
+    summary: "Read auto resume (?PCAR): 00 on, 01 off"
+    send: "@0?PCAR"
+    expect: { reply_contains: "@0PCAR", matches: '^@0PCAR([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_pip_mark:
+    summary: "Set pIP mark (DVPIP), then read it back on the DN-500BD"
+    params: { enabled: { type: bool, required: true, label: "PIP mark", description: "On shows a mark when the disc has secondary video for picture-in-picture." } }
+    send:
+      - "@0DVPIP{enabled:map.pip_mark}"
+      - { models: [dn-500bd], message: "@0?DVPIP" }
+    expect: *ack
+    returns: ack
+  get_pip_mark:
+    summary: "Read pIP mark (?DVPIP): 00 on, 01 off"
+    send: "@0?DVPIP"
+    expect: { reply_contains: "@0DVPIP", matches: '^@0DVPIP([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_hdmi_3d:
+    summary: "Set 3D output (DV3D), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [auto, "off"], required: true, label: "3D output", description: "auto outputs 3D to a 3D display; off never." } }
+    send:
+      - "@0DV3D{value:map.hdmi_3d}"
+      - { models: [dn-500bd], message: "@0?DV3D" }
+    expect: *ack
+    returns: ack
+  get_hdmi_3d:
+    summary: "Read 3D output (?DV3D): AT auto, 01 off"
+    send: "@0?DV3D"
+    expect: { reply_contains: "@0DV3D", matches: '^@0DV3D([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_aspect:
+    summary: "Set tV aspect ratio (DVAr), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: ["16_9_wide", "16_9_auto", "4_3_pan_scan", "4_3_letterbox"], required: true, label: "TV aspect ratio", description: "16:9 wide, 16:9 wide/auto, 4:3 pan and scan, or 4:3 letterbox." } }
+    send:
+      - "@0DVAr{value:map.aspect}"
+      - { models: [dn-500bd], message: "@0?DVAr" }
+    expect: *ack
+    returns: ack
+  get_aspect:
+    summary: "Read tV aspect ratio (?DVAr): 9W 16_9_wide, 9A 16_9_auto, 3P 4_3_pan_scan, 3L 4_3_letterbox"
+    send: "@0?DVAr"
+    expect: { reply_contains: "@0DVAr", matches: '^@0DVAr([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_tv_system:
+    summary: "Set tV system (DVFM), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [ntsc, pal, multi], required: true, label: "TV system", description: "ntsc, pal or multi (multi-system)." } }
+    send:
+      - "@0DVFM{value:map.tv_system}"
+      - { models: [dn-500bd], message: "@0?DVFM" }
+    expect: *ack
+    returns: ack
+  get_tv_system:
+    summary: "Read tV system (?DVFM): NT ntsc, PL pal, MS multi"
+    send: "@0?DVFM"
+    expect: { reply_contains: "@0DVFM", matches: '^@0DVFM([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_hdmi_1080p24:
+    summary: "Set 1080p 24 Hz (DV1K24), then read it back on the DN-500BD"
+    params: { enabled: { type: bool, required: true, label: "1080p 24 Hz", description: "On outputs Blu-ray video at 24 Hz; off converts it to 60 or 50 Hz." } }
+    send:
+      - "@0DV1K24{enabled:map.hdmi_1080p24}"
+      - { models: [dn-500bd], message: "@0?DV1K24" }
+    expect: *ack
+    returns: ack
+  get_hdmi_1080p24:
+    summary: "Read 1080p 24 Hz (?DV1K24): 00 on, 01 off"
+    send: "@0?DV1K24"
+    expect: { reply_contains: "@0DV1K24", matches: '^@0DV1K24([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_dvd_24p:
+    summary: "Set dVD 24p conversion (DV24pC), then read it back on the DN-500BD"
+    params: { enabled: { type: bool, required: true, label: "DVD 24p conversion", description: "On converts DVD video from 24 Hz to 60 or 50 Hz." } }
+    send:
+      - "@0DV24pC{enabled:map.dvd_24p}"
+      - { models: [dn-500bd], message: "@0?DV24pC" }
+    expect: *ack
+    returns: ack
+  get_dvd_24p:
+    summary: "Read dVD 24p conversion (?DV24pC): 00 on, 01 off"
+    send: "@0?DV24pC"
+    expect: { reply_contains: "@0DV24pC", matches: '^@0DV24pC([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_color_space:
+    summary: "Set hDMI color space (DVCS), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [rgb_video, rgb_pc, ycbcr444, ycbcr422], required: true, label: "HDMI color space", description: "RGB video level, RGB PC level, YCbCr 4:4:4 or YCbCr 4:2:2." } }
+    send:
+      - "@0DVCS{value:map.color_space}"
+      - { models: [dn-500bd], message: "@0?DVCS" }
+    expect: *ack
+    returns: ack
+  get_color_space:
+    summary: "Read hDMI color space (?DVCS): RV rgb_video, RP rgb_pc, Y4 ycbcr444, Y2 ycbcr422"
+    send: "@0?DVCS"
+    expect: { reply_contains: "@0DVCS", matches: '^@0DVCS([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_deep_color:
+    summary: "Set hDMI deep color (DVDC), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: ["48", "36", "30", "off"], required: true, label: "HDMI deep color", description: "48, 36 or 30 bits, or off (24 bits)." } }
+    send:
+      - "@0DVDC{value:map.deep_color}"
+      - { models: [dn-500bd], message: "@0?DVDC" }
+    expect: *ack
+    returns: ack
+  get_deep_color:
+    summary: "Read hDMI deep color (?DVDC): 48 48, 36 36, 30 30, OF off"
+    send: "@0?DVDC"
+    expect: { reply_contains: "@0DVDC", matches: '^@0DVDC([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_cc_attribute:
+    summary: "Set closed caption style (DVCC), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [auto, custom], required: true, label: "Closed caption style", description: "auto uses the default caption style; custom the font settings below." } }
+    send:
+      - "@0DVCC{value:map.cc_attribute}"
+      - { models: [dn-500bd], message: "@0?DVCC" }
+    expect: *ack
+    returns: ack
+  get_cc_attribute:
+    summary: "Read closed caption style (?DVCC): AT auto, CT custom"
+    send: "@0?DVCC"
+    expect: { reply_contains: "@0DVCC", matches: '^@0DVCC([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_cc_font_color:
+    summary: "Set caption font color (DVFC), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [default, white, black, red, green, blue, yellow, magenta, cyan], required: true, label: "Caption font color", description: "The caption text color, or default." } }
+    send:
+      - "@0DVFC{value:map.cc_font_color}"
+      - { models: [dn-500bd], message: "@0?DVFC" }
+    expect: *ack
+    returns: ack
+  get_cc_font_color:
+    summary: "Read caption font color (?DVFC): DF default, WT white, BK black, RD red, GR green, BL blue, YL yellow, MA magenta, CY cyan"
+    send: "@0?DVFC"
+    expect: { reply_contains: "@0DVFC", matches: '^@0DVFC([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_cc_font_size:
+    summary: "Set caption font size (DVFS), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [default, standard, small, large], required: true, label: "Caption font size", description: "default, standard, small or large." } }
+    send:
+      - "@0DVFS{value:map.cc_font_size}"
+      - { models: [dn-500bd], message: "@0?DVFS" }
+    expect: *ack
+    returns: ack
+  get_cc_font_size:
+    summary: "Read caption font size (?DVFS): DF default, ST standard, SM small, LG large"
+    send: "@0?DVFS"
+    expect: { reply_contains: "@0DVFS", matches: '^@0DVFS([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_cc_font_style:
+    summary: "Set caption font style (DVFT), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [default, mono_serif, mono_sans, proportional_serif, proportional_sans, casual, cursive, small_capitals], required: true, label: "Caption font style", description: "default, monospace or proportional with or without serifs, casual, cursive or small capitals." } }
+    send:
+      - "@0DVFT{value:map.cc_font_style}"
+      - { models: [dn-500bd], message: "@0?DVFT" }
+    expect: *ack
+    returns: ack
+  get_cc_font_style:
+    summary: "Read caption font style (?DVFT): DEF default, MNS mono_serif, MNN mono_sans, PTS proportional_serif, PTN proportional_sans, CAS casual, CUR cursive, SCA small_capitals"
+    send: "@0?DVFT"
+    expect: { reply_contains: "@0DVFT", matches: '^@0DVFT([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_cc_font_opacity:
+    summary: "Set caption font opacity (DVFO), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [solid, translucent, transparent], required: true, label: "Caption font opacity", description: "solid, translucent or transparent." } }
+    send:
+      - "@0DVFO{value:map.cc_font_opacity}"
+      - { models: [dn-500bd], message: "@0?DVFO" }
+    expect: *ack
+    returns: ack
+  get_cc_font_opacity:
+    summary: "Read caption font opacity (?DVFO): SD solid, TL translucent, TP transparent"
+    send: "@0?DVFO"
+    expect: { reply_contains: "@0DVFO", matches: '^@0DVFO([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_cc_font_edge:
+    summary: "Set caption font edge (DVFE), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [default, none, raised, depressed, uniform, left_drop, right_drop], required: true, label: "Caption font edge", description: "The style of the edges around the characters." } }
+    send:
+      - "@0DVFE{value:map.cc_font_edge}"
+      - { models: [dn-500bd], message: "@0?DVFE" }
+    expect: *ack
+    returns: ack
+  get_cc_font_edge:
+    summary: "Read caption font edge (?DVFE): DE default, NN none, RS raised, DP depressed, UF uniform, LS left_drop, RD right_drop"
+    send: "@0?DVFE"
+    expect: { reply_contains: "@0DVFE", matches: '^@0DVFE([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_cc_edge_color:
+    summary: "Set caption edge color (DVFc), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [white, black, red, green], required: true, label: "Caption edge color", description: "The color of the edges around the characters." } }
+    send:
+      - "@0DVFc{value:map.cc_edge_color}"
+      - { models: [dn-500bd], message: "@0?DVFc" }
+    expect: *ack
+    returns: ack
+  get_cc_edge_color:
+    summary: "Read caption edge color (?DVFc): WT white, BK black, RD red, GR green"
+    send: "@0?DVFc"
+    expect: { reply_contains: "@0DVFc", matches: '^@0DVFc([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_cc_background_color:
+    summary: "Set caption background color (DVBC), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [white, black, red, green], required: true, label: "Caption background color", description: "The caption background color." } }
+    send:
+      - "@0DVBC{value:map.cc_background_color}"
+      - { models: [dn-500bd], message: "@0?DVBC" }
+    expect: *ack
+    returns: ack
+  get_cc_background_color:
+    summary: "Read caption background color (?DVBC): WT white, BK black, RD red, GR green"
+    send: "@0?DVBC"
+    expect: { reply_contains: "@0DVBC", matches: '^@0DVBC([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_cc_background_opacity:
+    summary: "Set caption background opacity (DVBO), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [solid, translucent, transparent], required: true, label: "Caption background opacity", description: "solid, translucent or transparent." } }
+    send:
+      - "@0DVBO{value:map.cc_background_opacity}"
+      - { models: [dn-500bd], message: "@0?DVBO" }
+    expect: *ack
+    returns: ack
+  get_cc_background_opacity:
+    summary: "Read caption background opacity (?DVBO): SD solid, TL translucent, TP transparent"
+    send: "@0?DVBO"
+    expect: { reply_contains: "@0DVBO", matches: '^@0DVBO([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_cc_window_color:
+    summary: "Set caption window color (DVWC), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [white, black, red, green], required: true, label: "Caption window color", description: "The color of the window around the captions." } }
+    send:
+      - "@0DVWC{value:map.cc_window_color}"
+      - { models: [dn-500bd], message: "@0?DVWC" }
+    expect: *ack
+    returns: ack
+  get_cc_window_color:
+    summary: "Read caption window color (?DVWC): WT white, BK black, RD red, GR green"
+    send: "@0?DVWC"
+    expect: { reply_contains: "@0DVWC", matches: '^@0DVWC([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_cc_window_opacity:
+    summary: "Set caption window opacity (DVWO), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [solid, translucent, transparent], required: true, label: "Caption window opacity", description: "solid, translucent or transparent." } }
+    send:
+      - "@0DVWO{value:map.cc_window_opacity}"
+      - { models: [dn-500bd], message: "@0?DVWO" }
+    expect: *ack
+    returns: ack
+  get_cc_window_opacity:
+    summary: "Read caption window opacity (?DVWO): SD solid, TL translucent, TP transparent"
+    send: "@0?DVWO"
+    expect: { reply_contains: "@0DVWO", matches: '^@0DVWO([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_secondary_audio_mark:
+    summary: "Set secondary audio mark (DVSA), then read it back on the DN-500BD"
+    params: { enabled: { type: bool, required: true, label: "Secondary audio mark", description: "On shows a mark when the disc has secondary audio." } }
+    send:
+      - "@0DVSA{enabled:map.secondary_audio_mark}"
+      - { models: [dn-500bd], message: "@0?DVSA" }
+    expect: *ack
+    returns: ack
+  get_secondary_audio_mark:
+    summary: "Read secondary audio mark (?DVSA): 00 on, 01 off"
+    send: "@0?DVSA"
+    expect: { reply_contains: "@0DVSA", matches: '^@0DVSA([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_hdmi_audio:
+    summary: "Set hDMI audio (DVHA), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [stereo, lpcm, bitstream], required: true, label: "HDMI audio", description: "The HDMI output's audio: stereo, lpcm or bitstream." } }
+    send:
+      - "@0DVHA{value:map.hdmi_audio}"
+      - { models: [dn-500bd], message: "@0?DVHA" }
+    expect: *ack
+    returns: ack
+  get_hdmi_audio:
+    summary: "Read hDMI audio (?DVHA): ST stereo, LP lpcm, BS bitstream"
+    send: "@0?DVHA"
+    expect: { reply_contains: "@0DVHA", matches: '^@0DVHA([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_digital_out:
+    summary: "Set coaxial/optical output (DVDO), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [lpcm48, lpcm96, lpcm192, bitstream], required: true, label: "Coaxial/optical output", description: "48, 96 or 192 kHz LPCM, or bitstream." } }
+    send:
+      - "@0DVDO{value:map.digital_out}"
+      - { models: [dn-500bd], message: "@0?DVDO" }
+    expect: *ack
+    returns: ack
+  get_digital_out:
+    summary: "Read coaxial/optical output (?DVDO): 48 lpcm48, 96 lpcm96, 19 lpcm192, BS bitstream"
+    send: "@0?DVDO"
+    expect: { reply_contains: "@0DVDO", matches: '^@0DVDO([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_drc:
+    summary: "Set dynamic range control (DVDR), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [auto, "on", "off"], required: true, label: "Dynamic range control", description: "auto (as the Blu-ray disc asks), on or off." } }
+    send:
+      - "@0DVDR{value:map.drc}"
+      - { models: [dn-500bd], message: "@0?DVDR" }
+    expect: *ack
+    returns: ack
+  get_drc:
+    summary: "Read dynamic range control (?DVDR): AT auto, 00 on, 01 off"
+    send: "@0?DVDR"
+    expect: { reply_contains: "@0DVDR", matches: '^@0DVDR([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_remote_code:
+    summary: "Set remote control code (DVRC), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [code1, code2, code3], required: true, label: "Remote control code", description: "The IR remote code the player answers: code1, code2 or code3." } }
+    send:
+      - "@0DVRC{value:map.remote_code}"
+      - { models: [dn-500bd], message: "@0?DVRC" }
+    expect: *ack
+    returns: ack
+  get_remote_code:
+    summary: "Read remote control code (?DVRC): C1 code1, C2 code2, C3 code3"
+    send: "@0?DVRC"
+    expect: { reply_contains: "@0DVRC", matches: '^@0DVRC([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_hdmi_cec:
+    summary: "Set hDMI CEC (DVHDC), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [hdmi1, "off"], required: true, label: "HDMI CEC", description: "hdmi1 lets the remote also control a TV over HDMI CEC; off controls the player only." } }
+    send:
+      - "@0DVHDC{value:map.hdmi_cec}"
+      - { models: [dn-500bd], message: "@0?DVHDC" }
+    expect: *ack
+    returns: ack
+  get_hdmi_cec:
+    summary: "Read hDMI CEC (?DVHDC): H1 hdmi1, OF off"
+    send: "@0?DVHDC"
+    expect: { reply_contains: "@0DVHDC", matches: '^@0DVHDC([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_bd_live:
+    summary: "Set bD-Live access (DVBDLNA), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [permitted, limited, prohibited], required: true, label: "BD-Live access", description: "permitted, limited or prohibited." } }
+    send:
+      - "@0DVBDLNA{value:map.bd_live}"
+      - { models: [dn-500bd], message: "@0?DVBDLNA" }
+    expect: *ack
+    returns: ack
+  get_bd_live:
+    summary: "Read bD-Live access (?DVBDLNA): 00 permitted, LT limited, 01 prohibited"
+    send: "@0?DVBDLNA"
+    expect: { reply_contains: "@0DVBDLNA", matches: '^@0DVBDLNA([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_buda:
+    summary: "Set bD-Live storage (DVBUDA), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [internal, external], required: true, label: "BD-Live storage", description: "internal memory or an external USB drive for BD-Live downloads." } }
+    send:
+      - "@0DVBUDA{value:map.buda}"
+      - { models: [dn-500bd], message: "@0?DVBUDA" }
+    expect: *ack
+    returns: ack
+  get_buda:
+    summary: "Read bD-Live storage (?DVBUDA): IN internal, EX external"
+    send: "@0?DVBUDA"
+    expect: { reply_contains: "@0DVBUDA", matches: '^@0DVBUDA([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_network_interface:
+    summary: "Set network interface (PCNI), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [ethernet, wifi], required: true, label: "Network interface", description: "ethernet or wifi (the DN-500BD only) for internet access." } }
+    send:
+      - "@0PCNI{value:map.network_interface}"
+      - { models: [dn-500bd], message: "@0?PCNI" }
+    expect: *ack
+    returns: ack
+  get_network_interface:
+    summary: "Read network interface (?PCNI): ET ethernet, WF wifi"
+    send: "@0?PCNI"
+    expect: { reply_contains: "@0PCNI", matches: '^@0PCNI([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_ir_lock:
+    summary: "Set iR lock (PCIRLK), then read it back on the DN-500BD"
+    params: { enabled: { type: bool, required: true, label: "IR lock", description: "On makes the player ignore its IR remote." } }
+    send:
+      - "@0PCIRLK{enabled:map.ir_lock}"
+      - { models: [dn-500bd], message: "@0?PCIRLK" }
+    expect: *ack
+    returns: ack
+  get_ir_lock:
+    summary: "Read iR lock (?PCIRLK): 00 on, 01 off"
+    send: "@0?PCIRLK"
+    expect: { reply_contains: "@0PCIRLK", matches: '^@0PCIRLK([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_program:
+    summary: "Set program mode (PCPMP), then read it back on the DN-500BD"
+    params: { enabled: { type: bool, required: true, label: "Program mode", description: "On turns program mode on." } }
+    send:
+      - "@0PCPMP{enabled:map.program}"
+      - { models: [dn-500bd], message: "@0?PCPMP" }
+    expect: *ack
+    returns: ack
+  get_program:
+    summary: "Read program mode (?PCPMP): 00 on, 01 off"
+    send: "@0?PCPMP"
+    expect: { reply_contains: "@0PCPMP", matches: '^@0PCPMP([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_time_display:
+    summary: "Set time display (PCTMD), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [elapsed, remaining, total_elapsed, total_remaining], required: true, label: "Time display", description: "Elapsed or remaining time of the track, or of the whole track list (total_)." } }
+    send:
+      - "@0PCTMD{value:map.time_display}"
+      - { models: [dn-500bd], message: "@0?PCTMD" }
+    expect: *ack
+    returns: ack
+  get_time_display:
+    summary: "Read time display (?PCTMD): EL elapsed, RM remaining, TL total_elapsed, TR total_remaining"
+    send: "@0?PCTMD"
+    expect: { reply_contains: "@0PCTMD", matches: '^@0PCTMD([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_osd_hidden:
+    summary: "Set oSD hiding (DVHOSD), then read it back on the DN-500BD"
+    params: { hidden: { type: bool, required: true, label: "OSD hiding", description: "On keeps menu text and icons off the video output; off shows them." } }
+    send:
+      - "@0DVHOSD{hidden:map.osd_hidden}"
+      - { models: [dn-500bd], message: "@0?DVHOSD" }
+    expect: *ack
+    returns: ack
+  get_osd_hidden:
+    summary: "Read oSD hiding (?DVHOSD): 00 on, 01 off"
+    send: "@0?DVHOSD"
+    expect: { reply_contains: "@0DVHOSD", matches: '^@0DVHOSD([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_resolution:
+    summary: "Set resolution (DVVR), then read it back on the DN-500BD"
+    params: { value: { type: enum, values: [auto, "480i", "480p", "720p", "1080i", "1080p"], required: true, label: "Resolution", description: "auto, 480i or 576i, 480p or 576p, 720p, 1080i or 1080p." } }
+    send:
+      - "@0DVVR{value:map.resolution}"
+      - { models: [dn-500bd], message: "@0?DVVR" }
+    expect: *ack
+    returns: ack
+  get_resolution:
+    summary: "Read resolution (?DVVR): 1 auto, 2 480i, 3 480p, 4 720p, 5 1080i, 6 1080p"
+    send: "@0?DVVR"
+    expect: { reply_contains: "@0DVVR", matches: '^@0DVVR([0-9A-Za-z]+)\r?$' }
+    returns: value
+  set_mute:
+    summary: "Set mute (mt), then read it back on the DN-500BD"
+    params: { muted: { type: bool, required: true, label: "Mute", description: "On mutes the audio, off unmutes it." } }
+    send:
+      - "@0mt{muted:map.mute}"
+      - { models: [dn-500bd], message: "@0?mt" }
+    expect: *ack
+    returns: ack
+  get_mute:
+    summary: "Read mute (?mt): 00 on, 01 off"
+    send: "@0?mt"
+    expect: { reply_contains: "@0mt", matches: '^@0mt([0-9A-Za-z]+)\r?$' }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      factory_reset erases every setting, restore_settings replaces them with the backup, and firmware_upgrade starts
+      an upgrade; none can be stopped from here. Changing the IP settings can take the player off the network.
+  - models: [all]
+    severity: warning
+    text: >
+      The player expects the host to answer each status it sends by itself with ACK; the spec format cannot answer a
+      push without awaiting a reply, so the player sends each such status twice and then stops repeating it. State
+      is unaffected. NACK, or BUSY when commands come too fast, fails the command.
+  - models: [dn-500bd-mkii]
+    severity: warning
+    text: >
+      The DN-500BD MKII's protocol guide documents RS-232C only, while its user guide offers control over the LAN
+      port; the TCP port, 9030, is the one the DN-500BD's guide documents for the same commands (and the one the
+      Bitfocus Companion module uses for the MKII). Its guide lists no status requests for the menu settings, the
+      panel lock, the program mode or the time display, so on the MKII those sets are not read back; and it gives
+      the rewind as PCSLSR and no separate fast forward (search forward covers it).
+  - models: [all]
+    severity: info
+    text: >
+      get_power is answered ACK when on and not at all when off (a timeout). The panel lock, the speaker
+      configuration and the parental password cannot be read back; the DN-500BD's guide marks its statuses as not
+      notified, so state is polled. The total group and group answers carry a "?" ("@0?PCTG0003"), as the guide
+      gives them; the guides show a space before some answer values ("@0at xxx"), which is read with or without it.
+  - models: [all]
+    severity: info
+    text: >
+      The RS-232C speed's factory setting is not documented; 115200 is assumed, the speed the guides ask for so that
+      every command works (the DN-500BD's user guide lists only 9600 and 38400). The speaker delay is in
+      milliseconds as the guide gives it; its range is not documented.
+
+state:
+  disc.status: { type: string, description: "no_disc, disc, unformatted, tray_open, tray_closed or tray_error (CD)" }
+  transport.status: { type: string, description: "play, pause, slow_forward, slow_reverse, fast_forward, fast_reverse, step, fs_play, menu, setup, track_menu or home (ST)" }
+  track.number: { type: int, description: "The current track: chapter or file (Tr)" }
+  tracks.total: { type: int, description: "Tracks (Tt)" }
+  group.number: { type: int, description: "The current group: title or folder (PCGp)" }
+  groups.total: { type: int, description: "Groups (PCTG)" }
+  time.elapsed: { type: string, description: "Elapsed time, H:MM:SS (ET)" }
+  time.remaining: { type: string, description: "Remaining time, H:MM:SS (RM)" }
+  track.time: { type: string, description: "The current track's time, M:SS or M:SS:FF with frames (tl)" }
+  track.title: { type: string, description: "The current track's title (ti)" }
+  track.artist: { type: string, description: "The current track's artist (at)" }
+  track.album: { type: string, description: "The current track's album (al)" }
+  track.sample_rate: { type: string, description: "The current track's sampling rate in kHz, or UKN (Fs)" }
+  media.type: { type: string, description: "dvd_video, dvd_audio, cdda, cd_rom, sacd, dvd_vr, bdmv, bdav, avchd, dlna, external or unknown (PCTYP)" }
+  audio.format: { type: string, description: "The audio format code: DBD, DTS, MPG, LPC, PPC, DSD, DD+, DTH, DHM, DLH, MP3, AAC, WMA or UKN (PCAFMT)" }
+  audio.channels: { type: string, description: "The audio channel code: 1CH to 8CH, 21C to 71C, L/R, RCH, LCH or UKN (BDACH)" }
+  audio.primary_language: { type: string, description: "The primary audio's ISO 639-2 language, or UKN (PCDG+)" }
+  audio.secondary_language: { type: string, description: "The secondary audio's ISO 639-2 language, or UKN (PCDG-)" }
+  subtitle.language: { type: string, description: "The subtitle's ISO 639-2 language, or UKN (DVSTC)" }
+  angle: { type: int, description: "The video angle's number (DVANGL)" }
+  version: { type: string, description: "The version digits and model name (VN)" }
+  random.kind: { type: string, description: "shuffle or random (PCPMR)" }
+  random.mode: { type: string, description: "off, sub_item, item or all (PCPMR)" }
+  search.direction: { type: string, description: "forward or reverse (PCSLS)" }
+  search.speed: { type: string, description: "fast or slow (PCSLS)" }
+  rating: { type: string, description: "The rating limit: OFF, KIDSAFE, G, PG, PG13, R, NC-17 or ADULT (DVPCRT)" }
+  area_code: { type: string, description: "The area code's country (DVPCAC)" }
+  languages.osd: { type: string, description: "On-screen menu language, ISO 639-2 or OFF (DVLGOS)" }
+  languages.menu: { type: string, description: "Disc menu language (DVLGDM)" }
+  languages.audio: { type: string, description: "Audio language (DVLGAD)" }
+  languages.subtitle: { type: string, description: "Subtitle language (DVLGST)" }
+  picture.brightness: { type: int, description: "Brightness, -16 to +16 (DVPABN)" }
+  picture.contrast: { type: int, description: "Contrast, -16 to +16 (DVPACT)" }
+  picture.hue: { type: int, description: "Hue, -9 to +9 (DVPAHU)" }
+  picture.saturation: { type: int, description: "Saturation, -9 to +9 (DVPASR)" }
+  speakers.*.size: { type: string, description: "A speaker's size, large or small (DVSCSt), keyed center, left, right, surround_left or surround_right" }
+  speakers.*.level: { type: int, unit: dB, description: "A speaker's level, -10 to +10 (DVSCSt)" }
+  speakers.*.delay: { type: int, unit: ms, description: "A speaker's delay (DVSCSt)" }
+  crossover: { type: string, description: "The crossover in Hz, or OFF (DVCO)" }
+  output_volume.mode: { type: string, description: "variable, fixed or infinity (minus infinity) (DVOV)" }
+  output_volume.db: { type: int, unit: dB, description: "The variable output level, -90 to +10 (DVOV)" }
+  max_volume: { type: int, unit: dB, description: "The maximum volume, -10 to +10 (DVMV)" }
+  mac_address: { type: string, description: "The MAC address, twelve hexadecimal digits (MA)" }
+  buda_size: { type: string, description: "The free BD-Live storage as the player gives it (DVBUDASZ)" }
+  network.ip_address: { type: string, description: "The IP address as twelve digits, or AUTO00000000 for DHCP (Ip)" }
+  network.subnet_mask: { type: string, description: "The subnet mask as twelve digits (SM)" }
+  network.gateway: { type: string, description: "The gateway as twelve digits (GW)" }
+  network.dns: { type: string, description: "The DNS server as twelve digits (DN)" }
+  network.proxy: { type: string, description: "The proxy as host:port, or OF for none (PCPX)" }
+  network.connection_test: { type: string, description: "The last connection test: success or failure (PCCT)" }
+  auto_play: { type: bool, description: "Auto play on (PCAP)" }
+  auto_resume: { type: bool, description: "Auto resume on (PCAR)" }
+  pip_mark: { type: bool, description: "PIP mark on (DVPIP)" }
+  hdmi_3d: { type: string, description: "3D output: auto or off (DV3D)" }
+  aspect: { type: string, description: "TV aspect ratio: 16_9_wide, 16_9_auto, 4_3_pan_scan or 4_3_letterbox (DVAr)" }
+  tv_system: { type: string, description: "TV system: ntsc, pal or multi (DVFM)" }
+  hdmi_1080p24: { type: bool, description: "1080p 24 Hz on (DV1K24)" }
+  dvd_24p: { type: bool, description: "DVD 24p conversion on (DV24pC)" }
+  color_space: { type: string, description: "HDMI color space: rgb_video, rgb_pc, ycbcr444 or ycbcr422 (DVCS)" }
+  deep_color: { type: string, description: "HDMI deep color: 48, 36, 30 or off (DVDC)" }
+  captions.attribute: { type: string, description: "Closed caption style: auto or custom (DVCC)" }
+  captions.font_color: { type: string, description: "Caption font color: default, white, black, red, green, blue, yellow, magenta or cyan (DVFC)" }
+  captions.font_size: { type: string, description: "Caption font size: default, standard, small or large (DVFS)" }
+  captions.font_style: { type: string, description: "Caption font style: default, mono_serif, mono_sans, proportional_serif, proportional_sans, casual, cursive or small_capitals (DVFT)" }
+  captions.font_opacity: { type: string, description: "Caption font opacity: solid, translucent or transparent (DVFO)" }
+  captions.font_edge: { type: string, description: "Caption font edge: default, none, raised, depressed, uniform, left_drop or right_drop (DVFE)" }
+  captions.edge_color: { type: string, description: "Caption edge color: white, black, red or green (DVFc)" }
+  captions.background_color: { type: string, description: "Caption background color: white, black, red or green (DVBC)" }
+  captions.background_opacity: { type: string, description: "Caption background opacity: solid, translucent or transparent (DVBO)" }
+  captions.window_color: { type: string, description: "Caption window color: white, black, red or green (DVWC)" }
+  captions.window_opacity: { type: string, description: "Caption window opacity: solid, translucent or transparent (DVWO)" }
+  secondary_audio_mark: { type: bool, description: "Secondary audio mark on (DVSA)" }
+  hdmi_audio: { type: string, description: "HDMI audio: stereo, lpcm or bitstream (DVHA)" }
+  digital_out: { type: string, description: "Coaxial/optical output: lpcm48, lpcm96, lpcm192 or bitstream (DVDO)" }
+  drc: { type: string, description: "Dynamic range control: auto, on or off (DVDR)" }
+  remote_code: { type: string, description: "Remote control code: code1, code2 or code3 (DVRC)" }
+  hdmi_cec: { type: string, description: "HDMI CEC: hdmi1 or off (DVHDC)" }
+  bd_live: { type: string, description: "BD-Live access: permitted, limited or prohibited (DVBDLNA)" }
+  buda: { type: string, description: "BD-Live storage: internal or external (DVBUDA)" }
+  network_interface: { type: string, description: "Network interface: ethernet or wifi (PCNI)" }
+  ir_lock: { type: bool, description: "IR lock on (PCIRLK)" }
+  program: { type: bool, description: "Program mode on (PCPMP)" }
+  time_display: { type: string, description: "Time display: elapsed, remaining, total_elapsed or total_remaining (PCTMD)" }
+  osd_hidden: { type: bool, description: "OSD hiding on (DVHOSD)" }
+  resolution: { type: string, description: "Resolution: auto, 480i, 480p, 720p, 1080i or 1080p (DVVR)" }
+  mute: { type: bool, description: "Mute on (mt)" }
+
+telemetry:
+  poll:
+    - every_ms: 1000
+      send: ["@0?ST", "@0?ET", "@0?RM"]
+    - every_ms: 5000
+      send: ["@0?CD", "@0?Tr", "@0?Tt", "@0?PCGp", "@0?PCTG", "@0?PCPMR", { models: [dn-500bd], message: "@0?PCSLS" }]
+    - every_ms: 30000
+      send: ["@0?PCTYP", "@0?PCAFMT", "@0?PCACH", "@0?PCDG+", "@0?PCDG-", "@0?DVSTC", "@0?VN", "@0?fs",
+        { models: [dn-500bd], message: "@0?DVANGL" }, { models: [dn-500bd], message: "@0?DVPCRT" },
+        { models: [dn-500bd], message: "@0?DVPCAC" }, { models: [dn-500bd], message: "@0?DVLGOS" },
+        { models: [dn-500bd], message: "@0?DVLGDM" }, { models: [dn-500bd], message: "@0?DVLGAD" },
+        { models: [dn-500bd], message: "@0?DVLGST" }, { models: [dn-500bd], message: "@0?DVPABN" },
+        { models: [dn-500bd], message: "@0?DVPACT" }, { models: [dn-500bd], message: "@0?DVPAHU" },
+        { models: [dn-500bd], message: "@0?DVPASR" }, { models: [dn-500bd], message: "@0?DVSCStC" },
+        { models: [dn-500bd], message: "@0?DVSCStL" }, { models: [dn-500bd], message: "@0?DVSCStR" },
+        { models: [dn-500bd], message: "@0?DVSCStl" }, { models: [dn-500bd], message: "@0?DVSCStr" },
+        { models: [dn-500bd], message: "@0?DVCO" }, { models: [dn-500bd], message: "@0?DVOV" },
+        { models: [dn-500bd], message: "@0?DVMV" }, { models: [dn-500bd], message: "@0?MA" },
+        { models: [dn-500bd], message: "@0?DVBUDASZ" }, { models: [dn-500bd], message: "@0?Ip" },
+        { models: [dn-500bd], message: "@0?SM" }, { models: [dn-500bd], message: "@0?GW" },
+        { models: [dn-500bd], message: "@0?DN" }, { models: [dn-500bd], message: "@0?PCPX" },
+        { models: [dn-500bd], message: "@0?PCAP" },
+        { models: [dn-500bd], message: "@0?PCAR" },
+        { models: [dn-500bd], message: "@0?DVPIP" },
+        { models: [dn-500bd], message: "@0?DV3D" },
+        { models: [dn-500bd], message: "@0?DVAr" },
+        { models: [dn-500bd], message: "@0?DVFM" },
+        { models: [dn-500bd], message: "@0?DV1K24" },
+        { models: [dn-500bd], message: "@0?DV24pC" },
+        { models: [dn-500bd], message: "@0?DVCS" },
+        { models: [dn-500bd], message: "@0?DVDC" },
+        { models: [dn-500bd], message: "@0?DVCC" },
+        { models: [dn-500bd], message: "@0?DVFC" },
+        { models: [dn-500bd], message: "@0?DVFS" },
+        { models: [dn-500bd], message: "@0?DVFT" },
+        { models: [dn-500bd], message: "@0?DVFO" },
+        { models: [dn-500bd], message: "@0?DVFE" },
+        { models: [dn-500bd], message: "@0?DVFc" },
+        { models: [dn-500bd], message: "@0?DVBC" },
+        { models: [dn-500bd], message: "@0?DVBO" },
+        { models: [dn-500bd], message: "@0?DVWC" },
+        { models: [dn-500bd], message: "@0?DVWO" },
+        { models: [dn-500bd], message: "@0?DVSA" },
+        { models: [dn-500bd], message: "@0?DVHA" },
+        { models: [dn-500bd], message: "@0?DVDO" },
+        { models: [dn-500bd], message: "@0?DVDR" },
+        { models: [dn-500bd], message: "@0?DVRC" },
+        { models: [dn-500bd], message: "@0?DVHDC" },
+        { models: [dn-500bd], message: "@0?DVBDLNA" },
+        { models: [dn-500bd], message: "@0?DVBUDA" },
+        { models: [dn-500bd], message: "@0?PCNI" },
+        { models: [dn-500bd], message: "@0?PCIRLK" },
+        { models: [dn-500bd], message: "@0?PCPMP" },
+        { models: [dn-500bd], message: "@0?PCTMD" },
+        { models: [dn-500bd], message: "@0?DVHOSD" },
+        { models: [dn-500bd], message: "@0?DVVR" },
+        { models: [dn-500bd], message: "@0?mt" }]
+  updates:
+    - match: '^@0CD([A-Z]{2})\r?$'
+      state: { disc.status: { value: "{1}", map: { NC: no_disc, CI: disc, UF: unformatted, TO: tray_open, TC: tray_closed, TE: tray_error } } }
+    - match: '^@0ST([A-Z]+)\r?$'
+      state: { transport.status: { value: "{1}", map: { PL: play, PP: pause, DVSF: slow_forward, DVSR: slow_reverse, DVFF: fast_forward,
+        DVFR: fast_reverse, DVSP: step, DVFS: fs_play, ED: menu, DVSU: setup, DVTR: track_menu, DVHM: home } } }
+    # A new track: its title, artist and album are read.
+    - match: '^@0Tr ?([0-9]{4})\r?$'
+      state: { track.number: "{1}" }
+      then_send: ["@0?ti", "@0?at", "@0?al", "@0?tl"]
+    - match: '^@0Tr ?UNKN\r?$'
+      state: { track.number: { delete: true } }
+    - match: '^@0Tt ?([0-9]{4})\r?$'
+      state: { tracks.total: "{1}" }
+    - match: '^@0Tt ?UNKN\r?$'
+      state: { tracks.total: { delete: true } }
+    - match: '^@0\?PCGp ?([0-9]{4})\r?$'
+      state: { group.number: "{1}" }
+    - match: '^@0\?PCGp ?UNKN\r?$'
+      state: { group.number: { delete: true } }
+    - match: '^@0\?PCTG ?([0-9]{4})\r?$'
+      state: { groups.total: "{1}" }
+    - match: '^@0\?PCTG ?UNKN\r?$'
+      state: { groups.total: { delete: true } }
+    - match: '^@0ET([0-9]{3})([0-9]{2})([0-9]{2})\r?$'
+      state: { time.elapsed: "{1}:{2:02d}:{3:02d}" }
+    - match: '^@0RM([0-9]{3})([0-9]{2})([0-9]{2})\r?$'
+      state: { time.remaining: "{1}:{2:02d}:{3:02d}" }
+    - match: '^@0tl ?([0-9]{3})([0-9]{2})([0-9]{2})\r?$'
+      state: { track.time: "{1}:{2:02d}:{3:02d}" }
+    - match: '^@0tl ?([0-9]{3})([0-9]{2})\r?$'
+      state: { track.time: "{1}:{2:02d}" }
+    - match: '^@0ti ?([^\r]*)\r?$'
+      state: { track.title: "{1}" }
+    - match: '^@0at ?([^\r]*)\r?$'
+      state: { track.artist: "{1}" }
+    - match: '^@0al ?([^\r]*)\r?$'
+      state: { track.album: "{1}" }
+    - match: '^@0Fs ?([0-9A-Z.]+)\r?$'
+      state: { track.sample_rate: "{1}" }
+    - match: '^@0PCTYP([A-Z]{3})\r?$'
+      state: { media.type: { value: "{1}", map: { DVV: dvd_video, DVA: dvd_audio, CDA: cdda, CDR: cd_rom, SAC: sacd, DVR: dvd_vr,
+        BDM: bdmv, BDA: bdav, AVH: avchd, DLN: dlna, EXT: external, UKN: unknown } } }
+    - match: '^@0PCAFMT([A-Z0-9+]{3})\r?$'
+      state: { audio.format: "{1}" }
+    - match: '^@0BDACH([A-Z0-9/]{3})\r?$'
+      state: { audio.channels: "{1}" }
+    - match: '^@0PCDG\+([A-Za-z]{3})\r?$'
+      state: { audio.primary_language: "{1}" }
+    - match: '^@0PCDG-([A-Za-z]{3})\r?$'
+      state: { audio.secondary_language: "{1}" }
+    - match: '^@0DVSTC ?([A-Za-z]{3})\r?$'
+      state: { subtitle.language: "{1}" }
+    - match: '^@0DVANGL([0-9]+)\r?$'
+      state: { angle: "{1}" }
+    - match: '^@0VN ?([^\r]+)\r?$'
+      state: { version: "{1}" }
+    - match: '^@0PCPMR([SR])([A-Z]{2})\r?$'
+      state:
+        random.kind: { value: "{1}", map: { S: shuffle, R: random } }
+        random.mode: { value: "{2}", map: { OF: "off", SI: sub_item, IT: item, AL: all } }
+    - match: '^@0PCSLS([FR])([fs])\r?$'
+      state:
+        search.direction: { value: "{1}", map: { F: forward, R: reverse } }
+        search.speed: { value: "{2}", map: { f: fast, s: slow } }
+    - match: '^@0DVPCRT([A-Z0-9-]+)\r?$'
+      state: { rating: "{1}" }
+    - match: '^@0DVPCAC([^\r]*)\r?$'
+      state: { area_code: "{1}" }
+    - match: '^@0DVLGOS([A-Za-z]{3})\r?$'
+      state: { languages.osd: "{1}" }
+    - match: '^@0DVLGDM([A-Za-z]{3})\r?$'
+      state: { languages.menu: "{1}" }
+    - match: '^@0DVLGAD([A-Za-z]{3})\r?$'
+      state: { languages.audio: "{1}" }
+    - match: '^@0DVLGST([A-Za-z]{3})\r?$'
+      state: { languages.subtitle: "{1}" }
+    - match: '^@0DVPABN([-+0-9]{3})\r?$'
+      state: { picture.brightness: "{1}" }
+    - match: '^@0DVPACT([-+0-9]{3})\r?$'
+      state: { picture.contrast: "{1}" }
+    - match: '^@0DVPAHU([-+0-9]{2})\r?$'
+      state: { picture.hue: "{1}" }
+    - match: '^@0DVPASR([-+0-9]{2})\r?$'
+      state: { picture.saturation: "{1}" }
+    # A speaker: its type, size, a sign and two digits of level, four digits of delay.
+    - match: '^@0DVSCStC([01])([-+][0-9]{2})([0-9]{4})\r?$'
+      state: { speakers.center.size: { value: "{1}", map: &size { "0": large, "1": small } }, speakers.center.level: "{2}", speakers.center.delay: "{3}" }
+    - match: '^@0DVSCStL([01])([-+][0-9]{2})([0-9]{4})\r?$'
+      state: { speakers.left.size: { value: "{1}", map: *size }, speakers.left.level: "{2}", speakers.left.delay: "{3}" }
+    - match: '^@0DVSCStR([01])([-+][0-9]{2})([0-9]{4})\r?$'
+      state: { speakers.right.size: { value: "{1}", map: *size }, speakers.right.level: "{2}", speakers.right.delay: "{3}" }
+    - match: '^@0DVSCStl([01])([-+][0-9]{2})([0-9]{4})\r?$'
+      state: { speakers.surround_left.size: { value: "{1}", map: *size }, speakers.surround_left.level: "{2}", speakers.surround_left.delay: "{3}" }
+    - match: '^@0DVSCStr([01])([-+][0-9]{2})([0-9]{4})\r?$'
+      state: { speakers.surround_right.size: { value: "{1}", map: *size }, speakers.surround_right.level: "{2}", speakers.surround_right.delay: "{3}" }
+    - match: '^@0DVCO([0-9A-Z]{3})\r?$'
+      state: { crossover: "{1}" }
+    - match: '^@0DVOV([-+][0-9]{2}|000)\r?$'
+      state: { output_volume.mode: variable, output_volume.db: "{1}" }
+    - match: '^@0DVOVFX\r?$'
+      state: { output_volume.mode: fixed }
+    - match: '^@0DVOVinf\r?$'
+      state: { output_volume.mode: infinity }
+    - match: '^@0DVMV([-+][0-9]{2})\r?$'
+      state: { max_volume: "{1}" }
+    - match: '^@0MA([0-9A-Fa-f]{12})\r?$'
+      state: { mac_address: "{1}" }
+    - match: '^@0DVBUDASZ([^\r]+)\r?$'
+      state: { buda_size: "{1}" }
+    - match: '^@0Ip([0-9A-Z]{12,15})\r?$'
+      state: { network.ip_address: "{1}" }
+    - match: '^@0SM([0-9]{12})\r?$'
+      state: { network.subnet_mask: "{1}" }
+    - match: '^@0GW([0-9]{12})\r?$'
+      state: { network.gateway: "{1}" }
+    - match: '^@0DN([0-9]{12})\r?$'
+      state: { network.dns: "{1}" }
+    - match: '^@0PCPX([^\r]+)\r?$'
+      state: { network.proxy: "{1}" }
+    - match: '^@0PCCT([0-9]{2})\r?$'
+      state: { network.connection_test: { value: "{1}", map: { "00": success, "01": failure } } }
+    - match: '^@0PCAP([0-9A-Za-z]+)\r?$'
+      state: { auto_play: { value: "{1}", map: { "00": true, "01": false } } }
+    - match: '^@0PCAR([0-9A-Za-z]+)\r?$'
+      state: { auto_resume: { value: "{1}", map: { "00": true, "01": false } } }
+    - match: '^@0DVPIP([0-9A-Za-z]+)\r?$'
+      state: { pip_mark: { value: "{1}", map: { "00": true, "01": false } } }
+    - match: '^@0DV3D([0-9A-Za-z]+)\r?$'
+      state: { hdmi_3d: { value: "{1}", map: { "AT": auto, "01": "off" } } }
+    - match: '^@0DVAr([0-9A-Za-z]+)\r?$'
+      state: { aspect: { value: "{1}", map: { "9W": "16_9_wide", "9A": "16_9_auto", "3P": "4_3_pan_scan", "3L": "4_3_letterbox" } } }
+    - match: '^@0DVFM([0-9A-Za-z]+)\r?$'
+      state: { tv_system: { value: "{1}", map: { "NT": ntsc, "PL": pal, "MS": multi } } }
+    - match: '^@0DV1K24([0-9A-Za-z]+)\r?$'
+      state: { hdmi_1080p24: { value: "{1}", map: { "00": true, "01": false } } }
+    - match: '^@0DV24pC([0-9A-Za-z]+)\r?$'
+      state: { dvd_24p: { value: "{1}", map: { "00": true, "01": false } } }
+    - match: '^@0DVCS([0-9A-Za-z]+)\r?$'
+      state: { color_space: { value: "{1}", map: { "RV": rgb_video, "RP": rgb_pc, "Y4": ycbcr444, "Y2": ycbcr422 } } }
+    - match: '^@0DVDC([0-9A-Za-z]+)\r?$'
+      state: { deep_color: { value: "{1}", map: { "48": "48", "36": "36", "30": "30", "OF": "off" } } }
+    - match: '^@0DVCC([0-9A-Za-z]+)\r?$'
+      state: { captions.attribute: { value: "{1}", map: { "AT": auto, "CT": custom } } }
+    - match: '^@0DVFC([0-9A-Za-z]+)\r?$'
+      state: { captions.font_color: { value: "{1}", map: { "DF": default, "WT": white, "BK": black, "RD": red, "GR": green, "BL": blue, "YL": yellow, "MA": magenta, "CY": cyan } } }
+    - match: '^@0DVFS([0-9A-Za-z]+)\r?$'
+      state: { captions.font_size: { value: "{1}", map: { "DF": default, "ST": standard, "SM": small, "LG": large } } }
+    - match: '^@0DVFT([0-9A-Za-z]+)\r?$'
+      state: { captions.font_style: { value: "{1}", map: { "DEF": default, "MNS": mono_serif, "MNN": mono_sans, "PTS": proportional_serif, "PTN": proportional_sans, "CAS": casual, "CUR": cursive, "SCA": small_capitals } } }
+    - match: '^@0DVFO([0-9A-Za-z]+)\r?$'
+      state: { captions.font_opacity: { value: "{1}", map: { "SD": solid, "TL": translucent, "TP": transparent } } }
+    - match: '^@0DVFE([0-9A-Za-z]+)\r?$'
+      state: { captions.font_edge: { value: "{1}", map: { "DE": default, "NN": none, "RS": raised, "DP": depressed, "UF": uniform, "LS": left_drop, "RD": right_drop } } }
+    - match: '^@0DVFc([0-9A-Za-z]+)\r?$'
+      state: { captions.edge_color: { value: "{1}", map: { "WT": white, "BK": black, "RD": red, "GR": green } } }
+    - match: '^@0DVBC([0-9A-Za-z]+)\r?$'
+      state: { captions.background_color: { value: "{1}", map: { "WT": white, "BK": black, "RD": red, "GR": green } } }
+    - match: '^@0DVBO([0-9A-Za-z]+)\r?$'
+      state: { captions.background_opacity: { value: "{1}", map: { "SD": solid, "TL": translucent, "TP": transparent } } }
+    - match: '^@0DVWC([0-9A-Za-z]+)\r?$'
+      state: { captions.window_color: { value: "{1}", map: { "WT": white, "BK": black, "RD": red, "GR": green } } }
+    - match: '^@0DVWO([0-9A-Za-z]+)\r?$'
+      state: { captions.window_opacity: { value: "{1}", map: { "SD": solid, "TL": translucent, "TP": transparent } } }
+    - match: '^@0DVSA([0-9A-Za-z]+)\r?$'
+      state: { secondary_audio_mark: { value: "{1}", map: { "00": true, "01": false } } }
+    - match: '^@0DVHA([0-9A-Za-z]+)\r?$'
+      state: { hdmi_audio: { value: "{1}", map: { "ST": stereo, "LP": lpcm, "BS": bitstream } } }
+    - match: '^@0DVDO([0-9A-Za-z]+)\r?$'
+      state: { digital_out: { value: "{1}", map: { "48": lpcm48, "96": lpcm96, "19": lpcm192, "BS": bitstream } } }
+    - match: '^@0DVDR([0-9A-Za-z]+)\r?$'
+      state: { drc: { value: "{1}", map: { "AT": auto, "00": "on", "01": "off" } } }
+    - match: '^@0DVRC([0-9A-Za-z]+)\r?$'
+      state: { remote_code: { value: "{1}", map: { "C1": code1, "C2": code2, "C3": code3 } } }
+    - match: '^@0DVHDC([0-9A-Za-z]+)\r?$'
+      state: { hdmi_cec: { value: "{1}", map: { "H1": hdmi1, "OF": "off" } } }
+    - match: '^@0DVBDLNA([0-9A-Za-z]+)\r?$'
+      state: { bd_live: { value: "{1}", map: { "00": permitted, "LT": limited, "01": prohibited } } }
+    - match: '^@0DVBUDA([0-9A-Za-z]+)\r?$'
+      state: { buda: { value: "{1}", map: { "IN": internal, "EX": external } } }
+    - match: '^@0PCNI([0-9A-Za-z]+)\r?$'
+      state: { network_interface: { value: "{1}", map: { "ET": ethernet, "WF": wifi } } }
+    - match: '^@0PCIRLK([0-9A-Za-z]+)\r?$'
+      state: { ir_lock: { value: "{1}", map: { "00": true, "01": false } } }
+    - match: '^@0PCPMP([0-9A-Za-z]+)\r?$'
+      state: { program: { value: "{1}", map: { "00": true, "01": false } } }
+    - match: '^@0PCTMD([0-9A-Za-z]+)\r?$'
+      state: { time_display: { value: "{1}", map: { "EL": elapsed, "RM": remaining, "TL": total_elapsed, "TR": total_remaining } } }
+    - match: '^@0DVHOSD([0-9A-Za-z]+)\r?$'
+      state: { osd_hidden: { value: "{1}", map: { "00": true, "01": false } } }
+    - match: '^@0DVVR([0-9A-Za-z]+)\r?$'
+      state: { resolution: { value: "{1}", map: { "1": auto, "2": "480i", "3": "480p", "4": "720p", "5": "1080i", "6": "1080p" } } }
+    - match: '^@0mt([0-9A-Za-z]+)\r?$'
+      state: { mute: { value: "{1}", map: { "00": true, "01": false } } }
