@@ -149,6 +149,8 @@ mod resolume_push;
 mod rtp_journal;
 #[cfg(any(feature = "generic-midi", feature = "midi-show-control"))]
 mod rtp_midi;
+#[cfg(feature = "sacn")]
+mod sacn;
 #[cfg(feature = "samsung-mdc")]
 mod samsung_mdc;
 #[cfg(feature = "samsung-mdc")]
@@ -302,6 +304,8 @@ pub(crate) fn construct(
         },
         #[cfg(feature = "artnet")]
         "artnet" => Ok(Box::new(artnet::ArtNet::new(context)?)),
+        #[cfg(feature = "sacn")]
+        "sacn" => Ok(Box::new(sacn::Sacn::new(context)?)),
         #[cfg(feature = "osc-listener")]
         "osc-listener" => Ok(Box::new(osc_listener::OscListener::new(context)?)),
         #[cfg(feature = "tsl-umd-display")]
@@ -535,8 +539,10 @@ mod tests {
                     let used = first_port(&cx.take());
                     // These send nothing until asked (a request, a watched
                     // stream), so there is nothing to compare on starting.
+                    // An sACN source sends nothing before it holds a
+                    // universe.
                     if used.is_none()
-                        && ["generic-http", "http-snapshot"].contains(&spec.id.as_str())
+                        && ["generic-http", "http-snapshot", "sacn"].contains(&spec.id.as_str())
                     {
                         continue;
                     }

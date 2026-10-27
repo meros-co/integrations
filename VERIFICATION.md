@@ -3171,6 +3171,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check how often a restricted-tier token is refused with 429 at the core's pacing and polls. ([specs/rundown-studio.yaml:64](specs/rundown-studio.yaml#L64))
 - [ ] Confirm the cue order's children carry {id} as the shallow rundown example shows (the reorder body names them cue_id). ([specs/rundown-studio.yaml:720](specs/rundown-studio.yaml#L720))
 
+## sacn — sACN (ANSI E1.31)
+
+- [ ] Check that receivers take the core's universes, keep-alives and Stream_Terminated packets (multicast and unicast), and list it from its Universe Discovery. ([specs/sacn.yaml:150](specs/sacn.yaml#L150))
+- [ ] With two consoles at one priority, compare the received levels (merged highest takes precedence) with what the fixtures do, and check that a source is dropped 2.5 s after it stops. ([specs/sacn.yaml:159](specs/sacn.yaml#L159))
+- [ ] Check that multicast is received on each interface the core joins on, with several programs on the host listening on port 5568. ([specs/sacn.yaml:142](specs/sacn.yaml#L142))
+- [ ] Check what changed in the current edition of E1.31 against the 2016 edition this follows. ([specs/sacn.yaml:174](specs/sacn.yaml#L174))
+
 ## samsung-mdc — Samsung displays (MDC)
 
 - [ ] Check the secured mode handshake on a display with the secured protocol on: the plain-text MDCSTART<<TLS>> greeting, a TLS handshake on the same connection, the 4-digit PIN sent bare, and MDCAUTH<<PASS>> or MDCAUTH<<FAIL:xxxx>> (taken from a third-party library, not Ver. 15.0). ([specs/samsung-mdc.yaml:2884](specs/samsung-mdc.yaml#L2884))

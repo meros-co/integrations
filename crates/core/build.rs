@@ -137,6 +137,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-dtvideolabs", &["dtvideolabs-playbackpro-plus"]),
     ("vendor-epiphan", &["epiphan-pearl"]),
     ("vendor-epson", &["epson-projector"]),
+    ("vendor-esta", &["sacn"]),
     ("vendor-etc", &["etc-echo", "etc-eos", "etc-paradigm"]),
     ("vendor-evertz", &["evertz-quartz"]),
     (
