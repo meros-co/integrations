@@ -1,0 +1,736 @@
+spec: 1
+id: ventuz-director
+name: Ventuz Director (Director Remoting)
+vendor: Ventuz
+category: playback
+
+# Ventuz Director's Remoting API takes one JSON object per websocket message,
+# {"Command": "<command>", "RequestID": <int>, <parameters>...}, and answers
+# each with {"RequestID", "Code", "Result", "Warnings", "Errors"}, Code 0 being
+# success. Each command here sends its own fixed RequestID, which its reply
+# echoes and the command waits for. The API pushes nothing, so the status,
+# topology, show, channels, playlists, window layout, macros and remote
+# playlist are read on connecting and polled.
+source:
+  - title: "Ventuz Director Remoting (Director documentation, Remoting chapter)"
+    author: Ventuz Technology AG
+    url: "https://www.ventuz.com/support/help/latest/Director/DirectorRemoting.html"
+    note: >
+      Manufacturer documentation, read 2026-10-27. Remoting is turned on in Director's Application
+      Settings (Tools > Options). Websocket ws://<machine>:22404/DirectorRemoting_Service/1.0/commands/ws
+      and REST http://<machine>:22404/DirectorRemoting_Service/1.0/commands/api/:<command>. Request
+      {Command, RequestID, parameters}; response {RequestID, Status, Code, Result, Warnings, Errors}, Warnings
+      and Errors lists of {ResultIndex, Message}; channel results {ChannelIndex, ChannelName, Code,
+      TakeIndex, TakeCount}, the top-level Code Ok when one channel succeeded. Commands: log.write,
+      status.get; window.fullscreen, window.reverse, window.getlayout, window.setlayout,
+      window.can.setlayout; topology.get, topology.set, topology.status; show.get, show.open, show.close,
+      show.cue, show.can.cue, show.can.cuechannel, show.take, show.can.take, show.takerecue,
+      show.recueonair, show.can.recueonair, show.takeout, show.can.takeout, show.takeoutrecue,
+      show.clear, show.can.clear, show.gettemplates, show.getpages, show.createpage, show.getchannels,
+      show.getprojectdata, show.setprojectdata (Event, Boolean with Toggle, String, Enum, Asset, Arrays,
+      Color, Single/Double/Integer with SetRelative), show.preloadtemplates,
+      show.preloadtemplates_playlist, show.preloadtemplates_timeline, show.reloadtemplates,
+      show.getassets; playlist.getmeta, playlist.get, playlist.can.activate, playlist.activate,
+      playlist.can.restart, playlist.restart; remoteplaylist.get, remoteplaylist.open (SpecialAction
+      UseBlankShow, UseShowUri, UseDefaultShow, UseCurrentShow); macro.get, macro.execute,
+      macro.can.execute; timeline.play, timeline.pause, timeline.rewind, timeline.forward,
+      timeline.jumpstart, timeline.jumpend. Response codes 0 Ok, 1 ErrorException, 2 ErrorValidation,
+      3 ErrorNotFound, 4 ErrorNoShow, 5 ErrorInvalidOperation.
+  - title: "companion-module-ventuz-director (MIT, Ventuz Technology AG)"
+    author: Ventuz Technology AG
+    url: "https://github.com/bitfocus/companion-module-ventuz-director"
+    note: >
+      Corroboration only, read 2026-10-27: the websocket path, a numeric RequestID per request, replies told
+      apart by RequestID, and the "'Websocket' connection is disabled" error Director answers when its
+      websocket is turned off. Its default port 21404 differs from the documented 22404; the documentation
+      is followed.
+
+transport:
+  type: ws
+  port: 22404
+  path: /DirectorRemoting_Service/1.0/commands/ws
+  scheme: ws
+  timeout_ms: 10000
+  reply: expected
+  probe: '{"Command":"status.get","RequestID":999}'
+
+ports:
+  - { port: 22404, protocol: ws, role: control, note: "Director Remoting, turned on in Director's Application Settings" }
+
+models:
+  - id: director
+    name: Ventuz Director (Enterprise edition, 6.11 and later)
+    supports: [get_status, log_write, window_fullscreen, window_reverse, window_get_layout,
+               window_set_layout_index, window_set_layout_name, window_can_set_layout_index,
+               window_can_set_layout_name, topology_get, topology_set, topology_set_timeout, topology_status,
+               show_get, show_open, show_open_timeout, show_close, show_cue_uri, show_cue_template_data,
+               show_cue_template, show_cue_page, show_can_cue_uri, show_can_cue_template_data,
+               show_can_cue_template, show_can_cue_page, show_can_cue_channel, show_take, show_can_take,
+               show_take_recue, show_recue_on_air, show_can_recue_on_air, show_take_out, show_can_take_out,
+               show_take_out_recue, show_clear, show_can_clear, show_get_templates, show_get_pages,
+               show_create_page, show_get_channels, show_get_project_data, show_trigger_project_event,
+               show_set_project_bool, show_toggle_project_bool, show_set_project_value,
+               show_set_project_number_relative, show_preload_templates, show_preload_templates_playlist,
+               show_preload_templates_timeline, show_reload_templates, show_get_assets, playlist_get,
+               playlist_get_meta_index, playlist_get_meta_name, playlist_activate_index, playlist_activate_name,
+               playlist_can_activate_index, playlist_can_activate_name, playlist_restart, playlist_can_restart,
+               remote_playlist_get, remote_playlist_open, remote_playlist_open_show, macro_get,
+               macro_execute_id, macro_execute_name, macro_can_execute_id, macro_can_execute_name,
+               timeline_play, timeline_pause, timeline_rewind, timeline_forward, timeline_jump_start,
+               timeline_jump_end]
+    verification: none
+
+commands:
+  # ── Application ─────────────────────────────────────────────────────────
+  get_status:
+    summary: "Read Director's status: version, user, machine, topology, show, project, remote playlist and channel count (status.get)"
+    send: '{"Command":"status.get","RequestID":1}'
+    expect: { reply_json: { "$.RequestID": "1" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  log_write:
+    summary: "Write a message to Director's log (log.write)"
+    params:
+      level: { type: enum, values: [Verbose, Info, Warning, Error, Fatal], default: Info,
+               label: Level, description: "The log level the message is written at." }
+      message: { type: string, max_length: 4096, required: true,
+                 label: Message, description: "The text written to the log." }
+      popup: { type: bool, default: false,
+               label: Pop up, description: "Also show the message in a pop-up in Director." }
+    send: '{"Command":"log.write","RequestID":2,"Level":"{level}","Message":{message:json},"PopUp":{popup}}'
+    expect: { reply_json: { "$.RequestID": "2" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+
+  # ── Window ──────────────────────────────────────────────────────────────
+  window_fullscreen:
+    summary: "Toggle Director's window between fullscreen and windowed (window.fullscreen)"
+    send: '{"Command":"window.fullscreen","RequestID":10}'
+    expect: { reply_json: { "$.RequestID": "10" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  window_reverse:
+    summary: "Restore Director's previous window size (window.reverse)"
+    send: '{"Command":"window.reverse","RequestID":11}'
+    expect: { reply_json: { "$.RequestID": "11" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  window_get_layout:
+    summary: "Read the window layout in use, its index and name; needs an open show (window.getlayout)"
+    send: '{"Command":"window.getlayout","RequestID":12}'
+    expect: { reply_json: { "$.RequestID": "12" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  window_set_layout_index:
+    summary: "Switch the window layout, by index (window.setlayout)"
+    params:
+      index: &layout_index { type: int, min: 0, required: true,
+                             label: Layout, description: "The window layout's index, as window.getlayout reports it." }
+    send: '{"Command":"window.setlayout","RequestID":13,"Index":{index}}'
+    expect: { reply_json: { "$.RequestID": "13" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  window_set_layout_name:
+    summary: "Switch the window layout, by name (window.setlayout)"
+    params:
+      name: &layout_name { type: string, max_length: 256, required: true,
+                           label: Layout name, description: "The window layout's name." }
+    send: '{"Command":"window.setlayout","RequestID":14,"Name":{name:json}}'
+    expect: { reply_json: { "$.RequestID": "14" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  window_can_set_layout_index:
+    summary: "Check whether a window layout can be switched to, by index; succeeds when it can (window.can.setlayout)"
+    params: { index: *layout_index }
+    send: '{"Command":"window.can.setlayout","RequestID":15,"Index":{index}}'
+    expect: { reply_json: { "$.RequestID": "15" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  window_can_set_layout_name:
+    summary: "Check whether a window layout can be switched to, by name; succeeds when it can (window.can.setlayout)"
+    params: { name: *layout_name }
+    send: '{"Command":"window.can.setlayout","RequestID":16,"Name":{name:json}}'
+    expect: { reply_json: { "$.RequestID": "16" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+
+  # ── Topology ────────────────────────────────────────────────────────────
+  topology_get:
+    summary: "Read the topology in use and where it comes from (topology.get)"
+    send: '{"Command":"topology.get","RequestID":20}'
+    expect: { reply_json: { "$.RequestID": "20" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  topology_set:
+    summary: "Switch to another topology and wait for its client systems (topology.set)"
+    params:
+      name: &topology_name { type: string, max_length: 256, required: true,
+                             label: Topology, description: "The name of the topology to switch to." }
+      save: &save_topology { type: bool, default: false,
+                             label: Save current, description: "Save the current topology before switching." }
+    send: '{"Command":"topology.set","RequestID":21,"Name":{name:json},"SaveTopology":{save}}'
+    expect: { reply_json: { "$.RequestID": "21" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  topology_set_timeout:
+    summary: "Switch to another topology, waiting at most a given time for its client systems; a timeout succeeds with warnings (topology.set)"
+    params:
+      name: *topology_name
+      save: *save_topology
+      timeout_ms: &timeout_ms { type: int, min: 0, required: true, label: Timeout,
+                                description: "How long Director waits for the operation, in milliseconds." }
+    send: '{"Command":"topology.set","RequestID":22,"Name":{name:json},"SaveTopology":{save},"TimeOut":{timeout_ms}}'
+    expect: { reply_json: { "$.RequestID": "22" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  topology_status:
+    summary: "Read the topology's name, number of ports and state (topology.status)"
+    send: '{"Command":"topology.status","RequestID":23}'
+    expect: { reply_json: { "$.RequestID": "23" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+
+  # ── Show ────────────────────────────────────────────────────────────────
+  show_get:
+    summary: "Read the open show's id, project, publish context, URI and description (show.get)"
+    send: '{"Command":"show.get","RequestID":30}'
+    expect: { reply_json: { "$.RequestID": "30" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  show_open:
+    summary: "Open a show (show.open)"
+    params:
+      uri: &show_uri { type: string, max_length: 4096, required: true,
+                       label: Show, description: "The show's path or URI." }
+    send: '{"Command":"show.open","RequestID":31,"Uri":{uri:json}}'
+    expect: { reply_json: { "$.RequestID": "31" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  show_open_timeout:
+    summary: "Open a show, waiting at most a given time (show.open)"
+    params: { uri: *show_uri, timeout_ms: *timeout_ms }
+    send: '{"Command":"show.open","RequestID":32,"Uri":{uri:json},"TimeOut":{timeout_ms}}'
+    expect: { reply_json: { "$.RequestID": "32" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  show_close:
+    summary: "Close the open show (show.close)"
+    params:
+      save: { type: bool, default: false, label: Save, description: "Save the show before closing it." }
+      clear_renderer: { type: bool, default: false, label: Clear renderer, description: "Clear the renderers when the show closes." }
+    send: '{"Command":"show.close","RequestID":33,"SaveShow":{save},"ClearRenderer":{clear_renderer}}'
+    expect: { reply_json: { "$.RequestID": "33" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  show_cue_uri:
+    summary: "Cue a template or page by URI on a channel (show.cue)"
+    params:
+      uri: &item_uri { type: string, max_length: 4096, required: true,
+                       label: URI, description: "The template's or page's URI." }
+      channel: &channel { type: int, min: 0, required: true,
+                          label: Channel, description: "The channel's index, as show.getchannels lists it." }
+      ignore_rules: &ignore_rules { type: bool, default: false, label: Ignore channel rules,
+                                    description: "Cue even where the channel's rules would refuse it." }
+    send: '{"Command":"show.cue","RequestID":40,"Uri":{uri:json},"ChannelIndex":{channel},"IgnoreChannelRules":{ignore_rules}}'
+    expect: { reply_json: { "$.RequestID": "40" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  show_cue_template_data:
+    summary: "Cue a template with its data, given as Director's template data JSON, on a channel (show.cue)"
+    params:
+      template_data: &template_data { type: string, multiline: true, max_length: 1048576, required: true,
+                                      label: Template data, description: "The template data JSON, as show.gettemplates gives it, sent as a string." }
+      channel: *channel
+      ignore_rules: *ignore_rules
+    send: '{"Command":"show.cue","RequestID":41,"TemplateData":{template_data:json},"ChannelIndex":{channel},"IgnoreChannelRules":{ignore_rules}}'
+    expect: { reply_json: { "$.RequestID": "41" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  show_cue_template:
+    summary: "Cue a template by its display name on a channel (show.cue)"
+    params:
+      name: &template_name { type: string, max_length: 1024, required: true,
+                             label: Template, description: "The template's display name." }
+      channel: *channel
+      ignore_rules: *ignore_rules
+    send: '{"Command":"show.cue","RequestID":42,"TemplateDisplayName":{name:json},"ChannelIndex":{channel},"IgnoreChannelRules":{ignore_rules}}'
+    expect: { reply_json: { "$.RequestID": "42" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  show_cue_page:
+    summary: "Cue a page by its display name on a channel (show.cue)"
+    params:
+      name: &page_name { type: string, max_length: 1024, required: true,
+                         label: Page, description: "The page's display name." }
+      channel: *channel
+      ignore_rules: *ignore_rules
+    send: '{"Command":"show.cue","RequestID":43,"PageDisplayName":{name:json},"ChannelIndex":{channel},"IgnoreChannelRules":{ignore_rules}}'
+    expect: { reply_json: { "$.RequestID": "43" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  show_can_cue_uri:
+    summary: "Check whether a template or page can be cued by URI; returns each channel's result (show.can.cue)"
+    params: { uri: *item_uri, channel: *channel, ignore_rules: *ignore_rules }
+    send: '{"Command":"show.can.cue","RequestID":44,"Uri":{uri:json},"ChannelIndex":{channel},"IgnoreChannelRules":{ignore_rules}}'
+    expect: { reply_json: { "$.RequestID": "44" }, json_path: "$" }
+    returns: value
+  show_can_cue_template_data:
+    summary: "Check whether a template with its data can be cued; returns each channel's result (show.can.cue)"
+    params: { template_data: *template_data, channel: *channel, ignore_rules: *ignore_rules }
+    send: '{"Command":"show.can.cue","RequestID":45,"TemplateData":{template_data:json},"ChannelIndex":{channel},"IgnoreChannelRules":{ignore_rules}}'
+    expect: { reply_json: { "$.RequestID": "45" }, json_path: "$" }
+    returns: value
+  show_can_cue_template:
+    summary: "Check whether a template can be cued by display name; returns each channel's result (show.can.cue)"
+    params: { name: *template_name, channel: *channel, ignore_rules: *ignore_rules }
+    send: '{"Command":"show.can.cue","RequestID":46,"TemplateDisplayName":{name:json},"ChannelIndex":{channel},"IgnoreChannelRules":{ignore_rules}}'
+    expect: { reply_json: { "$.RequestID": "46" }, json_path: "$" }
+    returns: value
+  show_can_cue_page:
+    summary: "Check whether a page can be cued by display name; returns each channel's result (show.can.cue)"
+    params: { name: *page_name, channel: *channel, ignore_rules: *ignore_rules }
+    send: '{"Command":"show.can.cue","RequestID":47,"PageDisplayName":{name:json},"ChannelIndex":{channel},"IgnoreChannelRules":{ignore_rules}}'
+    expect: { reply_json: { "$.RequestID": "47" }, json_path: "$" }
+    returns: value
+  show_can_cue_channel:
+    summary: "Check whether a channel can cue at all; returns its result (show.can.cuechannel)"
+    params: { channel: *channel }
+    send: '{"Command":"show.can.cuechannel","RequestID":48,"ChannelIndex":{channel}}'
+    expect: { reply_json: { "$.RequestID": "48" }, json_path: "$" }
+    returns: value
+  show_take:
+    summary: "Take the cued item on a channel to air (show.take)"
+    params: { channel: *channel }
+    send: '{"Command":"show.take","RequestID":50,"ChannelIndex":{channel}}'
+    expect: { reply_json: { "$.RequestID": "50" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  show_can_take:
+    summary: "Check whether a channel can take; returns its result (show.can.take)"
+    params: { channel: *channel }
+    send: '{"Command":"show.can.take","RequestID":51,"ChannelIndex":{channel}}'
+    expect: { reply_json: { "$.RequestID": "51" }, json_path: "$" }
+    returns: value
+  show_take_recue:
+    summary: "Take the cued item on a channel and cue the next (show.takerecue)"
+    params: { channel: *channel }
+    send: '{"Command":"show.takerecue","RequestID":52,"ChannelIndex":{channel}}'
+    expect: { reply_json: { "$.RequestID": "52" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  show_recue_on_air:
+    summary: "Cue the item on air on a channel again (show.recueonair)"
+    params: { channel: *channel }
+    send: '{"Command":"show.recueonair","RequestID":53,"ChannelIndex":{channel}}'
+    expect: { reply_json: { "$.RequestID": "53" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  show_can_recue_on_air:
+    summary: "Check whether a channel can recue its on-air item; returns its result (show.can.recueonair)"
+    params: { channel: *channel }
+    send: '{"Command":"show.can.recueonair","RequestID":54,"ChannelIndex":{channel}}'
+    expect: { reply_json: { "$.RequestID": "54" }, json_path: "$" }
+    returns: value
+  show_take_out:
+    summary: "Take the item on air on a channel off air (show.takeout)"
+    params: { channel: *channel }
+    send: '{"Command":"show.takeout","RequestID":55,"ChannelIndex":{channel}}'
+    expect: { reply_json: { "$.RequestID": "55" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  show_can_take_out:
+    summary: "Check whether a channel can take out; returns its result (show.can.takeout)"
+    params: { channel: *channel }
+    send: '{"Command":"show.can.takeout","RequestID":56,"ChannelIndex":{channel}}'
+    expect: { reply_json: { "$.RequestID": "56" }, json_path: "$" }
+    returns: value
+  show_take_out_recue:
+    summary: "Take the item on air off air and cue it again (show.takeoutrecue)"
+    params: { channel: *channel }
+    send: '{"Command":"show.takeoutrecue","RequestID":57,"ChannelIndex":{channel}}'
+    expect: { reply_json: { "$.RequestID": "57" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  show_clear:
+    summary: "Clear a channel (show.clear)"
+    params: { channel: *channel }
+    send: '{"Command":"show.clear","RequestID":58,"ChannelIndex":{channel}}'
+    expect: { reply_json: { "$.RequestID": "58" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  show_can_clear:
+    summary: "Check whether a channel can be cleared; returns its result (show.can.clear)"
+    params: { channel: *channel }
+    send: '{"Command":"show.can.clear","RequestID":59,"ChannelIndex":{channel}}'
+    expect: { reply_json: { "$.RequestID": "59" }, json_path: "$" }
+    returns: value
+  show_get_templates:
+    summary: "Read the show's templates as Director's template data JSON (show.gettemplates)"
+    send: '{"Command":"show.gettemplates","RequestID":60}'
+    expect: { reply_json: { "$.RequestID": "60" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  show_get_pages:
+    summary: "Read the show's pages as Director's template data JSON (show.getpages)"
+    send: '{"Command":"show.getpages","RequestID":61}'
+    expect: { reply_json: { "$.RequestID": "61" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  show_create_page:
+    summary: "Create a page from a template and its data (show.createpage)"
+    params:
+      template_data: *template_data
+      name: { type: string, max_length: 1024, required: true, label: Name, description: "The new page's name." }
+      level: { type: string, max_length: 4096, required: true, label: Template URI, description: "The URI of the template the page is made from." }
+      description: { type: string, max_length: 4096, default: "", label: Description, description: "The page's description." }
+      keywords: { type: string, max_length: 4096, default: "", label: Keywords, description: "The page's keywords, separated by commas." }
+      category: { type: string, max_length: 1024, default: "", label: Category, description: "The page's category." }
+      channel_ids: { type: string, pattern: '^([0-9]+(,[0-9]+)*)?$', max_length: 1024, default: "",
+                     label: Channels, description: "The channels the page is for, as channel numbers separated by commas; empty for none given." }
+    send: '{"Command":"show.createpage","RequestID":62,"TemplateData":{template_data:json},"Name":{name:json},"Level":{level:json},"Description":{description:json},"Keywords":{keywords:json},"Category":{category:json},"ChannelIds":"{channel_ids}"}'
+    expect: { reply_json: { "$.RequestID": "62" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  show_get_channels:
+    summary: "Read the show's channels, each index and name (show.getchannels)"
+    send: '{"Command":"show.getchannels","RequestID":63}'
+    expect: { reply_json: { "$.RequestID": "63" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  show_get_project_data:
+    summary: "Read the project data items of the open show (show.getprojectdata)"
+    send: '{"Command":"show.getprojectdata","RequestID":64}'
+    expect: { reply_json: { "$.RequestID": "64" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  show_trigger_project_event:
+    summary: "Trigger an event item of the project data (show.setprojectdata)"
+    params:
+      path: &data_path { type: string, max_length: 1024, required: true,
+                         label: Data path, description: "The project data item's path, as show.getprojectdata lists it." }
+    send: '{"Command":"show.setprojectdata","RequestID":65,"DataPath":{path:json}}'
+    expect: { reply_json: { "$.RequestID": "65" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  show_set_project_bool:
+    summary: "Set a boolean item of the project data (show.setprojectdata)"
+    params:
+      path: *data_path
+      value: { type: bool, required: true, label: Value, description: "The value to set." }
+    send: '{"Command":"show.setprojectdata","RequestID":66,"DataPath":{path:json},"ValueToSet":"{value}"}'
+    expect: { reply_json: { "$.RequestID": "66" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  show_toggle_project_bool:
+    summary: "Toggle a boolean item of the project data (show.setprojectdata, SpecialAction Toggle)"
+    params: { path: *data_path }
+    send: '{"Command":"show.setprojectdata","RequestID":67,"DataPath":{path:json},"SpecialAction":"Toggle"}'
+    expect: { reply_json: { "$.RequestID": "67" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  show_set_project_value:
+    summary: "Set a string, enum, asset, array, color or number item of the project data, given as text (show.setprojectdata)"
+    params:
+      path: *data_path
+      value: { type: string, max_length: 65536, required: true, label: Value,
+               description: "The value as text: a string, an enum value, an asset URI, an array as Director parses it, a color as r,g,b or a,r,g,b, or a number." }
+    send: '{"Command":"show.setprojectdata","RequestID":68,"DataPath":{path:json},"ValueToSet":{value:json}}'
+    expect: { reply_json: { "$.RequestID": "68" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  show_set_project_number_relative:
+    summary: "Add to a number item of the project data (show.setprojectdata with SetRelative)"
+    params:
+      path: *data_path
+      delta: { type: float, required: true, label: Change, description: "The amount added to the item's current value; negative to subtract." }
+    send: '{"Command":"show.setprojectdata","RequestID":69,"DataPath":{path:json},"ValueToSet":"{delta:.6f}","SetRelative":true}'
+    expect: { reply_json: { "$.RequestID": "69" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  show_preload_templates:
+    summary: "Preload the show's templates on every channel (show.preloadtemplates)"
+    send: '{"Command":"show.preloadtemplates","RequestID":70}'
+    expect: { reply_json: { "$.RequestID": "70" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  show_preload_templates_playlist:
+    summary: "Preload the templates of every playlist (show.preloadtemplates_playlist)"
+    send: '{"Command":"show.preloadtemplates_playlist","RequestID":71}'
+    expect: { reply_json: { "$.RequestID": "71" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  show_preload_templates_timeline:
+    summary: "Preload the templates of every timeline (show.preloadtemplates_timeline)"
+    send: '{"Command":"show.preloadtemplates_timeline","RequestID":72}'
+    expect: { reply_json: { "$.RequestID": "72" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  show_reload_templates:
+    summary: "Reload the show's templates, waiting at most a given time (show.reloadtemplates)"
+    params: { timeout_ms: *timeout_ms }
+    send: '{"Command":"show.reloadtemplates","RequestID":73,"TimeOut":{timeout_ms}}'
+    expect: { reply_json: { "$.RequestID": "73" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  show_get_assets:
+    summary: "List the show's assets other than templates and pages: URI, display name, type and pool, with thumbnails if asked (show.getassets)"
+    params:
+      thumbnails: { type: bool, default: false, label: Thumbnails, description: "Include each asset's thumbnail as a base64 PNG." }
+    send: '{"Command":"show.getassets","RequestID":74,"IncludeThumbnail":{thumbnails}}'
+    expect: { reply_json: { "$.RequestID": "74" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+
+  # ── Playlists ───────────────────────────────────────────────────────────
+  playlist_get:
+    summary: "Read every channel's playlist and its items with their status (playlist.get)"
+    send: '{"Command":"playlist.get","RequestID":80}'
+    expect: { reply_json: { "$.RequestID": "80" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  playlist_get_meta_index:
+    summary: "Read a playlist item's metadata, by its index (playlist.getmeta)"
+    params:
+      channel: *channel
+      index: &item_index { type: int, min: 0, required: true, label: Item, description: "The item's index in the channel's playlist, as playlist.get lists it." }
+    send: '{"Command":"playlist.getmeta","RequestID":81,"ChannelIndex":{channel},"Index":{index}}'
+    expect: { reply_json: { "$.RequestID": "81" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  playlist_get_meta_name:
+    summary: "Read a playlist item's metadata, by its name (playlist.getmeta)"
+    params:
+      channel: *channel
+      name: &item_name { type: string, max_length: 1024, required: true, label: Item name, description: "The item's name in the channel's playlist." }
+    send: '{"Command":"playlist.getmeta","RequestID":82,"ChannelIndex":{channel},"Name":{name:json}}'
+    expect: { reply_json: { "$.RequestID": "82" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  playlist_activate_index:
+    summary: "Activate a playlist item, by its index (playlist.activate)"
+    params: { channel: *channel, index: *item_index }
+    send: '{"Command":"playlist.activate","RequestID":83,"ChannelIndex":{channel},"Index":{index}}'
+    expect: { reply_json: { "$.RequestID": "83" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  playlist_activate_name:
+    summary: "Activate a playlist item, by its name (playlist.activate)"
+    params: { channel: *channel, name: *item_name }
+    send: '{"Command":"playlist.activate","RequestID":84,"ChannelIndex":{channel},"Name":{name:json}}'
+    expect: { reply_json: { "$.RequestID": "84" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  playlist_can_activate_index:
+    summary: "Check whether a playlist item can be activated, by index; returns its result (playlist.can.activate)"
+    params: { channel: *channel, index: *item_index }
+    send: '{"Command":"playlist.can.activate","RequestID":85,"ChannelIndex":{channel},"Index":{index}}'
+    expect: { reply_json: { "$.RequestID": "85" }, json_path: "$" }
+    returns: value
+  playlist_can_activate_name:
+    summary: "Check whether a playlist item can be activated, by name; returns its result (playlist.can.activate)"
+    params: { channel: *channel, name: *item_name }
+    send: '{"Command":"playlist.can.activate","RequestID":86,"ChannelIndex":{channel},"Name":{name:json}}'
+    expect: { reply_json: { "$.RequestID": "86" }, json_path: "$" }
+    returns: value
+  playlist_restart:
+    summary: "Restart a channel's playlist and cue its first item; the timeline must be off (playlist.restart)"
+    params: { channel: *channel }
+    send: '{"Command":"playlist.restart","RequestID":87,"ChannelIndex":{channel}}'
+    expect: { reply_json: { "$.RequestID": "87" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  playlist_can_restart:
+    summary: "Check whether a channel's playlist can restart; returns its result (playlist.can.restart)"
+    params: { channel: *channel }
+    send: '{"Command":"playlist.can.restart","RequestID":88,"ChannelIndex":{channel}}'
+    expect: { reply_json: { "$.RequestID": "88" }, json_path: "$" }
+    returns: value
+
+  # ── Remote playlist ─────────────────────────────────────────────────────
+  remote_playlist_get:
+    summary: "Read the remote playlist's id, name and publish contexts (remoteplaylist.get)"
+    send: '{"Command":"remoteplaylist.get","RequestID":90}'
+    expect: { reply_json: { "$.RequestID": "90" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  remote_playlist_open:
+    summary: "Open a remote playlist with a blank, the default or the current show (remoteplaylist.open)"
+    params:
+      playlist_id: &playlist_id { type: string, pattern: '^\{?[0-9A-Fa-f-]{36}\}?$', required: true,
+                                  label: Remote playlist, description: "The remote playlist's id, a GUID." }
+      publish_context: &publish_context { type: string, max_length: 1024, default: "", label: Publish context,
+                                          description: "The publish context's name; empty for none." }
+      show: { type: enum, values: [UseBlankShow, UseDefaultShow, UseCurrentShow], default: UseCurrentShow,
+              label: Show, description: "The show the playlist opens with: a new blank show, the default show mappings' show, or the show open now." }
+    send: '{"Command":"remoteplaylist.open","RequestID":91,"PlaylistId":"{playlist_id}","PublishContextName":{publish_context:json},"SpecialAction":"{show}"}'
+    expect: { reply_json: { "$.RequestID": "91" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  remote_playlist_open_show:
+    summary: "Open a remote playlist with a given show (remoteplaylist.open, SpecialAction UseShowUri)"
+    params:
+      playlist_id: *playlist_id
+      publish_context: *publish_context
+      show_uri: *show_uri
+    send: '{"Command":"remoteplaylist.open","RequestID":92,"PlaylistId":"{playlist_id}","PublishContextName":{publish_context:json},"SpecialAction":"UseShowUri","ShowUri":{show_uri:json}}'
+    expect: { reply_json: { "$.RequestID": "92" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+
+  # ── Macros ──────────────────────────────────────────────────────────────
+  macro_get:
+    summary: "List the macros, each id and name (macro.get)"
+    send: '{"Command":"macro.get","RequestID":100}'
+    expect: { reply_json: { "$.RequestID": "100" }, code_path: "$.Code", code_range: [0, 0], json_path: "$.Result" }
+    returns: value
+  macro_execute_id:
+    summary: "Run a macro, by id (macro.execute)"
+    params:
+      id: &macro_id { type: string, max_length: 256, required: true, label: Macro, description: "The macro's id, as macro.get lists it." }
+    send: '{"Command":"macro.execute","RequestID":101,"Id":{id:json}}'
+    expect: { reply_json: { "$.RequestID": "101" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  macro_execute_name:
+    summary: "Run a macro, by name (macro.execute)"
+    params:
+      name: &macro_name { type: string, max_length: 1024, required: true, label: Macro name, description: "The macro's name." }
+    send: '{"Command":"macro.execute","RequestID":102,"Name":{name:json}}'
+    expect: { reply_json: { "$.RequestID": "102" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  macro_can_execute_id:
+    summary: "Check whether a macro can run, by id; succeeds when it can (macro.can.execute)"
+    params: { id: *macro_id }
+    send: '{"Command":"macro.can.execute","RequestID":103,"Id":{id:json}}'
+    expect: { reply_json: { "$.RequestID": "103" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  macro_can_execute_name:
+    summary: "Check whether a macro can run, by name; succeeds when it can (macro.can.execute)"
+    params: { name: *macro_name }
+    send: '{"Command":"macro.can.execute","RequestID":104,"Name":{name:json}}'
+    expect: { reply_json: { "$.RequestID": "104" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+
+  # ── Timeline ────────────────────────────────────────────────────────────
+  timeline_play:
+    summary: "Play the timeline (timeline.play)"
+    send: '{"Command":"timeline.play","RequestID":110}'
+    expect: { reply_json: { "$.RequestID": "110" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  timeline_pause:
+    summary: "Pause the timeline (timeline.pause)"
+    send: '{"Command":"timeline.pause","RequestID":111}'
+    expect: { reply_json: { "$.RequestID": "111" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  timeline_rewind:
+    summary: "Rewind the timeline (timeline.rewind)"
+    send: '{"Command":"timeline.rewind","RequestID":112}'
+    expect: { reply_json: { "$.RequestID": "112" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  timeline_forward:
+    summary: "Fast-forward the timeline (timeline.forward)"
+    send: '{"Command":"timeline.forward","RequestID":113}'
+    expect: { reply_json: { "$.RequestID": "113" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  timeline_jump_start:
+    summary: "Jump to the timeline's beginning (timeline.jumpstart)"
+    send: '{"Command":"timeline.jumpstart","RequestID":114}'
+    expect: { reply_json: { "$.RequestID": "114" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+  timeline_jump_end:
+    summary: "Jump to the timeline's end (timeline.jumpend)"
+    send: '{"Command":"timeline.jumpend","RequestID":115}'
+    expect: { reply_json: { "$.RequestID": "115" }, code_path: "$.Code", code_range: [0, 0] }
+    returns: ack
+
+codes:
+  "1": "ErrorException: an unexpected error"
+  "2": "ErrorValidation: a value or the request is invalid"
+  "3": "ErrorNotFound: a value asked for was not found"
+  "4": "ErrorNoShow: the command needs an open show"
+  "5": "ErrorInvalidOperation: not allowed now, for example by a channel rule"
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Director Remoting is off until it is turned on in Director's Application Settings (Tools >
+      Options); with its websocket turned off Director answers every request with the error
+      "'Websocket' connection is disabled". The documentation gives port 22404; the vendor's own Companion
+      module defaults to 21404, so a Director answering on neither should be checked in its settings.
+  - models: [all]
+    severity: info
+    text: >
+      The API pushes nothing: the status, topology, show, channels, playlists, window layout, macros and
+      remote playlist are polled (every 2 s for the playlists and the status, every 10 s for the rest).
+      Project data, templates, pages and assets are read on request only, their shapes being the show's.
+  - models: [all]
+    severity: info
+    text: >
+      Each command sends a fixed RequestID of its own (1 to 115, polls from 1000) and waits for the reply
+      echoing it. The documentation writes RequestID as an integer in quotes; it is sent here as a JSON
+      number, as the vendor's Companion module sends it. Channel and playlist item indexes are sent as
+      Director lists them; the documentation does not say whether they count from 0 or 1.
+  - models: [all]
+    severity: critical
+    text: >
+      show_take, show_take_out, show_take_out_recue, show_clear, playlist_activate_*, playlist_restart,
+      show_open, show_close, topology_set and remote_playlist_open change what is on air at once and
+      cannot be undone. The can_* commands check first without changing anything.
+
+state:
+  status.version: { type: string, description: "Director's version (status.get)" }
+  status.lifetime_ms: { type: int, unit: ms, description: "How long Director has been running" }
+  status.user: { type: string, description: "The user Director runs as" }
+  status.machine: { type: string, description: "The machine Director runs on" }
+  status.channel_count: { type: int, description: "The number of channels of the open show" }
+  topology.name: { type: string, description: "The topology in use" }
+  topology.state: { type: string, description: "The topology's state: Ok, Warning or Error (status.get and topology.status)" }
+  topology.source_type: { type: string, description: "Where the topology comes from: DefaultTopology, LocalFile or EmbeddedInProject" }
+  topology.number_of_ports: { type: int, description: "The topology's number of ports" }
+  show.id: { type: string, description: "The open show's id (a GUID)" }
+  show.name: { type: string, description: "The open show's name" }
+  show.uri: { type: string, description: "The open show's URI" }
+  show.description: { type: string, description: "The open show's description" }
+  show.publish_context_id: { type: string, description: "The open show's publish context id" }
+  project.id: { type: string, description: "The project's id (a GUID)" }
+  project.name: { type: string, description: "The project's name" }
+  project.uri: { type: string, description: "The project's URI" }
+  remote_playlist.id: { type: string, description: "The remote playlist in use (a GUID)" }
+  remote_playlist.name: { type: string, description: "The remote playlist's name" }
+  window.layout_index: { type: int, description: "The window layout in use, its index" }
+  window.layout_name: { type: string, description: "The window layout in use, its name" }
+  channels.*.name: { type: string, description: "Each channel's name, keyed by its index" }
+  macros.*.name: { type: string, description: "Each macro's name, keyed by its id" }
+  playlists.*.channel_name: { type: string, description: "The channel's name, the playlist keyed by channel index" }
+  playlists.*.items.*.name: { type: string, description: "Each item's name, keyed by its index in the playlist" }
+  playlists.*.items.*.display_name: { type: string, description: "The item's display name" }
+  playlists.*.items.*.id: { type: string, description: "The item's id" }
+  playlists.*.items.*.status: { type: string, description: "The item's status: Default, Cued, On-Air or Aired" }
+
+telemetry:
+  poll:
+    - every_ms: 2000
+      send:
+        - '{"Command":"status.get","RequestID":1000}'
+        - '{"Command":"playlist.get","RequestID":1001}'
+    - every_ms: 10000
+      send:
+        - '{"Command":"topology.get","RequestID":1002}'
+        - '{"Command":"topology.status","RequestID":1003}'
+        - '{"Command":"show.get","RequestID":1004}'
+        - '{"Command":"show.getchannels","RequestID":1005}'
+        - '{"Command":"window.getlayout","RequestID":1006}'
+        - '{"Command":"macro.get","RequestID":1007}'
+        - '{"Command":"remoteplaylist.get","RequestID":1008}'
+  updates:
+    - json_match: { "$.RequestID": "^(1|1000)$", "$.Code": "^0$" }
+      json: { version: "$.Result.Version", lifetime: "$.Result.LifetimeMs", user: "$.Result.User", machine: "$.Result.Machine",
+              topology: "$.Result.TopologyName", topology_state: "$.Result.TopologyState", show_id: "$.Result.ShowId",
+              show_name: "$.Result.ShowName", show_uri: "$.Result.ShowUri", project_id: "$.Result.ProjectId",
+              project_name: "$.Result.ProjectName", project_uri: "$.Result.ProjectUri",
+              remote_playlist: "$.Result.RemotePlaylistId", channels: "$.Result.ChannelCount" }
+      state:
+        status.version: "{version}"
+        status.lifetime_ms: "{lifetime}"
+        status.user: "{user}"
+        status.machine: "{machine}"
+        status.channel_count: "{channels}"
+        topology.name: "{topology}"
+        topology.state: "{topology_state}"
+        show.id: "{show_id}"
+        show.name: "{show_name}"
+        show.uri: "{show_uri}"
+        project.id: "{project_id}"
+        project.name: "{project_name}"
+        project.uri: "{project_uri}"
+        remote_playlist.id: "{remote_playlist}"
+    - json_match: { "$.RequestID": "^(20|1002)$", "$.Code": "^0$" }
+      json: { name: "$.Result.Name", source: "$.Result.SourceType" }
+      state: { topology.name: "{name}", topology.source_type: "{source}" }
+    - json_match: { "$.RequestID": "^(23|1003)$", "$.Code": "^0$" }
+      json: { name: "$.Result.Name", ports: "$.Result.NumberOfPorts", state: "$.Result.State" }
+      state: { topology.name: "{name}", topology.number_of_ports: "{ports}", topology.state: "{state}" }
+    - json_match: { "$.RequestID": "^(30|1004)$", "$.Code": "^0$" }
+      json: { id: "$.Result.Id", project: "$.Result.ProjectId", context: "$.Result.PublishContextId", uri: "$.Result.Uri",
+              description: "$.Result.Description" }
+      state: { show.id: "{id}", project.id: "{project}", show.publish_context_id: "{context}", show.uri: "{uri}",
+               show.description: "{description}" }
+    - json_match: { "$.RequestID": "^(63|1005)$", "$.Code": "^0$" }
+      json_each: "$.Result"
+      json: { index: "$.ChannelIndex", name: "$.Name" }
+      replace: channels
+      state: { "channels.{index}.name": "{name}" }
+    - json_match: { "$.RequestID": "^(12|1006)$", "$.Code": "^0$" }
+      json: { index: "$.Result.Index", name: "$.Result.Name" }
+      state: { window.layout_index: "{index}", window.layout_name: "{name}" }
+    - json_match: { "$.RequestID": "^(100|1007)$", "$.Code": "^0$" }
+      json_each: "$.Result"
+      json: { id: "$.Id", name: "$.Name" }
+      replace: macros
+      state: { "macros.{id:key}.name": "{name}" }
+    - json_match: { "$.RequestID": "^(90|1008)$", "$.Code": "^0$" }
+      json: { id: "$.Result.Id", name: "$.Result.Name" }
+      state: { remote_playlist.id: "{id}", remote_playlist.name: "{name}" }
+    - json_match: { "$.RequestID": "^(80|1001)$", "$.Code": "^0$" }
+      json_each: "$.Result"
+      json: { channel: "$.ChannelIndex", name: "$.ChannelName" }
+      replace: playlists
+      state: { "playlists.{channel}.channel_name": "{name}" }
+    - json_match: { "$.RequestID": "^(80|1001)$", "$.Code": "^0$" }
+      json_each: "$.Result[*].Items"
+      json: { channel: "$^.ChannelIndex", index: "$.Index", name: "$.Name", display: "$.DisplayName", id: "$.Id",
+              status: "$.Status" }
+      state:
+        "playlists.{channel}.items.{index}.name": "{name}"
+        "playlists.{channel}.items.{index}.display_name": "{display}"
+        "playlists.{channel}.items.{index}.id": "{id}"
+        "playlists.{channel}.items.{index}.status": "{status}"

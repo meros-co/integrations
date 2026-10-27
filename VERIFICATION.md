@@ -3464,6 +3464,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the answers to streaming ip enable on and get on a RoboSHOT 40 UHD or SDI camera, to settle whether OK comes after a second prompt ("> OK"). ([specs/vaddio-roboshot.yaml:893](specs/vaddio-roboshot.yaml#L893))
 - [ ] Record camera glass mode get on a RoboSHOT IW. ([specs/vaddio-roboshot.yaml:898](specs/vaddio-roboshot.yaml#L898))
 
+## ventuz-director — Ventuz Director (Director Remoting)
+
+- [ ] Confirm Director Remoting's websocket answers on port 22404 (the documentation's port; the vendor's Companion module defaults to 21404). ([specs/ventuz-director.yaml:50](specs/ventuz-director.yaml#L50))
+- [ ] Confirm a numeric RequestID is echoed as sent (the documentation writes it as an integer in quotes) and that each reply carries it. ([specs/ventuz-director.yaml:618](specs/ventuz-director.yaml#L618))
+- [ ] Check whether channel and playlist item indexes count from 0 or from 1, and what show.cue and show.take do without a ChannelIndex. ([specs/ventuz-director.yaml:620](specs/ventuz-director.yaml#L620))
+- [ ] Check the shape of show.getchannels, macro.get and playlist.get results (arrays of ChannelIndex/Name, Id/Name and ChannelIndex/ChannelName/Items) and of remoteplaylist.get's PublishContexts. ([specs/ventuz-director.yaml:707](specs/ventuz-director.yaml#L707))
+- [ ] Confirm show.setprojectdata takes a boolean's ValueToSet as the text true or false, and a relative number as text. ([specs/ventuz-director.yaml:382](specs/ventuz-director.yaml#L382))
+- [ ] Check that the can_* commands return Code 0 when the action is possible and another code (5, ErrorInvalidOperation) when not. ([specs/ventuz-director.yaml:286](specs/ventuz-director.yaml#L286))
+
 ## videolan-vlc — VLC media player
 
 - [ ] Confirm the .json pages take the same commands as the .xml ones, the status and playlist field names read here, and the rate and audiodelay commands. ([specs/videolan-vlc.yaml:315](specs/videolan-vlc.yaml#L315))
