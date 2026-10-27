@@ -1,0 +1,1425 @@
+spec: 1
+id: joy-playdeck
+name: PLAYDECK (REST API)
+vendor: JOY event & media
+category: playback
+
+# PLAYDECK's HTTP REST API v1 on port 11411 (the Web Remote's port): GET
+# /api/v1/status for the live playout snapshot, GET /api/v1/project for the
+# playlist tree, and POST routes per channel and asset for control, plus the
+# escape hatch POST /api/v1/commands for the whole pipe-command language
+# (<play|1|1|1>). Indices are 1-based throughout, as in the command language.
+# No authentication on the LAN in the current version.
+
+source:
+  - title: PLAYDECK Control API, OpenAPI 3 document (openapi-v1.yaml), version 1.0.0
+    author: JOY event & media GmbH & Co. KG
+    url: https://downloads.playdeck.tv/assets/openapi-v1.yaml
+    note: >
+      Manufacturer contract, licence "Proprietary" (facts only, nothing
+      quoted), retrieved 2026-10-23. Every path and schema used here:
+      /api/v1/health, status, project, project/file, channels,
+      channels/{id}; cue, play and fadein with a PlayoutTarget body (block,
+      clip, uid, pattern, list; omitted fields use the current selection);
+      pause (toggle), hold, resume, stop, fadeout, playnext, cuenext,
+      playnextblock, cuenextblock; position (timestamp HH:MM:SS:FF, SS:FF or
+      SS, negative from the end, or marker); select (block, clip, uid); mute
+      and unmute; desktop start/stop; overlays and actions start, stop,
+      toggle and stopall; streams 1-15, recordings 1-4, inputs 1-12; POST
+      /api/v1/commands with raw or name + args; ActionResponse {ok, command};
+      StatusRoot (Project, Channel[], DirectorView[], ObjectState), the
+      dynamic OverlayActiveN and ActionActiveN keys; ProjectRoot (Channel[]
+      with Block[], Clip[], Overlays[], Actions[]); the design notes (status
+      every ~250 ms on the WebSocket, project re-sent when ProjectHash
+      changes, do not poll the project on a timer).
+  - title: PLAYDECK API (manual article)
+    author: JOY event & media GmbH & Co. KG
+    url: https://playdeck.tv/playdeck-api/
+    note: >
+      Manufacturer article dated 2025-10-26, retrieved 2026-10-23: REST API on
+      11411 (Settings > Network > Developer API), the WebSocket channel on the
+      same port, the legacy TCP Commands In on 11375 with the same pipe
+      syntax, no API key or token on the LAN in the current version, and the
+      full command list shipped with the application (Main Menu >
+      Documentation).
+  - title: Using Commands for Playout Control (manual article)
+    author: JOY event & media GmbH & Co. KG
+    url: https://playdeck.tv/using-commands-for-playout-control/
+    note: >
+      Manufacturer article dated 2025-05-16: commands chained in one line run
+      in order, <wait|ms> between them (example <cue|1|1><cue|2|1><wait|1000>
+      <play|1|1><play|2|1>).
+
+transport:
+  type: http
+  port: 11411
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe: { method: GET, path: /api/v1/health }
+
+ports:
+  - { port: 11411, protocol: http, role: control, note: "PLAYDECK's REST API and Web Remote (Settings > Network > Developer API)" }
+
+models:
+  - id: playdeck
+    name: PLAYDECK (REST API v1)
+    supports:
+      [get_health, get_status, get_project, get_channels, get_channel, cue, cue_block, cue_clip,
+       cue_uid, cue_flex, cue_list, play, play_block, play_clip, play_uid, play_flex, play_list,
+       fade_in, fade_in_block, fade_in_clip, fade_in_uid, fade_in_flex, fade_in_list, toggle_pause,
+       hold, resume, stop, fade_out, play_next, cue_next, play_next_block, cue_next_block,
+       mute_channel, unmute_channel, start_desktop, stop_desktop, stop_all_overlays,
+       stop_all_actions, seek, seek_marker, select_block, select_clip, select_uid, start_overlay,
+       stop_overlay, toggle_overlay, start_action, stop_action, start_stream, stop_stream,
+       start_recording, stop_recording, mute_input, unmute_input, run_commands, run_named_command]
+    verification: none
+
+commands:
+  get_health:
+    summary: "Check the API is reachable and read its and PLAYDECK's versions (GET /api/v1/health)"
+    send: { method: GET, path: /api/v1/health }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_status:
+    summary: "Read the live playout snapshot, as state is kept (GET /api/v1/status)"
+    send: { method: GET, path: /api/v1/status }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_project:
+    summary: "Read the project and playlist tree, and refresh it in state (GET /api/v1/project)"
+    send: { method: GET, path: /api/v1/project }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_channels:
+    summary: "Read every channel's status, with its 1-based id (GET /api/v1/channels)"
+    send: { method: GET, path: /api/v1/channels }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_channel:
+    summary: "Read one channel's status (GET /api/v1/channels/{id})"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: GET, path: "/api/v1/channels/{channel}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  cue:
+    summary: "Cue the selected or cued clip on a channel (POST .../cue, empty target)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/cue", content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  cue_block:
+    summary: "Cue a block on a channel (POST .../cue, block)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      block: {"type": "int", "min": 1, "required": true, "label": "Block", "description": "Block number as the playlist shows it, from 1."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/cue", content_type: application/json, body: '{"block":{block}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  cue_clip:
+    summary: "Cue a clip of a block on a channel (POST .../cue, block and clip)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      block: {"type": "int", "min": 1, "required": true, "label": "Block", "description": "Block number as the playlist shows it, from 1."}
+      clip: {"type": "int", "min": 1, "required": true, "label": "Clip", "description": "Clip number within the block, from 1."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/cue", content_type: application/json, body: '{"block":{block},"clip":{clip}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  cue_uid:
+    summary: "Cue a block or clip by its unique ID (POST .../cue, uid)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      uid: {"type": "int", "required": true, "label": "Unique ID", "description": "The block's or clip's unique ID (UID), as the project lists it."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/cue", content_type: application/json, body: '{"uid":{uid}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  cue_flex:
+    summary: "Cue what a flex pattern names (POST .../cue, pattern)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      pattern: {"type": "string", "required": true, "max_length": 1024, "label": "Pattern", "description": "A flex pattern from PLAYDECK's command list, such as c:intro or b#5 c:name p:0:05:00."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/cue", content_type: application/json, body: '{"pattern":{pattern:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  cue_list:
+    summary: "Cue a clip from the left or right playlist (POST .../cue, list, block and clip)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      list: {"type": "enum", "values": ["1", "2"], "required": true, "label": "Playlist side", "description": "1 the left playlist, 2 the right one."}
+      block: {"type": "int", "min": 1, "required": true, "label": "Block", "description": "Block number as the playlist shows it, from 1."}
+      clip: {"type": "int", "min": 1, "required": true, "label": "Clip", "description": "Clip number within the block, from 1."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/cue", content_type: application/json, body: '{"list":{list},"block":{block},"clip":{clip}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  play:
+    summary: "Play the selected or cued clip on a channel (POST .../play, empty target)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/play", content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  play_block:
+    summary: "Play a block on a channel (POST .../play, block)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      block: {"type": "int", "min": 1, "required": true, "label": "Block", "description": "Block number as the playlist shows it, from 1."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/play", content_type: application/json, body: '{"block":{block}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  play_clip:
+    summary: "Play a clip of a block on a channel (POST .../play, block and clip)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      block: {"type": "int", "min": 1, "required": true, "label": "Block", "description": "Block number as the playlist shows it, from 1."}
+      clip: {"type": "int", "min": 1, "required": true, "label": "Clip", "description": "Clip number within the block, from 1."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/play", content_type: application/json, body: '{"block":{block},"clip":{clip}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  play_uid:
+    summary: "Play a block or clip by its unique ID (POST .../play, uid)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      uid: {"type": "int", "required": true, "label": "Unique ID", "description": "The block's or clip's unique ID (UID), as the project lists it."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/play", content_type: application/json, body: '{"uid":{uid}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  play_flex:
+    summary: "Play what a flex pattern names (POST .../play, pattern)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      pattern: {"type": "string", "required": true, "max_length": 1024, "label": "Pattern", "description": "A flex pattern from PLAYDECK's command list, such as c:intro or b#5 c:name p:0:05:00."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/play", content_type: application/json, body: '{"pattern":{pattern:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  play_list:
+    summary: "Play a clip from the left or right playlist (POST .../play, list, block and clip)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      list: {"type": "enum", "values": ["1", "2"], "required": true, "label": "Playlist side", "description": "1 the left playlist, 2 the right one."}
+      block: {"type": "int", "min": 1, "required": true, "label": "Block", "description": "Block number as the playlist shows it, from 1."}
+      clip: {"type": "int", "min": 1, "required": true, "label": "Clip", "description": "Clip number within the block, from 1."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/play", content_type: application/json, body: '{"list":{list},"block":{block},"clip":{clip}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  fade_in:
+    summary: "Fade in the selected or cued clip on a channel (POST .../fadein, empty target)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/fadein", content_type: application/json, body: '{}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  fade_in_block:
+    summary: "Fade in a block on a channel (POST .../fadein, block)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      block: {"type": "int", "min": 1, "required": true, "label": "Block", "description": "Block number as the playlist shows it, from 1."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/fadein", content_type: application/json, body: '{"block":{block}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  fade_in_clip:
+    summary: "Fade in a clip of a block on a channel (POST .../fadein, block and clip)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      block: {"type": "int", "min": 1, "required": true, "label": "Block", "description": "Block number as the playlist shows it, from 1."}
+      clip: {"type": "int", "min": 1, "required": true, "label": "Clip", "description": "Clip number within the block, from 1."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/fadein", content_type: application/json, body: '{"block":{block},"clip":{clip}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  fade_in_uid:
+    summary: "Fade in a block or clip by its unique ID (POST .../fadein, uid)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      uid: {"type": "int", "required": true, "label": "Unique ID", "description": "The block's or clip's unique ID (UID), as the project lists it."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/fadein", content_type: application/json, body: '{"uid":{uid}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  fade_in_flex:
+    summary: "Fade in what a flex pattern names (POST .../fadein, pattern)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      pattern: {"type": "string", "required": true, "max_length": 1024, "label": "Pattern", "description": "A flex pattern from PLAYDECK's command list, such as c:intro or b#5 c:name p:0:05:00."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/fadein", content_type: application/json, body: '{"pattern":{pattern:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  fade_in_list:
+    summary: "Fade in a clip from the left or right playlist (POST .../fadein, list, block and clip)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      list: {"type": "enum", "values": ["1", "2"], "required": true, "label": "Playlist side", "description": "1 the left playlist, 2 the right one."}
+      block: {"type": "int", "min": 1, "required": true, "label": "Block", "description": "Block number as the playlist shows it, from 1."}
+      clip: {"type": "int", "min": 1, "required": true, "label": "Clip", "description": "Clip number within the block, from 1."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/fadein", content_type: application/json, body: '{"list":{list},"block":{block},"clip":{clip}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  toggle_pause:
+    summary: "Pause playout, or resume it when paused (<pause|CHANNEL>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/pause" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  hold:
+    summary: "Hold: pause playout, without toggling (<hold|CHANNEL>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/hold" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  resume:
+    summary: "Resume playout from a pause (<resume|CHANNEL>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/resume" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  stop:
+    summary: "Stop playout on a channel (<stop|CHANNEL>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/stop" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  fade_out:
+    summary: "Fade out a channel (<fadeout|CHANNEL>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/fadeout" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  play_next:
+    summary: "Play the next clip (<playnext|CHANNEL>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/playnext" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  cue_next:
+    summary: "Cue the next clip (<cuenext|CHANNEL>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/cuenext" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  play_next_block:
+    summary: "Play the next block (<playnextblock|CHANNEL>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/playnextblock" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  cue_next_block:
+    summary: "Cue the next block (<cuenextblock|CHANNEL>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/cuenextblock" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  mute_channel:
+    summary: "Mute a channel's audio (<mutechannel|CHANNEL>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/mute" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  unmute_channel:
+    summary: "Unmute a channel's audio (<unmutechannel|CHANNEL>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/unmute" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  start_desktop:
+    summary: "Start the desktop output on a channel (<startdesktop|CHANNEL>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/desktop/start" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  stop_desktop:
+    summary: "Stop the desktop output on a channel (<stopdesktop|CHANNEL>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/desktop/stop" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  stop_all_overlays:
+    summary: "Stop every overlay on a channel (<stopalloverlays|CHANNEL>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/overlays/stopall" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  stop_all_actions:
+    summary: "Stop every action on a channel (<stopallactions|CHANNEL>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/actions/stopall" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  seek:
+    summary: "Move the playhead to a time (<position|CHANNEL|TIMESTAMP>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      timestamp: {"type": "string", "required": true, "max_length": 32, "pattern": "^-?[0-9]+(:[0-9]+){0,3}$", "label": "Position", "description": "HH:MM:SS:FF, or shortened SS:FF or SS; a negative value counts back from the end."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/position", content_type: application/json, body: '{"timestamp":{timestamp:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  seek_marker:
+    summary: "Move the playhead to a marker (<positionmarker|CHANNEL|MARKER>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      marker: {"type": "string", "required": true, "max_length": 255, "label": "Marker", "description": "The marker's name in the clip."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/position", content_type: application/json, body: '{"timestamp":"","marker":{marker:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  select_block:
+    summary: "Select a block (<select|\u2026>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      block: {"type": "int", "min": 1, "required": true, "label": "Block", "description": "Block number as the playlist shows it, from 1."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/select", content_type: application/json, body: '{"block":{block}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  select_clip:
+    summary: "Select a clip of a block (<select|\u2026>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      block: {"type": "int", "min": 1, "required": true, "label": "Block", "description": "Block number as the playlist shows it, from 1."}
+      clip: {"type": "int", "min": 1, "required": true, "label": "Clip", "description": "Clip number within the block, from 1."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/select", content_type: application/json, body: '{"block":{block},"clip":{clip}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  select_uid:
+    summary: "Select a block or clip by its unique ID (<selectid|UID>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      uid: {"type": "int", "required": true, "label": "Unique ID", "description": "The block's or clip's unique ID (UID), as the project lists it."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/select", content_type: application/json, body: '{"uid":{uid}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  start_overlay:
+    summary: "Start an overlay button (<startoverlay|CHANNEL|OVERLAY>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      overlay: {"type": "int", "min": 1, "max": 99, "required": true, "label": "Overlay", "description": "Overlay button, from 1 to 99."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/overlays/{overlay}/start" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  stop_overlay:
+    summary: "Stop an overlay button (<stopoverlay|CHANNEL|OVERLAY>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      overlay: {"type": "int", "min": 1, "max": 99, "required": true, "label": "Overlay", "description": "Overlay button, from 1 to 99."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/overlays/{overlay}/stop" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  toggle_overlay:
+    summary: "Toggle an overlay button (<toggleoverlay|CHANNEL|OVERLAY>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      overlay: {"type": "int", "min": 1, "max": 99, "required": true, "label": "Overlay", "description": "Overlay button, from 1 to 99."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/overlays/{overlay}/toggle" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  start_action:
+    summary: "Start an action button (<startaction|CHANNEL|ACTION>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      action: {"type": "int", "min": 1, "max": 99, "required": true, "label": "Action", "description": "Action button, from 1 to 99."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/actions/{action}/start" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  stop_action:
+    summary: "Stop an action button (<stopaction|CHANNEL|ACTION>)"
+    params:
+      channel: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Channel", "description": "Playout channel, from 1 (up to 8 depending on the licence)."}
+      action: {"type": "int", "min": 1, "max": 99, "required": true, "label": "Action", "description": "Action button, from 1 to 99."}
+    send: { method: POST, path: "/api/v1/channels/{channel}/actions/{action}/stop" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  start_stream:
+    summary: "Start an output stream (<startstream|STREAM>)"
+    params:
+      stream: {"type": "int", "min": 1, "max": 15, "required": true, "label": "Stream", "description": "Output stream slot, from 1 to 15."}
+    send: { method: POST, path: "/api/v1/streams/{stream}/start" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  stop_stream:
+    summary: "Stop an output stream (<stopstream|STREAM>)"
+    params:
+      stream: {"type": "int", "min": 1, "max": 15, "required": true, "label": "Stream", "description": "Output stream slot, from 1 to 15."}
+    send: { method: POST, path: "/api/v1/streams/{stream}/stop" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  start_recording:
+    summary: "Start a recording (<startrecord|RECORD>)"
+    params:
+      recording: {"type": "int", "min": 1, "max": 4, "required": true, "label": "Recording", "description": "Recording slot, from 1 to 4 depending on the licence."}
+    send: { method: POST, path: "/api/v1/recordings/{recording}/start" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  stop_recording:
+    summary: "Stop a recording (<stoprecord|RECORD>)"
+    params:
+      recording: {"type": "int", "min": 1, "max": 4, "required": true, "label": "Recording", "description": "Recording slot, from 1 to 4 depending on the licence."}
+    send: { method: POST, path: "/api/v1/recordings/{recording}/stop" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  mute_input:
+    summary: "Mute an input's audio (<muteinput|INPUT>)"
+    params:
+      input: {"type": "int", "min": 1, "max": 12, "required": true, "label": "Input", "description": "Input slot, from 1 to 12."}
+    send: { method: POST, path: "/api/v1/inputs/{input}/mute" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  unmute_input:
+    summary: "Unmute an input's audio (<unmuteinput|INPUT>)"
+    params:
+      input: {"type": "int", "min": 1, "max": 12, "required": true, "label": "Input", "description": "Input slot, from 1 to 12."}
+    send: { method: POST, path: "/api/v1/inputs/{input}/unmute" }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  run_commands:
+    summary: "Run one or more pipe commands from PLAYDECK's command list, in order (POST /api/v1/commands, raw)"
+    params:
+      commands: {"type": "string", "required": true, "max_length": 65536, "label": "Commands", "description": "Pipe commands with their angle brackets, run in the order written, such as <cue|1|1><wait|1000><play|1>."}
+    send: { method: POST, path: "/api/v1/commands", content_type: application/json, body: '{"raw":{commands:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  run_named_command:
+    summary: "Run one command from PLAYDECK's command list by name and arguments (POST /api/v1/commands, name and args)"
+    params:
+      name: {"type": "string", "required": true, "max_length": 64, "pattern": "^[A-Za-z0-9_]+$", "label": "Command", "description": "The command's name without brackets or pipes, such as play or startstream."}
+      args: {"type": "json", "default": [], "label": "Arguments", "description": "The positional arguments, a JSON array of strings, such as [\"1\", \"1\", \"1\"]."}
+    send: { method: POST, path: "/api/v1/commands", content_type: application/json, body: '{"name":{name:json},"args":{args}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+
+state:
+  project.name: { type: string, description: "Project name" }
+  project.filename: { type: string, description: "Project file name" }
+  project.clock_time: { type: string, description: "PLAYDECK's clock, as it shows it" }
+  project.timestamp: { type: string, description: "PLAYDECK's date and time, such as 2026-08-01 12:00:00" }
+  project.timestamp_unix: { type: int, description: "PLAYDECK's date and time, Unix seconds" }
+  project.hash: { type: string, description: "MD5 of the playlist in memory (without playhead or play state), rebuilt at most once a second; when it changes, get_project reads the playlist again" }
+  project.license_edition: { type: string, description: "Licence edition: Lite, Plus or Studio" }
+  project.license_customer: { type: string, description: "Licensed customer" }
+  project.license_lease: { type: string, description: "Licence lease, as PLAYDECK gives it" }
+  channels.*.state: { type: string, description: "not_started, starting, ready or error" }
+  channels.*.name: { type: string, description: "Channel name" }
+  channels.*.block_count: { type: int, description: "Number of blocks in the channel's playlist" }
+  channels.*.tally: { type: int, description: "Tally status, as PLAYDECK numbers it" }
+  channels.*.preview_note: { type: string, description: "Preview note" }
+  channels.*.stage_width: { type: int, description: "Output width in pixels" }
+  channels.*.stage_height: { type: int, description: "Output height in pixels" }
+  channels.*.selected_id: { type: int, description: "Unique ID of the current selection" }
+  channels.*.play_state: { type: string, description: "stopped, cueing, playing, paused or in_between" }
+  channels.*.progress_visible: { type: bool, description: "Whether the progress bar is shown" }
+  channels.*.schedule_visible: { type: bool, description: "Whether a schedule is shown" }
+  channels.*.autoplay_visible: { type: bool, description: "Whether an autoplay is shown" }
+  channels.*.block.name: { type: string, description: "Current block's name" }
+  channels.*.block.number: { type: int, description: "Current block's number" }
+  channels.*.block.id: { type: int, description: "Current block's unique ID" }
+  channels.*.block.position: { type: float, description: "Position in the block, as PLAYDECK gives it" }
+  channels.*.block.position_text: { type: string, description: "Position in the block, as text" }
+  channels.*.block.duration: { type: float, description: "Block duration, as PLAYDECK gives it" }
+  channels.*.block.duration_text: { type: string, description: "Block duration, as text" }
+  channels.*.block.progress: { type: float, description: "Progress through the block, as PLAYDECK gives it" }
+  channels.*.block.remain_caption: { type: string, description: "Caption shown beside the block's remaining time" }
+  channels.*.block.remain: { type: float, description: "Time left in the block, as PLAYDECK gives it" }
+  channels.*.block.remain_text: { type: string, description: "Time left in the block, as text (\u221e when infinite)" }
+  channels.*.block.end_caption: { type: string, description: "Caption shown beside the block's end time" }
+  channels.*.block.end: { type: int, description: "Block end time, as PLAYDECK gives it" }
+  channels.*.block.end_text: { type: string, description: "Block end time, as text" }
+  channels.*.block.progress_alert: { type: bool, description: "Whether the block's progress alert is on" }
+  channels.*.clip.name: { type: string, description: "Current clip's name" }
+  channels.*.clip.number: { type: int, description: "Current clip's number in its block" }
+  channels.*.clip.id: { type: int, description: "Current clip's unique ID" }
+  channels.*.clip.position: { type: float, description: "Position in the clip, as PLAYDECK gives it" }
+  channels.*.clip.position_text: { type: string, description: "Position in the clip (elapsed), as text" }
+  channels.*.clip.duration: { type: float, description: "Clip duration, as PLAYDECK gives it" }
+  channels.*.clip.duration_text: { type: string, description: "Clip duration, as text" }
+  channels.*.clip.progress: { type: float, description: "Progress through the clip, as PLAYDECK gives it" }
+  channels.*.clip.progress_alert: { type: bool, description: "Whether the clip's progress alert is on" }
+  channels.*.clip.remain_caption: { type: string, description: "Caption shown beside the clip's remaining time" }
+  channels.*.clip.remain: { type: float, description: "Time left in the clip, as PLAYDECK gives it" }
+  channels.*.clip.remain_text: { type: string, description: "Time left in the clip, as text (\u221e when infinite)" }
+  channels.*.clip.end: { type: int, description: "Clip end time, as PLAYDECK gives it" }
+  channels.*.clip.end_text: { type: string, description: "Clip end time, as text" }
+  channels.*.schedule.block_name: { type: string, description: "Name of the next scheduled block" }
+  channels.*.schedule.time: { type: int, description: "Time of the next scheduled block, as PLAYDECK gives it" }
+  channels.*.schedule.time_text: { type: string, description: "Time of the next scheduled block, as text" }
+  channels.*.schedule.remain: { type: float, description: "Time until the next scheduled block, as PLAYDECK gives it" }
+  channels.*.schedule.remain_text: { type: string, description: "Time until the next scheduled block, as text" }
+  channels.*.schedule.icons: { type: string, description: "Schedule icons, as PLAYDECK gives them" }
+  channels.*.schedule.alert: { type: bool, description: "Whether the schedule alert is on" }
+  channels.*.autoplay.block_name: { type: string, description: "Name of the next autoplay block" }
+  channels.*.autoplay.time: { type: int, description: "Time of the next autoplay, as PLAYDECK gives it" }
+  channels.*.autoplay.time_text: { type: string, description: "Time of the next autoplay, as text" }
+  channels.*.autoplay.remain: { type: float, description: "Time until the next autoplay, as PLAYDECK gives it" }
+  channels.*.autoplay.remain_text: { type: string, description: "Time until the next autoplay, as text" }
+  channels.*.autoplay.alert: { type: bool, description: "Whether the autoplay alert is on" }
+  channels.*.active_overlays.*: { type: string, description: "Present while that overlay button (1 to 99) is active: the value PLAYDECK sends for it" }
+  channels.*.active_actions.*: { type: string, description: "Present while that action button (1 to 99) is active: the value PLAYDECK sends for it" }
+  director_views.*.type: { type: int, description: "Director View type, as PLAYDECK numbers it" }
+  director_views.*.channel_ids: { type: string, description: "Channels the Director View shows" }
+  director_views.*.show_timer: { type: bool, description: "Whether it shows the timer" }
+  director_views.*.show_name: { type: bool, description: "Whether it shows the name" }
+  director_views.*.show_tally: { type: bool, description: "Whether it shows tally" }
+  director_views.*.show_notes: { type: bool, description: "Whether it shows notes" }
+  objects.*: { type: int, description: "Engine state of a subsystem, keyed by name (Channel1..8, Output1..8, Input1..12, Stream1..15, Director1..4, Recording1..4); 0 none or off" }
+  channels.*.blocks.*.can_play: { type: bool, description: "Project: whether the block can play, keyed by the block's place from 1" }
+  channels.*.blocks.*.name: { type: string, description: "Project: block name, keyed by the block's place from 1" }
+  channels.*.blocks.*.number: { type: int, description: "Project: block number, keyed by the block's place from 1" }
+  channels.*.blocks.*.id: { type: int, description: "Project: block unique ID, keyed by the block's place from 1" }
+  channels.*.blocks.*.clip_count: { type: int, description: "Project: number of clips, keyed by the block's place from 1" }
+  channels.*.blocks.*.active: { type: bool, description: "Project: whether the block is active, keyed by the block's place from 1" }
+  channels.*.blocks.*.stop_type: { type: string, description: "Project: what happens at the block's end, as PLAYDECK names it, keyed by the block's place from 1" }
+  channels.*.blocks.*.duration_text: { type: string, description: "Project: block duration, as text, keyed by the block's place from 1" }
+  channels.*.blocks.*.stop_follow_time: { type: float, description: "Project: follow time at the block's end, as PLAYDECK gives it, keyed by the block's place from 1" }
+  channels.*.blocks.*.loop_clips: { type: int, description: "Project: loop setting for its clips, as PLAYDECK numbers it, keyed by the block's place from 1" }
+  channels.*.blocks.*.break_option: { type: int, description: "Project: break option, as PLAYDECK numbers it, keyed by the block's place from 1" }
+  channels.*.blocks.*.jump_uid: { type: int, description: "Project: unique ID the block jumps to, keyed by the block's place from 1" }
+  channels.*.blocks.*.shuffle_type: { type: string, description: "Project: shuffle type, as PLAYDECK names it, keyed by the block's place from 1" }
+  channels.*.blocks.*.shuffle_clips: { type: int, description: "Project: shuffle setting, as PLAYDECK numbers it, keyed by the block's place from 1" }
+  channels.*.blocks.*.scheduled_unix: { type: int, description: "Project: scheduled start, Unix seconds, keyed by the block's place from 1" }
+  channels.*.blocks.*.scheduled_with_day: { type: bool, description: "Project: whether the schedule includes the day, keyed by the block's place from 1" }
+  channels.*.blocks.*.scheduled_with_repeat: { type: bool, description: "Project: whether the schedule repeats, keyed by the block's place from 1" }
+  channels.*.blocks.*.scheduled_repeat_duration: { type: float, description: "Project: schedule repeat interval, as PLAYDECK gives it, keyed by the block's place from 1" }
+  channels.*.blocks.*.scheduled_method: { type: int, description: "Project: schedule method, as PLAYDECK numbers it, keyed by the block's place from 1" }
+  channels.*.blocks.*.scheduled_weekdays: { type: string, description: "Project: scheduled weekdays, as PLAYDECK gives them, keyed by the block's place from 1" }
+  channels.*.blocks.*.clips.*.can_play: { type: bool, description: "Project: the clip's CanPlay as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.name: { type: string, description: "Project: the clip's Name as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.number: { type: int, description: "Project: the clip's Number as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.id: { type: int, description: "Project: the clip's ID as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.item_type: { type: int, description: "Project: the clip's ItemType as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.active: { type: bool, description: "Project: the clip's Active as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.file_name: { type: string, description: "Project: the clip's FileName as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.item_input: { type: int, description: "Project: the clip's ItemInput as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.duration_text: { type: string, description: "Project: the clip's DurationString as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.file_size: { type: int, description: "Project: the clip's FileSize as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.file_size_text: { type: string, description: "Project: the clip's FileSizeString as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.file_date_unix: { type: int, description: "Project: the clip's FileDateUnix as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.file_date_text: { type: string, description: "Project: the clip's FileDateString as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.file_type: { type: int, description: "Project: the clip's FileType as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.file_type_text: { type: string, description: "Project: the clip's FileTypeString as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.transition_type: { type: string, description: "Project: the clip's TransitionType as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.transition_time: { type: float, description: "Project: the clip's TransitionTime as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.duration_gfx: { type: float, description: "Project: the clip's DurationGfx as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.duration_gfx_type: { type: int, description: "Project: the clip's DurationGfxType as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.duration_gfx_clock_unix: { type: int, description: "Project: the clip's DurationGfxClockUnix as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.pause_mode: { type: int, description: "Project: the clip's PauseMode as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.pause_follow: { type: int, description: "Project: the clip's PauseFollow as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.pause_follow_time: { type: float, description: "Project: the clip's PauseFollowTime as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.mute_audio: { type: bool, description: "Project: the clip's MuteAudio as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.gain: { type: float, description: "Project: the clip's Gain as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.gain_custom: { type: bool, description: "Project: the clip's GainCustom as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.ebu_gain: { type: float, description: "Project: the clip's EBUGain as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.ebu_scanned: { type: bool, description: "Project: the clip's EBUScanned as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.scale_type: { type: string, description: "Project: the clip's ScaleType as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.scale_aspect: { type: string, description: "Project: the clip's ScaleAspect as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.cut_in: { type: float, description: "Project: the clip's CutIn as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.cut_out: { type: float, description: "Project: the clip's CutOut as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.cut_out_relative: { type: bool, description: "Project: the clip's CutOutRelative as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.crop_left: { type: float, description: "Project: the clip's CropLeft as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.crop_top: { type: float, description: "Project: the clip's CropTop as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.crop_right: { type: float, description: "Project: the clip's CropRight as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.crop_bottom: { type: float, description: "Project: the clip's CropBottom as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.loop_type: { type: int, description: "Project: the clip's LoopType as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.loop_seconds: { type: float, description: "Project: the clip's LoopSeconds as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.loop_count: { type: int, description: "Project: the clip's LoopCount as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.loop_clock: { type: int, description: "Project: the clip's LoopClock as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.loop_partial: { type: bool, description: "Project: the clip's LoopPartial as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.video_track: { type: int, description: "Project: the clip's VideoTrack as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.audio_track: { type: int, description: "Project: the clip's AudioTrack as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.subtitle_track: { type: int, description: "Project: the clip's SubtitleTrack as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.blocks.*.clips.*.subtitle_offset: { type: float, description: "Project: the clip's SubtitleOffset as PLAYDECK gives it, keyed by the clip's place in its block from 1" }
+  channels.*.overlays.*.name: { type: string, description: "Project: an overlay button's button name, keyed from 1" }
+  channels.*.overlays.*.has_content: { type: bool, description: "Project: an overlay button's whether the button has content, keyed from 1" }
+  channels.*.overlays.*.is_group: { type: bool, description: "Project: an overlay button's whether it is a group, keyed from 1" }
+  channels.*.overlays.*.type: { type: int, description: "Project: an overlay button's overlay type, as PLAYDECK numbers it, keyed from 1" }
+  channels.*.actions.*.name: { type: string, description: "Project: an action button's button name, keyed from 1" }
+  channels.*.actions.*.has_content: { type: bool, description: "Project: an action button's whether the button has content, keyed from 1" }
+
+telemetry:
+  # The status every second (PLAYDECK pushes it every ~250 ms on its
+  # WebSocket as status|<json>, a framing the rules cannot read); the project
+  # once on connecting: the vendor asks not to poll it on a timer, so
+  # get_project reads it again when project.hash changes.
+  poll:
+    - every_ms: 1000
+      send: [{ method: GET, path: /api/v1/status }]
+    - send: [{ method: GET, path: /api/v1/project }]
+  updates:
+    - path: "^/api/v1/status$"
+      json:
+        name: "$.Project.ProjectName"
+        filename: "$.Project.ProjectFilename"
+        clock: "$.Project.ClockTime"
+        ts: "$.Project.Timestamp"
+        unix: "$.Project.TimestampUnix"
+        hash: "$.Project.ProjectHash"
+        edition: "$.Project.LicenseEdition"
+        customer: "$.Project.LicenseCustomer"
+        lease: "$.Project.LicenseLease"
+      state:
+        project.name: "{name}"
+        project.filename: "{filename}"
+        project.clock_time: "{clock}"
+        project.timestamp: "{ts}"
+        project.timestamp_unix: "{unix}"
+        project.hash: "{hash}"
+        project.license_edition: "{edition}"
+        project.license_customer: "{customer}"
+        project.license_lease: "{lease}"
+    - path: "^/api/v1/status$"
+      json_each: "$.Channel"
+      json:
+        ChannelState: "$.ChannelState"
+        ChannelName: "$.ChannelName"
+        BlockCount: "$.BlockCount"
+        TallyStatus: "$.TallyStatus"
+        PreviewNote: "$.PreviewNote"
+        StageWidth: "$.StageWidth"
+        StageHeight: "$.StageHeight"
+        SelectedID: "$.SelectedID"
+        PlayState: "$.PlayState"
+        ProgressVisible: "$.ProgressVisible"
+        ScheduleVisible: "$.ScheduleVisible"
+        AutoplayVisible: "$.AutoplayVisible"
+        BlockName: "$.BlockName"
+        BlockNumber: "$.BlockNumber"
+        BlockID: "$.BlockID"
+        BlockPosition: "$.BlockPosition"
+        BlockPositionString: "$.BlockPositionString"
+        BlockDuration: "$.BlockDuration"
+        BlockDurationString: "$.BlockDurationString"
+        BlockProgress: "$.BlockProgress"
+        BlockRemainCaption: "$.BlockRemainCaption"
+        BlockRemain: "$.BlockRemain"
+        BlockRemainString: "$.BlockRemainString"
+        BlockEndCaption: "$.BlockEndCaption"
+        BlockEnd: "$.BlockEnd"
+        BlockEndString: "$.BlockEndString"
+        BlockProgressAlert: "$.BlockProgressAlert"
+        ClipName: "$.ClipName"
+        ClipNumber: "$.ClipNumber"
+        ClipID: "$.ClipID"
+        ClipPosition: "$.ClipPosition"
+        ClipPositionString: "$.ClipPositionString"
+        ClipDuration: "$.ClipDuration"
+        ClipDurationString: "$.ClipDurationString"
+        ClipProgress: "$.ClipProgress"
+        ClipProgressAlert: "$.ClipProgressAlert"
+        ClipRemainCaption: "$.ClipRemainCaption"
+        ClipRemain: "$.ClipRemain"
+        ClipRemainString: "$.ClipRemainString"
+        ClipEnd: "$.ClipEnd"
+        ClipEndString: "$.ClipEndString"
+        ScheduleBlockName: "$.ScheduleBlockName"
+        ScheduleTime: "$.ScheduleTime"
+        ScheduleTimeString: "$.ScheduleTimeString"
+        ScheduleRemain: "$.ScheduleRemain"
+        ScheduleRemainString: "$.ScheduleRemainString"
+        ScheduleIcons: "$.ScheduleIcons"
+        ScheduleAlert: "$.ScheduleAlert"
+        AutoplayBlockName: "$.AutoplayBlockName"
+        AutoplayTime: "$.AutoplayTime"
+        AutoplayTimeString: "$.AutoplayTimeString"
+        AutoplayRemain: "$.AutoplayRemain"
+        AutoplayRemainString: "$.AutoplayRemainString"
+        AutoplayAlert: "$.AutoplayAlert"
+      state:
+        "channels.{index:+1}.state": { value: "{ChannelState}", map: { "0": not_started, "1": starting, "2": ready, "3": error } }
+        "channels.{index:+1}.name": "{ChannelName}"
+        "channels.{index:+1}.block_count": "{BlockCount}"
+        "channels.{index:+1}.tally": "{TallyStatus}"
+        "channels.{index:+1}.preview_note": "{PreviewNote}"
+        "channels.{index:+1}.stage_width": "{StageWidth}"
+        "channels.{index:+1}.stage_height": "{StageHeight}"
+        "channels.{index:+1}.selected_id": "{SelectedID}"
+        "channels.{index:+1}.play_state": { value: "{PlayState}", map: { "0": stopped, "1": cueing, "2": playing, "3": paused, "4": in_between } }
+        "channels.{index:+1}.progress_visible": "{ProgressVisible}"
+        "channels.{index:+1}.schedule_visible": "{ScheduleVisible}"
+        "channels.{index:+1}.autoplay_visible": "{AutoplayVisible}"
+        "channels.{index:+1}.block.name": "{BlockName}"
+        "channels.{index:+1}.block.number": "{BlockNumber}"
+        "channels.{index:+1}.block.id": "{BlockID}"
+        "channels.{index:+1}.block.position": "{BlockPosition}"
+        "channels.{index:+1}.block.position_text": "{BlockPositionString}"
+        "channels.{index:+1}.block.duration": "{BlockDuration}"
+        "channels.{index:+1}.block.duration_text": "{BlockDurationString}"
+        "channels.{index:+1}.block.progress": "{BlockProgress}"
+        "channels.{index:+1}.block.remain_caption": "{BlockRemainCaption}"
+        "channels.{index:+1}.block.remain": "{BlockRemain}"
+        "channels.{index:+1}.block.remain_text": "{BlockRemainString}"
+        "channels.{index:+1}.block.end_caption": "{BlockEndCaption}"
+        "channels.{index:+1}.block.end": "{BlockEnd}"
+        "channels.{index:+1}.block.end_text": "{BlockEndString}"
+        "channels.{index:+1}.block.progress_alert": "{BlockProgressAlert}"
+        "channels.{index:+1}.clip.name": "{ClipName}"
+        "channels.{index:+1}.clip.number": "{ClipNumber}"
+        "channels.{index:+1}.clip.id": "{ClipID}"
+        "channels.{index:+1}.clip.position": "{ClipPosition}"
+        "channels.{index:+1}.clip.position_text": "{ClipPositionString}"
+        "channels.{index:+1}.clip.duration": "{ClipDuration}"
+        "channels.{index:+1}.clip.duration_text": "{ClipDurationString}"
+        "channels.{index:+1}.clip.progress": "{ClipProgress}"
+        "channels.{index:+1}.clip.progress_alert": "{ClipProgressAlert}"
+        "channels.{index:+1}.clip.remain_caption": "{ClipRemainCaption}"
+        "channels.{index:+1}.clip.remain": "{ClipRemain}"
+        "channels.{index:+1}.clip.remain_text": "{ClipRemainString}"
+        "channels.{index:+1}.clip.end": "{ClipEnd}"
+        "channels.{index:+1}.clip.end_text": "{ClipEndString}"
+        "channels.{index:+1}.schedule.block_name": "{ScheduleBlockName}"
+        "channels.{index:+1}.schedule.time": "{ScheduleTime}"
+        "channels.{index:+1}.schedule.time_text": "{ScheduleTimeString}"
+        "channels.{index:+1}.schedule.remain": "{ScheduleRemain}"
+        "channels.{index:+1}.schedule.remain_text": "{ScheduleRemainString}"
+        "channels.{index:+1}.schedule.icons": "{ScheduleIcons}"
+        "channels.{index:+1}.schedule.alert": "{ScheduleAlert}"
+        "channels.{index:+1}.autoplay.block_name": "{AutoplayBlockName}"
+        "channels.{index:+1}.autoplay.time": "{AutoplayTime}"
+        "channels.{index:+1}.autoplay.time_text": "{AutoplayTimeString}"
+        "channels.{index:+1}.autoplay.remain": "{AutoplayRemain}"
+        "channels.{index:+1}.autoplay.remain_text": "{AutoplayRemainString}"
+        "channels.{index:+1}.autoplay.alert": "{AutoplayAlert}"
+    - path: "^/api/v1/status$"
+      json_each: "$.Channel"
+      json:
+        a1: "$.OverlayActive1"
+        a2: "$.OverlayActive2"
+        a3: "$.OverlayActive3"
+        a4: "$.OverlayActive4"
+        a5: "$.OverlayActive5"
+        a6: "$.OverlayActive6"
+        a7: "$.OverlayActive7"
+        a8: "$.OverlayActive8"
+        a9: "$.OverlayActive9"
+        a10: "$.OverlayActive10"
+        a11: "$.OverlayActive11"
+        a12: "$.OverlayActive12"
+        a13: "$.OverlayActive13"
+        a14: "$.OverlayActive14"
+        a15: "$.OverlayActive15"
+        a16: "$.OverlayActive16"
+        a17: "$.OverlayActive17"
+        a18: "$.OverlayActive18"
+        a19: "$.OverlayActive19"
+        a20: "$.OverlayActive20"
+        a21: "$.OverlayActive21"
+        a22: "$.OverlayActive22"
+        a23: "$.OverlayActive23"
+        a24: "$.OverlayActive24"
+        a25: "$.OverlayActive25"
+        a26: "$.OverlayActive26"
+        a27: "$.OverlayActive27"
+        a28: "$.OverlayActive28"
+        a29: "$.OverlayActive29"
+        a30: "$.OverlayActive30"
+        a31: "$.OverlayActive31"
+        a32: "$.OverlayActive32"
+        a33: "$.OverlayActive33"
+        a34: "$.OverlayActive34"
+        a35: "$.OverlayActive35"
+        a36: "$.OverlayActive36"
+        a37: "$.OverlayActive37"
+        a38: "$.OverlayActive38"
+        a39: "$.OverlayActive39"
+        a40: "$.OverlayActive40"
+        a41: "$.OverlayActive41"
+        a42: "$.OverlayActive42"
+        a43: "$.OverlayActive43"
+        a44: "$.OverlayActive44"
+        a45: "$.OverlayActive45"
+        a46: "$.OverlayActive46"
+        a47: "$.OverlayActive47"
+        a48: "$.OverlayActive48"
+        a49: "$.OverlayActive49"
+        a50: "$.OverlayActive50"
+        a51: "$.OverlayActive51"
+        a52: "$.OverlayActive52"
+        a53: "$.OverlayActive53"
+        a54: "$.OverlayActive54"
+        a55: "$.OverlayActive55"
+        a56: "$.OverlayActive56"
+        a57: "$.OverlayActive57"
+        a58: "$.OverlayActive58"
+        a59: "$.OverlayActive59"
+        a60: "$.OverlayActive60"
+        a61: "$.OverlayActive61"
+        a62: "$.OverlayActive62"
+        a63: "$.OverlayActive63"
+        a64: "$.OverlayActive64"
+        a65: "$.OverlayActive65"
+        a66: "$.OverlayActive66"
+        a67: "$.OverlayActive67"
+        a68: "$.OverlayActive68"
+        a69: "$.OverlayActive69"
+        a70: "$.OverlayActive70"
+        a71: "$.OverlayActive71"
+        a72: "$.OverlayActive72"
+        a73: "$.OverlayActive73"
+        a74: "$.OverlayActive74"
+        a75: "$.OverlayActive75"
+        a76: "$.OverlayActive76"
+        a77: "$.OverlayActive77"
+        a78: "$.OverlayActive78"
+        a79: "$.OverlayActive79"
+        a80: "$.OverlayActive80"
+        a81: "$.OverlayActive81"
+        a82: "$.OverlayActive82"
+        a83: "$.OverlayActive83"
+        a84: "$.OverlayActive84"
+        a85: "$.OverlayActive85"
+        a86: "$.OverlayActive86"
+        a87: "$.OverlayActive87"
+        a88: "$.OverlayActive88"
+        a89: "$.OverlayActive89"
+        a90: "$.OverlayActive90"
+        a91: "$.OverlayActive91"
+        a92: "$.OverlayActive92"
+        a93: "$.OverlayActive93"
+        a94: "$.OverlayActive94"
+        a95: "$.OverlayActive95"
+        a96: "$.OverlayActive96"
+        a97: "$.OverlayActive97"
+        a98: "$.OverlayActive98"
+        a99: "$.OverlayActive99"
+      replace: "channels.{index:+1}.active_overlays"
+      state:
+        "channels.{index:+1}.active_overlays.1": "{a1}"
+        "channels.{index:+1}.active_overlays.2": "{a2}"
+        "channels.{index:+1}.active_overlays.3": "{a3}"
+        "channels.{index:+1}.active_overlays.4": "{a4}"
+        "channels.{index:+1}.active_overlays.5": "{a5}"
+        "channels.{index:+1}.active_overlays.6": "{a6}"
+        "channels.{index:+1}.active_overlays.7": "{a7}"
+        "channels.{index:+1}.active_overlays.8": "{a8}"
+        "channels.{index:+1}.active_overlays.9": "{a9}"
+        "channels.{index:+1}.active_overlays.10": "{a10}"
+        "channels.{index:+1}.active_overlays.11": "{a11}"
+        "channels.{index:+1}.active_overlays.12": "{a12}"
+        "channels.{index:+1}.active_overlays.13": "{a13}"
+        "channels.{index:+1}.active_overlays.14": "{a14}"
+        "channels.{index:+1}.active_overlays.15": "{a15}"
+        "channels.{index:+1}.active_overlays.16": "{a16}"
+        "channels.{index:+1}.active_overlays.17": "{a17}"
+        "channels.{index:+1}.active_overlays.18": "{a18}"
+        "channels.{index:+1}.active_overlays.19": "{a19}"
+        "channels.{index:+1}.active_overlays.20": "{a20}"
+        "channels.{index:+1}.active_overlays.21": "{a21}"
+        "channels.{index:+1}.active_overlays.22": "{a22}"
+        "channels.{index:+1}.active_overlays.23": "{a23}"
+        "channels.{index:+1}.active_overlays.24": "{a24}"
+        "channels.{index:+1}.active_overlays.25": "{a25}"
+        "channels.{index:+1}.active_overlays.26": "{a26}"
+        "channels.{index:+1}.active_overlays.27": "{a27}"
+        "channels.{index:+1}.active_overlays.28": "{a28}"
+        "channels.{index:+1}.active_overlays.29": "{a29}"
+        "channels.{index:+1}.active_overlays.30": "{a30}"
+        "channels.{index:+1}.active_overlays.31": "{a31}"
+        "channels.{index:+1}.active_overlays.32": "{a32}"
+        "channels.{index:+1}.active_overlays.33": "{a33}"
+        "channels.{index:+1}.active_overlays.34": "{a34}"
+        "channels.{index:+1}.active_overlays.35": "{a35}"
+        "channels.{index:+1}.active_overlays.36": "{a36}"
+        "channels.{index:+1}.active_overlays.37": "{a37}"
+        "channels.{index:+1}.active_overlays.38": "{a38}"
+        "channels.{index:+1}.active_overlays.39": "{a39}"
+        "channels.{index:+1}.active_overlays.40": "{a40}"
+        "channels.{index:+1}.active_overlays.41": "{a41}"
+        "channels.{index:+1}.active_overlays.42": "{a42}"
+        "channels.{index:+1}.active_overlays.43": "{a43}"
+        "channels.{index:+1}.active_overlays.44": "{a44}"
+        "channels.{index:+1}.active_overlays.45": "{a45}"
+        "channels.{index:+1}.active_overlays.46": "{a46}"
+        "channels.{index:+1}.active_overlays.47": "{a47}"
+        "channels.{index:+1}.active_overlays.48": "{a48}"
+        "channels.{index:+1}.active_overlays.49": "{a49}"
+        "channels.{index:+1}.active_overlays.50": "{a50}"
+        "channels.{index:+1}.active_overlays.51": "{a51}"
+        "channels.{index:+1}.active_overlays.52": "{a52}"
+        "channels.{index:+1}.active_overlays.53": "{a53}"
+        "channels.{index:+1}.active_overlays.54": "{a54}"
+        "channels.{index:+1}.active_overlays.55": "{a55}"
+        "channels.{index:+1}.active_overlays.56": "{a56}"
+        "channels.{index:+1}.active_overlays.57": "{a57}"
+        "channels.{index:+1}.active_overlays.58": "{a58}"
+        "channels.{index:+1}.active_overlays.59": "{a59}"
+        "channels.{index:+1}.active_overlays.60": "{a60}"
+        "channels.{index:+1}.active_overlays.61": "{a61}"
+        "channels.{index:+1}.active_overlays.62": "{a62}"
+        "channels.{index:+1}.active_overlays.63": "{a63}"
+        "channels.{index:+1}.active_overlays.64": "{a64}"
+        "channels.{index:+1}.active_overlays.65": "{a65}"
+        "channels.{index:+1}.active_overlays.66": "{a66}"
+        "channels.{index:+1}.active_overlays.67": "{a67}"
+        "channels.{index:+1}.active_overlays.68": "{a68}"
+        "channels.{index:+1}.active_overlays.69": "{a69}"
+        "channels.{index:+1}.active_overlays.70": "{a70}"
+        "channels.{index:+1}.active_overlays.71": "{a71}"
+        "channels.{index:+1}.active_overlays.72": "{a72}"
+        "channels.{index:+1}.active_overlays.73": "{a73}"
+        "channels.{index:+1}.active_overlays.74": "{a74}"
+        "channels.{index:+1}.active_overlays.75": "{a75}"
+        "channels.{index:+1}.active_overlays.76": "{a76}"
+        "channels.{index:+1}.active_overlays.77": "{a77}"
+        "channels.{index:+1}.active_overlays.78": "{a78}"
+        "channels.{index:+1}.active_overlays.79": "{a79}"
+        "channels.{index:+1}.active_overlays.80": "{a80}"
+        "channels.{index:+1}.active_overlays.81": "{a81}"
+        "channels.{index:+1}.active_overlays.82": "{a82}"
+        "channels.{index:+1}.active_overlays.83": "{a83}"
+        "channels.{index:+1}.active_overlays.84": "{a84}"
+        "channels.{index:+1}.active_overlays.85": "{a85}"
+        "channels.{index:+1}.active_overlays.86": "{a86}"
+        "channels.{index:+1}.active_overlays.87": "{a87}"
+        "channels.{index:+1}.active_overlays.88": "{a88}"
+        "channels.{index:+1}.active_overlays.89": "{a89}"
+        "channels.{index:+1}.active_overlays.90": "{a90}"
+        "channels.{index:+1}.active_overlays.91": "{a91}"
+        "channels.{index:+1}.active_overlays.92": "{a92}"
+        "channels.{index:+1}.active_overlays.93": "{a93}"
+        "channels.{index:+1}.active_overlays.94": "{a94}"
+        "channels.{index:+1}.active_overlays.95": "{a95}"
+        "channels.{index:+1}.active_overlays.96": "{a96}"
+        "channels.{index:+1}.active_overlays.97": "{a97}"
+        "channels.{index:+1}.active_overlays.98": "{a98}"
+        "channels.{index:+1}.active_overlays.99": "{a99}"
+    - path: "^/api/v1/status$"
+      json_each: "$.Channel"
+      json:
+        a1: "$.ActionActive1"
+        a2: "$.ActionActive2"
+        a3: "$.ActionActive3"
+        a4: "$.ActionActive4"
+        a5: "$.ActionActive5"
+        a6: "$.ActionActive6"
+        a7: "$.ActionActive7"
+        a8: "$.ActionActive8"
+        a9: "$.ActionActive9"
+        a10: "$.ActionActive10"
+        a11: "$.ActionActive11"
+        a12: "$.ActionActive12"
+        a13: "$.ActionActive13"
+        a14: "$.ActionActive14"
+        a15: "$.ActionActive15"
+        a16: "$.ActionActive16"
+        a17: "$.ActionActive17"
+        a18: "$.ActionActive18"
+        a19: "$.ActionActive19"
+        a20: "$.ActionActive20"
+        a21: "$.ActionActive21"
+        a22: "$.ActionActive22"
+        a23: "$.ActionActive23"
+        a24: "$.ActionActive24"
+        a25: "$.ActionActive25"
+        a26: "$.ActionActive26"
+        a27: "$.ActionActive27"
+        a28: "$.ActionActive28"
+        a29: "$.ActionActive29"
+        a30: "$.ActionActive30"
+        a31: "$.ActionActive31"
+        a32: "$.ActionActive32"
+        a33: "$.ActionActive33"
+        a34: "$.ActionActive34"
+        a35: "$.ActionActive35"
+        a36: "$.ActionActive36"
+        a37: "$.ActionActive37"
+        a38: "$.ActionActive38"
+        a39: "$.ActionActive39"
+        a40: "$.ActionActive40"
+        a41: "$.ActionActive41"
+        a42: "$.ActionActive42"
+        a43: "$.ActionActive43"
+        a44: "$.ActionActive44"
+        a45: "$.ActionActive45"
+        a46: "$.ActionActive46"
+        a47: "$.ActionActive47"
+        a48: "$.ActionActive48"
+        a49: "$.ActionActive49"
+        a50: "$.ActionActive50"
+        a51: "$.ActionActive51"
+        a52: "$.ActionActive52"
+        a53: "$.ActionActive53"
+        a54: "$.ActionActive54"
+        a55: "$.ActionActive55"
+        a56: "$.ActionActive56"
+        a57: "$.ActionActive57"
+        a58: "$.ActionActive58"
+        a59: "$.ActionActive59"
+        a60: "$.ActionActive60"
+        a61: "$.ActionActive61"
+        a62: "$.ActionActive62"
+        a63: "$.ActionActive63"
+        a64: "$.ActionActive64"
+        a65: "$.ActionActive65"
+        a66: "$.ActionActive66"
+        a67: "$.ActionActive67"
+        a68: "$.ActionActive68"
+        a69: "$.ActionActive69"
+        a70: "$.ActionActive70"
+        a71: "$.ActionActive71"
+        a72: "$.ActionActive72"
+        a73: "$.ActionActive73"
+        a74: "$.ActionActive74"
+        a75: "$.ActionActive75"
+        a76: "$.ActionActive76"
+        a77: "$.ActionActive77"
+        a78: "$.ActionActive78"
+        a79: "$.ActionActive79"
+        a80: "$.ActionActive80"
+        a81: "$.ActionActive81"
+        a82: "$.ActionActive82"
+        a83: "$.ActionActive83"
+        a84: "$.ActionActive84"
+        a85: "$.ActionActive85"
+        a86: "$.ActionActive86"
+        a87: "$.ActionActive87"
+        a88: "$.ActionActive88"
+        a89: "$.ActionActive89"
+        a90: "$.ActionActive90"
+        a91: "$.ActionActive91"
+        a92: "$.ActionActive92"
+        a93: "$.ActionActive93"
+        a94: "$.ActionActive94"
+        a95: "$.ActionActive95"
+        a96: "$.ActionActive96"
+        a97: "$.ActionActive97"
+        a98: "$.ActionActive98"
+        a99: "$.ActionActive99"
+      replace: "channels.{index:+1}.active_actions"
+      state:
+        "channels.{index:+1}.active_actions.1": "{a1}"
+        "channels.{index:+1}.active_actions.2": "{a2}"
+        "channels.{index:+1}.active_actions.3": "{a3}"
+        "channels.{index:+1}.active_actions.4": "{a4}"
+        "channels.{index:+1}.active_actions.5": "{a5}"
+        "channels.{index:+1}.active_actions.6": "{a6}"
+        "channels.{index:+1}.active_actions.7": "{a7}"
+        "channels.{index:+1}.active_actions.8": "{a8}"
+        "channels.{index:+1}.active_actions.9": "{a9}"
+        "channels.{index:+1}.active_actions.10": "{a10}"
+        "channels.{index:+1}.active_actions.11": "{a11}"
+        "channels.{index:+1}.active_actions.12": "{a12}"
+        "channels.{index:+1}.active_actions.13": "{a13}"
+        "channels.{index:+1}.active_actions.14": "{a14}"
+        "channels.{index:+1}.active_actions.15": "{a15}"
+        "channels.{index:+1}.active_actions.16": "{a16}"
+        "channels.{index:+1}.active_actions.17": "{a17}"
+        "channels.{index:+1}.active_actions.18": "{a18}"
+        "channels.{index:+1}.active_actions.19": "{a19}"
+        "channels.{index:+1}.active_actions.20": "{a20}"
+        "channels.{index:+1}.active_actions.21": "{a21}"
+        "channels.{index:+1}.active_actions.22": "{a22}"
+        "channels.{index:+1}.active_actions.23": "{a23}"
+        "channels.{index:+1}.active_actions.24": "{a24}"
+        "channels.{index:+1}.active_actions.25": "{a25}"
+        "channels.{index:+1}.active_actions.26": "{a26}"
+        "channels.{index:+1}.active_actions.27": "{a27}"
+        "channels.{index:+1}.active_actions.28": "{a28}"
+        "channels.{index:+1}.active_actions.29": "{a29}"
+        "channels.{index:+1}.active_actions.30": "{a30}"
+        "channels.{index:+1}.active_actions.31": "{a31}"
+        "channels.{index:+1}.active_actions.32": "{a32}"
+        "channels.{index:+1}.active_actions.33": "{a33}"
+        "channels.{index:+1}.active_actions.34": "{a34}"
+        "channels.{index:+1}.active_actions.35": "{a35}"
+        "channels.{index:+1}.active_actions.36": "{a36}"
+        "channels.{index:+1}.active_actions.37": "{a37}"
+        "channels.{index:+1}.active_actions.38": "{a38}"
+        "channels.{index:+1}.active_actions.39": "{a39}"
+        "channels.{index:+1}.active_actions.40": "{a40}"
+        "channels.{index:+1}.active_actions.41": "{a41}"
+        "channels.{index:+1}.active_actions.42": "{a42}"
+        "channels.{index:+1}.active_actions.43": "{a43}"
+        "channels.{index:+1}.active_actions.44": "{a44}"
+        "channels.{index:+1}.active_actions.45": "{a45}"
+        "channels.{index:+1}.active_actions.46": "{a46}"
+        "channels.{index:+1}.active_actions.47": "{a47}"
+        "channels.{index:+1}.active_actions.48": "{a48}"
+        "channels.{index:+1}.active_actions.49": "{a49}"
+        "channels.{index:+1}.active_actions.50": "{a50}"
+        "channels.{index:+1}.active_actions.51": "{a51}"
+        "channels.{index:+1}.active_actions.52": "{a52}"
+        "channels.{index:+1}.active_actions.53": "{a53}"
+        "channels.{index:+1}.active_actions.54": "{a54}"
+        "channels.{index:+1}.active_actions.55": "{a55}"
+        "channels.{index:+1}.active_actions.56": "{a56}"
+        "channels.{index:+1}.active_actions.57": "{a57}"
+        "channels.{index:+1}.active_actions.58": "{a58}"
+        "channels.{index:+1}.active_actions.59": "{a59}"
+        "channels.{index:+1}.active_actions.60": "{a60}"
+        "channels.{index:+1}.active_actions.61": "{a61}"
+        "channels.{index:+1}.active_actions.62": "{a62}"
+        "channels.{index:+1}.active_actions.63": "{a63}"
+        "channels.{index:+1}.active_actions.64": "{a64}"
+        "channels.{index:+1}.active_actions.65": "{a65}"
+        "channels.{index:+1}.active_actions.66": "{a66}"
+        "channels.{index:+1}.active_actions.67": "{a67}"
+        "channels.{index:+1}.active_actions.68": "{a68}"
+        "channels.{index:+1}.active_actions.69": "{a69}"
+        "channels.{index:+1}.active_actions.70": "{a70}"
+        "channels.{index:+1}.active_actions.71": "{a71}"
+        "channels.{index:+1}.active_actions.72": "{a72}"
+        "channels.{index:+1}.active_actions.73": "{a73}"
+        "channels.{index:+1}.active_actions.74": "{a74}"
+        "channels.{index:+1}.active_actions.75": "{a75}"
+        "channels.{index:+1}.active_actions.76": "{a76}"
+        "channels.{index:+1}.active_actions.77": "{a77}"
+        "channels.{index:+1}.active_actions.78": "{a78}"
+        "channels.{index:+1}.active_actions.79": "{a79}"
+        "channels.{index:+1}.active_actions.80": "{a80}"
+        "channels.{index:+1}.active_actions.81": "{a81}"
+        "channels.{index:+1}.active_actions.82": "{a82}"
+        "channels.{index:+1}.active_actions.83": "{a83}"
+        "channels.{index:+1}.active_actions.84": "{a84}"
+        "channels.{index:+1}.active_actions.85": "{a85}"
+        "channels.{index:+1}.active_actions.86": "{a86}"
+        "channels.{index:+1}.active_actions.87": "{a87}"
+        "channels.{index:+1}.active_actions.88": "{a88}"
+        "channels.{index:+1}.active_actions.89": "{a89}"
+        "channels.{index:+1}.active_actions.90": "{a90}"
+        "channels.{index:+1}.active_actions.91": "{a91}"
+        "channels.{index:+1}.active_actions.92": "{a92}"
+        "channels.{index:+1}.active_actions.93": "{a93}"
+        "channels.{index:+1}.active_actions.94": "{a94}"
+        "channels.{index:+1}.active_actions.95": "{a95}"
+        "channels.{index:+1}.active_actions.96": "{a96}"
+        "channels.{index:+1}.active_actions.97": "{a97}"
+        "channels.{index:+1}.active_actions.98": "{a98}"
+        "channels.{index:+1}.active_actions.99": "{a99}"
+    - path: "^/api/v1/status$"
+      json_each: "$.DirectorView"
+      json: { type: "$.DirectorType", ids: "$.ChannelIDs", timer: "$.ShowTimer", name: "$.ShowName", tally: "$.ShowTally", notes: "$.ShowNotes" }
+      replace: director_views
+      state:
+        "director_views.{index:+1}.type": "{type}"
+        "director_views.{index:+1}.channel_ids": "{ids}"
+        "director_views.{index:+1}.show_timer": "{timer}"
+        "director_views.{index:+1}.show_name": "{name}"
+        "director_views.{index:+1}.show_tally": "{tally}"
+        "director_views.{index:+1}.show_notes": "{notes}"
+    - path: "^/api/v1/status$"
+      json_each: "$.ObjectState.*"
+      json: { value: "$" }
+      state: { "objects.{key:key}": "{value}" }
+    - path: "^/api/v1/project$"
+      json_each: "$.Channel"
+      json: { name: "$.ChannelName", count: "$.BlockCount", width: "$.StageWidth", height: "$.StageHeight" }
+      replace: ["channels.{index:+1}.blocks", "channels.{index:+1}.overlays", "channels.{index:+1}.actions"]
+      state:
+        "channels.{index:+1}.name": "{name}"
+        "channels.{index:+1}.block_count": "{count}"
+        "channels.{index:+1}.stage_width": "{width}"
+        "channels.{index:+1}.stage_height": "{height}"
+    - path: "^/api/v1/project$"
+      json_each: "$.Channel[*].Block"
+      json:
+        CanPlay: "$.CanPlay"
+        Name: "$.Name"
+        Number: "$.Number"
+        ID: "$.ID"
+        ClipCount: "$.ClipCount"
+        Active: "$.Active"
+        StopType: "$.StopType"
+        DurationString: "$.DurationString"
+        StopFollowTime: "$.StopFollowTime"
+        LoopClips: "$.LoopClips"
+        BreakOption: "$.BreakOption"
+        JumpUniqueID: "$.JumpUniqueID"
+        ShuffleType: "$.ShuffleType"
+        ShuffleClips: "$.ShuffleClips"
+        ScheduledUnix: "$.ScheduledUnix"
+        ScheduledWithDay: "$.ScheduledWithDay"
+        ScheduledWithRepeat: "$.ScheduledWithRepeat"
+        ScheduledRepeatDuration: "$.ScheduledRepeatDuration"
+        ScheduledMethod: "$.ScheduledMethod"
+        ScheduledWeekdays: "$.ScheduledWeekdays"
+      state:
+        "channels.{^index:+1}.blocks.{index:+1}.can_play": "{CanPlay}"
+        "channels.{^index:+1}.blocks.{index:+1}.name": "{Name}"
+        "channels.{^index:+1}.blocks.{index:+1}.number": "{Number}"
+        "channels.{^index:+1}.blocks.{index:+1}.id": "{ID}"
+        "channels.{^index:+1}.blocks.{index:+1}.clip_count": "{ClipCount}"
+        "channels.{^index:+1}.blocks.{index:+1}.active": "{Active}"
+        "channels.{^index:+1}.blocks.{index:+1}.stop_type": "{StopType}"
+        "channels.{^index:+1}.blocks.{index:+1}.duration_text": "{DurationString}"
+        "channels.{^index:+1}.blocks.{index:+1}.stop_follow_time": "{StopFollowTime}"
+        "channels.{^index:+1}.blocks.{index:+1}.loop_clips": "{LoopClips}"
+        "channels.{^index:+1}.blocks.{index:+1}.break_option": "{BreakOption}"
+        "channels.{^index:+1}.blocks.{index:+1}.jump_uid": "{JumpUniqueID}"
+        "channels.{^index:+1}.blocks.{index:+1}.shuffle_type": "{ShuffleType}"
+        "channels.{^index:+1}.blocks.{index:+1}.shuffle_clips": "{ShuffleClips}"
+        "channels.{^index:+1}.blocks.{index:+1}.scheduled_unix": "{ScheduledUnix}"
+        "channels.{^index:+1}.blocks.{index:+1}.scheduled_with_day": "{ScheduledWithDay}"
+        "channels.{^index:+1}.blocks.{index:+1}.scheduled_with_repeat": "{ScheduledWithRepeat}"
+        "channels.{^index:+1}.blocks.{index:+1}.scheduled_repeat_duration": "{ScheduledRepeatDuration}"
+        "channels.{^index:+1}.blocks.{index:+1}.scheduled_method": "{ScheduledMethod}"
+        "channels.{^index:+1}.blocks.{index:+1}.scheduled_weekdays": "{ScheduledWeekdays}"
+    - path: "^/api/v1/project$"
+      json_each: "$.Channel[*].Block[*].Clip"
+      json:
+        CanPlay: "$.CanPlay"
+        Name: "$.Name"
+        Number: "$.Number"
+        ID: "$.ID"
+        ItemType: "$.ItemType"
+        Active: "$.Active"
+        FileName: "$.FileName"
+        ItemInput: "$.ItemInput"
+        DurationString: "$.DurationString"
+        FileSize: "$.FileSize"
+        FileSizeString: "$.FileSizeString"
+        FileDateUnix: "$.FileDateUnix"
+        FileDateString: "$.FileDateString"
+        FileType: "$.FileType"
+        FileTypeString: "$.FileTypeString"
+        TransitionType: "$.TransitionType"
+        TransitionTime: "$.TransitionTime"
+        DurationGfx: "$.DurationGfx"
+        DurationGfxType: "$.DurationGfxType"
+        DurationGfxClockUnix: "$.DurationGfxClockUnix"
+        PauseMode: "$.PauseMode"
+        PauseFollow: "$.PauseFollow"
+        PauseFollowTime: "$.PauseFollowTime"
+        MuteAudio: "$.MuteAudio"
+        Gain: "$.Gain"
+        GainCustom: "$.GainCustom"
+        EBUGain: "$.EBUGain"
+        EBUScanned: "$.EBUScanned"
+        ScaleType: "$.ScaleType"
+        ScaleAspect: "$.ScaleAspect"
+        CutIn: "$.CutIn"
+        CutOut: "$.CutOut"
+        CutOutRelative: "$.CutOutRelative"
+        CropLeft: "$.CropLeft"
+        CropTop: "$.CropTop"
+        CropRight: "$.CropRight"
+        CropBottom: "$.CropBottom"
+        LoopType: "$.LoopType"
+        LoopSeconds: "$.LoopSeconds"
+        LoopCount: "$.LoopCount"
+        LoopClock: "$.LoopClock"
+        LoopPartial: "$.LoopPartial"
+        VideoTrack: "$.VideoTrack"
+        AudioTrack: "$.AudioTrack"
+        SubtitleTrack: "$.SubtitleTrack"
+        SubtitleOffset: "$.SubtitleOffset"
+      state:
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.can_play": "{CanPlay}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.name": "{Name}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.number": "{Number}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.id": "{ID}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.item_type": "{ItemType}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.active": "{Active}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.file_name": "{FileName}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.item_input": "{ItemInput}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.duration_text": "{DurationString}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.file_size": "{FileSize}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.file_size_text": "{FileSizeString}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.file_date_unix": "{FileDateUnix}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.file_date_text": "{FileDateString}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.file_type": "{FileType}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.file_type_text": "{FileTypeString}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.transition_type": "{TransitionType}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.transition_time": "{TransitionTime}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.duration_gfx": "{DurationGfx}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.duration_gfx_type": "{DurationGfxType}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.duration_gfx_clock_unix": "{DurationGfxClockUnix}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.pause_mode": "{PauseMode}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.pause_follow": "{PauseFollow}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.pause_follow_time": "{PauseFollowTime}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.mute_audio": "{MuteAudio}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.gain": "{Gain}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.gain_custom": "{GainCustom}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.ebu_gain": "{EBUGain}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.ebu_scanned": "{EBUScanned}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.scale_type": "{ScaleType}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.scale_aspect": "{ScaleAspect}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.cut_in": "{CutIn}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.cut_out": "{CutOut}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.cut_out_relative": "{CutOutRelative}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.crop_left": "{CropLeft}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.crop_top": "{CropTop}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.crop_right": "{CropRight}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.crop_bottom": "{CropBottom}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.loop_type": "{LoopType}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.loop_seconds": "{LoopSeconds}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.loop_count": "{LoopCount}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.loop_clock": "{LoopClock}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.loop_partial": "{LoopPartial}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.video_track": "{VideoTrack}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.audio_track": "{AudioTrack}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.subtitle_track": "{SubtitleTrack}"
+        "channels.{^^index:+1}.blocks.{^index:+1}.clips.{index:+1}.subtitle_offset": "{SubtitleOffset}"
+    - path: "^/api/v1/project$"
+      json_each: "$.Channel[*].Overlays"
+      json: { name: "$.ButtonName", content: "$.HasContent", group: "$.IsGroup", type: "$.OverlayType" }
+      state:
+        "channels.{^index:+1}.overlays.{index:+1}.name": "{name}"
+        "channels.{^index:+1}.overlays.{index:+1}.has_content": "{content}"
+        "channels.{^index:+1}.overlays.{index:+1}.is_group": "{group}"
+        "channels.{^index:+1}.overlays.{index:+1}.type": "{type}"
+    - path: "^/api/v1/project$"
+      json_each: "$.Channel[*].Actions"
+      json: { name: "$.ButtonName", content: "$.HasContent" }
+      state:
+        "channels.{^index:+1}.actions.{index:+1}.name": "{name}"
+        "channels.{^index:+1}.actions.{index:+1}.has_content": "{content}"
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      The REST API is served on 11411 while PLAYDECK runs, beside the Web
+      Remote; it asks for no key or token on the LAN in the current version.
+      Indices (channel, block, clip, overlay, action, stream, recording,
+      input) count from 1, as in PLAYDECK's command language.
+  - models: [all]
+    severity: warning
+    text: >
+      State is read by polling GET /api/v1/status every second. PLAYDECK also
+      pushes the same JSON about every 250 ms on a WebSocket on the same
+      port, as text frames status|<json>, and its playout events as event|;
+      that prefixed framing is not JSON, which the spec format's rules read,
+      so the push is not used and events are not reported.
+  - models: [all]
+    severity: info
+    text: >
+      The project (blocks, clips, overlay and action buttons) is read once on
+      connecting: PLAYDECK's API asks clients not to poll it on a timer.
+      project.hash changes whenever the playlist does; get_project then reads
+      it again into state. Blocks and clips are keyed by their place in the
+      playlist from 1, which the cue, play and select commands take.
+  - models: [all]
+    severity: warning
+    text: >
+      GET /api/v1/project/file (the project as PDZ1 plus zlib, or plain XML on
+      older builds) is binary and is not offered: the spec format reads JSON
+      and text replies only.
+  - models: [all]
+    severity: info
+    text: >
+      Overlay and action button states appear in the status only while the
+      button is active (OverlayActiveN, ActionActiveN); the contract does not
+      give their value, which is kept as it arrives. pause toggles; hold
+      pauses without toggling.
+  - models: [all]
+    severity: info
+    text: >
+      The whole pipe-command language (wait, variables, chains, flex patterns,
+      playlist editing, loadproject and the rest) is reachable through
+      run_commands and run_named_command. Its list ships with PLAYDECK (Main
+      Menu > Documentation) and is not published, so those commands are not
+      broken out here. The legacy TCP Commands In (11375) and the AMP Video
+      Server (3811) are other ways in, not offered here.
+  - models: [all]
+    severity: critical
+    text: >
+      play, play_next, play_next_block, stop, fade_out and the stream and
+      recording commands change program output or a recording at once;
+      run_commands can load another project.

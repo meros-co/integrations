@@ -1,0 +1,470 @@
+spec: 1
+id: opensong
+name: OpenSong (OpenSong API)
+vendor: OpenSong
+category: playback
+
+# OpenSong's automation API (OpenSong 2.0 beta2 and later): REST over HTTP,
+# OpenSong being the server on port 8082. GET reads status and data, POST
+# changes things and needs the authentication key; requests take the form
+# /resource/action/identifier/param:value. Replies are XML (slide images are
+# JPEG). State follows /presentation/status, polled every second.
+
+source:
+  - title: OpenSong API (opensong.org, Development)
+    author: OpenSong
+    url: https://opensong.org/development/api/
+    note: >
+      Project documentation page, retrieved 2026-10-23 (documentation read
+      for facts; no OpenSong source read). The request form
+      /resource[/action[/identifier]]/param:value; port 8082 by default; GET
+      for reads, POST for changes; Basic authentication with a single key
+      (Authorization: Basic followed by the base64-encoded key) for POST
+      requests; the status reply (response, presentation running, screen
+      mode, slide itemnumber, name, title) and that slide item numbers are
+      unique ids, not positions; the presentation resource (status, slide
+      list, slide, preview and image, song insert with folder, song, after
+      and order, slide jump, next, previous, first, last, section next and
+      previous, song by order number, current song's chorus, bridge,
+      prechorus, tag and verse, screen normal, black, white, hide, logo and
+      freeze with toggle_ forms, alert message, close); the song resource
+      (list with folder, detail, folders, load, present with slide and
+      display); the set resource (list, slide list, slide by index, load,
+      present); and the websocket at /ws with /ws/subscribe/presentation.
+
+transport:
+  type: http
+  port: 8082
+  scheme: http
+  auth: header
+  auth_header: Authorization
+  timeout_ms: 4000
+  probe: { method: GET, path: /presentation/status }
+
+settings:
+  token: { type: string, secret: true, default: "", max_length: 1024, label: Authorization, description: "Basic followed by a space and OpenSong's authentication key in base64, sent with every request; POST requests are refused without it." }
+
+ports:
+  - { port: 8082, protocol: http, role: control, note: "OpenSong's API server (OpenSong 2.0 beta2 and later)" }
+
+models:
+  - id: opensong-2
+    name: OpenSong 2.0 and later
+    supports:
+      [get_status, get_slides, get_slide, get_songs, get_songs_in_folder, get_song,
+       get_song_in_folder, get_song_folders, get_sets, get_set_slides, get_set_slide, load_song,
+       load_song_from_folder, present_song, present_song_from_folder, load_set, present_set,
+       insert_song, insert_song_from_folder, insert_song_after, insert_song_from_folder_after,
+       insert_song_in_order, insert_song_from_folder_in_order, insert_song_after_in_order,
+       insert_song_from_folder_after_in_order, go_to_slide, next_slide, previous_slide,
+       first_slide, last_slide, next_section, previous_section, go_to_chorus, go_to_bridge,
+       go_to_prechorus, go_to_tag, go_to_song, go_to_verse, screen_normal, screen_black,
+       toggle_screen_black, screen_white, toggle_screen_white, screen_hide, toggle_screen_hide,
+       screen_logo, toggle_screen_logo, screen_freeze, toggle_screen_freeze, show_alert,
+       clear_alert, close_presentation]
+    verification: none
+
+commands:
+  get_status:
+    summary: "Read whether a presentation runs, the screen mode and the current slide (GET /presentation/status)"
+    send: { method: GET, path: "/presentation/status" }
+    expect: { status: 200 }
+    returns: text
+  get_slides:
+    summary: "List the running presentation's slides: item number, name and title (GET /presentation/slide/list)"
+    send: { method: GET, path: "/presentation/slide/list" }
+    expect: { status: 200 }
+    returns: text
+  get_slide:
+    summary: "Read a slide of the running presentation, as its raw XML (GET /presentation/slide/<item>)"
+    params:
+      item: {"type": "int", "min": 0, "required": true, "label": "Slide", "description": "The slide's item number, as the presentation's slide list gives it (not its position)."}
+    send: { method: GET, path: "/presentation/slide/{item}" }
+    expect: { status: 200 }
+    returns: text
+  get_songs:
+    summary: "List the songs in the songs root (GET /song/list)"
+    send: { method: GET, path: "/song/list" }
+    expect: { status: 200 }
+    returns: text
+  get_songs_in_folder:
+    summary: "List the songs in a song folder (GET /song/list/folder:<name>)"
+    params:
+      folder: {"type": "string", "required": true, "max_length": 255, "label": "Folder", "description": "The song folder, by name, under the songs root."}
+    send: { method: GET, path: "/song/list/folder:{folder}" }
+    expect: { status: 200 }
+    returns: text
+  get_song:
+    summary: "Read a song from the songs root, as its raw XML (GET /song/detail/<name>)"
+    params:
+      song: {"type": "string", "required": true, "max_length": 255, "label": "Song", "description": "The song's name, its file name in the song folder."}
+    send: { method: GET, path: "/song/detail/{song}" }
+    expect: { status: 200 }
+    returns: text
+  get_song_in_folder:
+    summary: "Read a song from a song folder, as its raw XML (GET /song/detail/<name>/folder:<folder>)"
+    params:
+      song: {"type": "string", "required": true, "max_length": 255, "label": "Song", "description": "The song's name, its file name in the song folder."}
+      folder: {"type": "string", "required": true, "max_length": 255, "label": "Folder", "description": "The song folder, by name, under the songs root."}
+    send: { method: GET, path: "/song/detail/{song}/folder:{folder}" }
+    expect: { status: 200 }
+    returns: text
+  get_song_folders:
+    summary: "List the song folders (GET /song/folders)"
+    send: { method: GET, path: "/song/folders" }
+    expect: { status: 200 }
+    returns: text
+  get_sets:
+    summary: "List the sets (GET /set/list)"
+    send: { method: GET, path: "/set/list" }
+    expect: { status: 200 }
+    returns: text
+  get_set_slides:
+    summary: "List a set's slides, a short summary each (GET /set/slide/<set>)"
+    params:
+      set: {"type": "string", "required": true, "max_length": 255, "label": "Set", "description": "The set's name."}
+    send: { method: GET, path: "/set/slide/{set}" }
+    expect: { status: 200 }
+    returns: text
+  get_set_slide:
+    summary: "Read one slide of a set, as its raw XML (GET /set/slide/<set>/slide:<index>)"
+    params:
+      set: {"type": "string", "required": true, "max_length": 255, "label": "Set", "description": "The set's name."}
+      index: {"type": "int", "min": 1, "required": true, "label": "Slide", "description": "The slide's index in the set, from 1."}
+    send: { method: GET, path: "/set/slide/{set}/slide:{index}" }
+    expect: { status: 200 }
+    returns: text
+  load_song:
+    summary: "Load a song from the songs root (POST /song/load/<name>)"
+    params:
+      song: {"type": "string", "required": true, "max_length": 255, "label": "Song", "description": "The song's name, its file name in the song folder."}
+    send: { method: POST, path: "/song/load/{song}" }
+    expect: { status: 200 }
+    returns: ack
+  load_song_from_folder:
+    summary: "Load a song from a song folder (POST /song/load/<name>/folder:<folder>)"
+    params:
+      song: {"type": "string", "required": true, "max_length": 255, "label": "Song", "description": "The song's name, its file name in the song folder."}
+      folder: {"type": "string", "required": true, "max_length": 255, "label": "Folder", "description": "The song folder, by name, under the songs root."}
+    send: { method: POST, path: "/song/load/{song}/folder:{folder}" }
+    expect: { status: 200 }
+    returns: ack
+  present_song:
+    summary: "Start a presentation of a song from the songs root (POST /song/present/<name>)"
+    params:
+      song: {"type": "string", "required": true, "max_length": 255, "label": "Song", "description": "The song's name, its file name in the song folder."}
+      slide: {"type": "int", "min": 1, "default": 1, "label": "Starting slide", "description": "The slide to start on, from 1."}
+      display: {"type": "enum", "values": ["1", "2"], "default": "2", "label": "Display", "description": "1 a single display, 2 dual display with the presentation helper."}
+    send: { method: POST, path: "/song/present/{song}/slide:{slide}/display:{display}" }
+    expect: { status: 200 }
+    returns: ack
+  present_song_from_folder:
+    summary: "Start a presentation of a song from a song folder (POST /song/present/<name>/folder:<folder>)"
+    params:
+      song: {"type": "string", "required": true, "max_length": 255, "label": "Song", "description": "The song's name, its file name in the song folder."}
+      folder: {"type": "string", "required": true, "max_length": 255, "label": "Folder", "description": "The song folder, by name, under the songs root."}
+      slide: {"type": "int", "min": 1, "default": 1, "label": "Starting slide", "description": "The slide to start on, from 1."}
+      display: {"type": "enum", "values": ["1", "2"], "default": "2", "label": "Display", "description": "1 a single display, 2 dual display with the presentation helper."}
+    send: { method: POST, path: "/song/present/{song}/folder:{folder}/slide:{slide}/display:{display}" }
+    expect: { status: 200 }
+    returns: ack
+  load_set:
+    summary: "Load a set (POST /set/load/<set>)"
+    params:
+      set: {"type": "string", "required": true, "max_length": 255, "label": "Set", "description": "The set's name."}
+    send: { method: POST, path: "/set/load/{set}" }
+    expect: { status: 200 }
+    returns: ack
+  present_set:
+    summary: "Start a presentation of a set (POST /set/present/<set>)"
+    params:
+      set: {"type": "string", "required": true, "max_length": 255, "label": "Set", "description": "The set's name."}
+      slide: {"type": "int", "min": 1, "default": 1, "label": "Starting slide", "description": "The slide to start on, from 1."}
+      display: {"type": "enum", "values": ["1", "2"], "default": "2", "label": "Display", "description": "1 a single display, 2 dual display with the presentation helper."}
+    send: { method: POST, path: "/set/present/{set}/slide:{slide}/display:{display}" }
+    expect: { status: 200 }
+    returns: ack
+  insert_song:
+    summary: "Insert a song from the songs root into the running set after the current slide group, in its default order (POST /presentation/slide/song)"
+    params:
+      song: {"type": "string", "required": true, "max_length": 255, "label": "Song", "description": "The song's name, its file name in the song folder."}
+    send: { method: POST, path: "/presentation/slide/song/song:{song}" }
+    expect: { status: 200 }
+    returns: ack
+  insert_song_from_folder:
+    summary: "Insert a song from a song folder into the running set after the current slide group, in its default order (POST /presentation/slide/song)"
+    params:
+      folder: {"type": "string", "required": true, "max_length": 255, "label": "Folder", "description": "The song folder, by name, under the songs root."}
+      song: {"type": "string", "required": true, "max_length": 255, "label": "Song", "description": "The song's name, its file name in the song folder."}
+    send: { method: POST, path: "/presentation/slide/song/folder:{folder}/song:{song}" }
+    expect: { status: 200 }
+    returns: ack
+  insert_song_after:
+    summary: "Insert a song from the songs root into the running set after a slide number, in its default order (POST /presentation/slide/song)"
+    params:
+      song: {"type": "string", "required": true, "max_length": 255, "label": "Song", "description": "The song's name, its file name in the song folder."}
+      after: {"type": "int", "min": 0, "required": true, "label": "After slide", "description": "The slide number to insert after; 0 inserts it as the first item of the set."}
+    send: { method: POST, path: "/presentation/slide/song/song:{song}/after:{after}" }
+    expect: { status: 200 }
+    returns: ack
+  insert_song_from_folder_after:
+    summary: "Insert a song from a song folder into the running set after a slide number, in its default order (POST /presentation/slide/song)"
+    params:
+      folder: {"type": "string", "required": true, "max_length": 255, "label": "Folder", "description": "The song folder, by name, under the songs root."}
+      song: {"type": "string", "required": true, "max_length": 255, "label": "Song", "description": "The song's name, its file name in the song folder."}
+      after: {"type": "int", "min": 0, "required": true, "label": "After slide", "description": "The slide number to insert after; 0 inserts it as the first item of the set."}
+    send: { method: POST, path: "/presentation/slide/song/folder:{folder}/song:{song}/after:{after}" }
+    expect: { status: 200 }
+    returns: ack
+  insert_song_in_order:
+    summary: "Insert a song from the songs root into the running set after the current slide group, with a presentation order (POST /presentation/slide/song)"
+    params:
+      song: {"type": "string", "required": true, "max_length": 255, "label": "Song", "description": "The song's name, its file name in the song folder."}
+      order: {"type": "string", "required": true, "max_length": 255, "pattern": "^[A-Za-z0-9]+(,[A-Za-z0-9]+)*$", "label": "Presentation order", "description": "The song's parts to add, comma separated, such as V1,C,V2,B,V2,V3."}
+    send: { method: POST, path: "/presentation/slide/song/song:{song}/order:{order}" }
+    expect: { status: 200 }
+    returns: ack
+  insert_song_from_folder_in_order:
+    summary: "Insert a song from a song folder into the running set after the current slide group, with a presentation order (POST /presentation/slide/song)"
+    params:
+      folder: {"type": "string", "required": true, "max_length": 255, "label": "Folder", "description": "The song folder, by name, under the songs root."}
+      song: {"type": "string", "required": true, "max_length": 255, "label": "Song", "description": "The song's name, its file name in the song folder."}
+      order: {"type": "string", "required": true, "max_length": 255, "pattern": "^[A-Za-z0-9]+(,[A-Za-z0-9]+)*$", "label": "Presentation order", "description": "The song's parts to add, comma separated, such as V1,C,V2,B,V2,V3."}
+    send: { method: POST, path: "/presentation/slide/song/folder:{folder}/song:{song}/order:{order}" }
+    expect: { status: 200 }
+    returns: ack
+  insert_song_after_in_order:
+    summary: "Insert a song from the songs root into the running set after a slide number, with a presentation order (POST /presentation/slide/song)"
+    params:
+      song: {"type": "string", "required": true, "max_length": 255, "label": "Song", "description": "The song's name, its file name in the song folder."}
+      after: {"type": "int", "min": 0, "required": true, "label": "After slide", "description": "The slide number to insert after; 0 inserts it as the first item of the set."}
+      order: {"type": "string", "required": true, "max_length": 255, "pattern": "^[A-Za-z0-9]+(,[A-Za-z0-9]+)*$", "label": "Presentation order", "description": "The song's parts to add, comma separated, such as V1,C,V2,B,V2,V3."}
+    send: { method: POST, path: "/presentation/slide/song/song:{song}/after:{after}/order:{order}" }
+    expect: { status: 200 }
+    returns: ack
+  insert_song_from_folder_after_in_order:
+    summary: "Insert a song from a song folder into the running set after a slide number, with a presentation order (POST /presentation/slide/song)"
+    params:
+      folder: {"type": "string", "required": true, "max_length": 255, "label": "Folder", "description": "The song folder, by name, under the songs root."}
+      song: {"type": "string", "required": true, "max_length": 255, "label": "Song", "description": "The song's name, its file name in the song folder."}
+      after: {"type": "int", "min": 0, "required": true, "label": "After slide", "description": "The slide number to insert after; 0 inserts it as the first item of the set."}
+      order: {"type": "string", "required": true, "max_length": 255, "pattern": "^[A-Za-z0-9]+(,[A-Za-z0-9]+)*$", "label": "Presentation order", "description": "The song's parts to add, comma separated, such as V1,C,V2,B,V2,V3."}
+    send: { method: POST, path: "/presentation/slide/song/folder:{folder}/song:{song}/after:{after}/order:{order}" }
+    expect: { status: 200 }
+    returns: ack
+  go_to_slide:
+    summary: "Show a slide of the running presentation (POST /presentation/slide/<item>)"
+    params:
+      item: {"type": "int", "min": 0, "required": true, "label": "Slide", "description": "The slide's item number, as the presentation's slide list gives it (not its position)."}
+    send: { method: POST, path: "/presentation/slide/{item}" }
+    expect: { status: 200 }
+    returns: ack
+  next_slide:
+    summary: "Show the next slide (POST /presentation/slide/next)"
+    send: { method: POST, path: "/presentation/slide/next" }
+    expect: { status: 200 }
+    returns: ack
+  previous_slide:
+    summary: "Show the previous slide (POST /presentation/slide/previous)"
+    send: { method: POST, path: "/presentation/slide/previous" }
+    expect: { status: 200 }
+    returns: ack
+  first_slide:
+    summary: "Show the first slide (POST /presentation/slide/first)"
+    send: { method: POST, path: "/presentation/slide/first" }
+    expect: { status: 200 }
+    returns: ack
+  last_slide:
+    summary: "Show the last slide (POST /presentation/slide/last)"
+    send: { method: POST, path: "/presentation/slide/last" }
+    expect: { status: 200 }
+    returns: ack
+  next_section:
+    summary: "Go to the next section (POST /presentation/section/next)"
+    send: { method: POST, path: "/presentation/section/next" }
+    expect: { status: 200 }
+    returns: ack
+  previous_section:
+    summary: "Go to the previous section (POST /presentation/section/previous)"
+    send: { method: POST, path: "/presentation/section/previous" }
+    expect: { status: 200 }
+    returns: ack
+  go_to_chorus:
+    summary: "Go to the next chorus of the current song (POST /presentation/song/current/chorus)"
+    send: { method: POST, path: "/presentation/song/current/chorus" }
+    expect: { status: 200 }
+    returns: ack
+  go_to_bridge:
+    summary: "Go to the next bridge of the current song (POST /presentation/song/current/bridge)"
+    send: { method: POST, path: "/presentation/song/current/bridge" }
+    expect: { status: 200 }
+    returns: ack
+  go_to_prechorus:
+    summary: "Go to the next pre-chorus of the current song (POST /presentation/song/current/prechorus)"
+    send: { method: POST, path: "/presentation/song/current/prechorus" }
+    expect: { status: 200 }
+    returns: ack
+  go_to_tag:
+    summary: "Go to the next tag of the current song (POST /presentation/song/current/tag)"
+    send: { method: POST, path: "/presentation/song/current/tag" }
+    expect: { status: 200 }
+    returns: ack
+  go_to_song:
+    summary: "Go to a song of the running set by its order number (POST /presentation/song/<number>)"
+    params:
+      number: {"type": "int", "min": 1, "required": true, "label": "Song", "description": "The song's order number in the set, from 1."}
+    send: { method: POST, path: "/presentation/song/{number}" }
+    expect: { status: 200 }
+    returns: ack
+  go_to_verse:
+    summary: "Go to a verse of the current song (POST /presentation/song/current/verse/verse:<number>)"
+    params:
+      verse: {"type": "int", "min": 1, "required": true, "label": "Verse", "description": "The verse number, as the song numbers it."}
+    send: { method: POST, path: "/presentation/song/current/verse/verse:{verse}" }
+    expect: { status: 200 }
+    returns: ack
+  screen_normal:
+    summary: "Return the screen to normal display (POST /presentation/screen/normal)"
+    send: { method: POST, path: "/presentation/screen/normal" }
+    expect: { status: 200 }
+    returns: ack
+  screen_black:
+    summary: "Show a black screen (POST /presentation/screen/black)"
+    send: { method: POST, path: "/presentation/screen/black" }
+    expect: { status: 200 }
+    returns: ack
+  toggle_screen_black:
+    summary: "Show a black screen, or return to normal when it shows (POST /presentation/screen/toggle_black)"
+    send: { method: POST, path: "/presentation/screen/toggle_black" }
+    expect: { status: 200 }
+    returns: ack
+  screen_white:
+    summary: "Show a white screen (POST /presentation/screen/white)"
+    send: { method: POST, path: "/presentation/screen/white" }
+    expect: { status: 200 }
+    returns: ack
+  toggle_screen_white:
+    summary: "Show a white screen, or return to normal when it shows (POST /presentation/screen/toggle_white)"
+    send: { method: POST, path: "/presentation/screen/toggle_white" }
+    expect: { status: 200 }
+    returns: ack
+  screen_hide:
+    summary: "Show the background only (text hidden) (POST /presentation/screen/hide)"
+    send: { method: POST, path: "/presentation/screen/hide" }
+    expect: { status: 200 }
+    returns: ack
+  toggle_screen_hide:
+    summary: "Show the background only (text hidden), or return to normal when it shows (POST /presentation/screen/toggle_hide)"
+    send: { method: POST, path: "/presentation/screen/toggle_hide" }
+    expect: { status: 200 }
+    returns: ack
+  screen_logo:
+    summary: "Show the logo over the screen (POST /presentation/screen/logo)"
+    send: { method: POST, path: "/presentation/screen/logo" }
+    expect: { status: 200 }
+    returns: ack
+  toggle_screen_logo:
+    summary: "Show the logo over the screen, or return to normal when it shows (POST /presentation/screen/toggle_logo)"
+    send: { method: POST, path: "/presentation/screen/toggle_logo" }
+    expect: { status: 200 }
+    returns: ack
+  screen_freeze:
+    summary: "Show a frozen screen (POST /presentation/screen/freeze)"
+    send: { method: POST, path: "/presentation/screen/freeze" }
+    expect: { status: 200 }
+    returns: ack
+  toggle_screen_freeze:
+    summary: "Show a frozen screen, or return to normal when it shows (POST /presentation/screen/toggle_freeze)"
+    send: { method: POST, path: "/presentation/screen/toggle_freeze" }
+    expect: { status: 200 }
+    returns: ack
+  show_alert:
+    summary: "Show an alert message on screen (POST /presentation/screen/alert/message:<text>)"
+    params:
+      message: {"type": "string", "required": true, "max_length": 1024, "pattern": "^[^/]+$", "label": "Message", "description": "The alert text, UTF-8 from OpenSong 2.2 rev. 918; it may not hold a slash."}
+    send: { method: POST, path: "/presentation/screen/alert/message:{message}" }
+    expect: { status: 200 }
+    returns: ack
+  clear_alert:
+    summary: "Remove the alert shown on screen (POST /presentation/screen/alert)"
+    send: { method: POST, path: "/presentation/screen/alert" }
+    expect: { status: 200 }
+    returns: ack
+  close_presentation:
+    summary: "End the running presentation, without asking (POST /presentation/close)"
+    send: { method: POST, path: "/presentation/close" }
+    expect: { status: 200 }
+    returns: ack
+
+state:
+  presentation.running: { type: bool, description: "Whether a presentation is running" }
+  presentation.screen.mode: { type: string, description: "Screen mode code, as OpenSong gives it (N for normal)" }
+  presentation.screen.name: { type: string, description: "Screen mode, as OpenSong names it (normal)" }
+  presentation.slide.item: { type: int, description: "Item number of the current slide: a unique id for the presentation's run, not its position" }
+  presentation.slide.name: { type: string, description: "Current slide's name" }
+  presentation.slide.title: { type: string, description: "Current slide's title" }
+
+telemetry:
+  # OpenSong pushes over its websocket in a form the documentation does not
+  # give: the status is polled every second.
+  poll:
+    every_ms: 1000
+    send: [{ method: GET, path: /presentation/status }]
+  updates:
+    - path: "^/presentation/status$"
+      xml_each: presentation
+      replace: [presentation.screen, presentation.slide]
+      state:
+        presentation.running: { value: "{running}", map: { "1": true, "0": false } }
+    - path: "^/presentation/status$"
+      xml_each: screen
+      state:
+        presentation.screen.mode: "{mode}"
+        presentation.screen.name: "{text}"
+    - path: "^/presentation/status$"
+      xml_each: slide
+      state:
+        presentation.slide.item: "{itemnumber}"
+        presentation.slide.name: "{name}"
+        presentation.slide.title: "{title}"
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      POST requests (every change) need OpenSong's single authentication key
+      in an Authorization header, Basic followed by the key in base64 (not a
+      user name and password): the token setting holds that whole value.
+      Without it OpenSong answers with a Basic challenge, which the core
+      takes as a refusal of the credential. GET requests mostly need none.
+  - models: [all]
+    severity: info
+    text: >
+      The page gives the default port as 8082, and 8080 in one place; 8082
+      is used. Slide item numbers are ids made when a presentation starts,
+      not positions; read them from get_slides.
+  - models: [all]
+    severity: warning
+    text: >
+      Only the status reply's XML is documented, so only it is read into
+      state; the slide list, songs, folders and sets are returned as the XML
+      OpenSong sends (get_slides, get_songs, get_song_folders, get_sets,
+      get_set_slides) without state, their element names being undocumented.
+      Slide previews and images (/presentation/slide/<item>/preview and
+      /image) are JPEG and are not offered: the spec format reads text and
+      JSON replies only.
+  - models: [all]
+    severity: info
+    text: >
+      Optional request parts become separate commands (songs from the root or
+      a folder, insert positions and presentation orders); a song or set
+      presented without a starting slide or display mode is the same as slide
+      1 on dual display, which present_song and present_set send. Inserting a
+      scripture is listed by OpenSong as not yet defined. The websocket (/ws,
+      GET requests and /ws/subscribe/presentation only, unauthenticated) is
+      not used: its pushes are not documented.
+  - models: [all]
+    severity: critical
+    text: >
+      present_set, present_song, close_presentation and the screen and
+      alert commands change what the audience sees at once.

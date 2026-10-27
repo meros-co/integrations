@@ -145,11 +145,13 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-greenhippo", &["greenhippo-hippotizer"]),
     ("vendor-h2r", &["h2r-graphics"]),
     ("vendor-highend", &["highend-hog4"]),
+    ("vendor-holyrics", &["holyrics"]),
     ("vendor-imimot", &["imimot-mitti"]),
     (
         "vendor-irisdown",
         &["irisdown-countdown-timer", "irisdown-remote-show-control"],
     ),
+    ("vendor-joy", &["joy-playdeck"]),
     (
         "vendor-kiloview",
         &[
@@ -197,6 +199,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-ontime", &["ontime", "ontime-osc"]),
     ("vendor-openlp", &["openlp"]),
     ("vendor-omt", &["omt", "omt-discovery"]),
+    ("vendor-opensong", &["opensong"]),
     (
         "vendor-panasonic",
         &[

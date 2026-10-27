@@ -1624,6 +1624,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that refreshall makes the console send every status, and whether repeating it every 60 s is noticeable on the console. ([specs/highend-hog4.yaml:489](specs/highend-hog4.yaml#L489))
 - [ ] Check whether the HPU acts on front panel keys, encoders and faders sent over OSC. ([specs/highend-hog4.yaml:556](specs/highend-hog4.yaml#L556))
 
+## holyrics — Holyrics
+
+- [ ] Confirm the API Server's default port (8091 is taken from the GetAPIServerInfo example; the documentation names no default). ([specs/holyrics.yaml:31](specs/holyrics.yaml#L31))
+- [ ] Record the HTTP status and body Holyrics answers an invalid or revoked token with ({"status":"error","error":"invalid token"} is documented, its status not; 401 is assumed for the refusal), and confirm CheckPermissions' 401 carries an error object instead. ([specs/holyrics.yaml:35](specs/holyrics.yaml#L35))
+- [ ] Confirm actions documented as returning no value answer {"status":"ok"} with HTTP 200, and that an action the token lacks answers status error rather than 401. ([specs/holyrics.yaml:146](specs/holyrics.yaml#L146))
+- [ ] Confirm GetCurrentPresentation answers data null while nothing is presented (the case that empties presentation state), and that GetHue answers data null while the hue is off. ([specs/holyrics.yaml:1537](specs/holyrics.yaml#L1537))
+- [ ] Check which response Numbers can be fractional: time_ms, duration_ms, volume, slide_number and total_slides are read as integers, countdown_time, stopwatch_time, BPM and the others as decimals. ([specs/holyrics.yaml:1427](specs/holyrics.yaml#L1427))
+- [ ] Confirm SetHue with hue null turns the hue off. ([specs/holyrics.yaml:1409](specs/holyrics.yaml#L1409))
+
 ## imimot-mitti — Mitti
 
 - [ ] Check that a Custom OSC Feedback target (this host and the feedback_port setting) receives every feedback message, and which port Mitti suggests by default. ([specs/imimot-mitti.yaml:617](specs/imimot-mitti.yaml#L617))
@@ -1647,6 +1656,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the add-in takes each command as a single UDP datagram with no line ending, and plain ASCII double quotes around names. ([specs/irisdown-remote-show-control.yaml:138](specs/irisdown-remote-show-control.yaml#L138))
 - [ ] Record how FIND answers (over UDP and over TCP 61001) and how the end of the list is marked. ([specs/irisdown-remote-show-control.yaml:135](specs/irisdown-remote-show-control.yaml#L135))
 - [ ] Check whether GO takes a slide number with the space (GO 23), as the manual's syntax shows, as well as without (GO2 in the Spyder example). ([specs/irisdown-remote-show-control.yaml:102](specs/irisdown-remote-show-control.yaml#L102))
+
+## joy-playdeck — PLAYDECK
+
+- [ ] Confirm a running PLAYDECK answers the REST API on 11411 as the OpenAPI document describes (the document says the implementation may follow the contract later), and which PLAYDECK version first serves it. ([specs/joy-playdeck.yaml:59](specs/joy-playdeck.yaml#L59))
+- [ ] Confirm control routes answer 200 with {"ok": true} (ActionResponse), and what a channel outside the licence answers (404 with an ErrorResponse is documented). ([specs/joy-playdeck.yaml:111](specs/joy-playdeck.yaml#L111))
+- [ ] Record the units of the status numbers BlockPosition, BlockDuration, BlockRemain, ClipPosition, ClipDuration, ClipRemain, ScheduleRemain and AutoplayRemain (seconds assumed), BlockProgress and ClipProgress (0 to 1 or percent), and BlockEnd, ClipEnd, ScheduleTime and AutoplayTime (Unix time assumed). ([specs/joy-playdeck.yaml:680](specs/joy-playdeck.yaml#L680))
+- [ ] Record the value of OverlayActiveN and ActionActiveN while a button is active (kept as text as it arrives), and confirm the keys are absent while it is not. ([specs/joy-playdeck.yaml:792](specs/joy-playdeck.yaml#L792))
+- [ ] Confirm a position request with a marker and an empty timestamp seeks to the marker (the schema requires timestamp, so an empty one is sent beside the marker). ([specs/joy-playdeck.yaml:369](specs/joy-playdeck.yaml#L369))
+- [ ] Confirm that blocks and clips in the project are listed in playlist order, so their place from 1 is the block and clip number the cue, play and select routes take. ([specs/joy-playdeck.yaml:1244](specs/joy-playdeck.yaml#L1244))
+- [ ] Confirm POST /api/v1/commands accepts args given as strings for numeric arguments (the schema says numbers as strings are fine) and what it answers an unknown command with. ([specs/joy-playdeck.yaml:491](specs/joy-playdeck.yaml#L491))
 
 ## kiloview-cube-r1 — Kiloview CUBE R1
 
@@ -2437,6 +2456,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Confirm the websocket sends a message for every change of the live item, slide and service, so re-reading on each one keeps the live item and service list current, and that the one-minute safety poll is enough for anything it misses. ([specs/openlp.yaml:388](specs/openlp.yaml#L388))
 - [ ] Confirm live-item answers {} (status 200) while nothing is live, the case that removes live_item from state. ([specs/openlp.yaml:416](specs/openlp.yaml#L416))
+
+## opensong — OpenSong
+
+- [ ] Confirm what OpenSong expects in Authorization for POST requests: Basic followed by the base64 of the key alone, as the API page says (not of user:password), and what it answers a wrong key with (a Basic challenge, 401, is assumed). ([specs/opensong.yaml:40](specs/opensong.yaml#L40))
+- [ ] Confirm the API's default port (8082; the page also says 8080 once) and where it is enabled and the key set in OpenSong's settings. ([specs/opensong.yaml:37](specs/opensong.yaml#L37))
+- [ ] Confirm that percent-encoded names (spaces as %20, commas as %2C) in path segments and param:value parts are decoded by OpenSong, and what a POST answers on success (status 200 with an XML response is assumed). ([specs/opensong.yaml:152](specs/opensong.yaml#L152))
+- [ ] Record the screen mode codes and names in the status for black, white, hide, logo and freeze (only N, normal, is documented). ([specs/opensong.yaml:401](specs/opensong.yaml#L401))
+- [ ] Confirm the status reply while no presentation runs carries presentation running="0" with no children. ([specs/opensong.yaml:415](specs/opensong.yaml#L415))
+- [ ] Check whether an alert message may hold a slash once percent-encoded (refused here), and which characters OpenSong's path parsing otherwise rejects. ([specs/opensong.yaml:381](specs/opensong.yaml#L381))
+- [ ] Record the XML of the slide list, song list, song folders, set list and set slide list, so they can be read into state. ([specs/opensong.yaml:73](specs/opensong.yaml#L73))
 
 ## osc-listener — OSC received from any sender
 
