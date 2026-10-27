@@ -3741,6 +3741,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a camera answers commands right after Address Set and IF_Clear broadcast on opening, and whether one that already has its address needs them. ([specs/visca.yaml:130](specs/visca.yaml#L130))
 - [ ] On Sony, confirm the 200 ms before a cancel counts from the pan/tilt drive's ACK (the core's reading of "after executing"); on the other vendors' cameras, which document no such gap and get none, check whether a cancel sent within 200 ms of a drive starting still stops it. ([specs/visca.yaml:1194](specs/visca.yaml#L1194))
 
+## vizrt-trio — Vizrt Viz Trio
+
+- [ ] Record what Viz Trio sends back for a command with no result (nothing, an empty line, or an acknowledgement); the spec waits for nothing. ([specs/vizrt-trio.yaml:910](specs/vizrt-trio.yaml#L910))
+- [ ] Record what a read answers when its result is empty (page:getpagename with no page read, playlist:get_current with none): an empty line, or nothing. ([specs/vizrt-trio.yaml:930](specs/vizrt-trio.yaml#L930))
+- [ ] Confirm a command ended by a line feed alone is accepted (the documents say a new line; some clients send CR LF). ([specs/vizrt-trio.yaml:54](specs/vizrt-trio.yaml#L54))
+- [ ] Check how boolean arguments are written (true/false as sent here, or 1/0) for page:fire, page:fire_all and goto_manual_graphics_mode. ([specs/vizrt-trio.yaml:267](specs/vizrt-trio.yaml#L267))
+- [ ] Check how arguments holding spaces are quoted when they are not the last one (channel and page names). ([specs/vizrt-trio.yaml:920](specs/vizrt-trio.yaml#L920))
+
 ## vmix — vMix
 
 - [ ] Capture a full XML state from vMix 27 or later (with a replay, a GT title, a list, a video call and layered inputs) so the parsing can be checked against the real shape; the shapes used here are inferred from vMix's old documented example and the MIT-licensed Companion module. ([specs/vmix.yaml:87](specs/vmix.yaml#L87))

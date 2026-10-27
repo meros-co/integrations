@@ -1,0 +1,942 @@
+spec: 1
+id: vizrt-trio
+name: Vizrt Viz Trio (macro commands over a socket)
+vendor: Vizrt
+category: other
+
+# Viz Trio runs a macro command server on TCP 6200: one macro command per
+# line (group:command arguments, such as page:read 1000), UTF-8 by default.
+# Commands that return something (get_* and the like) answer with the result
+# on a line; an error is answered ERROR: <message>. Arguments are separated
+# by spaces; the last one of a "restString" command takes the rest of the
+# line. Backslash is the socket's escape character.
+
+source:
+  - title: Viz Trio User Guide 4.6, Working with Macro Commands over a Socket Connection
+    author: Vizrt
+    url: https://docs.vizrt.com/viz-trio-guide/4.6/Working_with_Macro_Commands_over_a_Socket_Connection.html
+    note: >
+      Manufacturer document, read 2026-10-27. TCP port 6200 (overridable with
+      -macro-port); UTF-8 (default, preferred) or Latin-1, switched with the
+      socket-only command socket_encoding; a command ends at a new line;
+      backslash escapes \n, \r, \xHH and \; commandserver:enable_error_messages
+      true|false sends every Viz Trio error to the client as ERROR: <message>,
+      and errors from commands not found or failing are sent either way. The
+      same page in the 3.2 guide and its Port Numbers page agree (6200 for
+      trio.exe).
+  - title: Viz Trio User Guide 4.6, Overview of Commands and Working with Macro Commands
+    author: Vizrt
+    url: https://docs.vizrt.com/viz-trio-guide/4.6/Overview_of_Commands.html
+    note: >
+      Manufacturer document, read 2026-10-27. Every command used here with its
+      arguments and description, in the groups channelcontrol, page, playlist,
+      show, main, tabfield, table, trio and scroll2; results shown as RESULT:
+      in the commands window (show:get_variable returning the value,
+      main:help, main:apropos); "A get command cannot retrieve a variable's
+      value if a set command has not been issued first"; parameters are case
+      sensitive.
+  - title: Viz Trio User Guide 4.6, Command Line Parameters
+    author: Vizrt
+    url: https://docs.vizrt.com/viz-trio-guide/4.6/Command_Line_Parameters.html
+    note: Manufacturer document. -macro-port overrides the macro command server's port, 6200 by default.
+  - title: companion-module-vizrt-tcp-engine-trio (Bitfocus Companion module, MIT licence)
+    author: Bitfocus AS and Andreas H. Thomsen
+    url: https://github.com/bitfocus/companion-module-vizrt-tcp-engine-trio
+    note: >
+      Read for corroboration only (index.js, companion/HELP.md): Trio commands
+      sent as plain lines on the socket, page:read 1000 and page:take 1000. No
+      code taken.
+
+transport:
+  type: line-tcp
+  port: 6200
+  framing: terminated
+  terminator: lf
+  encoding: utf-8
+  timeout_ms: 5000
+  probe: "main:get_version"
+
+ports:
+  - { port: 6200, protocol: tcp, role: control, note: "Viz Trio's macro command server; -macro-port moves it" }
+
+models:
+  - id: viz-trio
+    name: Viz Trio 3.x and 4.x
+    supports: [
+               page_take, page_take_on_channel, page_continue, page_continue_on_channel, page_takeout, 
+               page_takeout_on_channel, page_cue, page_cue_on_channel, page_cut, page_cut_on_channel, 
+               page_prepare, page_prepare_on_channel, page_pause, page_pause_on_channel, current_take, 
+               current_continue, current_takeout, page_read, page_read_next, page_read_previous, page_take_next, 
+               page_take_exchange, page_update, page_save, page_save_as, page_arm, page_arm_current, page_unarm, 
+               page_unarm_current, page_unarm_all, page_fire, page_fire_all, page_set_property, page_get_property, 
+               page_get_name, page_get_description, page_get_template, page_get_tabfield_names, 
+               page_get_property_keys, page_get_tabfield_count, page_set_description, page_set_program_channel, 
+               page_get_program_channel, page_set_effect, page_refresh_linked_data, page_set_status, 
+               page_delete_range, tabfield_set_value, tabfield_tab_to, tabfield_tab_to_name, 
+               tabfield_get_property, table_get_cell, table_set_cell, table_get_row_count, table_insert_rows, 
+               table_delete_rows, show_get_name, show_get_description, show_get_pages, show_get_groups, 
+               show_get_templates, show_page_exists, show_set_dir, show_load, show_reload, show_load_armed, 
+               show_set_variable, show_get_variable, show_set_concept, show_get_concept, show_set_variant, 
+               show_get_variant, show_set_context_variable, show_get_context_variable, get_version, get_shows, 
+               call_macro, get_global_macros, get_local_macros, playlist_get_all, playlist_get_current, 
+               playlist_set_current, playlist_select_first, playlist_select_next, playlist_select_previous, 
+               playlist_read_selected, playlist_read_next, playlist_read_previous, playlist_take_selected, 
+               playlist_take_out_selected, playlist_next_story, playlist_previous_story, playlist_initialize, 
+               playlist_start_carousel, playlist_stop_carousel, playlist_pause_carousel, playlist_set_looping, 
+               playlist_set_manual_mode, playlist_clear, playlist_close, playlist_add_page, get_active_profile, 
+               list_profiles, set_active_profile, get_program_channel, set_program_channel, 
+               get_video_program_channel, set_video_program_channel, get_preview_channel, set_preview_channel, 
+               get_video_preview_channel, set_video_preview_channel, list_viz_channels, list_video_channels, 
+               set_channel_hosts, trio_on_air, trio_off_air, trio_initialize, trio_cleanup, 
+               trio_cleanup_all_channels, trio_cleanup_channel, trio_clear_preview, trio_clear_program, 
+               trio_check_channels, trio_continue_last_taken, trio_takeout_last_taken, trio_swap_channels, 
+               trio_exchange, trio_synchronize_clocks, trio_freeze_clock, trio_unfreeze_clock, trio_send_vizcmd, 
+               trio_send_preview_vizcmd, trio_send_vizcmd_to_channel, trio_set_global_variable, 
+               trio_get_global_variable, scroll_program_start, scroll_program_continue, scroll_program_stop, 
+               enable_error_messages
+               ]
+    verification: none
+
+commands:
+  page_take:
+    summary: "Take a page on air on its own channel (page:take)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+    send: "page:take {page}"
+    returns: none
+  page_take_on_channel:
+    summary: "Take a page on air on its own channel, on a named channel (page:take)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+      channel: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Channel", description: "Output channel name, as the channel profile names it (one word)." }
+    send: "page:take {page} {channel}"
+    returns: none
+  page_continue:
+    summary: "Continue a page (the next animation step) (page:continue)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+    send: "page:continue {page}"
+    returns: none
+  page_continue_on_channel:
+    summary: "Continue a page (the next animation step), on a named channel (page:continue)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+      channel: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Channel", description: "Output channel name, as the channel profile names it (one word)." }
+    send: "page:continue {page} {channel}"
+    returns: none
+  page_takeout:
+    summary: "Take a page off air (page:takeout)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+    send: "page:takeout {page}"
+    returns: none
+  page_takeout_on_channel:
+    summary: "Take a page off air, on a named channel (page:takeout)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+      channel: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Channel", description: "Output channel name, as the channel profile names it (one word)." }
+    send: "page:takeout {page} {channel}"
+    returns: none
+  page_cue:
+    summary: "Cue a video page (page:cue)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+    send: "page:cue {page}"
+    returns: none
+  page_cue_on_channel:
+    summary: "Cue a video page, on a named channel (page:cue)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+      channel: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Channel", description: "Output channel name, as the channel profile names it (one word)." }
+    send: "page:cue {page} {channel}"
+    returns: none
+  page_cut:
+    summary: "Cut a page on air (page:cut)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+    send: "page:cut {page}"
+    returns: none
+  page_cut_on_channel:
+    summary: "Cut a page on air, on a named channel (page:cut)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+      channel: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Channel", description: "Output channel name, as the channel profile names it (one word)." }
+    send: "page:cut {page} {channel}"
+    returns: none
+  page_prepare:
+    summary: "Prepare (load) a page (page:prepare)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+    send: "page:prepare {page}"
+    returns: none
+  page_prepare_on_channel:
+    summary: "Prepare (load) a page, on a named channel (page:prepare)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+      channel: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Channel", description: "Output channel name, as the channel profile names it (one word)." }
+    send: "page:prepare {page} {channel}"
+    returns: none
+  page_pause:
+    summary: "Pause a video page (page:pause)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+    send: "page:pause {page}"
+    returns: none
+  page_pause_on_channel:
+    summary: "Pause a video page, on a named channel (page:pause)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+      channel: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Channel", description: "Output channel name, as the channel profile names it (one word)." }
+    send: "page:pause {page} {channel}"
+    returns: none
+  current_take:
+    summary: "Take the current page on air (page:take without a page)"
+    send: "page:take"
+    returns: none
+  current_continue:
+    summary: "Continue the current page (page:continue without a page)"
+    send: "page:continue"
+    returns: none
+  current_takeout:
+    summary: "Take the current page off air (page:takeout without a page)"
+    send: "page:takeout"
+    returns: none
+  page_read:
+    summary: "Read (open) a page in the editor and preview (page:read)"
+    params:
+      page: { type: "int", min: 0, max: 99999999, required: true, label: "Page", description: "Page number." }
+    send: "page:read {page}"
+    returns: none
+  page_read_next:
+    summary: "Read the next element in the active view (page:readnext)"
+    send: "page:readnext"
+    returns: none
+  page_read_previous:
+    summary: "Read the previous element in the active view (page:readprevious)"
+    send: "page:readprevious"
+    returns: none
+  page_take_next:
+    summary: "Take the current page and read the next one (page:takenext)"
+    send: "page:takenext"
+    returns: none
+  page_take_exchange:
+    summary: "Take the current page and read the page last taken (page:take_exchange)"
+    send: "page:take_exchange"
+    returns: none
+  page_update:
+    summary: "Update the program renderer without animating in (page:update)"
+    send: "page:update"
+    returns: none
+  page_save:
+    summary: "Save the current page (page:save)"
+    send: "page:save"
+    returns: none
+  page_save_as:
+    summary: "Save the current page under a page number (page:saveas)"
+    params:
+      page: { type: "int", min: 0, max: 99999999, required: true, label: "Page", description: "Page number to save as." }
+    send: "page:saveas {page}"
+    returns: none
+  page_arm:
+    summary: "Arm a page on a channel (page:arm)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+      channel: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Channel", description: "Output channel name, as the channel profile names it (one word)." }
+    send: "page:arm {page} {channel}"
+    returns: none
+  page_arm_current:
+    summary: "Arm the current page on a channel (page:arm_current)"
+    params:
+      channel: { type: "string", max_length: 128, pattern: "^[^\\\\]+$", required: true, label: "Channel", description: "Output channel name, as the channel profile names it." }
+    send: "page:arm_current {channel}"
+    returns: none
+  page_unarm:
+    summary: "Unarm a channel (page:unarm)"
+    params:
+      channel: { type: "string", max_length: 128, pattern: "^[^\\\\]+$", required: true, label: "Channel", description: "Output channel name, as the channel profile names it." }
+    send: "page:unarm {channel}"
+    returns: none
+  page_unarm_current:
+    summary: "Unarm the current page (page:unarm_current)"
+    send: "page:unarm_current"
+    returns: none
+  page_unarm_all:
+    summary: "Unarm every armed page (page:unarm_all)"
+    send: "page:unarm_all"
+    returns: none
+  page_fire:
+    summary: "Fire an armed channel with an action (page:fire)"
+    params:
+      channel: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Channel", description: "Output channel name, as the channel profile names it (one word)." }
+      action: { type: "enum", values: ["take", "continue", "out", "cue", "prepare"], required: true, label: "Action", description: "What firing does to the armed element: take, continue, out (take out), cue or prepare." }
+      clear: { type: "bool", default: true, label: "Unarm after", description: "Whether the armed element is unarmed after firing." }
+    send: "page:fire {channel} {action} {clear}"
+    returns: none
+  page_fire_all:
+    summary: "Fire every armed channel with an action (page:fire_all)"
+    params:
+      action: { type: "enum", values: ["take", "continue", "out", "cue", "prepare"], required: true, label: "Action", description: "What firing does to the armed element: take, continue, out (take out), cue or prepare." }
+      clear: { type: "bool", default: true, label: "Unarm after", description: "Whether the armed element is unarmed after firing." }
+    send: "page:fire_all {action} {clear}"
+    returns: none
+  page_set_property:
+    summary: "Set a tab-field property of the current page (page:set_property)"
+    params:
+      name: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Property", description: "Tab-field property key, such as 01 or 1.image." }
+      value: { type: "string", max_length: 65536, pattern: "^[^\\\\]*$", label: "Value", description: "New value of the property.", required: true }
+    send: "page:set_property {name} {value}"
+    returns: none
+  page_get_property:
+    summary: "Read a tab-field property of the current page (page:get_property)"
+    params:
+      name: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Property", description: "Tab-field property key, such as 01." }
+    send: "page:get_property {name}"
+    expect: &value { not_contains: "ERROR: ", matches: '^(.*)$' }
+    returns: value
+  page_get_name:
+    summary: "Read the current page's name (page:getpagename)"
+    send: "page:getpagename"
+    expect: *value
+    returns: value
+  page_get_description:
+    summary: "Read the current page's description (page:getpagedescription)"
+    send: "page:getpagedescription"
+    expect: *value
+    returns: value
+  page_get_template:
+    summary: "Read the current page's template (page:getpagetemplate)"
+    send: "page:getpagetemplate"
+    expect: *value
+    returns: value
+  page_get_tabfield_names:
+    summary: "List a page's tab-field names (page:get_tabfield_names)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+    send: "page:get_tabfield_names {page}"
+    expect: *value
+    returns: value
+  page_get_property_keys:
+    summary: "List a page's property keys (page:get_property_keys)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+    send: "page:get_property_keys {page}"
+    expect: *value
+    returns: value
+  page_get_tabfield_count:
+    summary: "Read the number of tab fields on the current page (page:get_tabfield_count)"
+    send: "page:get_tabfield_count"
+    expect: *value
+    returns: value
+  page_set_description:
+    summary: "Set a page's description (page:change_description)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+      description: { type: "string", max_length: 65536, pattern: "^[^\\\\]*$", label: "Description", description: "New description of the page.", required: true }
+    send: "page:change_description {page} {description}"
+    returns: none
+  page_set_program_channel:
+    summary: "Set a page's program channel (page:set_program_pagechannel)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+      channel: { type: "string", max_length: 128, pattern: "^[^\\\\]+$", required: true, label: "Channel", description: "Output channel name, as the channel profile names it." }
+    send: "page:set_program_pagechannel {page} {channel}"
+    returns: none
+  page_get_program_channel:
+    summary: "Read a page's program channel (page:get_program_pagechannel)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+    send: "page:get_program_pagechannel {page}"
+    expect: *value
+    returns: value
+  page_set_effect:
+    summary: "Set the transition effect between scene-based pages; empty for cuts (page:set_effect)"
+    params:
+      effect: { type: "string", max_length: 65536, pattern: "^[^\\\\]*$", label: "Effect", description: "Transition effect name; empty for hard cuts.", default: "" }
+    send: "page:set_effect {effect}"
+    returns: none
+  page_refresh_linked_data:
+    summary: "Refresh a page's linked data from its external source (page:refresh_linked_data)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+    send: "page:refresh_linked_data {page}"
+    returns: none
+  page_set_status:
+    summary: "Set a page's status (page:set_pagestatus_one)"
+    params:
+      page: { type: "int", min: 0, max: 99999999, required: true, label: "Page", description: "Page number." }
+      status: { type: "enum", values: ["FINISHED", "UNFINISHED", "NONE"], required: true, label: "Status", description: "Page status." }
+    send: "page:set_pagestatus_one {page} {status}"
+    returns: none
+  page_delete_range:
+    summary: "Delete the pages from one number to another, inclusive (page:delete_pagerange)"
+    params:
+      start: { type: "int", min: 0, max: 99999999, required: true, label: "From", description: "First page number deleted." }
+      end: { type: "int", min: 0, max: 99999999, required: true, label: "To", description: "Last page number deleted." }
+    send: "page:delete_pagerange {start} {end}"
+    returns: none
+  tabfield_set_value:
+    summary: "Set the value of the current tab-field property (tabfield:set_value)"
+    params:
+      value: { type: "string", max_length: 65536, pattern: "^[^\\\\]*$", label: "Value", description: "New value.", required: true }
+    send: "tabfield:set_value {value}"
+    returns: none
+  tabfield_tab_to:
+    summary: "Go to a tab field by number (page:tabto)"
+    params:
+      number: { type: "int", min: 0, max: 9999, required: true, label: "Tab field", description: "Tab-field number." }
+    send: "page:tabto {number}"
+    returns: none
+  tabfield_tab_to_name:
+    summary: "Go to a tab field by name (page:tabtotabfield)"
+    params:
+      name: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Tab field", description: "Tab-field name." }
+    send: "page:tabtotabfield {name}"
+    returns: none
+  tabfield_get_property:
+    summary: "Read a property of a tab field (tabfield:get_tabfield_property)"
+    params:
+      number: { type: "int", min: 0, max: 9999, required: true, label: "Tab field", description: "Tab-field number." }
+      property: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Property", description: "Property name." }
+    send: "tabfield:get_tabfield_property {number} {property}"
+    expect: *value
+    returns: value
+  table_get_cell:
+    summary: "Read a cell of a table property (table:get_cell_value)"
+    params:
+      table: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Table", description: "Table property key." }
+      column: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Column", description: "Column key." }
+      row: { type: "int", min: 0, required: true, label: "Row", description: "Row number." }
+    send: "table:get_cell_value {table} {column} {row}"
+    expect: *value
+    returns: value
+  table_set_cell:
+    summary: "Set a cell of a table property (table:set_cell_value)"
+    params:
+      table: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Table", description: "Table property key." }
+      column: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Column", description: "Column key." }
+      row: { type: "int", min: 0, required: true, label: "Row", description: "Row number." }
+      value: { type: "string", max_length: 65536, pattern: "^[^\\\\]*$", label: "Value", description: "New cell value.", required: true }
+    send: "table:set_cell_value {table} {column} {row} {value}"
+    returns: none
+  table_get_row_count:
+    summary: "Read the number of rows of a table property (table:get_row_num)"
+    params:
+      table: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Table", description: "Table property key." }
+    send: "table:get_row_num {table}"
+    expect: *value
+    returns: value
+  table_insert_rows:
+    summary: "Insert rows into a table property (table:insert_rows)"
+    params:
+      table: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Table", description: "Table property key." }
+      row: { type: "int", min: 0, required: true, label: "Row", description: "Row index to insert at." }
+      count: { type: "int", min: 1, required: true, label: "Rows", description: "Number of rows to insert." }
+    send: "table:insert_rows {table} {row} {count}"
+    returns: none
+  table_delete_rows:
+    summary: "Delete rows from a table property (table:delete_rows)"
+    params:
+      table: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Table", description: "Table property key." }
+      rows: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Rows", description: "Row index list, as Viz Trio takes it." }
+    send: "table:delete_rows {table} {rows}"
+    returns: none
+  show_get_name:
+    summary: "Read the current show's name (show:get_show_name)"
+    send: "show:get_show_name"
+    expect: *value
+    returns: value
+  show_get_description:
+    summary: "Read the current show's description (show:get_show_description)"
+    send: "show:get_show_description"
+    expect: *value
+    returns: value
+  show_get_pages:
+    summary: "List the pages of the current show (show:get_pages)"
+    send: "show:get_pages"
+    expect: *value
+    returns: value
+  show_get_groups:
+    summary: "List the groups of the current show (show:get_groups)"
+    send: "show:get_groups"
+    expect: *value
+    returns: value
+  show_get_templates:
+    summary: "List the templates of the current show (show:get_templates)"
+    send: "show:get_templates"
+    expect: *value
+    returns: value
+  show_page_exists:
+    summary: "Check whether a page exists in the current show; true or false (show:page_exists)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\\\]+$", required: true, label: "Page", description: "Page name." }
+    send: "show:page_exists {page}"
+    expect: *value
+    returns: value
+  show_set_dir:
+    summary: "Change the show directory (open another show) (show:set_dir)"
+    params:
+      path: { type: "string", max_length: 65536, pattern: "^[^\\\\]*$", label: "Show path", description: "Show path in the Media Sequencer.", required: true }
+    send: "show:set_dir {path}"
+    returns: none
+  show_load:
+    summary: "Load the show's scenes, textures and fonts on the output channels (show:load_show)"
+    send: "show:load_show"
+    returns: none
+  show_reload:
+    summary: "Reload the current show (show:reload_current_show)"
+    send: "show:reload_current_show"
+    returns: none
+  show_load_armed:
+    summary: "Load every armed element on its channel (show:load_armed)"
+    send: "show:load_armed"
+    returns: none
+  show_set_variable:
+    summary: "Set a show variable, stored on the Media Sequencer (show:set_variable)"
+    params:
+      name: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Variable", description: "Show variable name." }
+      value: { type: "string", max_length: 65536, pattern: "^[^\\\\]*$", label: "Value", description: "New value.", required: true }
+    send: "show:set_variable {name} {value}"
+    returns: none
+  show_get_variable:
+    summary: "Read a show variable (show:get_variable)"
+    params:
+      name: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Variable", description: "Show variable name." }
+    send: "show:get_variable {name}"
+    expect: *value
+    returns: value
+  show_set_concept:
+    summary: "Set the show's concept; empty resets it to the page list's choice (show:set_concept)"
+    params:
+      concept: { type: "string", max_length: 65536, pattern: "^[^\\\\]*$", label: "Concept", description: "Concept name, such as News or Sport.", default: "" }
+    send: "show:set_concept {concept}"
+    returns: none
+  show_get_concept:
+    summary: "Read the show's concept, once set by set_concept (show:get_concept)"
+    send: "show:get_concept"
+    expect: *value
+    returns: value
+  show_set_variant:
+    summary: "Set the show's variant; empty resets it (show:set_variant)"
+    params:
+      variant: { type: "string", max_length: 65536, pattern: "^[^\\\\]*$", label: "Variant", description: "Variant name.", default: "" }
+    send: "show:set_variant {variant}"
+    returns: none
+  show_get_variant:
+    summary: "Read the show's variant, once set (show:get_variant)"
+    send: "show:get_variant"
+    expect: *value
+    returns: value
+  show_set_context_variable:
+    summary: "Set a context variable of the show (show:set_context_variable)"
+    params:
+      variable: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Context", description: "Context variable name, such as concept, variant or platform." }
+      value: { type: "string", max_length: 65536, pattern: "^[^\\\\]*$", label: "Value", description: "New value.", required: true }
+    send: "show:set_context_variable {variable} {value}"
+    returns: none
+  show_get_context_variable:
+    summary: "Read a context variable of the show, once set (show:get_context_variable)"
+    params:
+      variable: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Context", description: "Context variable name." }
+    send: "show:get_context_variable {variable}"
+    expect: *value
+    returns: value
+  get_version:
+    summary: "Read Viz Trio's version (main:get_version)"
+    send: "main:get_version"
+    expect: *value
+    returns: value
+  get_shows:
+    summary: "List the shows in the client (main:get_shows)"
+    send: "main:get_shows"
+    expect: *value
+    returns: value
+  call_macro:
+    summary: "Run a named macro (main:call_macro)"
+    params:
+      name: { type: "string", max_length: 256, pattern: "^[^\\\\]+$", required: true, label: "Macro", description: "Macro name." }
+    send: "main:call_macro {name}"
+    returns: none
+  get_global_macros:
+    summary: "List the global macros (main:get_global_macros)"
+    send: "main:get_global_macros"
+    expect: *value
+    returns: value
+  get_local_macros:
+    summary: "List the local macros (main:get_local_macros)"
+    send: "main:get_local_macros"
+    expect: *value
+    returns: value
+  playlist_get_all:
+    summary: "List the open playlists of the current show (playlist:get_playlists)"
+    send: "playlist:get_playlists"
+    expect: *value
+    returns: value
+  playlist_get_current:
+    summary: "Read the current playlist's path (playlist:get_current)"
+    send: "playlist:get_current"
+    expect: *value
+    returns: value
+  playlist_set_current:
+    summary: "Make a playlist the current one (playlist:set_current)"
+    params:
+      playlist: { type: "string", max_length: 512, pattern: "^[^\\\\]+$", required: true, label: "Playlist", description: "Playlist path or identifier, as playlist:get_playlists lists them." }
+    send: "playlist:set_current {playlist}"
+    returns: none
+  playlist_select_first:
+    summary: "Select the first element of the playlist (playlist:select_first)"
+    send: "playlist:select_first"
+    returns: none
+  playlist_select_next:
+    summary: "Select the next element of the active playlist (playlist:select_next)"
+    send: "playlist:select_next"
+    returns: none
+  playlist_select_previous:
+    summary: "Select the previous element of the active playlist (playlist:select_previous)"
+    send: "playlist:select_previous"
+    returns: none
+  playlist_read_selected:
+    summary: "Read the selected playlist element (playlist:read_selected)"
+    send: "playlist:read_selected"
+    returns: none
+  playlist_read_next:
+    summary: "Read the next playlist item (playlist:read_next_item)"
+    send: "playlist:read_next_item"
+    returns: none
+  playlist_read_previous:
+    summary: "Read the previous playlist item (playlist:read_prev_item)"
+    send: "playlist:read_prev_item"
+    returns: none
+  playlist_take_selected:
+    summary: "Take the selected playlist item on air without preview (playlist:direct_take_selected)"
+    send: "playlist:direct_take_selected"
+    returns: none
+  playlist_take_out_selected:
+    summary: "Take the selected playlist element off air (playlist:direct_take_out_selected)"
+    send: "playlist:direct_take_out_selected"
+    returns: none
+  playlist_next_story:
+    summary: "Select the next story of the active playlist (playlist:go_to_next_story)"
+    send: "playlist:go_to_next_story"
+    returns: none
+  playlist_previous_story:
+    summary: "Select the previous story of the active playlist (playlist:go_to_previous_story)"
+    send: "playlist:go_to_previous_story"
+    returns: none
+  playlist_initialize:
+    summary: "Load the playlist's graphics on the output channels (playlist:initialize_playlist)"
+    send: "playlist:initialize_playlist"
+    returns: none
+  playlist_start_carousel:
+    summary: "Run a playlist as a carousel (playlist:start_carousel)"
+    params:
+      playlist: { type: "string", max_length: 512, pattern: "^[^\\\\]+$", required: true, label: "Playlist", description: "Playlist path or identifier, as playlist:get_playlists lists them." }
+    send: "playlist:start_carousel {playlist}"
+    returns: none
+  playlist_stop_carousel:
+    summary: "Stop a playlist running as a carousel (playlist:stop_carousel)"
+    params:
+      playlist: { type: "string", max_length: 512, pattern: "^[^\\\\]+$", required: true, label: "Playlist", description: "Playlist path or identifier, as playlist:get_playlists lists them." }
+    send: "playlist:stop_carousel {playlist}"
+    returns: none
+  playlist_pause_carousel:
+    summary: "Pause the carousel (playlist:pause_carousel)"
+    send: "playlist:pause_carousel"
+    returns: none
+  playlist_set_looping:
+    summary: "Set whether the carousel loops (playlist:set_looping)"
+    params:
+      looping: { type: "enum", values: ["true", "false"], required: true, label: "Looping", description: "true loops the carousel." }
+    send: "playlist:set_looping {looping:upper}"
+    returns: none
+  playlist_set_manual_mode:
+    summary: "Switch graphics playout between manual and automatic (playlist:goto_manual_graphics_mode)"
+    params:
+      manual: { type: "bool", required: true, label: "Manual", description: "true for manual playout of graphic elements, false for automatic." }
+    send: "playlist:goto_manual_graphics_mode {manual}"
+    returns: none
+  playlist_clear:
+    summary: "Clear a playlist (playlist:clear)"
+    params:
+      playlist: { type: "string", max_length: 512, pattern: "^[^\\\\]+$", required: true, label: "Playlist", description: "Playlist path or identifier, as playlist:get_playlists lists them." }
+    send: "playlist:clear {playlist}"
+    returns: none
+  playlist_close:
+    summary: "Close a playlist (playlist:close)"
+    params:
+      playlist: { type: "string", max_length: 512, pattern: "^[^\\\\]+$", required: true, label: "Playlist", description: "Playlist path or identifier, as playlist:get_playlists lists them." }
+    send: "playlist:close {playlist}"
+    returns: none
+  playlist_add_page:
+    summary: "Add a page to the end of the current playlist (playlist:add_page)"
+    params:
+      page: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Page", description: "Page name (usually its number, such as 1000) in the current show." }
+    send: "playlist:add_page {page}"
+    returns: none
+  get_active_profile:
+    summary: "Read the active channel profile (channelcontrol:get_active_profile)"
+    send: "channelcontrol:get_active_profile"
+    expect: *value
+    returns: value
+  list_profiles:
+    summary: "List the channel profiles, one per line (channelcontrol:list_profiles)"
+    send: "channelcontrol:list_profiles"
+    expect: *value
+    returns: value
+  set_active_profile:
+    summary: "Change the active channel profile (channelcontrol:set_active_profile)"
+    params:
+      profile: { type: "string", max_length: 256, pattern: "^[^\\\\]+$", required: true, label: "Profile", description: "Channel profile name." }
+    send: "channelcontrol:set_active_profile {profile}"
+    returns: none
+  get_program_channel:
+    summary: "Read the Viz program channel (channelcontrol:get_program_channel)"
+    send: "channelcontrol:get_program_channel"
+    expect: *value
+    returns: value
+  set_program_channel:
+    summary: "Set the Viz program channel; empty for none (channelcontrol:set_program_channel)"
+    params:
+      channel: { type: "string", max_length: 128, pattern: "^[^\\\\]*$", default: "", label: "Channel", description: "Channel name; empty for none." }
+    send: "channelcontrol:set_program_channel {channel}"
+    returns: none
+  get_video_program_channel:
+    summary: "Read the video program channel (channelcontrol:get_video_program_channel)"
+    send: "channelcontrol:get_video_program_channel"
+    expect: *value
+    returns: value
+  set_video_program_channel:
+    summary: "Set the video program channel; empty for none (channelcontrol:set_video_program_channel)"
+    params:
+      channel: { type: "string", max_length: 128, pattern: "^[^\\\\]*$", default: "", label: "Channel", description: "Channel name; empty for none." }
+    send: "channelcontrol:set_video_program_channel {channel}"
+    returns: none
+  get_preview_channel:
+    summary: "Read the Viz preview channel (channelcontrol:get_preview_channel)"
+    send: "channelcontrol:get_preview_channel"
+    expect: *value
+    returns: value
+  set_preview_channel:
+    summary: "Set the Viz preview channel; empty for none (channelcontrol:set_preview_channel)"
+    params:
+      channel: { type: "string", max_length: 128, pattern: "^[^\\\\]*$", default: "", label: "Channel", description: "Channel name; empty for none." }
+    send: "channelcontrol:set_preview_channel {channel}"
+    returns: none
+  get_video_preview_channel:
+    summary: "Read the video preview channel (channelcontrol:get_video_preview_channel)"
+    send: "channelcontrol:get_video_preview_channel"
+    expect: *value
+    returns: value
+  set_video_preview_channel:
+    summary: "Set the video preview channel; empty for none (channelcontrol:set_video_preview_channel)"
+    params:
+      channel: { type: "string", max_length: 128, pattern: "^[^\\\\]*$", default: "", label: "Channel", description: "Channel name; empty for none." }
+    send: "channelcontrol:set_video_preview_channel {channel}"
+    returns: none
+  list_viz_channels:
+    summary: "List the Viz channels of the profile, comma-separated (channelcontrol:list_viz_channels)"
+    send: "channelcontrol:list_viz_channels"
+    expect: *value
+    returns: value
+  list_video_channels:
+    summary: "List the video channels of the profile, comma-separated (channelcontrol:list_video_channels)"
+    send: "channelcontrol:list_video_channels"
+    expect: *value
+    returns: value
+  set_channel_hosts:
+    summary: "Change the Viz hosts of a channel (channelcontrol:set_channel_hosts)"
+    params:
+      channel: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Channel", description: "Output channel name, as the channel profile names it (one word)." }
+      hosts: { type: "string", max_length: 65536, pattern: "^[^\\\\]*$", label: "Hosts", description: "Viz host list, separated by spaces, commas or semicolons.", required: true }
+    send: "channelcontrol:set_channel_hosts {channel} {hosts}"
+    returns: none
+  trio_on_air:
+    summary: "Set the client on air (trio:onair)"
+    send: "trio:onair"
+    returns: none
+  trio_off_air:
+    summary: "Set the client off air (trio:offair)"
+    send: "trio:offair"
+    returns: none
+  trio_initialize:
+    summary: "Initialise the show and every playlist on the external renderers (trio:initialize)"
+    send: "trio:initialize"
+    returns: none
+  trio_cleanup:
+    summary: "Clear the Viz layers and free memory for the show and playlists on the renderers (trio:cleanup)"
+    send: "trio:cleanup"
+    returns: none
+  trio_cleanup_all_channels:
+    summary: "Clear the Viz layers and free memory on every channel of the profile (trio:cleanup_all_channels)"
+    send: "trio:cleanup_all_channels"
+    returns: none
+  trio_cleanup_channel:
+    summary: "Clear the Viz layers and free memory on a channel (trio:cleanup_channel)"
+    params:
+      channel: { type: "string", max_length: 128, pattern: "^[^\\\\]+$", required: true, label: "Channel", description: "Output channel name, as the channel profile names it." }
+    send: "trio:cleanup_channel {channel}"
+    returns: none
+  trio_clear_preview:
+    summary: "Clear the Viz preview channel (trio:clear_preview)"
+    send: "trio:clear_preview"
+    returns: none
+  trio_clear_program:
+    summary: "Clear the Viz program channel (trio:clear_program)"
+    send: "trio:clear_program"
+    returns: none
+  trio_check_channels:
+    summary: "Check the program and preview channels; true when all are connected (trio:check_channels_status)"
+    send: "trio:check_channels_status"
+    expect: *value
+    returns: value
+  trio_continue_last_taken:
+    summary: "Continue the page last taken (trio:continue_last_taken_page)"
+    send: "trio:continue_last_taken_page"
+    returns: none
+  trio_takeout_last_taken:
+    summary: "Take out the page last taken (trio:takeout_last_taken_page)"
+    send: "trio:takeout_last_taken_page"
+    returns: none
+  trio_swap_channels:
+    summary: "Swap the program and preview channels (trio:swap_channels)"
+    send: "trio:swap_channels"
+    returns: none
+  trio_exchange:
+    summary: "Exchange the content of program and external preview (trio:exchange)"
+    send: "trio:exchange"
+    returns: none
+  trio_synchronize_clocks:
+    summary: "Synchronise the clocks to the program renderer's (trio:synchronize_clocks)"
+    send: "trio:synchronize_clocks"
+    returns: none
+  trio_freeze_clock:
+    summary: "Freeze a clock on the program renderer (trio:freeze_program_clock)"
+    params:
+      clock: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Clock", description: "Clock name." }
+    send: "trio:freeze_program_clock {clock}"
+    returns: none
+  trio_unfreeze_clock:
+    summary: "Unfreeze a clock on the program renderer (trio:unfreeze_program_clock)"
+    params:
+      clock: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Clock", description: "Clock name." }
+    send: "trio:unfreeze_program_clock {clock}"
+    returns: none
+  trio_send_vizcmd:
+    summary: "Send a Viz Engine command to the program renderer (trio:send_vizcmd)"
+    params:
+      command: { type: "string", max_length: 65536, pattern: "^[^\\\\]*$", label: "Viz command", description: "Viz Engine command text.", required: true }
+    send: "trio:send_vizcmd {command}"
+    returns: none
+  trio_send_preview_vizcmd:
+    summary: "Send a Viz Engine command to the preview renderer (trio:send_preview_vizcmd)"
+    params:
+      command: { type: "string", max_length: 65536, pattern: "^[^\\\\]*$", label: "Viz command", description: "Viz Engine command text.", required: true }
+    send: "trio:send_preview_vizcmd {command}"
+    returns: none
+  trio_send_vizcmd_to_channel:
+    summary: "Send a Viz Engine command to a named channel (trio:send_vizcmd_to_channel)"
+    params:
+      channel: { type: "string", max_length: 128, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Channel", description: "Output channel name, as the channel profile names it (one word)." }
+      command: { type: "string", max_length: 65536, pattern: "^[^\\\\]*$", label: "Viz command", description: "Viz Engine command text.", required: true }
+    send: "trio:send_vizcmd_to_channel {channel} {command}"
+    returns: none
+  trio_set_global_variable:
+    summary: "Set a global variable, stored on the Media Sequencer (trio:set_global_variable)"
+    params:
+      name: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Variable", description: "Global variable name." }
+      value: { type: "string", max_length: 65536, pattern: "^[^\\\\]*$", label: "Value", description: "New value.", required: true }
+    send: "trio:set_global_variable {name} {value}"
+    returns: none
+  trio_get_global_variable:
+    summary: "Read a global variable (trio:get_global_variable)"
+    params:
+      name: { type: "string", max_length: 256, pattern: "^[^\\s\\\\\"]+$", required: true, label: "Variable", description: "Global variable name." }
+    send: "trio:get_global_variable {name}"
+    expect: *value
+    returns: value
+  scroll_program_start:
+    summary: "Start the current scroll on the program channel (scroll2:program_start)"
+    send: "scroll2:program_start"
+    returns: none
+  scroll_program_continue:
+    summary: "Continue the current scroll on the program channel (scroll2:program_continue)"
+    send: "scroll2:program_continue"
+    returns: none
+  scroll_program_stop:
+    summary: "Stop the current scroll on the program channel (scroll2:program_stop)"
+    send: "scroll2:program_stop"
+    returns: none
+  enable_error_messages:
+    summary: "Send every Viz Trio error message to this connection, or stop (commandserver:enable_error_messages)"
+    params:
+      enabled: { type: "bool", required: true, label: "Error messages", description: "true sends all errors to this client as ERROR: lines." }
+    send: "commandserver:enable_error_messages {enabled}"
+    returns: none
+
+telemetry:
+  # Viz Trio pushes nothing to a macro client but errors; what an operator
+  # watches is read in turn. Each reply is the bare result, tied to the
+  # command it answers.
+  poll:
+    - every_ms: 2000
+      send: ["trio:check_channels_status"]
+    - every_ms: 15000
+      send: ["show:get_show_name", "channelcontrol:get_active_profile"]
+    - every_ms: 60000
+      send: ["main:get_version"]
+  updates:
+    - match: '^(true|false)$'
+      request_match: '^trio:check_channels_status$'
+      state: { channels.connected: "{1}" }
+    - match: &result '^((?:[^E]|E[^R]|ER[^R]|ERR[^O]|ERRO[^R]|ERROR[^:]).*|E|ER|ERR|ERRO|ERROR)$'
+      request_match: '^show:get_show_name$'
+      state: { show.name: "{1}" }
+    - match: *result
+      request_match: '^channelcontrol:get_active_profile$'
+      state: { channels.profile: "{1}" }
+    - match: *result
+      request_match: '^main:get_version$'
+      state: { system.version: "{1}" }
+
+state:
+  channels.connected: { type: bool, description: "Whether every program and preview channel of the profile, Viz and video, is connected" }
+  show.name: { type: string, description: "Name of the current show" }
+  channels.profile: { type: string, description: "Active channel profile" }
+  system.version: { type: string, description: "Viz Trio's version string" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The documents do not say what Viz Trio sends back for a command with no
+      result. This spec reads only the commands that return something (the
+      get commands, check_channels_status, page_exists) and sends the others
+      without waiting, reported unverified; a failed command answers
+      ERROR: <message>, which then comes before the next reply. Errors other
+      clients cause reach this client only after enable_error_messages true,
+      so the spec leaves that off.
+  - models: [all]
+    severity: info
+    text: >
+      Arguments are separated by spaces, so names (pages, channels, tab
+      fields, variables) are single words here; the last argument of a
+      command takes the rest of the line and may hold spaces. Backslash is the
+      socket's escape character and line breaks end a command, so values hold
+      neither. Command names and parameters are case sensitive. The socket
+      must be set to UTF-8 (Viz Trio's default and preference).
+  - models: [all]
+    severity: info
+    text: >
+      State is polled: the channels' status every 2 s, the show and the
+      channel profile every 15 s, the version every minute. Reads that may
+      answer an empty string (the current page, playlist, program and preview
+      channels) are commands only, not polled: an empty answer is no line,
+      and an unanswered read would reset the connection. Sent as
+      commands, such reads time out when the answer is empty. Viz Trio pushes nothing on the macro socket but errors. A get of
+      the concept, variant or a context variable returns a value only after a
+      set command set it (Viz Trio's own rule).
+  - models: [all]
+    severity: critical
+    text: >
+      show_set_dir changes the show; the cleanup commands clear the Viz layers
+      of channels on air; set_active_profile and the channel setters change
+      where pages play out; page_delete_range deletes pages.
