@@ -3530,6 +3530,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the answers to streaming ip enable on and get on a RoboSHOT 40 UHD or SDI camera, to settle whether OK comes after a second prompt ("> OK"). ([specs/vaddio-roboshot.yaml:893](specs/vaddio-roboshot.yaml#L893))
 - [ ] Record camera glass mode get on a RoboSHOT IW. ([specs/vaddio-roboshot.yaml:898](specs/vaddio-roboshot.yaml#L898))
 
+## vdcp — VDCP video servers
+
+- [ ] Record the TCP port the server takes VDCP on, and whether it carries the RS-422 bytes unchanged. ([specs/vdcp.yaml:54](specs/vdcp.yaml#L54))
+- [ ] Confirm opening and selecting the signal port on connecting (3X.01 with the lock byte, answered 3X.81, then 2X.22), and what a denied open does. ([specs/vdcp.yaml:38](specs/vdcp.yaml#L38))
+- [ ] Check the port status's lengths: Status 2 one byte (two extended), Status 3 three bytes (four extended), and that the error bits clear once read. ([specs/vdcp.yaml:476](specs/vdcp.yaml#L476))
+- [ ] Confirm a macro's completion return comes in place of a port status and that the controller's ACK (04) is what the server waits for. ([specs/vdcp.yaml:452](specs/vdcp.yaml#L452))
+- [ ] Check that asking the position only while the port is active keeps the error bits clear, and the load the 250 ms port status puts on the server. ([specs/vdcp.yaml:445](specs/vdcp.yaml#L445))
+- [ ] Check the server's variable-length ID commands (8X, AX, BX, DX) and the length byte before each ID in returns. ([specs/vdcp.yaml:42](specs/vdcp.yaml#L42))
+- [ ] Confirm the ID list's first two bytes count the IDs still to come after this message, and that NEXT (3X.02, answered 3X.82) continues it ten at a time. ([specs/vdcp.yaml:344](specs/vdcp.yaml#L344))
+- [ ] Check which VDCP commands Ross Tria, Mira and Kiva servers take and on which port. ([specs/vdcp.yaml:72](specs/vdcp.yaml#L72))
+
 ## videolan-vlc — VLC media player
 
 - [ ] Confirm the .json pages take the same commands as the .xml ones, the status and playlist field names read here, and the rate and audiodelay commands. ([specs/videolan-vlc.yaml:315](specs/videolan-vlc.yaml#L315))

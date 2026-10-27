@@ -197,6 +197,8 @@ mod tsl;
 mod ultimatte_presets;
 #[cfg(feature = "blackmagic-ultimatte")]
 mod ultimatte_zip;
+#[cfg(feature = "vdcp")]
+mod vdcp;
 #[cfg(feature = "visca")]
 mod visca;
 #[cfg(feature = "vmix")]
@@ -387,6 +389,8 @@ pub(crate) fn construct(
         "sony-9pin" => Ok(Box::new(vtr::Vtr::new(vtr::Dialect::Sony, context)?)),
         #[cfg(feature = "grassvalley-amp")]
         "grassvalley-amp" => Ok(Box::new(vtr::Vtr::new(vtr::Dialect::Amp, context)?)),
+        #[cfg(feature = "vdcp")]
+        "vdcp" => Ok(Box::new(vdcp::Vdcp::new(context)?)),
         #[cfg(feature = "generic-osc")]
         "generic-osc" => Ok(Box::new(generic_osc::GenericOsc::new(context)?)),
         #[cfg(feature = "generic-tcp-udp")]
