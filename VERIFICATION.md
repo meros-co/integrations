@@ -3118,6 +3118,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether the QPL frame for PANEL INFORMATION is also sent over LAN. ([specs/roland-v60hd.yaml:516](specs/roland-v60hd.yaml#L516))
 - [ ] Drive the V-60HD on RS-232 (link serial) and confirm the same frames as over LAN, with XON/XOFF. ([specs/roland-v60hd.yaml:50](specs/roland-v60hd.yaml#L50))
 
+## roland-vmixer — Roland V-Mixer M-480 / M-400 / M-380 / M-300 / M-200i
+
+- [ ] On the M-200i over Telnet, confirm that each reply (OK, ERR:n; and request replies) is a line ended by CR LF with no stx, and that the echoed command arrives as its own line. ([specs/roland-vmixer.yaml:44](specs/roland-vmixer.yaml#L44))
+- [ ] On RS-232C, confirm that reply commands begin with stx and end at ";" with no line ending, and that ack is the bare byte 06H. ([specs/roland-vmixer.yaml:63](specs/roland-vmixer.yaml#L63))
+- [ ] Confirm the CNS name is six characters padded with spaces, quoted. ([specs/roland-vmixer.yaml:1131](specs/roland-vmixer.yaml#L1131))
+- [ ] Confirm that a request through a user fader is answered with the U token, not the assigned channel's. ([specs/roland-vmixer.yaml:1115](specs/roland-vmixer.yaml#L1115))
+- [ ] Measure whether the consoles keep up with the polls (up to about 230 fader and mute requests every ten seconds at 115200 bps) without answering ERR:2 busy. ([specs/roland-vmixer.yaml:1190](specs/roland-vmixer.yaml#L1190))
+- [ ] Check the DTS reply for a delay in milliseconds and in samples (decimal places, unit token). ([specs/roland-vmixer.yaml:788](specs/roland-vmixer.yaml#L788))
+- [ ] Check which input-patch channels and ports each model accepts (the reference lists the M-480 cascade inputs and per-model port ranges). ([specs/roland-vmixer.yaml:862](specs/roland-vmixer.yaml#L862))
+
 ## roland-vr400uhd — Roland VR-400UHD
 
 - [ ] Confirm the password prompt (a line containing "Enter") and greeting, and record what a wrong password produces. ([specs/roland-vr400uhd.yaml:577](specs/roland-vr400uhd.yaml#L577))

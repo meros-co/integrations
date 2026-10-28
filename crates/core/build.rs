@@ -277,6 +277,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "roland-v160hd",
             "roland-v600uhd",
             "roland-v60hd",
+            "roland-vmixer",
             "roland-vr400uhd",
             "roland-vr4hd",
             "roland-xs1hd",
