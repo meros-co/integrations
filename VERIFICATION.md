@@ -3098,6 +3098,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record real streaming updates: that suid is stable for one encoder session, channelId matches the channel list's id, and deleteIncoming and deleteOutgoing arrive when the encoder and destinations stop. ([specs/restream.yaml:1034](specs/restream.yaml#L1034))
 - [ ] Record which updateStatuses fields each platform fills (viewers, followers, streamViews), and how often they arrive. ([specs/restream.yaml:1082](specs/restream.yaml#L1082))
 
+## rme-totalmix — RME TotalMix FX
+
+- [ ] Confirm TotalMix sends values as OSC floats and display texts as strings, and how often it sends changes (and meters with Send Peak Level Data). ([specs/rme-totalmix.yaml:1046](specs/rme-totalmix.yaml#L1046))
+- [ ] Confirm the snapshot and group button rows (snapshot 1 at /3/snapshots/8/1, group 1 at /3/muteGroups/4/1, as the chart lists them). ([specs/rme-totalmix.yaml:899](specs/rme-totalmix.yaml#L899))
+- [ ] Confirm that setSubmix, setBankStart and setOffsetInBank count from 0 and take a float, and what TotalMix sends back after each. ([specs/rme-totalmix.yaml:195](specs/rme-totalmix.yaml#L195))
+
 ## rogueamoeba-farrago — Farrago
 
 - [ ] Check Farrago's default OSC Input and Output ports (8090 and 8091 here, the Companion module's defaults; the manual gives none). ([specs/rogueamoeba-farrago.yaml:492](specs/rogueamoeba-farrago.yaml#L492))

@@ -274,6 +274,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ),
     ("vendor-resolume", &["resolume"]),
     ("vendor-restream", &["restream"]),
+    ("vendor-rme", &["rme-totalmix"]),
     ("vendor-rogueamoeba", &["rogueamoeba-farrago"]),
     (
         "vendor-roland",
