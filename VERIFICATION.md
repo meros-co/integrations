@@ -2144,16 +2144,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## kiloview-kilolink-server — Kiloview KiloLink Server Pro
 
 - [ ] Find out how the server takes the login token back (the document only says every request needs it and the user name). Check whether the token sent as it is in Authorization, or the cookie user=<user>; token=<token>, is accepted. ([specs/kiloview-kilolink-server.yaml:53](specs/kiloview-kilolink-server.yaml#L53))
-- [ ] Confirm that the login answers the token at $.token, and how a refused or expired token is answered (401/403, or Appendix 4 codes 1005, 1009, 1127 with HTTP 200). ([specs/kiloview-kilolink-server.yaml:124](specs/kiloview-kilolink-server.yaml#L124))
-- [ ] Confirm that request parameters go as a JSON body (the document gives no format), and that the requests with no parameters accept an empty JSON object. ([specs/kiloview-kilolink-server.yaml:155](specs/kiloview-kilolink-server.yaml#L155))
+- [ ] Confirm that the login answers the token at $.token, and how a refused or expired token is answered (401/403, or Appendix 4 codes 1005, 1009, 1127 with HTTP 200). ([specs/kiloview-kilolink-server.yaml:125](specs/kiloview-kilolink-server.yaml#L125))
+- [ ] Confirm that request parameters go as a JSON body (the document gives no format), and that the requests with no parameters accept an empty JSON object. ([specs/kiloview-kilolink-server.yaml:156](specs/kiloview-kilolink-server.yaml#L156))
 - [ ] Confirm that the web API is on port 80 by default, the installer's web port (user manual 2.6), and that it has no HTTPS. ([specs/kiloview-kilolink-server.yaml:47](specs/kiloview-kilolink-server.yaml#L47))
-- [ ] Record the device list's entries (the document says only "complex structure"), so devices can go into state. ([specs/kiloview-kilolink-server.yaml:291](specs/kiloview-kilolink-server.yaml#L291))
-- [ ] Check that the tree's first level under each organization is read as Appendix 1 shows it, and how deeper levels appear. ([specs/kiloview-kilolink-server.yaml:451](specs/kiloview-kilolink-server.yaml#L451))
-- [ ] Find out what OpenLDAPaci entries set_device_access takes (Appendix 3 is cut off). ([specs/kiloview-kilolink-server.yaml:250](specs/kiloview-kilolink-server.yaml#L250))
-- [ ] Check that rename_node and move_node also work for users, groups and folders, not only devices. ([specs/kiloview-kilolink-server.yaml:226](specs/kiloview-kilolink-server.yaml#L226))
-- [ ] Find out where a stream's key and id come from for set_stream (not in any documented reply). ([specs/kiloview-kilolink-server.yaml:344](specs/kiloview-kilolink-server.yaml#L344))
-- [ ] Check that modify_node replaces every attribute and needs all of them. ([specs/kiloview-kilolink-server.yaml:217](specs/kiloview-kilolink-server.yaml#L217))
-- [ ] Check what create_device_key does with the serial number. ([specs/kiloview-kilolink-server.yaml:377](specs/kiloview-kilolink-server.yaml#L377))
+- [ ] Record the device list's entries (the document says only "complex structure"), so devices can go into state. ([specs/kiloview-kilolink-server.yaml:292](specs/kiloview-kilolink-server.yaml#L292))
+- [ ] Check that the tree's first level under each organization is read as Appendix 1 shows it, and how deeper levels appear. ([specs/kiloview-kilolink-server.yaml:460](specs/kiloview-kilolink-server.yaml#L460))
+- [ ] Find out what OpenLDAPaci entries set_device_access takes (Appendix 3 is cut off). ([specs/kiloview-kilolink-server.yaml:251](specs/kiloview-kilolink-server.yaml#L251))
+- [ ] Check that rename_node and move_node also work for users, groups and folders, not only devices. ([specs/kiloview-kilolink-server.yaml:227](specs/kiloview-kilolink-server.yaml#L227))
+- [ ] Find out where a stream's key and id come from for set_stream (not in any documented reply). ([specs/kiloview-kilolink-server.yaml:353](specs/kiloview-kilolink-server.yaml#L353))
+- [ ] Check that modify_node replaces every attribute and needs all of them. ([specs/kiloview-kilolink-server.yaml:218](specs/kiloview-kilolink-server.yaml#L218))
+- [ ] Check what create_device_key does with the serial number. ([specs/kiloview-kilolink-server.yaml:386](specs/kiloview-kilolink-server.yaml#L386))
 
 ## kiloview-mg300 — Kiloview MG300 V2
 

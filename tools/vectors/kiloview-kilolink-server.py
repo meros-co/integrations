@@ -74,9 +74,11 @@ _kl("get_firmware_types", {}, "POST", "/api/tools/getFirmwareTypes.json", "{}",
 _kl("set_firmware_description", {"type": "E1", "version": "4.7.2515", "description": "E1 Firmware"}, "POST",
     "/api/tools/modifyFirmware.json", '{"desc":"E1 Firmware","type":"E1","version":"4.7.2515"}')
 _kl("get_devices", {}, "POST", "/api/tools/getDeviceList.json", "{}")
-_kl("get_devices_under", {"dn": "ou=KVDevices,cn=admin,dc=kiloview,dc=com", "device_mode": "encoder"}, "POST",
+_kl("get_devices_under", {"dn": "ou=KVDevices,cn=admin,dc=kiloview,dc=com"}, "POST",
+    "/api/tools/getDeviceList.json", '{"dn":"ou=KVDevices,cn=admin,dc=kiloview,dc=com","device_type":"all"}')
+_kl("get_devices_by_mode", {"device_type": "N40", "device_mode": "encoder"}, "POST",
     "/api/tools/getDeviceList.json",
-    '{"dn":"ou=KVDevices,cn=admin,dc=kiloview,dc=com","device_type":"all","device_mode":"encoder"}')
+    '{"dn":"cn=admin,dc=kiloview,dc=com","device_type":"N40","device_mode":"encoder"}')
 _kl("change_own_password", {"password": "Kiloview002"}, "POST", "/api/tools/changeSelfPassword.json",
     '{"new":"Kiloview002"}')
 _kl("change_own_nickname", {"nickname": "new_nickname"}, "POST", "/api/tools/changeSelfInfo.json",
