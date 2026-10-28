@@ -748,8 +748,8 @@ commands:
     returns: ack
 
   get_banned_users:
-    summary: The users banned or timed out in the channel, up to 100, kept in state (Get Banned Users; moderation:read or moderator:manage:banned_users)
-    send: { method: GET, path: /helix/moderation/banned, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" } }
+    summary: The users banned or timed out in the channel, every page, kept in state (Get Banned Users; moderation:read or moderator:manage:banned_users)
+    send: { method: GET, path: /helix/moderation/banned, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" }, pages: &pages { items: "$.data", cursor: "$.pagination.cursor", query: after } }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -806,8 +806,8 @@ commands:
     returns: value
 
   get_moderators:
-    summary: The channel's moderators, up to 100, kept in state (Get Moderators; moderation:read or channel:manage:moderators)
-    send: { method: GET, path: /helix/moderation/moderators, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" } }
+    summary: The channel's moderators, every page, kept in state (Get Moderators; moderation:read or channel:manage:moderators)
+    send: { method: GET, path: /helix/moderation/moderators, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -834,8 +834,8 @@ commands:
     returns: ack
 
   get_vips:
-    summary: The channel's VIPs, up to 100, kept in state (Get VIPs; channel:read:vips or channel:manage:vips)
-    send: { method: GET, path: /helix/channels/vips, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" } }
+    summary: The channel's VIPs, every page, kept in state (Get VIPs; channel:read:vips or channel:manage:vips)
+    send: { method: GET, path: /helix/channels/vips, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -862,9 +862,9 @@ commands:
     returns: ack
 
   get_blocked_terms:
-    summary: The words and phrases blocked in chat, up to 100, kept in state (Get Blocked Terms; moderator:read:blocked_terms)
+    summary: The words and phrases blocked in chat, every page, kept in state (Get Blocked Terms; moderator:read:blocked_terms)
     send: { method: GET, path: /helix/moderation/blocked_terms,
-            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}", first: "100" } }
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}", first: "100" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -1369,8 +1369,8 @@ quirks:
     text: >
       Moderators, VIPs, banned users and blocked terms are kept in state
       once read (get_moderators, get_vips, get_banned_users,
-      get_blocked_terms), up to the first 100 of each: a longer list shows
-      its first page only. Each change the integration makes reads its list
+      get_blocked_terms), whole: 100 a page, the cursor followed to the
+      last, and replaced each time. Each change the integration makes reads its list
       again, and EventSub's moderator and VIP events (moderation:read,
       channel:read:vips) read those lists again after a change made
       elsewhere. Bans and blocked terms changed elsewhere show at the next
@@ -1824,7 +1824,7 @@ telemetry:
       json: {}
       state: { moderation.shield_mode: "false" }
 
-    # ── Moderators and VIPs: the whole first page, read again on changes ───
+    # ── Moderators and VIPs: every page joined, read again on changes ──────
     - path: '^/helix/moderation/moderators\?broadcaster_id=[0-9]+&first=100$'
       json_each: "$.data"
       json: { id: "$.user_id", login: "$.user_login", name: "$.user_name" }
@@ -1835,11 +1835,11 @@ telemetry:
     - path: '^/helix/moderation/moderators\?broadcaster_id=[0-9]+&user_id='
       json: {}
       then_send:
-        - { method: GET, path: /helix/moderation/moderators, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" } }
+        - { method: GET, path: /helix/moderation/moderators, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" }, pages: *pages }
     - json_match: { "$.metadata.message_type": "^notification$", "$.metadata.subscription_type": "^channel\\.moderator\\.(add|remove)$" }
       json: {}
       then_send:
-        - { method: GET, path: /helix/moderation/moderators, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" } }
+        - { method: GET, path: /helix/moderation/moderators, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" }, pages: *pages }
     - path: '^/helix/channels/vips\?broadcaster_id=[0-9]+&first=100$'
       json_each: "$.data"
       json: { id: "$.user_id", login: "$.user_login", name: "$.user_name" }
@@ -1850,11 +1850,11 @@ telemetry:
     - path: '^/helix/channels/vips\?broadcaster_id=[0-9]+&user_id='
       json: {}
       then_send:
-        - { method: GET, path: /helix/channels/vips, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" } }
+        - { method: GET, path: /helix/channels/vips, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" }, pages: *pages }
     - json_match: { "$.metadata.message_type": "^notification$", "$.metadata.subscription_type": "^channel\\.vip\\.(add|remove)$" }
       json: {}
       then_send:
-        - { method: GET, path: /helix/channels/vips, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" } }
+        - { method: GET, path: /helix/channels/vips, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" }, pages: *pages }
 
     # ── Bans and blocked terms ──────────────────────────────────────────────
     - path: '^/helix/moderation/banned\?broadcaster_id=[0-9]+&first=100$'
@@ -1871,7 +1871,7 @@ telemetry:
     - path: '^/helix/moderation/bans\?'
       json: {}
       then_send:
-        - { method: GET, path: /helix/moderation/banned, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" } }
+        - { method: GET, path: /helix/moderation/banned, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" }, pages: *pages }
     - path: '^/helix/moderation/blocked_terms\?'
       json_each: "$.data"
       json: { id: "$.id", text: "$.text", expires: "$.expires_at" }
@@ -1885,7 +1885,7 @@ telemetry:
       json: {}
       then_send:
         - { method: GET, path: /helix/moderation/blocked_terms,
-            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}", first: "100" } }
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}", first: "100" }, pages: *pages }
 
     # ── Channel Points rewards and the redemption queue ─────────────────────
     - path: '^/helix/channel_points/custom_rewards\?'
