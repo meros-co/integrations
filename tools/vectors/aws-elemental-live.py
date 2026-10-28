@@ -174,3 +174,20 @@ telemetry(EL, "devices", inbound_http={"path": "/api/devices", "body": (
     '<device_number>1</device_number><quad>false</quad><node_id>1</node_id></device></device_list>')},
     expect_state={"devices": {"1": {"name": "Camera 1", "device_type": "AJA", "device_number": 0, "node_id": 1},
                               "2": {"name": "", "device_type": "AJA", "device_number": 1, "node_id": 1}}})
+
+# User authentication (Conductor Live API reference, "Hashing the API Key"):
+# each request carries X-Auth-User, X-Auth-Expires and X-Auth-Key. The vector
+# runner's clock reads the Unix epoch, so X-Auth-Expires is 30; the key is
+# worked out here independently, the url being the path without /api.
+import hashlib as _el_hashlib
+
+
+def _el_md5(text):
+    return _el_hashlib.md5(text.encode()).hexdigest()
+
+
+_EL_KEY = _el_md5("k3y" + _el_md5("/live_events" + "admin" + "k3y" + "30"))
+V.append({"spec": EL, "command": "list_live_events", "input": {}, "file": "list_live_events-auth",
+          "settings": {"username": "admin", "api_key": "k3y"},
+          "expect_request": {"method": "GET", "target": "/api/live_events?page=1&per_page=100",
+                             "headers": {"X-Auth-User": "admin", "X-Auth-Expires": "30", "X-Auth-Key": _EL_KEY}}})

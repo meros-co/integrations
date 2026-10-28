@@ -55,6 +55,9 @@ transport:
   scheme: { setting: scheme }
   accept_invalid_certs: true
   auth: digest
+  # The control queue tells clients apart by a cookie its queue request sets
+  # (UseCookie, on by default with the queue): kept and sent back.
+  cookies: true
   timeout_ms: 5000
   probe: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=speed&camera={settings.camera}" }
 
@@ -790,10 +793,16 @@ quirks:
     severity: info
     text: >
       With the control queue on (PTZ.Various.V#.CtlQueueing true), only the client holding control
-      may move the camera and every ptz.cgi request needs the queue's cookie. The core does not keep
-      the queue's cookie, so queue_request, queue_drop and queue_query report the queue as a
-      cookieless client and a device opened here controls a queued camera only while its user group
-      does not use cookies (UseCookie no).
+      may move the camera, and with cookies on for the user's group (UseCookie yes, the default
+      once the queue is on) every ptz.cgi request needs the cookie the queue gave the client. The
+      core keeps every cookie the camera sets and sends them back on each request, so
+      queue_request takes this device into the queue as one client and its moves carry the
+      cookie; queue_drop and queue_query answer for that client. The VAPIX document does not name
+      the cookie or say which answer sets it; that queue_request's answer does is inferred.
+      Control is lost when its time ends (TimeoutType and TimeoutTime of the user group, 60 s
+      typically, restarted by each command with the activity type); queue_request again renews
+      it. A consumer that queues waits the poll period queue.poll_period gives between
+      queue_query calls to keep its place.
   - models: [all]
     severity: info
     text: >

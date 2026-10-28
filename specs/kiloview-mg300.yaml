@@ -52,13 +52,19 @@ settings:
     default: http
     label: Scheme
     description: "http, or https where the gateway's HTTPS port is enabled; its certificate is not checked."
-  token:
+  username:
+    type: string
+    default: admin
+    max_length: 64
+    label: User name
+    description: "The account the core logs in as; admin by default."
+  password:
     type: string
     secret: true
-    default: ""
-    max_length: 256
-    label: Token
-    description: "The token the login command returns; every request carries it in the app header (an empty token until it is set, which only login and info/get accept)."
+    default: admin
+    max_length: 64
+    label: Password
+    description: "That account's password, admin until it is changed; leave it empty for a gateway whose token authentication is off, and nothing logs in."
 
 ports:
   - { port: 80, protocol: http, role: control, when: "scheme http" }
@@ -73,10 +79,19 @@ transport:
   auth: none
   timeout_ms: 5000
   # Section 1.1: every request but the login and info/get carries the
-  # header app, a JSON object holding the login's token.
+  # header app, a JSON object holding the login's token. The session logs
+  # in with the username and password settings, and again when a request is
+  # answered with code 2 (invalid token, section 1.3).
   headers:
-    app: '{"token":{settings.token:json}}'
+    app: '{"token":{session.id:json}}'
   probe: { method: GET, path: /api/info/get }
+  session:
+    when_set: password
+    login: { method: POST, path: /api/users/login, content_type: application/json,
+             body: '{"username":{settings.username:json},"password":{settings.password:json}}' }
+    capture: { json: $.data.token }
+    relogin: { json: { "$.result": "^error$", "$.msg": "^2$" } }
+    refused: { json: { "$.result": "^error$", "$.msg": "^(300|301|302)$" } }
 
 maps:
   dhcp: { "true": "y", "false": "n" }
@@ -276,16 +291,16 @@ models:
 commands:
   # --- Users and authentication (sections 1.1, 3) ---
   login:
-    summary: "Log in and return the token for the token setting (POST /api/users/login)"
+    summary: "Log in as an account and return its token, beside the session the core keeps (POST /api/users/login)"
     params:
       username: { type: string, default: admin, max_length: 64, label: User name, description: "The account to log in as; admin by default." }
       password: { type: string, secret: true, required: true, max_length: 64, label: Password, description: "That account's password; admin until it is changed." }
-    send: { method: POST, path: /api/users/login, content_type: application/json,
+    send: { method: POST, path: /api/users/login, content_type: application/json, session: false,
             body: '{"username":{username:json},"password":{password:json}}' }
     expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.token" }
     returns: value
   logout:
-    summary: "End the token setting's session; the token stops working at once (POST /api/users/logout)"
+    summary: "End the core's session; its token stops working at once and the next request logs in again (POST /api/users/logout)"
     send: { method: POST, path: /api/users/logout }
     expect: &ok { status: 200, json_equals: { "$.result": "ok" } }
     returns: ack
@@ -384,7 +399,7 @@ commands:
     expect: *ok
     returns: ack
   check_session:
-    summary: "Whether the token setting is still valid, with its account's user name and alias (POST /api/users/session/check)"
+    summary: "Whether the session's token is still valid, with its account's user name and alias (POST /api/users/session/check)"
     send: { method: POST, path: /api/users/session/check }
     expect: *val
     returns: value
@@ -2036,7 +2051,7 @@ state:
 
   auth.enabled:             { type: bool, description: "Token authentication is on" }
   auth.can_modify:          { type: bool, description: "The token's account may turn authentication on or off" }
-  session.valid:            { type: bool, description: "The token setting was accepted by the last session check" }
+  session.valid:            { type: bool, description: "The session's token was accepted by the last session check" }
   session.username:         { type: string, description: "User name of the token's account" }
   session.alias:            { type: string, description: "Alias of the token's account" }
 
@@ -3305,23 +3320,21 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      Authentication (section 1.1): the login (POST /api/users/login with
-      username and password, admin / admin until changed) answers a session
-      token in its JSON body (data.token), and every other request but
-      info/get must carry the header app holding the JSON object
-      {"token": "..."}. The format's session can send a captured token back
-      only as a header's whole value, not inside a JSON object, so the token
-      is a setting: the consumer runs login, puts the token it returns into
-      the token setting with update_settings, and the core then sends the
-      header on every request. The token ends at logout, and may expire
-      after a restart or a long idle time (the document gives no lifetime);
-      a refused token is answered with HTTP 200 and {"result": "error",
-      "msg": "2"}, which the format cannot take for a refusal of the
-      credential, so commands fail with the device's error and the consumer
-      logs in again then. session.valid, read every 30 s by
-      /users/session/check, says whether the token still works.
-      set_auth_enabled off makes the gateway accept requests without a
-      token.
+      Authentication (section 1.1): the core logs in with the username and
+      password settings (POST /api/users/login; admin / admin until
+      changed), keeps the token the answer holds (data.token), and sends it
+      in the header app as the JSON object {"token": "..."} on every other
+      request but info/get. The token ends at logout, and may expire after
+      a restart or a long idle time (the document gives no lifetime); a
+      request it no longer opens is answered HTTP 200 with {"result":
+      "error", "msg": "2"}, and the core then logs in again and sends that
+      request once more. A login answered with code 300, 301 or 302 (no
+      such user, wrong password) is the terminal refusal of the credential.
+      With the password setting empty nothing logs in, for a gateway whose
+      authentication is off (set_auth_enabled). The logout command ends the
+      core's own session too, so the next request logs in again.
+      session.valid, read every 30 s by /users/session/check, says whether
+      the token still works.
   - models: [all]
     severity: info
     text: >
