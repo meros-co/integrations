@@ -3204,6 +3204,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record whether the multi-window report (FD) starts with the window number. ([specs/philips-sicp.yaml:792](specs/philips-sicp.yaml#L792))
 - [ ] Confirm the operating hours report is a big-endian 16-bit count of hours. ([specs/philips-sicp.yaml:724](specs/philips-sicp.yaml#L724))
 
+## pikvm — PiKVM
+
+- [ ] Check the PiKVM Switch commands' answers (the reference shows FIXME for each) and that status 200 means the switch acted. ([specs/pikvm.yaml:694](specs/pikvm.yaml#L694))
+- [ ] Check on current KVMD that the websocket events still carry whole states as the reference's examples show (hid_state with outputs and jiggler, msd_state with storage.images by name), and that ocr_right and ocr_bottom are the region's bounds rather than its width and height. ([specs/pikvm.yaml:681](specs/pikvm.yaml#L681))
+- [ ] Confirm the GPIO switch route is /api/gpio/switch (the reference's heading says /gpio/switch, its example /api/gpio/switch). ([specs/pikvm.yaml:342](specs/pikvm.yaml#L342))
+
 ## pixotope — Pixotope
 
 - [ ] Record the Gateway's HTTP answer bodies (to a Set, a Get, a Call, and a Call that times out), so replies can be read into state. ([specs/pixotope.yaml:321](specs/pixotope.yaml#L321))
