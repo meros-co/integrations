@@ -141,7 +141,8 @@ fn wire(actions: &[Action]) -> Vec<Wire> {
                 socket: "device",
                 text,
             } => Some(Wire::Bytes(text.clone().into_bytes())),
-            Action::Http { request, .. } => {
+            // A request saved to a file is the same request on the wire.
+            Action::Http { request, .. } | Action::HttpSave { request, .. } => {
                 let after_host = request.url.splitn(4, '/').nth(3).unwrap_or("");
                 Some(Wire::Http {
                     method: request.method.to_string(),
@@ -169,7 +170,7 @@ fn http_ids(actions: &[Action]) -> Vec<u64> {
     actions
         .iter()
         .filter_map(|a| match a {
-            Action::Http { id, .. } => Some(*id),
+            Action::Http { id, .. } | Action::HttpSave { id, .. } => Some(*id),
             _ => None,
         })
         .collect()
@@ -440,7 +441,7 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         let waiting: Vec<super::Job> = engine.queue.drain(..).collect();
         for job in waiting {
             let flight = engine.prepare(&job)?;
-            for (outgoing, _, _, _) in flight.messages {
+            for (outgoing, _, _, _, _) in flight.messages {
                 match outgoing {
                     super::Outgoing::Http(request, _) => {
                         sent.extend(wire(&[Action::Http { id: 0, request }]))

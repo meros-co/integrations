@@ -1319,6 +1319,7 @@ commands:
 | `string` | `max_length`, `pattern` (RE2-safe), `default` |
 | `json` | Any JSON value, sent as compact JSON. Only for a request body whose shape the device's own API documents and validates; the command's summary names that schema |
 | `binary` | Bytes given as base64 or as a host file (`{"file": "<path>"}`), sent as they are in an HTTP body (§4, "Binary request bodies"); `max_length` in bytes |
+| `save` | A host file an HTTP answer is saved to, given as `{"file": "<path>"}` (§4, "Saving a response to a file") |
 
 Values outside the declared range are rejected before transmission. The core
 does not clamp, because a clamped value masks a caller error and produces a
@@ -1698,6 +1699,127 @@ gives the body as `body_hex`, and may give `content_type`, in
 a binary parameter is required, named only by `body.binary` or a part's
 `binary`, and used only over HTTP.
 
+### Saving a response to a file
+
+A file a device answers with (a recording, a snapshot, a log, a
+configuration backup, a media clip) is saved to a host file the caller
+names, as a `binary` parameter names one to send: a `save` parameter, given
+as an object whose only member is `file`, a path, and named by the request's
+`save`:
+
+```yaml
+commands:
+  download_recording:
+    params:
+      id: { type: string, max_length: 64, required: true, … }
+      to: { type: save, required: true, label: Save to,
+            description: "The host file the recording is written to; replaced if it exists." }
+    send: { method: GET, path: "/recordings/{id}/file", save: to }
+    expect: { status: 200 }
+    returns: file
+```
+
+```json
+{"id": "rec-12", "to": {"file": "D:/Recordings/rec-12.mp4"}}
+```
+
+A path naming a folder, a folder that does not exist, or anything but that
+object refuses the command with `invalid_params`. A 2xx answer's body is
+written to a file beside the one named as it arrives, a chunk at a time and
+never held whole, and moved over the named file once it has ended, so no
+size is too large and a transfer that fails (the connection lost, the body
+cut short, the disk full, the timeout below) leaves the named file as it
+was and no partial file behind. Any other answer is read as usual and
+nothing is saved, so `expect` and the refusal rules see an error's body.
+A saved answer is not offered to the telemetry rules. `returns: file` gives
+`{file, size, content_type}`: the path, the bytes written and the answer's
+`Content-Type` (or `null`); `ack` and the other returns work on the
+answer without its body. One request of a command saves, and a save
+parameter is required, never rendered in a template, and over HTTP only (the
+transport's or an endpoint's); `tools/validate.py` checks this. Through the
+HTTP service a client reserves a file in the transfer folder and passes
+`{"file": "transfer:<file>"}` (§ HTTP service, File transfers). A vector
+gives the parameter a file name of its own (`{"file": "rec.mp4"}`), which
+is never written: vectors show the request.
+
+### Paged lists
+
+A list an API answers a page at a time (page and size, offset and limit, a
+cursor, a link to the next page) is read whole by naming how it pages with
+`pages` on the request: every page is asked for in turn, and the pages'
+items are joined into one reply, so a list command returns every item and a
+poll's rules write the whole list, with `replace` clearing it once:
+
+```yaml
+    send:
+      method: GET
+      path: /services/v2/service_types
+      query: { per_page: "100" }
+      pages: { items: ["$.data", "$.included"], next: "$.links.next" }
+```
+
+`items` is where each page holds its items: a JSON path to an array, a list
+of them (each joined on its own; the first counts the page's items, and
+another a page leaves out is empty there), or `{xml: <element>}` for the
+elements of that name directly inside an XML answer's root. The next page is
+named by one of:
+
+| Key | The next page |
+|---|---|
+| `next` | A link the answer gives (a JSON path, below): a URL, a path from `/`, or a query from `?`. Only its path and query are used, sent to the server the list came from, so a page is never asked of another host. `{header: Link, rel: next}` takes it from a `Link` header (RFC 8288) |
+| `cursor` + `query` | A cursor the answer gives, sent in the query parameter `query` of the first request (YouTube's `nextPageToken` as `pageToken`) |
+| `page` | The query parameter numbering pages: one more each page, from the first request's value |
+| `offset` | The query parameter counting items skipped: on by each page's items, from the first request's value (0 when it has none) |
+
+The list ends when the next page's link or cursor is absent, null, `false`
+or empty; when a `page` or `offset` page holds no items; when a page names
+one already read; or at the first of these, each optional:
+
+- `more`: go on only while this value is present and not false, null or
+  empty (`$.has_more`, or the next link where the cursor is elsewhere).
+- `total`: the list's length; whole once that many items have arrived.
+- `page_count`: the number of pages; whole once that many have arrived.
+- `size`: the query parameter giving the page size; a page with fewer items
+  than the first request asked for is the last.
+
+Each of `next`, `cursor`, `more`, `total` and `page_count` is a JSON path
+into the page's body, `{header: <name>}` for a header's text, or `{header:
+<name>, json: <path>}` for JSON a header holds (BoxCast's `X-Pagination`).
+
+The reply is the last page's answer with each `items` array (or the root's
+elements) holding every page's, in order, offered to the rules under the
+first request's path and query; pages are not offered one by one, so the
+rules see one list and a list read again unchanged reports nothing (§8,
+Lists). Each page is a request in its own right: it carries the credential
+and session, its timeout is the command's, a refused token is refreshed and
+the page sent again, and an error answer to any page fails the command (or,
+for a poll, writes nothing) with that answer. The pages of one list go one
+after another, each as the last is answered, without the transport's
+`pacing`. A request has `pages` or `save`, not both, over HTTP only. The
+engine's own tests play the pages; a vector shows the first request, and a
+telemetry vector the joined reply.
+
+### Timeouts
+
+Each message waits for its answer for the transport's `timeout_ms`. A
+command the vendor documents as slow (applying firmware, formatting media,
+a large import) gives its own, `timeout_ms` on the command, which its
+messages wait instead; the catalogue lists it:
+
+```yaml
+commands:
+  apply_firmware:
+    timeout_ms: 600000
+    send: { method: POST, path: /api/firmware/apply }
+```
+
+A request whose body is streamed from a host file (§4, "Binary request
+bodies") or whose answer is saved to one (above) has no deadline as a
+whole, so no file is too large: its timeout, the command's or the
+transport's, is how long it may go with nothing moving, from sending the
+request to the end of the answer's body. A transfer that stalls that long
+fails with `timeout` and, for a save, leaves the named file as it was.
+
 ## 5. Responses
 
 ```yaml
@@ -1766,6 +1888,7 @@ A JSON API that answers every request with a status number in its body
 | `value` | Captured value: regex group 1, the `json_path` result, or the OSC argument. Requires one of `matches`, `json_path` or `address` |
 | `fields` | Map of `key: value` lines from the reply body, split at the first `: `. For HyperDeck-style replies such as `208 transport info:` |
 | `text` | The reply body as text: for `headed-block`, the lines after the first; otherwise the whole reply |
+| `file` | The file a request's `save` wrote: `{file, size, content_type}` (§4, "Saving a response to a file") |
 | `none` | No acknowledgement available. The core reports `unverified` |
 
 `json_path: "$"` returns the whole JSON body.
@@ -1978,7 +2101,9 @@ state. A rule may carry `replace` with no `state` when only some
 messages hold the whole list (Planning Center's first page with no `next`
 link): it sits beside the plain rule that writes the values for the same
 messages, and since every removal of a message is applied before any of its
-values, the order of the two rules does not matter.
+values, the order of the two rules does not matter. A list read with
+`pages` (§4, "Paged lists") is one reply holding every page, so its rule
+carries `replace` itself.
 
 A reply can hold many lists, one in each element: mimoLive's layer sets each
 carry their `layers`. With `json_each`, `replace` is also rendered for each
@@ -2854,7 +2979,10 @@ service did not hand out refuses the command with `invalid_params`. Every
 real path of the folder in a command's result, an event or a snapshot reads
 `transfer:<file>` again. For a command that writes a file, reserve an id,
 pass its `path`, and fetch the file once the command (for an ATEM or a
-HyperDeck, its transfer's `transfer_finished` event) is done.
+HyperDeck, its transfer's `transfer_finished` event) is done. A `save`
+parameter (§4, "Saving a response to a file") takes a reserved id the same
+way, as `{"file": "transfer:<file>"}`, and the file is there once the command
+has answered.
 
 A file is stored as `<folder>/<file>/<name>`, where `<name>` is the client's
 name with only letters, digits, space and `._()-` kept (`file` when none is

@@ -807,6 +807,13 @@ pub enum Action {
         id: RequestId,
         request: HttpRequest,
     },
+    /// Make a request whose 2xx answer's body is saved to the host file
+    /// `to`, streamed as it arrives; the response reported holds no body.
+    HttpSave {
+        id: RequestId,
+        request: HttpRequest,
+        to: PathBuf,
+    },
     /// Open a server-sent event stream, replacing any open under this key.
     SseOpen {
         stream: Key,
@@ -1099,6 +1106,12 @@ impl Cx {
 
     pub fn http(&mut self, id: RequestId, request: HttpRequest) {
         self.push(Action::Http { id, request });
+    }
+
+    /// As [`Cx::http`], saving a 2xx answer's body to the host file `to`
+    /// rather than returning it (SPEC.md §4, "Saving a response to a file").
+    pub fn http_save(&mut self, id: RequestId, request: HttpRequest, to: PathBuf) {
+        self.push(Action::HttpSave { id, request, to });
     }
 
     pub fn sse_open(&mut self, stream: Key, request: HttpRequest) {

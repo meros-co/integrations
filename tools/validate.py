@@ -130,6 +130,38 @@ def binary_checks(send, params: dict, where: str, transport_type) -> list[str]:
     return errors
 
 
+def save_checks(command: dict, params: dict, where: str, transport_type) -> list[str]:
+    """SPEC.md §4, "Saving a response to a file" and "Paged lists": a save
+    parameter is required and named only by one HTTP request's `save`; a
+    request has `pages` or `save`, over HTTP; `returns: file` goes with a
+    save."""
+    errors: list[str] = []
+    send = command.get("send", [])
+    items = [i for i in (send if isinstance(send, list) else [send]) if isinstance(i, dict)]
+    saved = []
+    for item in items:
+        http = transport_type == "http" or "endpoint" in item
+        if ("save" in item or "pages" in item) and not http:
+            errors.append(f"{where}: save and pages are for HTTP requests")
+        if "save" in item and "pages" in item:
+            errors.append(f"{where}: a request has pages or save, not both")
+        if "save" in item:
+            saved.append(item["save"])
+            decl = params.get(item["save"])
+            if decl is None or decl.get("type") != "save":
+                errors.append(f"{where}: save '{item['save']}' is not a save parameter")
+            elif not decl.get("required"):
+                errors.append(f"{where}: save '{item['save']}' must be required")
+    for name, decl in params.items():
+        if decl.get("type") == "save" and name not in saved:
+            errors.append(f"{where}: save parameter '{name}' is named by no request's save")
+    if len(saved) > 1:
+        errors.append(f"{where}: one request of a command saves its answer")
+    if command.get("returns") == "file" and not saved:
+        errors.append(f"{where}: returns 'file' needs a request with save")
+    return errors
+
+
 def check_template(
     context: str,
     text: str,
@@ -177,6 +209,9 @@ def check_template(
         ptype = decl["type"]
         if ptype == "binary":
             errors.append(f"{where}: binary '{name}' is sent only as a body or a multipart part, never in a template")
+            continue
+        if ptype == "save":
+            errors.append(f"{where}: save '{name}' names where an answer is saved, never sent in a template")
             continue
         # "-inf" for a float is only for a native module's own encoding.
         if decl.get("negative_infinity"):
@@ -430,6 +465,7 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                                      conversions=conversions, maps=doc.get("maps") or {})
         if doc.get("implementation") != "native":
             errors += binary_checks(command.get("send", []), params, f"commands.{name}", transport_type)
+            errors += save_checks(command, params, f"commands.{name}", transport_type)
         expect_ = command.get("expect") or {}
         if "reply_json" in expect_:
             if transport_type != "ws":

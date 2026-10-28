@@ -916,6 +916,15 @@ impl Session {
                         self.inbound_tx.clone(),
                     );
                 }
+                Action::HttpSave { id, request, to } => {
+                    self.services.http.spawn_save(
+                        self.epoch,
+                        id,
+                        &request,
+                        to,
+                        self.inbound_tx.clone(),
+                    );
+                }
                 Action::SseOpen { stream, request } => {
                     self.close_stream(stream);
                     let generation = self.next_generation;

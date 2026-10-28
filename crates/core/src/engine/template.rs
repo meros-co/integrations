@@ -194,6 +194,16 @@ impl Values<'_> {
             .ok_or_else(|| format!("'{name}' is not base64"))
     }
 
+    /// The host file a `save` parameter names, checked again as the
+    /// request goes out (SPEC.md §4, "Saving a response to a file").
+    pub(crate) fn save(&self, name: &str) -> Result<std::path::PathBuf, String> {
+        let (value, kind) = self.lookup(name)?;
+        if kind != ParamType::Save {
+            return Err(format!("'{name}' is not a save parameter"));
+        }
+        crate::catalog::save_file(name, value)
+    }
+
     fn lookup(&self, name: &str) -> Result<(&Value, ParamType), String> {
         if name == "session.id" {
             return self
@@ -504,6 +514,9 @@ fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String
         }
         ParamType::Binary => Err(format!(
             "binary '{name}' is sent only as a request body or a multipart part"
+        )),
+        ParamType::Save => Err(format!(
+            "save '{name}' names where a response is saved and is never sent"
         )),
         ParamType::Enum | ParamType::String => {
             let mut s = value

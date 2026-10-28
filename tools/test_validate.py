@@ -58,6 +58,35 @@ class Binary(unittest.TestCase):
         self.assertIn("c: header Content-Type is set by the core, not by the spec", errors)
 
 
+class Saves(unittest.TestCase):
+    PARAMS = {"to": {"type": "save", "required": True}, "id": {"type": "int", "required": True}}
+
+    def test_a_save_parameter_is_named_by_one_http_request(self):
+        good = {"send": {"method": "GET", "path": "/r/{id}", "save": "to"}, "returns": "file"}
+        self.assertEqual(validate.save_checks(good, self.PARAMS, "c", "http"), [])
+        on_line = {"send": {"method": "GET", "path": "/r", "save": "to"}}
+        self.assertEqual(validate.save_checks(on_line, self.PARAMS, "c", "line-tcp"),
+                         ["c: save and pages are for HTTP requests"])
+        on_endpoint = {"send": {"endpoint": "rest", "method": "GET", "path": "/r", "save": "to"}}
+        self.assertEqual(validate.save_checks(on_endpoint, self.PARAMS, "c", "line-tcp"), [])
+
+    def test_what_a_save_may_not_be(self):
+        unsaved = {"send": {"method": "GET", "path": "/r"}, "returns": "file"}
+        self.assertEqual(validate.save_checks(unsaved, self.PARAMS, "c", "http"), [
+            "c: save parameter 'to' is named by no request's save",
+            "c: returns 'file' needs a request with save",
+        ])
+        both = {"send": {"method": "GET", "path": "/r", "save": "to", "pages": {"items": "$", "page": "p"}}}
+        self.assertIn("c: a request has pages or save, not both",
+                      validate.save_checks(both, self.PARAMS, "c", "http"))
+        optional = {"to": {"type": "save"}}
+        self.assertEqual(validate.save_checks({"send": {"method": "GET", "path": "/r", "save": "to"}},
+                                              optional, "c", "http"),
+                         ["c: save 'to' must be required"])
+        templated = validate.check_template("http-path", "/r/{to}", self.PARAMS, {}, "c")
+        self.assertEqual(templated, ["c: save 'to' names where an answer is saved, never sent in a template"])
+
+
 class Templates(unittest.TestCase):
     def test_an_escaped_brace_is_no_placeholder(self):
         self.assertEqual(validate.check_template("text", r"\{VC}", {}, {}, "c"), [])

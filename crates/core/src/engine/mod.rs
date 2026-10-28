@@ -15,6 +15,7 @@ pub(crate) mod framing;
 mod oauth;
 mod osc;
 mod pacing;
+mod pages;
 mod telemetry;
 pub(crate) mod template;
 
@@ -809,6 +810,17 @@ impl Await {
     }
 }
 
+/// One message of a command: what is sent, the OSC reply it waits for, on
+/// a line transport its text without framing, the text its pacing groups
+/// are matched against, and over HTTP its `pages` and `save`.
+type Message = (
+    Outgoing,
+    Option<OscReply>,
+    Option<String>,
+    String,
+    pages::HttpExtra,
+);
+
 #[derive(Debug)]
 struct InFlight {
     /// `None` for a liveness probe.
@@ -816,7 +828,7 @@ struct InFlight {
     /// Each message, the OSC reply it waits for, on a line transport its
     /// text without framing (what a reply's `request_match` reads), and the
     /// text its pacing groups are matched against.
-    messages: VecDeque<(Outgoing, Option<OscReply>, Option<String>, String)>,
+    messages: VecDeque<Message>,
     /// Over a websocket: what identifies the reply (`expect.reply_json`).
     ws_reply: Option<Vec<(String, String)>>,
     /// On a line transport: text the reply holds (`expect.reply_contains`).
@@ -845,6 +857,16 @@ struct InFlight {
     /// Where the HTTP request now awaiting its reply went: one sent to an
     /// endpoint says nothing about whether the device is connected.
     route: Route,
+    /// How long each message waits for its reply: the command's
+    /// `timeout_ms`, or the transport's (SPEC.md §4, "Timeouts").
+    timeout: Millis,
+    /// The paged list being read by the request now awaiting its reply
+    /// (`pages`), and that request, from which the next page's is made.
+    paging: Option<(pages::Paging, HttpRequest)>,
+    /// Where the request now awaiting its reply has its answer saved (a
+    /// `save` parameter), and the file, once saved, for `returns: file`.
+    saving: Option<std::path::PathBuf>,
+    saved: Option<(std::path::PathBuf, Option<String>)>,
 }
 
 #[derive(Debug, Clone)]
@@ -2476,6 +2498,7 @@ impl SpecEngine {
                 _ => item.clone(),
             };
             let outgoing = self.build(&item, &values)?;
+            let extra = self.http_extra(&item, &values, &outgoing)?;
             let text = match (&self.transport, line_message(&item)) {
                 (_, _) if matches!(outgoing, Outgoing::Http(..)) => None,
                 (Transport::LineTcp { .. } | Transport::LineUdp { .. }, Some(template)) => {
@@ -2484,8 +2507,16 @@ impl SpecEngine {
                 _ => None,
             };
             let pace = pace_text(&outgoing, text.as_deref());
-            messages.push_back((outgoing, awaited_address.clone(), text, pace));
+            messages.push_back((outgoing, awaited_address.clone(), text, pace, extra));
         }
+        let timeout = match job.id {
+            Some(_) => spec
+                .commands
+                .get(&job.name)
+                .and_then(|c| c.timeout_ms)
+                .unwrap_or(self.timeout),
+            None => self.timeout,
+        };
         Ok(InFlight {
             id: job.id,
             messages,
@@ -2506,7 +2537,63 @@ impl SpecEngine {
             refreshed: false,
             job: job.clone(),
             route: Route::Main,
+            timeout,
+            paging: None,
+            saving: None,
+            saved: None,
         })
+    }
+
+    /// A request item's `pages` and `save` (SPEC.md §4, "Paged lists" and
+    /// "Saving a response to a file"): HTTP requests only.
+    fn http_extra(
+        &self,
+        item: &Value,
+        values: &Values,
+        outgoing: &Outgoing,
+    ) -> Result<pages::HttpExtra, String> {
+        let mut extra = pages::HttpExtra::default();
+        let (pages, save) = (item.get("pages"), str_field(item, "save"));
+        if (pages.is_some() || save.is_some()) && !matches!(outgoing, Outgoing::Http(..)) {
+            return Err("pages and save are for HTTP requests".into());
+        }
+        if pages.is_some() && save.is_some() {
+            return Err("a request has pages or save, not both".into());
+        }
+        if let Some(p) = pages {
+            extra.pages = Some(Arc::new(pages::Pages::parse(p)?));
+        }
+        if let Some(name) = save {
+            extra.save = Some(values.save(name)?);
+        }
+        Ok(extra)
+    }
+
+    /// Send the HTTP request of the command in flight: saved to its file
+    /// when it has one, and awaited for its timeout, which for a request
+    /// streamed either way is the HTTP client's (how long nothing may move).
+    fn dispatch_http(&mut self, cx: &mut Cx, mut request: HttpRequest) -> RequestId {
+        let (timeout, saving) = self
+            .current
+            .as_ref()
+            .map_or((self.timeout, None), |f| (f.timeout, f.saving.clone()));
+        request.timeout = Some(timeout);
+        let streamed = request.body_stream.is_some() || saving.is_some();
+        let id = match saving {
+            Some(to) => {
+                let id = self.next_request;
+                self.next_request += 1;
+                cx.http_save(id, request, to);
+                id
+            }
+            None => self.send_http(cx, request),
+        };
+        if streamed {
+            cx.cancel_timer(REPLY);
+        } else {
+            cx.set_timer(REPLY, timeout);
+        }
+        id
     }
 
     /// A command's `send` items for the device's model.
@@ -2644,7 +2731,7 @@ impl SpecEngine {
             let Some(flight) = self.current.as_mut() else {
                 return;
             };
-            let Some((outgoing, address, text, pace)) = flight.messages.pop_front() else {
+            let Some((outgoing, address, text, pace, extra)) = flight.messages.pop_front() else {
                 // Everything sent and, where the protocol replies, answered.
                 let flight = self.current.take().unwrap();
                 if let Some(id) = flight.id {
@@ -2682,7 +2769,11 @@ impl SpecEngine {
                     if self.oauth.is_some() {
                         flight.last_http = Some(request.clone());
                     }
-                    Await::Http(self.send_http(cx, request))
+                    flight.paging = extra
+                        .pages
+                        .map(|p| (pages::Paging::new(p, &request.url), request.clone()));
+                    flight.saving = extra.save;
+                    Await::Http(self.dispatch_http(cx, request))
                 }
             };
             let awaits = waits || matches!(awaiting, Await::Http(_));
@@ -2691,9 +2782,13 @@ impl SpecEngine {
             }
             if awaits {
                 let flight = self.current.as_mut().unwrap();
+                let http = matches!(awaiting, Await::Http(_));
                 flight.awaiting = Some(awaiting);
                 flight.sent_at = cx.now();
-                cx.set_timer(REPLY, self.timeout);
+                // An HTTP request's timer is armed as it is sent.
+                if !http {
+                    cx.set_timer(REPLY, flight.timeout);
+                }
                 return;
             }
             let flight = self.current.as_ref().unwrap();
@@ -2716,7 +2811,8 @@ impl SpecEngine {
         if self.pacer.is_off() || std::mem::take(&mut self.pace_pass) {
             return false;
         }
-        let Some((outgoing, _, _, text)) = self.current.as_ref().and_then(|f| f.messages.front())
+        let Some((outgoing, _, _, text, _)) =
+            self.current.as_ref().and_then(|f| f.messages.front())
         else {
             return false;
         };
@@ -2737,7 +2833,7 @@ impl SpecEngine {
         self.current
             .as_ref()
             .and_then(|f| f.messages.front())
-            .map(|(_, _, _, text)| self.pacer.groups_of(text))
+            .map(|(_, _, _, text, _)| self.pacer.groups_of(text))
             .unwrap_or_default()
     }
 
@@ -2990,13 +3086,16 @@ impl SpecEngine {
             .extend(auth_headers(HttpAuth::OAuth2, "", &self.settings));
         if let Some(flight) = self.current.as_mut() {
             flight.last_http = Some(request.clone());
+            // The next page is made from the request with the new token.
+            if let Some((_, last)) = flight.paging.as_mut() {
+                *last = request.clone();
+            }
         }
-        let id = self.send_http(cx, request);
+        let id = self.dispatch_http(cx, request);
         if let Some(flight) = self.current.as_mut() {
             flight.awaiting = Some(Await::Http(id));
             flight.sent_at = cx.now();
         }
-        cx.set_timer(REPLY, self.timeout);
     }
 
     /// The service refused the request in flight with 401: refresh the token
@@ -3125,6 +3224,59 @@ impl SpecEngine {
     }
 
     /// A reply for the command in flight.
+    /// A page of a paged list (`pages`) answered: ask for the next and true,
+    /// or, after the last, put the reply holding every item in `result`,
+    /// under the first request's path, and false. Pages are not offered to
+    /// the rules one by one, so a list is replaced once, whole.
+    fn next_page(
+        &mut self,
+        cx: &mut Cx,
+        id: RequestId,
+        result: &mut Result<HttpResponse, String>,
+    ) -> bool {
+        let Ok(response) = result else {
+            return false;
+        };
+        if !(200..300).contains(&response.status) {
+            return false;
+        }
+        let Some(flight) = self.current.as_mut() else {
+            return false;
+        };
+        let Some((paging, last)) = flight.paging.as_mut() else {
+            return false;
+        };
+        match paging.page(response) {
+            pages::Step::Fetch(url) => {
+                let mut request = last.clone();
+                request.url = url;
+                *last = request.clone();
+                if self.oauth.is_some() {
+                    flight.last_http = Some(request.clone());
+                }
+                // Each page has its own refusal and refresh.
+                flight.refreshed = false;
+                // Every page's answer is offered under the first request's
+                // path, as one reply.
+                let first = self.request_paths.remove(&id);
+                let next = self.dispatch_http(cx, request);
+                if let Some(first) = first {
+                    self.request_paths.insert(next, first);
+                }
+                if let Some(flight) = self.current.as_mut() {
+                    flight.awaiting = Some(Await::Http(next));
+                    flight.sent_at = cx.now();
+                }
+                true
+            }
+            pages::Step::Done(body) => {
+                flight.paging = None;
+                response.body = body;
+                false
+            }
+        }
+    }
+
     fn reply(&mut self, cx: &mut Cx, reply: Reply) {
         cx.cancel_timer(REPLY);
         let Some(flight) = self.current.as_mut() else {
@@ -3157,13 +3309,31 @@ impl SpecEngine {
                 ..
             }
         ) && matches!(reply, Reply::Text(_));
-        let result = expect::evaluate(
-            &flight.expect,
-            &flight.returns,
-            &self.spec.codes,
-            &reply,
-            headed,
-        );
+        // `returns: file`: the saved file, once `expect` has passed.
+        let saved = flight.saved.take();
+        let returns = if flight.returns == "file" {
+            "ack"
+        } else {
+            flight.returns.as_str()
+        };
+        let result = expect::evaluate(&flight.expect, returns, &self.spec.codes, &reply, headed);
+        let result = match (result, flight.returns.as_str(), saved) {
+            (Ok(_), "file", Some((path, content_type))) => {
+                let size = std::fs::metadata(&path).map(|m| m.len()).ok();
+                Ok(Outcome::Value {
+                    value: serde_json::json!({
+                        "file": path.to_string_lossy(),
+                        "size": size,
+                        "content_type": content_type,
+                    }),
+                })
+            }
+            (Ok(_), "file", None) => Err(CommandError::DeviceError {
+                code: None,
+                message: "nothing was saved".into(),
+            }),
+            (result, _, _) => result,
+        };
         // `expect.convert`: the returned wire value in the operator's terms.
         let result = match (result, flight.expect.get("convert").and_then(Value::as_str)) {
             (Ok(Outcome::Value { value }), Some(name)) => {
@@ -4525,7 +4695,12 @@ impl Module for SpecEngine {
         }
     }
 
-    fn http_response(&mut self, cx: &mut Cx, id: RequestId, result: Result<HttpResponse, String>) {
+    fn http_response(
+        &mut self,
+        cx: &mut Cx,
+        id: RequestId,
+        mut result: Result<HttpResponse, String>,
+    ) {
         if self
             .oauth
             .as_ref()
@@ -4559,6 +4734,23 @@ impl Module for SpecEngine {
                 self.logged_in(cx, result);
             }
             return;
+        }
+        if ours && self.next_page(cx, id, &mut result) {
+            return;
+        }
+        if ours {
+            if let (Some(flight), Ok(response)) = (self.current.as_mut(), &result) {
+                // A saved answer: its file, for `returns: file`.
+                if let Some(to) = flight.saving.take() {
+                    if (200..300).contains(&response.status) {
+                        let content_type = response
+                            .header_values("content-type")
+                            .next()
+                            .map(str::to_string);
+                        flight.saved = Some((to, content_type));
+                    }
+                }
+            }
         }
         if let (Some((path, request)), Ok(response)) = (self.request_paths.remove(&id), &result) {
             if (200..300).contains(&response.status) {
@@ -4656,6 +4848,10 @@ impl Module for SpecEngine {
                 cx.cancel_timer(REPLY);
                 let flight = self.current.take().unwrap();
                 match flight.id {
+                    // A transfer that stopped moving ran out of its time.
+                    Some(id) if message.starts_with(crate::http::STALLED) => {
+                        cx.complete(id, Err(CommandError::Timeout))
+                    }
                     Some(id) => cx.complete(id, Err(CommandError::Transport { message })),
                     // An endpoint that cannot be reached fails its request,
                     // not the device: the transport's port says whether the
@@ -4946,6 +5142,8 @@ fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 
 #[cfg(test)]
 mod pacing_tests;
+#[cfg(test)]
+mod transfer_tests;
 #[cfg(test)]
 mod vectors;
 

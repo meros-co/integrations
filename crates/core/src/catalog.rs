@@ -146,6 +146,11 @@ pub struct CommandSpec {
     pub send: Option<Value>,
     #[serde(default, skip_serializing)]
     pub expect: Option<Value>,
+    /// How long each of the command's messages may wait for its answer, in
+    /// place of the transport's timeout: a firmware upload or a slow
+    /// operation the vendor documents (SPEC.md §4, "Timeouts").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_ms: Option<u64>,
 }
 
 fn default_returns() -> String {
@@ -211,6 +216,36 @@ pub enum ParamType {
     /// body or a multipart part (an image, a show file). A file is streamed
     /// from disk as it is sent. `max_length` limits the bytes.
     Binary,
+    /// A host file a response body is saved to, given as `{"file":
+    /// "<path>"}`: a recording, a snapshot, a configuration backup. The
+    /// body is streamed to disk as it arrives (SPEC.md §4, "Saving a
+    /// response to a file").
+    Save,
+}
+
+/// The path of a `save` parameter: an object whose only member is `file`, a
+/// non-empty string naming a file (not a folder) in a folder that exists.
+pub(crate) fn save_file(name: &str, value: &Value) -> Result<std::path::PathBuf, String> {
+    let path =
+        binary_file(value).ok_or_else(|| format!("'{name}' must be {{\"file\": \"<path>\"}}"))?;
+    let path = std::path::PathBuf::from(path);
+    if path.is_dir() {
+        return Err(format!("'{name}': {} is a folder", path.display()));
+    }
+    if path.file_name().is_none() {
+        return Err(format!("'{name}': {} names no file", path.display()));
+    }
+    let parent = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(std::path::Path::new("."));
+    if !parent.is_dir() {
+        return Err(format!(
+            "'{name}': the folder {} does not exist",
+            parent.display()
+        ));
+    }
+    Ok(path)
 }
 
 /// The path of a `binary` parameter given as a host file: an object whose
@@ -985,6 +1020,7 @@ fn check_value(name: &str, spec: &ParamSpec, value: &Value) -> Result<(), String
             }
             Ok(())
         }
+        ParamType::Save => save_file(name, value).map(|_| ()),
         ParamType::Enum => {
             let s = value
                 .as_str()

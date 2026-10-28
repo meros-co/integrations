@@ -5,6 +5,7 @@
 //! need less (a consumer's integration review, item D).
 
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -49,7 +50,15 @@ impl HttpClients {
         })
     }
 
-    fn build(&self, request: &HttpRequest) -> reqwest::RequestBuilder {
+    /// The request ready to send. A request whose body is streamed from a
+    /// file, or whose answer is saved to one (`watch`), has no overall
+    /// deadline: its timeout is how long it may go without a byte moving,
+    /// so no size is too large (SPEC.md §4, "Timeouts").
+    fn build(
+        &self,
+        request: &HttpRequest,
+        watch: Option<&Arc<Progress>>,
+    ) -> reqwest::RequestBuilder {
         let client = if request.accept_invalid_certs {
             &self.accept_invalid
         } else {
@@ -71,9 +80,12 @@ impl HttpClients {
             let length: u64 = pieces.iter().map(BodyPiece::len).sum();
             builder = builder
                 .header(reqwest::header::CONTENT_LENGTH, length)
-                .body(reqwest::Body::wrap_stream(stream_pieces(pieces.clone())));
+                .body(reqwest::Body::wrap_stream(stream_pieces(
+                    pieces.clone(),
+                    watch.cloned(),
+                )));
         }
-        if let Some(ms) = request.timeout {
+        if let (Some(ms), None) = (request.timeout, watch) {
             builder = builder.timeout(Duration::from_millis(ms));
         }
         builder
@@ -95,18 +107,48 @@ impl HttpClients {
         });
     }
 
+    /// Make a request whose 2xx answer is saved to the host file `to`
+    /// rather than returned: the body is streamed to a file beside it and
+    /// moved into place once whole, so a failed download leaves `to` as it
+    /// was. The response reported holds no body (SPEC.md §4, "Saving a
+    /// response to a file").
+    pub(crate) fn spawn_save(
+        &self,
+        epoch: u64,
+        id: RequestId,
+        request: &HttpRequest,
+        to: PathBuf,
+        inbound: mpsc::Sender<Inbound>,
+    ) {
+        let clients = self.clone();
+        let request = request.clone();
+        tokio::spawn(async move {
+            let result = clients.execute_to(&request, Some(&to)).await;
+            let _ = inbound.send(Inbound::Http { epoch, id, result }).await;
+        });
+    }
+
     /// Make a request, answering one Digest challenge if it carries
     /// credentials. A second 401 is returned as it is: the engine treats it as
     /// a refusal, so a wrong password costs at most two attempts.
     async fn execute(&self, request: &HttpRequest) -> Result<HttpResponse, String> {
+        self.execute_to(request, None).await
+    }
+
+    /// As `execute`, saving a 2xx answer's body to `save` when given.
+    async fn execute_to(
+        &self,
+        request: &HttpRequest,
+        save: Option<&Path>,
+    ) -> Result<HttpResponse, String> {
         let Some(credentials) = &request.digest else {
-            let (response, _) = self.send(request, None).await?;
+            let (response, _) = self.send(request, None, save).await?;
             return Ok(response);
         };
         let (origin, uri) = split_url(&request.url);
         let key = (origin.to_string(), credentials.username.clone());
         let cached = self.answer(&key, credentials, request.method, uri);
-        let (response, challenges) = self.send(request, cached).await?;
+        let (response, challenges) = self.send(request, cached, save).await?;
         if response.status != 401 {
             return Ok(response);
         }
@@ -118,7 +160,7 @@ impl HttpClients {
             .unwrap()
             .insert(key.clone(), (challenge, 0));
         let fresh = self.answer(&key, credentials, request.method, uri);
-        let (response, _) = self.send(request, fresh).await?;
+        let (response, _) = self.send(request, fresh, save).await?;
         Ok(response)
     }
 
@@ -149,12 +191,23 @@ impl HttpClients {
         &self,
         request: &HttpRequest,
         authorization: Option<String>,
+        save: Option<&Path>,
     ) -> Result<(HttpResponse, Vec<String>), String> {
-        let mut builder = self.build(request);
+        // Streamed one way or the other: watched for progress instead of
+        // given an overall deadline.
+        let idle = Duration::from_millis(request.timeout.unwrap_or(30_000));
+        let watch =
+            (request.body_stream.is_some() || save.is_some()).then(|| Arc::new(Progress::new()));
+        let mut builder = self.build(request, watch.as_ref());
         if let Some(value) = authorization {
             builder = builder.header("Authorization", value);
         }
-        let response = builder.send().await.map_err(describe)?;
+        let response = match &watch {
+            Some(progress) => watched(builder.send(), progress, idle)
+                .await?
+                .map_err(describe)?,
+            None => builder.send().await.map_err(describe)?,
+        };
         let status = response.status().as_u16();
         let challenges = response
             .headers()
@@ -172,7 +225,17 @@ impl HttpClients {
                     .map(|v| (name.as_str().to_ascii_lowercase(), v.to_string()))
             })
             .collect();
-        let body = response.bytes().await.map_err(describe)?.to_vec();
+        let body = match (&watch, save) {
+            (Some(progress), Some(to)) if response.status().is_success() => {
+                save_body(response, to, progress, idle).await?;
+                Vec::new()
+            }
+            (Some(progress), _) => watched(response.bytes(), progress, idle)
+                .await?
+                .map_err(describe)?
+                .to_vec(),
+            (None, _) => response.bytes().await.map_err(describe)?.to_vec(),
+        };
         Ok((
             HttpResponse {
                 status,
@@ -191,7 +254,7 @@ impl HttpClients {
         request: &HttpRequest,
         inbound: mpsc::Sender<Inbound>,
     ) -> tokio::task::JoinHandle<()> {
-        let builder = self.build(request);
+        let builder = self.build(request, None);
         let json = request
             .headers
             .iter()
@@ -269,6 +332,121 @@ impl HttpClients {
 /// How much of a body's file is read at a time.
 const FILE_CHUNK: usize = 64 * 1024;
 
+/// How the failure of a transfer that stopped moving starts: the engine
+/// reports it as the command's timeout.
+pub(crate) const STALLED: &str = "nothing moved for";
+
+/// When a streamed request last moved a byte, either way.
+struct Progress {
+    start: tokio::time::Instant,
+    /// Milliseconds from `start` to the last byte moved.
+    last: std::sync::atomic::AtomicU64,
+}
+
+impl Progress {
+    fn new() -> Progress {
+        Progress {
+            start: tokio::time::Instant::now(),
+            last: std::sync::atomic::AtomicU64::new(0),
+        }
+    }
+
+    fn tick(&self) {
+        let ms = self.start.elapsed().as_millis() as u64;
+        self.last
+            .fetch_max(ms, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    fn last(&self) -> tokio::time::Instant {
+        self.start + Duration::from_millis(self.last.load(std::sync::atomic::Ordering::Relaxed))
+    }
+}
+
+/// Run `work` until it ends, failing it once `idle` passes with nothing
+/// moved: the timeout of a transfer that may take any time as a whole.
+async fn watched<F: std::future::Future>(
+    work: F,
+    progress: &Progress,
+    idle: Duration,
+) -> Result<F::Output, String> {
+    tokio::pin!(work);
+    loop {
+        let deadline = progress.last() + idle;
+        tokio::select! {
+            out = &mut work => return Ok(out),
+            _ = tokio::time::sleep_until(deadline) => {
+                if progress.last() + idle <= tokio::time::Instant::now() {
+                    return Err(format!("{STALLED} {} ms", idle.as_millis()));
+                }
+            }
+        }
+    }
+}
+
+/// Numbers the partial files of saves in progress, so two saves to one
+/// folder never share one.
+static PARTS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Stream a response's body to `to`: written to a file beside it as it
+/// arrives (on a blocking thread, a chunk at a time, never held whole), then
+/// moved over it once the body has ended. Anything that fails removes the
+/// partial file and leaves `to` as it was.
+async fn save_body(
+    response: reqwest::Response,
+    to: &Path,
+    progress: &Arc<Progress>,
+    idle: Duration,
+) -> Result<(), String> {
+    let name = to
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let part = to.with_file_name(format!(
+        ".{name}.{}-{}.part",
+        std::process::id(),
+        PARTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
+    let (chunks, mut queue) = mpsc::channel::<Vec<u8>>(4);
+    let writing = {
+        let part = part.clone();
+        tokio::task::spawn_blocking(move || -> std::io::Result<()> {
+            use std::io::Write;
+            let mut file = std::fs::File::create(&part)?;
+            while let Some(chunk) = queue.blocking_recv() {
+                file.write_all(&chunk)?;
+            }
+            file.flush()
+        })
+    };
+    let mut body = response.bytes_stream();
+    let received = loop {
+        match watched(body.next(), progress, idle).await {
+            Err(e) => break Err(e),
+            Ok(None) => break Ok(()),
+            Ok(Some(Err(e))) => break Err(describe(e)),
+            Ok(Some(Ok(chunk))) => {
+                progress.tick();
+                // The writer stopped: its error is reported below.
+                if chunks.send(chunk.to_vec()).await.is_err() {
+                    break Ok(());
+                }
+            }
+        }
+    };
+    drop(chunks);
+    let written = match writing.await {
+        Ok(result) => result.map_err(|e| format!("cannot write {}: {e}", to.display())),
+        Err(e) => Err(e.to_string()),
+    };
+    let moved = received.and(written).and_then(|()| {
+        std::fs::rename(&part, to).map_err(|e| format!("cannot write {}: {e}", to.display()))
+    });
+    if moved.is_err() {
+        let _ = std::fs::remove_file(&part);
+    }
+    moved
+}
+
 /// A streamed body's bytes: its pieces in order, each file read a chunk at a
 /// time on a blocking thread as the request takes them, so no file is ever
 /// held whole. A file that cannot be opened, fails a read or ends before
@@ -276,6 +454,7 @@ const FILE_CHUNK: usize = 64 * 1024;
 /// length. The reading stops when the request is dropped.
 fn stream_pieces(
     pieces: Vec<BodyPiece>,
+    progress: Option<Arc<Progress>>,
 ) -> impl futures_util::Stream<Item = std::io::Result<Vec<u8>>> + Send + 'static {
     let (chunks, receiver) = mpsc::channel::<std::io::Result<Vec<u8>>>(4);
     tokio::task::spawn_blocking(move || {
@@ -325,8 +504,17 @@ fn stream_pieces(
             }
         }
     });
-    futures_util::stream::unfold(receiver, |mut receiver| async move {
-        receiver.recv().await.map(|chunk| (chunk, receiver))
+    // Each chunk the request takes is progress: an upload is timed out
+    // only when the device stops taking it.
+    futures_util::stream::unfold(receiver, move |mut receiver| {
+        let progress = progress.clone();
+        async move {
+            let chunk = receiver.recv().await?;
+            if let Some(p) = &progress {
+                p.tick();
+            }
+            Some((chunk, receiver))
+        }
     })
 }
 
@@ -599,6 +787,194 @@ mod tests {
             ))
             .await;
         assert!(gone.is_err(), "{gone:?}");
+    }
+
+    /// A device on loopback that reads one request's head, then answers
+    /// `head`, then each chunk of `body` in turn, then holds the
+    /// connection open for `hold` before closing it.
+    async fn sender(head: String, body: Vec<Vec<u8>>, hold: Duration) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut buf = Vec::new();
+            let mut chunk = [0u8; 4096];
+            while !buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                match stream.read(&mut chunk).await {
+                    Ok(n) if n > 0 => buf.extend_from_slice(&chunk[..n]),
+                    _ => return,
+                }
+            }
+            if stream.write_all(head.as_bytes()).await.is_err() {
+                return;
+            }
+            for piece in body {
+                if stream.write_all(&piece).await.is_err() {
+                    return;
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+            tokio::time::sleep(hold).await;
+            let _ = stream.shutdown().await;
+        });
+        base
+    }
+
+    fn plain_get(url: String, timeout: u64) -> HttpRequest {
+        HttpRequest {
+            method: "GET",
+            url,
+            headers: Vec::new(),
+            body: None,
+            body_stream: None,
+            timeout: Some(timeout),
+            accept_invalid_certs: false,
+            digest: None,
+        }
+    }
+
+    fn scratch(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("meros-save-{name}-{}", std::process::id()))
+    }
+
+    /// Files left beside `to` by a save: none, once it is done.
+    fn parts_beside(to: &Path) -> usize {
+        let name = to.file_name().unwrap().to_string_lossy().into_owned();
+        std::fs::read_dir(to.parent().unwrap())
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|e| {
+                let n = e.file_name().to_string_lossy().into_owned();
+                n.starts_with(&format!(".{name}.")) && n.ends_with(".part")
+            })
+            .count()
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_saved_answer_is_streamed_to_its_file_longer_than_its_timeout() {
+        // 3 MiB in chunks over about 0.6 s, against a 300 ms timeout: the
+        // timeout counts silence, not the whole transfer.
+        let data: Vec<u8> = (0..3 * 1024 * 1024).map(|i| (i * 13) as u8).collect();
+        let chunks: Vec<Vec<u8>> = data.chunks(100 * 1024).map(<[u8]>::to_vec).collect();
+        let head = format!(
+            "HTTP/1.1 200 OK\r\ncontent-type: video/mp4\r\ncontent-length: {}\r\n\r\n",
+            data.len()
+        );
+        let base = sender(head, chunks, Duration::ZERO).await;
+        let to = scratch("whole");
+        std::fs::write(&to, b"old").unwrap();
+        let response = HttpClients::new()
+            .unwrap()
+            .execute_to(&plain_get(format!("{base}/clip"), 300), Some(&to))
+            .await
+            .unwrap();
+        let saved = std::fs::read(&to).unwrap();
+        let _ = std::fs::remove_file(&to);
+        assert_eq!(response.status, 200);
+        assert!(response.body.is_empty());
+        assert_eq!(saved.len(), data.len());
+        assert!(saved == data);
+        assert_eq!(parts_beside(&to), 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn an_error_answer_is_returned_and_nothing_saved() {
+        let base = sender(
+            "HTTP/1.1 404 Not Found\r\ncontent-length: 7\r\n\r\nmissing".into(),
+            vec![],
+            Duration::ZERO,
+        )
+        .await;
+        let to = scratch("error");
+        std::fs::write(&to, b"old").unwrap();
+        let response = HttpClients::new()
+            .unwrap()
+            .execute_to(&plain_get(format!("{base}/clip"), 2000), Some(&to))
+            .await
+            .unwrap();
+        let kept = std::fs::read(&to).unwrap();
+        let _ = std::fs::remove_file(&to);
+        assert_eq!(
+            (response.status, response.body.as_slice()),
+            (404, &b"missing"[..])
+        );
+        assert_eq!(kept, b"old");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_save_that_stops_moving_times_out_and_leaves_the_file_as_it_was() {
+        let base = sender(
+            "HTTP/1.1 200 OK\r\ncontent-length: 1000\r\n\r\n".into(),
+            vec![vec![1u8; 100]],
+            Duration::from_secs(5),
+        )
+        .await;
+        let to = scratch("stall");
+        std::fs::write(&to, b"old").unwrap();
+        let result = HttpClients::new()
+            .unwrap()
+            .execute_to(&plain_get(format!("{base}/clip"), 300), Some(&to))
+            .await;
+        let kept = std::fs::read(&to).unwrap();
+        let _ = std::fs::remove_file(&to);
+        assert!(
+            result.as_ref().is_err_and(|e| e.starts_with(STALLED)),
+            "{result:?}"
+        );
+        assert_eq!(kept, b"old");
+        assert_eq!(parts_beside(&to), 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_save_cut_short_fails_and_leaves_no_file() {
+        let base = sender(
+            "HTTP/1.1 200 OK\r\ncontent-length: 1000\r\n\r\n".into(),
+            vec![vec![1u8; 100]],
+            Duration::ZERO,
+        )
+        .await;
+        let to = scratch("short");
+        let result = HttpClients::new()
+            .unwrap()
+            .execute_to(&plain_get(format!("{base}/clip"), 2000), Some(&to))
+            .await;
+        assert!(result.is_err(), "{result:?}");
+        assert!(!to.exists());
+        assert_eq!(parts_beside(&to), 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn an_upload_waits_for_its_answer_only_as_long_as_its_timeout() {
+        // The device takes the body, then says nothing.
+        let path = scratch("upload");
+        std::fs::write(&path, vec![7u8; 1000]).unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut chunk = [0u8; 4096];
+            while let Ok(n) = stream.read(&mut chunk).await {
+                if n == 0 {
+                    break;
+                }
+            }
+        });
+        let mut request = post(
+            format!("{base}/upload"),
+            vec![BodyPiece::File {
+                path: path.clone(),
+                len: 1000,
+            }],
+        );
+        request.timeout = Some(300);
+        let started = std::time::Instant::now();
+        let result = HttpClients::new().unwrap().execute(&request).await;
+        let _ = std::fs::remove_file(&path);
+        assert!(
+            result.as_ref().is_err_and(|e| e.starts_with(STALLED)),
+            "{result:?}"
+        );
+        assert!(started.elapsed() < Duration::from_secs(3));
     }
 
     #[test]

@@ -2204,7 +2204,11 @@
                 },
                 "login_status": {
                   "type": "array",
-                  "items": { "type": "integer", "minimum": 100, "maximum": 599 },
+                  "items": {
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 599
+                  },
                   "description": "Statuses besides 2xx a login answer holding the session may have, such as a 302 that sets the session cookie."
                 },
                 "relogin": {
@@ -2533,9 +2537,15 @@
             "value",
             "fields",
             "text",
+            "file",
             "none"
           ],
           "default": "ack"
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How long each of the command's messages may wait for its answer, in place of the transport's timeout_ms; for a request streamed to or from a host file, how long nothing may move (SPEC.md §4, Timeouts)."
         }
       }
     },
@@ -2554,7 +2564,8 @@
             "enum",
             "string",
             "json",
-            "binary"
+            "binary",
+            "save"
           ]
         },
         "min": {
@@ -2851,6 +2862,133 @@
         "endpoint": {
           "type": "string",
           "description": "Sent to this endpoint of transport.endpoints (another port of the same host) instead of the transport's port. Not on the probe or the session login (SPEC.md §2, Endpoints)."
+        },
+        "pages": {
+          "type": "object",
+          "description": "A paged list: every page is asked for in turn and the answers joined into one reply holding every item (SPEC.md §4, Paged lists).",
+          "required": [
+            "items"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\$"
+                },
+                {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^\\$"
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "xml"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "xml": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ],
+              "description": "Where each page's items are: a JSON path to an array, a list of them (the first counts the items), or {xml: element} for the elements of that name in an XML answer's root."
+            },
+            "next": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/pageValue"
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "rel"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "header": {
+                      "type": "string"
+                    },
+                    "rel": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ],
+              "description": "The next page's link (a URL or a path; only its path and query are used, on the same server), or {header: Link, rel: next} for an RFC 8288 Link header."
+            },
+            "cursor": {
+              "$ref": "#/$defs/pageValue",
+              "description": "The cursor of the next page, sent in the query parameter `query`."
+            },
+            "query": {
+              "type": "string",
+              "minLength": 1,
+              "description": "With cursor: the query parameter the cursor goes in."
+            },
+            "page": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The query parameter numbering the pages, one more for each."
+            },
+            "offset": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The query parameter counting the items skipped, on by each page's items."
+            },
+            "more": {
+              "$ref": "#/$defs/pageValue",
+              "description": "Pages follow only while this is present and not false, null or empty."
+            },
+            "total": {
+              "$ref": "#/$defs/pageValue",
+              "description": "How many items the list holds: once this many have arrived, the list is whole."
+            },
+            "page_count": {
+              "$ref": "#/$defs/pageValue",
+              "description": "How many pages the list has: once this many have arrived, the list is whole."
+            },
+            "size": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The query parameter giving the page size: a page holding fewer items is the last."
+            }
+          },
+          "oneOf": [
+            {
+              "required": [
+                "next"
+              ]
+            },
+            {
+              "required": [
+                "cursor",
+                "query"
+              ]
+            },
+            {
+              "required": [
+                "page"
+              ]
+            },
+            {
+              "required": [
+                "offset"
+              ]
+            }
+          ]
+        },
+        "save": {
+          "type": "string",
+          "description": "A save parameter of the command: a 2xx answer's body is streamed to the host file it names rather than returned (SPEC.md §4, Saving a response to a file)."
         }
       },
       "not": {
@@ -3213,6 +3351,32 @@
           }
         }
       }
+    },
+    "pageValue": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^\\$"
+        },
+        {
+          "type": "object",
+          "required": [
+            "header"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "header": {
+              "type": "string",
+              "minLength": 1
+            },
+            "json": {
+              "type": "string",
+              "pattern": "^\\$"
+            }
+          }
+        }
+      ],
+      "description": "A value of a page's answer: a JSON path into its body, a header's text, or a JSON path into JSON a header holds."
     }
   }
 }
