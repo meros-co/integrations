@@ -99,6 +99,8 @@ mod http_listener;
 mod http_snapshot;
 #[cfg(feature = "blackmagic-hyperdeck")]
 mod hyperdeck_ftp;
+#[cfg(feature = "integ-jnior")]
+mod jnior;
 #[cfg(feature = "labgruppen-lake")]
 mod lake_dlm;
 #[cfg(feature = "meros-camera")]
@@ -322,6 +324,8 @@ pub(crate) fn construct(
         "sacn" => Ok(Box::new(sacn::Sacn::new(context)?)),
         #[cfg(feature = "posistagenet")]
         "posistagenet" => Ok(Box::new(posistagenet::Psn::new(context)?)),
+        #[cfg(feature = "integ-jnior")]
+        "integ-jnior" => Ok(Box::new(jnior::Jnior::new(context)?)),
         #[cfg(feature = "ptp")]
         "ptp" => Ok(Box::new(ptp::Ptp::new(context)?)),
         #[cfg(feature = "osc-listener")]

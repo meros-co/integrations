@@ -189,6 +189,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-imagine", &["vdcp"]),
     ("vendor-imimot", &["imimot-mitti"]),
     ("vendor-inoage", &["madrix"]),
+    ("vendor-integ", &["integ-jnior"]),
     ("vendor-ioversal", &["ioversal-vertex"]),
     (
         "vendor-irisdown",

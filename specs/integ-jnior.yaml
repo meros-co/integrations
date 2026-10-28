@@ -1,0 +1,267 @@
+spec: 1
+id: integ-jnior
+name: INTEG JNIOR automation controllers (JANOS Management Protocol)
+vendor: INTEG Process Group
+category: other
+implementation: native
+reason: >
+  The JANOS Management Protocol is a session of JSON messages, on TCP each wrapped in a [length, object] array: the
+  login answers a nonce challenge with an MD5 digest, the unit pushes I/O, registry, log and shutdown messages at
+  any time, responses are tied to their requests only by an echoed Meta object, and file transfers run in
+  base64 chunks with offsets, none of which the spec format can express.
+
+source:
+  - title: "JNIOR Users Manual (JANOS, Series 4), September 2021"
+    author: INTEG Process Group, Inc.
+    url: https://jnior.com/wp-content/uploads/dlm_uploads/2021/09/JNIOR-Users-Manual.pdf
+    note: >
+      JANOS Management Protocol (pp. 175-211): TCP port 9220 (JMPServer/Port), the [length, object] wrapper and
+      how to parse it, STARTTLS, the initial empty message, the 401 Unauthorized error with a Nonce and the
+      Auth-Digest username:MD5(username:nonce:password) with a worked example, Authenticated with Administrator
+      and Control, the Meta member echoed in responses; Monitor (Model, Version, Serial Number, Inputs with State
+      and Count, Outputs with State, Timestamp) sent on authentication and on every I/O change, Status; Control
+      commands Toggle, Close, Open (each with an optional Duration in ms), Block (Mask and States, relay 1 in the
+      least significant bit), Reset Latch, Reset Counter, Reset Usage (16 usage meters, inputs then outputs) with
+      no response; File List, File Read (base64, Offset and Limit), File Write (Size, Encoding, Data, Append), File
+      Remove, File Rename, File Mkdir; Registry Update (unsolicited), Registry List, Read, Write and Write
+      Encrypted; Console Open, Stdin, Stdout, Close; Enumerate, Read and Write Devices for sensor port modules
+      (4ROUT data blocks: mask, state, pulse times); Clock Read and Clock Set; Device Shutdown; Syslog Read and
+      Syslog Update. Also the WebSocket interface on the web server's port carrying the same messages unwrapped
+      (Websocket/Login), the registry keys of each input (IO/Inputs/dinN: Desc, OnDesc, OffDesc, Inversion,
+      Latching, LatchState, LatchTime, Debounce, Conditioning, CountState, UsageState, Log, Alarming, $HourMeter)
+      and relay output (IO/Outputs/routN: Desc, ClosedDesc, OpenDesc, InitialState, UsageState, Log, $HourMeter),
+      the system keys ($Model, $SerialNumber, $Version, $BootTime, $LastNtpSuccess, $BuildTag, Device/Desc,
+      Device/Timezone), the models' I/O (410: 8 inputs and 8 relays; 412: 4 and 12; 414: 12 and 4) and up to two
+      4ROUT modules extending the relays in Monitor.
+  - title: "JNIOR WebSocket Introduction; What is the JMP Protocol?"
+    author: INTEG Process Group, Inc.
+    url: https://jnior.com/jnior-websocket-introduction/
+    note: "The WebSocket interface on the web server's port 80, or 443 with TLS, on Series 4 models; JMP on TCP 9220 (https://jnior.com/introduction-to-the-jmp-protocol/)."
+
+settings:
+  transport: { type: enum, values: [tcp, ws, wss], default: tcp, label: Transport,
+               description: "tcp is the JMP server port (9220); ws and wss are the web server's WebSocket interface, plain (80) or over TLS (443)." }
+  ws_path: { type: string, max_length: 256, pattern: '^[!-~]*$', default: /, label: WebSocket path, description: "With ws or wss, the path the WebSocket connects to on the JNIOR's web server." }
+  accept_invalid_certs: { type: bool, default: true, label: Accept the unit's certificate, description: "With wss, accept the JNIOR's self-signed certificate; the link is encrypted but the unit not authenticated." }
+  username: { type: string, max_length: 64, default: jnior, label: User name, description: "A JANOS user account; the default administrator is jnior." }
+  password: { type: string, secret: true, max_length: 64, default: jnior, label: Password, description: "The account's password; the default administrator's is jnior." }
+  module_poll_ms: { type: int, min: 0, max: 3600000, default: 2000, label: Module read interval, description: "Milliseconds between reads of the expansion modules' data blocks while monitored; 0 reads them on connecting only." }
+  timeout_ms: { type: int, min: 1, max: 600000, default: 5000, label: Timeout, description: "Milliseconds to wait for a response to a request, and to each chunk of a file transfer." }
+
+ports:
+  - { port: 9220, protocol: tcp, role: control, when: "transport tcp" }
+  - { port: 80, protocol: ws, role: control, when: "transport ws" }
+  - { port: 443, protocol: wss, role: control, when: "transport wss" }
+
+models:
+  - id: jnior-410
+    name: JNIOR Model 410 (8 digital inputs, 8 relay outputs)
+    supports: &all [close_relay, open_relay, toggle_relay, set_relays, reset_latch, reset_counter, reset_usage, refresh,
+               registry_read, registry_write, registry_write_encrypted, registry_list, enumerate_modules,
+               read_modules, write_module, read_clock, set_clock, read_syslog, list_files, remove_files,
+               rename_file, make_folder, download_file, upload_file, console_open, console_input, console_close]
+    verification: none
+  - id: jnior-412
+    name: JNIOR Model 412 (4 digital inputs, 12 relay outputs)
+    supports: *all
+    verification: none
+  - id: jnior-414
+    name: JNIOR Model 414 (12 digital inputs, 4 relay outputs)
+    supports: *all
+    verification: none
+  - id: jnior-412dmx
+    name: JNIOR Model 412DMX (4 digital inputs, 12 relay outputs, DMX512 output)
+    supports: *all
+    verification: none
+
+commands:
+  close_relay:
+    summary: Close a relay output (Control Close), or pulse it closed for a duration; unverified, the Monitor that follows a change updates state
+    params:
+      channel: { type: int, min: 1, max: 20, required: true, label: Relay, description: "The relay output, numbered from 1; relays past the model's own are those of attached 4ROUT modules." }
+      duration_ms: { type: int, min: 0, max: 2147483647, default: 0, label: Pulse time, description: "Milliseconds before the relay returns to its earlier state; 0 leaves it closed." }
+    returns: none
+  open_relay:
+    summary: Open a relay output (Control Open), or pulse it open for a duration
+    params:
+      channel: { type: int, min: 1, max: 20, required: true, label: Relay, description: "The relay output, numbered from 1." }
+      duration_ms: { type: int, min: 0, max: 2147483647, default: 0, label: Pulse time, description: "Milliseconds before the relay returns to its earlier state; 0 leaves it open." }
+    returns: none
+  toggle_relay:
+    summary: Invert a relay output (Control Toggle), or for a duration
+    params:
+      channel: { type: int, min: 1, max: 20, required: true, label: Relay, description: "The relay output, numbered from 1." }
+      duration_ms: { type: int, min: 0, max: 2147483647, default: 0, label: Pulse time, description: "Milliseconds before the relay returns to its earlier state; 0 leaves it inverted." }
+    returns: none
+  set_relays:
+    summary: Set several relays at once (Control Block); the mask selects the relays, the states close (1) or open (0) them
+    params:
+      mask: { type: int, min: 1, max: 1048575, required: true, label: Mask, description: "The relays changed, one bit each, relay 1 in the least significant bit (7 is relays 1 to 3)." }
+      states: { type: int, min: 0, max: 1048575, required: true, label: States, description: "For each relay in the mask, 1 closes and 0 opens it, relay 1 in the least significant bit." }
+      duration_ms: { type: int, min: 0, max: 2147483647, default: 0, label: Pulse time, description: "Milliseconds before the relays return to their earlier states; 0 leaves them." }
+    returns: none
+  reset_latch:
+    summary: Reset a digital input's latched state (Control Reset Latch)
+    params:
+      channel: { type: int, min: 1, max: 12, required: true, label: Input, description: "The digital input, numbered from 1." }
+    returns: none
+  reset_counter:
+    summary: Reset a digital input's transition counter to 0 (Control Reset Counter)
+    params:
+      channel: { type: int, min: 1, max: 12, required: true, label: Input, description: "The digital input, numbered from 1." }
+    returns: none
+  reset_usage:
+    summary: Reset a usage meter (hour meter) to 0 (Control Reset Usage)
+    params:
+      meter: { type: int, min: 1, max: 16, required: true, label: Meter, description: "The usage meter: the model's inputs first, then its relays (on a Model 410, 1 to 8 are inputs 1 to 8 and 9 to 16 relays 1 to 8)." }
+    returns: none
+  refresh:
+    summary: Ask for a Monitor message (Status), which updates every input and output in state
+    returns: none
+  registry_read:
+    summary: "Read registry keys and return {key: content}; a key that does not exist reads as empty"
+    params:
+      keys: { type: string, max_length: 65536, required: true, label: Keys, description: "Registry keys separated by commas or line breaks, such as IO/Inputs/din1/Desc, $SerialNumber." }
+    returns: value
+  registry_write:
+    summary: Write a registry key (a description, a setting) and return the keys written; the unit's Registry Update follows
+    params:
+      key: { type: string, max_length: 1024, required: true, label: Key, description: "The registry key, such as IO/Outputs/rout1/Desc." }
+      value: { type: string, max_length: 65536, default: "", label: Content, description: "The key's new content, text; empty removes the key." }
+    returns: value
+  registry_write_encrypted:
+    summary: Write a credential JANOS keeps encrypted (Registry Write Encrypted), such as an email account's password
+    params:
+      key: { type: string, max_length: 1024, required: true, label: Key, description: "The registry key holding the credential, such as IpConfig/Password." }
+      value: { type: string, secret: true, max_length: 65536, required: true, label: Credential, description: "The plain text credential as JANOS expects it; use a TLS (wss) connection." }
+    returns: value
+  registry_list:
+    summary: List a registry node's keys and sub-nodes (those ending in /)
+    params:
+      node: { type: string, max_length: 1024, default: /, label: Node, description: "The registry node, such as /IO/Inputs/din1." }
+    returns: value
+  enumerate_modules:
+    summary: List the expansion modules on the sensor port by their 16-digit IDs, the last two digits giving the type (FB is a 4ROUT)
+    returns: value
+  read_modules:
+    summary: "Read expansion modules' data blocks, returned as [{Address, Hex}]"
+    params:
+      modules: { type: string, max_length: 4096, default: "", label: Modules, description: "Module IDs separated by commas; empty reads every module enumerated." }
+    returns: value
+  write_module:
+    summary: "Write a data block to an expansion module, as its type defines it (a 4ROUT takes mask, state and four pulse times), returned as [{Address, Result}]"
+    params:
+      module: { type: string, pattern: '^[0-9A-Fa-f]{16}$', required: true, label: Module, description: "The module's 16-digit ID." }
+      hex: { type: string, pattern: '^[0-9A-Fa-f]+$', max_length: 256, required: true, label: Data block, description: "The block in hex: for a 4ROUT, mask byte, state byte and four 16-bit pulse times, 01010000000000001388 pulsing relay A for 5 s." }
+    returns: value
+  read_clock:
+    summary: "Read the unit's clock, returned as {Time (ms since 1970), Date}"
+    returns: value
+  set_clock:
+    summary: Set the unit's clock (administrators only; the unit gives no response)
+    params:
+      time: { type: int, min: 0, max: 9007199254740991, required: true, label: Time, description: "Milliseconds since 1970-01-01 UTC." }
+    returns: none
+  read_syslog:
+    summary: Read the system log (jniorsys.log and its backup, up to 128 KB), returned as a list of lines, oldest first
+    returns: value
+  list_files:
+    summary: "List a folder of the unit's file system, returned as [{Name, Size, Mod}], folders ending in /"
+    params:
+      folder: { type: string, max_length: 1024, default: /, label: Folder, description: "The folder from the root, such as /flash." }
+    returns: value
+  remove_files:
+    summary: "Remove files or empty folders, returned as {Succeed, Fail}"
+    params:
+      files: { type: string, max_length: 65536, required: true, label: Files, description: "Paths from the root separated by commas or line breaks, folders without a trailing /." }
+    returns: value
+  rename_file:
+    summary: Rename a file or folder within its folder
+    params:
+      old: { type: string, max_length: 1024, required: true, label: Path, description: "The file or folder's path from the root." }
+      new: { type: string, max_length: 1024, required: true, label: New path, description: "The new path, in the same folder." }
+    returns: value
+  make_folder:
+    summary: Create a folder
+    params:
+      folder: { type: string, max_length: 1024, required: true, label: Folder, description: "The new folder's path from the root." }
+    returns: value
+  download_file:
+    summary: "Copy a file from the unit to a file on the host, read in 64 KB chunks; returns {file, bytes}"
+    params:
+      file: { type: string, max_length: 1024, required: true, label: File, description: "The file's path on the unit, such as /flash/jniorsys.log." }
+      path: { type: string, max_length: 4096, required: true, label: Host file, description: "Where to write it on the host running the core; an existing file is replaced." }
+    returns: value
+  upload_file:
+    summary: "Copy a host file to the unit, written in 64 KB chunks; returns {file, bytes}"
+    params:
+      path: { type: string, max_length: 4096, required: true, label: Host file, description: "The file on the host running the core." }
+      file: { type: string, max_length: 1024, required: true, label: File, description: "Its path on the unit, such as /flash/app.jar; an existing file is replaced." }
+    returns: value
+  console_open:
+    summary: Open a console session (the JANOS command line) on this connection; its output arrives as console message events
+    returns: value
+  console_input:
+    summary: Send characters to the console session, as typed (\r is Enter)
+    params:
+      data: { type: string, multiline: true, max_length: 65536, required: true, label: Input, description: "The characters, such as a command followed by a carriage return." }
+    returns: none
+  console_close:
+    summary: Close the console session
+    returns: value
+
+state:
+  login.administrator: { type: bool, description: "Whether the account logged in is an administrator" }
+  login.control: { type: bool, description: "Whether the account may control I/O" }
+  device.model: { type: string, description: "The model, such as 410" }
+  device.version: { type: string, description: "The JANOS version, such as v2.4" }
+  device.serial_number: { type: string, description: "The unit's serial number" }
+  device.timestamp: { type: int, unit: ms, description: "The unit's clock at the last Monitor, in milliseconds since 1970-01-01 UTC" }
+  device.description: { type: string, description: "Device/Desc: the unit's description" }
+  device.timezone: { type: string, description: "Device/Timezone" }
+  device.boot_time: { type: string, description: "$BootTime: when JANOS last started" }
+  device.last_ntp_success: { type: string, description: "$LastNtpSuccess: the last successful time synchronization" }
+  device.build_tag: { type: string, description: "$BuildTag: the JANOS build" }
+  inputs.*.state: { type: bool, description: "A digital input's state, numbered from 1: true when active (after any inversion or latching the unit applies)" }
+  inputs.*.count: { type: int, description: "Its transition counter" }
+  inputs.*.description: { type: string, description: "Its description (IO/Inputs/dinN/Desc)" }
+  inputs.*.hour_meter: { type: float, unit: h, description: "Its usage meter in hours ($HourMeter), updated every hundredth of an hour" }
+  outputs.*.state: { type: bool, description: "A relay output's state, numbered from 1 (the model's relays, then up to two 4ROUT modules'): true when closed" }
+  outputs.*.description: { type: string, description: "Its description (IO/Outputs/routN/Desc)" }
+  outputs.*.hour_meter: { type: float, unit: h, description: "Its usage meter in hours ($HourMeter)" }
+  registry.*: { type: string, description: "Every registry key read or updated, keyed by its path without a leading slash, such as IO/Inputs/din1/LatchTime" }
+  modules.*.type: { type: string, description: "An expansion module's type, keyed by its ID: the ID's last two hex digits" }
+  modules.*.type_name: { type: string, description: "The type: temperature_probe, led_dimmer, user_panel, 4rout, rtd_temperature, analog_10v, analog_4_20ma or unknown" }
+  modules.*.hex: { type: string, description: "The module's last data block read, in hex, as its type defines it" }
+  modules.*.relays.*: { type: bool, description: "A 4ROUT's relays a to d: true when closed" }
+  clock.time: { type: int, unit: ms, description: "The unit's clock when last read, in milliseconds since 1970-01-01 UTC" }
+  clock.date: { type: string, description: "The same as text" }
+  console.open: { type: bool, description: "Whether a console session is open on this connection" }
+  syslog.last: { type: string, description: "The last system log line the unit pushed" }
+  shutting_down: { type: bool, description: "True after the unit announced it is shutting down to reboot, until it is connected again" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Console output and system log lines are message events: {address: console, args: {data}} and {address: syslog,
+      args: {line}}, since output repeats. Control commands get no response from the unit: they are reported
+      unverified, and the Monitor message the unit sends on a change updates state (none comes when nothing changes,
+      such as closing a closed relay).
+  - models: [all]
+    severity: info
+    text: >
+      TCP 9220 is plain: JMP's STARTTLS, upgrading that connection, is not offered. Use transport wss for TLS through
+      the web server's WebSocket interface, whose self-signed certificate is accepted by default. The unit's JMP
+      server, its WebSocket interface and their logins can be turned off in its registry (JMPServer/Server,
+      JMPServer/Login, Websocket/Login); with the login off, the anonymous account's permissions apply.
+  - models: [all]
+    severity: warning
+    text: >
+      registry_write changes the unit's configuration at once, and some keys take effect only after a reboot; the
+      console runs any JANOS command, including ones that erase files or reboot the unit.
+  - models: [all]
+    severity: info
+    text: >
+      Opening for commands only reads no registry key, module or clock beyond the liveness check (a clock read after
+      30 s of silence); the unit still pushes Monitor on logging in and on every I/O change, which reaches state.

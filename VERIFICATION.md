@@ -1949,6 +1949,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether cue-level feedback keys a cue by its number or its ID, and the value range of the documented /mitti/<cue>/opacity. ([specs/imimot-mitti.yaml:654](specs/imimot-mitti.yaml#L654))
 - [ ] Confirm the UDP string form of the no-value commands, and that OSC control is ignored while Mitti follows MTC or LTC. ([specs/imimot-mitti.yaml:664](specs/imimot-mitti.yaml#L664))
 
+## integ-jnior — INTEG JNIOR automation controllers
+
+- [ ] Check the WebSocket transport's path: the manual describes the interface on the web server's port but not the path the WebUI connects to; / is assumed. ([specs/integ-jnior.yaml:44](specs/integ-jnior.yaml#L44))
+- [ ] Confirm every response the integration waits for (Registry, File, Console, Enumerate and Read Devices, Clock) echoes the request's Meta, as the manual says of responses in general; a response without it would time out the command. ([specs/integ-jnior.yaml:7](specs/integ-jnior.yaml#L7))
+- [ ] Check on a unit with JMPServer/Login disabled that a Monitor or Authenticated message arrives without a challenge, which the integration takes as logged in. ([specs/integ-jnior.yaml:254](specs/integ-jnior.yaml#L254))
+
 ## ioversal-vertex — ioversal VERTEX
 
 - [ ] Confirm the script server answers nothing to commands without return (a set, a Play), so nothing is taken for a later query's answer. ([specs/ioversal-vertex.yaml:307](specs/ioversal-vertex.yaml#L307))
