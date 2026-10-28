@@ -75,6 +75,7 @@ impl Config {
 }
 
 /// `/etc/resolv.conf`'s `nameserver`, `domain` and `search` lines.
+#[cfg_attr(not(unix), allow(dead_code))]
 pub(crate) fn parse_resolv_conf(text: &str) -> Config {
     let mut c = Config::default();
     for line in text.lines() {

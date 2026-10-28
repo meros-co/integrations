@@ -135,10 +135,7 @@ impl Reader {
         self.buf.extend_from_slice(data);
         let mut packets = Vec::new();
         let mut answers = Vec::new();
-        loop {
-            let Some(&first) = self.buf.first() else {
-                break;
-            };
+        while let Some(&first) = self.buf.first() {
             // The remaining length: at most four bytes.
             let mut len = 0usize;
             let mut mult = 1usize;

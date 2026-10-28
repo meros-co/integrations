@@ -242,6 +242,10 @@ struct MqttBroker {
     address: Option<SocketAddr>,
 }
 
+/// What a broker is wanted for: its topics, the Senders that report on each
+/// connection status topic, and whether any asks for authorization.
+type BrokerWanted = (BTreeSet<String>, BTreeMap<String, BTreeSet<String>>, bool);
+
 /// One scan of the Node's Senders.
 #[derive(Debug, Default)]
 struct Scan {
@@ -401,8 +405,7 @@ impl NmosEvents {
     /// Open, change and close connections to match what the Senders say.
     fn reconcile(&mut self, cx: &mut Cx, found: Vec<Found>) {
         let mut ws: BTreeMap<String, (BTreeSet<String>, bool)> = BTreeMap::new();
-        let mut mq: BTreeMap<Broker, (BTreeSet<String>, BTreeMap<String, BTreeSet<String>>, bool)> =
-            BTreeMap::new();
+        let mut mq: BTreeMap<Broker, BrokerWanted> = BTreeMap::new();
         for f in found {
             match f {
                 Found::Ws { uri, source, auth } => {
@@ -566,7 +569,7 @@ impl NmosEvents {
     fn tick(&mut self, cx: &mut Cx) {
         let now = cx.now();
         let mut any = false;
-        for i in 0..self.servers.len() {
+        for (i, key) in WS_KEYS.iter().copied().enumerate() {
             let token = self.token.clone();
             let Some(s) = self.servers[i].as_mut() else {
                 continue;
@@ -584,7 +587,7 @@ impl NmosEvents {
                         _ => Vec::new(),
                     };
                     cx.ws_open(
-                        WS_KEYS[i],
+                        key,
                         WsRequest {
                             url: s.uri.clone(),
                             headers,
@@ -597,7 +600,7 @@ impl NmosEvents {
                         Level::Info,
                         format!("IS-07 websocket {} silent; reopening", s.uri),
                     );
-                    cx.ws_close(WS_KEYS[i]);
+                    cx.ws_close(key);
                     s.link = Link::Idle;
                     s.retry_at = Some(now + s.retry);
                     s.retry = (s.retry * 2).min(MAX_RETRY);
@@ -605,13 +608,13 @@ impl NmosEvents {
                 Link::Open if now.saturating_sub(s.last_health) >= HEALTH_EVERY => {
                     let health =
                         json!({"command": "health", "timestamp": timestamp(cx.unix_millis())});
-                    cx.ws_send(WS_KEYS[i], health.to_string());
+                    cx.ws_send(key, health.to_string());
                     s.last_health = now;
                 }
                 _ => {}
             }
         }
-        for i in 0..self.brokers.len() {
+        for (i, key) in MQTT_KEYS.iter().copied().enumerate() {
             let Some(b) = self.brokers[i].as_mut() else {
                 continue;
             };
@@ -629,7 +632,7 @@ impl NmosEvents {
                             // A host name: resolved off the session's task.
                             b.link = Link::Resolving;
                             let target = format!("{}:{}", b.broker.host, b.broker.port);
-                            cx.compute(MQTT_KEYS[i], move || {
+                            cx.compute(key, move || {
                                 let addr = target
                                     .to_socket_addrs()
                                     .map_err(|e| e.to_string())?
@@ -645,7 +648,7 @@ impl NmosEvents {
                         && now.saturating_sub(b.last_sent)
                             >= Millis::from(MQTT_KEEP_ALIVE_S) * 500 =>
                 {
-                    cx.tcp_send(MQTT_KEYS[i], mqtt::pingreq());
+                    cx.tcp_send(key, mqtt::pingreq());
                     b.last_sent = now;
                 }
                 _ => {}

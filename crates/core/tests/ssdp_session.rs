@@ -121,6 +121,8 @@ async fn a_sony_camera_answers_a_search_and_is_described() {
         action: DiscoverAction::Scan,
         protocols: vec!["ssdp".into()],
         hints: vec![CAMERA],
+        dns_servers: vec![],
+        dns_domains: vec![],
     })
     .unwrap();
 
@@ -183,6 +185,8 @@ async fn a_sony_camera_answers_a_search_and_is_described() {
         action: DiscoverAction::Stop,
         protocols: vec!["ssdp".into()],
         hints: vec![],
+        dns_servers: vec![],
+        dns_domains: vec![],
     })
     .unwrap();
 }
