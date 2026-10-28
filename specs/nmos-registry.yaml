@@ -97,8 +97,8 @@ models:
       Nodes themselves are controlled with nmos-node.
 commands:
   get_nodes:
-    summary: "List the registry's nodes (GET /nodes), as many as one page holds"
-    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/nodes" }
+    summary: "List the registry's nodes (GET /nodes), every page"
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/nodes", pages: &pages { items: "$", next: { header: Link, rel: prev } } }
     expect: { status: 200, json_path: "$" }
     returns: value
     # QueryAPI.raml /nodes
@@ -114,8 +114,8 @@ commands:
     # QueryAPI.raml /nodes/{id}
 
   get_devices:
-    summary: "List the registry's devices (GET /devices), as many as one page holds"
-    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/devices" }
+    summary: "List the registry's devices (GET /devices), every page"
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/devices", pages: *pages }
     expect: { status: 200, json_path: "$" }
     returns: value
     # QueryAPI.raml /devices
@@ -131,8 +131,8 @@ commands:
     # QueryAPI.raml /devices/{id}
 
   get_sources:
-    summary: "List the registry's sources (GET /sources), as many as one page holds"
-    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/sources" }
+    summary: "List the registry's sources (GET /sources), every page"
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/sources", pages: *pages }
     expect: { status: 200, json_path: "$" }
     returns: value
     # QueryAPI.raml /sources
@@ -148,8 +148,8 @@ commands:
     # QueryAPI.raml /sources/{id}
 
   get_flows:
-    summary: "List the registry's flows (GET /flows), as many as one page holds"
-    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/flows" }
+    summary: "List the registry's flows (GET /flows), every page"
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/flows", pages: *pages }
     expect: { status: 200, json_path: "$" }
     returns: value
     # QueryAPI.raml /flows
@@ -165,8 +165,8 @@ commands:
     # QueryAPI.raml /flows/{id}
 
   get_senders:
-    summary: "List the registry's senders (GET /senders), as many as one page holds"
-    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/senders" }
+    summary: "List the registry's senders (GET /senders), every page"
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/senders", pages: *pages }
     expect: { status: 200, json_path: "$" }
     returns: value
     # QueryAPI.raml /senders
@@ -182,8 +182,8 @@ commands:
     # QueryAPI.raml /senders/{id}
 
   get_receivers:
-    summary: "List the registry's receivers (GET /receivers), as many as one page holds"
-    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/receivers" }
+    summary: "List the registry's receivers (GET /receivers), every page"
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/receivers", pages: *pages }
     expect: { status: 200, json_path: "$" }
     returns: value
     # QueryAPI.raml /receivers
@@ -521,7 +521,9 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      The get_ commands answer one page: a registry may page its answers (the
-      default page size is its own, docs/APIs - Query Parameters.md); query_resources
-      takes paging.since, paging.until and paging.limit for the rest. The
+      A registry pages its answers, newest first (the default page size is
+      its own, docs/APIs - Query Parameters.md): the list commands follow
+      each answer's Link rel="prev" to older resources until a page is
+      empty, and return every resource; query_resources answers the one
+      page its paging.since, paging.until and paging.limit name. The
       subscriptions are not paged.
