@@ -525,6 +525,7 @@ transport:
   port: 80
   scheme: http                # http | https
   auth: none                  # none | basic | digest | bearer | header | query-token | oauth2
+                              # | wsse | aws-sigv4
   timeout_ms: 4000
   probe: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&ptzstop&1&1" }
 ```
@@ -819,6 +820,204 @@ commands:
 
 `{session.id}` needs `transport.session`, and the login itself cannot
 name it; `tools/validate.py` checks both.
+
+A device that wants the session inside a header of its own making, rather
+than as a header's whole value, captures the JSON string alone, `capture: {
+json: path }` with no `header`, and names `{session.id}` where it goes: in a
+header of `transport.headers`, in a body, or in a push websocket's messages.
+Kiloview's MG300 answers its login with `{"result": "ok", "data": {"token":
+"..."}}` and takes the token back in a header `app` holding the JSON object
+`{"token": "..."}`; it says a token ended with HTTP 200 and `"msg": "2"`:
+
+```yaml
+transport:
+  type: http
+  headers:
+    app: '{"token":{session.id:json}}'
+  session:
+    login: { method: POST, path: /api/users/login, content_type: application/json,
+             body: '{"username":{settings.username:json},"password":{settings.password:json}}' }
+    capture: { json: $.data.token }
+    relogin: { json: { "$.result": "^error$", "$.msg": "^2$" } }
+    refused: { json: { "$.result": "^error$", "$.msg": "^(300|301|302)$" } }
+```
+
+A login whose answer holds more than one string to send back (a Kiloview
+NDI encoder's session ID beside its token, in `API-Session` and
+`API-Token`) names the others under the capture's `values`, each a JSON path
+of the answer by a snake_case name, and a template gives each as
+`{session.<name>}`; a name the answer does not hold has no value, so a
+header naming it is left out:
+
+```yaml
+  session:
+    capture: { json: $.data.token, values: { session: $.data.session } }
+commands:
+  get_mode:
+    send: { method: GET, path: /api/v1/mode/get,
+            headers: { API-Session: "{session.session}", API-Token: "{session.id}" } }
+```
+
+A header naming `{session.id}` is left out while no session is held: on the
+login itself, on requests marked `session: false`, and while `when_set`
+turns the session off. `tools/validate.py` checks that a capture without a
+header is named somewhere.
+
+A device that issues a fresh token with every answer to an authenticated
+request, the last one being the one to send next, says `renew: true`: any
+2xx answer to a request carrying the session (a command's, a poll's) that
+holds a session in the captured place replaces the one held, as the login's
+answer did. Pharos controllers answer each authenticated request with a new
+token, valid for five minutes from then.
+
+A push websocket (§8) whose messages carry the session (Pharos wants the
+token in each JSON message it is sent) names `{session.id}` in them. Such a
+message is sent only while the session is in use, once one is held: when the
+websocket opens with no session yet, the core logs in first and sends the
+websocket's messages once the login answers, and each later sending (its
+`every_ms`) renders the session current then. A message for the device with
+the session off is written `{ message: "...", session: false }` and is sent
+only while the session is not in use:
+
+```yaml
+telemetry:
+  websocket:
+    path: /query
+    send:
+      - '{"subscribe":"scene","token":{session.id:json}}'
+      - { message: '{"subscribe":"scene"}', session: false }
+```
+
+#### Cookies
+
+A device that tells its clients apart by a cookie it sets on some answer,
+and wants back on later requests, says `cookies: true`. An Axis camera with
+its PTZ control queue on answers a client's queue request with a cookie and
+takes PTZ commands only from the client sending it back:
+
+```yaml
+transport:
+  type: http
+  cookies: true
+```
+
+The core keeps every cookie the device's own server sets (`Set-Cookie` on
+any answer, the login's included), by name, and sends them all on each later
+request to it as `Cookie: name=value; ...`, after a session cookie when
+there is one. A cookie set again replaces the one kept; one set empty, with
+`Max-Age` zero or below, or with an `Expires` date past, is removed. Paths
+and domains are not told apart: every request goes to the one device. The
+cookies are kept while the device is open, are never logged, offered to the
+rules or kept in state, and go nowhere else (an endpoint, §2, Endpoints,
+gets them only with `auth: inherit`).
+
+#### Computed request credentials
+
+A device that wants each request to carry a key worked out from the request,
+the time and a secret names those values in `transport.sign`: an ordered
+list of named values, each one expression of a closed set, and the headers
+and query parameters they are sent in. AWS Elemental Live, with user
+authentication on, takes `X-Auth-User`, `X-Auth-Expires` (a Unix time about
+30 seconds ahead) and `X-Auth-Key`, the MD5 of the API key and the MD5 of the
+request's path, the user, the key and the expiry:
+
+```yaml
+transport:
+  type: http
+  sign:
+    when_set: api_key
+    values:
+      expires: { unix_time: 30 }
+      url: { text: "{request.path}", remove: "^/api(?:/v[0-9][^/]*)?" }
+      inner: { md5: "{url}{settings.username}{settings.api_key}{expires}" }
+      key: { md5: "{settings.api_key}{inner}" }
+    headers:
+      X-Auth-User: "{settings.username}"
+      X-Auth-Expires: "{expires}"
+      X-Auth-Key: "{key}"
+```
+
+| Expression | Value |
+|---|---|
+| `unix_time: <s>` | The Unix time in whole seconds, plus `s` (which may be 0 or negative) |
+| `random: { min, max }` | A whole number drawn from the system's secure generator, `min` (default 0) to `max` |
+| `text: <template>` | The template rendered; with `remove`, a regex, its first match taken out |
+| `md5`, `sha1`, `sha256: <template>` | The digest of the template rendered, in `encoding` `hex` (lowercase, the default) or `base64` of its bytes |
+| `hmac_sha256: <template>`, `key: <template>` | HMAC-SHA-256 of the template, keyed by `key`'s text, in `encoding` |
+
+Templates are those of §4, over the settings, the values named before
+(`{inner}`), and the request: `{request.method}`, `{request.path}` (the path
+as sent, percent-encoded, without the query), `{request.query}` (the query as
+sent, without `?`) and `{request.body}` (the body's text, empty for none).
+Nimble Streamer, with a management token set, takes a random salt and the
+Base64 of the raw MD5 of salt, `/` and token in the query:
+
+```yaml
+  sign:
+    when_set: management_token
+    values:
+      salt: { random: { max: 1000000 } }
+      hash: { md5: "{salt}/{settings.management_token}", encoding: base64 }
+    query: { salt: "{salt}", hash: "{hash}" }
+```
+
+The values are worked out as each request goes, so a request sent again
+(after a fresh login, a timeout) has new ones; with `when_set`, only while
+that setting is set. `headers` are added to the request (`Authorization`,
+`Content-Type` and `Host` are the core's), and `query` pairs are appended to
+its query, each value percent-encoded, after the pairs the message gives.
+They go on every request to the device's own server (commands, polls, the
+probe and a session's login) and to an endpoint with `auth: inherit`, never
+elsewhere, and are never logged. `tools/validate.py` checks the expressions
+and that each template names only what comes before it.
+
+#### AWS Signature Version 4 (`auth: aws-sigv4`)
+
+An AWS service API (AWS Elemental MediaLive) signs every request with AWS
+Signature Version 4. `auth: aws-sigv4` names the service's signing name and
+its region in `transport.aws`, and takes the credential from three settings:
+`access_key_id`, `secret_access_key` (secret) and `session_token` (secret, and
+optional: only temporary credentials have one).
+
+```yaml
+transport:
+  type: http
+  port: 443
+  scheme: https
+  auth: aws-sigv4
+  aws: { service: medialive, region: { setting: region } }
+```
+
+The device is opened by the service's host name for the region
+(`medialive.us-west-2.amazonaws.com`). Each request, as it goes, gets `Host`,
+`X-Amz-Date` (the time now, UTC), `X-Amz-Security-Token` when there is a
+session token, and
+`Authorization: AWS4-HMAC-SHA256 Credential=..., SignedHeaders=..., Signature=...`,
+signed over the method, the path (each
+segment encoded once more, as every service but S3 wants), the query sorted,
+the `host`, `content-type` and `x-amz-*` headers, and the SHA-256 of the
+body (a body streamed from a host file is sent `UNSIGNED-PAYLOAD`). A
+request sent again is signed again. The secret never leaves the core: only
+the signature is sent, and nothing of the credential is logged. AWS answers a
+credential it does not accept with HTTP 403 and other errors (a permission
+the key lacks) with 403 too, so such a spec narrows the refusal with
+`refusal_status_body` (above).
+
+#### WS-Security UsernameToken (`auth: wsse`)
+
+A SOAP device that authenticates the message rather than the HTTP request
+(ONVIF's legacy devices) takes `auth: wsse`: each request whose body is a
+SOAP envelope gets a WS-Security header (OASIS Web Services Security
+UsernameToken Profile 1.0) with the `username` setting, a fresh 16-byte
+nonce, the time (`wsu:Created`, UTC) and the password digest,
+Base64(SHA-1(nonce + created + password)); the password itself is never
+sent. The `wsse:Security` element goes first inside the envelope's `Header`,
+or in a new `Header` before its `Body`, under the envelope's own namespace
+prefix, with `mustUnderstand="1"`. A body that is not a SOAP envelope, or an
+empty user name, goes as it is. The device checks `Created` against its own
+clock, so a host and device whose clocks differ by more than the device
+allows (often five seconds) are refused: keep both on NTP. A refusal is a
+SOAP fault with HTTP 400 or 401 (§2: a 401 is terminal).
 
 The session is a secret: the login's answer is never offered to the
 telemetry rules, and the session is never logged or kept in state.
@@ -2518,6 +2717,36 @@ and never logged, since it may hold a token. The transport's credential and
 or 403 answer to its opening is a refusal of that token: refreshed once if it
 can be, as on the transport, and otherwise the terminal refusal of §2.
 
+A device that opens its websocket only to a client holding a short-lived
+token, asked for over its HTTP API just before (CamStreamer's apps: a token
+from `ws_authorization.cgi`, valid 30 seconds, sent as the first message),
+names that request under `token`, with the JSON path of the token in its
+answer:
+
+```yaml
+telemetry:
+  websocket:
+    path: /local/camstreamer/events
+    subprotocol: events
+    token: { request: { method: GET, path: /local/camstreamer/api/ws_authorization.cgi }, json: $.data }
+    send: ['{"authorization":{push.token:json}}']
+```
+
+Before each opening (and reopening) the core sends the request over the
+transport, with its credential, scheme and headers as any request; the
+answer's string at `json` is `{push.token}` in the `send` messages, and the
+websocket opens. The answer is never offered to the rules, logged or kept in
+state. A request the device refuses with one of `refusal_status` is the
+terminal refusal of §2; an answer without the token, or none, is tried again
+with the websocket's backoff. `token` needs an http transport, and
+`{push.token}` is named only in its websocket's messages.
+
+A family whose models push on different websockets (CamStreamer's apps, one
+model each) gives `telemetry.websocket` as a list, each block naming its
+`models`; the first block for the device's model (one naming no models is
+for every model) is its websocket, and a model no block is for has none. The rules stay shared; a rule naming `models`
+(below, "Rules per model") reads one app's messages only.
+
 `idle_ms` reopens the websocket when nothing at all has arrived on it for
 that long, for a service that sends keepalives, where silence means a dead
 connection.
@@ -2619,6 +2848,55 @@ own `listen_port` and takes no `telemetry.osc`; `tools/validate.py` checks
 that, and that `ports` has a `udp` `feedback` entry listened on by the core
 for it. A telemetry vector gives the datagram as `inbound_hex`, as for an OSC
 transport.
+
+#### A ZeroMQ bus beside the transport
+
+A device that publishes its changes on a ZeroMQ bus (Pixotope's Data Hub,
+beside the HTTP Gateway that takes its commands) names the bus under
+`telemetry.zeromq`. The core opens a SUB socket to the device's host on
+`subscribe.port` and subscribes to each of `topics`, prefixes of a message's
+first frame; with `publish`, it also opens a PUB socket on `publish.port`
+and publishes `send` each time that socket connects, and again every
+`every_ms` when given (requests the device answers on the bus, such as a
+read of its whole state):
+
+```yaml
+telemetry:
+  zeromq:
+    subscribe:
+      port: 16201                    # or {setting: name}
+      topics: ['{"Type":"Update","Target":"BROADCAST"']
+    publish:                         # optional
+      port: 16202
+      send:                          # each message a list of frames
+        - ['{"Type":"Get","Target":"Store","RespondTo":"{settings.client_name}","Name":"State"}', '{}']
+  updates:
+    - json_match: { "$.frames[0].Type": "^Update$", "$.frames[0].Source": "^(.+)$" }
+      json: { value: "$.frames[1].Value" }
+      state: { "services.{1:key}.value": "{value}" }
+```
+
+Each message received goes to the `json_match` rules as `{"frames": [...]}`,
+every frame its JSON where it parses as JSON, its text where it is UTF-8,
+and otherwise `{"base64": "..."}`. Topics and frames are templates over
+settings, rendered when they are sent.
+
+Both sockets speak ZMTP 3.0 (RFC 23) with the NULL mechanism: no
+encryption or credential, as ZeroMQ buses on a production network usually
+run; a peer asking for another mechanism, or of a socket type that does not
+pair (SUB with PUB or XPUB, PUB with SUB or XSUB), is logged and closed. A
+subscription is sent as ZMTP 3.0's subscription message, which ZMTP 3.1
+peers take too, and a heartbeat PING is answered. Like the push websocket
+the bus carries no commands and does not decide whether the device is
+connected; each message received reports it alive. It is opened only while
+the device is monitored (never for commands only), reopened after 1 s
+doubling to 30 s when it closes or fails, and opened again at once when
+`update_settings` changes its ports, topics or messages. Nothing bounds a
+message's size. The ports list a `tcp` `push` entry for each socket (with
+the `setting` of a port that comes from one); `tools/validate.py` checks
+it. A telemetry vector gives `inbound_zmq`, the message's frames as text,
+and optionally `expect_connect_zmq`, the messages published on connecting,
+each a list of frames.
 
 #### A status dump that ends in silence
 

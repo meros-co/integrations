@@ -812,3 +812,10 @@ _kp3_rb("panel", "/api/codec/panel/settings", ["/api/codec/panel/settings"])
 # A read is not a write: the status read (no body) asks for nothing more.
 _kp3_tel("no-readback-on-read", "/api/record/v1/get_recording_status", {"result": "ok", "data": {"status": False}},
          {"recording": {"active": False}}, expect_then_send=[])
+
+# With API authentication on: the session logs in first (the engine's
+# session tests cover the token in the Authorization header).
+V.append({"spec": "kiloview-p3", "command": "get_hostname", "input": {}, "file": "get_hostname-login",
+          "settings": {"password": "admin"},
+          "expect_request": {"method": "POST", "target": "/api/systemctrl/user/login",
+                             "body": '{"username":"admin","password":"admin"}', "content_type": "application/json"}})

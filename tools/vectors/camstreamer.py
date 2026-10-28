@@ -189,3 +189,39 @@ telemetry(CMS, "ndi", model="ndi-hx",
           inbound_http={"path": "/local/ndihxplugin/settings.cgi?action=get", "body": json.dumps(_NDI)},
           expect_state={"ndi": {"name": "P1375", "groups": "", "channel": 2, "width": 1920, "height": 1080, "fps": 50.0, "gop": 101,
                                 "audio_enabled": False}})
+
+# The apps' websockets of events (CamStreamer ACAP API: the WebSocket API of
+# CamStreamer 6.x and 4.x, CamOverlay and CamSwitcher), from the document's
+# examples: each event as it happens, or inside an init message.
+telemetry(CMS, "ws-stream-state", model="app-6", inbound_ws=json.dumps(
+    {"type": "init", "data": {"type": "StreamState", "streamID": "117930", "enabled": 0, "active": 1,
+                              "automationState": 1, "isStreaming": 0}}),
+    expect_state={"streams": {"117930": {"enabled": False, "active": True}},
+                  "stream_status": {"117930": {"automation_state": 1, "streaming": False}}})
+telemetry(CMS, "ws-stream-state-event", model="app-4", inbound_ws=json.dumps(
+    {"type": "StreamState", "streamID": "2", "enabled": 1, "active": 1, "automationState": 0, "isStreaming": 1}),
+    expect_state={"streams": {"2": {"enabled": True, "active": True}},
+                  "stream_status": {"2": {"automation_state": 0, "streaming": True}}})
+telemetry(CMS, "ws-port-changed", model="app-6", inbound_ws=json.dumps(
+    {"type": "init", "data": {"type": "PortChanged", "port": 0, "value": 0}}),
+    expect_state={"status_ports": {"0": {"value": 0}}})
+telemetry(CMS, "ws-service-start", model="camoverlay", inbound_ws='{"type":"ServiceStart","serviceId":2}',
+          expect_state={"service_status": {"2": {"running": True}}})
+telemetry(CMS, "ws-service-stop", model="camoverlay", inbound_ws='{"type":"ServiceStop","serviceId":2}',
+          state_before={"service_status": {"2": {"running": True}}},
+          expect_state={"service_status": {"2": {"running": False}}})
+telemetry(CMS, "ws-switcher-start", model="camswitcher", inbound_ws=json.dumps(
+    {"type": "init", "data": {"type": "SwitcherStart", "default_playlist_id": "c26b737ea-1178-4f9e-851c-479cbdd6e97d"}}),
+    expect_state={"switcher": {"started": True, "default_playlist": "c26b737ea-1178-4f9e-851c-479cbdd6e97d"}})
+telemetry(CMS, "ws-switch-video", model="camswitcher", inbound_ws=json.dumps(
+    {"type": "init", "data": {"playlist_active_stream": 0, "stream_name": "c4f673956-99c5-4a92-8854-c369d1f7da27",
+                              "playlist_name": "c4f673956-99c5-4a92-8854-c369d1f7da27", "type": "StreamSwitchVideo"}}),
+    expect_state={"switcher": {"video": {"playlist": "c4f673956-99c5-4a92-8854-c369d1f7da27",
+                                         "stream": "c4f673956-99c5-4a92-8854-c369d1f7da27", "index": 0}}})
+telemetry(CMS, "ws-switch-audio", model="camswitcher", inbound_ws=json.dumps(
+    {"playlist_active_stream": 1, "stream_name": "cam2", "playlist_name": "show", "type": "StreamSwitchAudio"}),
+    expect_state={"switcher": {"audio": {"playlist": "show", "stream": "cam2", "index": 1}}})
+telemetry(CMS, "ws-stream-available", model="camswitcher", inbound_ws=json.dumps(
+    {"type": "init", "data": {"type": "StreamAvailable", "stream_name": "c4f673956-99c5-4a92-8854-c369d1f7da27",
+                              "state": True}}),
+    expect_state={"switcher_streams": {"c4f673956-99c5-4a92-8854-c369d1f7da27": {"available": True}}})

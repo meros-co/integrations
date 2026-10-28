@@ -44,10 +44,18 @@ transport:
   accept_invalid_certs: true
   timeout_ms: 5000
   # 2.1: every request carries the header app, a JSON object with the
-  # user name and the token the login returns.
+  # user name and the token the login returns. The session logs in with the
+  # username and password settings, and again once when a request is
+  # answered with an error (the document names no code for a token refused).
   headers:
-    app: '{"username":{settings.username:json},"token":{settings.token:json}}'
+    app: '{"username":{settings.username:json},"token":{session.id:json}}'
   probe: { method: GET, path: /api/v2/config/general.json }
+  session:
+    when_set: password
+    login: { method: POST, path: /api/v2/users/login.json, content_type: application/json,
+             body: '{"username":{settings.username:json},"password":{settings.password:json}}' }
+    capture: { json: $.data.token }
+    relogin: { json: { "$.result": "^error$" } }
 
 settings:
   username:
@@ -55,14 +63,14 @@ settings:
     max_length: 64
     default: admin
     label: User name
-    description: "The user the token belongs to, sent with it in the app header; the default user is admin."
-  token:
+    description: "The user the core logs in as, sent with its token in the app header; the default user is admin."
+  password:
     type: string
     secret: true
-    max_length: 256
+    max_length: 128
     default: ""
-    label: Login token
-    description: "The token the login command returns, sent in the app header with every request; run login and store it here with update_settings."
+    label: Password
+    description: "That user's password; while it is empty nothing logs in, and the program answers every request but the probe with an error."
   scheme:
     type: enum
     values: [http, https]
@@ -171,11 +179,11 @@ models:
 commands:
   # ── 3 Login ──────────────────────────────────────────────────────────
   login:
-    summary: Log in and return the token for the token setting (POST /api/v2/users/login.json); the token is data.token
+    summary: Log in as a user and return its token, beside the session the core keeps (POST /api/v2/users/login.json); the token is data.token
     params:
       username: { type: string, required: true, max_length: 64, label: User name, description: "The user to log in as; admin by default." }
       password: { type: string, required: true, secret: true, max_length: 128, label: Password, description: "That user's password." }
-    send: { method: POST, path: /api/v2/users/login.json, content_type: application/json, body: '{"username":{username:json},"password":{password:json}}' }
+    send: { method: POST, path: /api/v2/users/login.json, content_type: application/json, session: false, body: '{"username":{username:json},"password":{password:json}}' }
     expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.token" }
     returns: value
 
@@ -911,12 +919,16 @@ quirks:
     severity: warning
     text: >
       Authentication: every request carries the header app, a JSON object
-      with the user name and the token (2.1). The login answers its token
-      in the JSON body (data.token) and the app header carries it inside a
-      JSON object, so the token is a setting: run login and store it with
-      update_settings. A request with a missing or wrong token is answered
-      with {"result": "error"}, which fails the command; the document does
-      not say whether the token expires.
+      with the user name and the token (2.1). The core logs in with the
+      username and password settings (POST /api/v2/users/login.json), keeps
+      the token the answer holds (data.token) and sends it in the app header
+      from then on. A request with a missing or wrong token is answered with
+      {"result": "error"} and no code the document names, so the core logs in
+      again on any error answer and sends that request once more: a request
+      the program refuses for another reason is sent twice, and its second
+      error is the command's. The document does not say whether the token
+      expires, or how a wrong password is answered (a login answer without a
+      token fails what waits for it, and the next request logs in again).
   - models: [all]
     severity: warning
     text: >

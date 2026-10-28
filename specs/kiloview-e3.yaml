@@ -84,13 +84,10 @@ source:
       and its login example shows the token as a JSON Web Token.
 
 settings:
-  token:
-    type: string
-    secret: true
-    default: ""
-    max_length: 1024
-    label: API token
-    description: "The token the login command returns, sent as the Authorization header on every request; needed only once API authentication is turned on, and empty sends none."
+  username: { type: string, default: admin, max_length: 64, label: User name,
+              description: "The user the core logs in as once API authentication is on; admin by default." }
+  password: { type: string, secret: true, default: "", max_length: 128, label: Password,
+              description: "That user's password; leave it empty while API authentication is off, and nothing logs in." }
   scheme:
     type: enum
     values: [http, https]
@@ -109,11 +106,18 @@ transport:
   scheme: { setting: scheme }
   # The default certificate is the device's own (reset_ssl restores it).
   accept_invalid_certs: true
-  # Version 1.21 API authentication: the login token in Authorization, as is.
-  auth: header
-  auth_header: Authorization
   timeout_ms: 5000
   probe: { method: GET, path: /api/systemctrl/system/getHostname }
+  # Version 1.21 API authentication: the session logs in with the username
+  # and password settings and sends the login's token in Authorization, as
+  # it is, logging in again when a request is answered 401.
+  session:
+    when_set: password
+    login: { method: POST, path: /api/systemctrl/users/login, content_type: application/json,
+             headers: { App: '{"language":"en"}' },
+             body: '{"username":{settings.username:json},"password":{settings.password:json}}' }
+    capture: { json: $.data.token, header: Authorization }
+    relogin: { status: [401] }
 
 maps:
   ptz_on: { "true": "1", "false": "0" }
@@ -180,13 +184,13 @@ models:
 commands:
   # ── Users and API authentication (1.1) ─────────────────────────────────
   login:
-    summary: "Log in and return the token for the token setting (POST /api/systemctrl/users/login); the token is data.token"
+    summary: "Log in as a user and return its token, beside the session the core keeps (POST /api/systemctrl/users/login); the token is data.token"
     params:
       username: { type: string, required: true, max_length: 64, label: User name,
                   description: "A user allowed to use the API; admin by default." }
       password: { type: string, required: true, secret: true, max_length: 128, label: Password,
                   description: "That user's password; admin by default (the manual), changed on first web login." }
-    send: { method: POST, path: /api/systemctrl/users/login, content_type: application/json,
+    send: { method: POST, path: /api/systemctrl/users/login, content_type: application/json, session: false,
             headers: { App: '{"language":"en"}' },
             body: '{"username":{username:json},"password":{password:json}}' }
     expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.token" }
@@ -3269,14 +3273,14 @@ quirks:
     text: >
       API authentication (firmware 1.21 and later) is off by default.
       Once on, every request must carry a login token in the Authorization
-      header, as it is (no "Bearer"), or the device answers Unauthorized,
-      which stops this device until its settings change. Run login with a
-      user's name and password, put the returned token in the token
-      setting with update_settings, then turn authentication on with
-      set_api_auth. The document gives no token lifetime and no refresh;
-      the sibling P3's example token is a JSON Web Token with an expiry.
-      When a token stops being accepted, clear the token setting, log in
-      again and set the new one. The document's session check
+      header, as it is (no "Bearer"), or the device answers Unauthorized.
+      With the password setting set, the core logs in with the username and
+      password settings, keeps the token the answer holds (data.token) and
+      sends it on every later request; a request answered 401 has it log
+      in again and send the request once more. Set the password before
+      turning authentication on with set_api_auth. The document gives no
+      token lifetime and no refresh; the sibling P3's example token is a
+      JSON Web Token with an expiry. The document's session check
       (/users/session, with a cookie the web page assembles from the
       login) is the web interface's and is not used here.
   - models: [all]

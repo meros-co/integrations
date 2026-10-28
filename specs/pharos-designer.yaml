@@ -43,18 +43,19 @@ transport:
   accept_invalid_certs: true
   timeout_ms: 5000
   probe: { method: GET, path: /api/system, session: false }
-  # With security enabled, a login answers with a token cookie that later
-  # requests carry; without it, nothing logs in.
+  # With security enabled, the login (token authentication, without
+  # original_url) answers {"token": ...}, sent as Authorization: Bearer; each
+  # authenticated answer's JSON holds a new token, valid 5 minutes, which
+  # replaces it. Without security, nothing logs in.
   session:
     when_set: username
     login:
       method: POST
       path: /authenticate
-      query: { original_url: / }
       body: '{"username":{settings.username:json},"password":{settings.password:json}}'
       content_type: application/json
-    capture: { cookie: token }
-    login_status: [200, 302, 303]
+    capture: { json: $.token, header: Authorization, scheme: Bearer }
+    renew: true
     relogin: { status: [401] }
 
 settings:
@@ -894,25 +895,25 @@ telemetry:
   websocket:
     path: /query
     scheme: { setting: scheme }
-    # With security enabled each message carries the session's bearer token
-    # (WebSocket API, Authentication), and the keep-alive refreshes it.
+    # With security enabled each message carries the token (the WebSocket
+    # API's authentication); without it, none.
     send:
-      - { unless_set: username, message: '{"subscribe":"scene"}' }
-      - { when_set: username, message: '{"subscribe":"scene","token":{session.id:json}}' }
-      - { unless_set: username, message: '{"subscribe":"timeline"}' }
-      - { when_set: username, message: '{"subscribe":"timeline","token":{session.id:json}}' }
-      - { unless_set: username, message: '{"subscribe":"group"}' }
-      - { when_set: username, message: '{"subscribe":"group","token":{session.id:json}}' }
-      - { unless_set: username, message: '{"subscribe":"beacon"}' }
-      - { when_set: username, message: '{"subscribe":"beacon","token":{session.id:json}}' }
-      - { unless_set: username, message: '{"subscribe":"remote_device"}' }
-      - { when_set: username, message: '{"subscribe":"remote_device","token":{session.id:json}}' }
-      - { unless_set: username, message: '{"subscribe":"lua"}' }
-      - { when_set: username, message: '{"subscribe":"lua","token":{session.id:json}}' }
-      - { unless_set: username, message: '{"subscribe":"content_target"}' }
-      - { when_set: username, message: '{"subscribe":"content_target","token":{session.id:json}}' }
-      - { unless_set: username, message: '{}' }
-      - { when_set: username, message: '{"token":{session.id:json}}' }
+      - '{"subscribe":"scene","token":{session.id:json}}'
+      - '{"subscribe":"timeline","token":{session.id:json}}'
+      - '{"subscribe":"group","token":{session.id:json}}'
+      - '{"subscribe":"beacon","token":{session.id:json}}'
+      - '{"subscribe":"remote_device","token":{session.id:json}}'
+      - '{"subscribe":"lua","token":{session.id:json}}'
+      - '{"subscribe":"content_target","token":{session.id:json}}'
+      - '{"token":{session.id:json}}'
+      - { message: '{"subscribe":"scene"}', session: false }
+      - { message: '{"subscribe":"timeline"}', session: false }
+      - { message: '{"subscribe":"group"}', session: false }
+      - { message: '{"subscribe":"beacon"}', session: false }
+      - { message: '{"subscribe":"remote_device"}', session: false }
+      - { message: '{"subscribe":"lua"}', session: false }
+      - { message: '{"subscribe":"content_target"}', session: false }
+      - { message: '{}', session: false }
     every_ms: 10000
   poll:
     - every_ms: 2000
@@ -1148,14 +1149,19 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      With security enabled the session logs in with POST /authenticate?original_url=/ and keeps
-      the token cookie the answer sets; a token lasts 5 minutes from the request that issued it,
-      and the session logs in again when a request is refused with 401. That the cookie comes
-      with a redirect (or a 200) and that an expired token is answered 401 are inferred. Wrong
-      credentials are answered with a redirect to the referring page, which the session reads as
-      a login without a session, not as a refusal. With security enabled each WebSocket
-      message carries the session's token as its token attribute (a message waits for the next
-      round, every 10 s, until the session is held), and the keep-alive refreshes it.
+      With security enabled the session logs in with POST /authenticate (token authentication:
+      no original_url) and sends the token the answer holds as Authorization: Bearer. A token
+      lasts 5 minutes from the request that issued it, and each authenticated answer's JSON holds
+      a new one, which the session takes in its place; it logs in again when a request is refused
+      with 401. That the token comes as {"token": ...} in a 2xx answer, that later answers carry
+      it as a top-level token attribute, and that an expired token is answered 401 are inferred.
+      Wrong credentials are answered with a redirect to the referring page, which the session
+      reads as a login without a session, not as a refusal. The WebSocket messages carry the
+      token as their token attribute: the subscriptions and the keep-alive are sent once the
+      session holds one, each with the token current then, so the keep-alive renews the
+      WebSocket's session too. The controller answers a keep-alive whose session timed out with
+      an all-zero binary object, which the core does not read: the next keep-alive, 10 s later,
+      carries the token the polls renewed.
   - models: [all]
     severity: warning
     text: >

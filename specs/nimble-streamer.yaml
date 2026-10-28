@@ -57,6 +57,19 @@ transport:
   auth: none
   timeout_ms: 5000
   probe: { method: GET, path: /manage/server_status }
+  # With management_token set in nimble.conf, each request carries a random
+  # salt and the Base64 of the raw MD5 of salt, "/" and the token.
+  sign:
+    when_set: management_token
+    values:
+      salt: { random: { max: 1000000 } }
+      hash: { md5: "{salt}/{settings.management_token}", encoding: base64 }
+    query: { salt: "{salt}", hash: "{hash}" }
+
+settings:
+  management_token: { type: string, secret: true, default: "", max_length: 256,
+                      label: Management token,
+                      description: "nimble.conf's management_token; leave it empty for a server without one, and no salt or hash is sent." }
 
 ports:
   - { port: 8082, protocol: http, role: control, note: "nimble.conf management_port; the API answers only on management_listen_interfaces" }
@@ -67,8 +80,9 @@ models:
     supports: [get_server_status, sync_panel_settings, reload_config, reload_config_with_drm, reload_ssl_certificates, get_live_streams_status, list_sessions, delete_sessions, get_rtmp_settings, get_rtmp_republish_stats, list_rtmp_republish_rules, get_rtmp_republish_rule, create_rtmp_republish_rule, create_rtmp_republish_rule_custom, delete_rtmp_republish_rule, get_mpegts_status, get_mpegts_settings, get_srt_sender_stats, get_srt_receiver_stats, get_rist_sender_stats, get_rist_receiver_stats, list_ndi_streams, get_dvr_status, get_dvr_timeline, get_stream_dvr_status, get_stream_dvr_timeline, export_dvr_subtitles, export_dvr_subtitles_language, reload_dvr_archive, cleanup_dvr_archive, cleanup_dvr_archive_keep, cleanup_dvr_archive_span, insert_scte35_out, insert_scte35_out_for, insert_scte35_out_program, insert_scte35_in, insert_scte35_in_program, insert_scte35_time_signal, insert_scte35_time_signal_for, get_icecast_stream_info, insert_icecast_metadata, get_server_playlist_status, get_publish_control_status, deny_publishers, get_cache_key, delete_cache_item, list_sdi_sources, list_sdi_sinks, list_aja_devices]
     verification: none
     notes: >
-      A server with management_token set cannot be reached (see quirks);
-      the Advertizer SCTE-35 calls need an Addenda license.
+      A server with management_token set is reached with the
+      management_token setting; the Advertizer SCTE-35 calls need an
+      Addenda license.
 
 commands:
   get_server_status:
@@ -463,12 +477,17 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      A server with management_token set wants each request to carry a salt
-      and the base64 of the raw MD5 of salt/token, which the spec format
-      cannot compute (its md5 directive gives hexadecimal of one value), so
-      such a server answers every request with a refusal; keep the API on
-      a trusted interface without a token (management_listen_interfaces),
-      as Softvelum's default leaves it.
+      A server with management_token set wants each request to carry salt, a
+      random number (the reference's example draws 0 to 1,000,000), and
+      hash, the Base64 of the raw MD5 of salt, "/" and the token, as query
+      parameters. With the management_token setting set the core adds both
+      to every request, a new salt each time, after the query the request
+      has; the hash's Base64 characters + / = are percent-encoded, while the
+      reference's example puts them in the URL as they are, so that the
+      server decodes them is inferred. The reference shows them on GET
+      requests only; they go on POST and DELETE requests too, also inferred.
+      With the setting empty nothing is added, as a server without a token
+      expects.
 
   - models: [all]
     severity: info

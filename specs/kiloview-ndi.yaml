@@ -76,20 +76,19 @@ settings:
     default: http
     label: Scheme
     description: "http on port 80, or https on port 443, which Kiloview recommends so the password and token do not travel in clear; the certificate is not checked."
-  api_session:
+  username:
+    type: string
+    default: admin
+    max_length: 64
+    label: User name
+    description: "A user allowed to use the HTTP API, which the core signs in as; Kiloview advises a user of its own rather than admin."
+  password:
     type: string
     secret: true
     default: ""
-    max_length: 128
-    label: API session ID
-    description: "N3, N4, N30, N40: the session ID the authorize command returns (data.session), sent as the API-Session header; empty sends none."
-  api_token:
-    type: string
-    secret: true
-    default: ""
-    max_length: 128
-    label: API token
-    description: "The token the authorize command returns (data.token), sent as the API-Token header (N3, N4, N30, N40) or the token cookie (N5, N6); empty sends no API-Token header and an empty token cookie, for a device whose API authorization is turned off."
+    max_length: 64
+    label: Password
+    description: "That user's password; while it is empty nothing signs in and requests carry no token, for a device whose API authorization is turned off."
 
 ports:
   - { port: 80, protocol: http, role: control, when: "scheme http" }
@@ -100,6 +99,18 @@ ports:
 # with methods of their own. Each message names the models it is for. Every
 # reply is HTTP 200 with a JSON result: ok, error or auth-failed.
 transport:
+  # The session signs in with the username and password settings and sends
+  # the token (and on Version 1.0 the session ID) in the headers each message
+  # names; a request answered auth-failed signs in again.
+  session:
+    when_set: password
+    login:
+      - { models: [n3, n4, n30, n40, n40-plus], method: POST, path: /api/v1/user/authorize, content_type: application/json,
+          body: '{"username":{settings.username:json},"password":{settings.password:json}}' }
+      - { models: [n5, n6], method: POST, path: /api/user/authorize.json, content_type: application/x-www-form-urlencoded,
+          body: "user={settings.username:url}&password={settings.password:url}" }
+    capture: { json: $.data.token, values: { session: $.data.session } }
+    relogin: { json: { "$.result": "^auth-failed$" } }
   type: http
   port: 80
   https_port: 443
@@ -110,9 +121,9 @@ transport:
   timeout_ms: 8000
   probe:
     - { models: &v1 [n3, n4, n30, n40, n40-plus], method: GET, path: /api/v1/mode/get,
-        headers: &h1 { API-Session: "{settings.api_session}", API-Token: "{settings.api_token}" } }
+        headers: &h1 { API-Session: "{session.session}", API-Token: "{session.id}" } }
     - { models: &v3 [n5, n6], method: GET, path: /api/mode/get.json,
-        headers: &h3 { Cookie: "token={settings.api_token}" } }
+        headers: &h3 { Cookie: "token={session.id}" } }
 
 models:
   - id: n3
@@ -185,16 +196,16 @@ maps:
 
 commands:
   authorize:
-    summary: "Sign in and return the session ID and token to put in the api_session and api_token settings (user/authorize; data.session and data.token on N3/N4/N30/N40, data.token and data.alias on N5/N6)"
+    summary: "Sign in as a user and return its session ID and token, beside the session the core keeps (user/authorize; data.session and data.token on N3/N4/N30/N40, data.token and data.alias on N5/N6)"
     params:
       username: { type: string, required: true, max_length: 64, label: User name,
         description: "A user allowed to use the HTTP API; Kiloview advises a user of its own rather than admin." }
       password: { type: string, required: true, secret: true, max_length: 64, label: Password,
         description: "That user's password." }
     send:
-      - { models: *v1, method: POST, path: /api/v1/user/authorize, content_type: application/json,
+      - { models: *v1, method: POST, path: /api/v1/user/authorize, content_type: application/json, session: false,
           body: '{"username":{username:json},"password":{password:json}}' }
-      - { models: *v3, method: POST, path: /api/user/authorize.json, content_type: application/x-www-form-urlencoded,
+      - { models: *v3, method: POST, path: /api/user/authorize.json, content_type: application/x-www-form-urlencoded, session: false,
           body: "user={username:url}&password={password:url}" }
     expect: &data { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
     returns: value
@@ -982,22 +993,19 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      Signing in is a command, not a session the core keeps. authorize posts
-      the user name and password and answers with a token (and, on N3, N4,
-      N30 and N40, a session ID) in its JSON body; the consumer puts them in
-      the api_token and api_session settings with update_settings. The
-      Version 1.0 models take them in the API-Session and API-Token headers,
-      N5 and N6 in the token cookie. On the Version 1.0 models they expire
-      after 10 minutes without a request (polling keeps them alive while the
-      device is monitored) and survive a mode switch; on every model a
+      The core signs in with the username and password settings
+      (user/authorize), keeps the token in the answer (and, on N3, N4, N30
+      and N40, the session ID), and sends them on every later request: the
+      Version 1.0 models in the API-Session and API-Token headers, N5 and N6
+      in the token cookie. On the Version 1.0 models they expire after 10
+      minutes without a request and survive a mode switch; on every model a
       restart or factory reset ends them. The version 3.0 document gives no
       lifetime. A missing, wrong or expired token is answered with HTTP 200
-      and result auth-failed, which the core reports as a failed command,
-      not as unauthorized: sign in again and update the settings. N5 and N6
-      can have API authorization turned off in their web interface; leave
-      api_token empty then (an empty token cookie is still sent: a message
-      header is sent whenever its setting has a value, and the empty
-      default is one).
+      and result auth-failed: the core signs in again and sends that
+      request once more. A wrong password is answered with result error and
+      no token, which fails what waits for the sign-in. N5 and N6 can have
+      API authorization turned off in their web interface; leave the
+      password empty then, and no token cookie is sent.
   - models: [all]
     severity: info
     text: >

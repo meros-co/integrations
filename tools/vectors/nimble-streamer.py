@@ -135,3 +135,17 @@ telemetry(NB, "publish-control", inbound_http={"path": "/manage/publish_control/
                              {"key": "2", "id": "ID_2", "ip": "192.168.1.2", "stream": "live/stream2"}]})},
     expect_state={"publishers": {"1": {"id": "ID_1", "ip": "192.168.1.1", "stream": "live/stream1"},
                                  "2": {"id": "ID_2", "ip": "192.168.1.2", "stream": "live/stream2"}}})
+
+# With a management token (Native API Reference, "Making authorized
+# requests"): a salt and the Base64 of the raw MD5 of salt/token in the query.
+# The vector runner draws random bytes from a counter from 0, so the salt is
+# the little-endian number of bytes 0 to 7, taken modulo 1,000,001.
+import base64 as _nb_base64
+import hashlib as _nb_hashlib
+from urllib.parse import quote as _nb_quote
+
+_NB_SALT = int.from_bytes(bytes(range(8)), "little") % 1000001
+_NB_HASH = _nb_base64.b64encode(_nb_hashlib.md5(f"{_NB_SALT}/s3cret".encode()).digest()).decode()
+_nb("get_server_status", {}, "GET",
+    f"/manage/server_status?salt={_NB_SALT}&hash={_nb_quote(_NB_HASH, safe='-._~')}",
+    settings={"management_token": "s3cret"}, file="get_server_status-token")

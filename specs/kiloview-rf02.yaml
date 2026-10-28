@@ -31,21 +31,34 @@ transport:
   type: http
   port: 8000
   scheme: http
-  # "HTTP Authentication, scheme: bearer": the login's JWT in
-  # Authorization: Bearer <token>, sent while the token setting is set.
-  auth: bearer
   timeout_ms: 5000
   # The front-screen (LCD) requests need no JWT (reset-lcd's note); this
   # one only reads, so it checks that the platform answers without a token.
   probe: { method: GET, path: /api/v1/netmgr/lcd-checkConf }
+  # "HTTP Authentication, scheme: bearer": the session logs in with the
+  # username and password settings and sends the login's JWT as
+  # Authorization: Bearer <token>, logging in again on a 401.
+  session:
+    when_set: password
+    login: { method: POST, path: /api/v1/login, content_type: application/json,
+             body: '{"userName":{settings.username:json},"passWord":{settings.password:json}}' }
+    capture: { json: $.data.token, header: Authorization, scheme: Bearer }
+    relogin: { status: [401] }
 
 settings:
-  token:
+  username:
+    type: string
+    default: admin
+    max_length: 64
+    label: User name
+    description: "The platform user the core logs in as; admin by default."
+  password:
     type: string
     secret: true
-    default: ""
-    label: Access token
-    description: "The JWT sent as a bearer token with every request: run login and store its result here with update_settings; empty sends none."
+    default: admin
+    max_length: 128
+    label: Password
+    description: "That user's password, admin by default; while it is empty nothing logs in and requests go without a JWT."
 
 ports:
   - { port: 8000, protocol: http, role: control, note: "the management platform's Web API (base URL http://IP:8000)" }
@@ -151,11 +164,11 @@ models:
 commands:
   # ── Login and users ──────────────────────────────────────────────────
   login:
-    summary: Log in and return the JWT for the token setting (POST /api/v1/login); the token is data.token
+    summary: Log in as a user and return its JWT, beside the session the core keeps (POST /api/v1/login); the token is data.token
     params:
       username: { type: string, required: true, max_length: 64, label: User name, description: "The platform user to log in as; admin by default." }
       password: { type: string, required: true, secret: true, max_length: 128, label: Password, description: "That user's password; admin by default." }
-    send: { method: POST, path: /api/v1/login, content_type: application/json, body: '{"userName":{username:json},"passWord":{password:json}}' }
+    send: { method: POST, path: /api/v1/login, content_type: application/json, session: false, body: '{"userName":{username:json},"passWord":{password:json}}' }
     expect: { status: 200, json_path: "$.data.token" }
     returns: value
   get_self:
@@ -799,15 +812,13 @@ quirks:
     severity: warning
     text: >
       Authentication: every request carries "Authorization: Bearer <JWT>".
-      The login answers its JWT in the JSON body (data.token), which the
-      core cannot capture into a bearer session, so the token is a setting:
-      run login and store its result in the token setting with
-      update_settings. The document's example token expires a century after
-      it is issued (data.expire). A refused token (401 or 403) stops all
-      requests until the settings change. The probe reads the front-screen
+      The core logs in with the username and password settings, keeps the
+      JWT the answer holds (data.token) and sends it on every later
+      request; a request answered 401 has it log in again and send the
+      request once more. The document's example token expires a century
+      after it is issued (data.expire). The probe reads the front-screen
       network setting, which the document's LCD requests take without a
-      JWT, so an empty token does not make the platform unauthorized before
-      login has run.
+      JWT.
   - models: [all]
     severity: critical
     text: >
