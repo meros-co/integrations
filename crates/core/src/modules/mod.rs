@@ -101,6 +101,8 @@ mod http_snapshot;
 mod hyperdeck_ftp;
 #[cfg(feature = "integ-jnior")]
 mod jnior;
+#[cfg(feature = "kissbox-io")]
+mod kissbox;
 #[cfg(feature = "labgruppen-lake")]
 mod lake_dlm;
 #[cfg(feature = "meros-camera")]
@@ -326,6 +328,8 @@ pub(crate) fn construct(
         "posistagenet" => Ok(Box::new(posistagenet::Psn::new(context)?)),
         #[cfg(feature = "integ-jnior")]
         "integ-jnior" => Ok(Box::new(jnior::Jnior::new(context)?)),
+        #[cfg(feature = "kissbox-io")]
+        "kissbox-io" => Ok(Box::new(kissbox::KissBox::new(context)?)),
         #[cfg(feature = "ptp")]
         "ptp" => Ok(Box::new(ptp::Ptp::new(context)?)),
         #[cfg(feature = "osc-listener")]

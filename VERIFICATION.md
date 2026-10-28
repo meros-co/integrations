@@ -2373,6 +2373,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Find the units of the gateway device CPU, memory, uptime and disk values. ([specs/kiloview-rf02.yaml:912](specs/kiloview-rf02.yaml#L912))
 - [ ] Check that delete_gateway_channel's single-entry list body is accepted. ([specs/kiloview-rf02.yaml:389](specs/kiloview-rf02.yaml#L389))
 
+## kissbox-io — KissBox IO3CC and IO8CC I/O card frames
+
+- [ ] Check where a frame on the UDP firmware sends its answers to reads: to the destination port set in the Editor as a broadcast (as the core expects, listening on feedback_port), or back to the sender's port. ([specs/kissbox-io.yaml:109](specs/kissbox-io.yaml#L109))
+- [ ] Check that input change notifications use the all channel status (A1h) or single channel status (A3h) layout, which the protocol document does not state for notifications. ([specs/kissbox-io.yaml:7](specs/kissbox-io.yaml#L7))
+
 ## kramer-p3000 — Kramer Protocol 3000
 
 - [ ] Check that the KDS-EN7/DEC7, DSP-62 and MV-4X accept a space after the command name, which their manuals leave out. ([specs/kramer-p3000.yaml:4103](specs/kramer-p3000.yaml#L4103))

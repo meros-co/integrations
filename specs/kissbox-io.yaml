@@ -1,0 +1,130 @@
+spec: 1
+id: kissbox-io
+name: KissBox IO3CC and IO8CC I/O card frames (TCP/UDP firmware)
+vendor: KissBox
+category: other
+implementation: native
+reason: >
+  The KissBox TCP/UDP control protocol is binary: a header byte and slot, channel and value bytes, answered by
+  binary status messages that name their slot and channel rather than their request. Over UDP the frame sends its
+  answers and input change notifications as broadcasts to a port set in its Editor, so the core listens on a shared
+  port and keeps what the frame's address sends; writes are never answered and are read back.
+
+source:
+  - title: "IO3CC and IO8CC - TCP/UDP Control Commands (KissBox protocol V2, 2023)"
+    author: KissBox B.V.
+    url: https://kiss-box.com/wp-content/uploads/2023/12/IOCC_KissBox-protocol_V2.pdf
+    note: >
+      Write one channel A5h (slot, channel, value), write all channels A4h (slot and eight values; cards with fewer
+      contacts ignore the rest), read one channel A2h answered by single channel status A3h (slot, channel, value),
+      read all channels A0h answered by all channel status A1h (slot and eight values); zero-based slot numbers (0
+      to 2 on the IO3CC, 0 to 7 on the IO8CC) and channel numbers (0 to 7); digital contacts 00h off and 01h on,
+      analog 00h to FFh.
+  - title: "Kiss-Box Software User's Manual, revision 1.5 (2017)"
+    author: KissBox B.V.
+    url: https://kiss-box.com/wp-content/uploads/2017/03/KB_Software-users-manual_V1.5_UK.pdf
+    note: >
+      §5.9: TCP, TCP mirror and UDP port numbers set per box in the Editor; §10.1: the I/O protocol over TCP (the box
+      a server that never sends on its own) or UDP (any computer may command it; it always sends to a global
+      broadcast address); §10.3: the Automatic Timed Control of output cards over UDP; §10.4: input cards sending an
+      input state message on a change or after a set time over UDP, to the destination address and port set in the
+      Master configuration window; §14.1.2: factory address 192.168.0.253.
+  - title: "UDP/TCP-IP firmware for IO3CC and IO8CC (bootloader V5.x, V9.1)"
+    author: KissBox B.V.
+    url: https://kiss-box.com/downloads-archive/udp-tcp-ip-firmware-for-io3cc-and-io8cc-bootloader-v5-x/
+    note: "Datagram-based UDP/TCP control, automatic status change notification, adjustable automatic release of output contacts, and a polling option. Card types: DI8DC, DO4PR, DO8SK, AI8RA, AO8DA."
+
+settings:
+  link: { type: enum, values: [udp, tcp], default: udp, label: Link,
+          description: "The transport chosen in the KissBox Editor for the I/O Master: udp, which also carries input notifications, or tcp, where the frame only answers reads." }
+  slots: { type: string, pattern: '^[A-Za-z0-9 ,;-]*$', max_length: 128, default: "", label: Slot cards,
+           description: "The card in each slot from the left, separated by commas: di (DI8DC), do (DO4PR, DO8SK), ai (AI8RA), ao (AO8DA), or none or nothing for an empty slot; the slots with a card are read." }
+  feedback_port: { type: int, min: 1, max: 65535, label: Notification port,
+                   description: "With udp, the destination port set in the KissBox Editor's Master window, where the frame sends its answers and input notifications; unset uses the frame's own UDP port." }
+  bind_address: { type: string, pattern: '^[0-9A-Fa-f.:]*$', max_length: 45, default: "", label: Bind address,
+                  description: "With udp, the local address of the interface on the frame's network to listen on; empty listens where the core binds." }
+  poll_interval_ms: { type: int, min: 0, max: 3600000, default: 1000, label: Poll interval,
+                      description: "Milliseconds between reads of every slot with a card; 0 relies on the frame's notifications and reads only on connecting and after writes." }
+
+ports:
+  - { port: null, protocol: udp, role: control, when: "link udp", note: "The UDP port set in the KissBox Editor: the port is given when the device is opened" }
+  - { port: null, protocol: udp, role: feedback, listener: core, setting: feedback_port, when: "link udp", note: "Answers and input notifications the frame broadcasts to the destination port set in its Editor; the frame's own port when unset" }
+  - { port: null, protocol: tcp, role: control, when: "link tcp", note: "The TCP port set in the KissBox Editor: the port is given when the device is opened" }
+
+models:
+  - id: io3cc
+    name: KissBox IO3CC (3 card slots)
+    supports: &all [read_channel, read_slot, write_channel, set_output, write_slot, refresh]
+    verification: none
+  - id: io8cc
+    name: KissBox IO8CC (8 card slots)
+    supports: *all
+    verification: none
+
+commands:
+  read_channel:
+    summary: Read one channel (A2h), answered with its value (0 or 1 on digital cards, 0 to 255 on analog cards)
+    params:
+      slot: { type: int, min: 1, max: 8, required: true, label: Slot, description: "The card slot, numbered from 1 at the left." }
+      channel: { type: int, min: 1, max: 8, required: true, label: Channel, description: "The contact on the card, numbered from 1 at the top of its connector." }
+    returns: value
+  read_slot:
+    summary: Read the eight channels of a slot (A0h), answered with a list of eight values
+    params:
+      slot: { type: int, min: 1, max: 8, required: true, label: Slot, description: "The card slot, numbered from 1 at the left." }
+    returns: value
+  write_channel:
+    summary: Set one output contact (A5h); unanswered, so reported unverified and the slot read back
+    params:
+      slot: { type: int, min: 1, max: 8, required: true, label: Slot, description: "The output card's slot, numbered from 1." }
+      channel: { type: int, min: 1, max: 8, required: true, label: Channel, description: "The contact, numbered from 1." }
+      value: { type: int, min: 0, max: 255, required: true, label: Value, description: "0 off and 1 on for a digital card; 0 (off) to 255 (full on) for an analog card." }
+    returns: none
+  set_output:
+    summary: Turn a digital output contact on or off (A5h with 01h or 00h)
+    params:
+      slot: { type: int, min: 1, max: 8, required: true, label: Slot, description: "The output card's slot, numbered from 1." }
+      channel: { type: int, min: 1, max: 8, required: true, label: Channel, description: "The contact, numbered from 1." }
+      active: { type: bool, required: true, label: Output on, description: "True closes (turns on) the contact." }
+    returns: none
+  write_slot:
+    summary: Set all eight contacts of an output card (A4h)
+    params:
+      slot: { type: int, min: 1, max: 8, required: true, label: Slot, description: "The output card's slot, numbered from 1." }
+      values: { type: string, pattern: '^[0-9 ,;]+$', max_length: 64, required: true, label: Values, description: "Eight values separated by commas, contact 1 first: 0 or 1 on a digital card, 0 to 255 on an analog card; a card with fewer contacts ignores the rest." }
+    returns: none
+  refresh:
+    summary: Read every slot with a card now
+    returns: ack
+
+state:
+  slots.*.card: { type: string, description: "The card the slots setting names for the slot (numbered from 1): digital_input, digital_output, analog_input, analog_output or none" }
+  slots.*.channels.*.value: { type: int, description: "A channel's value as last read or notified: 0 or 1 on digital cards, 0 to 255 on analog cards" }
+  slots.*.channels.*.on: { type: bool, description: "On a digital card, whether the contact is on" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      KissBox documents no default port: the TCP and UDP ports are set per frame in the KissBox Editor and must be
+      given when the device is opened. With udp, the frame sends its answers and notifications to the global broadcast
+      address and the destination port set in the Editor; the core listens there (feedback_port, shared with other
+      programs on the host) and keeps only what the frame's address sends, so several frames can share the port. Set
+      the destination port in the Editor, and the destination address if the firmware offers it, to reach the core.
+  - models: [all]
+    severity: info
+    text: >
+      Writes are not acknowledged: they are reported unverified, and the slot is read back when the device is
+      monitored. With the Editor's Automatic Timed Control on an output card (udp only), the frame turns the card's
+      outputs off when no command reaches it within the time set; keep writing within that time, or turn it off.
+  - models: [all]
+    severity: info
+    text: >
+      The frame does not say which card sits in each slot, so the slots setting tells the core which slots to read
+      and whether values are digital; a slot left out is not read but can still be commanded. Frames running the
+      Art-Net or Modbus firmware are reached with the artnet and generic-modbus integrations instead.
+  - models: [all]
+    severity: info
+    text: >
+      Opening for commands only polls no slot; a read of the first slot with a card after 10 s of silence stays as the
+      liveness check, and notifications still reach state.

@@ -53,6 +53,7 @@ NATIVE = {
     "generic-ping": "ICMP echo or a TCP connection; Wake-on-LAN over UDP",
     "generic-modbus": "Modbus TCP 502",
     "integ-jnior": "JANOS Management Protocol (JSON) over TCP 9220 or WebSocket",
+    "kissbox-io": "KissBox binary I/O commands over UDP or TCP (the port set in the KissBox Editor)",
     "generic-mqtt": "MQTT 3.1.1 or 5 over TCP 1883, TLS 8883 or a WebSocket",
     "generic-snmp": "SNMP v1, v2c or v3 over UDP 161; traps and informs",
     "generic-tcp-udp": "Text or bytes over TCP, UDP or a serial port",
