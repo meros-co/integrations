@@ -1089,3 +1089,12 @@ _ka_reread("reread-alarm-config", "/v1/alarm/config/set", {"cpu_enabled": True},
 _ka_reread("reread-serial", "/v1/test/set_serial_number", {"serial_number": "S"},
            _ka_then("/v1/test/get_resources", "/v1/switch/sys/info"),
            body='{"code":200,"message":"ok","data":{"code":1,"message":"string"}}')
+
+# The session: with a password, a command's first request is the login, its
+# token then sent as a bearer token (the engine's session tests cover the
+# header and the login again on 401). The other vectors leave the password
+# empty, so each command's own request is the one compared.
+V.append({"spec": _KA, "command": "get_users", "input": {}, "file": "get_users-login",
+          "settings": {"password": "admin"},
+          "expect_request": {"method": "POST", "target": "/v1/user/login",
+                             "body": '{"username":"admin","password":"admin"}', "content_type": "application/json"}})

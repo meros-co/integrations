@@ -60,9 +60,8 @@ V.append({"spec": TDK, "command": "refresh_access_token", "input": {"refresh_tok
           "expect_result": {"ok": {"kind": "value", "value": {
               "expires_in": 3600, "token_type": "Bearer", "refresh_token": "bNLzvBOEqwDNYApV9jduhjlVXIoOp9kB",
               "access_token": "rYDVtxfHdH7Igk5qdMEWMJZAJpg1Gjvy"}}}})
-# With a token set, it goes as Authorization: Bearer (the headers are not
-# part of the vector; the request is the same).
-_get("get_api_root", {}, "/api/v1", settings={"token": "rYDVtxfHdH7Igk5qdMEWMJZAJpg1Gjvy"},
+# GET /api/v1 needs no token.
+_get("get_api_root", {}, "/api/v1",
      http_reply={"status": 200, "body": '{"endpoints":["decoders","encoders","inputs","network","settings","streams","system"]}'},
      expect_result={"ok": {"kind": "value", "value": ["decoders", "encoders", "inputs", "network", "settings",
                                                        "streams", "system"]}})
@@ -695,3 +694,12 @@ _t("modem", "/api/v1/network/modem/0",
                                  "label": "Modem 1", "status_json": json.dumps(_MODEM, separators=(",", ":"))}}}})
 _t("settings-import", "/api/v1/settings/sync/import", '{"status":"ok","message":"Imported"}', {},
    expect_then_send=[_g("/api/v1/encoders"), _g("/api/v1/decoders"), _g("/api/v1/streams")])
+
+# With the admin password set, the session signs in first with the password
+# grant (the engine's session tests cover the bearer token and the sign-in
+# again on 401).
+V.append({"spec": TDK, "command": "get_api_root", "input": {}, "file": "get_api_root-login",
+          "settings": {"password": "p@ss word"},
+          "expect_request": {"method": "POST", "target": "/oauth/token",
+                             "body": "grant_type=password&password=p%40ss%20word",
+                             "content_type": "application/x-www-form-urlencoded"}})

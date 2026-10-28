@@ -19,8 +19,11 @@ _kl("login", {"username": "admin", "password": "kiloview001"}, "POST", "/api/too
     '{"username":"admin","password":"kiloview001"}',
     http_reply={"status": 200, "body": '{"token":"sdaf3!AS413@"}'},
     expect_result={"ok": {"kind": "value", "value": "sdaf3!AS413@"}})
-V.append({"spec": KL, "command": "get_own_menu", "input": {}, "settings": {"token": "sdaf3!AS413@", "username": "ocl"},
-          "expect_request": {"method": "GET", "target": "/api/tools/getSelfMenu.json"}})
+# With a password, the session logs in first (the engine's session tests
+# cover the token in Authorization and the cookie).
+V.append({"spec": KL, "command": "get_own_menu", "input": {}, "settings": {"password": "kiloview001", "username": "ocl"},
+          "expect_request": {"method": "POST", "target": "/api/tools/login.json",
+                             "body": '{"username":"ocl","password":"kiloview001"}', "content_type": "application/json"}})
 _kl("get_group_menus", {}, "GET", "/api/tools/getRdControl.json")
 _kl("set_group_menu", {"group": "cn=kiloview,ou=KVGroups,cn=admin,dc=kiloview,dc=com", "device_control": True,
                        "user_control": True, "upload_control": True, "send_control": True}, "POST",
@@ -177,3 +180,9 @@ _kl_tel("reread-menu", "/api/tools/setRdControl.json", {"result": "ok", "msg": "
                           {"method": "GET", "target": "/api/tools/getSelfMenu.json"}])
 _kl_tel("reread-refused", "/api/tools/delete.json", {"result": "error", "msg": "1053"}, {}, request={"dn": "x"},
         expect_then_send=[])
+
+# Every other vector leaves the password empty, so each command's own
+# request is the one compared.
+for _kl_v in V:
+    if _kl_v["spec"] == KL and _kl_v.get("command") != "get_own_menu":
+        _kl_v.setdefault("settings", {}).setdefault("password", "")

@@ -39,10 +39,10 @@ V.append({"spec": KX, "command": "login", "file": "login.encoded",
           # The document's error example: a wrong user name.
           "http_reply": {"status": 200, "body": '{"result":"error","error":{"code":"10002","info":"User name does not exist"}}'},
           "expect_result": {"error": {"error": "device_error"}}})
-V.append({"spec": KX, "command": "logout", "input": {}, "settings": {"token": "eyJ.abc.def"},
+V.append({"spec": KX, "command": "logout", "input": {},
           "expect_request": {"method": "POST", "target": _P + "/user/logout"},
           "http_reply": _OK, "expect_result": _ACK})
-_get("renew_token", {}, "/user/token/get", settings={"token": "eyJ.abc.def"},
+_get("renew_token", {}, "/user/token/get",
      http_reply=_msg({"access_token": "eyJ.new.tok", "token_type": "bearer"}),
      expect_result={"ok": {"kind": "value", "value": "eyJ.new.tok"}})
 # 1.9: the document's example sends only username and password.
@@ -404,3 +404,15 @@ _reread("reread-template-switch", "/template/switch", {"switch_id": 2, "save": T
 # A refused change reads nothing again.
 _reread("reread-route-error", "/panel/output/input", {"id": 3, "output_id": 1, "input_id": 2}, [],
         body='{"result":"error","error":{"code":"10010","info":"Output is locked"}}')
+
+# The session: with a password, a command's first request is the login (a
+# form, as the login command sends it). Every other vector leaves the
+# password empty, so each command's own request is the one compared.
+V.append({"spec": KX, "command": "logout", "input": {}, "file": "logout-login",
+          "settings": {"username": "admin", "password": "admin"},
+          "expect_request": {"method": "POST", "target": "/api/cube/v2/user/login",
+                             "body": "grant_type=&username=admin&password=admin&scope=&client_id=&client_secret=",
+                             "content_type": "application/x-www-form-urlencoded"}})
+for _kx_v in V:
+    if _kx_v["spec"] == KX and _kx_v.get("file") != "logout-login":
+        _kx_v.setdefault("settings", {}).setdefault("password", "")
