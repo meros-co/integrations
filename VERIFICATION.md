@@ -3159,25 +3159,29 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## nmos-node — AMWA NMOS Node (IS-04, IS-05, IS-08, IS-07)
 
-- [ ] Check against a real Node (and nmos-cpp's node) that GET /x-nmos/node answers as the liveness probe. ([specs/nmos-node.yaml:59](specs/nmos-node.yaml#L59))
-- [ ] Check that an empty connection_port (and channelmapping_port, events_port) reaches a Node serving every API on its Node API port, and record which Nodes serve them on other ports. ([specs/nmos-node.yaml:89](specs/nmos-node.yaml#L89))
-- [ ] Check which Nodes still accept the deprecated PUT /receivers/{id}/target, and what they answer (202, or 501). ([specs/nmos-node.yaml:265](specs/nmos-node.yaml#L265))
-- [ ] Check a connect_receiver with an SDP against a Node, and its answer to the read-back of active. ([specs/nmos-node.yaml:409](specs/nmos-node.yaml#L409))
-- [ ] Check that a Node's /single/senders and /single/receivers lists end each id with a slash, as the example shows, and that the per-id reads keep up with many senders every 5 seconds. ([specs/nmos-node.yaml:943](specs/nmos-node.yaml#L943))
-- [ ] Check that a Sender's transportfile answers with the SDP itself (not a redirect the client must follow). ([specs/nmos-node.yaml:1004](specs/nmos-node.yaml#L1004))
-- [ ] Check an IS-08 Node's channel indexes (from 0) and route_channel's single-channel activation. ([specs/nmos-node.yaml:591](specs/nmos-node.yaml#L591))
-- [ ] Check that GET /map/activations/ (with the trailing slash) answers the scheduled activations on IS-08 Nodes. ([specs/nmos-node.yaml:1058](specs/nmos-node.yaml#L1058))
-- [ ] Check that reading IS-07 event states every 2 seconds is fast enough for tally, and what a Node without IS-07 answers at /x-nmos/events. ([specs/nmos-node.yaml:684](specs/nmos-node.yaml#L684))
+- [ ] Check against a real Node (and nmos-cpp's node) that GET /x-nmos/node answers as the liveness probe. ([specs/nmos-node.yaml:74](specs/nmos-node.yaml#L74))
+- [ ] Check that an empty connection_port (and channelmapping_port, events_port) reaches a Node serving every API on its Node API port, and record which Nodes serve them on other ports. ([specs/nmos-node.yaml:107](specs/nmos-node.yaml#L107))
+- [ ] Check which Nodes still accept the deprecated PUT /receivers/{id}/target, and what they answer (202, or 501). ([specs/nmos-node.yaml:297](specs/nmos-node.yaml#L297))
+- [ ] Check a connect_receiver with an SDP against a Node, and its answer to the read-back of active. ([specs/nmos-node.yaml:441](specs/nmos-node.yaml#L441))
+- [ ] Check that a Node's /single/senders and /single/receivers lists end each id with a slash, as the example shows, and that the per-id reads keep up with many senders every 5 seconds. ([specs/nmos-node.yaml:975](specs/nmos-node.yaml#L975))
+- [ ] Check that a Sender's transportfile answers with the SDP itself (not a redirect the client must follow). ([specs/nmos-node.yaml:1036](specs/nmos-node.yaml#L1036))
+- [ ] Check an IS-08 Node's channel indexes (from 0) and route_channel's single-channel activation. ([specs/nmos-node.yaml:623](specs/nmos-node.yaml#L623))
+- [ ] Check that GET /map/activations/ (with the trailing slash) answers the scheduled activations on IS-08 Nodes. ([specs/nmos-node.yaml:1090](specs/nmos-node.yaml#L1090))
+- [ ] Check that reading IS-07 event states every 2 seconds is fast enough for tally, and what a Node without IS-07 answers at /x-nmos/events. ([specs/nmos-node.yaml:716](specs/nmos-node.yaml#L716))
+- [ ] Check against an IS-07 Node with a websocket Sender that one subscription command naming every ext_is_07_source_id at a connection_uri brings each source's state, and that a health command every 5 seconds keeps the connection. ([crates/core/src/modules/nmos_events.rs:529](crates/core/src/modules/nmos_events.rs#L529))
+- [ ] Check against a broker that an IS-07 MQTT Sender's retained state arrives on subscribing at QoS 0 to its broker_topic, that its connection status topic gives the will message, and how a broker with broker_authorization true takes its credential (a user name and password assumed). ([crates/core/src/modules/nmos_events.rs:543](crates/core/src/modules/nmos_events.rs#L543))
+- [ ] Check that a Sender's IS-05 active parameters give the broker or connection_uri the extension follows (not auto), and what Senders on a Node with many Devices list. ([crates/core/src/modules/nmos_events.rs:133](crates/core/src/modules/nmos_events.rs#L133))
 
 ## nmos-registry — AMWA NMOS registry (IS-04 Query API)
 
 - [ ] Check against a registry (nmos-cpp's and a vendor's) that GET /x-nmos/query answers as the liveness probe. ([specs/nmos-registry.yaml:35](specs/nmos-registry.yaml#L35))
 - [ ] Check that a registry answers the subscription POST with a ws_href the core can reach (a registry behind NAT or naming a host name), and that the first grain on each websocket is the whole list. ([specs/nmos-registry.yaml:39](specs/nmos-registry.yaml#L39))
 - [ ] Check that a registry accepts max_update_rate_ms 0 and 100, and how it batches changes at 100. ([specs/nmos-registry.yaml:60](specs/nmos-registry.yaml#L60))
-- [ ] Record a registry's default page size for the get_ commands, and check query_resources with basic queries and paging. ([specs/nmos-registry.yaml:201](specs/nmos-registry.yaml#L201))
-- [ ] Check that a registry answers create_subscription with 200 for an existing identical subscription and 201 for a new one. ([specs/nmos-registry.yaml:230](specs/nmos-registry.yaml#L230))
-- [ ] Check that a grain deleting a resource carries its id in path (and pre), as the module reads it. ([specs/nmos-registry.yaml:364](specs/nmos-registry.yaml#L364))
+- [ ] Record a registry's default page size for the get_ commands, and check query_resources with basic queries and paging. ([specs/nmos-registry.yaml:202](specs/nmos-registry.yaml#L202))
+- [ ] Check that a registry answers create_subscription with 200 for an existing identical subscription and 201 for a new one. ([specs/nmos-registry.yaml:231](specs/nmos-registry.yaml#L231))
+- [ ] Check that a grain deleting a resource carries its id in path (and pre), as the module reads it. ([specs/nmos-registry.yaml:365](specs/nmos-registry.yaml#L365))
 - [ ] Check what an mDNS browse of _nmos-query._tcp finds on a network with several registries (TXT pri), and whether registries advertise only by unicast DNS-SD there. ([crates/core/src/mdns.rs:258](crates/core/src/mdns.rs#L258))
+- [ ] Check a unicast DNS-SD browse of _nmos-query._tcp against a site's DNS server (PTR, SRV, TXT and A answered in turn or together), and that the host's own DNS servers and domains are the ones asked on Windows, macOS and Linux. ([crates/core/src/dns_sd.rs:344](crates/core/src/dns_sd.rs#L344))
 
 ## novastar-central-control — NovaStar COEX central control protocol
 
