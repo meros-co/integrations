@@ -392,9 +392,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## aws-elemental-live — AWS Elemental Live
 
 - [ ] Confirm the REST interface answers over HTTPS on 443 (the guide's examples) and record whether plain HTTP on 80 is served too. ([specs/aws-elemental-live.yaml:66](specs/aws-elemental-live.yaml#L66))
-- [ ] Confirm list and detail XML carry an <id> child for each live event and device (the guide says GET XML holds id tags; its list example shows only href). ([specs/aws-elemental-live.yaml:1392](specs/aws-elemental-live.yaml#L1392))
-- [ ] Confirm GET /live_events with filter=active lists running, preprocessing and postprocessing events, and that each status document's errors and warnings hold code and message (warnings assumed in the same shape as errors). ([specs/aws-elemental-live.yaml:1429](specs/aws-elemental-live.yaml#L1429))
-- [ ] Record what GET /live_events/<id>/priority answers (a <priority> element assumed) and the priority range. ([specs/aws-elemental-live.yaml:1434](specs/aws-elemental-live.yaml#L1434))
+- [ ] Confirm list and detail XML carry an <id> child for each live event and device (the guide says GET XML holds id tags; its list example shows only href). ([specs/aws-elemental-live.yaml:1393](specs/aws-elemental-live.yaml#L1393))
+- [ ] Confirm GET /live_events with filter=active lists running, preprocessing and postprocessing events, and that each status document's errors and warnings hold code and message (warnings assumed in the same shape as errors). ([specs/aws-elemental-live.yaml:1430](specs/aws-elemental-live.yaml#L1430))
+- [ ] Record what GET /live_events/<id>/priority answers (a <priority> element assumed) and the priority range. ([specs/aws-elemental-live.yaml:1435](specs/aws-elemental-live.yaml#L1435))
 - [ ] Record what the action endpoints (start, stop, cancel, archive, reset, mute_audio, adjust_audio_gain, the output and group actions) answer, and their status on success and on refusal. ([specs/aws-elemental-live.yaml:218](specs/aws-elemental-live.yaml#L218))
 - [ ] Confirm one-line XML documents (with an XML declaration or without) are accepted by create and update. ([specs/aws-elemental-live.yaml:1320](specs/aws-elemental-live.yaml#L1320))
 - [ ] Confirm MPTS start takes an empty <mux></mux> body (the guide gives no body for POST /mpts/<id>/mux). ([specs/aws-elemental-live.yaml:950](specs/aws-elemental-live.yaml#L950))

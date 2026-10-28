@@ -1331,12 +1331,12 @@ quirks:
     text: >
       The encoder pushes nothing (its notifications go to e-mail, a web
       callback URL or SNMP traps the consumer receives itself). Every 10
-      seconds the core reads the first 100 live events, the active ones
-      and each active event's status, and the system status; every 60
-      seconds the input devices. live_events is replaced whole by each
-      read, so a deleted or archived event leaves it; event_status keeps an
-      event's last status until it runs again. A system with more than 100
-      live events keeps only the first page in state.
+      seconds the core reads every live event (100 a page, each page in
+      turn until one is short), the active ones and each active event's
+      status, and the system status; every 60 seconds the input devices.
+      live_events is replaced whole by each read, so a deleted or archived
+      event leaves it; event_status keeps an event's last status until it
+      runs again.
 
   - models: [all]
     severity: critical
@@ -1382,14 +1382,15 @@ telemetry:
   poll:
     - every_ms: 10000
       send:
-        - { method: GET, path: /api/live_events, query: { page: "1", per_page: "100" } }
-        - { method: GET, path: /api/live_events, query: { filter: active, page: "1", per_page: "100" } }
+        - { method: GET, path: /api/live_events, query: { page: "1", per_page: "100" },
+            pages: &pages { items: { xml: live_event }, page: page, size: per_page } }
+        - { method: GET, path: /api/live_events, query: { filter: active, page: "1", per_page: "100" }, pages: *pages }
         - { method: GET, path: /api/system_status.json }
     - every_ms: 60000
       send:
         - { method: GET, path: /api/devices }
   updates:
-    # Every live event (the first page), whole.
+    # Every live event, every page joined, whole.
     - path: "^/api/live_events\\?page=1&per_page=100$"
       xml_each: live_event
       replace: live_events
