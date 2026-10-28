@@ -28,6 +28,7 @@ TRANSPORT = {
 
 # Native modules choose their own transport, so it is described here.
 NATIVE = {
+    "adder-aim": "AIM API (XML over HTTP or HTTPS)",
     "aes70": "OCP.1 over TCP, UDP, WebSocket, TLS or DTLS (the device's port)",
     "allenheath-ahm": "MIDI over TCP 51325",
     "allenheath-cq": "MIDI over TCP 51325",
@@ -51,6 +52,10 @@ NATIVE = {
     "generic-midi": "MIDI 1.0 over RTP-MIDI (UDP 5004/5005) or a MIDI port of the host",
     "generic-osc": "OSC over UDP or TCP",
     "generic-ping": "ICMP echo or a TCP connection; Wake-on-LAN over UDP",
+    "generic-modbus": "Modbus TCP 502",
+    "integ-jnior": "JANOS Management Protocol (JSON) over TCP 9220 or WebSocket",
+    "kissbox-io": "KissBox binary I/O commands over UDP or TCP (the port set in the KissBox Editor)",
+    "generic-mqtt": "MQTT 3.1.1 or 5 over TCP 1883, TLS 8883 or a WebSocket",
     "generic-snmp": "SNMP v1, v2c or v3 over UDP 161; traps and informs",
     "generic-tcp-udp": "Text or bytes over TCP, UDP or a serial port",
     "generic-websocket": "Text, bytes or JSON over WebSocket (ws or wss)",
@@ -74,7 +79,9 @@ NATIVE = {
     "panasonic-projector": "NTCONTROL over TCP 1024, or RS-232C",
     "philips-sicp": "SICP binary messages over TCP 5000, or an RS-232 port",
     "pjlink": "PJLink over TCP 4352",
+    "pigpio": "pigpio socket interface over TCP 8888",
     "posistagenet": "PosiStageNet over UDP multicast 236.10.10.10:56565; receives and sends",
+    "ptp": "PTP v2 over UDP 319 and 320, multicast 224.0.1.129 and 224.0.0.107; listens only",
     "probel-swp02": "SW-P-02 binary messages on a serial port, or over TCP",
     "probel-swp08": "SW-P-08 binary frames over TCP (2008 by default) or a serial port",
     "qsys": "QRC JSON-RPC over TCP 1710",

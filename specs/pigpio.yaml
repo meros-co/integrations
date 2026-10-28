@@ -1,0 +1,262 @@
+spec: 1
+id: pigpio
+name: Raspberry Pi GPIO (pigpio daemon socket interface)
+vendor: pigpio (the pigpiod daemon on a Raspberry Pi)
+category: other
+implementation: native
+reason: >
+  The pigpio socket interface is binary: each request is four little-endian 32-bit words, some with an extension,
+  echoed back with a signed result; GPIO changes come on a second connection turned into a stream of 12-byte reports
+  by NOIB and started by NB on the first. Pairing the two connections, decoding the reports and reading back what
+  each command sets needs logic the format cannot express.
+
+source:
+  - title: "pigpio library: Socket Interface (sif.html), updated 1 January 2023"
+    author: joan2937 (abyz.me.uk; pigpio is released into the public domain, The Unlicense)
+    url: https://abyz.me.uk/rpi/pigpio/sif.html
+    note: >
+      Port 8888 by default (pigpiod -p changes it; -k turns the interface off); the request cmdCmd_t of cmd, p1, p2
+      and p3 (the extension's length) and the response echoing them with the result in p3 (negative on error, unsigned
+      for the commands marked *); the command numbers and parameters: MODES 0, MODEG 1, PUD 2, READ 3, WRITE 4, PWM
+      5, PRS 6, PFS 7, SERVO 8, WDOG 9, BR1 10, BR2 11, BC1 12, BC2 13, BS1 14, BS2 15, TICK 16, HWVER 17, NB 19,
+      PRG 22, PFG 23, PRRG 24, PIGPV 26, TRIG 37 (level in a 4-byte extension), GDC 83, GPW 84, HC 85, HP 86 (duty
+      cycle in a 4-byte extension), FG 97, FN 98 (active in a 4-byte extension), NOIB 99, PADS 102, PADG 103, EVT 116.
+  - title: "pigpio library: C interface (cif.html), updated 1 January 2023"
+    author: joan2937 (abyz.me.uk)
+    url: https://abyz.me.uk/rpi/pigpio/cif.html
+    note: >
+      Parameter ranges and meanings: modes (input 0, output 1, alt0 4, alt1 5, alt2 6, alt3 7, alt4 3, alt5 2), pulls
+      (off 0, down 1, up 2), PWM duty cycle 0 to range (default 255), range 25 to 40000 and the real range, PWM
+      frequency (closest of 18 per sample rate), servo pulse width 0 or 500 to 2500 us, watchdog 0 to 60000 ms,
+      trigger pulse 1 to 100 us, glitch filter 0 to 300000 us, noise filter steady 0 to 300000 and active 0 to
+      1000000 us, hardware clock and PWM GPIO and frequencies (duty 0 to 1000000), pad drive strength 1 to 16 mA on
+      pads 0 to 2 (GPIO 0-27, 28-45, 46-53), events 0 to 31; gpioNotifyOpen and gpioNotifyBegin: the gpioReport_t
+      (seqno, flags, tick, level) and its flags (bit 5 watchdog timeout, bit 6 keep-alive once a minute, bit 7 event,
+      bits 0-4 the GPIO or event); the error codes.
+
+settings:
+  gpios: { type: string, pattern: '^[0-9 ,-]*$', max_length: 256, default: "2-27", label: GPIO kept,
+           description: "Broadcom GPIO numbers kept in state and notified, as numbers and ranges such as 2-27 or 4,17,22; the default is the 40-pin header's GPIO." }
+  poll_interval_ms: { type: int, min: 0, max: 3600000, default: 5000, label: Mode read interval,
+                      description: "Milliseconds between reads of the GPIO's modes, which another program may change; 0 reads them on connecting only. Levels come as they change." }
+  timeout_ms: { type: int, min: 1, max: 60000, default: 2000, label: Timeout, description: "Milliseconds to wait for each answer; three unanswered in a row reconnect." }
+
+ports:
+  - { port: 8888, protocol: tcp, role: control, note: "pigpiod's socket interface; a second connection to the same port carries the notifications" }
+
+models:
+  - id: pigpiod
+    name: Raspberry Pi running the pigpio daemon (pigpiod, models with a BCM2835, BCM2836, BCM2837 or BCM2711)
+    supports: [set_mode, get_mode, set_pull, read, write, set_pwm, set_pwm_range, set_pwm_frequency, get_pwm,
+               get_pwm_range, get_pwm_real_range, get_pwm_frequency, set_servo, get_servo, set_watchdog, trigger,
+               set_glitch_filter, set_noise_filter, hardware_clock, hardware_pwm, read_bank_1, read_bank_2,
+               set_bits_bank_1, clear_bits_bank_1, set_bits_bank_2, clear_bits_bank_2, set_pad_strength,
+               get_pad_strength, trigger_event, get_tick, get_hardware_revision, get_version, refresh]
+    verification: none
+
+commands:
+  set_mode:
+    summary: Set a GPIO's mode (MODES)
+    params:
+      gpio: { type: int, min: 0, max: 53, required: true, label: GPIO, description: "The Broadcom GPIO number." }
+      mode: { type: enum, values: [input, output, alt0, alt1, alt2, alt3, alt4, alt5], required: true, label: Mode, description: "Input, output, or one of the alternative functions." }
+    returns: ack
+  get_mode:
+    summary: Read a GPIO's mode (MODEG)
+    params:
+      gpio: { type: int, min: 0, max: 53, required: true, label: GPIO, description: "The Broadcom GPIO number." }
+    returns: value
+  set_pull:
+    summary: Set or clear a GPIO's pull-up or pull-down resistor (PUD)
+    params:
+      gpio: { type: int, min: 0, max: 53, required: true, label: GPIO, description: "The Broadcom GPIO number." }
+      pull: { type: enum, values: ["off", down, up], required: true, label: Pull, description: "off clears the resistor; down pulls low, up pulls high." }
+    returns: ack
+  read:
+    summary: Read a GPIO's level (READ), 0 or 1
+    params:
+      gpio: { type: int, min: 0, max: 53, required: true, label: GPIO, description: "The Broadcom GPIO number." }
+    returns: value
+  write:
+    summary: Set a GPIO's level (WRITE); it becomes an output
+    params:
+      gpio: { type: int, min: 0, max: 53, required: true, label: GPIO, description: "The Broadcom GPIO number." }
+      level: { type: bool, required: true, label: High, description: "True drives the GPIO high, false low." }
+    returns: ack
+  set_pwm:
+    summary: Start software PWM on a GPIO at a duty cycle within its range (PWM); 0 stops it
+    params:
+      gpio: { type: int, min: 0, max: 31, required: true, label: GPIO, description: "The GPIO, 0 to 31." }
+      dutycycle: { type: int, min: 0, max: 40000, required: true, label: Duty cycle, description: "0 (off) to the GPIO's range (fully on), 255 unless changed." }
+    returns: ack
+  set_pwm_range:
+    summary: Set the range a GPIO's PWM duty cycle is given in (PRS); answered with the real range
+    params:
+      gpio: { type: int, min: 0, max: 31, required: true, label: GPIO, description: "The GPIO, 0 to 31." }
+      range: { type: int, min: 25, max: 40000, required: true, label: Range, description: "The duty cycle meaning fully on." }
+    returns: value
+  set_pwm_frequency:
+    summary: Set a GPIO's PWM frequency (PFS); answered with the nearest frequency available
+    params:
+      gpio: { type: int, min: 0, max: 31, required: true, label: GPIO, description: "The GPIO, 0 to 31." }
+      frequency: { type: int, min: 0, max: 40000, required: true, label: Frequency, description: "Hertz; the daemon picks the closest of the 18 its sample rate offers." }
+    returns: value
+  get_pwm:
+    summary: Read a GPIO's PWM duty cycle (GDC); fails when the GPIO is not in use for PWM
+    params:
+      gpio: { type: int, min: 0, max: 31, required: true, label: GPIO, description: "The GPIO, 0 to 31." }
+    returns: value
+  get_pwm_range:
+    summary: Read a GPIO's PWM range (PRG)
+    params:
+      gpio: { type: int, min: 0, max: 31, required: true, label: GPIO, description: "The GPIO, 0 to 31." }
+    returns: value
+  get_pwm_real_range:
+    summary: Read a GPIO's real PWM range, the steps its frequency allows (PRRG)
+    params:
+      gpio: { type: int, min: 0, max: 31, required: true, label: GPIO, description: "The GPIO, 0 to 31." }
+    returns: value
+  get_pwm_frequency:
+    summary: Read a GPIO's PWM frequency (PFG)
+    params:
+      gpio: { type: int, min: 0, max: 31, required: true, label: GPIO, description: "The GPIO, 0 to 31." }
+    returns: value
+  set_servo:
+    summary: Send servo pulses on a GPIO (SERVO); 0 stops them
+    params:
+      gpio: { type: int, min: 0, max: 31, required: true, label: GPIO, description: "The GPIO, 0 to 31." }
+      pulsewidth: { type: int, min: 0, max: 2500, required: true, label: Pulse width, description: "Microseconds: 0 (off) or 500 (most anti-clockwise) to 2500 (most clockwise), 1500 the middle." }
+    returns: ack
+  get_servo:
+    summary: Read a GPIO's servo pulse width (GPW); fails when the GPIO is not in use for servo pulses
+    params:
+      gpio: { type: int, min: 0, max: 31, required: true, label: GPIO, description: "The GPIO, 0 to 31." }
+    returns: value
+  set_watchdog:
+    summary: Report a watchdog event when a GPIO has not changed for a time (WDOG); 0 cancels it
+    params:
+      gpio: { type: int, min: 0, max: 31, required: true, label: GPIO, description: "The GPIO, 0 to 31." }
+      timeout_ms: { type: int, min: 0, max: 60000, required: true, label: Timeout, description: "Milliseconds without a change before a watchdog report, repeated until a change; 0 cancels." }
+    returns: ack
+  trigger:
+    summary: Send a trigger pulse on a GPIO (TRIG)
+    params:
+      gpio: { type: int, min: 0, max: 31, required: true, label: GPIO, description: "The GPIO, 0 to 31." }
+      pulse_us: { type: int, min: 1, max: 100, required: true, label: Pulse length, description: "Microseconds the GPIO is held at the level before returning to the other." }
+      level: { type: bool, default: true, label: High pulse, description: "True pulses high, false low." }
+    returns: ack
+  set_glitch_filter:
+    summary: Report a GPIO's level changes only once stable for a time (FG); 0 turns the filter off
+    params:
+      gpio: { type: int, min: 0, max: 31, required: true, label: GPIO, description: "The GPIO, 0 to 31." }
+      steady_us: { type: int, min: 0, max: 300000, required: true, label: Steady time, description: "Microseconds a level must hold before it is reported." }
+    returns: ack
+  set_noise_filter:
+    summary: Ignore a GPIO's changes until stable for a time, then report them for a time (FN); 0 turns it off
+    params:
+      gpio: { type: int, min: 0, max: 31, required: true, label: GPIO, description: "The GPIO, 0 to 31." }
+      steady_us: { type: int, min: 0, max: 300000, required: true, label: Steady time, description: "Microseconds a level must hold before changes are reported." }
+      active_us: { type: int, min: 0, max: 1000000, required: true, label: Active time, description: "Microseconds changes are then reported for." }
+    returns: ack
+  hardware_clock:
+    summary: Start a hardware clock on a GPIO that has one (HC); 0 stops it
+    params:
+      gpio: { type: int, min: 0, max: 53, required: true, label: GPIO, description: "A GPIO with a clock: 4, 6, 20 (and 32, 34, 43 on a compute module)." }
+      frequency: { type: int, min: 0, max: 375000000, required: true, label: Frequency, description: "Hertz: 0 (off), or 4689 to 250 MHz (13184 to 375 MHz on the BCM2711); above 30 MHz is unlikely to work." }
+    returns: ack
+  hardware_pwm:
+    summary: Start hardware PWM on a GPIO that has it (HP); frequency 0 stops it
+    params:
+      gpio: { type: int, min: 0, max: 53, required: true, label: GPIO, description: "A GPIO with hardware PWM: 12, 13, 18 or 19 on the 40-pin header." }
+      frequency: { type: int, min: 0, max: 187500000, required: true, label: Frequency, description: "Hertz: 0 (off), or 1 to 125 MHz (187.5 MHz on the BCM2711)." }
+      dutycycle: { type: int, min: 0, max: 1000000, required: true, label: Duty cycle, description: "0 (off) to 1000000 (fully on)." }
+    returns: ack
+  read_bank_1:
+    summary: Read GPIO 0 to 31's levels at once (BR1), one bit each
+    returns: value
+  read_bank_2:
+    summary: Read GPIO 32 to 53's levels at once (BR2), GPIO 32 in bit 0
+    returns: value
+  set_bits_bank_1:
+    summary: Drive the GPIO of a mask, 0 to 31, high at once (BS1)
+    params:
+      bits: { type: int, min: 0, max: 4294967295, required: true, label: Mask, description: "One bit per GPIO, GPIO 0 in bit 0." }
+    returns: ack
+  clear_bits_bank_1:
+    summary: Drive the GPIO of a mask, 0 to 31, low at once (BC1)
+    params:
+      bits: { type: int, min: 0, max: 4294967295, required: true, label: Mask, description: "One bit per GPIO, GPIO 0 in bit 0." }
+    returns: ack
+  set_bits_bank_2:
+    summary: Drive the GPIO of a mask, 32 to 53, high at once (BS2)
+    params:
+      bits: { type: int, min: 0, max: 4194303, required: true, label: Mask, description: "One bit per GPIO, GPIO 32 in bit 0." }
+    returns: ack
+  clear_bits_bank_2:
+    summary: Drive the GPIO of a mask, 32 to 53, low at once (BC2)
+    params:
+      bits: { type: int, min: 0, max: 4194303, required: true, label: Mask, description: "One bit per GPIO, GPIO 32 in bit 0." }
+    returns: ack
+  set_pad_strength:
+    summary: Set a pad's drive strength (PADS)
+    params:
+      pad: { type: int, min: 0, max: 2, required: true, label: Pad, description: "0 for GPIO 0-27, 1 for 28-45, 2 for 46-53." }
+      strength_ma: { type: int, min: 1, max: 16, required: true, label: Strength, description: "Milliamps." }
+    returns: ack
+  get_pad_strength:
+    summary: Read a pad's drive strength in mA (PADG)
+    params:
+      pad: { type: int, min: 0, max: 2, required: true, label: Pad, description: "0 for GPIO 0-27, 1 for 28-45, 2 for 46-53." }
+    returns: value
+  trigger_event:
+    summary: Trigger an event (EVT), which notification streams watching it report
+    params:
+      event: { type: int, min: 0, max: 31, required: true, label: Event, description: "The event number." }
+    returns: ack
+  get_tick:
+    summary: The microseconds since the Pi booted, wrapping after about 72 minutes (TICK)
+    returns: value
+  get_hardware_revision:
+    summary: The Pi's hardware revision number (HWVER)
+    returns: value
+  get_version:
+    summary: The pigpio version (PIGPV)
+    returns: value
+  refresh:
+    summary: Read every kept GPIO's mode and the levels now
+    returns: ack
+
+state:
+  hardware_revision: { type: string, description: "The Pi's hardware revision code, in hex as /proc/cpuinfo gives it" }
+  pigpio_version: { type: int, description: "The pigpio daemon's version" }
+  gpio.*.level: { type: bool, description: "A kept GPIO's level, keyed by its Broadcom number: true when high" }
+  gpio.*.mode: { type: string, description: "Its mode: input, output, alt0 to alt5, or unknown" }
+  gpio.*.pull: { type: string, description: "The pull set by this integration: off, down or up (the daemon cannot read it back)" }
+  gpio.*.pwm_dutycycle: { type: int, description: "For an output in PWM use, its duty cycle" }
+  gpio.*.pwm_range: { type: int, description: "Its PWM range" }
+  gpio.*.pwm_real_range: { type: int, description: "Its real PWM range at its frequency" }
+  gpio.*.pwm_frequency: { type: int, unit: Hz, description: "Its PWM frequency" }
+  gpio.*.servo_pulsewidth: { type: int, unit: us, description: "For an output in servo use, its pulse width" }
+  gpio.*.watchdog_ms: { type: int, unit: ms, description: "The watchdog this integration set on it; 0 for none" }
+  pads.*.strength_ma: { type: int, unit: mA, description: "A pad's drive strength, keyed 0 (GPIO 0-27), 1 (28-45), 2 (46-53)" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Watchdog timeouts and events are message events, {address: watchdog, args: {gpio, tick}} and {address: event,
+      args: {event, tick}}, since they repeat. Levels come from the notification stream as they change, with the
+      daemon's own once-a-minute keep-alive; a GPIO's PWM, servo and range readings are taken for outputs, and fail
+      harmlessly (nothing kept) for an output not in that use.
+  - models: [all]
+    severity: info
+    text: >
+      pigpiod must run on the Pi with its socket interface on (not -k) and reachable from the core's address (pigpiod
+      -n limits the addresses it accepts; by default it listens on every interface without a password). pigpio does not
+      support the Raspberry Pi 5 (RP1); a Pi 5 needs another daemon. The daemon offers I2C, SPI, serial, waveforms,
+      scripts, files and a shell over the same interface; this integration offers the GPIO functions only.
+  - models: [all]
+    severity: info
+    text: >
+      Opening for commands only opens no notification stream and reads nothing; a TICK after 10 s of silence stays as the
+      liveness check.

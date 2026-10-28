@@ -55,6 +55,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the value ranges Live accepts for tempo, song and scene signatures, clip transposition and detune, groove amount (the Live Object Model says 0 to 1), and what Live does with a value outside them. ([specs/ableton-live.yaml:3097](specs/ableton-live.yaml#L3097))
 - [ ] Confirm /live/startup is sent when Live loads another Set, so the rule registering everything again runs then. ([specs/ableton-live.yaml:3112](specs/ableton-live.yaml#L3112))
 
+## adder-aim — Adder AdderLink Infinity Manager (AIM API)
+
+- [ ] Check what the AIM answers a request with an ended or unknown token: the integration logs in again only when the error's message names the login, the token or the session, since appendix K documents no code for it. ([specs/adder-aim.yaml:314](specs/adder-aim.yaml#L314))
+- [ ] Check on AIM 5.10 that get_devices for receivers lists a current connection with an empty con_end_time, as the example shows, so receivers.<id>.connected is right, and that pages past 1000 devices come as total_devices says. ([specs/adder-aim.yaml:309](specs/adder-aim.yaml#L309))
+
+## adder-xdip — Adder XDIP receivers
+
+- [ ] Check that a switch with an expired token (after a day) is answered 401, which logs in again, and that a receiver without an Access password answers the access login with 401. ([specs/adder-xdip.yaml:49](specs/adder-xdip.yaml#L49))
+
 ## aes70 — AES70 / OCA devices
 
 - [ ] Check the device's OCP.1 port (AES70 assigns none) and which transports it accepts: TCP, UDP, WebSocket (and its path), or only secure OCP.1. ([specs/aes70.yaml:401](specs/aes70.yaml#L401))
@@ -1782,6 +1791,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Run the MTC generator into a DAW or lighting console chasing MTC, over a MIDI port and over RTP-MIDI, at 24, 25, 30df and 30: confirm it locks at the time located, reads drop-frame across a minute (00:00:59:28 to 00:01:00:02), and stays within a frame of the core's clock for an hour. ([specs/generic-midi.yaml:457](specs/generic-midi.yaml#L457))
 - [ ] Against an MMC device (a DAW or recorder), confirm READ answers for selected_time_code and motion_control_tally decode as kept, including short time code updates. ([specs/generic-midi.yaml:475](specs/generic-midi.yaml#L475))
 
+## generic-modbus — Generic Modbus TCP server
+
+- [ ] Check the word_order setting against devices that document 32-bit floats and integers in either register order (a power meter, a PLC), and that 0-based addressing matches devices that document 1-based 4xxxx and 3xxxx registers. ([specs/generic-modbus.yaml:220](specs/generic-modbus.yaml#L220))
+- [ ] Check that servers answer a liveness read of a register they lack with an exception rather than silence, and that common Modbus TCP to RTU gateways answer for the unit IDs behind them without stalling the single outstanding request. ([specs/generic-modbus.yaml:245](specs/generic-modbus.yaml#L245))
+
+## generic-mqtt — Generic MQTT broker client
+
+- [ ] Connect to Mosquitto, EMQX and HiveMQ with versions 3.1.1 and 5 over tcp, tls and wss, and confirm CONNACK, SUBACK and version 5 properties (server keep alive, assigned client id, maximum QoS) are read as described, and that their WebSocket endpoints accept the mqtt subprotocol at the paths they document. ([specs/generic-mqtt.yaml:42](specs/generic-mqtt.yaml#L42))
+- [ ] With clean_start false and a session expiry, confirm a broker delivers the messages queued while the client was away after reconnecting, and that dropping unacknowledged QoS 1 and 2 publishes (not resent with DUP) is acceptable to it. ([specs/generic-mqtt.yaml:153](specs/generic-mqtt.yaml#L153))
+
 ## generic-ping — Network presence (ping) and Wake-on-LAN
 
 - [ ] Check that network adapters with a SecureOn password take it as 4 or 6 bytes right after the sixteen MAC repetitions (from practice, not AMD's paper). ([specs/generic-ping.yaml:66](specs/generic-ping.yaml#L66))
@@ -1938,6 +1957,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the argument types Mitti accepts: values are sent as OSC strings ("75", "-3.5", "0.50") as the Companion module does; check whether floats or ints are what the OSC Query server advertises, and the types Mitti's feedback carries. ([specs/imimot-mitti.yaml:647](specs/imimot-mitti.yaml#L647))
 - [ ] Check whether cue-level feedback keys a cue by its number or its ID, and the value range of the documented /mitti/<cue>/opacity. ([specs/imimot-mitti.yaml:654](specs/imimot-mitti.yaml#L654))
 - [ ] Confirm the UDP string form of the no-value commands, and that OSC control is ignored while Mitti follows MTC or LTC. ([specs/imimot-mitti.yaml:664](specs/imimot-mitti.yaml#L664))
+
+## integ-jnior — INTEG JNIOR automation controllers
+
+- [ ] Check the WebSocket transport's path: the manual describes the interface on the web server's port but not the path the WebUI connects to; / is assumed. ([specs/integ-jnior.yaml:44](specs/integ-jnior.yaml#L44))
+- [ ] Confirm every response the integration waits for (Registry, File, Console, Enumerate and Read Devices, Clock) echoes the request's Meta, as the manual says of responses in general; a response without it would time out the command. ([specs/integ-jnior.yaml:7](specs/integ-jnior.yaml#L7))
+- [ ] Check on a unit with JMPServer/Login disabled that a Monitor or Authenticated message arrives without a challenge, which the integration takes as logged in. ([specs/integ-jnior.yaml:254](specs/integ-jnior.yaml#L254))
 
 ## ioversal-vertex — ioversal VERTEX
 
@@ -2362,6 +2387,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Find out the user status codes besides 2 (enabled), and the gateway device status codes. ([specs/kiloview-rf02.yaml:871](specs/kiloview-rf02.yaml#L871))
 - [ ] Find the units of the gateway device CPU, memory, uptime and disk values. ([specs/kiloview-rf02.yaml:912](specs/kiloview-rf02.yaml#L912))
 - [ ] Check that delete_gateway_channel's single-entry list body is accepted. ([specs/kiloview-rf02.yaml:389](specs/kiloview-rf02.yaml#L389))
+
+## kissbox-io — KissBox IO3CC and IO8CC I/O card frames
+
+- [ ] Check where a frame on the UDP firmware sends its answers to reads: to the destination port set in the Editor as a broadcast (as the core expects, listening on feedback_port), or back to the sender's port. ([specs/kissbox-io.yaml:109](specs/kissbox-io.yaml#L109))
+- [ ] Check that input change notifications use the all channel status (A1h) or single channel status (A3h) layout, which the protocol document does not state for notifications. ([specs/kissbox-io.yaml:7](specs/kissbox-io.yaml#L7))
 
 ## kramer-p3000 — Kramer Protocol 3000
 
@@ -3189,6 +3219,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record whether the multi-window report (FD) starts with the window number. ([specs/philips-sicp.yaml:792](specs/philips-sicp.yaml#L792))
 - [ ] Confirm the operating hours report is a big-endian 16-bit count of hours. ([specs/philips-sicp.yaml:724](specs/philips-sicp.yaml#L724))
 
+## pigpio — Raspberry Pi GPIO (pigpio daemon)
+
+- [ ] Check against pigpiod (version 79) on a Raspberry Pi 4 that NOIB on a second connection answers the handle and then streams reports for the GPIO NB names on the first, as the C interface describes for socket notifications. ([specs/pigpio.yaml:7](specs/pigpio.yaml#L7))
+
+## pikvm — PiKVM
+
+- [ ] Check the PiKVM Switch commands' answers (the reference shows FIXME for each) and that status 200 means the switch acted. ([specs/pikvm.yaml:694](specs/pikvm.yaml#L694))
+- [ ] Check on current KVMD that the websocket events still carry whole states as the reference's examples show (hid_state with outputs and jiggler, msd_state with storage.images by name), and that ocr_right and ocr_bottom are the region's bounds rather than its width and height. ([specs/pikvm.yaml:681](specs/pikvm.yaml#L681))
+- [ ] Confirm the GPIO switch route is /api/gpio/switch (the reference's heading says /gpio/switch, its example /api/gpio/switch). ([specs/pikvm.yaml:342](specs/pikvm.yaml#L342))
+
 ## pixotope — Pixotope
 
 - [ ] Record the Gateway's HTTP answer bodies (to a Set, a Get, a Call, and a Call that times out), so replies can be read into state. ([specs/pixotope.yaml:321](specs/pixotope.yaml#L321))
@@ -3272,6 +3312,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that playlist_get by UUID answers id and items for a playlist inside folders, as the document gives it. ([specs/propresenter.yaml:2232](specs/propresenter.yaml#L2232))
 - [ ] Check the media and audio playlist replies: the document gives media's items as an object with array fields and audio's reply as an array of playlists; an object with id and an items array is assumed for both. ([specs/propresenter.yaml:2260](specs/propresenter.yaml#L2260))
 - [ ] Open POST /v1/status/updates with Accept application/json and confirm each update arrives as {"url", "data"} followed by a blank line (not as server-sent events), that url carries /v1 as the document's example does, and that data is what each endpoint's own GET returns; and record whether the stream ends when ProPresenter changes presentations. ([specs/propresenter.yaml:1756](specs/propresenter.yaml#L1756))
+
+## ptp — PTP version 2 (IEEE 1588) network monitor
+
+- [ ] On a SMPTE ST 2059-2 or AES67 network with a real grandmaster (and a boundary clock), confirm the Announce dataset, the best master and the clock accuracy and time source texts match what the grandmaster's own interface shows. ([specs/ptp.yaml:87](specs/ptp.yaml#L87))
+- [ ] Confirm the Delay_Req (1) and Delay_Resp (9) message types and the slave role they show, taken from a BSD-licensed decoder rather than IEEE 1588's own text, against a real end-to-end network. ([specs/ptp.yaml:107](specs/ptp.yaml#L107))
+- [ ] Check host_offset_ms on a host disciplined by PTP (it should stay within a millisecond or so) and on one that is not, and that sharing ports 319 and 320 with a PTP daemon on the same host works on Windows, Linux and macOS. ([specs/ptp.yaml:158](specs/ptp.yaml#L158))
 
 ## ptzoptics — PTZOptics
 

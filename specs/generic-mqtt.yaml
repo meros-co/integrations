@@ -1,0 +1,174 @@
+spec: 1
+id: generic-mqtt
+name: Generic MQTT broker client
+vendor: Generic (any MQTT 3.1.1 or 5 broker, such as Mosquitto, EMQX, HiveMQ or a device's own broker, and the devices publishing through it)
+category: other
+implementation: native
+reason: >
+  MQTT is a binary session protocol: a CONNECT answered by CONNACK, variable-length control packets, packet
+  identifiers tying PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK and UNSUBACK to their requests, the broker delivering
+  messages at any time with QoS 1 and 2 handshakes the client must answer, keep alive pings the client must send,
+  and version 5's property lists; over TCP, TLS or a WebSocket carrying the packets in binary messages.
+
+source:
+  - title: "MQTT Version 3.1.1, OASIS Standard (29 October 2014), with Errata 01 (10 December 2015)"
+    author: OASIS
+    url: http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html
+    note: >
+      Fixed header and remaining length (§2.2), packet identifiers (§2.3.1); CONNECT with protocol level 4, connect
+      flags (user name, password, will retain, will QoS, will flag, clean session), keep alive, client identifier
+      (empty only with clean session) (§3.1); CONNACK session present and return codes 0 to 5 (§3.2); PUBLISH flags
+      DUP, QoS, RETAIN, and PUBACK, PUBREC, PUBREL (flags 0010) and PUBCOMP (§3.3 to §3.7); SUBSCRIBE (flags 0010) and
+      SUBACK return codes 0 to 2 and 80h (§3.8, §3.9); UNSUBSCRIBE and UNSUBACK (§3.10, §3.11); PINGREQ and
+      PINGRESP (§3.12, §3.13); DISCONNECT (§3.14); QoS 2 delivery once, method B for the receiver (§4.3.3); topic
+      names and filters with + and # wildcards (§4.7); IANA ports 1883 and 8883 for TLS (§4.2); WebSocket with the
+      mqtt subprotocol and binary frames (§6).
+  - title: "MQTT Version 5.0, OASIS Standard (7 March 2019)"
+    author: OASIS
+    url: https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html
+    note: >
+      Variable byte integers and properties (§1.5.5, §2.2.2), reason codes (§2.4); CONNECT with protocol level 5,
+      clean start, session expiry interval (§3.1); CONNACK reason codes and properties: session expiry, receive
+      maximum, maximum QoS, retain available, maximum packet size, assigned client identifier, topic alias maximum,
+      reason string, wildcard, subscription identifier and shared subscription availability, server keep alive,
+      response information, server reference (§3.2); PUBLISH properties: payload format indicator, message expiry,
+      topic alias, response topic, correlation data, user properties, subscription identifier, content type (§3.3);
+      PUBACK, PUBREC and PUBCOMP reason codes, present only when the remaining length allows (§3.4 to §3.7);
+      subscription options: QoS, no local, retain as published, retain handling (§3.8.3.1); SUBACK and UNSUBACK
+      reason codes (§3.9, §3.11); DISCONNECT from the server with a reason code (§3.14); AUTH for enhanced
+      authentication (§3.15, §4.12).
+
+settings:
+  transport: { type: enum, values: [tcp, tls, ws, wss], default: tcp, label: Transport,
+               description: "tcp is plain MQTT (1883), tls is MQTT over TLS (8883), ws and wss are MQTT over a WebSocket, plain or secure, at ws_path." }
+  ws_port: { type: int, min: 1, max: 65535, default: 80, label: WebSocket port, description: "With transport ws, the broker's WebSocket port when none is given on opening (often 80, 8080 or 9001)." }
+  wss_port: { type: int, min: 1, max: 65535, default: 443, label: Secure WebSocket port, description: "With transport wss, the broker's secure WebSocket port when none is given on opening (often 443 or 8084)." }
+  ws_path: { type: string, max_length: 256, pattern: '^[!-~]*$', default: /mqtt, label: WebSocket path, description: "With transport ws or wss, the path of the broker's MQTT WebSocket endpoint." }
+  accept_invalid_certs: { type: bool, default: false, label: Accept self-signed certificates, description: "With tls or wss, accept a broker certificate that is self-signed or does not name the host; the link is encrypted but the broker not authenticated." }
+  version: { type: enum, values: ["3.1.1", "5"], default: "3.1.1", label: MQTT version, description: "The protocol version spoken: 3.1.1, which every current broker accepts, or 5, which adds properties, reason codes and subscription options." }
+  client_id: { type: string, max_length: 256, default: "", label: Client ID, description: "The client identifier; empty lets the broker assign one, which needs a clean session (always used then)." }
+  username: { type: string, max_length: 1024, default: "", label: User name, description: "The user name sent in CONNECT; empty sends none." }
+  password: { type: string, secret: true, max_length: 1024, default: "", label: Password, description: "The password sent in CONNECT; empty sends none." }
+  clean_start: { type: bool, default: true, label: Clean session, description: "Start a new session on each connection (3.1.1 clean session, 5 clean start); false resumes the broker's stored session for the client ID." }
+  session_expiry_s: { type: int, min: 0, max: 4294967295, default: 0, label: Session expiry, description: "Version 5: seconds the broker keeps the session after the connection ends; 0 ends it with the connection, 4294967295 never." }
+  keepalive_s: { type: int, min: 0, max: 65535, default: 30, label: Keep alive, description: "Seconds the client may stay silent; a ping goes every three quarters of it, and 0 turns pings off." }
+  timeout_ms: { type: int, min: 1, max: 600000, default: 10000, label: Timeout, description: "Milliseconds to wait for a PUBACK, PUBREC, PUBCOMP, SUBACK or UNSUBACK before failing the command." }
+  subscriptions: { type: string, max_length: 65536, default: "", label: Subscriptions, description: "Topic filters subscribed on each connection, separated by commas or line breaks, each optionally ending @0, @1 or @2 for its QoS: studio/+/tally@1, sensors/#." }
+  will_topic: { type: string, max_length: 65535, default: "", label: Will topic, description: "The topic the broker publishes the will message to if the connection is lost without a DISCONNECT; empty sets no will." }
+  will_payload: { type: string, max_length: 65535, default: "", label: Will message, description: "The will message's payload, as text." }
+  will_qos: { type: int, min: 0, max: 2, default: 0, label: Will QoS, description: "The QoS the will message is published with." }
+  will_retain: { type: bool, default: false, label: Retain will, description: "Whether the will message is published retained." }
+
+ports:
+  - { port: 1883, protocol: tcp, role: control, when: "transport tcp" }
+  - { port: 8883, protocol: tls, role: control, when: "transport tls" }
+  - { port: 80, protocol: ws, role: control, setting: ws_port, when: "transport ws" }
+  - { port: 443, protocol: wss, role: control, setting: wss_port, when: "transport wss" }
+
+models:
+  - id: generic
+    name: "Any MQTT 3.1.1 or 5 broker (give its address, and its port if not the transport's default)"
+    supports: [publish, subscribe, unsubscribe, clear_retained]
+    verification: none
+
+commands:
+  publish:
+    summary: >
+      Publish a message: at QoS 0 it is sent and reported unverified, at QoS 1 the broker's PUBACK and at QoS 2 its
+      PUBCOMP (after PUBREC and PUBREL) confirm it; a version 5 reason code of 80h or above fails it
+    params:
+      topic: { type: string, max_length: 65535, required: true, label: Topic, description: "The topic name, without wildcards, such as studio/camera1/tally." }
+      payload: { type: string, multiline: true, max_length: 268435455, default: "", label: Payload, description: "The message as text, or as hex or base64 bytes when encoding says so; empty sends a message with no payload." }
+      encoding: { type: enum, values: [text, hex, base64], default: text, label: Payload encoding, description: "text sends the payload as UTF-8; hex and base64 decode it to the bytes sent." }
+      qos: { type: int, min: 0, max: 2, default: 0, label: QoS, description: "0 at most once, 1 at least once, 2 exactly once." }
+      retain: { type: bool, default: false, label: Retain, description: "Ask the broker to keep the message and give it to future subscribers." }
+      content_type: { type: string, max_length: 1024, default: "", label: Content type, description: "Version 5: the payload's content type, such as application/json; empty sends none." }
+      response_topic: { type: string, max_length: 65535, default: "", label: Response topic, description: "Version 5: the topic a responder should answer on; empty sends none." }
+      correlation_data: { type: string, max_length: 65535, default: "", label: Correlation data, description: "Version 5: text the responder echoes to tie its answer to this message; empty sends none." }
+      message_expiry_s: { type: int, min: 0, max: 4294967295, default: 0, label: Message expiry, description: "Version 5: seconds after which the broker drops the message if undelivered; 0 never." }
+      user_properties: { type: string, max_length: 65535, default: "", label: User properties, description: "Version 5: name=value pairs separated by semicolons, sent as user properties; empty sends none." }
+    returns: ack
+  subscribe:
+    summary: >
+      Subscribe to a topic filter; SUBACK's granted QoS is returned, and a refusal fails it with its reason. The
+      filter is subscribed again after each reconnection until unsubscribed
+    params:
+      filter: { type: string, max_length: 65535, required: true, label: Topic filter, description: "The filter, with + for one level and # for every level below: studio/+/tally, sensors/#." }
+      qos: { type: int, min: 0, max: 2, default: 0, label: Maximum QoS, description: "The highest QoS the broker should deliver with." }
+      no_local: { type: bool, default: false, label: No local, description: "Version 5: do not receive this client's own messages on this subscription." }
+      retain_as_published: { type: bool, default: false, label: Retain as published, description: "Version 5: keep the retain flag of forwarded messages as they were published." }
+      retain_handling: { type: enum, values: [always, if_new, never], default: always, label: Retained messages, description: "Version 5: when the broker sends the retained messages matching the filter: on every subscribe, only if the subscription is new, or never." }
+    returns: value
+  unsubscribe:
+    summary: Unsubscribe from a topic filter, answered by UNSUBACK
+    params:
+      filter: { type: string, max_length: 65535, required: true, label: Topic filter, description: "The filter as it was subscribed." }
+    returns: ack
+  clear_retained:
+    summary: Publish an empty retained message to a topic, which removes the broker's retained message there
+    params:
+      topic: { type: string, max_length: 65535, required: true, label: Topic, description: "The topic whose retained message is removed." }
+      qos: { type: int, min: 0, max: 2, default: 1, label: QoS, description: "The QoS the empty message is published with." }
+    returns: ack
+
+state:
+  version: { type: string, description: "The MQTT version connected with: 3.1.1 or 5" }
+  session.present: { type: bool, description: "Whether the broker resumed a stored session for the client (CONNACK session present)" }
+  session.client_id: { type: string, description: "The client identifier: the configured one, or the one a version 5 broker assigned; empty when a 3.1.1 broker assigned one without saying it" }
+  server.session_expiry: { type: int, unit: s, description: "Version 5: the session expiry the broker set, when it differs from the one asked" }
+  server.receive_maximum: { type: int, description: "Version 5: QoS 1 and 2 messages the broker takes in flight at once" }
+  server.maximum_qos: { type: int, description: "Version 5: the highest QoS the broker accepts, when below 2" }
+  server.retain_available: { type: bool, description: "Version 5: whether the broker keeps retained messages" }
+  server.maximum_packet_size: { type: int, unit: bytes, description: "Version 5: the largest packet the broker accepts" }
+  server.topic_alias_maximum: { type: int, description: "Version 5: topic aliases the broker accepts from the client" }
+  server.wildcard_subscription_available: { type: bool, description: "Version 5: whether wildcard filters are allowed" }
+  server.subscription_identifiers_available: { type: bool, description: "Version 5: whether subscription identifiers are allowed" }
+  server.shared_subscription_available: { type: bool, description: "Version 5: whether shared subscriptions ($share/...) are allowed" }
+  server.server_keep_alive: { type: int, unit: s, description: "Version 5: the keep alive the broker imposes in place of the one asked" }
+  server.response_information: { type: string, description: "Version 5: the broker's response information" }
+  server.server_reference: { type: string, description: "Version 5: another broker the client is pointed to" }
+  subscriptions.*.qos: { type: int, description: "A subscribed filter's granted QoS, keyed by the filter" }
+  subscriptions.*.error: { type: string, description: "Why the broker refused a filter (its reason), instead of a QoS" }
+  topics.*.payload: { type: string, description: "The last message on a topic (keyed by the topic name): its payload as text, or as base64 when it is not UTF-8" }
+  topics.*.encoding: { type: string, description: "How payload holds the bytes: text or base64" }
+  topics.*.qos: { type: int, description: "The QoS the message was delivered with" }
+  topics.*.retained: { type: bool, description: "Whether it was delivered as a retained message (sent on subscribing)" }
+  topics.*.received_at: { type: int, unit: ms, description: "When it arrived, in milliseconds since 1970-01-01 UTC" }
+  topics.*.content_type: { type: string, description: "Version 5: its content type" }
+  topics.*.response_topic: { type: string, description: "Version 5: its response topic" }
+  topics.*.correlation_data: { type: string, description: "Version 5: its correlation data, as base64" }
+  topics.*.user_properties: { type: array, description: "Version 5: its user properties, as [name, value] pairs in order" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Every message is also a message event, {event: message, address: <topic>, args: {payload, encoding, qos, retain,
+      and with version 5 content_type, response_topic, correlation_data, message_expiry_s, payload_format,
+      subscription_id, user_properties}}, since a repeated payload changes no state. Topics are kept in state whatever
+      their number: a filter such as # on a busy broker keeps every topic it delivers.
+  - models: [all]
+    severity: info
+    text: >
+      QoS 1 and 2 messages the client sent and the broker had not confirmed when the connection dropped fail with
+      transport and are not sent again with DUP on reconnecting; publish again to retry. Messages the broker delivers
+      are acknowledged as they arrive, and a QoS 2 message is delivered once until its PUBREL.
+  - models: [all]
+    severity: info
+    text: >
+      TLS checks the broker's certificate against public roots and the host name (accept_invalid_certs for a
+      self-signed one); client certificates are not offered. Version 5 enhanced authentication (AUTH, an
+      authentication method) is not offered: user name and password only. Topic aliases are not used either way.
+  - models: [all]
+    severity: info
+    text: >
+      A refused user name or password, or a client not authorized (3.1.1 return codes 4 and 5; version 5 reason codes
+      86h, 87h, 8Ah banned and 8Ch), is terminal: the device is unauthorized and does not reconnect until its
+      settings change. Other refusals, a missing CONNACK within 10 s, a missing PINGRESP and a lost connection are
+      retried after 1 s, doubling to 30 s.
+  - models: [all]
+    severity: info
+    text: >
+      Opening for commands only subscribes nothing from the subscriptions setting; the connection and its keep alive
+      pings, which the protocol requires, stay, and commands (filters subscribed by command included) work as usual.
+      Messages a resumed session delivers still reach state.
