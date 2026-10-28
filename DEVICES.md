@@ -385,7 +385,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | Devices | Protocol | Documentation |
 |---|---|---|
 | Grass Valley Kaleido | Kaleido remote control protocol, TCP 13000 | Public |
-| TAG Video Systems MCS | REST | Public |
+| TAG Video Systems MCS | REST | On request (API documents are behind a login on TAG's portals) |
 | PHABRIX Qx beyond the manual's example requests (phabrix-qx is built from them), QxL, QxP; Leader LPX | REST (full reference from PHABRIX on request); LPX: no published remote API | On request |
 | Sony PVM / BVM monitors | Sony monitor control protocol over TCP | On request |
 | NDI Studio Monitor, Sienna NDI monitors (Tractus Multiview and FullView are built; Tractus Monitor for NDI has no remote API) | Studio Monitor: web control without a published API | Unknown |
