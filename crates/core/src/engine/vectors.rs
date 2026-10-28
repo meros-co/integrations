@@ -704,6 +704,8 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         "08F0100",
         // Shure UHF-R: a REPORT between asterisks.
         "* REPORT ok *",
+        // Meyer Sound GALAXY: the answer to :ping.
+        ":pong",
     ];
     let line = match &engine.transport {
         super::Transport::LineTcp {
