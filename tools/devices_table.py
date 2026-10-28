@@ -28,6 +28,7 @@ TRANSPORT = {
 
 # Native modules choose their own transport, so it is described here.
 NATIVE = {
+    "adder-aim": "AIM API (XML over HTTP or HTTPS)",
     "aes70": "OCP.1 over TCP, UDP, WebSocket, TLS or DTLS (the device's port)",
     "allenheath-ahm": "MIDI over TCP 51325",
     "allenheath-cq": "MIDI over TCP 51325",

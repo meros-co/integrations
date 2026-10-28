@@ -18,7 +18,7 @@ use std::{collections::BTreeSet, env, fs, path::PathBuf};
 const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-7thsense", &["7thsense-delta"]),
     ("vendor-ableton", &["ableton-live"]),
-    ("vendor-adder", &["adder-xdip"]),
+    ("vendor-adder", &["adder-aim", "adder-xdip"]),
     ("vendor-aes70", &["aes70"]),
     ("vendor-aimedia", &["aimedia-icap"]),
     (

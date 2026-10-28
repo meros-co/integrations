@@ -55,6 +55,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the value ranges Live accepts for tempo, song and scene signatures, clip transposition and detune, groove amount (the Live Object Model says 0 to 1), and what Live does with a value outside them. ([specs/ableton-live.yaml:3097](specs/ableton-live.yaml#L3097))
 - [ ] Confirm /live/startup is sent when Live loads another Set, so the rule registering everything again runs then. ([specs/ableton-live.yaml:3112](specs/ableton-live.yaml#L3112))
 
+## adder-aim — Adder AdderLink Infinity Manager (AIM API)
+
+- [ ] Check what the AIM answers a request with an ended or unknown token: the integration logs in again only when the error's message names the login, the token or the session, since appendix K documents no code for it. ([specs/adder-aim.yaml:314](specs/adder-aim.yaml#L314))
+- [ ] Check on AIM 5.10 that get_devices for receivers lists a current connection with an empty con_end_time, as the example shows, so receivers.<id>.connected is right, and that pages past 1000 devices come as total_devices says. ([specs/adder-aim.yaml:309](specs/adder-aim.yaml#L309))
+
 ## adder-xdip — Adder XDIP receivers
 
 - [ ] Check that a switch with an expired token (after a day) is answered 401, which logs in again, and that a receiver without an Access password answers the access login with 401. ([specs/adder-xdip.yaml:49](specs/adder-xdip.yaml#L49))

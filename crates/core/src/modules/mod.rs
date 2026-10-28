@@ -6,6 +6,8 @@
 //! A module shared by several integrations (one protocol, several product
 //! lines) is compiled when any of them is.
 
+#[cfg(feature = "adder-aim")]
+mod adder_aim;
 #[cfg(any(feature = "aes70", feature = "focusrite-rednet", feature = "dbaudio"))]
 mod aes70;
 #[cfg(any(feature = "aja-helo", feature = "aja-kipro", feature = "aja-kumo"))]
@@ -326,6 +328,8 @@ pub(crate) fn construct(
         "sacn" => Ok(Box::new(sacn::Sacn::new(context)?)),
         #[cfg(feature = "posistagenet")]
         "posistagenet" => Ok(Box::new(posistagenet::Psn::new(context)?)),
+        #[cfg(feature = "adder-aim")]
+        "adder-aim" => Ok(Box::new(adder_aim::AdderAim::new(context)?)),
         #[cfg(feature = "integ-jnior")]
         "integ-jnior" => Ok(Box::new(jnior::Jnior::new(context)?)),
         #[cfg(feature = "kissbox-io")]
