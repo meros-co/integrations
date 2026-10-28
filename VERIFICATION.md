@@ -4181,6 +4181,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the ID list's first two bytes count the IDs still to come after this message, and that NEXT (3X.02, answered 3X.82) continues it ten at a time. ([specs/vdcp.yaml:344](specs/vdcp.yaml#L344))
 - [ ] Check which VDCP commands Ross Tria, Mira and Kiva servers take and on which port. ([specs/vdcp.yaml:72](specs/vdcp.yaml#L72))
 
+## vdoninja — VDO.Ninja
+
+- [ ] Confirm the relay accepts {"join": key} with nothing answered, and how long an idle websocket lasts (a 30 s getDetails keep-alive is assumed to hold it). ([specs/vdoninja.yaml:90](specs/vdoninja.yaml#L90))
+- [ ] Confirm every websocket answer is {"callback": {action, target, value, result}} with the request's action, as the Companion module reads it (the README shows it only as a screenshot). ([specs/vdoninja.yaml:859](specs/vdoninja.yaml#L859))
+- [ ] Record getDetails' answer: whether result is an array or an object, and its fields (streamID, label, director, position, localStream, muted, videoMuted, speakerMuted, scenes, others mute-guest and hide-guest). ([specs/vdoninja.yaml:924](specs/vdoninja.yaml#L924))
+- [ ] Record getGuestList's answer shape (slots keyed "1", "2" with streamID and label assumed). ([specs/vdoninja.yaml:957](specs/vdoninja.yaml#L957))
+- [ ] Confirm values sent as strings ("true", "false", "toggle") are taken like booleans, and that activeSpeaker off is false. ([specs/vdoninja.yaml:104](specs/vdoninja.yaml#L104))
+- [ ] Confirm videoConstraint takes the constraint's name as target and its value in value2, and requestAspectRatio the largest dimension in value2. ([specs/vdoninja.yaml:416](specs/vdoninja.yaml#L416))
+- [ ] Record which update actions a page pushes (mic, camera, remoteMuted, remoteVideoMuted, directorMuted, directorVideoHide, hangup, endViewConnection, newViewConnection, positionChange, details) and their value types. ([specs/vdoninja.yaml:969](specs/vdoninja.yaml#L969))
+
 ## ventuz-director — Ventuz Director (Director Remoting)
 
 - [ ] Confirm Director Remoting's websocket answers on port 22404 (the documentation's port; the vendor's Companion module defaults to 21404). ([specs/ventuz-director.yaml:50](specs/ventuz-director.yaml#L50))

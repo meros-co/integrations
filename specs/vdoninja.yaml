@@ -1,0 +1,990 @@
+spec: 1
+id: vdoninja
+name: VDO.Ninja (remote control API)
+vendor: VDO.Ninja
+category: other
+
+# VDO.Ninja runs in a browser: a page opened with &api=KEY (a director's
+# room, a guest's push, the mixer or a scene) joins VDO.Ninja's API relay,
+# and the integration controls that page through the relay's websocket,
+# opened with host api.vdo.ninja on port 443 (or a self-hosted relay). The
+# page answers each command with its result and pushes updates; state
+# keeps every stream the page knows, as a director sees its guests.
+
+source:
+  - title: Companion Ninja, the VDO.Ninja remote HTTP/WSS API (README)
+    author: Steve Seguin (VDO.Ninja)
+    url: https://github.com/steveseguin/Companion-Ninja#readme
+    note: >
+      Manufacturer document, retrieved 2026-10-28; the API section of
+      VDO.Ninja's documentation points to it as the current reference.
+      Pages opened with &api=KEY take commands from api.vdo.ninja: HTTP GET
+      /{apiID}/{action}/{target}/{value}, HTTP POST /{apiID} with a JSON
+      body, or the websocket wss://api.vdo.ninja:443 after sending
+      {"join": apiID}, which times out about every minute unless used and
+      must then be joined again. Commands are {action, target, value} with
+      an optional value2; target and value are "null" when unused. Local
+      actions: speaker, mic, camera (true, false, toggle), volume (true,
+      false, 0 to 200), sendChat, showChatOverlay, record (true, false),
+      reload, hangup, bitrate (true, false, kbps), panning (true, false, 0
+      to 180), togglehand (raisehand), togglescreenshare, forceKeyframe,
+      group, joinGroup, leaveGroup, viewGroup, joinViewGroup,
+      leaveViewGroup (1 to 8), getDetails, requestStats, getStats (an
+      optional inbound stream as target), nextSlide, prevSlide, soloVideo,
+      muteAllGuests (true, false, toggle), stopRoomTimer, startRoomTimer
+      (seconds), PauseRoomTimer, getGuestList, setBufferDelay (ms, target a
+      stream or null), activeSpeaker ("toggle", false, null, 1, 2, 3),
+      tallylight (onair, active, standby, off), aspectRatio,
+      videoConstraint (name as target, value in value2), zoom, focus, pan,
+      tilt (relative, or zoom absolute with value2 abs), exposure (0 to 1)
+      and layout (an index, 0 the automatic mixer, or a layout array).
+      Director actions on a guest (slot 1 to 99, stream ID or UUID):
+      forward, addScene, setScene (value2 true or false),
+      activateQueuedGuest, setslot (0 unsets), muteScene, group, mic,
+      hangup, soloChat, soloChatBidirectional, speaker, display, mirror,
+      rotate (true, false, 90, 180, 270), channel (0, 1, 2),
+      sendDirectorChat, sendPinnedDirectorChat, forceKeyframe, soloVideo,
+      volume (0 to 200), the room timer, ptzZoom, ptzFocus, ptzPan, ptzTilt
+      (value2 abs for absolute), ptzAutofocus (true, false, manual, off),
+      requestResolution (WIDTHxHEIGHT), requestAspectRatio (value2 the
+      largest dimension), setWidth, setHeight, setAspectRatio,
+      refreshVideo, refreshConnection, recoverStream and mixorder (-1, 1).
+      Since version 22 every request is answered with its result (true,
+      false, null, fail, a value, or an object for getDetails); over the
+      websocket the answer is a JSON object holding the request and its
+      result, and the page also pushes details updates after state
+      changes. A server-sent event stream at /sse/{apiID} carries the same
+      events.
+  - title: VDO.Ninja documentation, API & MIDI Parameters, &api and API reference
+    author: Steve Seguin (VDO.Ninja)
+    url: https://docs.vdo.ninja/advanced-settings/api-and-midi-parameters/api
+    note: >
+      Manufacturer document, retrieved 2026-10-28: &api=KEY enables the
+      HTTP/WSS remote control API on a page (&osc is a legacy alias; there
+      is no native OSC). The API reference page is a snapshot of the README
+      above as of 2023-08-16.
+  - title: Bitfocus Companion module for VDO.Ninja (companion-module-vdo-ninja)
+    author: Bitfocus and contributors
+    url: https://github.com/bitfocus/companion-module-vdo-ninja
+    note: >
+      MIT licence, consulted 2026-10-28 as corroboration of the websocket
+      messages the README shows only as screenshots: answers arrive as
+      {"callback": {action, target, value, result}} (getDetails' result
+      listing every stream with streamID, label, director, position,
+      localStream, muted, videoMuted, speakerMuted, scenes and others
+      mute-guest and hide-guest), and pushes as {"update": {streamID,
+      action, value}} with actions such as mic, camera, remoteMuted,
+      remoteVideoMuted, directorMuted, directorVideoHide, hangup,
+      endViewConnection, newViewConnection, positionChange, seeding,
+      tracksAdded and details. No code was copied.
+
+transport:
+  type: ws
+  port: 443
+  path: /
+  scheme: wss
+  timeout_ms: 3000
+  reply: expected
+  # The relay drops a socket idle for about a minute: getDetails every 30 s
+  # keeps it (and its answer refreshes state).
+  keepalive: { send: '{"action":"getDetails","target":"null","value":"null"}', every_ms: 30000 }
+
+settings:
+  api_key: { type: string, secret: true, pattern: "^[A-Za-z0-9_-]+$", max_length: 128, required: true,
+             label: API key,
+             description: "The key the controlled page was opened with as &api=KEY; anyone with it controls the page, so keep it private." }
+
+on_connect:
+  - '{"join":{settings.api_key:json}}'
+
+ports:
+  - { port: 443, protocol: wss, role: control, note: "VDO.Ninja's API relay at api.vdo.ninja, opened by that host name, or a self-hosted relay" }
+
+maps:
+  active_speaker: { toggle: '"toggle"', "off": "false", "1": "1", "2": "2", "3": "3" }
+  rotation: { next: "true", reset: "false", "90": "90", "180": "180", "270": "270" }
+  mix_order: { earlier: "-1", later: "1" }
+
+models:
+  - id: api
+    name: VDO.Ninja page with &api (director, guest, mixer or scene)
+    supports: [set_speaker, set_mic, set_camera, set_volume, set_playback_muted, send_chat, show_chat_overlay, set_recording, reload, hangup, set_incoming_bitrate, reset_incoming_bitrate, pause_incoming_video, set_panning, center_panning, toggle_hand, toggle_screen_share, force_keyframe, toggle_group, join_group, leave_group, toggle_view_group, join_view_group, leave_view_group, get_details, request_stats, get_stats, get_stream_stats, next_slide, prev_slide, set_solo_video, mute_all_guests, start_room_timer, pause_room_timer, stop_room_timer, get_guest_list, set_buffer_delay, set_stream_buffer_delay, set_active_speaker, set_tally_light, set_aspect_ratio, set_video_constraint, zoom, set_zoom, focus, pan, tilt, set_exposure, set_layout, set_layout_custom, forward_guest, toggle_guest_scene, set_guest_scene, activate_queued_guest, set_guest_slot, toggle_guest_scene_audio, toggle_guest_group, toggle_guest_mic, hangup_guest, toggle_guest_solo_chat, toggle_guest_solo_chat_bidirectional, toggle_guest_speaker, toggle_guest_display, set_guest_mirror, rotate_guest, set_guest_channel, send_director_chat, send_pinned_director_chat, force_guest_keyframe, toggle_guest_solo_video, set_guest_volume, start_guest_timer, pause_guest_timer, stop_guest_timer, guest_zoom, set_guest_zoom, guest_focus, set_guest_focus, guest_pan, set_guest_pan, guest_tilt, set_guest_tilt, set_guest_autofocus, request_guest_resolution, request_guest_aspect_ratio, set_guest_width, set_guest_height, set_guest_aspect_ratio, refresh_guest_video, restart_guest_connection, recover_guest_stream, move_guest_mix_order]
+    verification: none
+    notes: >
+      Local actions control the page itself; guest actions need the page
+      to be a room's director (or co-director, or the mixer). Some actions
+      name the VDO.Ninja version that added them (v22 to v27).
+
+commands:
+  set_speaker:
+    summary: "Unmute, mute or toggle the page's speaker (speaker)"
+    params:
+      state: {"type": "enum", "values": ["true", "false", "toggle"], "required": true, "label": "Speaker", "description": "true unmutes the speaker, false mutes it, toggle flips it."}
+    send: '{"action":"speaker","target":"null","value":{state:json}}'
+    expect: { reply_json: { "$.callback.action": "speaker" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_mic:
+    summary: "Unmute, mute or toggle the page's microphone (mic)"
+    params:
+      state: {"type": "enum", "values": ["true", "false", "toggle"], "required": true, "label": "Microphone", "description": "true unmutes the microphone, false mutes it, toggle flips it."}
+    send: '{"action":"mic","target":"null","value":{state:json}}'
+    expect: { reply_json: { "$.callback.action": "mic" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_camera:
+    summary: "Turn the page's camera on, off, or toggle it (camera)"
+    params:
+      state: {"type": "enum", "values": ["true", "false", "toggle"], "required": true, "label": "Camera", "description": "true turns the camera on, false off, toggle flips it."}
+    send: '{"action":"camera","target":"null","value":{state:json}}'
+    expect: { reply_json: { "$.callback.action": "camera" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_volume:
+    summary: "Set the playback volume of every audio track the page plays (volume)"
+    params:
+      level: {"type": "int", "min": 0, "max": 200, "required": true, "label": "Volume", "description": "Playback volume in percent, 0 to 200, 100 being unchanged."}
+    send: '{"action":"volume","target":"null","value":{level}}'
+    expect: { reply_json: { "$.callback.action": "volume" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_playback_muted:
+    summary: "Mute every audio track the page plays (volume 0 %), or restore 100 % (volume true or false)"
+    params:
+      muted: {"type": "enum", "values": ["true", "false"], "required": true, "label": "Muted", "description": "true sets playback to 0 %, false back to 100 %."}
+    send: '{"action":"volume","target":"null","value":{muted:json}}'
+    expect: { reply_json: { "$.callback.action": "volume" }, json_path: "$.callback.result" }
+    returns: value
+
+  send_chat:
+    summary: "Send a chat message to everyone connected (sendChat)"
+    params:
+      message: {"type": "string", "pattern": "\\S", "max_length": 2000, "required": true, "label": "Message", "description": "The chat message."}
+    send: '{"action":"sendChat","target":"null","value":{message:json}}'
+    expect: { reply_json: { "$.callback.action": "sendChat" }, json_path: "$.callback.result" }
+    returns: value
+
+  show_chat_overlay:
+    summary: "Show a chat message as an overlay on this page only (showChatOverlay)"
+    params:
+      message: {"type": "string", "pattern": "\\S", "max_length": 2000, "required": true, "label": "Message", "description": "The text to overlay."}
+    send: '{"action":"showChatOverlay","target":"null","value":{message:json}}'
+    expect: { reply_json: { "$.callback.action": "showChatOverlay" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_recording:
+    summary: "Start or stop recording the page's own video to disk (record)"
+    params:
+      recording: {"type": "enum", "values": ["true", "false"], "required": true, "label": "Recording", "description": "true starts a local recording (the browser may ask where to save it), false stops it."}
+    send: '{"action":"record","target":"null","value":{recording:json}}'
+    expect: { reply_json: { "$.callback.action": "record" }, json_path: "$.callback.result" }
+    returns: value
+
+  reload:
+    summary: "Reload the page (reload)"
+    send: '{"action":"reload","target":"null","value":"null"}'
+    expect: { reply_json: { "$.callback.action": "reload" }, json_path: "$.callback.result" }
+    returns: value
+
+  hangup:
+    summary: "Hang up the page's connection; for a director, stop its microphone and camera (hangup)"
+    send: '{"action":"hangup","target":"null","value":"null"}'
+    expect: { reply_json: { "$.callback.action": "hangup" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_incoming_bitrate:
+    summary: "Set the video bitrate of every incoming stream (bitrate)"
+    params:
+      kbps: {"type": "int", "min": 1, "max": 100000, "required": true, "label": "Bitrate", "description": "Target bitrate in kilobits per second."}
+    send: '{"action":"bitrate","target":"null","value":{kbps}}'
+    expect: { reply_json: { "$.callback.action": "bitrate" }, json_path: "$.callback.result" }
+    returns: value
+
+  reset_incoming_bitrate:
+    summary: "Unlock (reset) the bitrate of every incoming video stream (bitrate true)"
+    send: '{"action":"bitrate","target":"null","value":"true"}'
+    expect: { reply_json: { "$.callback.action": "bitrate" }, json_path: "$.callback.result" }
+    returns: value
+
+  pause_incoming_video:
+    summary: "Pause every incoming video stream by setting its bitrate to 0 (bitrate false)"
+    send: '{"action":"bitrate","target":"null","value":"false"}'
+    expect: { reply_json: { "$.callback.action": "bitrate" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_panning:
+    summary: "Set the stereo panning of every incoming audio stream (panning)"
+    params:
+      pan: {"type": "int", "min": 0, "max": 180, "required": true, "label": "Pan", "description": "0 is full left, 90 center, 180 full right."}
+    send: '{"action":"panning","target":"null","value":{pan}}'
+    expect: { reply_json: { "$.callback.action": "panning" }, json_path: "$.callback.result" }
+    returns: value
+
+  center_panning:
+    summary: "Center the panning of every incoming audio stream (panning true)"
+    send: '{"action":"panning","target":"null","value":"true"}'
+    expect: { reply_json: { "$.callback.action": "panning" }, json_path: "$.callback.result" }
+    returns: value
+
+  toggle_hand:
+    summary: "Raise or lower the page's hand (togglehand)"
+    send: '{"action":"togglehand","target":"null","value":"null"}'
+    expect: { reply_json: { "$.callback.action": "togglehand" }, json_path: "$.callback.result" }
+    returns: value
+
+  toggle_screen_share:
+    summary: "Start or stop screen sharing; the browser still asks which screen (togglescreenshare)"
+    send: '{"action":"togglescreenshare","target":"null","value":"null"}'
+    expect: { reply_json: { "$.callback.action": "togglescreenshare" }, json_path: "$.callback.result" }
+    returns: value
+
+  force_keyframe:
+    summary: "Make the page's published stream send a keyframe to every viewer (forceKeyframe)"
+    send: '{"action":"forceKeyframe","target":"null","value":"null"}'
+    expect: { reply_json: { "$.callback.action": "forceKeyframe" }, json_path: "$.callback.result" }
+    returns: value
+
+  toggle_group:
+    summary: "Toggle the director in or out of a group (group)"
+    params:
+      group: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Group", "description": "The group, 1 to 8."}
+    send: '{"action":"group","target":"null","value":{group}}'
+    expect: { reply_json: { "$.callback.action": "group" }, json_path: "$.callback.result" }
+    returns: value
+
+  join_group:
+    summary: "Have the director join a group (joinGroup)"
+    params:
+      group: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Group", "description": "The group, 1 to 8."}
+    send: '{"action":"joinGroup","target":"null","value":{group}}'
+    expect: { reply_json: { "$.callback.action": "joinGroup" }, json_path: "$.callback.result" }
+    returns: value
+
+  leave_group:
+    summary: "Have the director leave a group (leaveGroup)"
+    params:
+      group: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Group", "description": "The group, 1 to 8."}
+    send: '{"action":"leaveGroup","target":"null","value":{group}}'
+    expect: { reply_json: { "$.callback.action": "leaveGroup" }, json_path: "$.callback.result" }
+    returns: value
+
+  toggle_view_group:
+    summary: "Toggle the director's preview of a group (viewGroup)"
+    params:
+      group: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Group", "description": "The group, 1 to 8."}
+    send: '{"action":"viewGroup","target":"null","value":{group}}'
+    expect: { reply_json: { "$.callback.action": "viewGroup" }, json_path: "$.callback.result" }
+    returns: value
+
+  join_view_group:
+    summary: "Have the director preview a group (joinViewGroup)"
+    params:
+      group: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Group", "description": "The group, 1 to 8."}
+    send: '{"action":"joinViewGroup","target":"null","value":{group}}'
+    expect: { reply_json: { "$.callback.action": "joinViewGroup" }, json_path: "$.callback.result" }
+    returns: value
+
+  leave_view_group:
+    summary: "Have the director stop previewing a group (leaveViewGroup)"
+    params:
+      group: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Group", "description": "The group, 1 to 8."}
+    send: '{"action":"leaveViewGroup","target":"null","value":{group}}'
+    expect: { reply_json: { "$.callback.action": "leaveViewGroup" }, json_path: "$.callback.result" }
+    returns: value
+
+  get_details:
+    summary: "The page's state and, for a director, every guest's, kept in state (getDetails)"
+    send: '{"action":"getDetails","target":"null","value":"null"}'
+    expect: { reply_json: { "$.callback.action": "getDetails" }, json_path: "$.callback.result" }
+    returns: value
+
+  request_stats:
+    summary: "Detailed live statistics of the page, peers included (requestStats)"
+    send: '{"action":"requestStats","target":"null","value":"null"}'
+    expect: { reply_json: { "$.callback.action": "requestStats" }, json_path: "$.callback.result" }
+    returns: value
+
+  get_stats:
+    summary: "Inbound and outbound statistics with bitrates (getStats)"
+    send: '{"action":"getStats","target":"null","value":"null"}'
+    expect: { reply_json: { "$.callback.action": "getStats" }, json_path: "$.callback.result" }
+    returns: value
+
+  get_stream_stats:
+    summary: "Statistics of one inbound stream (getStats with a target)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Stream", "description": "The inbound stream's ID."}
+    send: '{"action":"getStats","target":{target:json},"value":"null"}'
+    expect: { reply_json: { "$.callback.action": "getStats" }, json_path: "$.callback.result" }
+    returns: value
+
+  next_slide:
+    summary: "Next PowerPoint slide, with the PowerPoint remote set up (nextSlide)"
+    send: '{"action":"nextSlide","target":"null","value":"null"}'
+    expect: { reply_json: { "$.callback.action": "nextSlide" }, json_path: "$.callback.result" }
+    returns: value
+
+  prev_slide:
+    summary: "Previous PowerPoint slide, with the PowerPoint remote set up (prevSlide)"
+    send: '{"action":"prevSlide","target":"null","value":"null"}'
+    expect: { reply_json: { "$.callback.action": "prevSlide" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_solo_video:
+    summary: "Highlight the director's video for every guest, stop, or toggle (soloVideo)"
+    params:
+      state: {"type": "enum", "values": ["true", "false", "toggle"], "required": true, "label": "Highlight", "description": "true highlights the video, false stops, toggle flips it."}
+    send: '{"action":"soloVideo","target":"null","value":{state:json}}'
+    expect: { reply_json: { "$.callback.action": "soloVideo" }, json_path: "$.callback.result" }
+    returns: value
+
+  mute_all_guests:
+    summary: "Mute, unmute or toggle every guest who is not a director (muteAllGuests)"
+    params:
+      state: {"type": "enum", "values": ["true", "false", "toggle"], "required": true, "label": "Muted", "description": "true mutes every guest, false unmutes them, toggle flips them."}
+    send: '{"action":"muteAllGuests","target":"null","value":{state:json}}'
+    expect: { reply_json: { "$.callback.action": "muteAllGuests" }, json_path: "$.callback.result" }
+    returns: value
+
+  start_room_timer:
+    summary: "Start a countdown for everyone in the room (startRoomTimer)"
+    params:
+      seconds: {"type": "int", "min": 1, "max": 86400, "required": true, "label": "Seconds", "description": "The countdown's length in seconds."}
+    send: '{"action":"startRoomTimer","target":"null","value":{seconds}}'
+    expect: { reply_json: { "$.callback.action": "startRoomTimer" }, json_path: "$.callback.result" }
+    returns: value
+
+  pause_room_timer:
+    summary: "Pause the room's countdown (PauseRoomTimer)"
+    send: '{"action":"PauseRoomTimer","target":"null","value":"null"}'
+    expect: { reply_json: { "$.callback.action": "PauseRoomTimer" }, json_path: "$.callback.result" }
+    returns: value
+
+  stop_room_timer:
+    summary: "Stop the room's countdown (stopRoomTimer)"
+    send: '{"action":"stopRoomTimer","target":"null","value":"null"}'
+    expect: { reply_json: { "$.callback.action": "stopRoomTimer" }, json_path: "$.callback.result" }
+    returns: value
+
+  get_guest_list:
+    summary: "The guest slots with each guest's stream ID and label (getGuestList)"
+    send: '{"action":"getGuestList","target":"null","value":"null"}'
+    expect: { reply_json: { "$.callback.action": "getGuestList" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_buffer_delay:
+    summary: "Set the playback delay of every incoming stream (setBufferDelay)"
+    params:
+      ms: {"type": "int", "min": 0, "max": 60000, "required": true, "label": "Delay", "description": "Playback buffer delay in milliseconds."}
+    send: '{"action":"setBufferDelay","target":"null","value":{ms}}'
+    expect: { reply_json: { "$.callback.action": "setBufferDelay" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_stream_buffer_delay:
+    summary: "Set the playback delay of one incoming stream (setBufferDelay with a target)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Stream", "description": "The incoming stream's ID or UUID."}
+      ms: {"type": "int", "min": 0, "max": 60000, "required": true, "label": "Delay", "description": "Playback buffer delay in milliseconds."}
+    send: '{"action":"setBufferDelay","target":{target:json},"value":{ms}}'
+    expect: { reply_json: { "$.callback.action": "setBufferDelay" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_active_speaker:
+    summary: "Turn the active speaker mode on in a mode, off, or toggle it (activeSpeaker)"
+    params:
+      mode: {"type": "enum", "values": ["toggle", "off", "1", "2", "3"], "required": true, "label": "Mode", "description": "toggle, off, or the mode 1, 2 or 3 as VDO.Ninja's activeSpeaker parameter numbers them."}
+    send: '{"action":"activeSpeaker","target":"null","value":{mode:map.active_speaker}}'
+    expect: { reply_json: { "$.callback.action": "activeSpeaker" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_tally_light:
+    summary: "Override the tally light (tallylight)"
+    params:
+      state: {"type": "enum", "values": ["onair", "active", "standby", "off"], "required": true, "label": "Tally", "description": "onair (program), active, standby (preview) or off."}
+    send: '{"action":"tallylight","target":"null","value":{state:json}}'
+    expect: { reply_json: { "$.callback.action": "tallylight" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_aspect_ratio:
+    summary: "Constrain the local camera to an aspect ratio (aspectRatio)"
+    params:
+      ratio: {"type": "string", "pattern": "^([0-9]+(\\.[0-9]+)?|[0-9]+:[0-9]+)$", "max_length": 16, "required": true, "label": "Aspect ratio", "description": "A decimal such as 1.7778 or a ratio such as 16:9."}
+    send: '{"action":"aspectRatio","target":"null","value":{ratio:json}}'
+    expect: { reply_json: { "$.callback.action": "aspectRatio" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_video_constraint:
+    summary: "Set a local camera constraint, such as frameRate, to a value (videoConstraint)"
+    params:
+      constraint: {"type": "string", "pattern": "^[A-Za-z]+$", "max_length": 64, "required": true, "label": "Constraint", "description": "The browser media constraint's name, such as frameRate or width."}
+      value: {"type": "string", "pattern": "\\S", "max_length": 64, "required": true, "label": "Value", "description": "The value the constraint takes."}
+    send: '{"action":"videoConstraint","target":{constraint:json},"value":"null","value2":{value:json}}'
+    expect: { reply_json: { "$.callback.action": "videoConstraint" }, json_path: "$.callback.result" }
+    returns: value
+
+  zoom:
+    summary: "Zoom the local camera in or out by a step (zoom, relative)"
+    params:
+      step: {"type": "float", "min": -1, "max": 1, "required": true, "label": "Step", "description": "How far to zoom in, a decimal; a negative step moves the other way."}
+    send: '{"action":"zoom","target":"null","value":{step:.3f}}'
+    expect: { reply_json: { "$.callback.action": "zoom" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_zoom:
+    summary: "Set the local camera's zoom (zoom, value2 abs)"
+    params:
+      position: {"type": "float", "min": 0, "max": 1, "required": true, "label": "Position", "description": "The zoom level, 0 to 1."}
+    send: '{"action":"zoom","target":"null","value":{position:.3f},"value2":"abs"}'
+    expect: { reply_json: { "$.callback.action": "zoom" }, json_path: "$.callback.result" }
+    returns: value
+
+  focus:
+    summary: "Focus the local camera farther or closer by a step (focus)"
+    params:
+      step: {"type": "float", "min": -1, "max": 1, "required": true, "label": "Step", "description": "How far to focus farther, a decimal; a negative step moves the other way."}
+    send: '{"action":"focus","target":"null","value":{step:.3f}}'
+    expect: { reply_json: { "$.callback.action": "focus" }, json_path: "$.callback.result" }
+    returns: value
+
+  pan:
+    summary: "Pan the local camera right or left by a step (pan)"
+    params:
+      step: {"type": "float", "min": -1, "max": 1, "required": true, "label": "Step", "description": "How far to pan right, a decimal; a negative step moves the other way."}
+    send: '{"action":"pan","target":"null","value":{step:.3f}}'
+    expect: { reply_json: { "$.callback.action": "pan" }, json_path: "$.callback.result" }
+    returns: value
+
+  tilt:
+    summary: "Tilt the local camera up or down by a step (tilt)"
+    params:
+      step: {"type": "float", "min": -1, "max": 1, "required": true, "label": "Step", "description": "How far to tilt up, a decimal; a negative step moves the other way."}
+    send: '{"action":"tilt","target":"null","value":{step:.3f}}'
+    expect: { reply_json: { "$.callback.action": "tilt" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_exposure:
+    summary: "Set the local camera's exposure (exposure)"
+    params:
+      level: {"type": "float", "min": 0, "max": 1, "required": true, "label": "Position", "description": "The exposure, 0 dark to 1 bright, 0 to 1."}
+    send: '{"action":"exposure","target":"null","value":{level:.3f}}'
+    expect: { reply_json: { "$.callback.action": "exposure" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_layout:
+    summary: "Switch to a layout from the page's layouts parameter; 0 is the automatic mixer (layout)"
+    params:
+      layout: {"type": "int", "min": 0, "max": 99, "required": true, "label": "Layout", "description": "0 for the automatic mixer, 1 for the first custom layout, and so on."}
+    send: '{"action":"layout","target":"null","value":{layout}}'
+    expect: { reply_json: { "$.callback.action": "layout" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_layout_custom:
+    summary: "Show a layout given whole, a JSON array of slot objects with x, y, w, h, slot and optional z and c (layout with an object)"
+    params:
+      layout: {"type": "json", "required": true, "label": "Layout", "description": "A JSON array of layout items as VDO.Ninja's layouts parameter documents, such as [{\"x\":0,\"y\":0,\"w\":100,\"h\":100,\"slot\":0}]."}
+    send: '{"action":"layout","target":"null","value":{layout}}'
+    expect: { reply_json: { "$.callback.action": "layout" }, json_path: "$.callback.result" }
+    returns: value
+
+  forward_guest:
+    summary: "Transfer a guest to another room (forward)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      room: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 64, "required": true, "label": "Room", "description": "The room to send the guest to."}
+    send: '{"action":"forward","target":{target:json},"value":{room:json}}'
+    expect: { reply_json: { "$.callback.action": "forward" }, json_path: "$.callback.result" }
+    returns: value
+
+  toggle_guest_scene:
+    summary: "Toggle a guest in or out of a scene (addScene)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      scene: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 64, "required": true, "label": "Scene", "description": "The scene: 0 to 8, or the name of an active custom scene."}
+    send: '{"action":"addScene","target":{target:json},"value":{scene:json}}'
+    expect: { reply_json: { "$.callback.action": "addScene" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_guest_scene:
+    summary: "Put a guest in a scene or take them out (setScene with value2)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      scene: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 64, "required": true, "label": "Scene", "description": "The scene: 0 to 8, or the name of an active custom scene."}
+      in_scene: {"type": "enum", "values": ["true", "false"], "required": true, "label": "In scene", "description": "true adds the guest to the scene, false removes them."}
+    send: '{"action":"setScene","target":{target:json},"value":{scene:json},"value2":{in_scene}}'
+    expect: { reply_json: { "$.callback.action": "setScene" }, json_path: "$.callback.result" }
+    returns: value
+
+  activate_queued_guest:
+    summary: "Let a held or queued guest in, as the Activate Guest control does (activateQueuedGuest)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+    send: '{"action":"activateQueuedGuest","target":{target:json},"value":"null"}'
+    expect: { reply_json: { "$.callback.action": "activateQueuedGuest" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_guest_slot:
+    summary: "Assign a guest to a mixer slot, or unset it (setslot)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      slot: {"type": "int", "min": 0, "max": 99, "required": true, "label": "Slot", "description": "The mixer slot, from 1; 0 unsets it."}
+    send: '{"action":"setslot","target":{target:json},"value":{slot}}'
+    expect: { reply_json: { "$.callback.action": "setslot" }, json_path: "$.callback.result" }
+    returns: value
+
+  toggle_guest_scene_audio:
+    summary: "Toggle a guest's microphone in scenes (muteScene)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      scene: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 64, "required": true, "label": "Scene", "description": "The scene: 0 to 8, or the name of an active custom scene."}
+    send: '{"action":"muteScene","target":{target:json},"value":{scene:json}}'
+    expect: { reply_json: { "$.callback.action": "muteScene" }, json_path: "$.callback.result" }
+    returns: value
+
+  toggle_guest_group:
+    summary: "Toggle a guest in or out of a group (group)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      group: {"type": "int", "min": 1, "max": 8, "required": true, "label": "Group", "description": "The group, 1 to 8."}
+    send: '{"action":"group","target":{target:json},"value":{group}}'
+    expect: { reply_json: { "$.callback.action": "group" }, json_path: "$.callback.result" }
+    returns: value
+
+  toggle_guest_mic:
+    summary: "Toggle a guest's microphone (mic)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+    send: '{"action":"mic","target":{target:json},"value":"null"}'
+    expect: { reply_json: { "$.callback.action": "mic" }, json_path: "$.callback.result" }
+    returns: value
+
+  hangup_guest:
+    summary: "Hang up a guest (hangup)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+    send: '{"action":"hangup","target":{target:json},"value":"null"}'
+    expect: { reply_json: { "$.callback.action": "hangup" }, json_path: "$.callback.result" }
+    returns: value
+
+  toggle_guest_solo_chat:
+    summary: "Toggle a private talk-back with a guest (soloChat)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+    send: '{"action":"soloChat","target":{target:json},"value":"null"}'
+    expect: { reply_json: { "$.callback.action": "soloChat" }, json_path: "$.callback.result" }
+    returns: value
+
+  toggle_guest_solo_chat_bidirectional:
+    summary: "Toggle a two-way private talk with a guest (soloChatBidirectional)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+    send: '{"action":"soloChatBidirectional","target":{target:json},"value":"null"}'
+    expect: { reply_json: { "$.callback.action": "soloChatBidirectional" }, json_path: "$.callback.result" }
+    returns: value
+
+  toggle_guest_speaker:
+    summary: "Toggle a guest's speaker (speaker)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+    send: '{"action":"speaker","target":{target:json},"value":"null"}'
+    expect: { reply_json: { "$.callback.action": "speaker" }, json_path: "$.callback.result" }
+    returns: value
+
+  toggle_guest_display:
+    summary: "Toggle whether a guest sees any video (display)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+    send: '{"action":"display","target":{target:json},"value":"null"}'
+    expect: { reply_json: { "$.callback.action": "display" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_guest_mirror:
+    summary: "Mirror a guest's video, stop, or toggle it (mirror)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      state: {"type": "enum", "values": ["true", "false", "toggle"], "required": true, "label": "Mirror", "description": "true mirrors the guest's video, false stops, toggle flips it."}
+    send: '{"action":"mirror","target":{target:json},"value":{state:json}}'
+    expect: { reply_json: { "$.callback.action": "mirror" }, json_path: "$.callback.result" }
+    returns: value
+
+  rotate_guest:
+    summary: "Rotate a guest's video (rotate)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      rotation: {"type": "enum", "values": ["next", "reset", "90", "180", "270"], "required": true, "label": "Rotation", "description": "next turns 90 degrees further, reset back to 0, or 90, 180 or 270 degrees."}
+    send: '{"action":"rotate","target":{target:json},"value":{rotation:map.rotation}}'
+    expect: { reply_json: { "$.callback.action": "rotate" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_guest_channel:
+    summary: "Set a guest's program or microphone isolation channel (channel)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      channel: {"type": "int", "min": 0, "max": 2, "required": true, "label": "Channel", "description": "1 or 2; 0 resets it."}
+    send: '{"action":"channel","target":{target:json},"value":{channel}}'
+    expect: { reply_json: { "$.callback.action": "channel" }, json_path: "$.callback.result" }
+    returns: value
+
+  send_director_chat:
+    summary: "Send a guest a message shown over their screen for a few moments (sendDirectorChat)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      message: {"type": "string", "pattern": "\\S", "max_length": 2000, "required": true, "label": "Message", "description": "The message shown over the guest's screen."}
+    send: '{"action":"sendDirectorChat","target":{target:json},"value":{message:json}}'
+    expect: { reply_json: { "$.callback.action": "sendDirectorChat" }, json_path: "$.callback.result" }
+    returns: value
+
+  send_pinned_director_chat:
+    summary: "Send a guest a message shown over their screen until replaced (sendPinnedDirectorChat)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      message: {"type": "string", "pattern": "\\S", "max_length": 2000, "required": true, "label": "Message", "description": "The message shown over the guest's screen."}
+    send: '{"action":"sendPinnedDirectorChat","target":{target:json},"value":{message:json}}'
+    expect: { reply_json: { "$.callback.action": "sendPinnedDirectorChat" }, json_path: "$.callback.result" }
+    returns: value
+
+  force_guest_keyframe:
+    summary: "Make a guest's stream send a keyframe to the active scenes (forceKeyframe)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+    send: '{"action":"forceKeyframe","target":{target:json},"value":"null"}'
+    expect: { reply_json: { "$.callback.action": "forceKeyframe" }, json_path: "$.callback.result" }
+    returns: value
+
+  toggle_guest_solo_video:
+    summary: "Toggle a guest's video highlighted everywhere (soloVideo)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+    send: '{"action":"soloVideo","target":{target:json},"value":"null"}'
+    expect: { reply_json: { "$.callback.action": "soloVideo" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_guest_volume:
+    summary: "Set a guest's microphone volume (volume)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      level: {"type": "int", "min": 0, "max": 200, "required": true, "label": "Volume", "description": "Microphone volume in percent, 0 to 200, 100 being unchanged."}
+    send: '{"action":"volume","target":{target:json},"value":{level}}'
+    expect: { reply_json: { "$.callback.action": "volume" }, json_path: "$.callback.result" }
+    returns: value
+
+  start_guest_timer:
+    summary: "Start a countdown for one guest (startRoomTimer)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      seconds: {"type": "int", "min": 1, "max": 86400, "required": true, "label": "Seconds", "description": "The countdown's length in seconds."}
+    send: '{"action":"startRoomTimer","target":{target:json},"value":{seconds}}'
+    expect: { reply_json: { "$.callback.action": "startRoomTimer" }, json_path: "$.callback.result" }
+    returns: value
+
+  pause_guest_timer:
+    summary: "Pause one guest's countdown (PauseRoomTimer)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+    send: '{"action":"PauseRoomTimer","target":{target:json},"value":"null"}'
+    expect: { reply_json: { "$.callback.action": "PauseRoomTimer" }, json_path: "$.callback.result" }
+    returns: value
+
+  stop_guest_timer:
+    summary: "Stop one guest's countdown (stopRoomTimer)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+    send: '{"action":"stopRoomTimer","target":{target:json},"value":"null"}'
+    expect: { reply_json: { "$.callback.action": "stopRoomTimer" }, json_path: "$.callback.result" }
+    returns: value
+
+  guest_zoom:
+    summary: "Zoom a guest's camera by a step; the guest's page loads with ptz (ptzZoom)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      step: {"type": "float", "min": -1, "max": 1, "required": true, "label": "Step", "description": "How far to zoom in, a decimal; a negative step moves the other way."}
+    send: '{"action":"ptzZoom","target":{target:json},"value":{step:.3f}}'
+    expect: { reply_json: { "$.callback.action": "ptzZoom" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_guest_zoom:
+    summary: "Set a guest camera's zoom position; the guest's page loads with ptz (ptzZoom, value2 abs)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      position: {"type": "float", "min": 0, "max": 1, "required": true, "label": "Position", "description": "The zoom position, 0 to 1."}
+    send: '{"action":"ptzZoom","target":{target:json},"value":{position:.3f},"value2":"abs"}'
+    expect: { reply_json: { "$.callback.action": "ptzZoom" }, json_path: "$.callback.result" }
+    returns: value
+
+  guest_focus:
+    summary: "Focus a guest's camera by a step; the guest's page loads with ptz (ptzFocus)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      step: {"type": "float", "min": -1, "max": 1, "required": true, "label": "Step", "description": "How far to focus farther, a decimal; a negative step moves the other way."}
+    send: '{"action":"ptzFocus","target":{target:json},"value":{step:.3f}}'
+    expect: { reply_json: { "$.callback.action": "ptzFocus" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_guest_focus:
+    summary: "Set a guest camera's focus position; the guest's page loads with ptz (ptzFocus, value2 abs)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      position: {"type": "float", "min": 0, "max": 1, "required": true, "label": "Position", "description": "The focus position, 0 to 1."}
+    send: '{"action":"ptzFocus","target":{target:json},"value":{position:.3f},"value2":"abs"}'
+    expect: { reply_json: { "$.callback.action": "ptzFocus" }, json_path: "$.callback.result" }
+    returns: value
+
+  guest_pan:
+    summary: "Pan a guest's camera by a step; the guest's page loads with ptz (ptzPan)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      step: {"type": "float", "min": -1, "max": 1, "required": true, "label": "Step", "description": "How far to pan right, a decimal; a negative step moves the other way."}
+    send: '{"action":"ptzPan","target":{target:json},"value":{step:.3f}}'
+    expect: { reply_json: { "$.callback.action": "ptzPan" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_guest_pan:
+    summary: "Set a guest camera's pan position; the guest's page loads with ptz (ptzPan, value2 abs)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      position: {"type": "float", "min": 0, "max": 1, "required": true, "label": "Position", "description": "The pan position, 0 to 1."}
+    send: '{"action":"ptzPan","target":{target:json},"value":{position:.3f},"value2":"abs"}'
+    expect: { reply_json: { "$.callback.action": "ptzPan" }, json_path: "$.callback.result" }
+    returns: value
+
+  guest_tilt:
+    summary: "Tilt a guest's camera by a step; the guest's page loads with ptz (ptzTilt)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      step: {"type": "float", "min": -1, "max": 1, "required": true, "label": "Step", "description": "How far to tilt up, a decimal; a negative step moves the other way."}
+    send: '{"action":"ptzTilt","target":{target:json},"value":{step:.3f}}'
+    expect: { reply_json: { "$.callback.action": "ptzTilt" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_guest_tilt:
+    summary: "Set a guest camera's tilt position; the guest's page loads with ptz (ptzTilt, value2 abs)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      position: {"type": "float", "min": 0, "max": 1, "required": true, "label": "Position", "description": "The tilt position, 0 to 1."}
+    send: '{"action":"ptzTilt","target":{target:json},"value":{position:.3f},"value2":"abs"}'
+    expect: { reply_json: { "$.callback.action": "ptzTilt" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_guest_autofocus:
+    summary: "Turn a guest camera's autofocus on or off (ptzAutofocus)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      state: {"type": "enum", "values": ["true", "false", "manual", "off"], "required": true, "label": "Autofocus", "description": "true for autofocus; false, manual or off for manual focus."}
+    send: '{"action":"ptzAutofocus","target":{target:json},"value":{state:json}}'
+    expect: { reply_json: { "$.callback.action": "ptzAutofocus" }, json_path: "$.callback.result" }
+    returns: value
+
+  request_guest_resolution:
+    summary: "Ask a guest for a preview resolution (requestResolution)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      resolution: {"type": "string", "pattern": "^[0-9]+x[0-9]+$", "max_length": 16, "required": true, "label": "Resolution", "description": "WIDTHxHEIGHT, such as 1280x720."}
+    send: '{"action":"requestResolution","target":{target:json},"value":{resolution:json}}'
+    expect: { reply_json: { "$.callback.action": "requestResolution" }, json_path: "$.callback.result" }
+    returns: value
+
+  request_guest_aspect_ratio:
+    summary: "Ask a guest for a preview resolution of an aspect ratio, up to a largest dimension (requestAspectRatio)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      ratio: {"type": "string", "pattern": "^([0-9]+(\\.[0-9]+)?|[0-9]+:[0-9]+)$", "max_length": 16, "required": true, "label": "Aspect ratio", "description": "A decimal such as 1.7778 or a ratio such as 16:9."}
+      max: {"type": "int", "min": 16, "max": 8192, "required": true, "label": "Largest dimension", "description": "The largest width or height in pixels."}
+    send: '{"action":"requestAspectRatio","target":{target:json},"value":{ratio:json},"value2":{max}}'
+    expect: { reply_json: { "$.callback.action": "requestAspectRatio" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_guest_width:
+    summary: "Ask a guest's camera for a capture width (setWidth)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      pixels: {"type": "int", "min": 16, "max": 8192, "required": true, "label": "Width", "description": "Capture width in pixels."}
+    send: '{"action":"setWidth","target":{target:json},"value":{pixels}}'
+    expect: { reply_json: { "$.callback.action": "setWidth" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_guest_height:
+    summary: "Ask a guest's camera for a capture height (setHeight)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      pixels: {"type": "int", "min": 16, "max": 8192, "required": true, "label": "Height", "description": "Capture height in pixels."}
+    send: '{"action":"setHeight","target":{target:json},"value":{pixels}}'
+    expect: { reply_json: { "$.callback.action": "setHeight" }, json_path: "$.callback.result" }
+    returns: value
+
+  set_guest_aspect_ratio:
+    summary: "Ask a guest's camera for a capture aspect ratio (setAspectRatio)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      ratio: {"type": "float", "min": 0.1, "max": 10, "required": true, "label": "Aspect ratio", "description": "Width divided by height, such as 1.7778."}
+    send: '{"action":"setAspectRatio","target":{target:json},"value":{ratio:.4f}}'
+    expect: { reply_json: { "$.callback.action": "setAspectRatio" }, json_path: "$.callback.result" }
+    returns: value
+
+  refresh_guest_video:
+    summary: "Ask a guest to refresh their camera and video tracks (refreshVideo)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+    send: '{"action":"refreshVideo","target":{target:json},"value":"null"}'
+    expect: { reply_json: { "$.callback.action": "refreshVideo" }, json_path: "$.callback.result" }
+    returns: value
+
+  restart_guest_connection:
+    summary: "Ask a guest to restart their connection (refreshConnection)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+    send: '{"action":"refreshConnection","target":{target:json},"value":"null"}'
+    expect: { reply_json: { "$.callback.action": "refreshConnection" }, json_path: "$.callback.result" }
+    returns: value
+
+  recover_guest_stream:
+    summary: "Ask a guest to recover both media and connection (recoverStream)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+    send: '{"action":"recoverStream","target":{target:json},"value":"null"}'
+    expect: { reply_json: { "$.callback.action": "recoverStream" }, json_path: "$.callback.result" }
+    returns: value
+
+  move_guest_mix_order:
+    summary: "Move a guest earlier or later in the director's mixer order (mixorder)"
+    params:
+      target: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 128, "required": true, "label": "Guest", "description": "The guest's slot (1 to 99), stream ID or peer UUID."}
+      direction: {"type": "enum", "values": ["earlier", "later"], "required": true, "label": "Direction", "description": "earlier (-1) or later (1)."}
+    send: '{"action":"mixorder","target":{target:json},"value":{direction:map.mix_order}}'
+    expect: { reply_json: { "$.callback.action": "mixorder" }, json_path: "$.callback.result" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Commands go over the relay's websocket as {"action", "target",
+      "value"} with "null" for what is unused, and are answered by the page
+      with its callback, whose result is the command's value: true or false
+      for a toggle's new state, an object for getDetails, getGuestList and
+      the statistics, or fail. Each answer is matched by its action; two
+      commands of the same action in flight at once may take each other's
+      answers. Nothing answers while no page with the key is open, so a
+      command then times out.
+
+  - models: [all]
+    severity: info
+    text: >
+      State comes from getDetails, asked for on connecting and every 30
+      seconds (which also keeps the relay's socket, dropped after about a
+      minute of silence), and after every command and every update the page
+      pushes that says the guests changed (a new or ended connection, a
+      position change, a details hint). Microphone and camera mutes,
+      director mutes and hides, and hang-ups the page pushes apply at once.
+      The streams list is replaced whole by each getDetails answer.
+
+  - models: [all]
+    severity: info
+    text: >
+      The documents describe getDetails' and getGuestList's answers in
+      words only; the field names kept in state (streamID, label, director,
+      position, localStream, muted, videoMuted, speakerMuted, scenes,
+      others) follow the Companion module that reads them, and getGuestList
+      is kept as slots with streamID and label. Values are sent as the
+      README shows them: states as the strings "true", "false" and
+      "toggle", numbers as numbers.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Recording (set_recording) writes to the disk of the computer running
+      the page and may open a save dialog there; screen sharing still asks
+      the browser for a screen. PTZ actions need the camera's page loaded
+      with &ptz and the browser's camera permission granted; setslot needs
+      &slotmode=1 or the mixer.
+
+  - models: [all]
+    severity: critical
+    text: >
+      hangup ends the page's connection, and hangup_guest, forward_guest and
+      reload drop a guest or the page from the show; they cannot be undone
+      from the API (the guest must rejoin).
+
+state:
+  streams.*.label:          { type: string, description: "A stream the page knows, keyed by stream ID: its label, empty when none" }
+  streams.*.director:       { type: bool, description: "It is the room's director" }
+  streams.*.position:       { type: int, description: "Its guest slot, from 1" }
+  streams.*.local:          { type: bool, description: "It is the controlled page's own stream" }
+  streams.*.muted:          { type: bool, description: "Its microphone is muted" }
+  streams.*.video_muted:    { type: bool, description: "Its camera is off" }
+  streams.*.speaker_muted:  { type: bool, description: "Its speaker is muted" }
+  streams.*.director_muted: { type: bool, description: "The director has muted it" }
+  streams.*.director_hidden: { type: bool, description: "The director has hidden its video" }
+  streams.*.scenes:         { type: string, description: "The scenes it is in, as a JSON object of scene to true or false" }
+  guests.*.stream_id:       { type: string, description: "A guest slot, keyed by its number: the guest's stream ID" }
+  guests.*.label:           { type: string, description: "The guest's label" }
+
+telemetry:
+  subscribe:
+    send: ['{"action":"getDetails","target":"null","value":"null"}']
+  updates:
+    # getDetails: every stream, whole, as a list.
+    - json_match: { "$.callback.action": "^getDetails$", "$.callback.result": '^\[' }
+      json_each: "$.callback.result"
+      replace: streams
+      json: &stream
+        id: "$.streamID"
+        label: "$.label"
+        director: "$.director"
+        position: "$.position"
+        local: "$.localStream"
+        muted: "$.muted"
+        video: "$.videoMuted"
+        speaker: "$.speakerMuted"
+        scenes: "$.scenes"
+        dmute: "$.others.mute-guest"
+        dhide: "$.others.hide-guest"
+      state: &stream_state
+        "streams.{id:key}.label": "{label}"
+        "streams.{id:key}.director": "{director}"
+        "streams.{id:key}.position": "{position}"
+        "streams.{id:key}.local": "{local}"
+        "streams.{id:key}.muted": "{muted}"
+        "streams.{id:key}.video_muted": "{video}"
+        "streams.{id:key}.speaker_muted": "{speaker}"
+        "streams.{id:key}.scenes": "{scenes}"
+        "streams.{id:key}.director_muted": { value: "{dmute}", map: { "1": true, "0": false, "true": true, "false": false } }
+        "streams.{id:key}.director_hidden": { value: "{dhide}", map: { "1": true, "0": false, "true": true, "false": false } }
+    # The same as an object of streams.
+    - json_match: { "$.callback.action": "^getDetails$", "$.callback.result": '^\{' }
+      json_each: "$.callback.result.*"
+      replace: streams
+      json: *stream
+      state: *stream_state
+    # getGuestList: the slots.
+    - json_match: { "$.callback.action": "^getGuestList$", "$.callback.result": '^\{' }
+      json_each: "$.callback.result.*"
+      replace: guests
+      json: { id: "$.streamID", label: "$.label" }
+      state:
+        "guests.{key:key}.stream_id": "{id}"
+        "guests.{key:key}.label": "{label}"
+    # A command that changes the page or a guest reads everything again.
+    - json_match: { "$.callback.action": "^(speaker|mic|camera|volume|hangup|group|joinGroup|leaveGroup|forward|addScene|setScene|muteScene|activateQueuedGuest|setslot|display|soloVideo|muteAllGuests|mirror|rotate|channel)$" }
+      json: {}
+      then_send: ['{"action":"getDetails","target":"null","value":"null"}']
+    # Pushes.
+    - json_match: { "$.update.action": "^(mic|remoteMuted)$", "$.update.streamID": "." }
+      json: { id: "$.update.streamID", value: "$.update.value" }
+      state: { "streams.{id:key}.muted": "{value}" }
+    - json_match: { "$.update.action": "^(camera|remoteVideoMuted)$", "$.update.streamID": "." }
+      json: { id: "$.update.streamID", value: "$.update.value" }
+      state: { "streams.{id:key}.video_muted": "{value}" }
+    - json_match: { "$.update.action": "^directorMuted$", "$.update.streamID": "." }
+      json: { id: "$.update.streamID", value: "$.update.value" }
+      state: { "streams.{id:key}.director_muted": "{value}" }
+    - json_match: { "$.update.action": "^directorVideoHide$", "$.update.streamID": "." }
+      json: { id: "$.update.streamID", value: "$.update.value" }
+      state: { "streams.{id:key}.director_hidden": "{value}" }
+    - json_match: { "$.update.action": "^hangup$", "$.update.streamID": "." }
+      json: { id: "$.update.streamID" }
+      state: { "streams.{id:key}": { delete: true } }
+    - json_match: { "$.update.action": "^endViewConnection$", "$.update.value": "." }
+      json: { id: "$.update.value" }
+      state: { "streams.{id:key}": { delete: true } }
+    - json_match: { "$.update.action": "^(details|newViewConnection|positionChange|seeding|tracksAdded|director)$" }
+      json: {}
+      then_send: ['{"action":"getDetails","target":"null","value":"null"}']
