@@ -1856,6 +1856,42 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that each project in updateFrontend carries its name in a name field (assumed; the Companion module does not read it). ([specs/h2r-graphics.yaml:488](specs/h2r-graphics.yaml#L488))
 - [ ] Confirm a score graphic's scores are an array per team of {score} per level, with levels and delimiter on the graphic, as the Companion module reads them, and whether a score can be other than a whole number. ([specs/h2r-graphics.yaml:483](specs/h2r-graphics.yaml#L483))
 
+## haivision-kb — Haivision KB Encoder/Transcoder
+
+- [ ] Check that the login answers {"sessionid": ...} and that later requests take it in the Authorization header as it is (no scheme word). ([specs/haivision-kb.yaml:74](specs/haivision-kb.yaml#L74))
+- [ ] Check how a request on an expired session (30 minutes idle) or after a logout is answered (status and body); 401 or 403 is taken as the session's end, and 403 as a refused login. ([specs/haivision-kb.yaml:75](specs/haivision-kb.yaml#L75))
+- [ ] Check that software before 4.3.1 needs no login, and how 4.3.1 or later answers a request without one (the probe, GET /ecs/version.json, goes without the session). ([specs/haivision-kb.yaml:71](specs/haivision-kb.yaml#L71))
+- [ ] Check whether the channel part of /ecs/channels/{channel}.json takes the channel's id, its label, or both (the document calls it the label; its lists and examples use the id). ([specs/haivision-kb.yaml:165](specs/haivision-kb.yaml#L165))
+- [ ] Check that create_channel accepts an empty id (to have the encoder choose one) and the status a successful create answers. ([specs/haivision-kb.yaml:152](specs/haivision-kb.yaml#L152))
+- [ ] Check the signal list's query form (index=-1, time=HH:MM:SS:mmm, timespan=60, without the quotes the document's syntax line shows) and the reply's top-level shape. ([specs/haivision-kb.yaml:300](specs/haivision-kb.yaml#L300))
+- [ ] Check that ad cue durations and offsets with three decimals are accepted, and whether repeat takes true/false (the document's text) or no/yes (its example). ([specs/haivision-kb.yaml:339](specs/haivision-kb.yaml#L339))
+- [ ] Check that reading each channel listed by GET /ecs.json every 2 s is light enough for the ECS with many channels running. ([specs/haivision-kb.yaml:966](specs/haivision-kb.yaml#L966))
+
+## haivision-makito-x4 — Haivision Makito X4 encoder and decoder
+
+- [ ] Check that the encoder's login sets the SessionID cookie, as the decoder's reference shows, and that the login takes a JSON body of username and password. ([specs/haivision-makito-x4.yaml:101](specs/haivision-makito-x4.yaml#L101))
+- [ ] Check that an expired session (auto-logout policy) is answered 401 on any request, and that a refused login is answered 401. ([specs/haivision-makito-x4.yaml:102](specs/haivision-makito-x4.yaml#L102))
+- [ ] Check that GET /apis/authentication without a session answers (401) promptly, as the liveness probe relies on any answer. ([specs/haivision-makito-x4.yaml:95](specs/haivision-makito-x4.yaml#L95))
+- [ ] Check that PUT /apis/system_info with only deviceName (or only analytics, or only personality) keeps the other fields. ([specs/haivision-makito-x4.yaml:240](specs/haivision-makito-x4.yaml#L240))
+- [ ] Check that PUT /apis/datetime without "server" (manual time) keeps the NTP server, and that the PTP fields alone are accepted. ([specs/haivision-makito-x4.yaml:742](specs/haivision-makito-x4.yaml#L742))
+- [ ] Check that PUT /apis/datetime with "ntp":1/0 is what the decoder wants and true/false what the encoder wants (the two references differ). ([specs/haivision-makito-x4.yaml:742](specs/haivision-makito-x4.yaml#L742))
+- [ ] Check that PUT /apis/datetime takes the five PTP fields alone (set_ptp), and what announcementTimeout range is allowed. ([specs/haivision-makito-x4.yaml:756](specs/haivision-makito-x4.yaml#L756))
+- [ ] Check that PUT /apis/comport with only baudRate is accepted in pass-through mode (rugged encoder). ([specs/haivision-makito-x4.yaml:946](specs/haivision-makito-x4.yaml#L946))
+- [ ] Check that PUT /apis/videnc/{id} with only some fields (such as bitrate) keeps the others. ([specs/haivision-makito-x4.yaml:1251](specs/haivision-makito-x4.yaml#L1251))
+- [ ] Check that PUT /apis/metadata/{id}/start and the audio and video encoder start requests work without a body. ([specs/haivision-makito-x4.yaml:1399](specs/haivision-makito-x4.yaml#L1399))
+- [ ] Check that the role is spelled Administrator when creating an account (the reference's field description spells Administator). ([specs/haivision-makito-x4.yaml:331](specs/haivision-makito-x4.yaml#L331))
+- [ ] Check that PUT /apis/services with one service ({"onvif":1}) or one nic entry changes only that service, and that preview and passthrough take the same form. ([specs/haivision-makito-x4.yaml:824](specs/haivision-makito-x4.yaml#L824))
+- [ ] Check the recordings API (1.10): POST and PUT bodies with limitSize and segmentSize as text, segmentType "0" for none, and whether the recording id is the stream's id. ([specs/haivision-makito-x4.yaml:1164](specs/haivision-makito-x4.yaml#L1164))
+- [ ] Check that PUT /apis/decoders/{id} with streamId alone keeps the other decoder settings, and the reply of a decoder PUT. ([specs/haivision-makito-x4.yaml:1746](specs/haivision-makito-x4.yaml#L1746))
+- [ ] Check that PUT /apis/st2110/{id} takes name, tos and ttl beside address and port, and packetTime for an audio essence. ([specs/haivision-makito-x4.yaml:1811](specs/haivision-makito-x4.yaml#L1811))
+- [ ] Check the certificate upload's form fields: the file part's filename (the certificate's name here, the reference's example uses the original file name) and an empty password field. ([specs/haivision-makito-x4.yaml:508](specs/haivision-makito-x4.yaml#L508))
+- [ ] Check that PUT /apis/logosettings/{id} without if_name, url and panelColor (which the web interface sends) is accepted. ([specs/haivision-makito-x4.yaml:1712](specs/haivision-makito-x4.yaml#L1712))
+- [ ] Check what the audio encoder accepts for sampleRate 16 on non-analog inputs and the bit rate ranges per mode (the user's guide table). ([specs/haivision-makito-x4.yaml:1324](specs/haivision-makito-x4.yaml#L1324))
+- [ ] Check what GET /apis/essences and GET /apis/logos answer outside the 2110 and DEFENSE personalities, and GET /apis/comport on a non-rugged encoder (the polls ask regardless). ([specs/haivision-makito-x4.yaml:3932](specs/haivision-makito-x4.yaml#L3932))
+- [ ] Check that a rugged encoder answers the comport endpoints and that the plain encoder does not, as the model split assumes. ([specs/haivision-makito-x4.yaml:930](specs/haivision-makito-x4.yaml#L930))
+- [ ] Check that POST /apis/leds takes duration as a number (the reference's example sends it as text). ([specs/haivision-makito-x4.yaml:306](specs/haivision-makito-x4.yaml#L306))
+- [ ] Check how long an upgrade package upload with verification (POST /apis/upgrade) takes on a unit; the transport waits 20 s for an answer. ([specs/haivision-makito-x4.yaml:93](specs/haivision-makito-x4.yaml#L93))
+
 ## highend-hog4 — High End Systems Hog 4 / Hog OS
 
 - [ ] Confirm that playback commands take the object number as the argument (/hog/playback/go/0 with 15), as the manual says, and not in the address as the Companion module sends it. ([specs/highend-hog4.yaml:507](specs/highend-hog4.yaml#L507))

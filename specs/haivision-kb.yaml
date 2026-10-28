@@ -1,0 +1,1307 @@
+spec: 1
+id: haivision-kb
+name: Haivision KB Encoder/Transcoder
+vendor: Haivision
+category: other
+
+# The KB REST API of the Encoder Communication Server (ECS): JSON over HTTPS
+# on port 1080 under /ecs, each resource named with a .json suffix. A login
+# answers with a session id that every later request carries in its
+# Authorization header. A channel is one encoding process: its input, video
+# and audio encoders and outputs come from a channel configuration (preset).
+# Nothing is pushed: state is polled, with each channel's state read in
+# turn, and every write reads back what it changed.
+
+source:
+  - title: "KB Encoder/Transcoder 5.9 API Integrator's Reference (HVS-ID-API-KB-5.9, 2024-01-31)"
+    author: Haivision
+    url: "https://doc.haivision.com/__attachments/a_337876342e2d4f8769019b883dcf4efbf4b73be21aa9a24f9f9ec913b5e6af21/KB5.9%20API%20Integrator's%20Reference.pdf"
+    note: >
+      Manufacturer-documented and public: linked from the KB 5.9 document
+      page, https://doc.haivision.com/KB/5.9/ (retrieved 2026-10-27). The
+      source of every command and state rule here. Resource URIs, port 1080,
+      HTTPS only with a self-signed certificate by default, the session and
+      its Authorization header, standard messages (Introducing the KB REST
+      API); Login, Logout; Get License Parameter, Reset License, Get License
+      State; Get Version, Get System Information, Get System Time, Get ECS
+      State; Get Channel List, Create Channel, Get Channel State, Delete
+      Channel, Controlling a Channel, Input Control, Output Control, Get
+      Channel Signal List, Get Video Preview, Inject Metadata, Inject AdCue
+      Messages; Get Channel Configurations, Review, Load and Get
+      Configuration Label; Error Response Messages; Signals Reference;
+      Channel Configuration File Syntax Reference.
+  - title: "companion-module-haivision-kbencoder (Bitfocus Companion module)"
+    author: Bitfocus
+    url: "https://github.com/bitfocus/companion-module-haivision-kbencoder"
+    note: >
+      Community source (MIT license), read as corroboration only: it logs in
+      before any other request and follows channel state, input and output
+      status and recording.
+
+settings:
+  username:
+    type: string
+    default: ""
+    max_length: 64
+    label: User name
+    description: "A KB web interface user (Administrator, Operator or Observer); empty sends no login, for software before 4.3.1, which needs none."
+  password:
+    type: string
+    secret: true
+    default: ""
+    max_length: 128
+    label: Password
+    description: "That user's password."
+
+ports:
+  - { port: 1080, protocol: https, role: control, note: "the ECS REST API; the port given when opening wins" }
+
+transport:
+  type: http
+  port: 1080
+  scheme: https
+  # A self-signed certificate unless one is configured in the KB UI.
+  accept_invalid_certs: true
+  timeout_ms: 10000
+  # Any answer means the ECS is there (without a session it refuses).
+  probe: { method: GET, path: /ecs/version.json }
+  # Login (4.3.1+): the session id comes back as {"sessionid": "..."} and
+  # goes back as the Authorization header; a refused login is 403.
+  session:
+    when_set: username
+    login: { method: POST, path: /ecs/auth.json, content_type: application/json,
+             body: '{"username":{settings.username:json},"password":{settings.password:json}}' }
+    capture: { json: "$.sessionid", header: Authorization }
+    relogin: { status: [401, 403] }
+    refused: { status: [401, 403] }
+
+maps:
+  start_param: { "true": startrecord, "false": "" }
+
+models:
+  - id: kb-encoder
+    name: Haivision KB Encoder/Transcoder
+    supports:
+      [get_version, get_system, get_time, get_ecs_state, get_license, get_license_state, reset_license,
+       list_channels, create_channel, get_channel, delete_channel, start_channel, prepare_stop_channel,
+       stop_channel, start_recording, stop_recording, set_audio_gain, increase_audio_gain,
+       decrease_audio_gain, enable_output, disable_output, get_signals_after, get_signals_since,
+       get_signals_recent, inject_metadata, inject_scte35, inject_splice_out, list_channel_configs,
+       get_channel_configuration, load_channel_configuration, get_configuration_label]
+    verification: none
+    notes: >
+      KB software 5.9 as documented, on Haivision's KB Max, Mini and Server
+      appliances or installed on a server (software-only). Requests marked
+      with a version in their summary need that version or later (Get ECS
+      State 4.5, input control and ad cues 5.0, channel configurations 5.4;
+      the license state only 4.0 to 4.3.1).
+
+commands:
+  # ── Encoder ────────────────────────────────────────────────────────────
+  get_version:
+    summary: "The KB software version (GET /ecs/version.json)"
+    send: { method: GET, path: /ecs/version.json }
+    expect: &read { status: 200, json_path: "$" }
+    returns: value
+
+  get_system:
+    summary: "CPUs, memory, GPU encoders, capture cards with their video modes, network adapters and uptime (GET /ecs/system.json)"
+    send: { method: GET, path: /ecs/system.json }
+    expect: *read
+    returns: value
+
+  get_time:
+    summary: "The encoder's local and UTC time (GET /ecs/time.json)"
+    send: { method: GET, path: /ecs/time.json }
+    expect: *read
+    returns: value
+
+  get_ecs_state:
+    summary: "Load, disk, network, temperature, license, time and the channels, in one read (GET /ecs.json, 4.5 and later)"
+    send: { method: GET, path: /ecs.json }
+    expect: *read
+    returns: value
+
+  get_license:
+    summary: "The license: channels, validity, demo mode, watermark and its period (GET /ecs/license.json)"
+    send: { method: GET, path: /ecs/license.json }
+    expect: *read
+    returns: value
+
+  get_license_state:
+    summary: "License type, MAC address and channels registered (GET /ecs/license/state.json, 4.0 to 4.3.1)"
+    send: { method: GET, path: /ecs/license/state.json }
+    expect: *read
+    returns: value
+
+  reset_license:
+    summary: "Remove the license and its data (DELETE /ecs/license.json)"
+    send:
+      - { method: DELETE, path: /ecs/license.json }
+      - { method: GET, path: /ecs/license.json }
+    expect: &ok { status: [200, 201, 204] }
+    returns: ack
+
+  # ── Channels ───────────────────────────────────────────────────────────
+  list_channels:
+    summary: "Channels running, or created through the API (GET /ecs/channels.json); list_channel_configs has every channel of the web interface"
+    send: { method: GET, path: /ecs/channels.json }
+    expect: *read
+    returns: value
+
+  create_channel:
+    summary: "Create a channel (POST /ecs/channels.json); load_channel_configuration then gives it a configuration"
+    params:
+      label: { type: string, required: true, max_length: 128, label: Label, description: "The channel's unique label, such as Channel_1." }
+      id: { type: string, default: "", max_length: 64, pattern: "^[A-Za-z0-9{}-]*$", label: Id, description: "The channel's id, usually a GUID; empty lets the encoder choose one." }
+      preview_only: { type: bool, default: false, label: Preview only, description: "A channel with an input alone, for preview, which takes no licensed channel." }
+    send:
+      - { method: POST, path: /ecs/channels.json, content_type: application/json,
+          body: '{"channel":{"label":{label:json},"id":{id:json},"previewonly":"{preview_only:bool01}"}}' }
+      - { method: GET, path: /ecs/channels.json }
+    expect: *ok
+    returns: ack
+
+  get_channel:
+    summary: "A channel's state: load, its encoders, inputs and outputs (GET /ecs/channels/{channel}.json)"
+    params:
+      channel: &channel { type: string, required: true, max_length: 128, label: Channel, description: "The channel's id, as the channel lists give it (the API document names this part of the path the channel's label)." }
+    send: { method: GET, path: "/ecs/channels/{channel}.json" }
+    expect: *read
+    returns: value
+
+  delete_channel:
+    summary: "Close and delete a channel (DELETE /ecs/channels/{channel}.json)"
+    params:
+      channel: *channel
+    send:
+      - { method: DELETE, path: "/ecs/channels/{channel}.json" }
+      - { method: GET, path: /ecs/channels.json }
+    expect: *ok
+    returns: ack
+
+  start_channel:
+    summary: "Start a channel (PUT /ecs/channels/{channel}.json invoke StartChannel), with every file output recording from the start when asked"
+    params:
+      channel: *channel
+      record: { type: bool, default: false, label: Record, description: "Whether every file output records from the start (startrecord)." }
+    send:
+      - { method: PUT, path: "/ecs/channels/{channel}.json", content_type: application/json,
+          body: '{"invoke":{"command":"StartChannel","param":"{record:map.start_param}"}}' }
+      - { method: GET, path: "/ecs/channels/{channel}.json" }
+    expect: *ok
+    returns: ack
+
+  prepare_stop_channel:
+    summary: "Stop taking input, deliver what is buffered and close the recordings, ahead of stop_channel (PUT invoke PrepareStop)"
+    params:
+      channel: *channel
+    send:
+      - { method: PUT, path: "/ecs/channels/{channel}.json", content_type: application/json,
+          body: '{"invoke":{"command":"PrepareStop","param":""}}' }
+      - { method: GET, path: "/ecs/channels/{channel}.json" }
+    expect: *ok
+    returns: ack
+
+  stop_channel:
+    summary: "Stop a channel (PUT invoke StopChannel); prepare_stop_channel first stops it cleanly"
+    params:
+      channel: *channel
+    send:
+      - { method: PUT, path: "/ecs/channels/{channel}.json", content_type: application/json,
+          body: '{"invoke":{"command":"StopChannel","param":""}}' }
+      - { method: GET, path: "/ecs/channels/{channel}.json" }
+    expect: *ok
+    returns: ack
+
+  start_recording:
+    summary: "Start recording on every file output of a running channel (PUT invoke StartRecord)"
+    params:
+      channel: *channel
+    send:
+      - { method: PUT, path: "/ecs/channels/{channel}.json", content_type: application/json,
+          body: '{"invoke":{"command":"StartRecord","param":""}}' }
+      - { method: GET, path: "/ecs/channels/{channel}.json" }
+    expect: *ok
+    returns: ack
+
+  stop_recording:
+    summary: "Stop recording on every file output of a running channel (PUT invoke StopRecord)"
+    params:
+      channel: *channel
+    send:
+      - { method: PUT, path: "/ecs/channels/{channel}.json", content_type: application/json,
+          body: '{"invoke":{"command":"StopRecord","param":""}}' }
+      - { method: GET, path: "/ecs/channels/{channel}.json" }
+    expect: *ok
+    returns: ack
+
+  set_audio_gain:
+    summary: "Set an input's audio gain (PUT /ecs/channels/{channel}/inputs/{input}.json invoke setaudiogain, 5.0 and later)"
+    params:
+      channel: *channel
+      input: &input { type: string, required: true, max_length: 128, label: Input, description: "The input's id, such as Device_DeckLink_Baseband_2, as the channel state gives it." }
+      gain: { type: float, min: -20.0, max: 40.0, required: true, label: Gain, description: "Audio gain in dB." }
+    send:
+      - { method: PUT, path: "/ecs/channels/{channel}/inputs/{input}.json", content_type: application/json,
+          body: '{"invoke":{"command":"setaudiogain","param":"{gain:.1f}"}}' }
+      - { method: GET, path: "/ecs/channels/{channel}.json" }
+    expect: *ok
+    returns: ack
+
+  increase_audio_gain:
+    summary: "Raise an input's audio gain by 5 dB (PUT invoke audiogaininc)"
+    params:
+      channel: *channel
+      input: *input
+    send:
+      - { method: PUT, path: "/ecs/channels/{channel}/inputs/{input}.json", content_type: application/json,
+          body: '{"invoke":{"command":"audiogaininc","param":""}}' }
+      - { method: GET, path: "/ecs/channels/{channel}.json" }
+    expect: *ok
+    returns: ack
+
+  decrease_audio_gain:
+    summary: "Lower an input's audio gain by 5 dB (PUT invoke audiogaindec)"
+    params:
+      channel: *channel
+      input: *input
+    send:
+      - { method: PUT, path: "/ecs/channels/{channel}/inputs/{input}.json", content_type: application/json,
+          body: '{"invoke":{"command":"audiogaindec","param":""}}' }
+      - { method: GET, path: "/ecs/channels/{channel}.json" }
+    expect: *ok
+    returns: ack
+
+  enable_output:
+    summary: "Turn on a channel's output (PUT /ecs/channels/{channel}/outputs/{output}.json invoke EnableOutput)"
+    params:
+      channel: *channel
+      output: &output { type: string, required: true, max_length: 128, label: Output, description: "The output's id, such as HLS_Sink_12, as the channel state gives it." }
+    send:
+      - { method: PUT, path: "/ecs/channels/{channel}/outputs/{output}.json", content_type: application/json,
+          body: '{"invoke":{"command":"EnableOutput","param":""}}' }
+      - { method: GET, path: "/ecs/channels/{channel}.json" }
+    expect: *ok
+    returns: ack
+
+  disable_output:
+    summary: "Turn off a channel's output (PUT invoke DisableOutput)"
+    params:
+      channel: *channel
+      output: *output
+    send:
+      - { method: PUT, path: "/ecs/channels/{channel}/outputs/{output}.json", content_type: application/json,
+          body: '{"invoke":{"command":"DisableOutput","param":""}}' }
+      - { method: GET, path: "/ecs/channels/{channel}.json" }
+    expect: *ok
+    returns: ack
+
+  get_signals_after:
+    summary: "A channel's signals (events) after an index, -1 for every one kept (GET /ecs/channels/{channel}/signals.json?index=...)"
+    params:
+      channel: *channel
+      index: { type: int, min: -1, required: true, label: After index, description: "The index of the last signal already read, or -1 for the first request." }
+    send: { method: GET, path: "/ecs/channels/{channel}/signals.json", query: { index: "{index}" } }
+    expect: *read
+    returns: value
+
+  get_signals_since:
+    summary: "A channel's signals since a time of day (GET /ecs/channels/{channel}/signals.json?time=HH:MM:SS:mmm)"
+    params:
+      channel: *channel
+      time: { type: string, required: true, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{3}$", label: Since, description: "Time of day as HH:MM:SS:mmm, 24-hour, with milliseconds." }
+    send: { method: GET, path: "/ecs/channels/{channel}/signals.json", query: { time: "{time}" } }
+    expect: *read
+    returns: value
+
+  get_signals_recent:
+    summary: "A channel's signals of the last seconds (GET /ecs/channels/{channel}/signals.json?timespan=...)"
+    params:
+      channel: *channel
+      seconds: { type: int, min: 1, required: true, label: Seconds, description: "How many seconds back." }
+    send: { method: GET, path: "/ecs/channels/{channel}/signals.json", query: { timespan: "{seconds}" } }
+    expect: *read
+    returns: value
+
+  inject_metadata:
+    summary: "Send metadata into an RTMP output stream (PUT /ecs/channels/{channel}/outputs/{output}/streams/{stream}.json) with the API's data list of {label, type (int, double, bool or string), value}"
+    params:
+      channel: *channel
+      output: *output
+      stream: { type: string, required: true, max_length: 128, label: Stream, description: "The stream component's id within the output, as the channel state gives it." }
+      data: { type: json, required: true, label: Metadata, description: "JSON array of {label, type, value}, type int, double, bool or string and value its text, such as [{\"label\":\"score\",\"type\":\"int\",\"value\":\"3\"}]." }
+    send: { method: PUT, path: "/ecs/channels/{channel}/outputs/{output}/streams/{stream}.json", content_type: application/json,
+            body: '{"data":{data}}' }
+    expect: *ok
+    returns: ack
+
+  inject_scte35:
+    summary: "Insert a SCTE-35 ad cue at an input (PUT /ecs/channels/{channel}/inputs/{input}/adcue.json type scte35, 5.0 and later); an empty cue makes a splice insert of the duration"
+    params:
+      channel: *channel
+      input: *input
+      cue: { type: string, multiline: true, default: "", label: SCTE-35 message, description: "The SCTE-35 message in its XML form (SpliceInfoSection), or empty for a splice insert with out-of-network and auto-return set." }
+      duration: &cue_duration { type: float, min: 0.0, required: true, label: Duration, description: "Length of the break in seconds; 0 when unknown (an empty cue needs more than 0)." }
+      offset: &cue_offset { type: float, min: 0.0, default: 0.0, label: Offset, description: "Seconds from the current stream time to the cue." }
+      repeat: &cue_repeat { type: bool, default: false, label: Repeat, description: "Whether this message repeats the previous one." }
+    send: { method: PUT, path: "/ecs/channels/{channel}/inputs/{input}/adcue.json", content_type: application/json,
+            body: '{"adcue":{"type":"scte35","cue":{cue:json},"duration":"{duration:.3f}","offset":"{offset:.3f}","repeat":"{repeat}"}}' }
+    expect: *ok
+    returns: ack
+
+  inject_splice_out:
+    summary: "Insert a simple ad break of a duration at an input (PUT .../adcue.json type SpliceOut, 5.0 and later)"
+    params:
+      channel: *channel
+      input: *input
+      duration: { type: float, min: 0.0, required: true, label: Duration, description: "Length of the break in seconds." }
+      offset: *cue_offset
+      repeat: *cue_repeat
+    send: { method: PUT, path: "/ecs/channels/{channel}/inputs/{input}/adcue.json", content_type: application/json,
+            body: '{"adcue":{"type":"SpliceOut","duration":"{duration:.3f}","offset":"{offset:.3f}","repeat":"{repeat}"}}' }
+    expect: *ok
+    returns: ack
+
+  # ── Channel configurations ─────────────────────────────────────────────
+  list_channel_configs:
+    summary: "Every channel configuration of the web interface, running or idle, with its state, recording and load (GET /ecs/channelconfigs.json, 5.4 and later)"
+    send: { method: GET, path: /ecs/channelconfigs.json }
+    expect: *read
+    returns: value
+
+  get_channel_configuration:
+    summary: "A channel's configuration in the channel configuration file syntax (GET /ecs/channels/{channel}/preset.json)"
+    params:
+      channel: *channel
+    send: { method: GET, path: "/ecs/channels/{channel}/preset.json" }
+    expect: *read
+    returns: value
+
+  load_channel_configuration:
+    summary: "Give a channel a configuration (PUT /ecs/channels/{channel}/preset.json) in the channel configuration file syntax: version, type, label, description and kulabytepreset with input, preview, video_encoder, audio_encoder and output; license limits are answered as warnings"
+    params:
+      channel: *channel
+      configuration: { type: json, required: true, label: Configuration, description: "JSON channel configuration in the shape get_channel_configuration returns, as the API document's syntax reference gives it." }
+    send:
+      - { method: PUT, path: "/ecs/channels/{channel}/preset.json", content_type: application/json, body: "{configuration}" }
+      - { method: GET, path: "/ecs/channels/{channel}/preset.json" }
+    expect: *ok
+    returns: ack
+
+  get_configuration_label:
+    summary: "The label of a channel's configuration (GET /ecs/channels/{channel}/preset/label.json)"
+    params:
+      channel: *channel
+    send: { method: GET, path: "/ecs/channels/{channel}/preset/label.json" }
+    expect: { status: 200, json_path: "$.preset" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The login (4.3.1 and later) answers {"sessionid": ...}, and the id goes
+      back as the Authorization header as it is. A session ends 30 minutes
+      after the last request (the polls keep it in use) or at a logout. The
+      document gives 403 for a refused login and no status for a request on
+      an ended session; 401 or 403 is taken as the session's end, and the
+      core signs in again once. With the user name empty nothing signs in,
+      for software before 4.3.1. The logout is not offered: the session is
+      the core's own.
+  - models: [all]
+    severity: info
+    text: >
+      The document names the channel part of a channel's paths as the
+      channel's label, while its examples and channel lists use the
+      channel's id; the id from the lists is what the commands and state
+      use.
+  - models: [all]
+    severity: info
+    text: >
+      Channels created through the API or running are listed by the ECS
+      (channels); every channel of the web interface, running or idle, with
+      its configuration, by list_channel_configs (configs). Each listed
+      channel's state is read after each list (channel_state). A channel
+      deleted elsewhere keeps its last channel_state until the core is
+      opened again; delete_channel removes it at once.
+  - models: [all]
+    severity: info
+    text: >
+      Writes answer the standard messages list; a refused one answers HTTP
+      500 with an error message (KULA_ERROR_..., such as
+      KULA_ERROR_ALREADY_EXISTS or KULA_ERROR_LICENSE_NO_FREE_CHANNEL for
+      create_channel, KULA_ERROR_WRONG_STATE for recording on a stopped
+      channel). License limits found while loading a configuration come as
+      warnings in a successful answer.
+  - models: [all]
+    severity: critical
+    text: >
+      reset_license removes the license, after which channels cannot run
+      until a license is installed again; stop_channel and delete_channel
+      end the channel's output at once; load_channel_configuration replaces
+      a channel's whole configuration.
+  - models: [all]
+    severity: info
+    text: >
+      The video preview (GET /ecs/channels/{channel}/preview.jpg) is a JPEG
+      image, which a spec-driven command cannot hand to the consumer, so it
+      is not offered. Values come as text; numbers and on/off flags given
+      as text are converted where state declares them so.
+  - models: [all]
+    severity: info
+    text: >
+      Signals are read with get_signals_after (an index, -1 for all),
+      get_signals_since (a time of day) or get_signals_recent (seconds back),
+      the option as a plain query parameter; the document writes the value
+      in quotes in its syntax line and spells the option timespan in its
+      table (timepsan once). The last list read is kept whole as JSON text.
+  - models: [all]
+    severity: info
+    text: >
+      Ad cue durations and offsets go as text with three decimals, and
+      repeat as true or false (the document's text; its example shows no).
+
+state:
+  # Encoder (GET /ecs.json, the ECS state)
+  encoder.cpu: { type: float, unit: "%", description: "CPU use of the ECS" }
+  encoder.memory: { type: float, description: "Memory use of the ECS" }
+  encoder.disk_free_gb: { type: float, unit: "GB", description: "Free disk space" }
+  encoder.system_memory_used: { type: float, unit: "MB", description: "System memory used" }
+  encoder.system_memory_percent: { type: float, unit: "%", description: "System memory used" }
+  encoder.system_memory_total: { type: float, unit: "MB", description: "System memory" }
+  encoder.disk_total_gb: { type: float, unit: "GB", description: "Disk space" }
+  encoder.disk_used_percent: { type: float, unit: "%", description: "Disk space used" }
+  encoder.app: { type: string, description: "Application name, such as kulabyte" }
+  encoder.label: { type: string, description: "The encoder's host label" }
+  encoder.version.major: { type: string, description: "Software major version" }
+  encoder.version.minor: { type: string, description: "Software minor version" }
+  encoder.version.subminor: { type: string, description: "Software subminor version" }
+  encoder.version.build: { type: string, description: "Software build" }
+  encoder.version.type: { type: string, description: "Build type, such as DEV" }
+  encoder.network.in: { type: float, unit: "Mbit/s", description: "Network traffic in" }
+  encoder.network.out: { type: float, unit: "Mbit/s", description: "Network traffic out" }
+  encoder.network.total: { type: float, unit: "Mbit/s", description: "Network traffic in and out" }
+  encoder.temperature: { type: float, unit: "\u00b0C", description: "Temperature" }
+  encoder.uptime_hours: { type: int, unit: "h", description: "Time the ECS has run" }
+  encoder.gpu.h264: { type: bool, description: "Hardware H.264 encoding available" }
+  encoder.gpu.hevc: { type: bool, description: "Hardware HEVC encoding available" }
+  encoder.gpu.blitter: { type: float, unit: "%", description: "GPU blitter use" }
+  encoder.gpu.renderer: { type: float, unit: "%", description: "GPU renderer use" }
+  encoder.gpu.video: { type: float, unit: "%", description: "GPU video engine use" }
+  encoder.gpu.video_enhancement: { type: float, unit: "%", description: "GPU video enhancement use" }
+  encoder.gpu.metrics_valid: { type: bool, description: "Whether the GPU figures are measured" }
+  encoder.gpu.hevc_use: { type: float, unit: "%", description: "GPU HEVC encoder use" }
+  # License
+  license.channels: { type: int, description: "Channels the license allows" }
+  license.expired: { type: bool, description: "The license has expired" }
+  license.valid: { type: bool, description: "The license is valid" }
+  license.time_limit: { type: int, description: "Time limit, 0 for none" }
+  license.time_zone: { type: string, description: "Time zone of the start and stop times" }
+  license.start.year: { type: int, description: "License start time: year" }
+  license.start.month: { type: int, description: "License start time: month" }
+  license.start.day: { type: int, description: "License start time: day" }
+  license.start.hour: { type: int, description: "License start time: hour" }
+  license.start.minute: { type: int, description: "License start time: minute" }
+  license.start.second: { type: int, description: "License start time: second" }
+  license.stop.year: { type: int, description: "License stop time: year" }
+  license.stop.month: { type: int, description: "License stop time: month" }
+  license.stop.day: { type: int, description: "License stop time: day" }
+  license.stop.hour: { type: int, description: "License stop time: hour" }
+  license.stop.minute: { type: int, description: "License stop time: minute" }
+  license.stop.second: { type: int, description: "License stop time: second" }
+  license.mac: { type: string, description: "MAC address the license is bound to" }
+  license.registered_channels: { type: int, description: "Channels registered (locked) under the license" }
+  license.type: { type: string, description: "License type, such as key" }
+  license.demo_mode: { type: bool, description: "Running as a demo" }
+  license.no_watermark: { type: bool, description: "Output without the demo watermark" }
+  # Time
+  time.local.year: { type: int, description: "Local time of the encoder: year" }
+  time.local.month: { type: int, description: "Local time of the encoder: month" }
+  time.local.day: { type: int, description: "Local time of the encoder: day" }
+  time.local.hour: { type: int, description: "Local time of the encoder: hour" }
+  time.local.minute: { type: int, description: "Local time of the encoder: minute" }
+  time.local.second: { type: int, description: "Local time of the encoder: second" }
+  time.utc.year: { type: int, description: "UTC time of the encoder: year" }
+  time.utc.month: { type: int, description: "UTC time of the encoder: month" }
+  time.utc.day: { type: int, description: "UTC time of the encoder: day" }
+  time.utc.hour: { type: int, description: "UTC time of the encoder: hour" }
+  time.utc.minute: { type: int, description: "UTC time of the encoder: minute" }
+  time.utc.second: { type: int, description: "UTC time of the encoder: second" }
+  # System (GET /ecs/system.json)
+  system.label: { type: string, description: "Host label" }
+  system.cores: { type: int, description: "CPU cores" }
+  system.cpu_count: { type: int, description: "CPU packages" }
+  system.cpu: { type: string, description: "CPUs as JSON text: a list of {model_name, vendor_id, cpu_cores, cpu_speed, cache_size, ...}" }
+  system.memory_total: { type: string, description: "Memory, as the encoder words it (such as 3872260 kB)" }
+  system.uptime_hours: { type: int, unit: "h", description: "Time the ECS has run" }
+  system.gpu_h264: { type: bool, description: "Hardware H.264 encoding available" }
+  system.gpu_hevc: { type: bool, description: "Hardware HEVC encoding available" }
+  system.aja_detected: { type: bool, description: "AJA capture cards found" }
+  system.aja_cards: { type: string, description: "AJA cards as JSON text" }
+  system.decklink_detected: { type: bool, description: "Blackmagic DeckLink cards found" }
+  system.decklink_cards: { type: string, description: "DeckLink cards as JSON text: per card its name, connections, audio channels and video modes" }
+  system.network_adapters: { type: string, description: "Network adapters as JSON text: a list of {name, address, mac}" }
+  # Channels running or created through the API (GET /ecs.json, /ecs/channels.json); keyed by channel id
+  channels.*.label: { type: string, description: "Channel label" }
+  channels.*.port: { type: int, description: "The channel process's control port" }
+  channels.*.out_of_order: { type: bool, description: "The channel is out of order" }
+  channels.*.start_counter: { type: int, description: "Times the channel has started" }
+  channels.*.event_id: { type: string, description: "Event the channel serves, if any" }
+  channels.*.event_label: { type: string, description: "Label of that event" }
+  # Channel state (GET /ecs/channels/{channel}.json); keyed by channel id
+  channel_state.*.app: { type: string, description: "Application" }
+  channel_state.*.cpu: { type: float, unit: "%", description: "CPU use of the channel" }
+  channel_state.*.memory: { type: float, unit: "MB", description: "Memory use of the channel" }
+  channel_state.*.memory_percent: { type: float, unit: "%", description: "Memory use of the channel" }
+  channel_state.*.virtual_memory: { type: float, unit: "MB", description: "Virtual memory of the channel" }
+  channel_state.*.virtual_memory_percent: { type: float, unit: "%", description: "Virtual memory of the channel" }
+  channel_state.*.elapsed: { type: string, description: "Running time, HH:MM:SS" }
+  channel_state.*.media_sample_usage: { type: float, description: "Media sample buffers in use" }
+  channel_state.*.network_in: { type: float, unit: "Mbit/s", description: "Network traffic in" }
+  channel_state.*.network_out: { type: float, unit: "Mbit/s", description: "Network traffic out" }
+  channel_state.*.out_of_order: { type: bool, description: "Out of order" }
+  channel_state.*.preset_label: { type: string, description: "Label of the configuration loaded" }
+  channel_state.*.preset_state: { type: string, description: "Configuration state, such as fully_loaded" }
+  channel_state.*.record_state: { type: string, description: "Recording state, such as idle" }
+  channel_state.*.system_cpu: { type: float, unit: "%", description: "CPU use of the whole system" }
+  channel_state.*.threads: { type: int, description: "Threads of the channel process" }
+  channel_state.*.label: { type: string, description: "Channel label" }
+  channel_state.*.state: { type: string, description: "Channel state, such as running" }
+  channel_state.*.type: { type: string, description: "Channel type, such as multistream" }
+  channel_state.*.active_input: { type: string, description: "Id of the input in use" }
+  channel_state.*.encoders.*.implementation: { type: string, description: "Software or hardware" }
+  channel_state.*.encoders.*.component: { type: string, description: "Component, such as AVC_ENC or AAC_ENC" }
+  channel_state.*.encoders.*.label: { type: string, description: "Encoder label" }
+  channel_state.*.encoders.*.state: { type: string, description: "Encoder state, such as enabled" }
+  channel_state.*.encoders.*.type: { type: string, description: "videoencoder or audioencoder" }
+  channel_state.*.encoders.*.input_video_queue: { type: int, description: "Video frames queued" }
+  channel_state.*.encoders.*.video_codec: { type: string, description: "Video codec, such as H264" }
+  channel_state.*.encoders.*.video_bitrate: { type: int, unit: "bit/s", description: "Video bit rate" }
+  channel_state.*.encoders.*.video_fps: { type: float, unit: "fps", description: "Video frame rate" }
+  channel_state.*.encoders.*.video_height: { type: int, unit: "px", description: "Video height" }
+  channel_state.*.encoders.*.video_width: { type: int, unit: "px", description: "Video width" }
+  channel_state.*.encoders.*.audio_bit_depth: { type: int, description: "Audio bit depth" }
+  channel_state.*.encoders.*.audio_channel_config: { type: string, description: "Audio channel mapping, as the encoder gives it" }
+  channel_state.*.encoders.*.audio_channels: { type: int, description: "Audio channels" }
+  channel_state.*.encoders.*.audio_codec: { type: string, description: "Audio codec, such as AAC" }
+  channel_state.*.encoders.*.audio_bitrate: { type: int, unit: "bit/s", description: "Audio bit rate" }
+  channel_state.*.encoders.*.audio_language_code: { type: string, description: "Audio language code" }
+  channel_state.*.encoders.*.audio_language_comment: { type: string, description: "Audio language comment" }
+  channel_state.*.encoders.*.audio_language_name: { type: string, description: "Audio language name" }
+  channel_state.*.encoders.*.audio_language_type: { type: string, description: "Audio language type code" }
+  channel_state.*.encoders.*.audio_sample_rate: { type: int, unit: "Hz", description: "Audio sample rate" }
+  channel_state.*.encoders.*.audio_stream_number: { type: int, description: "Audio stream number, -1 for none" }
+  channel_state.*.encoders.*.input_audio_queue: { type: int, description: "Audio frames queued" }
+  channel_state.*.inputs.*.audio_gain_db: { type: float, unit: "dB", description: "Audio gain" }
+  channel_state.*.inputs.*.audio_levels: { type: string, description: "Audio levels per channel in dB, separated by ;" }
+  channel_state.*.inputs.*.closed_captions: { type: string, description: "Closed captions found" }
+  channel_state.*.inputs.*.configured_audio: { type: bool, description: "Audio configured" }
+  channel_state.*.inputs.*.configured_audio_bit_depth: { type: int, description: "Configured audio bit depth" }
+  channel_state.*.inputs.*.configured_audio_channels: { type: int, description: "Configured audio channels" }
+  channel_state.*.inputs.*.configured_audio_sample_rate: { type: int, unit: "Hz", description: "Configured audio sample rate" }
+  channel_state.*.inputs.*.configured_video: { type: bool, description: "Video configured" }
+  channel_state.*.inputs.*.configured_video_frame_rate: { type: float, unit: "fps", description: "Configured frame rate" }
+  channel_state.*.inputs.*.configured_video_height: { type: int, unit: "px", description: "Configured height" }
+  channel_state.*.inputs.*.configured_video_width: { type: int, unit: "px", description: "Configured width" }
+  channel_state.*.inputs.*.detected_audio: { type: bool, description: "Audio found" }
+  channel_state.*.inputs.*.detected_audio_bit_depth: { type: int, description: "Audio bit depth found" }
+  channel_state.*.inputs.*.detected_audio_channels: { type: int, description: "Audio channels found" }
+  channel_state.*.inputs.*.detected_audio_sample_rate: { type: int, unit: "Hz", description: "Audio sample rate found" }
+  channel_state.*.inputs.*.detected_video: { type: bool, description: "Video found" }
+  channel_state.*.inputs.*.detected_video_frame_rate: { type: float, unit: "fps", description: "Frame rate found" }
+  channel_state.*.inputs.*.detected_video_height: { type: int, unit: "px", description: "Height found" }
+  channel_state.*.inputs.*.detected_video_width: { type: int, unit: "px", description: "Width found" }
+  channel_state.*.inputs.*.ibs: { type: string, description: "Input buffer state as the encoder gives it" }
+  channel_state.*.inputs.*.implementation: { type: string, description: "Software or hardware" }
+  channel_state.*.inputs.*.input_audio_channels: { type: int, description: "Audio channels of the input" }
+  channel_state.*.inputs.*.input_audio_connector: { type: string, description: "Audio connector, such as Embedded" }
+  channel_state.*.inputs.*.input_audio_encoding: { type: string, description: "Audio coding of the input, such as PCM" }
+  channel_state.*.inputs.*.input_audio_sample_rate: { type: int, unit: "Hz", description: "Audio sample rate of the input" }
+  channel_state.*.inputs.*.display_name: { type: string, description: "Input name, such as DeckLink SDI (1)" }
+  channel_state.*.inputs.*.signal: { type: string, description: "Input signal state, such as good" }
+  channel_state.*.inputs.*.input_video_connector: { type: string, description: "Video connector, such as SDI" }
+  channel_state.*.inputs.*.input_video_encoding: { type: string, description: "Video coding of the input, such as YUY2" }
+  channel_state.*.inputs.*.input_video_frame_rate: { type: float, unit: "fps", description: "Frame rate of the input" }
+  channel_state.*.inputs.*.input_video_height: { type: int, unit: "px", description: "Height of the input" }
+  channel_state.*.inputs.*.input_video_width: { type: int, unit: "px", description: "Width of the input" }
+  channel_state.*.inputs.*.output_audio_sample_rate: { type: int, unit: "Hz", description: "Audio sample rate passed on" }
+  channel_state.*.inputs.*.output_video_frame_rate: { type: float, unit: "fps", description: "Frame rate passed on" }
+  channel_state.*.inputs.*.position: { type: string, description: "Picture position, such as topleft" }
+  channel_state.*.inputs.*.scte35_state: { type: string, description: "SCTE-35 state, such as disabled" }
+  channel_state.*.inputs.*.signal_losses: { type: int, description: "Signal losses" }
+  channel_state.*.inputs.*.audio_gain_control: { type: bool, description: "The input takes the audio gain commands" }
+  channel_state.*.inputs.*.used_audio_channels: { type: string, description: "Audio channels used, separated by ;" }
+  channel_state.*.inputs.*.component: { type: string, description: "Component, such as Device_DeckLink_Baseband" }
+  channel_state.*.inputs.*.label: { type: string, description: "Input label" }
+  channel_state.*.outputs.*.audio_encoder: { type: string, description: "Audio encoder used" }
+  channel_state.*.outputs.*.video_encoder: { type: string, description: "Video encoders used, separated by |" }
+  channel_state.*.outputs.*.audio_language_codes: { type: string, description: "Audio language codes" }
+  channel_state.*.outputs.*.audio_language_comments: { type: string, description: "Audio language comments" }
+  channel_state.*.outputs.*.audio_language_names: { type: string, description: "Audio language names" }
+  channel_state.*.outputs.*.cc_language_codes: { type: string, description: "Caption language codes, separated by |" }
+  channel_state.*.outputs.*.cc_language_comments: { type: string, description: "Caption language comments" }
+  channel_state.*.outputs.*.cc_language_names: { type: string, description: "Caption language names" }
+  channel_state.*.outputs.*.default_audio_language: { type: string, description: "Default audio language" }
+  channel_state.*.outputs.*.default_video: { type: string, description: "Default video" }
+  channel_state.*.outputs.*.master_playlist_url: { type: string, description: "Master playlist URL (HLS)" }
+  channel_state.*.outputs.*.media: { type: string, description: "Media carried, such as AV" }
+  channel_state.*.outputs.*.audio_queues: { type: string, description: "Audio queues, separated by |" }
+  channel_state.*.outputs.*.audio_sample_rates: { type: string, description: "Audio sample rates, separated by |" }
+  channel_state.*.outputs.*.video_frame_rates: { type: string, description: "Video frame rates, separated by |" }
+  channel_state.*.outputs.*.video_queues: { type: string, description: "Video queues, separated by |" }
+  channel_state.*.outputs.*.audio_queue: { type: int, description: "Audio queue (file outputs)" }
+  channel_state.*.outputs.*.audio_sample_rate: { type: int, unit: "Hz", description: "Audio sample rate (file outputs)" }
+  channel_state.*.outputs.*.video_frame_rate: { type: float, unit: "fps", description: "Video frame rate (file outputs)" }
+  channel_state.*.outputs.*.video_queue: { type: int, description: "Video queue (file outputs)" }
+  channel_state.*.outputs.*.playback_url: { type: string, description: "Playback URL" }
+  channel_state.*.outputs.*.stream_name: { type: string, description: "Stream name" }
+  channel_state.*.outputs.*.stream_playlist_url: { type: string, description: "Stream playlist URL" }
+  channel_state.*.outputs.*.stream_url: { type: string, description: "Stream URL" }
+  channel_state.*.outputs.*.waiting_segments: { type: int, description: "Segments waiting to be sent" }
+  channel_state.*.outputs.*.archive_directory: { type: string, description: "Recording directory (file outputs)" }
+  channel_state.*.outputs.*.archive_filename: { type: string, description: "Recording file (file outputs)" }
+  channel_state.*.outputs.*.disk_free_mb: { type: float, unit: "MB", description: "Free disk space" }
+  channel_state.*.outputs.*.disk_free_percent: { type: float, unit: "%", description: "Free disk space" }
+  channel_state.*.outputs.*.disk_total_mb: { type: float, unit: "MB", description: "Disk space" }
+  channel_state.*.outputs.*.disk_used_mb: { type: float, unit: "MB", description: "Disk space used" }
+  channel_state.*.outputs.*.write_rate: { type: float, unit: "Mbit/s", description: "Write rate" }
+  channel_state.*.outputs.*.component: { type: string, description: "Component, such as HLS_Sink or File" }
+  channel_state.*.outputs.*.label: { type: string, description: "Output label" }
+  channel_state.*.outputs.*.name: { type: string, description: "Output name" }
+  channel_state.*.outputs.*.state: { type: string, description: "Output state, such as connected, disconnected or idle" }
+  channel_state.*.outputs.*.type: { type: string, description: "Output type, such as http or archive" }
+  # Channel configurations in the web interface (GET /ecs/channelconfigs.json); keyed by configuration id
+  configs.*.name: { type: string, description: "Configuration name" }
+  configs.*.description: { type: string, description: "Description" }
+  configs.*.state: { type: string, description: "Channel state, such as idle or running" }
+  configs.*.recording: { type: string, description: "Recording state, such as idle" }
+  configs.*.memory: { type: float, description: "Memory use" }
+  configs.*.virtual_memory: { type: float, description: "Virtual memory use" }
+  configs.*.cpu: { type: float, unit: "%", description: "CPU use" }
+  configs.*.network_in: { type: float, description: "Network traffic in" }
+  configs.*.network_out: { type: float, description: "Network traffic out" }
+  configs.*.label: { type: string, description: "Configuration label" }
+  configs.*.type: { type: string, description: "Configuration type, such as multistream" }
+  configs.*.version: { type: string, description: "Configuration format version" }
+  configs.*.preset: { type: string, description: "The whole configuration as JSON text, in the channel configuration file syntax" }
+  # Per-channel reads (signals, configuration label); keyed by the channel named in the request
+  channel_signals.*: { type: string, description: "The channel's signals (events) last read, as JSON text: per signal its index, date, time, type (such as INPUT_SIGNAL_LOST or STREAM_STARTED), component, id, name, param1 and param2" }
+  channel_configuration.*.label: { type: string, description: "The label of the channel's configuration (get_configuration_label)" }
+  channel_configuration.*.configuration: { type: string, description: "The channel's configuration as JSON text, in the channel configuration file syntax (get_channel_configuration)" }
+
+telemetry:
+  # Nothing is pushed: the ECS state every 2 s, each channel it lists read
+  # after it, the web interface's channels every 5 s, the rest each minute.
+  poll:
+    - every_ms: 2000
+      send: [{ method: GET, path: /ecs.json }]
+    - every_ms: 5000
+      send: [{ method: GET, path: /ecs/channelconfigs.json }]
+    - every_ms: 60000
+      send:
+        - { method: GET, path: /ecs/system.json }
+        - { method: GET, path: /ecs/license.json }
+        - { method: GET, path: /ecs/version.json }
+  updates:
+    - path: '^/ecs\.json$'
+      json:
+        cpu: "$.encoder.CurrentCpuUsage"
+        mem: "$.encoder.CurrentMemUsage"
+        free: "$.encoder.FreeDiskSpaceGB"
+        sysmem: "$.encoder.SystemMemUsage"
+        sysmemp: "$.encoder.SystemMemUsagePercent"
+        systot: "$.encoder.SystemTotalMemory"
+        disk: "$.encoder.TotalDiskSpaceGB"
+        diskp: "$.encoder.UsedDiskSpacePercent"
+        app: "$.encoder.app"
+        label: "$.encoder.label"
+        major: "$.encoder.major"
+        minor: "$.encoder.minor"
+        subminor: "$.encoder.subminor"
+        build: "$.encoder.build"
+        type: "$.encoder.type"
+        net_in: "$.encoder.network.in"
+        net_out: "$.encoder.network.out"
+        net_total: "$.encoder.network.total"
+        temp: "$.encoder.temperature"
+        uptime: "$.encoder.uptime.hours"
+        h264: "$.encoder.gpu.hwencoder.h264"
+        hevc: "$.encoder.gpu.hwencoder.hevc"
+        blit: "$.encoder.gpu.metrics.blitter"
+        rend: "$.encoder.gpu.metrics.renderer"
+        gvid: "$.encoder.gpu.metrics.video"
+        genh: "$.encoder.gpu.metrics.videoenhancement"
+        gvalid: "$.encoder.gpu.metrics.valid"
+        ghevc: "$.encoder.gpu.usage.hevc"
+      state:
+        "encoder.cpu": "{cpu}"
+        "encoder.memory": "{mem}"
+        "encoder.disk_free_gb": "{free}"
+        "encoder.system_memory_used": "{sysmem}"
+        "encoder.system_memory_percent": "{sysmemp}"
+        "encoder.system_memory_total": "{systot}"
+        "encoder.disk_total_gb": "{disk}"
+        "encoder.disk_used_percent": "{diskp}"
+        "encoder.app": "{app}"
+        "encoder.label": "{label}"
+        "encoder.version.major": "{major}"
+        "encoder.version.minor": "{minor}"
+        "encoder.version.subminor": "{subminor}"
+        "encoder.version.build": "{build}"
+        "encoder.version.type": "{type}"
+        "encoder.network.in": "{net_in}"
+        "encoder.network.out": "{net_out}"
+        "encoder.network.total": "{net_total}"
+        "encoder.temperature": "{temp}"
+        "encoder.uptime_hours": "{uptime}"
+        "encoder.gpu.h264": { value: "{h264}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "encoder.gpu.hevc": { value: "{hevc}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "encoder.gpu.blitter": "{blit}"
+        "encoder.gpu.renderer": "{rend}"
+        "encoder.gpu.video": "{gvid}"
+        "encoder.gpu.video_enhancement": "{genh}"
+        "encoder.gpu.metrics_valid": { value: "{gvalid}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "encoder.gpu.hevc_use": "{ghevc}"
+    - path: '^/ecs\.json$'
+      json:
+        channels: "$.encoder.license.channels"
+        expired: "$.encoder.license.expired"
+        valid: "$.encoder.license.valid"
+        limit: "$.encoder.license.time_limit"
+        tz: "$.encoder.license.time_zone"
+        start_year: "$.encoder.license.start_year"
+        start_month: "$.encoder.license.start_month"
+        start_day: "$.encoder.license.start_day"
+        start_hour: "$.encoder.license.start_hour"
+        start_minute: "$.encoder.license.start_minute"
+        start_second: "$.encoder.license.start_second"
+        stop_year: "$.encoder.license.stop_year"
+        stop_month: "$.encoder.license.stop_month"
+        stop_day: "$.encoder.license.stop_day"
+        stop_hour: "$.encoder.license.stop_hour"
+        stop_minute: "$.encoder.license.stop_minute"
+        stop_second: "$.encoder.license.stop_second"
+        mac: "$.encoder.license.mac"
+        reg: "$.encoder.license.registered_channels"
+        ltype: "$.encoder.license.type"
+      state:
+        "license.channels": "{channels}"
+        "license.expired": { value: "{expired}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "license.valid": { value: "{valid}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "license.time_limit": "{limit}"
+        "license.time_zone": "{tz}"
+        "license.start.year": "{start_year}"
+        "license.start.month": "{start_month}"
+        "license.start.day": "{start_day}"
+        "license.start.hour": "{start_hour}"
+        "license.start.minute": "{start_minute}"
+        "license.start.second": "{start_second}"
+        "license.stop.year": "{stop_year}"
+        "license.stop.month": "{stop_month}"
+        "license.stop.day": "{stop_day}"
+        "license.stop.hour": "{stop_hour}"
+        "license.stop.minute": "{stop_minute}"
+        "license.stop.second": "{stop_second}"
+        "license.mac": "{mac}"
+        "license.registered_channels": "{reg}"
+        "license.type": "{ltype}"
+    - path: '^/ecs/license\.json$'
+      json:
+        channels: "$.license.channels"
+        expired: "$.license.expired"
+        valid: "$.license.valid"
+        limit: "$.license.time_limit"
+        tz: "$.license.time_zone"
+        start_year: "$.license.start_year"
+        start_month: "$.license.start_month"
+        start_day: "$.license.start_day"
+        start_hour: "$.license.start_hour"
+        start_minute: "$.license.start_minute"
+        start_second: "$.license.start_second"
+        stop_year: "$.license.stop_year"
+        stop_month: "$.license.stop_month"
+        stop_day: "$.license.stop_day"
+        stop_hour: "$.license.stop_hour"
+        stop_minute: "$.license.stop_minute"
+        stop_second: "$.license.stop_second"
+        demo: "$.license.demo_mode"
+        wm: "$.license.no_watermark"
+      state:
+        "license.channels": "{channels}"
+        "license.expired": { value: "{expired}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "license.valid": { value: "{valid}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "license.time_limit": "{limit}"
+        "license.time_zone": "{tz}"
+        "license.start.year": "{start_year}"
+        "license.start.month": "{start_month}"
+        "license.start.day": "{start_day}"
+        "license.start.hour": "{start_hour}"
+        "license.start.minute": "{start_minute}"
+        "license.start.second": "{start_second}"
+        "license.stop.year": "{stop_year}"
+        "license.stop.month": "{stop_month}"
+        "license.stop.day": "{stop_day}"
+        "license.stop.hour": "{stop_hour}"
+        "license.stop.minute": "{stop_minute}"
+        "license.stop.second": "{stop_second}"
+        "license.demo_mode": { value: "{demo}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "license.no_watermark": { value: "{wm}", map: { "true": true, "false": false, "1": true, "0": false } }
+    - path: '^/ecs/license/state\.json$'
+      json:
+        mac: "$.license_state.mac"
+        reg: "$.license_state.registered_channels"
+        ltype: "$.license_state.type"
+      state:
+        "license.mac": "{mac}"
+        "license.registered_channels": "{reg}"
+        "license.type": "{ltype}"
+    - path: '^/ecs\.json$'
+      json:
+        localtime_year: "$.encoder.time.localtime.year"
+        localtime_month: "$.encoder.time.localtime.month"
+        localtime_day: "$.encoder.time.localtime.day"
+        localtime_hour: "$.encoder.time.localtime.hour"
+        localtime_minute: "$.encoder.time.localtime.minute"
+        localtime_second: "$.encoder.time.localtime.second"
+        utctime_year: "$.encoder.time.utctime.year"
+        utctime_month: "$.encoder.time.utctime.month"
+        utctime_day: "$.encoder.time.utctime.day"
+        utctime_hour: "$.encoder.time.utctime.hour"
+        utctime_minute: "$.encoder.time.utctime.minute"
+        utctime_second: "$.encoder.time.utctime.second"
+      state:
+        "time.local.year": "{localtime_year}"
+        "time.local.month": "{localtime_month}"
+        "time.local.day": "{localtime_day}"
+        "time.local.hour": "{localtime_hour}"
+        "time.local.minute": "{localtime_minute}"
+        "time.local.second": "{localtime_second}"
+        "time.utc.year": "{utctime_year}"
+        "time.utc.month": "{utctime_month}"
+        "time.utc.day": "{utctime_day}"
+        "time.utc.hour": "{utctime_hour}"
+        "time.utc.minute": "{utctime_minute}"
+        "time.utc.second": "{utctime_second}"
+    - path: '^/ecs/time\.json$'
+      json:
+        localtime_year: "$.time.localtime.year"
+        localtime_month: "$.time.localtime.month"
+        localtime_day: "$.time.localtime.day"
+        localtime_hour: "$.time.localtime.hour"
+        localtime_minute: "$.time.localtime.minute"
+        localtime_second: "$.time.localtime.second"
+        utctime_year: "$.time.utctime.year"
+        utctime_month: "$.time.utctime.month"
+        utctime_day: "$.time.utctime.day"
+        utctime_hour: "$.time.utctime.hour"
+        utctime_minute: "$.time.utctime.minute"
+        utctime_second: "$.time.utctime.second"
+      state:
+        "time.local.year": "{localtime_year}"
+        "time.local.month": "{localtime_month}"
+        "time.local.day": "{localtime_day}"
+        "time.local.hour": "{localtime_hour}"
+        "time.local.minute": "{localtime_minute}"
+        "time.local.second": "{localtime_second}"
+        "time.utc.year": "{utctime_year}"
+        "time.utc.month": "{utctime_month}"
+        "time.utc.day": "{utctime_day}"
+        "time.utc.hour": "{utctime_hour}"
+        "time.utc.minute": "{utctime_minute}"
+        "time.utc.second": "{utctime_second}"
+    - path: '^/ecs/version\.json$'
+      json:
+        major: "$.version.major"
+        minor: "$.version.minor"
+        subminor: "$.version.subminor"
+        build: "$.version.build"
+        type: "$.version.type"
+      state:
+        "encoder.version.major": "{major}"
+        "encoder.version.minor": "{minor}"
+        "encoder.version.subminor": "{subminor}"
+        "encoder.version.build": "{build}"
+        "encoder.version.type": "{type}"
+    - path: '^/ecs/system\.json$'
+      json:
+        label: "$.system.label"
+        cores: "$.system.cores_count"
+        cpus: "$.system.cpu_count"
+        cpu: "$.system.cpu"
+        mem: "$.system.memory.mem_total"
+        uptime: "$.system.uptime.hours"
+        h264: "$.system.gpu.hwencoder.h264"
+        hevc: "$.system.gpu.hwencoder.hevc"
+        aja: "$.system.capturesources.aja_detected"
+        ajacards: "$.system.capturesources.ajacard"
+        dl: "$.system.capturesources.decklink_detected"
+        dlcards: "$.system.capturesources.decklinkcard"
+        nics: "$.system.network_adapters.adapter"
+      state:
+        "system.label": "{label}"
+        "system.cores": "{cores}"
+        "system.cpu_count": "{cpus}"
+        "system.cpu": "{cpu}"
+        "system.memory_total": "{mem}"
+        "system.uptime_hours": "{uptime}"
+        "system.gpu_h264": { value: "{h264}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "system.gpu_hevc": { value: "{hevc}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "system.aja_detected": { value: "{aja}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "system.aja_cards": "{ajacards}"
+        "system.decklink_detected": { value: "{dl}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "system.decklink_cards": "{dlcards}"
+        "system.network_adapters": "{nics}"
+    - path: '^/ecs\.json$'
+      json_each: "$.encoder.channels.channel"
+      json:
+        id: "$.id"
+        label: "$.label"
+        port: "$.port"
+        ooo: "$.outoforder"
+        starts: "$.startcounter"
+        event: "$.event_id"
+        event_label: "$.event_label"
+      replace: "channels"
+      then_send: [{ method: GET, path: "/ecs/channels/{id}.json" }]
+      state:
+        "channels.{id}.label": "{label}"
+        "channels.{id}.port": "{port}"
+        "channels.{id}.out_of_order": { value: "{ooo}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "channels.{id}.start_counter": "{starts}"
+        "channels.{id}.event_id": "{event}"
+        "channels.{id}.event_label": "{event_label}"
+    - path: '^/ecs/channels\.json$'
+      json_each: "$.channels.channel"
+      json:
+        id: "$.id"
+        label: "$.label"
+        port: "$.port"
+        ooo: "$.outoforder"
+        starts: "$.startcounter"
+      replace: "channels"
+      then_send: [{ method: GET, path: "/ecs/channels/{id}.json" }]
+      state:
+        "channels.{id}.label": "{label}"
+        "channels.{id}.port": "{port}"
+        "channels.{id}.out_of_order": { value: "{ooo}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "channels.{id}.start_counter": "{starts}"
+    - path: '^/ecs/channels/[^/]+\.json$'
+      json_match: { "$.channel.id": "." }
+      json:
+        id: "$.channel.id"
+        app: "$.channel.App"
+        cpu: "$.channel.CurrentCpuUsage"
+        mem: "$.channel.CurrentMemUsage"
+        memp: "$.channel.CurrentMemUsagePercent"
+        vmem: "$.channel.CurrentVMemUsage"
+        vmemp: "$.channel.CurrentVMemUsagePercent"
+        elapsed: "$.channel.ElapsedRunningTime"
+        samples: "$.channel.MediaSampleUsage"
+        net_in: "$.channel.NetworkInTraffic"
+        net_out: "$.channel.NetworkOutTraffic"
+        ooo: "$.channel.OutOfOrder"
+        preset: "$.channel.PresetLabel"
+        pstate: "$.channel.PresetState"
+        rec: "$.channel.RecordState"
+        syscpu: "$.channel.SystemCpuUsage"
+        threads: "$.channel.Threads"
+        label: "$.channel.label"
+        state: "$.channel.state"
+        type: "$.channel.type"
+        active: "$.channel.inputs.active"
+      state:
+        "channel_state.{id}.app": "{app}"
+        "channel_state.{id}.cpu": "{cpu}"
+        "channel_state.{id}.memory": "{mem}"
+        "channel_state.{id}.memory_percent": "{memp}"
+        "channel_state.{id}.virtual_memory": "{vmem}"
+        "channel_state.{id}.virtual_memory_percent": "{vmemp}"
+        "channel_state.{id}.elapsed": "{elapsed}"
+        "channel_state.{id}.media_sample_usage": "{samples}"
+        "channel_state.{id}.network_in": "{net_in}"
+        "channel_state.{id}.network_out": "{net_out}"
+        "channel_state.{id}.out_of_order": { value: "{ooo}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "channel_state.{id}.preset_label": "{preset}"
+        "channel_state.{id}.preset_state": "{pstate}"
+        "channel_state.{id}.record_state": "{rec}"
+        "channel_state.{id}.system_cpu": "{syscpu}"
+        "channel_state.{id}.threads": "{threads}"
+        "channel_state.{id}.label": "{label}"
+        "channel_state.{id}.state": "{state}"
+        "channel_state.{id}.type": "{type}"
+        "channel_state.{id}.active_input": "{active}"
+    - path: '^/ecs/channels/[^/]+\.json$'
+      json_each: "$.channel.encoders.encoder"
+      json:
+        id: "$^.channel.id"
+        enc: "$.id"
+        impl: "$.Implementation"
+        comp: "$.comp"
+        label: "$.label"
+        state: "$.state"
+        type: "$.type"
+        vq: "$.InputVideoQueue"
+        vcodec: "$.VideoCodec"
+        vbr: "$.VideoEncoderBitrate"
+        vfps: "$.VideoEncoderFps"
+        vh: "$.VideoFrameHeight"
+        vw: "$.VideoFrameWidth"
+        abits: "$.AudioBitDepth"
+        acfg: "$.AudioChannelConfig"
+        achans: "$.AudioChannels"
+        acodec: "$.AudioCodec"
+        abr: "$.AudioEncoderBitrate"
+        alang: "$.AudioLanguageCode"
+        alangc: "$.AudioLanguageComment"
+        alangn: "$.AudioLanguageName"
+        alangt: "$.AudioLanguageType"
+        arate: "$.AudioSampleRate"
+        astream: "$.AudioStreamNumber"
+        aq: "$.InputAudioQueue"
+      replace: "channel_state.{id}.encoders"
+      state:
+        "channel_state.{id}.encoders.{enc:key}.implementation": "{impl}"
+        "channel_state.{id}.encoders.{enc:key}.component": "{comp}"
+        "channel_state.{id}.encoders.{enc:key}.label": "{label}"
+        "channel_state.{id}.encoders.{enc:key}.state": "{state}"
+        "channel_state.{id}.encoders.{enc:key}.type": "{type}"
+        "channel_state.{id}.encoders.{enc:key}.input_video_queue": "{vq}"
+        "channel_state.{id}.encoders.{enc:key}.video_codec": "{vcodec}"
+        "channel_state.{id}.encoders.{enc:key}.video_bitrate": "{vbr}"
+        "channel_state.{id}.encoders.{enc:key}.video_fps": "{vfps}"
+        "channel_state.{id}.encoders.{enc:key}.video_height": "{vh}"
+        "channel_state.{id}.encoders.{enc:key}.video_width": "{vw}"
+        "channel_state.{id}.encoders.{enc:key}.audio_bit_depth": "{abits}"
+        "channel_state.{id}.encoders.{enc:key}.audio_channel_config": "{acfg}"
+        "channel_state.{id}.encoders.{enc:key}.audio_channels": "{achans}"
+        "channel_state.{id}.encoders.{enc:key}.audio_codec": "{acodec}"
+        "channel_state.{id}.encoders.{enc:key}.audio_bitrate": "{abr}"
+        "channel_state.{id}.encoders.{enc:key}.audio_language_code": "{alang}"
+        "channel_state.{id}.encoders.{enc:key}.audio_language_comment": "{alangc}"
+        "channel_state.{id}.encoders.{enc:key}.audio_language_name": "{alangn}"
+        "channel_state.{id}.encoders.{enc:key}.audio_language_type": "{alangt}"
+        "channel_state.{id}.encoders.{enc:key}.audio_sample_rate": "{arate}"
+        "channel_state.{id}.encoders.{enc:key}.audio_stream_number": "{astream}"
+        "channel_state.{id}.encoders.{enc:key}.input_audio_queue": "{aq}"
+    - path: '^/ecs/channels/[^/]+\.json$'
+      json_each: "$.channel.inputs.input"
+      json:
+        id: "$^.channel.id"
+        inp: "$.id"
+        gain: "$.AudioGainValue"
+        level: "$.AudioLevel"
+        cc: "$.CC"
+        ca: "$.ConfiguredAudio"
+        cabits: "$.ConfiguredAudioBitDepth"
+        cach: "$.ConfiguredAudioChannels"
+        car: "$.ConfiguredAudioSampleRate"
+        cv: "$.ConfiguredVideo"
+        cvfr: "$.ConfiguredVideoFrameRate"
+        cvh: "$.ConfiguredVideoHeight"
+        cvw: "$.ConfiguredVideoWidth"
+        da: "$.DetectedAudio"
+        dabits: "$.DetectedAudioBitDepth"
+        dach: "$.DetectedAudioChannels"
+        dar: "$.DetectedAudioSampleRate"
+        dv: "$.DetectedVideo"
+        dvfr: "$.DetectedVideoFrameRate"
+        dvh: "$.DetectedVideoHeight"
+        dvw: "$.DetectedVideoWidth"
+        ibs: "$.IBS"
+        impl: "$.Implementation"
+        iach: "$.InputAudioChannels"
+        iacon: "$.InputAudioConnector"
+        iaenc: "$.InputAudioEncoding"
+        iar: "$.InputAudioSampleRate"
+        iname: "$.InputDisplayName"
+        signal: "$.InputSignal"
+        ivcon: "$.InputVideoConnector"
+        ivenc: "$.InputVideoEncoding"
+        ivfr: "$.InputVideoFrameRate"
+        ivh: "$.InputVideoHeight"
+        ivw: "$.InputVideoWidth"
+        oar: "$.OutputAudioSampleRate"
+        ovfr: "$.OutputVideoFrameRate"
+        pos: "$.Position"
+        scte: "$.SCTE35State"
+        losses: "$.SignalLosses"
+        gainctl: "$.SupportsAudioGainControl"
+        used: "$.UsedAudioChannels"
+        comp: "$.comp"
+        label: "$.label"
+      replace: "channel_state.{id}.inputs"
+      state:
+        "channel_state.{id}.inputs.{inp:key}.audio_gain_db": "{gain}"
+        "channel_state.{id}.inputs.{inp:key}.audio_levels": "{level}"
+        "channel_state.{id}.inputs.{inp:key}.closed_captions": "{cc}"
+        "channel_state.{id}.inputs.{inp:key}.configured_audio": { value: "{ca}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "channel_state.{id}.inputs.{inp:key}.configured_audio_bit_depth": "{cabits}"
+        "channel_state.{id}.inputs.{inp:key}.configured_audio_channels": "{cach}"
+        "channel_state.{id}.inputs.{inp:key}.configured_audio_sample_rate": "{car}"
+        "channel_state.{id}.inputs.{inp:key}.configured_video": { value: "{cv}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "channel_state.{id}.inputs.{inp:key}.configured_video_frame_rate": "{cvfr}"
+        "channel_state.{id}.inputs.{inp:key}.configured_video_height": "{cvh}"
+        "channel_state.{id}.inputs.{inp:key}.configured_video_width": "{cvw}"
+        "channel_state.{id}.inputs.{inp:key}.detected_audio": { value: "{da}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "channel_state.{id}.inputs.{inp:key}.detected_audio_bit_depth": "{dabits}"
+        "channel_state.{id}.inputs.{inp:key}.detected_audio_channels": "{dach}"
+        "channel_state.{id}.inputs.{inp:key}.detected_audio_sample_rate": "{dar}"
+        "channel_state.{id}.inputs.{inp:key}.detected_video": { value: "{dv}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "channel_state.{id}.inputs.{inp:key}.detected_video_frame_rate": "{dvfr}"
+        "channel_state.{id}.inputs.{inp:key}.detected_video_height": "{dvh}"
+        "channel_state.{id}.inputs.{inp:key}.detected_video_width": "{dvw}"
+        "channel_state.{id}.inputs.{inp:key}.ibs": "{ibs}"
+        "channel_state.{id}.inputs.{inp:key}.implementation": "{impl}"
+        "channel_state.{id}.inputs.{inp:key}.input_audio_channels": "{iach}"
+        "channel_state.{id}.inputs.{inp:key}.input_audio_connector": "{iacon}"
+        "channel_state.{id}.inputs.{inp:key}.input_audio_encoding": "{iaenc}"
+        "channel_state.{id}.inputs.{inp:key}.input_audio_sample_rate": "{iar}"
+        "channel_state.{id}.inputs.{inp:key}.display_name": "{iname}"
+        "channel_state.{id}.inputs.{inp:key}.signal": "{signal}"
+        "channel_state.{id}.inputs.{inp:key}.input_video_connector": "{ivcon}"
+        "channel_state.{id}.inputs.{inp:key}.input_video_encoding": "{ivenc}"
+        "channel_state.{id}.inputs.{inp:key}.input_video_frame_rate": "{ivfr}"
+        "channel_state.{id}.inputs.{inp:key}.input_video_height": "{ivh}"
+        "channel_state.{id}.inputs.{inp:key}.input_video_width": "{ivw}"
+        "channel_state.{id}.inputs.{inp:key}.output_audio_sample_rate": "{oar}"
+        "channel_state.{id}.inputs.{inp:key}.output_video_frame_rate": "{ovfr}"
+        "channel_state.{id}.inputs.{inp:key}.position": "{pos}"
+        "channel_state.{id}.inputs.{inp:key}.scte35_state": "{scte}"
+        "channel_state.{id}.inputs.{inp:key}.signal_losses": "{losses}"
+        "channel_state.{id}.inputs.{inp:key}.audio_gain_control": { value: "{gainctl}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "channel_state.{id}.inputs.{inp:key}.used_audio_channels": "{used}"
+        "channel_state.{id}.inputs.{inp:key}.component": "{comp}"
+        "channel_state.{id}.inputs.{inp:key}.label": "{label}"
+    - path: '^/ecs/channels/[^/]+\.json$'
+      json_each: "$.channel.outputs.output"
+      json:
+        id: "$^.channel.id"
+        out: "$.id"
+        aenc: "$.AudioEncoder"
+        venc: "$.VideoEncoder"
+        langs: "$.AudioLanguageCodes"
+        langc: "$.AudioLanguageComments"
+        langn: "$.AudioLanguageNames"
+        cccode: "$.CCLanguageCodes"
+        cccom: "$.CCLanguageComments"
+        ccname: "$.CCLanguageNames"
+        dal: "$.DefaultAudioLanguage"
+        dv: "$.DefaultVideo"
+        master: "$.MasterPlaylistURL"
+        media: "$.Media"
+        oaq: "$.OutputAudioQueues"
+        oar: "$.OutputAudioSampleRates"
+        ovfr: "$.OutputVideoFrameRates"
+        ovq: "$.OutputVideoQueues"
+        oaq1: "$.OutputAudioQueue"
+        oar1: "$.OutputAudioSampleRate"
+        ovfr1: "$.OutputVideoFrameRate"
+        ovq1: "$.OutputVideoQueue"
+        play: "$.PlaybackURL"
+        sname: "$.StreamName"
+        splay: "$.StreamPlaylistURL"
+        surl: "$.StreamURL"
+        waiting: "$.WaitingSegmentsCount"
+        adir: "$.ArchiveDirectory"
+        afile: "$.ArchiveFilename"
+        free: "$.FreeDiskSpace"
+        freep: "$.FreeDiskSpacePercent"
+        total: "$.TotalDiskSpace"
+        used: "$.UsedDiskSpace"
+        write: "$.WriteRate"
+        comp: "$.comp"
+        label: "$.label"
+        name: "$.name"
+        state: "$.state"
+        type: "$.type"
+      replace: "channel_state.{id}.outputs"
+      state:
+        "channel_state.{id}.outputs.{out:key}.audio_encoder": "{aenc}"
+        "channel_state.{id}.outputs.{out:key}.video_encoder": "{venc}"
+        "channel_state.{id}.outputs.{out:key}.audio_language_codes": "{langs}"
+        "channel_state.{id}.outputs.{out:key}.audio_language_comments": "{langc}"
+        "channel_state.{id}.outputs.{out:key}.audio_language_names": "{langn}"
+        "channel_state.{id}.outputs.{out:key}.cc_language_codes": "{cccode}"
+        "channel_state.{id}.outputs.{out:key}.cc_language_comments": "{cccom}"
+        "channel_state.{id}.outputs.{out:key}.cc_language_names": "{ccname}"
+        "channel_state.{id}.outputs.{out:key}.default_audio_language": "{dal}"
+        "channel_state.{id}.outputs.{out:key}.default_video": "{dv}"
+        "channel_state.{id}.outputs.{out:key}.master_playlist_url": "{master}"
+        "channel_state.{id}.outputs.{out:key}.media": "{media}"
+        "channel_state.{id}.outputs.{out:key}.audio_queues": "{oaq}"
+        "channel_state.{id}.outputs.{out:key}.audio_sample_rates": "{oar}"
+        "channel_state.{id}.outputs.{out:key}.video_frame_rates": "{ovfr}"
+        "channel_state.{id}.outputs.{out:key}.video_queues": "{ovq}"
+        "channel_state.{id}.outputs.{out:key}.audio_queue": "{oaq1}"
+        "channel_state.{id}.outputs.{out:key}.audio_sample_rate": "{oar1}"
+        "channel_state.{id}.outputs.{out:key}.video_frame_rate": "{ovfr1}"
+        "channel_state.{id}.outputs.{out:key}.video_queue": "{ovq1}"
+        "channel_state.{id}.outputs.{out:key}.playback_url": "{play}"
+        "channel_state.{id}.outputs.{out:key}.stream_name": "{sname}"
+        "channel_state.{id}.outputs.{out:key}.stream_playlist_url": "{splay}"
+        "channel_state.{id}.outputs.{out:key}.stream_url": "{surl}"
+        "channel_state.{id}.outputs.{out:key}.waiting_segments": "{waiting}"
+        "channel_state.{id}.outputs.{out:key}.archive_directory": "{adir}"
+        "channel_state.{id}.outputs.{out:key}.archive_filename": "{afile}"
+        "channel_state.{id}.outputs.{out:key}.disk_free_mb": "{free}"
+        "channel_state.{id}.outputs.{out:key}.disk_free_percent": "{freep}"
+        "channel_state.{id}.outputs.{out:key}.disk_total_mb": "{total}"
+        "channel_state.{id}.outputs.{out:key}.disk_used_mb": "{used}"
+        "channel_state.{id}.outputs.{out:key}.write_rate": "{write}"
+        "channel_state.{id}.outputs.{out:key}.component": "{comp}"
+        "channel_state.{id}.outputs.{out:key}.label": "{label}"
+        "channel_state.{id}.outputs.{out:key}.name": "{name}"
+        "channel_state.{id}.outputs.{out:key}.state": "{state}"
+        "channel_state.{id}.outputs.{out:key}.type": "{type}"
+    - path: '^/ecs/channelconfigs\.json$'
+      json_each: "$"
+      json:
+        id: "$._id"
+        name: "$.name"
+        desc: "$.description"
+        state: "$.state"
+        rec: "$.actions.recording"
+        mem: "$.metrics.memory"
+        vmem: "$.metrics.v_memory"
+        cpu: "$.metrics.cpu"
+        net_in: "$.metrics.network.incoming"
+        net_out: "$.metrics.network.outgoing"
+        label: "$.preset.label"
+        type: "$.preset.type"
+        version: "$.preset.version"
+        preset: "$.preset"
+      replace: "configs"
+      state:
+        "configs.{id}.name": "{name}"
+        "configs.{id}.description": "{desc}"
+        "configs.{id}.state": "{state}"
+        "configs.{id}.recording": "{rec}"
+        "configs.{id}.memory": "{mem}"
+        "configs.{id}.virtual_memory": "{vmem}"
+        "configs.{id}.cpu": "{cpu}"
+        "configs.{id}.network_in": "{net_in}"
+        "configs.{id}.network_out": "{net_out}"
+        "configs.{id}.label": "{label}"
+        "configs.{id}.type": "{type}"
+        "configs.{id}.version": "{version}"
+        "configs.{id}.preset": "{preset}"
+    # Reads keyed by the channel named in the request.
+    - path: '^/ecs/channels/([^/]+)/signals\.json(\?|$)'
+      json: { all: "$" }
+      state: { "channel_signals.{1:url_decode:key}": "{all}" }
+    - path: '^/ecs/channels/([^/]+)/preset/label\.json$'
+      json: { label: "$.preset" }
+      state: { "channel_configuration.{1:url_decode:key}.label": "{label}" }
+    - path: '^/ecs/channels/([^/]+)/preset\.json$'
+      json_match: { "$.kulabytepreset": "." }
+      json: { all: "$" }
+      state: { "channel_configuration.{1:url_decode:key}.configuration": "{all}" }
+    # A channel deleted through the core leaves state at once.
+    - path: '^/ecs/channels/([^/]+)\.json$'
+      json_match: { "$.messages.message[0].text": "(?i)deleted" }
+      json: {}
+      state:
+        "channel_state.{1:url_decode:key}": { delete: true }
+        "channel_signals.{1:url_decode:key}": { delete: true }
+        "channel_configuration.{1:url_decode:key}": { delete: true }
