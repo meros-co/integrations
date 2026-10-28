@@ -489,6 +489,16 @@ pub enum Bind {
         address: Option<std::net::IpAddr>,
         port: u16,
     },
+    /// A port owned by this session that also hears an IPv4 multicast
+    /// group, joined on every interface the core uses (none when it is bound
+    /// to loopback, where only datagrams sent to that address arrive), shared
+    /// with other programs listening to the same group and port. Multicast
+    /// sent from it goes with a time to live of 255 and loops back to this
+    /// host's own listeners. For a protocol announced on a group (SAP).
+    Multicast {
+        group: std::net::Ipv4Addr,
+        port: u16,
+    },
 }
 
 /// Work too heavy for the session's own task, such as decoding or encoding

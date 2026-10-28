@@ -1070,6 +1070,31 @@ impl Session {
                 let reader = spawn_reader(key, socket.clone(), None, self.inbound_tx.clone());
                 self.sockets.insert(key, Socket::Own { socket, reader });
             }
+            Bind::Multicast { group, port } => {
+                let bind = self.services.bind_address;
+                let socket =
+                    bind_multicast(bind, group, port).map_err(|e| format!("bind :{port}: {e}"))?;
+                if !bind.is_loopback() {
+                    let mut problems = Vec::new();
+                    for (ip, _) in crate::discovery::interfaces(bind) {
+                        if let Err(e) =
+                            socket2::SockRef::from(&socket).join_multicast_v4(&group, &ip)
+                        {
+                            problems.push(format!(
+                                "cannot join {group} on {ip} ({e}); it will not be heard there"
+                            ));
+                        }
+                    }
+                    let mut cx = self.cx();
+                    for problem in problems {
+                        cx.log(crate::module::Level::Warning, problem);
+                    }
+                    Box::pin(self.apply(cx.take())).await;
+                }
+                let socket = Arc::new(socket);
+                let reader = spawn_reader(key, socket.clone(), None, self.inbound_tx.clone());
+                self.sockets.insert(key, Socket::Own { socket, reader });
+            }
             Bind::Shared(port) => {
                 let bound = self.services.shared_udp.register(
                     self.services.bind_address,
@@ -1275,6 +1300,45 @@ fn bind_any(address: IpAddr, port: u16) -> std::io::Result<UdpSocket> {
     let _ = socket.set_recv_buffer_size(RECV_BUFFER);
     socket.set_nonblocking(true)?;
     socket.bind(&SocketAddr::new(address, port).into())?;
+    UdpSocket::from_std(socket.into())
+}
+
+/// A socket for a multicast group's port, shared with other listeners to it.
+/// On Unix it binds the group's address, so it hears only that group; on
+/// Windows, which cannot bind a multicast address, the core's. A core bound
+/// to loopback binds there.
+fn bind_multicast(
+    bind: IpAddr,
+    group: std::net::Ipv4Addr,
+    port: u16,
+) -> std::io::Result<UdpSocket> {
+    use socket2::{Domain, Protocol, Socket, Type};
+    let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
+    socket.set_reuse_address(true)?;
+    #[cfg(all(
+        unix,
+        not(any(target_os = "solaris", target_os = "illumos", target_os = "cygwin"))
+    ))]
+    let _ = socket.set_reuse_port(true);
+    let _ = socket.set_recv_buffer_size(RECV_BUFFER);
+    socket.set_multicast_ttl_v4(255)?;
+    socket.set_multicast_loop_v4(true)?;
+    let local = match bind {
+        IpAddr::V4(v4) => v4,
+        IpAddr::V6(_) => std::net::Ipv4Addr::UNSPECIFIED,
+    };
+    if !local.is_unspecified() {
+        socket.set_multicast_if_v4(&local)?;
+    }
+    socket.set_nonblocking(true)?;
+    #[cfg(unix)]
+    let address = if local.is_loopback() { local } else { group };
+    #[cfg(not(unix))]
+    let address = {
+        let _ = group;
+        local
+    };
+    socket.bind(&SocketAddr::new(IpAddr::V4(address), port).into())?;
     UdpSocket::from_std(socket.into())
 }
 
