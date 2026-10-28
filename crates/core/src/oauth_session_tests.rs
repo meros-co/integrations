@@ -281,6 +281,60 @@ async fn a_token_about_to_expire_is_refreshed_first_by_a_public_client() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn client_credentials_get_the_first_token_and_a_new_one_after_a_refusal() {
+    let shared = server(
+        "cc1",
+        Token::Issue {
+            access: "cc1".into(),
+            expires_in: 86400,
+            rotate: None,
+        },
+    );
+    let port = serve(shared.clone()).await;
+    let mut spec = Catalog::source_tree()
+        .device("youtube-live")
+        .unwrap()
+        .clone();
+    let transport = spec.transport.as_mut().unwrap();
+    transport["scheme"] = json!("http");
+    transport["oauth"]["client_credentials"] = json!(true);
+    let catalog = Catalog {
+        devices: [(spec.id.clone(), spec)].into(),
+    };
+    let core = Core::with_catalog(
+        catalog,
+        CoreOptions::new().bind_address([127, 0, 0, 1].into()),
+    )
+    .unwrap();
+    // The client's id and secret alone: no token of any kind yet.
+    let device = open(
+        &core,
+        port,
+        json!({"client_id": "cid", "client_secret": "sec"}),
+    );
+    assert!(get_broadcast(&core, device).await.is_ok());
+    assert_eq!(
+        refreshes(&shared),
+        ["grant_type=client_credentials&client_id=cid&client_secret=sec"]
+    );
+    let event = wait_event(&core, |e| credentials(e).is_some()).await;
+    assert_eq!(credentials(&event).unwrap()["access_token"], "cc1");
+    // The service drops the token (inactivity): a 401 gets a new one.
+    {
+        let mut s = shared.lock().unwrap();
+        s.valid = "cc2".into();
+        s.token = Token::Issue {
+            access: "cc2".into(),
+            expires_in: 86400,
+            rotate: None,
+        };
+    }
+    assert!(get_broadcast(&core, device).await.is_ok());
+    assert_eq!(refreshes(&shared).len(), 2);
+    assert_eq!(shared.lock().unwrap().api.last().unwrap().1, "Bearer cc2");
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn a_refused_token_is_refreshed_and_the_request_sent_again() {
     let shared = server(
         "fresh",

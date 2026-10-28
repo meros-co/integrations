@@ -3005,7 +3005,10 @@ impl SpecEngine {
     /// refusal stands.
     fn retry_after_refresh(&mut self, cx: &mut Cx) -> bool {
         // A refresh already in flight (one validation asked for) serves too.
-        let refreshable = self.oauth.is_some() && OAuth::can_refresh(&self.settings);
+        let refreshable = self
+            .oauth
+            .as_ref()
+            .is_some_and(|o| o.can_refresh(&self.settings));
         let Some(flight) = self.current.as_mut() else {
             return false;
         };
@@ -3061,7 +3064,10 @@ impl SpecEngine {
     /// refresh token; otherwise, or when the new token is refused too, the
     /// refusal is terminal. Anything else is tried again with backoff.
     fn validated(&mut self, cx: &mut Cx, result: Result<HttpResponse, String>) {
-        let can_refresh = OAuth::can_refresh(&self.settings);
+        let can_refresh = self
+            .oauth
+            .as_ref()
+            .is_some_and(|o| o.can_refresh(&self.settings));
         let Some(oauth) = self.oauth.as_mut() else {
             return;
         };
@@ -3097,7 +3103,11 @@ impl SpecEngine {
     /// A push websocket or event stream refused its token: refresh it and
     /// reopen, once. False when the refusal stands.
     fn side_refresh(&mut self, cx: &mut Cx) -> bool {
-        if self.oauth.is_none() || !OAuth::can_refresh(&self.settings) || self.side_refreshed {
+        let refreshable = self
+            .oauth
+            .as_ref()
+            .is_some_and(|o| o.can_refresh(&self.settings));
+        if !refreshable || self.side_refreshed {
             return false;
         }
         self.side_refreshed = true;

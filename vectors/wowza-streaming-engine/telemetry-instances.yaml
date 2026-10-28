@@ -1,0 +1,51 @@
+spec: wowza-streaming-engine
+telemetry: instances
+inbound_http:
+  path: /v2/servers/_defaultServer_/vhosts/_defaultVHost_/applications/live/instances
+  body: '{"serverName": "_defaultServer_", "instanceList": [{"name": "_definst_", "incomingStreams": [{"name":
+    "my Stream", "sourceIp": "rtmp://192.168.1.20:52000", "isConnected": true, "isRecordingSet": true,
+    "isPublishedToVOD": false, "isPTZEnabled": false, "isStreamManagerStream": false, "applicationInstance":
+    "_definst_"}], "outgoingStreams": [], "recorders": [{"recorderName": "my Stream", "recorderState":
+    "Recording in progress", "currentFile": "/usr/local/WowzaStreamingEngine/content/my Stream.mp4", "currentSize":
+    1048576, "currentDuration": 60000, "recordingStartTime": "2026-10-28-10:00:00", "outputPath": "/usr/local/WowzaStreamingEngine/content",
+    "fileFormat": "MP4", "segmentationType": "None", "recorderErrorString": ""}], "streamGroups": [{"groupName":
+    "my Stream_all", "members": ["my Stream_720p", "my Stream_360p"], "isTranscodeResult": true}]}]}'
+state_before:
+  applications:
+    live:
+      instances:
+        _definst_:
+          incoming_streams:
+            old:
+              connected: true
+expect_state:
+  applications:
+    live:
+      instances:
+        _definst_:
+          incoming_streams:
+            my Stream:
+              connected: true
+              source_ip: rtmp://192.168.1.20:52000
+              recording: true
+              published_to_vod: false
+              ptz_enabled: false
+              stream_manager: false
+          recorders:
+            my Stream:
+              state: Recording in progress
+              current_file: /usr/local/WowzaStreamingEngine/content/my Stream.mp4
+              current_size: 1048576
+              current_duration: 60000
+              start_time: 2026-10-28-10:00:00
+              output_path: /usr/local/WowzaStreamingEngine/content
+              file_format: MP4
+              segmentation_type: None
+              error: ''
+          stream_groups:
+            my Stream_all:
+              members: '["my Stream_720p","my Stream_360p"]'
+              transcode_result: true
+expect_then_send:
+- method: GET
+  target: /v2/servers/_defaultServer_/vhosts/_defaultVHost_/applications/live/instances/_definst_/incomingstreams/my%20Stream/monitoring/current

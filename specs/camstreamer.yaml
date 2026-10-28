@@ -1,0 +1,728 @@
+spec: 1
+id: camstreamer
+name: CamStreamer apps for Axis cameras (HTTP API)
+vendor: CamStreamer
+category: camera
+
+# CamStreamer's ACAP applications run inside Axis cameras and encoders and
+# answer HTTP on the camera's web server, with the camera's credentials:
+# CamStreamer App (streaming to RTMP, SRT, HLS and MPEG-TS destinations),
+# CamOverlay App (graphics), CamSwitcher App (switching cameras and clips),
+# CamScripter App (micro-apps) and the NDI HX Plugin. Each app is a model:
+# open one device per app on the camera.
+
+source:
+  - title: CamStreamer ACAP API (CamStreamer App 5.x and 6.x, CamStreamer App 4.x, CamOverlay App 3.x and 4.x, CamSwitcher App 2.x, CamScripter App 2.x, NDI HX Plugin 1.x)
+    author: CamStreamer
+    url: https://camstreamer.com/api
+    note: >
+      Manufacturer document, retrieved 2026-10-28. The apps' APIs work once
+      the app is installed and licensed, on the camera's HTTP port (80 by
+      default) with the camera's user and password. CamStreamer App 5.x and
+      6.x: GET /local/camstreamer/stream_list.cgi?action=get, POST
+      ?action=set (the whole {"streamList": [...]}; an empty list deletes
+      every stream), GET and POST
+      /local/camstreamer/stream/stream_list.cgi?action=get|set&stream_id,
+      /local/camstreamer/set_stream_enabled.cgi?stream_id&enabled,
+      /local/camstreamer/get_streamstat.cgi?stream_id (data net_stats,
+      stream_bytes_time_ms, stream_bytes, start_count, is_streaming), the
+      HLS signature in param.cgi group camstreamer.signature; a stream has
+      streamId, platform, enabled, active, title, callApi, trigger (manual
+      with an optional port, onetime with startTime and stopTime, recurrent
+      with a schedule), video input (CRS, CSw, RTSP_URL) and output (url:
+      rtmp, tcp, udp, hls, ftp, srt), audio (source none, default, file,
+      url; avSyncMsec), prepareAhead and status (led, port); the app
+      restarts a stream whenever a parameter changes. CamStreamer App 4.x:
+      /local/camstreamer/param/get.cgi and set.cgi, stream/list.cgi
+      (action get or set), stream/set.cgi, stream/get.cgi and
+      stream/remove.cgi with flat parameters (enabled, active, audioSource,
+      avSyncMsec, internalVapixParameters, userVapixParameters,
+      outputParameters, outputType, mediaServerUrl, inputType, inputUrl,
+      forceStereo, streamDelay, statusLed, statusPort, callApi, trigger
+      none, inputX, time or recurrent, schedule, prepareAhead, startTime,
+      stopTime). CamOverlay: param.cgi group CamOverlay (Enabled),
+      /local/camoverlay/api/services.cgi (action get, or set by POST),
+      enabled.cgi (id_X or name_X = 0 or 1), customGraphics.cgi
+      (update_text with field texts, FIELD_color, FIELD_index; update_image
+      with image, coord_system, pos_x, pos_y, or a POSTed picture),
+      infoticker.cgi (service_id, text); changes by GET are not kept over a
+      restart. CamSwitcher: /local/camswitcher/output_info.cgi, and under
+      /local/camswitcher/react/local/camswitcher/api/ playlists.cgi
+      (action get), playlist_switch.cgi, playlist_queue_list.cgi,
+      playlist_queue_push.cgi, playlist_queue_play_next.cgi,
+      playlist_queue_clear.cgi (playlist_name) and clips.cgi (action get);
+      master audio in param.cgi camswitcher.masterAudio ({"type": NONE,
+      SILENCE, STREAM with stream_name, or CLIP with clip_name}).
+      CamScripter: /local/camscripter/package/install.cgi (multipart file),
+      remove.cgi, list.cgi, settings.cgi (package_name, action get or set),
+      the PackageConfigurations parameter, network_camera_list.cgi. NDI HX
+      Plugin: /local/ndihxplugin/settings.cgi (action get, or set by POST)
+      with ndiName, ndiGroups, channel, width, height, fps, gop,
+      audioEnabled. Each app also has a websocket of events (stream states,
+      overlay starts and stops, switcher switches), opened with a token
+      from its ws_authorization.cgi valid 30 seconds.
+
+transport:
+  type: http
+  port: 80
+  https_port: 443
+  scheme: { setting: scheme }
+  accept_invalid_certs: true
+  # Axis cameras answer Digest by default; Basic where the camera allows it.
+  auth: { setting: auth }
+  refusal_status: [401]
+  timeout_ms: 8000
+  probe: { method: GET, path: /axis-cgi/param.cgi, query: { action: list, group: Brand.ProdNbr } }
+
+settings:
+  auth: { type: enum, values: [digest, basic], default: digest,
+          label: Authentication,
+          description: "digest as Axis cameras answer by default, or basic where the camera's HTTP authentication allows it." }
+  username: { type: string, max_length: 256, default: root,
+              label: Username,
+              description: "A camera user allowed to use the apps (an administrator for configuration)." }
+  password: { type: string, secret: true, max_length: 256, default: "",
+              label: Password,
+              description: "That user's password." }
+  scheme: { type: enum, values: [http, https], default: http,
+            label: Connection,
+            description: "http, or https where the camera serves it (a self-signed certificate is accepted)." }
+
+ports:
+  - { port: 80, protocol: http, role: control, when: "scheme http", note: "the camera's web server" }
+  - { port: 443, protocol: https, role: control, when: "scheme https", note: "the camera's web server over TLS" }
+
+maps:
+  master_audio: { source: NONE, silence: SILENCE }
+
+models:
+  - id: app-6
+    name: CamStreamer App 5.x and 6.x
+    supports: [list_streams, set_stream_list, clear_streams, get_stream, set_stream, set_stream_enabled, get_stream_status, get_hls_signature]
+    verification: none
+  - id: app-4
+    name: CamStreamer App 4.x
+    supports: [set_stream_enabled, get_stream_status, list_streams_v4, set_stream_list_v4, get_stream_v4, set_stream_param_v4, set_stream_enabled_v4, set_stream_active_v4, remove_stream_v4, get_params_v4, set_param_v4]
+    verification: none
+  - id: camoverlay
+    name: CamOverlay App 3.x and 4.x
+    supports: [get_camoverlay_params, set_overlays_enabled, get_services, set_services, set_service_enabled, set_service_enabled_by_name, set_custom_text, set_custom_text_color, set_custom_text_variant, set_custom_image_from_camera, set_custom_image_position, upload_custom_image, set_infoticker_text]
+    verification: none
+  - id: camswitcher
+    name: CamSwitcher App 2.x
+    supports: [get_output_info, list_playlists, switch_playlist, list_queue, queue_playlist, play_next, clear_queue, list_clips, get_master_audio, set_master_audio, set_master_audio_clip, set_master_audio_stream]
+    verification: none
+  - id: camscripter
+    name: CamScripter App 2.x
+    supports: [list_packages, install_package, remove_package, get_package_settings, set_package_settings, set_package_configurations, list_network_cameras]
+    verification: none
+  - id: ndi-hx
+    name: NDI HX Plugin 1.x
+    supports: [get_ndi_settings, set_ndi_settings]
+    verification: none
+
+commands:
+  list_streams:
+    summary: "Every stream's whole configuration (stream_list.cgi?action=get)"
+    send: {"method": "GET", "path": "/local/camstreamer/stream_list.cgi", "query": {"action": "get"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_stream_list:
+    summary: "Replace the whole stream configuration; {\"streamList\": []} deletes every stream (stream_list.cgi?action=set)"
+    params:
+      config: {"type": "json", "required": true, "label": "Configuration", "description": "A JSON object with a streamList array of stream objects, as CamStreamer's API documentation gives it."}
+    send: {"method": "POST", "path": "/local/camstreamer/stream_list.cgi", "query": {"action": "set"}, "body": "{config}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  clear_streams:
+    summary: "Delete every stream (stream_list.cgi?action=set with an empty streamList)"
+    send: {"method": "POST", "path": "/local/camstreamer/stream_list.cgi", "query": {"action": "set"}, "body": "{\"streamList\":[]}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_stream:
+    summary: "One stream's configuration (stream/stream_list.cgi?action=get&stream_id)"
+    params:
+      stream: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 64, "required": true, "label": "Stream", "description": "The stream's ID: one the app made, or your own (CamStreamer reserves IDs starting api for streams made by API)."}
+    send: {"method": "GET", "path": "/local/camstreamer/stream/stream_list.cgi", "query": {"action": "get", "stream_id": "{stream}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_stream:
+    summary: "Add a stream or change one with a stream object (streamId, platform, enabled, active, title, trigger, video input and output, audio, status); a platform the app does not know hides it from its interface (stream/stream_list.cgi?action=set&stream_id)"
+    params:
+      stream: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 64, "required": true, "label": "Stream", "description": "The stream's ID: one the app made, or your own (CamStreamer reserves IDs starting api for streams made by API)."}
+      config: {"type": "json", "required": true, "label": "Configuration", "description": "A JSON object for one stream, as CamStreamer's API documentation gives it."}
+    send: {"method": "POST", "path": "/local/camstreamer/stream/stream_list.cgi", "query": {"action": "set", "stream_id": "{stream}"}, "body": "{config}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_stream_enabled:
+    summary: "Start or stop a stream (set_stream_enabled.cgi)"
+    params:
+      stream: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 64, "required": true, "label": "Stream", "description": "The stream's ID: one the app made, or your own (CamStreamer reserves IDs starting api for streams made by API)."}
+      enabled: {"type": "bool", "required": true, "label": "Enabled", "description": "On starts the stream, off stops it."}
+    send: {"method": "GET", "path": "/local/camstreamer/set_stream_enabled.cgi", "query": {"stream_id": "{stream}", "enabled": "{enabled:bool01}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_stream_status:
+    summary: "Whether a stream is streaming, with its bytes, network counters and start count (get_streamstat.cgi)"
+    params:
+      stream: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 64, "required": true, "label": "Stream", "description": "The stream's ID: one the app made, or your own (CamStreamer reserves IDs starting api for streams made by API)."}
+    send: {"method": "GET", "path": "/local/camstreamer/get_streamstat.cgi", "query": {"stream_id": "{stream}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_hls_signature:
+    summary: "The signature in the camera's HLS pull URLs, /local/camstreamer/SIGNATURE/live.m3u8 (param.cgi group camstreamer.signature)"
+    send: {"method": "GET", "path": "/axis-cgi/param.cgi", "query": {"action": "list", "group": "camstreamer.signature"}}
+    expect: { status: 200 }
+    returns: text
+
+  list_streams_v4:
+    summary: "Every stream's parameters, keyed by stream ID (stream/list.cgi?action=get)"
+    send: {"method": "GET", "path": "/local/camstreamer/stream/list.cgi", "query": {"action": "get"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_stream_list_v4:
+    summary: "Replace every stream's parameters with an object keyed by stream ID (stream/list.cgi?action=set)"
+    params:
+      config: {"type": "json", "required": true, "label": "Configuration", "description": "A JSON object keyed by stream ID, each with the 4.x stream parameters, as CamStreamer's API documentation gives it."}
+    send: {"method": "POST", "path": "/local/camstreamer/stream/list.cgi", "query": {"action": "set"}, "body": "{config}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_stream_v4:
+    summary: "One stream's parameters (stream/get.cgi)"
+    params:
+      stream: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 64, "required": true, "label": "Stream", "description": "The stream's ID: one the app made, or your own (CamStreamer reserves IDs starting api for streams made by API)."}
+    send: {"method": "GET", "path": "/local/camstreamer/stream/get.cgi", "query": {"stream_id": "{stream}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_stream_param_v4:
+    summary: "Add a stream or change one parameter of it, such as enabled, active, mediaServerUrl, audioSource, trigger, startTime or schedule (stream/set.cgi)"
+    params:
+      stream: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 64, "required": true, "label": "Stream", "description": "The stream's ID: one the app made, or your own (CamStreamer reserves IDs starting api for streams made by API)."}
+      param: {"type": "string", "pattern": "^[A-Za-z]+$", "max_length": 64, "required": true, "label": "Parameter", "description": "The 4.x stream parameter's name, such as enabled or mediaServerUrl."}
+      value: {"type": "string", "max_length": 4096, "required": true, "label": "Value", "description": "Its new value; it is URL-encoded on the way."}
+    send: {"method": "GET", "path": "/local/camstreamer/stream/set.cgi", "raw_query": "stream_id={stream}&{param}={value:url}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_stream_enabled_v4:
+    summary: "Start or stop a stream (stream/set.cgi enabled)"
+    params:
+      stream: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 64, "required": true, "label": "Stream", "description": "The stream's ID: one the app made, or your own (CamStreamer reserves IDs starting api for streams made by API)."}
+      enabled: {"type": "bool", "required": true, "label": "Enabled", "description": "On starts the stream, off stops it."}
+    send: {"method": "GET", "path": "/local/camstreamer/stream/set.cgi", "query": {"stream_id": "{stream}", "enabled": "{enabled:bool01}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_stream_active_v4:
+    summary: "Pause a stream or let it run, keeping its other processes (stream/set.cgi active)"
+    params:
+      stream: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 64, "required": true, "label": "Stream", "description": "The stream's ID: one the app made, or your own (CamStreamer reserves IDs starting api for streams made by API)."}
+      active: {"type": "bool", "required": true, "label": "Active", "description": "Off pauses the stream; on lets it run."}
+    send: {"method": "GET", "path": "/local/camstreamer/stream/set.cgi", "query": {"stream_id": "{stream}", "active": "{active:bool01}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  remove_stream_v4:
+    summary: "Delete a stream (stream/remove.cgi)"
+    params:
+      stream: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 64, "required": true, "label": "Stream", "description": "The stream's ID: one the app made, or your own (CamStreamer reserves IDs starting api for streams made by API)."}
+    send: {"method": "GET", "path": "/local/camstreamer/stream/remove.cgi", "query": {"stream_id": "{stream}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_params_v4:
+    summary: "CamStreamer's global parameters by name, such as signature (param/get.cgi)"
+    params:
+      names: {"type": "string", "pattern": "^[A-Za-z0-9_,]+$", "max_length": 1024, "required": true, "label": "Parameters", "description": "Parameter names separated by commas."}
+    send: {"method": "GET", "path": "/local/camstreamer/param/get.cgi", "query": {"list": "{names}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_param_v4:
+    summary: "Change one of CamStreamer's global parameters (param/set.cgi)"
+    params:
+      name: {"type": "string", "pattern": "^[A-Za-z0-9_]+$", "max_length": 64, "required": true, "label": "Parameter", "description": "The parameter's name."}
+      value: {"type": "string", "max_length": 4096, "required": true, "label": "Value", "description": "Its new value; it is URL-encoded on the way."}
+    send: {"method": "GET", "path": "/local/camstreamer/param/set.cgi", "raw_query": "{name}={value:url}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_camoverlay_params:
+    summary: "CamOverlay's parameters, such as Enabled (param.cgi group CamOverlay)"
+    send: {"method": "GET", "path": "/axis-cgi/param.cgi", "query": {"action": "list", "group": "CamOverlay"}}
+    expect: { status: 200 }
+    returns: text
+
+  set_overlays_enabled:
+    summary: "Start or stop every overlay in the camera's video (param.cgi CamOverlay.Enabled)"
+    params:
+      enabled: {"type": "bool", "required": true, "label": "Enabled", "description": "On shows the overlays, off hides them all."}
+    send: {"method": "GET", "path": "/axis-cgi/param.cgi", "query": {"action": "update", "CamOverlay.Enabled": "{enabled:bool01}"}}
+    expect: { status: 200 }
+    returns: text
+
+  get_services:
+    summary: "Every overlay service's configuration (api/services.cgi?action=get)"
+    send: {"method": "GET", "path": "/local/camoverlay/api/services.cgi", "query": {"action": "get"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_services:
+    summary: "Replace every overlay service's configuration, saved across restarts (api/services.cgi?action=set)"
+    params:
+      config: {"type": "json", "required": true, "label": "Configuration", "description": "A JSON object with a services array of overlay objects, as CamStreamer's API documentation gives it."}
+    send: {"method": "POST", "path": "/local/camoverlay/api/services.cgi", "query": {"action": "set"}, "body": "{config}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_service_enabled:
+    summary: "Show or hide one overlay service until the camera restarts (api/enabled.cgi id_X)"
+    params:
+      service: {"type": "int", "min": 0, "max": 1000000, "required": true, "label": "Service", "description": "The overlay service's id."}
+      enabled: {"type": "bool", "required": true, "label": "Shown", "description": "On shows the overlay, off hides it."}
+    send: {"method": "GET", "path": "/local/camoverlay/api/enabled.cgi", "raw_query": "id_{service}={enabled:bool01}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_service_enabled_by_name:
+    summary: "Show or hide one overlay service, by its custom name (api/enabled.cgi name_X)"
+    params:
+      name: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 128, "required": true, "label": "Service name", "description": "The overlay service's custom name."}
+      enabled: {"type": "bool", "required": true, "label": "Shown", "description": "On shows the overlay, off hides it."}
+    send: {"method": "GET", "path": "/local/camoverlay/api/enabled.cgi", "raw_query": "name_{name}={enabled:bool01}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_custom_text:
+    summary: "Change a Custom Graphics text field's text until the camera restarts (api/customGraphics.cgi update_text)"
+    params:
+      service: {"type": "int", "min": 0, "max": 1000000, "required": true, "label": "Service", "description": "The overlay service's id."}
+      field: {"type": "string", "pattern": "^[A-Za-z0-9_]+$", "max_length": 64, "required": true, "label": "Field", "description": "The text field's name in the Custom Graphics service, such as field1."}
+      text: {"type": "string", "max_length": 1024, "required": true, "label": "Text", "description": "The text to show."}
+    send: {"method": "GET", "path": "/local/camoverlay/api/customGraphics.cgi", "raw_query": "action=update_text&service_id={service}&{field}={text:url}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_custom_text_color:
+    summary: "Change a Custom Graphics text field's text and color (api/customGraphics.cgi update_text with FIELD_color)"
+    params:
+      service: {"type": "int", "min": 0, "max": 1000000, "required": true, "label": "Service", "description": "The overlay service's id."}
+      field: {"type": "string", "pattern": "^[A-Za-z0-9_]+$", "max_length": 64, "required": true, "label": "Field", "description": "The text field's name in the Custom Graphics service, such as field1."}
+      text: {"type": "string", "max_length": 1024, "required": true, "label": "Text", "description": "The text to show."}
+      color: {"type": "string", "pattern": "^[0-9]{9}([0-9]{3})?$", "max_length": 12, "required": true, "label": "Color", "description": "RRRGGGBBB or RRRGGGBBBAAA as decimal digits, such as 255255255."}
+    send: {"method": "GET", "path": "/local/camoverlay/api/customGraphics.cgi", "raw_query": "action=update_text&service_id={service}&{field}={text:url}&{field}_color={color}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_custom_text_variant:
+    summary: "Show another of a text field's variants, numbered from 0 for text1 (api/customGraphics.cgi FIELD_index)"
+    params:
+      service: {"type": "int", "min": 0, "max": 1000000, "required": true, "label": "Service", "description": "The overlay service's id."}
+      field: {"type": "string", "pattern": "^[A-Za-z0-9_]+$", "max_length": 64, "required": true, "label": "Field", "description": "The text field's name in the Custom Graphics service, such as field1."}
+      index: {"type": "int", "min": 0, "max": 99, "required": true, "label": "Variant", "description": "The variant, from 0."}
+    send: {"method": "GET", "path": "/local/camoverlay/api/customGraphics.cgi", "raw_query": "action=update_text&service_id={service}&{field}_index={index}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_custom_image_from_camera:
+    summary: "Change a Custom Graphics service's background to an image in the camera's storage (api/customGraphics.cgi update_image)"
+    params:
+      service: {"type": "int", "min": 0, "max": 1000000, "required": true, "label": "Service", "description": "The overlay service's id."}
+      path: {"type": "string", "pattern": "^\\S+$", "max_length": 1024, "required": true, "label": "Image", "description": "The image's path on the camera."}
+    send: {"method": "GET", "path": "/local/camoverlay/api/customGraphics.cgi", "query": {"action": "update_image", "service_id": "{service}", "image": "{path}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_custom_image_position:
+    summary: "Move a Custom Graphics service's background image (api/customGraphics.cgi update_image with coord_system, pos_x, pos_y)"
+    params:
+      service: {"type": "int", "min": 0, "max": 1000000, "required": true, "label": "Service", "description": "The overlay service's id."}
+      coord: {"type": "enum", "values": ["top_left", "top_right", "bottom_left", "bottom_right", "left", "right", "top", "bottom", "center"], "required": true, "label": "Origin", "description": "Where the offset is measured from."}
+      x: {"type": "int", "min": -10000, "max": 10000, "required": true, "label": "X", "description": "Offset along X in pixels."}
+      y: {"type": "int", "min": -10000, "max": 10000, "required": true, "label": "Y", "description": "Offset along Y in pixels."}
+    send: {"method": "GET", "path": "/local/camoverlay/api/customGraphics.cgi", "query": {"action": "update_image", "service_id": "{service}", "coord_system": "{coord}", "pos_x": "{x}", "pos_y": "{y}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  upload_custom_image:
+    summary: "Change a Custom Graphics service's background to an uploaded image (POST api/customGraphics.cgi update_image)"
+    params:
+      service: {"type": "int", "min": 0, "max": 1000000, "required": true, "label": "Service", "description": "The overlay service's id."}
+      image: {"type": "binary", "required": true, "label": "Image", "description": "The image file, sent as it is."}
+    send: {"method": "POST", "path": "/local/camoverlay/api/customGraphics.cgi", "query": {"action": "update_image", "service_id": "{service}"}, "body": {"binary": "image"}, "content_type": "application/octet-stream"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_infoticker_text:
+    summary: "Change an Info Ticker service's text (api/infoticker.cgi)"
+    params:
+      service: {"type": "int", "min": 0, "max": 1000000, "required": true, "label": "Service", "description": "The overlay service's id."}
+      text: {"type": "string", "max_length": 1024, "required": true, "label": "Text", "description": "The ticker's text."}
+    send: {"method": "GET", "path": "/local/camoverlay/api/infoticker.cgi", "query": {"service_id": "{service}", "text": "{text}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_output_info:
+    summary: "The output's RTSP link (valid once, for 5 minutes) and its websocket video link (output_info.cgi)"
+    send: {"method": "GET", "path": "/local/camswitcher/output_info.cgi"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_playlists:
+    summary: "Every playable item: cameras, clips and playlists, with their names and settings (playlists.cgi?action=get)"
+    send: {"method": "GET", "path": "/local/camswitcher/react/local/camswitcher/api/playlists.cgi", "query": {"action": "get"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  switch_playlist:
+    summary: "Switch the output to a playlist now: clears the queue, queues it and plays it (playlist_switch.cgi)"
+    params:
+      playlist: {"type": "string", "pattern": "^[A-Za-z0-9-]+$", "max_length": 64, "required": true, "label": "Playlist", "description": "The playlist's name, from list_playlists: c... for a camera, p... for a playlist, s... for a clip."}
+    send: {"method": "GET", "path": "/local/camswitcher/react/local/camswitcher/api/playlist_switch.cgi", "query": {"playlist_name": "{playlist}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_queue:
+    summary: "The playlists waiting in the queue (playlist_queue_list.cgi)"
+    send: {"method": "GET", "path": "/local/camswitcher/react/local/camswitcher/api/playlist_queue_list.cgi"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  queue_playlist:
+    summary: "Add a playlist to the end of the queue (playlist_queue_push.cgi)"
+    params:
+      playlist: {"type": "string", "pattern": "^[A-Za-z0-9-]+$", "max_length": 64, "required": true, "label": "Playlist", "description": "The playlist's name, from list_playlists: c... for a camera, p... for a playlist, s... for a clip."}
+    send: {"method": "GET", "path": "/local/camswitcher/react/local/camswitcher/api/playlist_queue_push.cgi", "query": {"playlist_name": "{playlist}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  play_next:
+    summary: "Play the next playlist in the queue (playlist_queue_play_next.cgi)"
+    send: {"method": "GET", "path": "/local/camswitcher/react/local/camswitcher/api/playlist_queue_play_next.cgi"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  clear_queue:
+    summary: "Clear the queue (playlist_queue_clear.cgi)"
+    send: {"method": "GET", "path": "/local/camswitcher/react/local/camswitcher/api/playlist_queue_clear.cgi"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_clips:
+    summary: "The clips on the camera, with their names for master audio (clips.cgi?action=get)"
+    send: {"method": "GET", "path": "/local/camswitcher/react/local/camswitcher/api/clips.cgi", "query": {"action": "get"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_master_audio:
+    summary: "The master audio setting (param.cgi group camswitcher.masterAudio)"
+    send: {"method": "GET", "path": "/axis-cgi/param.cgi", "query": {"action": "list", "group": "camswitcher.masterAudio"}}
+    expect: { status: 200 }
+    returns: text
+
+  set_master_audio:
+    summary: "Follow the playing source's audio, or silence the output (param.cgi camswitcher.masterAudio NONE or SILENCE)"
+    params:
+      mode: {"type": "enum", "values": ["source", "silence"], "required": true, "label": "Master audio", "description": "source follows the playing item's audio; silence mutes the output."}
+    send: {"method": "GET", "path": "/axis-cgi/param.cgi", "query": {"action": "update", "camswitcher.masterAudio": "{\"type\":\"{mode:map.master_audio}\"}"}}
+    expect: { status: 200 }
+    returns: text
+
+  set_master_audio_clip:
+    summary: "Use a clip as the master audio (param.cgi camswitcher.masterAudio CLIP)"
+    params:
+      clip: {"type": "string", "pattern": "^[A-Za-z0-9-]+$", "max_length": 64, "required": true, "label": "Clip", "description": "The clip's name, from list_clips."}
+    send: {"method": "GET", "path": "/axis-cgi/param.cgi", "query": {"action": "update", "camswitcher.masterAudio": "{\"type\":\"CLIP\",\"clip_name\":{clip:json}}"}}
+    expect: { status: 200 }
+    returns: text
+
+  set_master_audio_stream:
+    summary: "Use a camera's audio as the master audio (param.cgi camswitcher.masterAudio STREAM)"
+    params:
+      stream: {"type": "string", "pattern": "^[A-Za-z0-9-]+$", "max_length": 64, "required": true, "label": "Stream", "description": "The camera stream's name, from list_playlists."}
+    send: {"method": "GET", "path": "/axis-cgi/param.cgi", "query": {"action": "update", "camswitcher.masterAudio": "{\"type\":\"STREAM\",\"stream_name\":{stream:json}}"}}
+    expect: { status: 200 }
+    returns: text
+
+  list_packages:
+    summary: "The installed micro-app packages with their versions and UI links (package/list.cgi)"
+    send: {"method": "GET", "path": "/local/camscripter/package/list.cgi"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  install_package:
+    summary: "Install a micro-app package, a .zip with manifest.json and main.js (package/install.cgi)"
+    params:
+      package: {"type": "binary", "required": true, "label": "Package", "description": "The package's .zip file."}
+      filename: {"type": "string", "pattern": "^[^/\\\\\"]+\\.zip$", "max_length": 255, "default": "package.zip", "label": "File name", "description": "The file's name, such as clock.zip."}
+    send: {"method": "POST", "path": "/local/camscripter/package/install.cgi", "multipart": [{"name": "file", "binary": "package", "filename": "{filename}", "content_type": "application/zip"}]}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  remove_package:
+    summary: "Remove a micro-app package (package/remove.cgi)"
+    params:
+      package: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 128, "required": true, "label": "Package", "description": "The package's name, such as clockAnalog."}
+    send: {"method": "GET", "path": "/local/camscripter/package/remove.cgi", "query": {"package_name": "{package}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_package_settings:
+    summary: "A package's settings (package/settings.cgi?action=get)"
+    params:
+      package: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 128, "required": true, "label": "Package", "description": "The package's name, such as clockAnalog."}
+    send: {"method": "GET", "path": "/local/camscripter/package/settings.cgi", "query": {"package_name": "{package}", "action": "get"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_package_settings:
+    summary: "Replace a package's settings; the package is signalled to reload them (package/settings.cgi?action=set)"
+    params:
+      package: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 128, "required": true, "label": "Package", "description": "The package's name, such as clockAnalog."}
+      config: {"type": "json", "required": true, "label": "Configuration", "description": "A JSON object in the package's own settings shape, as CamStreamer's API documentation gives it."}
+    send: {"method": "POST", "path": "/local/camscripter/package/settings.cgi", "query": {"package_name": "{package}", "action": "set"}, "body": "{config}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_package_configurations:
+    summary: "Enable or disable packages with a PackageConfigurations object, such as {\"clock\": {\"enabled\": true}} (param.cgi camscripter.PackageConfigurations)"
+    params:
+      config: {"type": "json", "required": true, "label": "Configuration", "description": "A JSON object keyed by package name, each with enabled, as CamStreamer's API documentation gives it."}
+    send: {"method": "GET", "path": "/axis-cgi/param.cgi", "query": {"action": "update", "camscripter.PackageConfigurations": "{config}"}}
+    expect: { status: 200 }
+    returns: text
+
+  list_network_cameras:
+    summary: "The cameras CamScripter finds on the local network by mDNS (network_camera_list.cgi)"
+    send: {"method": "GET", "path": "/local/camscripter/network_camera_list.cgi"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_ndi_settings:
+    summary: "The NDI source's name, groups, channel, size, frame rate, GOP and audio (ndihxplugin/settings.cgi?action=get)"
+    send: {"method": "GET", "path": "/local/ndihxplugin/settings.cgi", "query": {"action": "get"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_ndi_settings:
+    summary: "Replace the NDI settings: ndiName, ndiGroups, channel, width, height, fps, gop, audioEnabled (ndihxplugin/settings.cgi?action=set)"
+    params:
+      config: {"type": "json", "required": true, "label": "Configuration", "description": "A JSON object with the eight NDI settings, as CamStreamer's API documentation gives it."}
+    send: {"method": "POST", "path": "/local/ndihxplugin/settings.cgi", "query": {"action": "set"}, "body": "{config}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Each app answers only once it is installed and licensed on the camera
+      (an unlicensed app refuses its API). The apps' own websockets of
+      events (stream states, overlay starts and stops, CamSwitcher's
+      switches) need a token fetched over HTTP (ws_authorization.cgi, valid
+      30 seconds) as their first message, which the spec format cannot
+      chain, so state is polled: CamStreamer streams and their status, and
+      CamOverlay services, every 10 seconds; CamSwitcher playlists and
+      master audio, and the NDI settings, every 30 seconds; CamScripter
+      packages every minute. CamSwitcher's playing item is reported only on
+      its websocket, so it is not in state.
+
+  - models: [app-6, app-4]
+    severity: info
+    text: >
+      A stream runs when it is enabled, active and its trigger allows it
+      (manual, a camera input, a time window or a weekly schedule). The app
+      restarts a stream whenever one of its parameters changes. Output URLs
+      hold stream keys: they are returned by the list and get commands but
+      never kept in state. Streams added by API with a platform the app does
+      not know are hidden from its interface; CamStreamer reserves IDs
+      starting api for API streams and gives its own streams numbers above
+      10. Each stream's status (get_streamstat.cgi) is read after every list
+      read, one request per stream.
+
+  - models: [camoverlay]
+    severity: info
+    text: >
+      Changes made with enabled.cgi, customGraphics.cgi and infoticker.cgi
+      are lost when the camera restarts; set_services saves the whole
+      configuration for good. More than four active services per video
+      channel may conflict with Axis's own overlay. The custom text field
+      commands name the field as the service's settings name it (field1 and
+      so on), and variants are numbered from 0.
+
+  - models: [camswitcher]
+    severity: info
+    text: >
+      Playlist names are prefixed c for a camera, p for a playlist and s for
+      a clip. output_info's RTSP link works once, within 5 minutes; a
+      lasting link is made in the app's settings. For PTZ, use the camera's
+      own Axis API.
+
+  - models: [camscripter]
+    severity: warning
+    text: >
+      install_package runs the package's Node.js code on the camera; install
+      only packages from a trusted source. remove_package deletes a package
+      and its data.
+
+  - models: [app-6, app-4, camoverlay, camswitcher, camscripter]
+    severity: critical
+    text: >
+      clear_streams, set_stream_list and remove_stream_v4 delete streams
+      for good, and stopping a stream ends a live broadcast;
+      switch_playlist and play_next change the switcher's program output
+      live; set_services replaces every overlay.
+
+state:
+  streams.*.title:          { type: string, description: "A CamStreamer stream, keyed by its ID: its title" }
+  streams.*.platform:       { type: string, description: "Its platform, such as rtmp, youtube or srt" }
+  streams.*.enabled:        { type: bool, description: "It is enabled (started)" }
+  streams.*.active:         { type: bool, description: "It is active (not paused)" }
+  streams.*.trigger:        { type: string, description: "Its automation: manual, onetime, recurrent (6.x), or none, inputX, time, recurrent (4.x)" }
+  stream_status.*.streaming: { type: bool, description: "A stream, keyed by its ID: it is streaming now, as last read" }
+  stream_status.*.bytes:    { type: int, unit: B, description: "Bytes it has sent" }
+  stream_status.*.start_count: { type: int, description: "How often it has started" }
+  overlays_enabled:         { type: bool, description: "CamOverlay shows its overlays (Enabled)" }
+  services.*.type:          { type: string, description: "An overlay service, keyed by id: its type (images, customGraphics, ptzCompass, infoticker, screenSharing, pip, accuweather, ...)" }
+  services.*.name:          { type: string, description: "Its custom name" }
+  services.*.enabled:       { type: bool, description: "It is shown" }
+  services.*.automation:    { type: string, description: "What controls it: manual, schedule, time or inputX" }
+  playlists.*.name:         { type: string, description: "A CamSwitcher playlist, camera or clip, keyed by its name: its display name" }
+  playlists.*.loop:         { type: bool, description: "It loops" }
+  playlists.*.favourite:    { type: bool, description: "It is a favorite" }
+  playlists.*.channel:      { type: string, description: "What it carries: av, video or audio" }
+  master_audio:             { type: string, description: "CamSwitcher's master audio as the JSON it is set with" }
+  packages.*.menu_name:     { type: string, description: "A CamScripter package, keyed by name: its menu name" }
+  packages.*.version:       { type: string, description: "Its version" }
+  packages.*.vendor:        { type: string, description: "Its vendor" }
+  packages.*.ui_link:       { type: string, description: "Its interface's path on the camera" }
+  ndi.name:                 { type: string, description: "The NDI source's name" }
+  ndi.groups:               { type: string, description: "The NDI groups it is in, separated by commas" }
+  ndi.channel:              { type: int, description: "The camera channel it sends, from 1" }
+  ndi.width:                { type: int, unit: px, description: "Its width" }
+  ndi.height:               { type: int, unit: px, description: "Its height" }
+  ndi.fps:                  { type: float, unit: fps, description: "Its frame rate" }
+  ndi.gop:                  { type: int, description: "Frames between key frames" }
+  ndi.audio_enabled:        { type: bool, description: "It carries audio" }
+
+telemetry:
+  poll:
+    - every_ms: 10000
+      send:
+        - { models: [app-6], method: GET, path: /local/camstreamer/stream_list.cgi, query: { action: get } }
+        - { models: [app-4], method: GET, path: /local/camstreamer/stream/list.cgi, query: { action: get } }
+        - { models: [camoverlay], method: GET, path: /local/camoverlay/api/services.cgi, query: { action: get } }
+        - { models: [camoverlay], method: GET, path: /axis-cgi/param.cgi, query: { action: list, group: CamOverlay.Enabled } }
+    - every_ms: 30000
+      send:
+        - { models: [camswitcher], method: GET, path: /local/camswitcher/react/local/camswitcher/api/playlists.cgi, query: { action: get } }
+        - { models: [camswitcher], method: GET, path: /axis-cgi/param.cgi, query: { action: list, group: camswitcher.masterAudio } }
+        - { models: [ndi-hx], method: GET, path: /local/ndihxplugin/settings.cgi, query: { action: get } }
+    - every_ms: 60000
+      send:
+        - { models: [camscripter], method: GET, path: /local/camscripter/package/list.cgi }
+  updates:
+    # CamStreamer 6.x: the stream list, bare or in data.
+    - path: "^/local/camstreamer/stream_list\\.cgi\\?action=get$"
+      json_match: { "$.streamList": '^\[' }
+      json_each: "$.streamList"
+      replace: streams
+      json: &stream6 { id: "$.streamId", title: "$.title", platform: "$.platform", enabled: "$.enabled", active: "$.active",
+                       trigger: "$.trigger.type" }
+      state: &stream6_state
+        "streams.{id:key}.title": "{title}"
+        "streams.{id:key}.platform": "{platform}"
+        "streams.{id:key}.enabled": "{enabled}"
+        "streams.{id:key}.active": "{active}"
+        "streams.{id:key}.trigger": "{trigger}"
+      then_send:
+        - { method: GET, path: /local/camstreamer/get_streamstat.cgi, query: { stream_id: "{id}" } }
+    - path: "^/local/camstreamer/stream_list\\.cgi\\?action=get$"
+      json_match: { "$.data.streamList": '^\[' }
+      json_each: "$.data.streamList"
+      replace: streams
+      json: *stream6
+      state: *stream6_state
+      then_send:
+        - { method: GET, path: /local/camstreamer/get_streamstat.cgi, query: { stream_id: "{id}" } }
+    # CamStreamer 4.x: streams keyed by ID, values as strings.
+    - path: "^/local/camstreamer/stream/list\\.cgi\\?action=get$"
+      json_each: "$.*"
+      replace: streams
+      json: { enabled: "$.enabled", active: "$.active", trigger: "$.trigger" }
+      state:
+        "streams.{key:key}.enabled": { value: "{enabled}", map: { "1": true, "0": false } }
+        "streams.{key:key}.active": { value: "{active}", map: { "1": true, "0": false } }
+        "streams.{key:key}.trigger": "{trigger}"
+      then_send:
+        - { method: GET, path: /local/camstreamer/get_streamstat.cgi, query: { stream_id: "{key}" } }
+    - path: "^/local/camstreamer/get_streamstat\\.cgi\\?stream_id=([^&]+)$"
+      json_match: { "$.data.is_streaming": "^[01]$" }
+      json: { streaming: "$.data.is_streaming", bytes: "$.data.stream_bytes", starts: "$.data.start_count" }
+      state:
+        "stream_status.{1:url_decode:key}.streaming": { value: "{streaming}", map: { "1": true, "0": false } }
+        "stream_status.{1:url_decode:key}.bytes": "{bytes}"
+        "stream_status.{1:url_decode:key}.start_count": "{starts}"
+
+    # CamOverlay.
+    - path: "^/local/camoverlay/api/services\\.cgi\\?action=get$"
+      json_each: "$.services"
+      replace: services
+      json: { id: "$.id", type: "$.name", name: "$.customName", enabled: "$.enabled", automation: "$.automationType" }
+      state:
+        "services.{id}.type": "{type}"
+        "services.{id}.name": "{name}"
+        "services.{id}.enabled": { value: "{enabled}", map: { "1": true, "0": false, "true": true, "false": false } }
+        "services.{id}.automation": "{automation}"
+    - path: "^/axis-cgi/param\\.cgi\\?action=list&group=CamOverlay"
+      match: "(?mi)^root\\.CamOverlay\\.Enabled=([01])\\s*$"
+      state: { overlays_enabled: { value: "{1}", map: { "1": true, "0": false } } }
+
+    # CamSwitcher.
+    - path: "^/local/camswitcher/react/local/camswitcher/api/playlists\\.cgi\\?action=get$"
+      json_each: "$.data.*"
+      replace: playlists
+      json: { name: "$.niceName", loop: "$.loop", favourite: "$.isFavourite", channel: "$.channel" }
+      state:
+        "playlists.{key:key}.name": "{name}"
+        "playlists.{key:key}.loop": "{loop}"
+        "playlists.{key:key}.favourite": "{favourite}"
+        "playlists.{key:key}.channel": "{channel}"
+    - path: "^/axis-cgi/param\\.cgi\\?action=list&group=camswitcher\\.masterAudio$"
+      match: "(?mi)^root\\.camswitcher\\.masterAudio=(.*?)\\s*$"
+      state: { master_audio: "{1}" }
+
+    # CamScripter.
+    - path: "^/local/camscripter/package/list\\.cgi$"
+      json_each: "$"
+      replace: packages
+      json: { name: "$.package_name", menu: "$.package_menu_name", version: "$.package_version", vendor: "$.vendor", ui: "$.ui_link" }
+      state:
+        "packages.{name:key}.menu_name": "{menu}"
+        "packages.{name:key}.version": "{version}"
+        "packages.{name:key}.vendor": "{vendor}"
+        "packages.{name:key}.ui_link": "{ui}"
+
+    # NDI HX Plugin.
+    - path: "^/local/ndihxplugin/settings\\.cgi\\?action=get$"
+      json: { name: "$.ndiName", groups: "$.ndiGroups", channel: "$.channel", width: "$.width", height: "$.height", fps: "$.fps",
+              gop: "$.gop", audio: "$.audioEnabled" }
+      state:
+        ndi.name: "{name}"
+        ndi.groups: "{groups}"
+        ndi.channel: "{channel}"
+        ndi.width: "{width}"
+        ndi.height: "{height}"
+        ndi.fps: "{fps}"
+        ndi.gop: "{gop}"
+        ndi.audio_enabled: "{audio}"

@@ -1,0 +1,1212 @@
+spec: 1
+id: boxcast
+name: BoxCast (BoxCast API v1)
+vendor: BoxCast
+category: other
+
+# A cloud service, not a device on the venue network: the integration is
+# opened with host rest.boxcast.com on port 443 and acts for the BoxCast
+# account its API client belongs to. It keeps the account's BoxCasters, the
+# broadcasts on air and coming up, its channels and its RTMP sources in
+# state; the commands reach everything the API documents.
+
+source:
+  - title: BoxCast API Reference (API Design, Account, BoxCasters, Broadcasts, Channels, Highlights, RTMP Sources, Uploads, Viewer Analytics, Code Samples)
+    author: BoxCast
+    url: https://boxcast.github.io/boxcast_api/
+    note: >
+      Manufacturer document, retrieved 2026-10-28 (copyright 2021; the page
+      says it may be out of date in places). Base URL https://rest.boxcast.com/,
+      TLS only. OAuth 2: token endpoint https://auth.boxcast.com/oauth2/token
+      with the client authenticating by HTTP Basic; the client credentials
+      grant gives an account's own client a token (expires_in counts seconds
+      of inactivity), the authorization code grant a partner's token with a
+      refresh token, refreshed with grant_type refresh_token. Requests carry
+      the token as Bearer; POST and PUT take form or JSON bodies; responses
+      are JSON, never null, with far-future dates (9999-12-31T23:59:59Z) and
+      empty strings for unset values. Lists page with p (from 0), l and s
+      and answer an X-Pagination header; filter.<name> filters, q searches
+      (field:value, wildcards, date ranges, space for OR, + for AND).
+      Errors answer error (invalid_token for an expired or revoked token,
+      unauthorized, forbidden, not_found, unprocessable_entity with
+      invalid_fields, too_many_requests, ...) and error_description.
+      Resources: GET /account; GET and PUT /account/boxcasters/{id}, GET
+      /account/boxcasters (status offline, ready, preparing_broadcast,
+      broadcasting; warning none, no_video_source, updating_firmware or
+      others); POST, GET, PUT, DELETE /account/broadcasts[/{id}] (stream_source
+      boxcaster, app, switcher, rtmp; audio_source all, embedded, hdmi,
+      analog, nochange; starts_at and stops_at take now on create;
+      timeframe future, preroll, current, past; free_variant none, best,
+      low, audio; target_video_resolution); POST
+      /account/recordings/{recording_id}/download (audio_only) then GET
+      /account/recordings/{id} (download_status unprocessed, queued,
+      requested, failed, processing:N, ready); POST, GET, PUT
+      /account/channels[/{id}], GET /account/channels/{id}/broadcasts;
+      POST, GET, PUT, DELETE /account/broadcasts/{broadcast_id}/highlights[/{id}],
+      POST /account/highlights/{id}/download then GET /account/highlights/{id};
+      POST, GET, PUT, DELETE /account/static_rtmps[/{id}] (regenerate_stream_key);
+      POST /account/uploads (filename, filesize, mimetype, slot overlay)
+      answering a signed S3 form, PUT /account/uploads/{id} status uploaded,
+      GET /account/uploads[/{id}] (filter.slot); GET
+      /account/viewer_analytics/{broadcast_id or channel_id} (since, until,
+      include_viewer_timeseries).
+
+transport:
+  type: http
+  port: 443
+  scheme: https
+  # The access_token setting as Bearer. Without a refresh token, the
+  # account's own client id and secret get a new token with the client
+  # credentials grant whenever one is needed; a partner's tokens are
+  # refreshed with the refresh token.
+  auth: oauth2
+  oauth:
+    token_url: https://auth.boxcast.com/oauth2/token
+    client_auth: basic
+    client_credentials: true
+  # 401 is a refused token (invalid_token, unauthorized); 403 is a
+  # permission or plan limit.
+  refusal_status: [401]
+  timeout_ms: 10000
+  # The account: one request that also checks the token.
+  probe: { method: GET, path: /account }
+
+settings:
+  client_id: { type: string, max_length: 512, default: "",
+               label: Client ID,
+               description: "The API client's id from BoxCast, sent with every token request as the HTTP Basic username." }
+  client_secret: { type: string, secret: true, max_length: 512, default: "",
+                   label: Client secret,
+                   description: "The API client's secret; with the id and no refresh token, the core gets the account's tokens with it itself. Leave empty to pass tokens obtained elsewhere." }
+  refresh_token: { type: string, secret: true, max_length: 4096, default: "",
+                   label: Refresh token,
+                   description: "A partner integration's refresh token from BoxCast's authorization code sign-in; empty for an account's own client." }
+  access_token: { type: string, secret: true, max_length: 4096, default: "",
+                  label: Access token,
+                  description: "The current access token; may be left empty when the client secret or a refresh token is given, and each new one is reported in a credentials event." }
+  expires_at: { type: int, min: 0,
+                label: Access token expiry,
+                description: "When the access token expires, in Unix seconds; a new one is fetched 5 minutes before." }
+  token_url: { type: string, max_length: 2048, default: "",
+               pattern: "^(https://[^\\s]+|http://(localhost|127\\.0\\.0\\.1|\\[::1\\])(:[0-9]+)?(/[^\\s]*)?)?$",
+               label: Token endpoint override,
+               description: "A token endpoint to use instead of BoxCast's, such as the consumer's own proxy holding the client secret; https, or http to this machine only. Empty uses BoxCast's." }
+
+ports:
+  - { port: 443, protocol: https, role: control, note: "the cloud API at rest.boxcast.com, opened by that host name; tokens come from auth.boxcast.com (or the token_url proxy)" }
+
+models:
+  - id: api-v1
+    name: BoxCast API v1
+    supports: [get_account,
+               list_boxcasters, search_boxcasters, get_boxcaster, rename_boxcaster,
+               list_broadcasts, search_broadcasts, list_live_broadcasts, list_upcoming_broadcasts,
+               get_broadcast, schedule_broadcast, schedule_rtmp_broadcast, schedule_broadcast_custom,
+               update_broadcast, rename_broadcast, set_broadcast_description, set_broadcast_times,
+               set_broadcast_start, set_broadcast_stop, set_broadcast_private, set_broadcast_audio_source,
+               set_broadcast_boxcaster, set_broadcast_ticketing, set_broadcast_channels, delete_broadcast,
+               prepare_recording_download, get_recording,
+               list_channels, search_channels, get_channel, create_channel, create_channel_custom,
+               update_channel, rename_channel, set_channel_ticketing, list_channel_broadcasts,
+               list_highlights, get_highlight, create_highlight, update_highlight, rename_highlight,
+               set_highlight_range, delete_highlight, prepare_highlight_download, get_highlight_download,
+               list_rtmp_sources, get_rtmp_source, get_rtmp_ingest, create_rtmp_source, rename_rtmp_source,
+               set_rtmp_source_description, regenerate_rtmp_stream_key, delete_rtmp_source,
+               create_upload, mark_upload_uploaded, get_upload, list_uploads,
+               get_viewer_analytics, get_viewer_analytics_range]
+    verification: none
+    notes: >
+      API clients are registered with BoxCast (the account's client id and
+      secret come from the dashboard or BoxCast's support); everything an
+      account's dashboard does the API documents, for that account.
+
+commands:
+  # ── Account ──────────────────────────────────────────────────────────────
+  get_account:
+    summary: The account's id, name, description, time zone and channel (Get Account Detail)
+    send: { method: GET, path: /account }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── BoxCasters ───────────────────────────────────────────────────────────
+  list_boxcasters:
+    summary: Every BoxCaster on the account with its status, warning and next broadcast (List BoxCasters)
+    params:
+      sort: &boxcaster_sort { type: enum, values: [id, -id, name, -name], default: name,
+                              label: Sort,
+                              description: "Order of the list: by id or name, a leading minus for descending." }
+    send: { method: GET, path: /account/boxcasters, query: { s: "{sort}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  search_boxcasters:
+    summary: The BoxCasters a search query matches, such as name:*Camera* (List BoxCasters, q)
+    params:
+      query: &query { type: string, pattern: "\\S", max_length: 500, required: true,
+                      label: Search,
+                      description: "A BoxCast search query: words, *wildcards*, \"exact phrases\", field:value, ranges [a TO b], + for AND." }
+      sort: *boxcaster_sort
+    send: { method: GET, path: /account/boxcasters, query: { q: "{query}", s: "{sort}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_boxcaster:
+    summary: One BoxCaster with its status, warning, last report, next broadcast and channel (Get BoxCaster Detail)
+    params:
+      boxcaster_id: &boxcaster_id { type: string, pattern: "^[A-Za-z0-9._~-]+$", max_length: 64, required: true,
+                                    label: BoxCaster ID,
+                                    description: "The BoxCaster's id, usually printed on its underside, such as m9c4ebfb82112." }
+    send: { method: GET, path: "/account/boxcasters/{boxcaster_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  rename_boxcaster:
+    summary: Change a BoxCaster's name (Update a BoxCaster, name)
+    params:
+      boxcaster_id: *boxcaster_id
+      name: &name { type: string, pattern: "^\\S(.*\\S)?$", max_length: 255, required: true,
+                    label: Name,
+                    description: "The new name, one line without spaces at either end." }
+    send: { method: PUT, path: "/account/boxcasters/{boxcaster_id}", body: '{"name":{name:json}}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Broadcasts ───────────────────────────────────────────────────────────
+  list_broadcasts:
+    summary: A page of the account's broadcasts, summary fields (List Broadcasts)
+    params:
+      page: &page { type: int, min: 0, default: 0,
+                    label: Page,
+                    description: "Which page of results, counted from 0." }
+      limit: &limit { type: int, min: 1, max: 100, default: 20,
+                      label: Per page,
+                      description: "How many results each page holds." }
+      sort: &broadcast_sort { type: enum, values: [starts_at, -starts_at, stops_at, -stops_at, name, -name], default: -starts_at,
+                              label: Sort,
+                              description: "Order of the list: by start, stop or name, a leading minus for descending." }
+    send: { method: GET, path: /account/broadcasts, query: { p: "{page}", l: "{limit}", s: "{sort}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  search_broadcasts:
+    summary: A page of the broadcasts a search query matches, such as timeframe:past or name:*Service* (List Broadcasts, q)
+    params:
+      query: *query
+      page: *page
+      limit: *limit
+      sort: *broadcast_sort
+    send: { method: GET, path: /account/broadcasts, query: { q: "{query}", p: "{page}", l: "{limit}", s: "{sort}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_live_broadcasts:
+    summary: The broadcasts preparing to go live or live now (List Broadcasts, q timeframe:preroll timeframe:current)
+    send: &live_poll { method: GET, path: /account/broadcasts,
+                       query: { q: "timeframe:preroll timeframe:current", s: starts_at, l: "100" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_upcoming_broadcasts:
+    summary: The next broadcasts scheduled, soonest first (List Broadcasts, q timeframe:future)
+    send: &upcoming_poll { method: GET, path: /account/broadcasts,
+                           query: { q: "timeframe:future", s: starts_at, l: "50" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_broadcast:
+    summary: One broadcast with every field, its description, channels and recording id included (Get Broadcast Detail)
+    params:
+      broadcast_id: &broadcast_id { type: string, pattern: "^[A-Za-z0-9._~-]+$", max_length: 64, required: true,
+                                    label: Broadcast ID,
+                                    description: "The broadcast's id, such as Z7a0XjcgnYpUIuKqvxGk." }
+    send: { method: GET, path: "/account/broadcasts/{broadcast_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  schedule_broadcast:
+    summary: Schedule a broadcast from a BoxCaster, or start one at once with starts_at now; answers its id (Schedule a Broadcast, stream_source boxcaster)
+    params:
+      name: *name
+      boxcaster_id: *boxcaster_id
+      starts_at: &starts_at { type: string, pattern: "^(now|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)$", required: true,
+                              label: Start,
+                              description: "When it starts, an ISO 8601 UTC time such as 2026-11-01T15:00:00Z (not in the past), or now to start as soon as possible." }
+      stops_at: &stops_at { type: string, pattern: "^(now|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)$", required: true,
+                            label: Stop,
+                            description: "When it stops, an ISO 8601 UTC time after the start, such as 2026-11-01T17:00:00Z." }
+      private: &private { type: bool, default: false,
+                          label: Private,
+                          description: "On to keep the broadcast out of every channel listing except its own, as for a test." }
+    send: { method: POST, path: /account/broadcasts,
+            body: '{"name":{name:json},"stream_source":"boxcaster","boxcaster_id":{boxcaster_id:json},"starts_at":{starts_at:json},"stops_at":{stops_at:json},"is_private":{private}}',
+            content_type: application/json }
+    expect: { status: [200, 201], json_path: "$.id" }
+    returns: value
+
+  schedule_rtmp_broadcast:
+    summary: Schedule a broadcast from an RTMP source (an encoder streaming to BoxCast), or start one at once with starts_at now; answers its id (Schedule a Broadcast, stream_source rtmp)
+    params:
+      name: *name
+      rtmp_source_id: &rtmp_source_id { type: string, pattern: "^[A-Za-z0-9._~-]+$", max_length: 64, required: true,
+                                        label: RTMP source ID,
+                                        description: "The RTMP source's id, such as Q9b1VkadIxkdsI93nkdco." }
+      starts_at: *starts_at
+      stops_at: *stops_at
+      private: *private
+    send: { method: POST, path: /account/broadcasts,
+            body: '{"name":{name:json},"stream_source":"rtmp","static_rtmp_id":{rtmp_source_id:json},"starts_at":{starts_at:json},"stops_at":{stops_at:json},"is_private":{private}}',
+            content_type: application/json }
+    expect: { status: [200, 201], json_path: "$.id" }
+    returns: value
+
+  schedule_broadcast_custom:
+    summary: Schedule a broadcast with a full Schedule a Broadcast body (name, stream_source, boxcaster_id or static_rtmp_id, audio_source, starts_at, stops_at, is_private, is_ticketed, ticket_price, free_variant, description, in_channel_ids, target_video_resolution); answers its id
+    params:
+      broadcast: { type: json, required: true,
+                   label: Broadcast,
+                   description: "A JSON object with the parameters BoxCast documents for Schedule a Broadcast." }
+    send: { method: POST, path: /account/broadcasts, body: '{broadcast}', content_type: application/json }
+    expect: { status: [200, 201], json_path: "$.id" }
+    returns: value
+
+  update_broadcast:
+    summary: Change a broadcast with an Update a Broadcast body (name, boxcaster_id, audio_source, starts_at, stops_at, is_private, is_ticketed, ticket_price, free_variant, description, in_channel_ids)
+    params:
+      broadcast_id: *broadcast_id
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "A JSON object with the fields BoxCast documents for Update a Broadcast; others are left as they are." }
+    send: { method: PUT, path: "/account/broadcasts/{broadcast_id}", body: '{changes}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  rename_broadcast:
+    summary: Change a broadcast's name (Update a Broadcast, name)
+    params:
+      broadcast_id: *broadcast_id
+      name: *name
+    send: { method: PUT, path: "/account/broadcasts/{broadcast_id}", body: '{"name":{name:json}}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_broadcast_description:
+    summary: Change the text shown to viewers about a broadcast (Update a Broadcast, description)
+    params:
+      broadcast_id: *broadcast_id
+      description: &description { type: string, multiline: true, max_length: 10000, required: true,
+                                  label: Description,
+                                  description: "The text viewers see, lines separated by line breaks; empty for none." }
+    send: { method: PUT, path: "/account/broadcasts/{broadcast_id}", body: '{"description":{description:json}}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_broadcast_times:
+    summary: Move a broadcast's scheduled start and stop (Update a Broadcast, starts_at and stops_at)
+    params:
+      broadcast_id: *broadcast_id
+      starts_at: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$", required: true,
+                   label: Start,
+                   description: "The new start, an ISO 8601 UTC time not in the past." }
+      stops_at: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$", required: true,
+                  label: Stop,
+                  description: "The new stop, an ISO 8601 UTC time after the start." }
+    send: { method: PUT, path: "/account/broadcasts/{broadcast_id}",
+            body: '{"starts_at":{starts_at:json},"stops_at":{stops_at:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_broadcast_start:
+    summary: Move a broadcast's scheduled start, or start it at once with now (Update a Broadcast, starts_at)
+    params:
+      broadcast_id: *broadcast_id
+      starts_at: *starts_at
+    send: { method: PUT, path: "/account/broadcasts/{broadcast_id}", body: '{"starts_at":{starts_at:json}}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_broadcast_stop:
+    summary: Move a broadcast's scheduled stop, or end it at once with now (Update a Broadcast, stops_at)
+    params:
+      broadcast_id: *broadcast_id
+      stops_at: *stops_at
+    send: { method: PUT, path: "/account/broadcasts/{broadcast_id}", body: '{"stops_at":{stops_at:json}}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_broadcast_private:
+    summary: Make a broadcast private or public (Update a Broadcast, is_private)
+    params:
+      broadcast_id: *broadcast_id
+      private: { type: bool, required: true,
+                 label: Private,
+                 description: "On to keep it out of every channel listing except its own; off to list it publicly." }
+    send: { method: PUT, path: "/account/broadcasts/{broadcast_id}", body: '{"is_private":{private}}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_broadcast_audio_source:
+    summary: Choose the audio a BoxCaster streams for a broadcast (Update a Broadcast, audio_source)
+    params:
+      broadcast_id: *broadcast_id
+      source: { type: enum, values: [all, embedded, hdmi, analog, nochange], required: true,
+                label: Audio source,
+                description: "all mixes every input; embedded (BoxCaster Pro), hdmi (BoxCaster) or analog uses that one; nochange (Spark) leaves the device's own setting." }
+    send: { method: PUT, path: "/account/broadcasts/{broadcast_id}", body: '{"audio_source":{source:json}}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_broadcast_boxcaster:
+    summary: Move a broadcast to another BoxCaster (Update a Broadcast, boxcaster_id)
+    params:
+      broadcast_id: *broadcast_id
+      boxcaster_id: *boxcaster_id
+    send: { method: PUT, path: "/account/broadcasts/{broadcast_id}", body: '{"boxcaster_id":{boxcaster_id:json}}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_broadcast_ticketing:
+    summary: Turn ticketing on or off for a broadcast, with its price and free variant (Update a Broadcast, is_ticketed, ticket_price, free_variant)
+    params:
+      broadcast_id: *broadcast_id
+      ticketed: &ticketed { type: bool, required: true,
+                            label: Ticketed,
+                            description: "On to require a ticket to watch the full stream." }
+      price: &price { type: float, min: 0, max: 100000, default: 0,
+                      label: Ticket price,
+                      description: "The ticket's price in US dollars, rounded to cents; ignored when not ticketed." }
+      free_variant: &free_variant { type: enum, values: [none, best, low, audio], default: none,
+                                    label: Free variant,
+                                    description: "What viewers without a ticket get: none, best (everything free), low (SD only) or audio (audio only)." }
+    send: { method: PUT, path: "/account/broadcasts/{broadcast_id}",
+            body: '{"is_ticketed":{ticketed},"ticket_price":{price:.2f},"free_variant":{free_variant:json}}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_broadcast_channels:
+    summary: Set the channels a broadcast is added to, beyond its own (Update a Broadcast, in_channel_ids)
+    params:
+      broadcast_id: *broadcast_id
+      channel_ids: { type: json, required: true,
+                     label: Channel IDs,
+                     description: "A JSON array of channel ids, such as [\"Z7a0XjcgnYpUIuKqvxGk\"]; [] for none." }
+    send: { method: PUT, path: "/account/broadcasts/{broadcast_id}", body: '{"in_channel_ids":{channel_ids}}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  delete_broadcast:
+    summary: Delete a broadcast and its recording from the account (Delete a Broadcast)
+    params: { broadcast_id: *broadcast_id }
+    send: { method: DELETE, path: "/account/broadcasts/{broadcast_id}" }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  prepare_recording_download:
+    summary: Start converting a broadcast's recording to an MP4 (or audio-only M4A) for download; then read get_recording until ready (Download a Broadcast, step 1)
+    params:
+      recording_id: &recording_id { type: string, pattern: "^[A-Za-z0-9._~-]+$", max_length: 64, required: true,
+                                    label: Recording ID,
+                                    description: "The broadcast's recording_id, from get_broadcast." }
+      audio_only: &audio_only { type: bool, default: false,
+                                label: Audio only,
+                                description: "On for an audio-only M4A, off for an MP4 with video." }
+    send: { method: POST, path: "/account/recordings/{recording_id}/download", body: '{"audio_only":{audio_only}}',
+            content_type: application/json }
+    expect: { status: [200, 201] }
+    returns: ack
+
+  get_recording:
+    summary: A recording's download status and URL once ready (Download a Broadcast, step 2)
+    params: { recording_id: *recording_id }
+    send: { method: GET, path: "/account/recordings/{recording_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Channels ─────────────────────────────────────────────────────────────
+  list_channels:
+    summary: Every channel on the account with its ticketing (List Channels)
+    send: &channels_poll { method: GET, path: /account/channels, query: { s: name, l: "100" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  search_channels:
+    summary: The channels a search query matches, such as name:*Basketball* (List Channels, q)
+    params: { query: *query }
+    send: { method: GET, path: /account/channels, query: { q: "{query}", s: name } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_channel:
+    summary: One channel with its ticketing and playlist URL (Get Channel Detail)
+    params:
+      channel_id: &channel_id { type: string, pattern: "^[A-Za-z0-9._~-]+$", max_length: 64, required: true,
+                                label: Channel ID,
+                                description: "The channel's id, such as Z7a0XjcgnYpUIuKqvxGk." }
+    send: { method: GET, path: "/account/channels/{channel_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_channel:
+    summary: Create a channel to group broadcasts; answers its id (Create a Channel)
+    params:
+      name: *name
+      description: *description
+    send: { method: POST, path: /account/channels, body: '{"name":{name:json},"description":{description:json}}',
+            content_type: application/json }
+    expect: { status: [200, 201], json_path: "$.id" }
+    returns: value
+
+  create_channel_custom:
+    summary: Create a channel with a full Create a Channel body (name, description, is_ticketed, ticket_price, free_variant); answers its id
+    params:
+      channel: { type: json, required: true,
+                 label: Channel,
+                 description: "A JSON object with the parameters BoxCast documents for Create a Channel." }
+    send: { method: POST, path: /account/channels, body: '{channel}', content_type: application/json }
+    expect: { status: [200, 201], json_path: "$.id" }
+    returns: value
+
+  update_channel:
+    summary: Change a channel with an Update a Channel body (name, is_ticketed, ticket_price, free_variant)
+    params:
+      channel_id: *channel_id
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "A JSON object with the fields BoxCast documents for Update a Channel." }
+    send: { method: PUT, path: "/account/channels/{channel_id}", body: '{changes}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  rename_channel:
+    summary: Change a channel's name (Update a Channel, name)
+    params:
+      channel_id: *channel_id
+      name: *name
+    send: { method: PUT, path: "/account/channels/{channel_id}", body: '{"name":{name:json}}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_channel_ticketing:
+    summary: Turn ticketing on or off for a channel, with its price and free variant (Update a Channel)
+    params:
+      channel_id: *channel_id
+      ticketed: *ticketed
+      price: *price
+      free_variant: *free_variant
+    send: { method: PUT, path: "/account/channels/{channel_id}",
+            body: '{"is_ticketed":{ticketed},"ticket_price":{price:.2f},"free_variant":{free_variant:json}}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  list_channel_broadcasts:
+    summary: A page of a channel's broadcasts (id, name, start, stop), live ones first (List Channel Broadcasts)
+    params:
+      channel_id: *channel_id
+      page: *page
+      limit: *limit
+    send: { method: GET, path: "/account/channels/{channel_id}/broadcasts", query: { p: "{page}", l: "{limit}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Highlights ───────────────────────────────────────────────────────────
+  list_highlights:
+    summary: A broadcast's highlights, kept in state (List Highlights)
+    params:
+      broadcast_id: *broadcast_id
+    send: { method: GET, path: "/account/broadcasts/{broadcast_id}/highlights", query: { l: "100" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_highlight:
+    summary: One highlight of a broadcast (Get Highlight Detail)
+    params:
+      broadcast_id: *broadcast_id
+      highlight_id: &highlight_id { type: string, pattern: "^[A-Za-z0-9._~-]+$", max_length: 64, required: true,
+                                    label: Highlight ID,
+                                    description: "The highlight's id, such as h9a0Xacgn7pUIuKqvxHj." }
+    send: { method: GET, path: "/account/broadcasts/{broadcast_id}/highlights/{highlight_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_highlight:
+    summary: Cut a highlight from a broadcast's recording; answers its id (Create a Highlight)
+    params:
+      broadcast_id: *broadcast_id
+      name: *name
+      description: *description
+      start_seconds: &start_seconds { type: int, min: 0, required: true,
+                                      label: Start,
+                                      description: "Where it begins, in seconds from the start of the broadcast's whole recording (before any trimming)." }
+      stop_seconds: &stop_seconds { type: int, min: 1, required: true,
+                                    label: End,
+                                    description: "Where it ends, in seconds from the recording's start, after the start; BoxCast moves it to the next keyframe." }
+    send: { method: POST, path: "/account/broadcasts/{broadcast_id}/highlights",
+            body: '{"name":{name:json},"description":{description:json},"start_seconds":{start_seconds},"stop_seconds":{stop_seconds}}',
+            content_type: application/json }
+    expect: { status: [200, 201], json_path: "$.id" }
+    returns: value
+
+  update_highlight:
+    summary: Change a highlight with an Update a Highlight body (name, description, start_seconds, stop_seconds)
+    params:
+      broadcast_id: *broadcast_id
+      highlight_id: *highlight_id
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "A JSON object with the fields BoxCast documents for Update a Highlight." }
+    send: { method: PUT, path: "/account/broadcasts/{broadcast_id}/highlights/{highlight_id}", body: '{changes}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  rename_highlight:
+    summary: Change a highlight's name and description (Update a Highlight)
+    params:
+      broadcast_id: *broadcast_id
+      highlight_id: *highlight_id
+      name: *name
+      description: *description
+    send: { method: PUT, path: "/account/broadcasts/{broadcast_id}/highlights/{highlight_id}",
+            body: '{"name":{name:json},"description":{description:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_highlight_range:
+    summary: Move a highlight's start and end in the recording (Update a Highlight, start_seconds and stop_seconds)
+    params:
+      broadcast_id: *broadcast_id
+      highlight_id: *highlight_id
+      start_seconds: *start_seconds
+      stop_seconds: *stop_seconds
+    send: { method: PUT, path: "/account/broadcasts/{broadcast_id}/highlights/{highlight_id}",
+            body: '{"start_seconds":{start_seconds},"stop_seconds":{stop_seconds}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  delete_highlight:
+    summary: Delete a highlight from its broadcast (Delete a Highlight)
+    params:
+      broadcast_id: *broadcast_id
+      highlight_id: *highlight_id
+    send: { method: DELETE, path: "/account/broadcasts/{broadcast_id}/highlights/{highlight_id}" }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  prepare_highlight_download:
+    summary: Start converting a highlight to an MP4 (or audio-only M4A) for download; then read get_highlight_download until ready (Download a Highlight, step 1)
+    params:
+      highlight_id: *highlight_id
+      audio_only: *audio_only
+    send: { method: POST, path: "/account/highlights/{highlight_id}/download", body: '{"audio_only":{audio_only}}',
+            content_type: application/json }
+    expect: { status: [200, 201] }
+    returns: ack
+
+  get_highlight_download:
+    summary: A highlight's download status and URL once ready (Download a Highlight, step 2)
+    params: { highlight_id: *highlight_id }
+    send: { method: GET, path: "/account/highlights/{highlight_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── RTMP sources ─────────────────────────────────────────────────────────
+  list_rtmp_sources:
+    summary: The account's RTMP sources (encoders streaming into BoxCast); they include stream keys, so the value is never kept or logged (List RTMP Sources)
+    send: &rtmp_poll { method: GET, path: /account/static_rtmps, query: { s: name, l: "100" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_rtmp_source:
+    summary: One RTMP source with its server URL, stream key and playlist URL; the key is never kept in state (Get RTMP Source)
+    params: { rtmp_source_id: *rtmp_source_id }
+    send: { method: GET, path: "/account/static_rtmps/{rtmp_source_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_rtmp_ingest:
+    summary: An RTMP source's stream key for the encoder, a secret returned here only (Get RTMP Source, stream_key)
+    params: { rtmp_source_id: *rtmp_source_id }
+    send: { method: GET, path: "/account/static_rtmps/{rtmp_source_id}" }
+    expect: { status: 200, json_path: "$.stream_key" }
+    returns: value
+
+  create_rtmp_source:
+    summary: Create an RTMP source for an encoder; answers its id, and get_rtmp_ingest its key (Create an RTMP Source)
+    params:
+      name: *name
+      description: &rtmp_description { type: string, max_length: 1000, required: true,
+                                       label: Description,
+                                       description: "A note on the source, such as the encoder it is for; empty for none." }
+    send: { method: POST, path: /account/static_rtmps, body: '{"name":{name:json},"description":{description:json}}',
+            content_type: application/json }
+    expect: { status: [200, 201], json_path: "$.id" }
+    returns: value
+
+  rename_rtmp_source:
+    summary: Change an RTMP source's name (Update an RTMP Source, name)
+    params:
+      rtmp_source_id: *rtmp_source_id
+      name: *name
+    send: { method: PUT, path: "/account/static_rtmps/{rtmp_source_id}", body: '{"name":{name:json}}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_rtmp_source_description:
+    summary: Change an RTMP source's description (Update an RTMP Source, description)
+    params:
+      rtmp_source_id: *rtmp_source_id
+      description: *rtmp_description
+    send: { method: PUT, path: "/account/static_rtmps/{rtmp_source_id}", body: '{"description":{description:json}}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  regenerate_rtmp_stream_key:
+    summary: Give an RTMP source a new stream key; the encoder must be given the new one (Update an RTMP Source, regenerate_stream_key)
+    params: { rtmp_source_id: *rtmp_source_id }
+    send: { method: PUT, path: "/account/static_rtmps/{rtmp_source_id}", body: '{"regenerate_stream_key":true}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  delete_rtmp_source:
+    summary: Delete an RTMP source and its stream key (Delete an RTMP Source)
+    params: { rtmp_source_id: *rtmp_source_id }
+    send: { method: DELETE, path: "/account/static_rtmps/{rtmp_source_id}" }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  # ── Uploads ──────────────────────────────────────────────────────────────
+  create_upload:
+    summary: Register a file to upload, such as an overlay image; answers its id and the signed form to POST the file to (Create an Upload)
+    params:
+      filename: { type: string, pattern: "^[^/\\\\]+$", max_length: 255, required: true,
+                  label: File name,
+                  description: "The file's name, such as overlay.png." }
+      filesize: { type: int, min: 1, required: true,
+                  label: Size,
+                  description: "The file's size in bytes." }
+      mimetype: { type: string, pattern: "^[a-z]+/[A-Za-z0-9.+-]+$", max_length: 255, required: true,
+                  label: Type,
+                  description: "The file's MIME type, such as image/png." }
+      slot: { type: enum, values: [overlay], default: overlay,
+              label: Slot,
+              description: "What the upload is for: overlay, an image shown over a broadcast." }
+    send: { method: POST, path: /account/uploads,
+            body: '{"filename":{filename:json},"filesize":{filesize},"mimetype":{mimetype:json},"slot":{slot:json}}',
+            content_type: application/json }
+    expect: { status: [200, 201], json_path: "$" }
+    returns: value
+
+  mark_upload_uploaded:
+    summary: Tell BoxCast an upload's file has been sent to its signed form (Notify Uploaded)
+    params:
+      upload_id: &upload_id { type: string, pattern: "^[A-Za-z0-9._~-]+$", max_length: 64, required: true,
+                              label: Upload ID,
+                              description: "The upload's id, from create_upload." }
+    send: { method: PUT, path: "/account/uploads/{upload_id}", body: '{"status":"uploaded"}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  get_upload:
+    summary: One upload with its status and view URL (Get Upload Details)
+    params: { upload_id: *upload_id }
+    send: { method: GET, path: "/account/uploads/{upload_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_uploads:
+    summary: The account's uploads of one slot, newest first (List Uploads, filter.slot)
+    params:
+      slot: { type: enum, values: [overlay], default: overlay,
+              label: Slot,
+              description: "Which uploads: overlay images." }
+    send: { method: GET, path: /account/uploads, query: { filter.slot: "{slot}", s: -created_at } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Viewer analytics ─────────────────────────────────────────────────────
+  get_viewer_analytics:
+    summary: Viewer analytics of a broadcast (since shortly before it started) or a channel (the last 28 days), kept in state by id (Get Broadcast or Channel Viewer Analytics)
+    params:
+      id: &analytics_id { type: string, pattern: "^[A-Za-z0-9._~-]+$", max_length: 64, required: true,
+                          label: Broadcast or channel ID,
+                          description: "The id of the broadcast or channel to report on." }
+      timeseries: &timeseries { type: bool, default: false,
+                                label: Time series,
+                                description: "On to include the viewer count over time in the answer." }
+    send: { method: GET, path: "/account/viewer_analytics/{id}", query: { include_viewer_timeseries: "{timeseries}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_viewer_analytics_range:
+    summary: Viewer analytics of a broadcast or channel between two dates (Get Broadcast or Channel Viewer Analytics, since and until)
+    params:
+      id: *analytics_id
+      since: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2}))?$", required: true,
+               label: From,
+               description: "The first date to count, such as 2026-03-11 or 2026-03-11T00:00:00-04:00." }
+      until: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2}))?$", required: true,
+               label: Until,
+               description: "The cutoff date, such as 2026-04-11 or 2026-04-11T00:00:00-04:00." }
+      timeseries: *timeseries
+    send: { method: GET, path: "/account/viewer_analytics/{id}",
+            query: { since: "{since}", until: "{until}", include_viewer_timeseries: "{timeseries}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Credentials: an account's own API client gives its client id and
+      secret, and the core gets each access token itself with the client
+      credentials grant (HTTP Basic to auth.boxcast.com), again when one
+      nears its expiry or is refused. BoxCast documents expires_in as
+      seconds of inactivity, so a token in steady use may outlive the
+      expiry the core computes; the core simply fetches a new one then. A
+      partner integration passes the access and refresh tokens of its
+      authorization code sign-in instead; a consumer that cannot hold the
+      secret leaves it empty and passes a token it obtained itself, used
+      until refused.
+
+  - models: [all]
+    severity: info
+    text: >
+      BoxCast pushes nothing to the API. The BoxCasters and the broadcasts
+      in preroll or on air are polled every 10 seconds (2 requests); the
+      next 50 scheduled broadcasts, the channels, the RTMP sources and the
+      account every 60 seconds (4 requests). Broadcasts on air
+      (on_air.<id>) are replaced whole by each poll, so a broadcast that
+      ends leaves that list while its broadcasts.<id> entry keeps its last
+      values, timeframe included, until it is read again (get_broadcast or
+      a search). The BoxCaster, channel and RTMP source lists are replaced
+      whole too, so one deleted elsewhere leaves state. Answers to commands
+      update state at once. BoxCast states no rate limit beyond
+      too_many_requests.
+
+  - models: [all]
+    severity: info
+    text: >
+      List polls ask for 100 channels and RTMP sources, which BoxCast
+      pages: an account with more keeps only the first 100 in state (the
+      commands page through the rest). Lists answer summary fields only:
+      a broadcast's description, channels and recording id come from
+      get_broadcast. Unset times read 9999-12-31T23:59:59Z and unset text
+      reads empty, never null.
+
+  - models: [all]
+    severity: info
+    text: >
+      Ingest stream keys (RTMP sources) are secrets: they are returned by
+      get_rtmp_ingest, get_rtmp_source and the lists, never kept in state
+      or logged. regenerate_rtmp_stream_key invalidates the encoder's
+      current key at once.
+
+  - models: [all]
+    severity: info
+    text: >
+      Uploading is three steps: create_upload answers a signed form for
+      BoxCast's storage (an Amazon S3 URL with key, policy and signature
+      fields); the consumer POSTs the file there as multipart form data
+      itself, since that host is not the API's; then mark_upload_uploaded
+      tells BoxCast it arrived. Downloads are two: prepare_*_download
+      starts the conversion, and get_recording or get_highlight_download
+      (kept in state) shows download_status until ready and the URL.
+
+  - models: [all]
+    severity: info
+    text: >
+      Starting and stopping a broadcast is by its schedule: starts_at now
+      on schedule_broadcast starts at once (documented), and
+      set_broadcast_stop with now ends it at once. The documents give the
+      now keyword for Schedule a Broadcast only; for Update a Broadcast it
+      is assumed to work the same. A broadcast on a BoxCaster is streamed
+      only while that BoxCaster is online with a video source
+      (boxcasters.<id>.warning no_video_source otherwise).
+
+  - models: [all]
+    severity: critical
+    text: >
+      delete_broadcast deletes a broadcast with its recording and
+      highlights, delete_highlight a highlight, and delete_rtmp_source a
+      source with its stream key; none can be undone. set_broadcast_stop
+      with now ends a live broadcast for every viewer.
+
+  - models: [all]
+    severity: info
+    text: >
+      Channel descriptions are set on create_channel only: Update a Channel
+      does not list description (update_channel passes whatever body is
+      given). A channel's is_private, shown in Create's answer, has no
+      documented parameter.
+
+state:
+  account.id:                       { type: string, description: "The account's id" }
+  account.name:                     { type: string, description: "The account's name" }
+  account.channel_id:               { type: string, description: "The account's own channel of every non-private broadcast" }
+  account.description:              { type: string, description: "The account's description shown to viewers" }
+  account.time_zone:                { type: string, description: "The organization's time zone, such as Pacific Time (US & Canada)" }
+  boxcasters.*.name:                { type: string, description: "The BoxCaster's name, keyed by its id" }
+  boxcasters.*.status:              { type: string, description: "offline, ready, preparing_broadcast or broadcasting" }
+  boxcasters.*.warning:             { type: string, description: "none, no_video_source, updating_firmware, or another BoxCast adds" }
+  boxcasters.*.last_seen_at:        { type: string, description: "When it last reported to BoxCast, ISO 8601 UTC" }
+  boxcasters.*.next_broadcast_at:   { type: string, description: "Start of its next (or current) broadcast; 9999-12-31T23:59:59Z for none" }
+  boxcasters.*.next_broadcast_id:   { type: string, description: "Id of its next (or current) broadcast; empty for none" }
+  boxcasters.*.next_broadcast_name: { type: string, description: "Name of its next (or current) broadcast; empty for none" }
+  boxcasters.*.channel_id:          { type: string, description: "Its own channel of every non-private broadcast it streams (detail only)" }
+  on_air.*.name:                    { type: string, description: "A broadcast preparing or on air now, keyed by id: its name" }
+  on_air.*.timeframe:               { type: string, description: "preroll while it prepares, current while it is live" }
+  broadcasts.*.name:                { type: string, description: "The broadcast's name, keyed by its id" }
+  broadcasts.*.channel_id:          { type: string, description: "The broadcast's own channel" }
+  broadcasts.*.stream_source:       { type: string, description: "boxcaster, app, switcher or rtmp" }
+  broadcasts.*.boxcaster_id:        { type: string, description: "The BoxCaster streaming it; empty for another source" }
+  broadcasts.*.boxcaster_name:      { type: string, description: "That BoxCaster's name; empty for another source" }
+  broadcasts.*.audio_source:        { type: string, description: "all, embedded, hdmi, analog or nochange, when the answer gives it" }
+  broadcasts.*.starts_at:           { type: string, description: "Scheduled start, ISO 8601 UTC" }
+  broadcasts.*.stops_at:            { type: string, description: "Scheduled stop, ISO 8601 UTC" }
+  broadcasts.*.timeframe:           { type: string, description: "future, preroll, current or past, as last read" }
+  broadcasts.*.is_private:          { type: bool, description: "Kept out of every listing but its own channel" }
+  broadcasts.*.is_ticketed:         { type: bool, description: "A ticket is needed to watch the full stream" }
+  broadcasts.*.ticket_price:        { type: float, unit: USD, description: "The ticket's price" }
+  broadcasts.*.free_variant:        { type: string, description: "What viewers without a ticket get: none, best, low or audio" }
+  broadcasts.*.viewer_url:          { type: string, description: "BoxCast's page for viewers to watch it" }
+  broadcasts.*.preview:             { type: string, description: "A thumbnail image URL, empty when none" }
+  broadcasts.*.poster:              { type: string, description: "A full-size poster image URL, empty when none" }
+  broadcasts.*.total_view_count:    { type: int, description: "How many times it was watched" }
+  broadcasts.*.total_minutes_viewed: { type: float, unit: min, description: "Minutes watched across every view" }
+  broadcasts.*.total_active_viewer_count: { type: int, description: "Viewers watching now" }
+  broadcasts.*.description:         { type: string, description: "The text shown to viewers (detail only)" }
+  broadcasts.*.in_channel_ids:      { type: string, description: "The other channels it is in, as a JSON array (detail only)" }
+  broadcasts.*.recording_id:        { type: string, description: "Its recording's id, for downloads (detail only)" }
+  broadcasts.*.highlights.*.name:   { type: string, description: "A highlight of the broadcast, keyed by its id: its name" }
+  broadcasts.*.highlights.*.description: { type: string, description: "The highlight's description" }
+  broadcasts.*.highlights.*.start_seconds: { type: int, unit: s, description: "Its start in the whole recording" }
+  broadcasts.*.highlights.*.stop_seconds: { type: int, unit: s, description: "Its end in the whole recording" }
+  broadcasts.*.highlights.*.duration: { type: float, unit: s, description: "Its length" }
+  channels.*.name:                  { type: string, description: "The channel's name, keyed by its id" }
+  channels.*.channel_id:            { type: string, description: "The channel's slug, as in its viewer URLs" }
+  channels.*.description:           { type: string, description: "The channel's description, when the answer gives it" }
+  channels.*.is_ticketed:           { type: bool, description: "A ticket is needed to watch the channel" }
+  channels.*.ticket_price:          { type: float, unit: USD, description: "The channel ticket's price" }
+  channels.*.free_variant:          { type: string, description: "What viewers without a ticket get, or empty" }
+  rtmp_sources.*.name:              { type: string, description: "The RTMP source's name, keyed by its id" }
+  rtmp_sources.*.description:       { type: string, description: "The RTMP source's description" }
+  rtmp_sources.*.server_url:        { type: string, description: "The server URL the encoder streams to (the stream key is never kept)" }
+  recordings.*.download_status:     { type: string, description: "A recording's MP4: unprocessed, queued, requested, failed, processing:<percent> or ready" }
+  recordings.*.download_url:        { type: string, description: "Its MP4's URL once ready, else empty" }
+  recordings.*.audio_download_status: { type: string, description: "Its audio-only M4A's status, as download_status" }
+  recordings.*.audio_download_url:  { type: string, description: "Its M4A's URL once ready, else empty" }
+  highlight_downloads.*.download_status: { type: string, description: "A highlight's MP4, keyed by highlight id: status as for recordings" }
+  highlight_downloads.*.download_url: { type: string, description: "Its MP4's URL once ready, else empty" }
+  highlight_downloads.*.audio_download_status: { type: string, description: "Its M4A's status" }
+  highlight_downloads.*.audio_download_url: { type: string, description: "Its M4A's URL once ready, else empty" }
+  uploads.*.filename:               { type: string, description: "An upload's file name, keyed by its id" }
+  uploads.*.filesize:               { type: int, unit: B, description: "Its size" }
+  uploads.*.mimetype:               { type: string, description: "Its MIME type" }
+  uploads.*.slot:                   { type: string, description: "What it is for, such as overlay" }
+  uploads.*.status:                 { type: string, description: "Its status, such as uploaded" }
+  uploads.*.view_url:               { type: string, description: "Where the uploaded file can be seen" }
+  uploads.*.created_at:             { type: string, description: "When it was created, ISO 8601 UTC" }
+  analytics.*.live_view_count:      { type: int, description: "Live views of a broadcast or channel, keyed by its id, over the period last asked for" }
+  analytics.*.live_view_seconds:    { type: int, unit: s, description: "Seconds watched live" }
+  analytics.*.live_buffer_seconds:  { type: int, unit: s, description: "Seconds spent buffering live" }
+  analytics.*.recorded_view_count:  { type: int, description: "Views of the recording" }
+  analytics.*.recorded_view_seconds: { type: int, unit: s, description: "Seconds of the recording watched" }
+  analytics.*.recorded_buffer_seconds: { type: int, unit: s, description: "Seconds spent buffering the recording" }
+  analytics.*.unique_viewer_count:  { type: int, description: "Distinct viewers" }
+  analytics.*.viewed_broadcast_count: { type: int, description: "Broadcasts watched" }
+
+telemetry:
+  # BoxCast pushes nothing: what moves in a show every 10 seconds, the rest
+  # every minute.
+  poll:
+    - every_ms: 10000
+      send:
+        - { method: GET, path: /account/boxcasters, query: { s: name } }
+        - *live_poll
+    - every_ms: 60000
+      send:
+        - *upcoming_poll
+        - *channels_poll
+        - *rtmp_poll
+        - { method: GET, path: /account }
+  updates:
+    - path: "^/account$"
+      json_match: { "$.id": "." }
+      json: { id: "$.id", name: "$.name", channel: "$.channel_id", description: "$.description", zone: "$.time_zone" }
+      state:
+        account.id: "{id}"
+        account.name: "{name}"
+        account.channel_id: "{channel}"
+        account.description: "{description}"
+        account.time_zone: "{zone}"
+
+    # BoxCasters: the whole list, or one.
+    - path: "^/account/boxcasters\\?s=name$"
+      json_each: "$"
+      replace: boxcasters
+      json: &boxcaster
+        id: "$.id"
+        name: "$.name"
+        status: "$.status"
+        warning: "$.warning"
+        seen: "$.last_seen_at"
+        next_at: "$.next_broadcast_at"
+        next_id: "$.next_broadcast_id"
+        next_name: "$.next_broadcast_name"
+        channel: "$.channel_id"
+      state: &boxcaster_state
+        boxcasters.{id}.name: "{name}"
+        boxcasters.{id}.status: "{status}"
+        boxcasters.{id}.warning: "{warning}"
+        boxcasters.{id}.last_seen_at: "{seen}"
+        boxcasters.{id}.next_broadcast_at: "{next_at}"
+        boxcasters.{id}.next_broadcast_id: "{next_id}"
+        boxcasters.{id}.next_broadcast_name: "{next_name}"
+        boxcasters.{id}.channel_id: "{channel}"
+    - path: "^/account/boxcasters\\?q="
+      json_each: "$"
+      json: *boxcaster
+      state: *boxcaster_state
+    - path: "^/account/boxcasters/[^/?]+$"
+      json_match: { "$.id": "." }
+      json: *boxcaster
+      state: *boxcaster_state
+
+    # Broadcasts: the on-air list is whole each time.
+    - path: "^/account/broadcasts\\?q=timeframe%3Apreroll%20timeframe%3Acurrent&"
+      json_each: "$"
+      replace: on_air
+      json: { id: "$.id", name: "$.name", timeframe: "$.timeframe" }
+      state:
+        on_air.{id}.name: "{name}"
+        on_air.{id}.timeframe: "{timeframe}"
+    # Every list of broadcasts: summary fields.
+    - path: "^/account/broadcasts\\?"
+      json_each: "$"
+      json:
+        id: "$.id"
+        name: "$.name"
+        channel: "$.channel_id"
+        source: "$.stream_source"
+        boxcaster: "$.boxcaster_id"
+        boxcaster_name: "$.boxcaster_name"
+        audio: "$.audio_source"
+        starts: "$.starts_at"
+        stops: "$.stops_at"
+        timeframe: "$.timeframe"
+        private: "$.is_private"
+        ticketed: "$.is_ticketed"
+        price: "$.ticket_price"
+        free: "$.free_variant"
+        viewer: "$.viewer_url"
+        preview: "$.preview"
+        poster: "$.poster"
+        views: "$.total_view_count"
+        minutes: "$.total_minutes_viewed"
+        active: "$.total_active_viewer_count"
+      state:
+        broadcasts.{id}.name: "{name}"
+        broadcasts.{id}.channel_id: "{channel}"
+        broadcasts.{id}.stream_source: "{source}"
+        broadcasts.{id}.boxcaster_id: "{boxcaster}"
+        broadcasts.{id}.boxcaster_name: "{boxcaster_name}"
+        broadcasts.{id}.audio_source: "{audio}"
+        broadcasts.{id}.starts_at: "{starts}"
+        broadcasts.{id}.stops_at: "{stops}"
+        broadcasts.{id}.timeframe: "{timeframe}"
+        broadcasts.{id}.is_private: "{private}"
+        broadcasts.{id}.is_ticketed: "{ticketed}"
+        broadcasts.{id}.ticket_price: "{price}"
+        broadcasts.{id}.free_variant: "{free}"
+        broadcasts.{id}.viewer_url: "{viewer}"
+        broadcasts.{id}.preview: "{preview}"
+        broadcasts.{id}.poster: "{poster}"
+        broadcasts.{id}.total_view_count: "{views}"
+        broadcasts.{id}.total_minutes_viewed: "{minutes}"
+        broadcasts.{id}.total_active_viewer_count: "{active}"
+    # One broadcast: read, scheduled or changed.
+    - path: "^/account/broadcasts(/[^/?]+)?$"
+      json_match: { "$.id": "." }
+      json:
+        id: "$.id"
+        name: "$.name"
+        channel: "$.channel_id"
+        source: "$.stream_source"
+        boxcaster: "$.boxcaster_id"
+        boxcaster_name: "$.boxcaster_name"
+        audio: "$.audio_source"
+        starts: "$.starts_at"
+        stops: "$.stops_at"
+        timeframe: "$.timeframe"
+        private: "$.is_private"
+        ticketed: "$.is_ticketed"
+        price: "$.ticket_price"
+        free: "$.free_variant"
+        viewer: "$.viewer_url"
+        preview: "$.preview"
+        poster: "$.poster"
+        views: "$.total_view_count"
+        minutes: "$.total_minutes_viewed"
+        active: "$.total_active_viewer_count"
+        description: "$.description"
+        channels: "$.in_channel_ids"
+        recording: "$.recording_id"
+      state:
+        broadcasts.{id}.name: "{name}"
+        broadcasts.{id}.channel_id: "{channel}"
+        broadcasts.{id}.stream_source: "{source}"
+        broadcasts.{id}.boxcaster_id: "{boxcaster}"
+        broadcasts.{id}.boxcaster_name: "{boxcaster_name}"
+        broadcasts.{id}.audio_source: "{audio}"
+        broadcasts.{id}.starts_at: "{starts}"
+        broadcasts.{id}.stops_at: "{stops}"
+        broadcasts.{id}.timeframe: "{timeframe}"
+        broadcasts.{id}.is_private: "{private}"
+        broadcasts.{id}.is_ticketed: "{ticketed}"
+        broadcasts.{id}.ticket_price: "{price}"
+        broadcasts.{id}.free_variant: "{free}"
+        broadcasts.{id}.viewer_url: "{viewer}"
+        broadcasts.{id}.preview: "{preview}"
+        broadcasts.{id}.poster: "{poster}"
+        broadcasts.{id}.total_view_count: "{views}"
+        broadcasts.{id}.total_minutes_viewed: "{minutes}"
+        broadcasts.{id}.total_active_viewer_count: "{active}"
+        broadcasts.{id}.description: "{description}"
+        broadcasts.{id}.in_channel_ids: "{channels}"
+        broadcasts.{id}.recording_id: "{recording}"
+    # A deletion answers 200 with no body.
+    - path: "^/account/broadcasts/([^/?]+)$"
+      match: "^$"
+      state:
+        "broadcasts.{1}": { delete: true }
+        "on_air.{1}": { delete: true }
+
+    # Highlights: a broadcast's list is whole; one is read, cut or changed.
+    - path: "^/account/broadcasts/([^/?]+)/highlights\\?"
+      json_each: "$"
+      replace: "broadcasts.{1}.highlights"
+      json: &highlight { id: "$.id", name: "$.name", description: "$.description", start: "$.start_seconds",
+                         stop: "$.stop_seconds", duration: "$.duration" }
+      state: &highlight_state
+        broadcasts.{1}.highlights.{id}.name: "{name}"
+        broadcasts.{1}.highlights.{id}.description: "{description}"
+        broadcasts.{1}.highlights.{id}.start_seconds: "{start}"
+        broadcasts.{1}.highlights.{id}.stop_seconds: "{stop}"
+        broadcasts.{1}.highlights.{id}.duration: "{duration}"
+    - path: "^/account/broadcasts/([^/?]+)/highlights(/[^/?]+)?$"
+      json_match: { "$.id": "." }
+      json: *highlight
+      state: *highlight_state
+    - path: "^/account/broadcasts/([^/?]+)/highlights/([^/?]+)$"
+      match: "^$"
+      state: { "broadcasts.{1}.highlights.{2}": { delete: true } }
+
+    # Downloads.
+    - path: "^/account/recordings/([^/?]+)$"
+      json: &download { status: "$.download_status", url: "$.download_url", audio_status: "$.audio_download_status",
+                        audio_url: "$.audio_download_url" }
+      state:
+        recordings.{1}.download_status: "{status}"
+        recordings.{1}.download_url: "{url}"
+        recordings.{1}.audio_download_status: "{audio_status}"
+        recordings.{1}.audio_download_url: "{audio_url}"
+    - path: "^/account/highlights/([^/?]+)$"
+      json: *download
+      state:
+        highlight_downloads.{1}.download_status: "{status}"
+        highlight_downloads.{1}.download_url: "{url}"
+        highlight_downloads.{1}.audio_download_status: "{audio_status}"
+        highlight_downloads.{1}.audio_download_url: "{audio_url}"
+
+    # Channels: the poll's list is whole; one is read, made or changed.
+    - path: "^/account/channels\\?s=name&l=100$"
+      json_each: "$"
+      replace: channels
+      json: &channel { id: "$.id", name: "$.name", slug: "$.channel_id", description: "$.description",
+                       ticketed: "$.is_ticketed", price: "$.ticket_price", free: "$.free_variant" }
+      state: &channel_state
+        channels.{id}.name: "{name}"
+        channels.{id}.channel_id: "{slug}"
+        channels.{id}.description: "{description}"
+        channels.{id}.is_ticketed: "{ticketed}"
+        channels.{id}.ticket_price: "{price}"
+        channels.{id}.free_variant: "{free}"
+    - path: "^/account/channels\\?q="
+      json_each: "$"
+      json: *channel
+      state: *channel_state
+    - path: "^/account/channels(/[^/?]+)?$"
+      json_match: { "$.id": "." }
+      json: *channel
+      state: *channel_state
+
+    # RTMP sources: the stream key is never kept.
+    - path: "^/account/static_rtmps\\?s=name&l=100$"
+      json_each: "$"
+      replace: rtmp_sources
+      json: &rtmp { id: "$.id", name: "$.name", description: "$.description", server: "$.server_url" }
+      state: &rtmp_state
+        rtmp_sources.{id}.name: "{name}"
+        rtmp_sources.{id}.description: "{description}"
+        rtmp_sources.{id}.server_url: "{server}"
+    - path: "^/account/static_rtmps(/[^/?]+)?$"
+      json_match: { "$.id": "." }
+      json: *rtmp
+      state: *rtmp_state
+    - path: "^/account/static_rtmps/([^/?]+)$"
+      match: "^$"
+      state: { "rtmp_sources.{1}": { delete: true } }
+
+    # Uploads.
+    - path: "^/account/uploads\\?"
+      json_each: "$"
+      json: &upload { id: "$.id", filename: "$.filename", filesize: "$.filesize", mimetype: "$.mimetype",
+                      slot: "$.slot", status: "$.status", view: "$.view_url", created: "$.created_at" }
+      state: &upload_state
+        uploads.{id}.filename: "{filename}"
+        uploads.{id}.filesize: "{filesize}"
+        uploads.{id}.mimetype: "{mimetype}"
+        uploads.{id}.slot: "{slot}"
+        uploads.{id}.status: "{status}"
+        uploads.{id}.view_url: "{view}"
+        uploads.{id}.created_at: "{created}"
+    - path: "^/account/uploads(/[^/?]+)?$"
+      json_match: { "$.id": "." }
+      json: *upload
+      state: *upload_state
+
+    # Viewer analytics, keyed by the broadcast or channel asked about.
+    - path: "^/account/viewer_analytics/([^/?]+)\\?"
+      json:
+        live: "$.live_view_count"
+        live_s: "$.live_view_seconds"
+        live_buffer: "$.live_buffer_seconds"
+        recorded: "$.recorded_view_count"
+        recorded_s: "$.recorded_view_seconds"
+        recorded_buffer: "$.recorded_buffer_seconds"
+        unique: "$.unique_viewer_count"
+        broadcasts: "$.viewed_broadcast_count"
+      state:
+        analytics.{1}.live_view_count: "{live}"
+        analytics.{1}.live_view_seconds: "{live_s}"
+        analytics.{1}.live_buffer_seconds: "{live_buffer}"
+        analytics.{1}.recorded_view_count: "{recorded}"
+        analytics.{1}.recorded_view_seconds: "{recorded_s}"
+        analytics.{1}.recorded_buffer_seconds: "{recorded_buffer}"
+        analytics.{1}.unique_viewer_count: "{unique}"
+        analytics.{1}.viewed_broadcast_count: "{broadcasts}"

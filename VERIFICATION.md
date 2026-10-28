@@ -373,6 +373,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that replies to polled getters come back compact or spaced as the poll rules read them, with strings escaped as JSON. ([specs/avstumpfl-pixera.yaml:6802](specs/avstumpfl-pixera.yaml#L6802))
 - [ ] Confirm what utility_run_js_script answers for a script that throws, and whether it is subject to the allowlist. ([specs/avstumpfl-pixera.yaml:6743](specs/avstumpfl-pixera.yaml#L6743))
 
+## aws-elemental-live — AWS Elemental Live
+
+- [ ] Confirm the REST interface answers over HTTPS on 443 (the guide's examples) and record whether plain HTTP on 80 is served too. ([specs/aws-elemental-live.yaml:66](specs/aws-elemental-live.yaml#L66))
+- [ ] Confirm list and detail XML carry an <id> child for each live event and device (the guide says GET XML holds id tags; its list example shows only href). ([specs/aws-elemental-live.yaml:1392](specs/aws-elemental-live.yaml#L1392))
+- [ ] Confirm GET /live_events with filter=active lists running, preprocessing and postprocessing events, and that each status document's errors and warnings hold code and message (warnings assumed in the same shape as errors). ([specs/aws-elemental-live.yaml:1429](specs/aws-elemental-live.yaml#L1429))
+- [ ] Record what GET /live_events/<id>/priority answers (a <priority> element assumed) and the priority range. ([specs/aws-elemental-live.yaml:1434](specs/aws-elemental-live.yaml#L1434))
+- [ ] Record what the action endpoints (start, stop, cancel, archive, reset, mute_audio, adjust_audio_gain, the output and group actions) answer, and their status on success and on refusal. ([specs/aws-elemental-live.yaml:218](specs/aws-elemental-live.yaml#L218))
+- [ ] Confirm one-line XML documents (with an XML declaration or without) are accepted by create and update. ([specs/aws-elemental-live.yaml:1320](specs/aws-elemental-live.yaml#L1320))
+- [ ] Confirm MPTS start takes an empty <mux></mux> body (the guide gives no body for POST /mpts/<id>/mux). ([specs/aws-elemental-live.yaml:950](specs/aws-elemental-live.yaml#L950))
+- [ ] Confirm system_status.json is served under /api like the other endpoints, and that cpu.pct may be a string ("1.46" in the guide's example). ([specs/aws-elemental-live.yaml:74](specs/aws-elemental-live.yaml#L74))
+- [ ] Confirm the time signal descriptors element may be empty when there are no descriptors. ([specs/aws-elemental-live.yaml:509](specs/aws-elemental-live.yaml#L509))
+
 ## axia-lwrp — Axia Livewire devices
 
 - [ ] Confirm that the client that makes a change also receives its indication (the specification says changes go to every client). ([specs/axia-lwrp.yaml:62](specs/axia-lwrp.yaml#L62))
@@ -950,6 +962,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that input-descriptions comes in list replies, sideloaded objects and websocket pushes of layers, variants, sources and filters, not only in a GET of one object, and in the shape the Data Types page gives (type, label, hidden, index, value-min, value-max, value-step, value-unit, value-list). ([specs/boinx-mimolive.yaml:1483](specs/boinx-mimolive.yaml#L1483))
 - [ ] Check whether a camera or device source's GET, list entry, sideloaded object or websocket push reports video-device-id, video-device-name, audio-device-id, audio-device-name or channel-map (none is documented as reported, so state does not hold them); if they are, add them to the source state. ([specs/boinx-mimolive.yaml:2164](specs/boinx-mimolive.yaml#L2164))
 
+## boxcast — BoxCast
+
+- [ ] Confirm the client credentials grant (HTTP Basic client id and secret to auth.boxcast.com/oauth2/token, grant_type client_credentials) answers an access token, how long it lasts in steady use, and that an expired or revoked token answers 401 (not 403). ([specs/boxcast.yaml:66](specs/boxcast.yaml#L66))
+- [ ] Confirm JSON request bodies are accepted for every POST and PUT, and record the status Create calls answer (the reference shows 200 with the resource; uploads 201). ([specs/boxcast.yaml:227](specs/boxcast.yaml#L227))
+- [ ] Confirm the poll's search q=timeframe:preroll timeframe:current answers both kinds (space as OR) and that list items carry timeframe, which the reference's summary examples leave out. ([specs/boxcast.yaml:205](specs/boxcast.yaml#L205))
+- [ ] Confirm s=name and l=100 are accepted on the BoxCaster, channel and RTMP source lists, and record whether those lists page (X-Pagination) beyond a default size. ([specs/boxcast.yaml:437](specs/boxcast.yaml#L437))
+- [ ] Confirm stops_at now in Update a Broadcast ends a live broadcast at once (the now keyword is documented for Schedule a Broadcast only), and likewise starts_at now. ([specs/boxcast.yaml:331](specs/boxcast.yaml#L331))
+- [ ] Confirm DELETE of a broadcast, highlight and RTMP source answers 200 with an empty body (the state rules rely on it). ([specs/boxcast.yaml:1092](specs/boxcast.yaml#L1092))
+- [ ] Record whether broadcast answers include audio_source and recording_id (Get Broadcast Detail names recording_id only in the download guide). ([specs/boxcast.yaml:1068](specs/boxcast.yaml#L1068))
+- [ ] Confirm the download preparation takes audio_only as JSON and answers 201, and the download_status values (processing:N). ([specs/boxcast.yaml:413](specs/boxcast.yaml#L413))
+- [ ] Confirm /account/viewer_analytics/{id} serves broadcasts and channels alike with since, until and include_viewer_timeseries as query parameters (the reference's examples join them with &). ([specs/boxcast.yaml:742](specs/boxcast.yaml#L742))
+- [ ] Confirm Update a Channel takes description (not documented) and whether channel lists include description. ([specs/boxcast.yaml:852](specs/boxcast.yaml#L852))
+
 ## brightsign-dws — BrightSign players (Local DWS)
 
 - [ ] Confirm a path with slashes in /api/v1/files/<path>/ (each segment percent-encoded) lists, reads, renames and deletes nested files. ([specs/brightsign-dws.yaml:671](specs/brightsign-dws.yaml#L671))
@@ -987,6 +1012,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that venue and parameter preset recall bodies carry the 32-bit preset ID with no node address. ([specs/bss-london.yaml:147](specs/bss-london.yaml#L147))
 - [ ] Check the SET STRING length field (string bytes plus the terminator) and the answer to a subscribed string SV. ([specs/bss-london.yaml:94](specs/bss-london.yaml#L94))
 - [ ] Confirm which current London models (BLU-806, BLU-806DA and later) speak the same protocol unchanged. ([specs/bss-london.yaml:55](specs/bss-london.yaml#L55))
+
+## camstreamer — CamStreamer apps for Axis cameras
+
+- [ ] Confirm the 6.x stream list's path (/local/camstreamer/stream_list.cgi; the page also writes /local/camstreamer/stream/stream_list.cgi for one stream) and whether its answer is the bare {"streamList": [...]} or wrapped in {status, message, data}. ([specs/camstreamer.yaml:635](specs/camstreamer.yaml#L635))
+- [ ] Confirm set_stream_enabled.cgi takes stream_id and enabled (the page writes stream_id=?stream_id=), on 6.x and 4.x. ([specs/camstreamer.yaml:162](specs/camstreamer.yaml#L162))
+- [ ] Confirm set_stream's body is one stream object (the page shows only the whole streamList). ([specs/camstreamer.yaml:153](specs/camstreamer.yaml#L153))
+- [ ] Record how an unlicensed app answers its API calls (status and body). ([specs/camstreamer.yaml:529](specs/camstreamer.yaml#L529))
+- [ ] Confirm param.cgi lists CamOverlay.Enabled and camswitcher.masterAudio as root.CamOverlay.Enabled= and root.camswitcher.masterAudio= lines (the group names' case as the page writes them). ([specs/camstreamer.yaml:688](specs/camstreamer.yaml#L688))
+- [ ] Confirm CamScripter's PackageConfigurations parameter is camscripter.PackageConfigurations in param.cgi, and network_camera_list.cgi's path under /local/camscripter/. ([specs/camstreamer.yaml:497](specs/camstreamer.yaml#L497))
+- [ ] Record the shape of playlist_queue_list.cgi's and clips.cgi's answers, to keep the queue in state. ([specs/camstreamer.yaml:395](specs/camstreamer.yaml#L395))
+- [ ] Confirm upload_custom_image takes the picture as the raw POST body (as curl --data-binary sends it). ([specs/camstreamer.yaml:357](specs/camstreamer.yaml#L357))
 
 ## canon-ptz — Canon PTZ and pro video cameras (XC protocol)
 
@@ -3062,6 +3098,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm GET /v1/datalink lists every DataLink key as <data><key/><value/></data> elements. ([specs/newtek-tricaster.yaml:686](specs/newtek-tricaster.yaml#L686))
 - [ ] Confirm Vizrt Vectar and Viz Vectar Plus answer the same shortcuts, dictionaries and change notification websocket as a TriCaster, and their input count for the net commands. ([specs/newtek-tricaster.yaml:852](specs/newtek-tricaster.yaml#L852))
 
+## nimble-streamer — Nimble Streamer (native API)
+
+- [ ] Confirm a server without management_token answers every call, and record how a server with a token refuses a request without salt and hash (status and body). ([specs/nimble-streamer.yaml:466](specs/nimble-streamer.yaml#L466))
+- [ ] Confirm the POST calls without a body (sync_panel_settings, reload_config, reload_ssl_certificates, dvr reload and cleanup, the Advertizer markers) are accepted with an empty body, and record what they answer. ([specs/nimble-streamer.yaml:86](specs/nimble-streamer.yaml#L86))
+- [ ] Confirm get_cache_key is a POST with a JSON body (the reference's curl example sends -d to it). ([specs/nimble-streamer.yaml:427](specs/nimble-streamer.yaml#L427))
+- [ ] Confirm create_rtmp_republish_rule takes dest_port as a number (the reference's example sends it as a string). ([specs/nimble-streamer.yaml:150](specs/nimble-streamer.yaml#L150))
+- [ ] Confirm live_streams_status gives bandwidth and publish_time as strings of digits (as in the reference's example) or numbers, both read as integers. ([specs/nimble-streamer.yaml:575](specs/nimble-streamer.yaml#L575))
+- [ ] Record the shapes of mpeg2ts_status, srt and rist statistics, ndi/list and dvr_status replies beyond the reference's examples, to keep them in state. ([specs/nimble-streamer.yaml:490](specs/nimble-streamer.yaml#L490))
+
 ## nmos-node — AMWA NMOS Node (IS-04, IS-05, IS-08, IS-07)
 
 - [ ] Check against a real Node (and nmos-cpp's node) that GET /x-nmos/node answers as the liveness probe. ([specs/nmos-node.yaml:59](specs/nmos-node.yaml#L59))
@@ -4483,6 +4528,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the ID list's first two bytes count the IDs still to come after this message, and that NEXT (3X.02, answered 3X.82) continues it ten at a time. ([specs/vdcp.yaml:344](specs/vdcp.yaml#L344))
 - [ ] Check which VDCP commands Ross Tria, Mira and Kiva servers take and on which port. ([specs/vdcp.yaml:72](specs/vdcp.yaml#L72))
 
+## vdoninja — VDO.Ninja
+
+- [ ] Confirm the relay accepts {"join": key} with nothing answered, and how long an idle websocket lasts (a 30 s getDetails keep-alive is assumed to hold it). ([specs/vdoninja.yaml:90](specs/vdoninja.yaml#L90))
+- [ ] Confirm every websocket answer is {"callback": {action, target, value, result}} with the request's action, as the Companion module reads it (the README shows it only as a screenshot). ([specs/vdoninja.yaml:859](specs/vdoninja.yaml#L859))
+- [ ] Record getDetails' answer: whether result is an array or an object, and its fields (streamID, label, director, position, localStream, muted, videoMuted, speakerMuted, scenes, others mute-guest and hide-guest). ([specs/vdoninja.yaml:924](specs/vdoninja.yaml#L924))
+- [ ] Record getGuestList's answer shape (slots keyed "1", "2" with streamID and label assumed). ([specs/vdoninja.yaml:957](specs/vdoninja.yaml#L957))
+- [ ] Confirm values sent as strings ("true", "false", "toggle") are taken like booleans, and that activeSpeaker off is false. ([specs/vdoninja.yaml:104](specs/vdoninja.yaml#L104))
+- [ ] Confirm videoConstraint takes the constraint's name as target and its value in value2, and requestAspectRatio the largest dimension in value2. ([specs/vdoninja.yaml:416](specs/vdoninja.yaml#L416))
+- [ ] Record which update actions a page pushes (mic, camera, remoteMuted, remoteVideoMuted, directorMuted, directorVideoHide, hangup, endViewConnection, newViewConnection, positionChange, details) and their value types. ([specs/vdoninja.yaml:969](specs/vdoninja.yaml#L969))
+
 ## ventuz-director — Ventuz Director (Director Remoting)
 
 - [ ] Confirm Director Remoting's websocket answers on port 22404 (the documentation's port; the vendor's Companion module defaults to 21404). ([specs/ventuz-director.yaml:50](specs/ventuz-director.yaml#L50))
@@ -4582,12 +4637,35 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the dynamic element's input1 to input4 and value1 to value4 children. ([specs/vmix.yaml:5196](specs/vmix.yaml#L5196))
 - [ ] Confirm the video call attributes (callPassword, callConnected, callVideoSource, callAudioSource) and the VideoCallAudioSourceX and VideoCallSourceOutputN activators. ([specs/vmix.yaml:5141](specs/vmix.yaml#L5141))
 
+## wmspanel — WMSPanel
+
+- [ ] Confirm wrong credentials and a calling host missing from the API whitelist both answer 403, and record the body. ([specs/wmspanel.yaml:2477](specs/wmspanel.yaml#L2477))
+- [ ] Confirm create and update calls take the request data fields as a JSON body with Content-Type application/json, for every resource (the reference shows it for some). ([specs/wmspanel.yaml:2491](specs/wmspanel.yaml#L2491))
+- [ ] Confirm the single get calls' answer shapes: stream (an object) for a live stream, rule (an array in the reference's example) for a re-publish rule. ([specs/wmspanel.yaml:2611](specs/wmspanel.yaml#L2611))
+- [ ] Confirm the action calls (pause, resume, restart, start, stop, clone) answer {"status": "Ok"}, and record how soon the lists show the change. ([specs/wmspanel.yaml:2683](specs/wmspanel.yaml#L2683))
+- [ ] Record how WMSPanel counts the probe and poll calls against the 15,000-call daily limit, and what it answers once the limit is reached. ([specs/wmspanel.yaml:2465](specs/wmspanel.yaml#L2465))
+- [ ] Confirm list_servers lists every server kind, and that the server answer's status is online, offline or pending. ([specs/wmspanel.yaml:2519](specs/wmspanel.yaml#L2519))
+
 ## workpro-lightshark — Work Pro LightShark LS-1 / LS-Core (OSC)
 
 - [ ] Check the default OSC input and output ports (8000 and 9000 per Companion) and where the console sends its output. ([specs/workpro-lightshark.yaml:265](specs/workpro-lightshark.yaml#L265))
 - [ ] Record the console's feedback after /LS/Sync (grand master, master levels, playback levels, executors) and the executor value format. ([specs/workpro-lightshark.yaml:272](specs/workpro-lightshark.yaml#L272))
 - [ ] Check that a release-only message (0.0) triggers keys, playbacks and executors as the manual's hexadecimal table shows. ([specs/workpro-lightshark.yaml:279](specs/workpro-lightshark.yaml#L279))
 - [ ] Check /LS/Color against /LS/Colour, /LS/Fx, the /LS/ExecutorLine form, and the Companion-only addresses (Tap, FxTap, TAP/PB, ChaseValue/PB, Level/Sm*, Reset/Sm*). ([specs/workpro-lightshark.yaml:286](specs/workpro-lightshark.yaml#L286))
+
+## wowza-streaming-engine — Wowza Streaming Engine
+
+- [ ] Confirm every GET answers JSON with Accept: application/json (the API answers XML otherwise), and that writes take JSON bodies. ([specs/wowza-streaming-engine.yaml:63](specs/wowza-streaming-engine.yaml#L63))
+- [ ] Confirm the default digest authentication is answered, that basic and none work when Server.xml sets them, and that a wrong credential answers 401. ([specs/wowza-streaming-engine.yaml:59](specs/wowza-streaming-engine.yaml#L59))
+- [ ] Confirm an update body holding only some fields leaves the others as they were, for the configuration commands (update_app, update_transcoder, update_push_publish_map_entry and the like). ([specs/wowza-streaming-engine.yaml:3405](specs/wowza-streaming-engine.yaml#L3405))
+- [ ] Confirm GET .../instances lists every instance with incomingStreams, recorders and streamGroups in the shapes the reference gives (its OutgoingStreamConfig shows placeholder fields only). ([specs/wowza-streaming-engine.yaml:3692](specs/wowza-streaming-engine.yaml#L3692))
+- [ ] Confirm start_recording's body (recorderName, instanceName, defaultRecorder true) starts a recording with the application's recorder defaults. ([specs/wowza-streaming-engine.yaml:3363](specs/wowza-streaming-engine.yaml#L3363))
+- [ ] Confirm write operations answer {"success": true, ...}, which the stream target and recorder re-reads rely on. ([specs/wowza-streaming-engine.yaml:3789](specs/wowza-streaming-engine.yaml#L3789))
+- [ ] Confirm per-stream monitoring (incomingstreams/{stream}/monitoring/current) answers for live streams, including names with spaces, and what it answers for a stream not publishing. ([specs/wowza-streaming-engine.yaml:3761](specs/wowza-streaming-engine.yaml#L3761))
+- [ ] Record the stream recorder's currentDuration unit (ms assumed) and recordingStartTime format, and the sessionStatus values of stream targets. ([specs/wowza-streaming-engine.yaml:3539](specs/wowza-streaming-engine.yaml#L3539))
+- [ ] Confirm the media caster type is rtp-record (the reference lists it with a leading space). ([specs/wowza-streaming-engine.yaml:3420](specs/wowza-streaming-engine.yaml#L3420))
+- [ ] Record the action names the DVR store and media cache store actions take, which the reference leaves open. ([specs/wowza-streaming-engine.yaml:1273](specs/wowza-streaming-engine.yaml#L1273))
+- [ ] Confirm startupstreams answers its list under Streams (capitalized, as the reference gives it). ([specs/wowza-streaming-engine.yaml:3802](specs/wowza-streaming-engine.yaml#L3802))
 
 ## wyrestorm-matrix — WyreStorm matrix switchers
 

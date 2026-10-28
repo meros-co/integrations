@@ -1,5 +1,8 @@
 //! OAuth 2 for the HTTP transport (`auth: oauth2`, SPEC.md §2): keeping the
-//! consumer's access token fresh with its refresh token (RFC 6749 §6).
+//! consumer's access token fresh with its refresh token (RFC 6749 §6), or,
+//! for a service that issues an account's own client a token with the
+//! client credentials grant (RFC 6749 §4.4, `oauth.client_credentials`),
+//! with the client's id and secret.
 //!
 //! The consumer runs the sign-in and owns the tokens; they arrive as the
 //! device's settings and are held in memory only. This is the refresh state
@@ -82,6 +85,9 @@ pub(crate) struct OAuth {
     token_url: String,
     refresh_ahead: Millis,
     client_auth: ClientAuth,
+    /// `oauth.client_credentials`: without a refresh token, the client's id
+    /// and secret get a token with the client credentials grant.
+    client_credentials: bool,
     /// The refresh in flight, if any.
     pub(crate) refreshing: Option<RequestId>,
     /// The lifetime of the last token issued: a token living shorter than
@@ -169,10 +175,17 @@ impl OAuth {
             None => None,
             Some(v) => Some(Validate::new(v)?),
         };
+        let client_credentials = match oauth.get("client_credentials") {
+            None => false,
+            Some(v) => v
+                .as_bool()
+                .ok_or("oauth.client_credentials is true or false")?,
+        };
         Ok(OAuth {
             token_url,
             refresh_ahead: ahead * 1000,
             client_auth,
+            client_credentials,
             refreshing: None,
             lifetime: None,
             retry_at: 0,
@@ -247,16 +260,27 @@ impl OAuth {
         }
     }
 
-    /// Whether there is a refresh token: without one the access token is a
-    /// plain bearer token, used until it is refused.
-    pub(crate) fn can_refresh(settings: &Params) -> bool {
-        !setting(settings, "refresh_token").is_empty()
+    /// Whether a new access token can be had: with a refresh token, or,
+    /// with `oauth.client_credentials`, the client's id and secret. Without
+    /// either the access token is a plain bearer token, used until it is
+    /// refused.
+    pub(crate) fn can_refresh(&self, settings: &Params) -> bool {
+        !setting(settings, "refresh_token").is_empty() || self.uses_client_credentials(settings)
+    }
+
+    /// The client credentials grant applies: it is on, there is no refresh
+    /// token, and the client's id and secret are both set.
+    fn uses_client_credentials(&self, settings: &Params) -> bool {
+        self.client_credentials
+            && setting(settings, "refresh_token").is_empty()
+            && !setting(settings, "client_id").is_empty()
+            && !setting(settings, "client_secret").is_empty()
     }
 
     /// Whether the access token must be refreshed before the next request:
     /// there is none, or it expires within the refresh margin.
     pub(crate) fn needs_refresh(&self, settings: &Params, unix: Millis) -> bool {
-        if !OAuth::can_refresh(settings) {
+        if !self.can_refresh(settings) {
             return false;
         }
         if setting(settings, "access_token").is_empty() {
@@ -269,7 +293,8 @@ impl OAuth {
         expires_at(settings).is_some_and(|at| (at * 1000) <= unix.saturating_add(ahead))
     }
 
-    /// The refresh request (RFC 6749 §6), form-encoded.
+    /// The refresh request (RFC 6749 §6), or the client credentials grant
+    /// (§4.4) when that applies, form-encoded.
     pub(crate) fn request(
         &self,
         settings: &Params,
@@ -281,10 +306,14 @@ impl OAuth {
             setting(settings, "client_id"),
             setting(settings, "client_secret"),
         );
-        let mut form = vec![
-            ("grant_type", "refresh_token"),
-            ("refresh_token", setting(settings, "refresh_token")),
-        ];
+        let mut form = if self.uses_client_credentials(settings) {
+            vec![("grant_type", "client_credentials")]
+        } else {
+            vec![
+                ("grant_type", "refresh_token"),
+                ("refresh_token", setting(settings, "refresh_token")),
+            ]
+        };
         let mut headers = vec![
             (
                 "Content-Type".to_string(),
@@ -736,6 +765,46 @@ mod tests {
             &json!({"token_url": "https://x/t", "validate": {"url": "http://127.0.0.1:9/v"}})
         ))
         .is_ok());
+    }
+
+    #[test]
+    fn client_credentials_get_a_token_without_a_refresh_token() {
+        let o = oauth(json!({"token_url": "https://auth.example.com/oauth2/token",
+                             "client_auth": "basic", "client_credentials": true}));
+        let client = json!({"client_id": "cid1000", "client_secret": "secret9999"});
+        // No token yet: one is due, asked for with the client's own credentials.
+        assert!(o.can_refresh(&params(client.clone())));
+        assert!(o.needs_refresh(&params(client.clone()), 0));
+        let request = o.request(&params(client.clone()), 1, false).unwrap();
+        assert_eq!(
+            String::from_utf8(request.body.unwrap()).unwrap(),
+            "grant_type=client_credentials"
+        );
+        assert!(request.headers.contains(&(
+            "Authorization".into(),
+            "Basic Y2lkMTAwMDpzZWNyZXQ5OTk5".into()
+        )));
+        // A token near its expiry is replaced the same way.
+        let mut held = client.clone();
+        held["access_token"] = json!("a");
+        held["expires_at"] = json!(1_000);
+        assert!(o.needs_refresh(&params(held.clone()), 800_000));
+        assert!(!o.needs_refresh(&params(held), 600_000));
+        // A refresh token, when given, is used instead.
+        let mut refreshing = client.clone();
+        refreshing["refresh_token"] = json!("r");
+        let request = o.request(&params(refreshing), 1, false).unwrap();
+        assert_eq!(
+            String::from_utf8(request.body.unwrap()).unwrap(),
+            "grant_type=refresh_token&refresh_token=r"
+        );
+        // Without the secret, or without the option, the token is a plain one.
+        assert!(!o.can_refresh(&params(json!({"client_id": "cid1000"}))));
+        assert!(!google().can_refresh(&params(client)));
+        assert!(OAuth::new(Some(
+            &json!({"token_url": "https://x/t", "client_credentials": "yes"})
+        ))
+        .is_err());
     }
 
     #[test]
