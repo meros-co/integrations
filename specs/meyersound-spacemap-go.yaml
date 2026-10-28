@@ -1,0 +1,133 @@
+spec: 1
+id: meyersound-spacemap-go
+name: Meyer Sound Spacemap Go (general purpose OSC)
+vendor: Meyer Sound
+category: other
+
+# Spacemap Go's general purpose OSC input: messages to the Spacemap Go
+# system's IPv4 address, port 38033, move each channel's panner, set channel,
+# mix and system levels and mutes, run trajectories and recall snapshots by
+# their External Recall ID. The interface takes commands only: it documents
+# no queries or feedback. It is turned on, and limited to one sender if
+# wished, in the app (Settings, System settings, External device control,
+# General purpose OSC).
+source:
+  - title: "User Guide: Spacemap Go, General purpose OSC commands (web edition, read 27 October 2026)"
+    author: Meyer Sound Laboratories
+    url: https://docs.meyersound.com/products/en/user-guide---spacemap-go.html
+    note: >
+      Manufacturer document. The system address and port 38033, the IPv4
+      filter, outbound port and enable switch; /channel/<1-32>/position (X and
+      Y, -1000 to 1000), level (-90 to +10 dB), mute (0 or 1), crossfade (-100
+      to 100), spread (0 to 100), trajectory/status (play, pause, stop);
+      /mix/level, /mix/mute, /system/level; /recall/channel, /recall/mix and
+      /recall/system with External Recall IDs (between 900 and 3000, shown per
+      snapshot in the app).
+
+transport:
+  type: osc-udp
+  port: 38033
+  reply: none
+
+ports:
+  - { port: 38033, protocol: udp, role: control }
+
+models:
+  - id: spacemap-go
+    name: Meyer Sound Spacemap Go (on GALAXY processors in Spacemap mode)
+    supports: [set_position, set_channel_level, set_channel_mute, set_crossfade, set_spread, set_trajectory,
+               set_mix_level, set_mix_mute, set_system_level, recall_channel_snapshot, recall_mix_snapshot,
+               recall_system_snapshot]
+    verification: none
+
+commands:
+  set_position:
+    summary: Move a channel's panner (/channel/<n>/position)
+    params:
+      channel: &channel { type: int, min: 1, max: 32, required: true, label: Channel, description: "Spacemap Go channel, 1 to 32." }
+      x: { type: int, min: -1000, max: 1000, required: true, label: X, description: "Horizontal position, -1000 (left) to 1000 (right)." }
+      y: { type: int, min: -1000, max: 1000, required: true, label: Y, description: "Vertical position, -1000 (bottom) to 1000 (top)." }
+    send: { address: "/channel/{channel}/position", args: [ { value: "{x}", type: int }, { value: "{y}", type: int } ] }
+    returns: none
+  set_channel_level:
+    summary: Set a channel's level in dB (/channel/<n>/level)
+    params:
+      channel: *channel
+      level_db: &level { type: float, min: -90.0, max: 10.0, required: true, label: Level, description: "Level in dB, -90 to +10." }
+    send: { address: "/channel/{channel}/level", args: [ { value: "{level_db}", type: float } ] }
+    returns: none
+  set_channel_mute:
+    summary: Mute or unmute a channel (/channel/<n>/mute)
+    params:
+      channel: *channel
+      muted: &muted { type: bool, required: true, label: Muted, description: "On mutes, off unmutes." }
+    send: { address: "/channel/{channel}/mute", args: [ { value: "{muted:bool01}", type: int } ] }
+    returns: none
+  set_crossfade:
+    summary: Crossfade a channel between its two Spacemaps (/channel/<n>/crossfade)
+    params:
+      channel: *channel
+      crossfade: { type: int, min: -100, max: 100, required: true, label: Crossfade, description: "-100 the left Spacemap alone, 100 the right one alone, 0 both equally." }
+    send: { address: "/channel/{channel}/crossfade", args: [ { value: "{crossfade}", type: int } ] }
+    returns: none
+  set_spread:
+    summary: Set a channel's spread (/channel/<n>/spread)
+    params:
+      channel: *channel
+      spread: { type: int, min: 0, max: 100, required: true, label: Spread, description: "Spread in percent, 0 to 100, on a logarithmic scale (14 is Meyer's suggested value)." }
+    send: { address: "/channel/{channel}/spread", args: [ { value: "{spread}", type: int } ] }
+    returns: none
+  set_trajectory:
+    summary: Play, pause or stop a channel's trajectory (/channel/<n>/trajectory/status); stop returns it to its start
+    params:
+      channel: *channel
+      status: { type: enum, values: [play, pause, stop], required: true, label: Trajectory, description: "play, pause, or stop (back to the start point)." }
+    send: { address: "/channel/{channel}/trajectory/status", args: [ { value: "{status}", type: string } ] }
+    returns: none
+  set_mix_level:
+    summary: Set the mix level in dB (/mix/level)
+    params: { level_db: *level }
+    send: { address: /mix/level, args: [ { value: "{level_db}", type: float } ] }
+    returns: none
+  set_mix_mute:
+    summary: Mute or unmute the mix (/mix/mute)
+    params: { muted: *muted }
+    send: { address: /mix/mute, args: [ { value: "{muted:bool01}", type: int } ] }
+    returns: none
+  set_system_level:
+    summary: Set the system trim in dB (/system/level)
+    params: { level_db: *level }
+    send: { address: /system/level, args: [ { value: "{level_db}", type: float } ] }
+    returns: none
+  recall_channel_snapshot:
+    summary: Recall a channel snapshot by its External Recall ID (/recall/channel)
+    params:
+      recall_id: &recall { type: int, min: 1, max: 99999, required: true, label: External Recall ID, description: "The snapshot's External Recall ID, as Spacemap Go shows it (such as 3003)." }
+    send: { address: /recall/channel, args: [ { value: "{recall_id}", type: int } ] }
+    returns: none
+  recall_mix_snapshot:
+    summary: Recall a mix snapshot by its External Recall ID (/recall/mix)
+    params: { recall_id: *recall }
+    send: { address: /recall/mix, args: [ { value: "{recall_id}", type: int } ] }
+    returns: none
+  recall_system_snapshot:
+    summary: Recall a system snapshot by its External Recall ID (/recall/system)
+    params: { recall_id: *recall }
+    send: { address: /recall/system, args: [ { value: "{recall_id}", type: int } ] }
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      The recall commands change the spatial mix (or the whole system) at
+      once and cannot be undone from here.
+  - models: [all]
+    severity: warning
+    text: >
+      General purpose OSC takes commands only: there is no query or feedback,
+      so no state is kept and every command reports unverified. It must be
+      enabled in Spacemap Go, and with its IPv4 filter set only that sender is
+      heard. The guide does not give the OSC argument types or say UDP; ints,
+      floats for levels, a string for the trajectory and UDP are assumed. The
+      bidirectional protocol consoles use with Spacemap Go is not published.

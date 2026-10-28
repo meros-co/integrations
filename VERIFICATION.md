@@ -2522,6 +2522,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check how create_snapshot separates a name with spaces from the comment (the guide gives no quoting). ([specs/meyersound-galaxy.yaml:368](specs/meyersound-galaxy.yaml#L368))
 - [ ] Record each typed point's range, units and enumeration with describe_control_point (delay types, filter types, slopes, scales), which the guide does not tabulate. ([specs/meyersound-galaxy.yaml:107](specs/meyersound-galaxy.yaml#L107))
 
+## meyersound-spacemap-go — Meyer Sound Spacemap Go
+
+- [ ] Confirm that general purpose OSC is received over UDP on 38033, and record the argument types Spacemap Go accepts (ints, floats, a string for the trajectory are assumed). ([specs/meyersound-spacemap-go.yaml:28](specs/meyersound-spacemap-go.yaml#L28))
+- [ ] Confirm the position command takes X then Y as two arguments in one message. ([specs/meyersound-spacemap-go.yaml:50](specs/meyersound-spacemap-go.yaml#L50))
+
 ## midi-show-control — MIDI Show Control (MSC) device
 
 - [ ] Against an MSC lighting console (ETC Eos, grandMA, Chamsys), confirm GO, STOP, RESUME, TIMED_GO, SET and FIRE act as described for its device ID and command format, and whether it answers all_types and the all-call ID 127. ([specs/midi-show-control.yaml:318](specs/midi-show-control.yaml#L318))
