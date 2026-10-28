@@ -54,6 +54,8 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check current_monitoring_state's values (0 In, 1 Auto, 2 Off) and the device type values (1, 2, 4 in the README; 0, 1, 2 in a source comment). ([specs/ableton-live.yaml:3104](specs/ableton-live.yaml#L3104))
 - [ ] Check the value ranges Live accepts for tempo, song and scene signatures, clip transposition and detune, groove amount (the Live Object Model says 0 to 1), and what Live does with a value outside them. ([specs/ableton-live.yaml:3097](specs/ableton-live.yaml#L3097))
 - [ ] Confirm /live/startup is sent when Live loads another Set, so the rule registering everything again runs then. ([specs/ableton-live.yaml:3112](specs/ableton-live.yaml#L3112))
+- [ ] Record Live's dB for several mixer volume values (0.85 is taken to be 0 dB) so a dB law can be stated. ([specs/ableton-live.yaml:2475](specs/ableton-live.yaml#L2475))
+- [ ] Record the dB Live's meters show for several output meter values (0.0 to 1.0) so their scale can be stated. ([specs/ableton-live.yaml:2468](specs/ableton-live.yaml#L2468))
 
 ## adder-aim — Adder AdderLink Infinity Manager (AIM API)
 
@@ -3057,7 +3059,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a reply carries an error object (not a result) when a method fails, and that every doaction and set.property answers with a result. ([specs/modulopi-kinetic.yaml:341](specs/modulopi-kinetic.yaml#L341))
 - [ ] Check the units of a timeline's timecode, grandMasterFader and audioMaster in get.list.timelines (ms and percent are assumed), and the fade argument of grandMasterFader and audioMaster (timecode, in ms). ([specs/modulopi-kinetic.yaml:188](specs/modulopi-kinetic.yaml#L188))
 - [ ] Find how the Designer's uuid for doaction.kinetic is obtained. ([specs/modulopi-kinetic.yaml:345](specs/modulopi-kinetic.yaml#L345))
-- [ ] Check the forms of a vec2-vec4 and color variable's value in get.list.variables. ([specs/modulopi-kinetic.yaml:373](specs/modulopi-kinetic.yaml#L373))
+- [ ] Check the forms of a vec2-vec4 and color variable's value in get.list.variables. ([specs/modulopi-kinetic.yaml:380](specs/modulopi-kinetic.yaml#L380))
 
 ## modulopi-player — Modulo Pi Modulo Player
 
