@@ -211,6 +211,8 @@ mod snmp_ber;
     feature = "ups-mib"
 ))]
 mod snmp_device;
+#[cfg(all(test, feature = "apc-rack-pdu"))]
+mod snmp_device_session_tests;
 #[cfg(any(
     feature = "generic-snmp",
     feature = "apc-rack-pdu",
