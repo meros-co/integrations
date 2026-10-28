@@ -1,0 +1,1044 @@
+spec: 1
+id: sennheiser-adn
+name: Sennheiser ADN conference system (MediaCtrl protocol)
+vendor: Sennheiser
+category: other
+
+# The ADN CU1 central unit's media control protocol: plain text over TCP
+# 53252, each message a keyword and its parameters ended by ";", no line
+# ending. A client is an observer: every change to a setting, wherever it was
+# made, is sent to it as "Keyword value;", and a set or a get is answered the
+# same way. Conference units are addressed by serial number (with their type
+# code) or, wired ones, by bus position. ADN does not speak SSC.
+source:
+  - title: "Audio Distribution Network: MediaCtrl Protocol, Publ. 03/15, 549157/A02"
+    author: Sennheiser
+    url: https://assets.sennheiser.com/download/assets/QG_ADNMediaCtrlProtocol_A02_EN.pdf/1f94ac1ce7b811f0bce7beb43c66122a
+    note: >
+      Manufacturer document; pages are the document's own. TCP server on 53252,
+      about 45 s after the central unit starts, messages ended by ";", several
+      in one packet, about 100 ms between commands p.3-4; set, get, updates
+      pushed to every client, relative changes with # and errors p.4-5; the
+      commands p.6-25; error codes 1000-1070 p.26.
+  - title: "Media Control Systems: 3rd party control of Sennheiser products (AN 1260 v1.0), p.5 and p.7"
+    author: Sennheiser
+    url: https://assets.sennheiser.com/download/assets/AN_1260_v1.0_Media_Control_Systems_EN.pdf/d2d66562e7b411f08c892a34179bc91d
+    note: >
+      Manufacturer document. ADN is controlled with the Media Control
+      Protocol, not SSC; its other ports (53248-53251) are the central unit's
+      own discovery and monitoring.
+
+transport:
+  type: line-tcp
+  port: 53252
+  framing: delimited
+  close: ";"
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # Answers and pushed changes are the same "Keyword value;" messages, told
+  # apart by the keyword (expect.reply_contains); errors name nothing.
+  error_match: '^\s*error [0-9]+'
+  probe: "FloorVolume"
+  pacing:
+    min_interval_ms: 100
+
+ports:
+  - { port: 53252, protocol: tcp, role: control }
+
+maps:
+  eq: { "12": "1", "11": "2", "10": "3", "9": "4", "8": "5", "7": "6", "6": "7", "5": "8", "4": "9", "3": "10", "2": "11", "1": "12", "0": "13", "-1": "14", "-2": "15", "-3": "16", "-4": "17", "-5": "18", "-6": "19", "-7": "20", "-8": "21", "-9": "22", "-10": "23", "-11": "24", "-12": "25" }
+  sensitivity: { "-18.0": "1", "-16.5": "2", "-15.0": "3", "-13.5": "4", "-12.0": "5", "-10.5": "6", "-9.0": "7", "-7.5": "8", "-6.0": "9", "-4.5": "10", "-3.0": "11", "-1.5": "12", "0.0": "13", "1.5": "14", "3.0": "15", "4.5": "16", "6.0": "17", "7.5": "18", "9.0": "19", "10.5": "20", "12.0": "21", "13.5": "22", "15.0": "23", "16.5": "24", "18.0": "25" }
+  floor_mix: { "0.0": "1", "0.5": "2", "1.0": "3", "1.5": "4", "2.0": "5", "2.5": "6", "3.0": "7", "linear": "8" }
+  premonition: { "0": "1", "10": "2", "20": "3", "30": "4", "40": "5", "50": "6", "60": "7", "70": "8", "80": "9", "90": "10", "100": "11", "110": "12", "120": "13" }
+  rf_power: { "0": "1", "20": "2", "40": "3", "60": "4", "80": "5", "100": "6" }
+  conference_mode: { "automatic": "1", "overrun": "2", "request": "3", "push_to_talk": "4" }
+  feedback_suppression: { "off": "1", "low": "2", "high": "3" }
+
+models:
+  - id: adn-cu1
+    name: Sennheiser ADN CU1 central unit (wired ADN C1/D1 and wireless ADN-W C1/D1 units, ADN-W AM antenna modules)
+    supports:
+      - get_auto_frequency_selection
+      - set_auto_frequency_selection
+      - get_blink_on_request
+      - set_blink_on_request
+      - get_clear_cleans_request_list
+      - set_clear_cleans_request_list
+      - get_conference_mode
+      - set_conference_mode
+      - get_wireless_unit_shutdown
+      - set_wireless_unit_shutdown
+      - get_floor_eq_high
+      - set_floor_eq_high
+      - adjust_floor_eq_high
+      - get_floor_eq_mid
+      - set_floor_eq_mid
+      - adjust_floor_eq_mid
+      - get_floor_eq_low
+      - set_floor_eq_low
+      - adjust_floor_eq_low
+      - get_floor_mix
+      - set_floor_mix
+      - adjust_floor_mix
+      - get_floor_volume
+      - set_floor_volume
+      - adjust_floor_volume
+      - get_hd_recording
+      - set_hd_recording
+      - get_talk_time_limit
+      - set_talk_time_limit
+      - adjust_talk_time_limit
+      - get_max_open_mics
+      - set_max_open_mics
+      - adjust_max_open_mics
+      - get_max_requests
+      - set_max_requests
+      - adjust_max_requests
+      - get_open_access
+      - set_open_access
+      - get_premonition_time
+      - set_premonition_time
+      - adjust_premonition_time
+      - get_unit_feedback_suppression
+      - set_unit_feedback_suppression
+      - get_mic_loudspeaker_mute
+      - set_mic_loudspeaker_mute
+      - get_talk_time_hard_cut_off
+      - set_talk_time_hard_cut_off
+      - get_talk_time_limit_active
+      - set_talk_time_limit_active
+      - get_xlr_mix_minus
+      - set_xlr_mix_minus
+      - get_xlr_in
+      - set_xlr_in
+      - get_xlr_in_sensitivity
+      - set_xlr_in_sensitivity
+      - adjust_xlr_in_sensitivity
+      - get_xlr_in_eq_high
+      - set_xlr_in_eq_high
+      - adjust_xlr_in_eq_high
+      - get_xlr_in_eq_mid
+      - set_xlr_in_eq_mid
+      - adjust_xlr_in_eq_mid
+      - get_xlr_in_eq_low
+      - set_xlr_in_eq_low
+      - adjust_xlr_in_eq_low
+      - get_xlr_out
+      - set_xlr_out
+      - get_xlr_out_volume
+      - set_xlr_out_volume
+      - adjust_xlr_out_volume
+      - get_xlr_out_eq_high
+      - set_xlr_out_eq_high
+      - adjust_xlr_out_eq_high
+      - get_xlr_out_eq_mid
+      - set_xlr_out_eq_mid
+      - adjust_xlr_out_eq_mid
+      - get_xlr_out_eq_low
+      - set_xlr_out_eq_low
+      - adjust_xlr_out_eq_low
+      - get_xlr_out_feedback_suppression
+      - set_xlr_out_feedback_suppression
+      - get_antenna_channel
+      - set_antenna_channel
+      - get_antenna_power
+      - set_antenna_power
+      - get_wired_unit_status
+      - get_unit_status
+      - get_wired_unit_talk_time
+      - get_unit_talk_time
+      - get_unit_battery
+      - get_unit_external_power
+      - get_unit_rf_quality
+      - get_hd_recording_error
+      - press_mic_button
+      - press_unit_mic_button
+      - all_mics_off
+      - reinitialize_system
+      - set_date_time
+    verification: none
+
+commands:
+  get_auto_frequency_selection:
+    summary: "Read: antenna modules choose their frequency automatically (AutoFreqSelection, p.9)"
+    send: "AutoFreqSelection"
+    expect: { reply_contains: "AutoFreqSelection ", matches: "AutoFreqSelection (-?[0-9]+)$" }
+    returns: value
+
+  set_auto_frequency_selection:
+    summary: "Set: antenna modules choose their frequency automatically (AutoFreqSelection, p.9)"
+    params:
+      enabled: { type: bool, required: true, label: "Antenna modules choose their frequency automatically", description: "On turns it on, off turns it off: antenna modules choose their frequency automatically." }
+    send: "AutoFreqSelection {enabled:bool01}"
+    expect: { reply_contains: "AutoFreqSelection ", not_contains: "error" }
+    returns: ack
+
+  get_blink_on_request:
+    summary: "Read: microphone rings blink for a request to speak (BlinkOnReq, p.9)"
+    send: "BlinkOnReq"
+    expect: { reply_contains: "BlinkOnReq ", matches: "BlinkOnReq (-?[0-9]+)$" }
+    returns: value
+
+  set_blink_on_request:
+    summary: "Set: microphone rings blink for a request to speak (BlinkOnReq, p.9)"
+    params:
+      enabled: { type: bool, required: true, label: "Microphone rings blink for a request to speak", description: "On turns it on, off turns it off: microphone rings blink for a request to speak." }
+    send: "BlinkOnReq {enabled:bool01}"
+    expect: { reply_contains: "BlinkOnReq ", not_contains: "error" }
+    returns: ack
+
+  get_clear_cleans_request_list:
+    summary: "Read: clearing also empties the request list (ClearDoesCleanRequestList, p.9)"
+    send: "ClearDoesCleanRequestList"
+    expect: { reply_contains: "ClearDoesCleanRequestList ", matches: "ClearDoesCleanRequestList (-?[0-9]+)$" }
+    returns: value
+
+  set_clear_cleans_request_list:
+    summary: "Set: clearing also empties the request list (ClearDoesCleanRequestList, p.9)"
+    params:
+      enabled: { type: bool, required: true, label: "Clearing also empties the request list", description: "On turns it on, off turns it off: clearing also empties the request list." }
+    send: "ClearDoesCleanRequestList {enabled:bool01}"
+    expect: { reply_contains: "ClearDoesCleanRequestList ", not_contains: "error" }
+    returns: ack
+
+  get_conference_mode:
+    summary: "Read: conference mode: automatic, overrun, request or push_to_talk (ConferenceMode, p.9)"
+    send: "ConferenceMode"
+    expect: { reply_contains: "ConferenceMode ", matches: "ConferenceMode (-?[0-9]+)$" }
+    returns: value
+
+  set_conference_mode:
+    summary: "Set: conference mode: automatic, overrun, request or push_to_talk (ConferenceMode, p.9)"
+    params:
+      value: { type: enum, values: ["automatic", "overrun", "request", "push_to_talk"], required: true, label: "Conference mode", description: "Conference mode: automatic, overrun, request or push_to_talk." }
+    send: "ConferenceMode {value:map.conference_mode}"
+    expect: { reply_contains: "ConferenceMode ", not_contains: "error" }
+    returns: ack
+
+  get_wireless_unit_shutdown:
+    summary: "Read: participants may switch wireless units off (EnableSUwShutdown, p.9)"
+    send: "EnableSUwShutdown"
+    expect: { reply_contains: "EnableSUwShutdown ", matches: "EnableSUwShutdown (-?[0-9]+)$" }
+    returns: value
+
+  set_wireless_unit_shutdown:
+    summary: "Set: participants may switch wireless units off (EnableSUwShutdown, p.9)"
+    params:
+      enabled: { type: bool, required: true, label: "Participants may switch wireless units off", description: "On turns it on, off turns it off: participants may switch wireless units off." }
+    send: "EnableSUwShutdown {enabled:bool01}"
+    expect: { reply_contains: "EnableSUwShutdown ", not_contains: "error" }
+    returns: ack
+
+  get_floor_eq_high:
+    summary: "Read: unit loudspeakers' treble in dB, -12 to +12 (FloorEqualizerHigh, p.10)"
+    send: "FloorEqualizerHigh"
+    expect: { reply_contains: "FloorEqualizerHigh ", matches: "FloorEqualizerHigh (-?[0-9]+)$" }
+    returns: value
+
+  set_floor_eq_high:
+    summary: "Set: unit loudspeakers' treble in dB, -12 to +12 (FloorEqualizerHigh, p.10)"
+    params:
+      value: { type: enum, values: ["12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "0", "-1", "-2", "-3", "-4", "-5", "-6", "-7", "-8", "-9", "-10", "-11", "-12"], required: true, label: "Unit loudspeakers' treble", description: "Unit loudspeakers' treble in dB, -12 to +12." }
+    send: "FloorEqualizerHigh {value:map.eq}"
+    expect: { reply_contains: "FloorEqualizerHigh ", not_contains: "error" }
+    returns: ack
+
+  adjust_floor_eq_high:
+    summary: "Change by a number of steps: unit loudspeakers' treble in dB, -12 to +12 (FloorEqualizerHigh #n, p.10)"
+    params:
+      steps: { type: int, min: -32, max: 32, required: true, label: Steps, description: "Steps to move the setting by on its wire scale, negative for lower wire values; the device keeps it in range." }
+    send: "FloorEqualizerHigh #{steps}"
+    expect: { reply_contains: "FloorEqualizerHigh ", not_contains: "error" }
+    returns: ack
+
+  get_floor_eq_mid:
+    summary: "Read: unit loudspeakers' mid in dB, -12 to +12 (FloorEqualizerMid, p.11)"
+    send: "FloorEqualizerMid"
+    expect: { reply_contains: "FloorEqualizerMid ", matches: "FloorEqualizerMid (-?[0-9]+)$" }
+    returns: value
+
+  set_floor_eq_mid:
+    summary: "Set: unit loudspeakers' mid in dB, -12 to +12 (FloorEqualizerMid, p.11)"
+    params:
+      value: { type: enum, values: ["12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "0", "-1", "-2", "-3", "-4", "-5", "-6", "-7", "-8", "-9", "-10", "-11", "-12"], required: true, label: "Unit loudspeakers' mid", description: "Unit loudspeakers' mid in dB, -12 to +12." }
+    send: "FloorEqualizerMid {value:map.eq}"
+    expect: { reply_contains: "FloorEqualizerMid ", not_contains: "error" }
+    returns: ack
+
+  adjust_floor_eq_mid:
+    summary: "Change by a number of steps: unit loudspeakers' mid in dB, -12 to +12 (FloorEqualizerMid #n, p.11)"
+    params:
+      steps: { type: int, min: -32, max: 32, required: true, label: Steps, description: "Steps to move the setting by on its wire scale, negative for lower wire values; the device keeps it in range." }
+    send: "FloorEqualizerMid #{steps}"
+    expect: { reply_contains: "FloorEqualizerMid ", not_contains: "error" }
+    returns: ack
+
+  get_floor_eq_low:
+    summary: "Read: unit loudspeakers' bass in dB, -12 to +12 (FloorEqualizerLow, p.11)"
+    send: "FloorEqualizerLow"
+    expect: { reply_contains: "FloorEqualizerLow ", matches: "FloorEqualizerLow (-?[0-9]+)$" }
+    returns: value
+
+  set_floor_eq_low:
+    summary: "Set: unit loudspeakers' bass in dB, -12 to +12 (FloorEqualizerLow, p.11)"
+    params:
+      value: { type: enum, values: ["12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "0", "-1", "-2", "-3", "-4", "-5", "-6", "-7", "-8", "-9", "-10", "-11", "-12"], required: true, label: "Unit loudspeakers' bass", description: "Unit loudspeakers' bass in dB, -12 to +12." }
+    send: "FloorEqualizerLow {value:map.eq}"
+    expect: { reply_contains: "FloorEqualizerLow ", not_contains: "error" }
+    returns: ack
+
+  adjust_floor_eq_low:
+    summary: "Change by a number of steps: unit loudspeakers' bass in dB, -12 to +12 (FloorEqualizerLow #n, p.11)"
+    params:
+      steps: { type: int, min: -32, max: 32, required: true, label: Steps, description: "Steps to move the setting by on its wire scale, negative for lower wire values; the device keeps it in range." }
+    send: "FloorEqualizerLow #{steps}"
+    expect: { reply_contains: "FloorEqualizerLow ", not_contains: "error" }
+    returns: ack
+
+  get_floor_mix:
+    summary: "Read: gain reduction per open microphone in dB (0.0 to 3.0 in 0.5 steps), or linear division (FloorMix, p.12)"
+    send: "FloorMix"
+    expect: { reply_contains: "FloorMix ", matches: "FloorMix (-?[0-9]+)$" }
+    returns: value
+
+  set_floor_mix:
+    summary: "Set: gain reduction per open microphone in dB (0.0 to 3.0 in 0.5 steps), or linear division (FloorMix, p.12)"
+    params:
+      value: { type: enum, values: ["0.0", "0.5", "1.0", "1.5", "2.0", "2.5", "3.0", "linear"], required: true, label: "Gain reduction per open microphone", description: "Gain reduction per open microphone in dB (0.0 to 3.0 in 0.5 steps), or linear division." }
+    send: "FloorMix {value:map.floor_mix}"
+    expect: { reply_contains: "FloorMix ", not_contains: "error" }
+    returns: ack
+
+  adjust_floor_mix:
+    summary: "Change by a number of steps: gain reduction per open microphone in dB (0.0 to 3.0 in 0.5 steps), or linear division (FloorMix #n, p.12)"
+    params:
+      steps: { type: int, min: -32, max: 32, required: true, label: Steps, description: "Steps to move the setting by on its wire scale, negative for lower wire values; the device keeps it in range." }
+    send: "FloorMix #{steps}"
+    expect: { reply_contains: "FloorMix ", not_contains: "error" }
+    returns: ack
+
+  get_floor_volume:
+    summary: "Read: unit loudspeaker volume, 0 to 32 (FloorVolume, p.12)"
+    send: "FloorVolume"
+    expect: { reply_contains: "FloorVolume ", matches: "FloorVolume (-?[0-9]+)$" }
+    returns: value
+
+  set_floor_volume:
+    summary: "Set: unit loudspeaker volume, 0 to 32 (FloorVolume, p.12)"
+    params:
+      value: { type: int, min: 0, max: 32, required: true, label: "Unit loudspeaker volume", description: "Unit loudspeaker volume, 0 to 32." }
+    send: "FloorVolume {value}"
+    expect: { reply_contains: "FloorVolume ", not_contains: "error" }
+    returns: ack
+
+  adjust_floor_volume:
+    summary: "Change by a number of steps: unit loudspeaker volume, 0 to 32 (FloorVolume #n, p.12)"
+    params:
+      steps: { type: int, min: -32, max: 32, required: true, label: Steps, description: "Steps to move the setting by on its wire scale, negative for lower wire values; the device keeps it in range." }
+    send: "FloorVolume #{steps}"
+    expect: { reply_contains: "FloorVolume ", not_contains: "error" }
+    returns: ack
+
+  get_hd_recording:
+    summary: "Read: recording to the central unit's disk (HdRecordIsActive, p.13)"
+    send: "HdRecordIsActive"
+    expect: { reply_contains: "HdRecordIsActive ", matches: "HdRecordIsActive (-?[0-9]+)$" }
+    returns: value
+
+  set_hd_recording:
+    summary: "Set: recording to the central unit's disk (HdRecordIsActive, p.13)"
+    params:
+      enabled: { type: bool, required: true, label: "Recording to the central unit's disk", description: "On turns it on, off turns it off: recording to the central unit's disk." }
+    send: "HdRecordIsActive {enabled:bool01}"
+    expect: { reply_contains: "HdRecordIsActive ", not_contains: "error" }
+    returns: ack
+
+  get_talk_time_limit:
+    summary: "Read: speaking time limit in minutes, 0 unlimited (LimitOfTalkTime, p.13)"
+    send: "LimitOfTalkTime"
+    expect: { reply_contains: "LimitOfTalkTime ", matches: "LimitOfTalkTime (-?[0-9]+)$" }
+    returns: value
+
+  set_talk_time_limit:
+    summary: "Set: speaking time limit in minutes, 0 unlimited (LimitOfTalkTime, p.13)"
+    params:
+      value: { type: int, min: 0, max: 60, required: true, label: "Speaking time limit", description: "Speaking time limit in minutes, 0 unlimited." }
+    send: "LimitOfTalkTime {value}"
+    expect: { reply_contains: "LimitOfTalkTime ", not_contains: "error" }
+    returns: ack
+
+  adjust_talk_time_limit:
+    summary: "Change by a number of steps: speaking time limit in minutes, 0 unlimited (LimitOfTalkTime #n, p.13)"
+    params:
+      steps: { type: int, min: -32, max: 32, required: true, label: Steps, description: "Steps to move the setting by on its wire scale, negative for lower wire values; the device keeps it in range." }
+    send: "LimitOfTalkTime #{steps}"
+    expect: { reply_contains: "LimitOfTalkTime ", not_contains: "error" }
+    returns: ack
+
+  get_max_open_mics:
+    summary: "Read: most microphones on at once, 1 to 10 (MaxOpenMic, p.13)"
+    send: "MaxOpenMic"
+    expect: { reply_contains: "MaxOpenMic ", matches: "MaxOpenMic (-?[0-9]+)$" }
+    returns: value
+
+  set_max_open_mics:
+    summary: "Set: most microphones on at once, 1 to 10 (MaxOpenMic, p.13)"
+    params:
+      value: { type: int, min: 1, max: 10, required: true, label: "Most microphones on at once", description: "Most microphones on at once, 1 to 10." }
+    send: "MaxOpenMic {value}"
+    expect: { reply_contains: "MaxOpenMic ", not_contains: "error" }
+    returns: ack
+
+  adjust_max_open_mics:
+    summary: "Change by a number of steps: most microphones on at once, 1 to 10 (MaxOpenMic #n, p.13)"
+    params:
+      steps: { type: int, min: -32, max: 32, required: true, label: Steps, description: "Steps to move the setting by on its wire scale, negative for lower wire values; the device keeps it in range." }
+    send: "MaxOpenMic #{steps}"
+    expect: { reply_contains: "MaxOpenMic ", not_contains: "error" }
+    returns: ack
+
+  get_max_requests:
+    summary: "Read: longest request list, 1 to 10 (MaxSpeakReqListLength, p.14)"
+    send: "MaxSpeakReqListLength"
+    expect: { reply_contains: "MaxSpeakReqListLength ", matches: "MaxSpeakReqListLength (-?[0-9]+)$" }
+    returns: value
+
+  set_max_requests:
+    summary: "Set: longest request list, 1 to 10 (MaxSpeakReqListLength, p.14)"
+    params:
+      value: { type: int, min: 1, max: 10, required: true, label: "Longest request list", description: "Longest request list, 1 to 10." }
+    send: "MaxSpeakReqListLength {value}"
+    expect: { reply_contains: "MaxSpeakReqListLength ", not_contains: "error" }
+    returns: ack
+
+  adjust_max_requests:
+    summary: "Change by a number of steps: longest request list, 1 to 10 (MaxSpeakReqListLength #n, p.14)"
+    params:
+      steps: { type: int, min: -32, max: 32, required: true, label: Steps, description: "Steps to move the setting by on its wire scale, negative for lower wire values; the device keeps it in range." }
+    send: "MaxSpeakReqListLength #{steps}"
+    expect: { reply_contains: "MaxSpeakReqListLength ", not_contains: "error" }
+    returns: ack
+
+  get_open_access:
+    summary: "Read: open access mode (OpenAccessMode, p.15)"
+    send: "OpenAccessMode"
+    expect: { reply_contains: "OpenAccessMode ", matches: "OpenAccessMode (-?[0-9]+)$" }
+    returns: value
+
+  set_open_access:
+    summary: "Set: open access mode (OpenAccessMode, p.15)"
+    params:
+      enabled: { type: bool, required: true, label: "Open access mode", description: "On turns it on, off turns it off: open access mode." }
+    send: "OpenAccessMode {enabled:bool01}"
+    expect: { reply_contains: "OpenAccessMode ", not_contains: "error" }
+    returns: ack
+
+  get_premonition_time:
+    summary: "Read: warning before the speaking time ends, in seconds: 0 to 120 in steps of 10 (PremonitionTime, p.16)"
+    send: "PremonitionTime"
+    expect: { reply_contains: "PremonitionTime ", matches: "PremonitionTime (-?[0-9]+)$" }
+    returns: value
+
+  set_premonition_time:
+    summary: "Set: warning before the speaking time ends, in seconds: 0 to 120 in steps of 10 (PremonitionTime, p.16)"
+    params:
+      value: { type: enum, values: ["0", "10", "20", "30", "40", "50", "60", "70", "80", "90", "100", "110", "120"], required: true, label: "Warning before the speaking time ends", description: "Warning before the speaking time ends, in seconds: 0 to 120 in steps of 10." }
+    send: "PremonitionTime {value:map.premonition}"
+    expect: { reply_contains: "PremonitionTime ", not_contains: "error" }
+    returns: ack
+
+  adjust_premonition_time:
+    summary: "Change by a number of steps: warning before the speaking time ends, in seconds: 0 to 120 in steps of 10 (PremonitionTime #n, p.16)"
+    params:
+      steps: { type: int, min: -32, max: 32, required: true, label: Steps, description: "Steps to move the setting by on its wire scale, negative for lower wire values; the device keeps it in range." }
+    send: "PremonitionTime #{steps}"
+    expect: { reply_contains: "PremonitionTime ", not_contains: "error" }
+    returns: ack
+
+  get_unit_feedback_suppression:
+    summary: "Read: unit loudspeaker feedback suppression: off, low or high (SpeakerFeedbackSuppression, p.17)"
+    send: "SpeakerFeedbackSuppression"
+    expect: { reply_contains: "SpeakerFeedbackSuppression ", matches: "SpeakerFeedbackSuppression (-?[0-9]+)$" }
+    returns: value
+
+  set_unit_feedback_suppression:
+    summary: "Set: unit loudspeaker feedback suppression: off, low or high (SpeakerFeedbackSuppression, p.17)"
+    params:
+      value: { type: enum, values: ["off", "low", "high"], required: true, label: "Unit loudspeaker feedback suppression", description: "Unit loudspeaker feedback suppression: off, low or high." }
+    send: "SpeakerFeedbackSuppression {value:map.feedback_suppression}"
+    expect: { reply_contains: "SpeakerFeedbackSuppression ", not_contains: "error" }
+    returns: ack
+
+  get_mic_loudspeaker_mute:
+    summary: "Read: a unit's loudspeaker mutes while its microphone is on (SwitchableMicVolumeIsActive, p.17)"
+    send: "SwitchableMicVolumeIsActive"
+    expect: { reply_contains: "SwitchableMicVolumeIsActive ", matches: "SwitchableMicVolumeIsActive (-?[0-9]+)$" }
+    returns: value
+
+  set_mic_loudspeaker_mute:
+    summary: "Set: a unit's loudspeaker mutes while its microphone is on (SwitchableMicVolumeIsActive, p.17)"
+    params:
+      enabled: { type: bool, required: true, label: "A unit's loudspeaker mutes while its microphone is on", description: "On turns it on, off turns it off: a unit's loudspeaker mutes while its microphone is on." }
+    send: "SwitchableMicVolumeIsActive {enabled:bool01}"
+    expect: { reply_contains: "SwitchableMicVolumeIsActive ", not_contains: "error" }
+    returns: ack
+
+  get_talk_time_hard_cut_off:
+    summary: "Read: the microphone is cut off when the speaking time ends (TalkTimeExpirationHardCutOff, p.17)"
+    send: "TalkTimeExpirationHardCutOff"
+    expect: { reply_contains: "TalkTimeExpirationHardCutOff ", matches: "TalkTimeExpirationHardCutOff (-?[0-9]+)$" }
+    returns: value
+
+  set_talk_time_hard_cut_off:
+    summary: "Set: the microphone is cut off when the speaking time ends (TalkTimeExpirationHardCutOff, p.17)"
+    params:
+      enabled: { type: bool, required: true, label: "The microphone is cut off when the speaking time ends", description: "On turns it on, off turns it off: the microphone is cut off when the speaking time ends." }
+    send: "TalkTimeExpirationHardCutOff {enabled:bool01}"
+    expect: { reply_contains: "TalkTimeExpirationHardCutOff ", not_contains: "error" }
+    returns: ack
+
+  get_talk_time_limit_active:
+    summary: "Read: speaking time limit on (TalkTimeLimitIsActive, p.17)"
+    send: "TalkTimeLimitIsActive"
+    expect: { reply_contains: "TalkTimeLimitIsActive ", matches: "TalkTimeLimitIsActive (-?[0-9]+)$" }
+    returns: value
+
+  set_talk_time_limit_active:
+    summary: "Set: speaking time limit on (TalkTimeLimitIsActive, p.17)"
+    params:
+      enabled: { type: bool, required: true, label: "Speaking time limit on", description: "On turns it on, off turns it off: speaking time limit on." }
+    send: "TalkTimeLimitIsActive {enabled:bool01}"
+    expect: { reply_contains: "TalkTimeLimitIsActive ", not_contains: "error" }
+    returns: ack
+
+  get_xlr_mix_minus:
+    summary: "Read: xLR mix-minus on (XLRMixMinusIsActive, p.17)"
+    send: "XLRMixMinusIsActive"
+    expect: { reply_contains: "XLRMixMinusIsActive ", matches: "XLRMixMinusIsActive (-?[0-9]+)$" }
+    returns: value
+
+  set_xlr_mix_minus:
+    summary: "Set: xLR mix-minus on (XLRMixMinusIsActive, p.17)"
+    params:
+      enabled: { type: bool, required: true, label: "XLR mix-minus on", description: "On turns it on, off turns it off: xLR mix-minus on." }
+    send: "XLRMixMinusIsActive {enabled:bool01}"
+    expect: { reply_contains: "XLRMixMinusIsActive ", not_contains: "error" }
+    returns: ack
+
+  get_xlr_in:
+    summary: "Read: xLR input on (XLRinStatus, p.17)"
+    send: "XLRinStatus"
+    expect: { reply_contains: "XLRinStatus ", matches: "XLRinStatus (-?[0-9]+)$" }
+    returns: value
+
+  set_xlr_in:
+    summary: "Set: xLR input on (XLRinStatus, p.17)"
+    params:
+      enabled: { type: bool, required: true, label: "XLR input on", description: "On turns it on, off turns it off: xLR input on." }
+    send: "XLRinStatus {enabled:bool01}"
+    expect: { reply_contains: "XLRinStatus ", not_contains: "error" }
+    returns: ack
+
+  get_xlr_in_sensitivity:
+    summary: "Read: xLR input sensitivity in dBu, -18.0 to +18.0 in 1.5 dB steps (XLRinSensitivity, p.18)"
+    send: "XLRinSensitivity"
+    expect: { reply_contains: "XLRinSensitivity ", matches: "XLRinSensitivity (-?[0-9]+)$" }
+    returns: value
+
+  set_xlr_in_sensitivity:
+    summary: "Set: xLR input sensitivity in dBu, -18.0 to +18.0 in 1.5 dB steps (XLRinSensitivity, p.18)"
+    params:
+      value: { type: enum, values: ["-18.0", "-16.5", "-15.0", "-13.5", "-12.0", "-10.5", "-9.0", "-7.5", "-6.0", "-4.5", "-3.0", "-1.5", "0.0", "1.5", "3.0", "4.5", "6.0", "7.5", "9.0", "10.5", "12.0", "13.5", "15.0", "16.5", "18.0"], required: true, label: "XLR input sensitivity", description: "XLR input sensitivity in dBu, -18.0 to +18.0 in 1.5 dB steps." }
+    send: "XLRinSensitivity {value:map.sensitivity}"
+    expect: { reply_contains: "XLRinSensitivity ", not_contains: "error" }
+    returns: ack
+
+  adjust_xlr_in_sensitivity:
+    summary: "Change by a number of steps: xLR input sensitivity in dBu, -18.0 to +18.0 in 1.5 dB steps (XLRinSensitivity #n, p.18)"
+    params:
+      steps: { type: int, min: -32, max: 32, required: true, label: Steps, description: "Steps to move the setting by on its wire scale, negative for lower wire values; the device keeps it in range." }
+    send: "XLRinSensitivity #{steps}"
+    expect: { reply_contains: "XLRinSensitivity ", not_contains: "error" }
+    returns: ack
+
+  get_xlr_in_eq_high:
+    summary: "Read: xLR input treble in dB, -12 to +12 (XLRinEqHigh, p.19)"
+    send: "XLRinEqHigh"
+    expect: { reply_contains: "XLRinEqHigh ", matches: "XLRinEqHigh (-?[0-9]+)$" }
+    returns: value
+
+  set_xlr_in_eq_high:
+    summary: "Set: xLR input treble in dB, -12 to +12 (XLRinEqHigh, p.19)"
+    params:
+      value: { type: enum, values: ["12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "0", "-1", "-2", "-3", "-4", "-5", "-6", "-7", "-8", "-9", "-10", "-11", "-12"], required: true, label: "XLR input treble", description: "XLR input treble in dB, -12 to +12." }
+    send: "XLRinEqHigh {value:map.eq}"
+    expect: { reply_contains: "XLRinEqHigh ", not_contains: "error" }
+    returns: ack
+
+  adjust_xlr_in_eq_high:
+    summary: "Change by a number of steps: xLR input treble in dB, -12 to +12 (XLRinEqHigh #n, p.19)"
+    params:
+      steps: { type: int, min: -32, max: 32, required: true, label: Steps, description: "Steps to move the setting by on its wire scale, negative for lower wire values; the device keeps it in range." }
+    send: "XLRinEqHigh #{steps}"
+    expect: { reply_contains: "XLRinEqHigh ", not_contains: "error" }
+    returns: ack
+
+  get_xlr_in_eq_mid:
+    summary: "Read: xLR input mid in dB, -12 to +12 (XLRinEqMid, p.20)"
+    send: "XLRinEqMid"
+    expect: { reply_contains: "XLRinEqMid ", matches: "XLRinEqMid (-?[0-9]+)$" }
+    returns: value
+
+  set_xlr_in_eq_mid:
+    summary: "Set: xLR input mid in dB, -12 to +12 (XLRinEqMid, p.20)"
+    params:
+      value: { type: enum, values: ["12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "0", "-1", "-2", "-3", "-4", "-5", "-6", "-7", "-8", "-9", "-10", "-11", "-12"], required: true, label: "XLR input mid", description: "XLR input mid in dB, -12 to +12." }
+    send: "XLRinEqMid {value:map.eq}"
+    expect: { reply_contains: "XLRinEqMid ", not_contains: "error" }
+    returns: ack
+
+  adjust_xlr_in_eq_mid:
+    summary: "Change by a number of steps: xLR input mid in dB, -12 to +12 (XLRinEqMid #n, p.20)"
+    params:
+      steps: { type: int, min: -32, max: 32, required: true, label: Steps, description: "Steps to move the setting by on its wire scale, negative for lower wire values; the device keeps it in range." }
+    send: "XLRinEqMid #{steps}"
+    expect: { reply_contains: "XLRinEqMid ", not_contains: "error" }
+    returns: ack
+
+  get_xlr_in_eq_low:
+    summary: "Read: xLR input bass in dB, -12 to +12 (XLRinEqLow, p.21)"
+    send: "XLRinEqLow"
+    expect: { reply_contains: "XLRinEqLow ", matches: "XLRinEqLow (-?[0-9]+)$" }
+    returns: value
+
+  set_xlr_in_eq_low:
+    summary: "Set: xLR input bass in dB, -12 to +12 (XLRinEqLow, p.21)"
+    params:
+      value: { type: enum, values: ["12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "0", "-1", "-2", "-3", "-4", "-5", "-6", "-7", "-8", "-9", "-10", "-11", "-12"], required: true, label: "XLR input bass", description: "XLR input bass in dB, -12 to +12." }
+    send: "XLRinEqLow {value:map.eq}"
+    expect: { reply_contains: "XLRinEqLow ", not_contains: "error" }
+    returns: ack
+
+  adjust_xlr_in_eq_low:
+    summary: "Change by a number of steps: xLR input bass in dB, -12 to +12 (XLRinEqLow #n, p.21)"
+    params:
+      steps: { type: int, min: -32, max: 32, required: true, label: Steps, description: "Steps to move the setting by on its wire scale, negative for lower wire values; the device keeps it in range." }
+    send: "XLRinEqLow #{steps}"
+    expect: { reply_contains: "XLRinEqLow ", not_contains: "error" }
+    returns: ack
+
+  get_xlr_out:
+    summary: "Read: xLR output on (XLRoutStatus, p.21)"
+    send: "XLRoutStatus"
+    expect: { reply_contains: "XLRoutStatus ", matches: "XLRoutStatus (-?[0-9]+)$" }
+    returns: value
+
+  set_xlr_out:
+    summary: "Set: xLR output on (XLRoutStatus, p.21)"
+    params:
+      enabled: { type: bool, required: true, label: "XLR output on", description: "On turns it on, off turns it off: xLR output on." }
+    send: "XLRoutStatus {enabled:bool01}"
+    expect: { reply_contains: "XLRoutStatus ", not_contains: "error" }
+    returns: ack
+
+  get_xlr_out_volume:
+    summary: "Read: xLR output volume in dB, -20 to +11 (XLRoutVolume, p.22)"
+    send: "XLRoutVolume"
+    expect: { reply_contains: "XLRoutVolume ", matches: "XLRoutVolume (-?[0-9]+)$" }
+    returns: value
+
+  set_xlr_out_volume:
+    summary: "Set: xLR output volume in dB, -20 to +11 (XLRoutVolume, p.22)"
+    params:
+      value: { type: int, min: -20, max: 11, required: true, label: "XLR output volume", description: "XLR output volume in dB, -20 to +11." }
+    send: "XLRoutVolume {value:+21}"
+    expect: { reply_contains: "XLRoutVolume ", not_contains: "error" }
+    returns: ack
+
+  adjust_xlr_out_volume:
+    summary: "Change by a number of steps: xLR output volume in dB, -20 to +11 (XLRoutVolume #n, p.22)"
+    params:
+      steps: { type: int, min: -32, max: 32, required: true, label: Steps, description: "Steps to move the setting by on its wire scale, negative for lower wire values; the device keeps it in range." }
+    send: "XLRoutVolume #{steps}"
+    expect: { reply_contains: "XLRoutVolume ", not_contains: "error" }
+    returns: ack
+
+  get_xlr_out_eq_high:
+    summary: "Read: xLR output treble in dB, -12 to +12 (XLRoutEqHigh, p.23)"
+    send: "XLRoutEqHigh"
+    expect: { reply_contains: "XLRoutEqHigh ", matches: "XLRoutEqHigh (-?[0-9]+)$" }
+    returns: value
+
+  set_xlr_out_eq_high:
+    summary: "Set: xLR output treble in dB, -12 to +12 (XLRoutEqHigh, p.23)"
+    params:
+      value: { type: enum, values: ["12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "0", "-1", "-2", "-3", "-4", "-5", "-6", "-7", "-8", "-9", "-10", "-11", "-12"], required: true, label: "XLR output treble", description: "XLR output treble in dB, -12 to +12." }
+    send: "XLRoutEqHigh {value:map.eq}"
+    expect: { reply_contains: "XLRoutEqHigh ", not_contains: "error" }
+    returns: ack
+
+  adjust_xlr_out_eq_high:
+    summary: "Change by a number of steps: xLR output treble in dB, -12 to +12 (XLRoutEqHigh #n, p.23)"
+    params:
+      steps: { type: int, min: -32, max: 32, required: true, label: Steps, description: "Steps to move the setting by on its wire scale, negative for lower wire values; the device keeps it in range." }
+    send: "XLRoutEqHigh #{steps}"
+    expect: { reply_contains: "XLRoutEqHigh ", not_contains: "error" }
+    returns: ack
+
+  get_xlr_out_eq_mid:
+    summary: "Read: xLR output mid in dB, -12 to +12 (XLRoutEqMid, p.24)"
+    send: "XLRoutEqMid"
+    expect: { reply_contains: "XLRoutEqMid ", matches: "XLRoutEqMid (-?[0-9]+)$" }
+    returns: value
+
+  set_xlr_out_eq_mid:
+    summary: "Set: xLR output mid in dB, -12 to +12 (XLRoutEqMid, p.24)"
+    params:
+      value: { type: enum, values: ["12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "0", "-1", "-2", "-3", "-4", "-5", "-6", "-7", "-8", "-9", "-10", "-11", "-12"], required: true, label: "XLR output mid", description: "XLR output mid in dB, -12 to +12." }
+    send: "XLRoutEqMid {value:map.eq}"
+    expect: { reply_contains: "XLRoutEqMid ", not_contains: "error" }
+    returns: ack
+
+  adjust_xlr_out_eq_mid:
+    summary: "Change by a number of steps: xLR output mid in dB, -12 to +12 (XLRoutEqMid #n, p.24)"
+    params:
+      steps: { type: int, min: -32, max: 32, required: true, label: Steps, description: "Steps to move the setting by on its wire scale, negative for lower wire values; the device keeps it in range." }
+    send: "XLRoutEqMid #{steps}"
+    expect: { reply_contains: "XLRoutEqMid ", not_contains: "error" }
+    returns: ack
+
+  get_xlr_out_eq_low:
+    summary: "Read: xLR output bass in dB, -12 to +12 (XLRoutEqLow, p.25)"
+    send: "XLRoutEqLow"
+    expect: { reply_contains: "XLRoutEqLow ", matches: "XLRoutEqLow (-?[0-9]+)$" }
+    returns: value
+
+  set_xlr_out_eq_low:
+    summary: "Set: xLR output bass in dB, -12 to +12 (XLRoutEqLow, p.25)"
+    params:
+      value: { type: enum, values: ["12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "0", "-1", "-2", "-3", "-4", "-5", "-6", "-7", "-8", "-9", "-10", "-11", "-12"], required: true, label: "XLR output bass", description: "XLR output bass in dB, -12 to +12." }
+    send: "XLRoutEqLow {value:map.eq}"
+    expect: { reply_contains: "XLRoutEqLow ", not_contains: "error" }
+    returns: ack
+
+  adjust_xlr_out_eq_low:
+    summary: "Change by a number of steps: xLR output bass in dB, -12 to +12 (XLRoutEqLow #n, p.25)"
+    params:
+      steps: { type: int, min: -32, max: 32, required: true, label: Steps, description: "Steps to move the setting by on its wire scale, negative for lower wire values; the device keeps it in range." }
+    send: "XLRoutEqLow #{steps}"
+    expect: { reply_contains: "XLRoutEqLow ", not_contains: "error" }
+    returns: ack
+
+  get_xlr_out_feedback_suppression:
+    summary: "Read: xLR output feedback suppression: off, low or high (XLROutFeedbackSuppression, p.25)"
+    send: "XLROutFeedbackSuppression"
+    expect: { reply_contains: "XLROutFeedbackSuppression ", matches: "XLROutFeedbackSuppression (-?[0-9]+)$" }
+    returns: value
+
+  set_xlr_out_feedback_suppression:
+    summary: "Set: xLR output feedback suppression: off, low or high (XLROutFeedbackSuppression, p.25)"
+    params:
+      value: { type: enum, values: ["off", "low", "high"], required: true, label: "XLR output feedback suppression", description: "XLR output feedback suppression: off, low or high." }
+    send: "XLROutFeedbackSuppression {value:map.feedback_suppression}"
+    expect: { reply_contains: "XLROutFeedbackSuppression ", not_contains: "error" }
+    returns: ack
+
+  get_antenna_channel:
+    summary: "Read an antenna module's RF channel, 1-30, or 31 while searching (AmRfChannel, p.8)"
+    params:
+      module: { type: string, required: true, max_length: 8, pattern: "^AM[0-9]{6}$", label: Antenna module, description: "The antenna module's serial number, AM and six digits (AM100001)." }
+    send: "AmRfChannel {module}"
+    expect: { reply_contains: "AmRfChannel {module} ", matches: "AmRfChannel \\S+ ([0-9]+)$" }
+    returns: value
+
+  set_antenna_channel:
+    summary: "Set an antenna module's RF channel (AmRfChannel, p.8)"
+    params:
+      module: { type: string, required: true, max_length: 8, pattern: "^AM[0-9]{6}$", label: Antenna module, description: "The antenna module's serial number, AM and six digits (AM100001)." }
+      channel: { type: int, min: 1, max: 30, required: true, label: RF channel, description: "RF channel, 1 to 30." }
+    send: "AmRfChannel {module} {channel}"
+    expect: { reply_contains: "AmRfChannel {module} ", not_contains: "error" }
+    returns: ack
+
+  get_antenna_power:
+    summary: "Read an antenna module's RF output power (AmRfOutputPower, p.8)"
+    params:
+      module: { type: string, required: true, max_length: 8, pattern: "^AM[0-9]{6}$", label: Antenna module, description: "The antenna module's serial number, AM and six digits (AM100001)." }
+    send: "AmRfOutputPower {module}"
+    expect: { reply_contains: "AmRfOutputPower {module} ", matches: "AmRfOutputPower \\S+ ([0-9]+)$" }
+    returns: value
+
+  set_antenna_power:
+    summary: "Set an antenna module's RF output power in percent (AmRfOutputPower, p.8)"
+    params:
+      module: { type: string, required: true, max_length: 8, pattern: "^AM[0-9]{6}$", label: Antenna module, description: "The antenna module's serial number, AM and six digits (AM100001)." }
+      percent: { type: enum, values: ["0", "20", "40", "60", "80", "100"], required: true, label: RF power, description: "Output power in percent: 0, 20, 40, 60, 80 or 100." }
+    send: "AmRfOutputPower {module} {percent:map.rf_power}"
+    expect: { reply_contains: "AmRfOutputPower {module} ", not_contains: "error" }
+    returns: ack
+
+  get_wired_unit_status:
+    summary: "Read a wired unit's microphone status (MicStatus, p.15)"
+    params:
+      position: { type: int, min: 1, max: 9999, required: true, label: Bus position, description: "The wired unit's position on the bus, from 1, as the central unit numbers it." }
+    send: "MicStatus {position}"
+    expect: { reply_contains: "MicStatus {position} ", matches: "MicStatus \\S+ ([0-9]+)$" }
+    returns: value
+
+  get_unit_status:
+    summary: "Read a unit's microphone status (MicStatusSN, p.15)"
+    params:
+      unit: { type: string, required: true, max_length: 10, pattern: "^(C1W|D1W|C1|D1)[0-9]{6}$", label: Unit, description: "The conference unit's type code and six-digit serial number (C1W100001, D1100004)." }
+    send: "MicStatusSN {unit}"
+    expect: { reply_contains: "MicStatusSN {unit} ", matches: "MicStatusSN \\S+ ([0-9]+)$" }
+    returns: value
+
+  get_wired_unit_talk_time:
+    summary: "Read a wired unit's speaking time so far, in seconds (LapsedTalkTime, p.13)"
+    params:
+      position: { type: int, min: 1, max: 9999, required: true, label: Bus position, description: "The wired unit's position on the bus, from 1, as the central unit numbers it." }
+    send: "LapsedTalkTime {position}"
+    expect: { reply_contains: "LapsedTalkTime {position} ", matches: "LapsedTalkTime \\S+ ([0-9]+)$" }
+    returns: value
+
+  get_unit_talk_time:
+    summary: "Read a unit's speaking time so far, in seconds (LapsedTalkTimeSN, p.13)"
+    params:
+      unit: { type: string, required: true, max_length: 10, pattern: "^(C1W|D1W|C1|D1)[0-9]{6}$", label: Unit, description: "The conference unit's type code and six-digit serial number (C1W100001, D1100004)." }
+    send: "LapsedTalkTimeSN {unit}"
+    expect: { reply_contains: "LapsedTalkTimeSN {unit} ", matches: "LapsedTalkTimeSN \\S+ ([0-9]+)$" }
+    returns: value
+
+  get_unit_battery:
+    summary: "Read a wireless unit's battery charge in percent (MicBatteryStatus, p.14)"
+    params:
+      unit: { type: string, required: true, max_length: 10, pattern: "^(C1W|D1W)[0-9]{6}$", label: Wireless unit, description: "The wireless conference unit's serial number, C1W or D1W and six digits." }
+    send: "MicBatteryStatus {unit}"
+    expect: { reply_contains: "MicBatteryStatus {unit} ", matches: "MicBatteryStatus \\S+ ([0-9]+)$" }
+    returns: value
+
+  get_unit_external_power:
+    summary: "Read whether a wireless unit runs on its external power supply (MicExtPowerSupply, p.14)"
+    params:
+      unit: { type: string, required: true, max_length: 10, pattern: "^(C1W|D1W)[0-9]{6}$", label: Wireless unit, description: "The wireless conference unit's serial number, C1W or D1W and six digits." }
+    send: "MicExtPowerSupply {unit}"
+    expect: { reply_contains: "MicExtPowerSupply {unit} ", matches: "MicExtPowerSupply \\S+ ([0-9]+)$" }
+    returns: value
+
+  get_unit_rf_quality:
+    summary: "Read a wireless unit's RF quality in percent (MicRfStatus, p.14)"
+    params:
+      unit: { type: string, required: true, max_length: 10, pattern: "^(C1W|D1W)[0-9]{6}$", label: Wireless unit, description: "The wireless conference unit's serial number, C1W or D1W and six digits." }
+    send: "MicRfStatus {unit}"
+    expect: { reply_contains: "MicRfStatus {unit} ", matches: "MicRfStatus \\S+ ([0-9]+)$" }
+    returns: value
+
+  get_hd_recording_error:
+    summary: "Read whether disk recording has a disk error (HdRecordError, p.13)"
+    send: "HdRecordError"
+    expect: { reply_contains: "HdRecordError ", matches: "HdRecordError ([01])$" }
+    returns: value
+
+  press_mic_button:
+    summary: "Press a wired unit's microphone button: on, off or a request (MicButton, p.14)"
+    params:
+      position: { type: int, min: 1, max: 9999, required: true, label: Bus position, description: "The wired unit's position on the bus, from 1, as the central unit numbers it." }
+    send: "MicButton {position}"
+    expect: { reply_contains: "MicStatus {position} ", not_contains: "error" }
+    returns: ack
+
+  press_unit_mic_button:
+    summary: "Press a unit's microphone button by serial number (MicButtonSN, p.14); wired units answer with their bus position"
+    params:
+      unit: { type: string, required: true, max_length: 10, pattern: "^(C1W|D1W|C1|D1)[0-9]{6}$", label: Unit, description: "The conference unit's type code and six-digit serial number (C1W100001, D1100004)." }
+    send: "MicButtonSN {unit}"
+    expect: { reply_contains: "MicStatus", not_contains: "error" }
+    returns: ack
+
+  all_mics_off:
+    summary: "Turn every microphone off (AllMicsOff, p.7)"
+    send: "AllMicsOff 1"
+    expect: { not_contains: "error" }
+    returns: none
+
+  reinitialize_system:
+    summary: "Re-initialize the conference system (ReinitSystem, p.16)"
+    send: "ReinitSystem 1"
+    returns: none
+
+  set_date_time:
+    summary: "Set the central unit's date and time (SetCUDateTime, p.16); an invalid date is ignored"
+    params:
+      year: { type: int, min: 1900, max: 3000, required: true, label: "Year", description: "Year, 1900 to 3000." }
+      month: { type: int, min: 1, max: 12, required: true, label: "Month", description: "Month, 1 to 12." }
+      day: { type: int, min: 1, max: 31, required: true, label: "Day", description: "Day, 1 to 31." }
+      hour: { type: int, min: 0, max: 23, required: true, label: "Hour", description: "Hour, 0 to 23." }
+      minute: { type: int, min: 0, max: 59, required: true, label: "Minute", description: "Minute, 0 to 59." }
+      second: { type: int, min: 0, max: 59, required: true, label: "Second", description: "Second, 0 to 59." }
+    send: "SetCUDateTime {year} {month} {day} {hour} {minute} {second}"
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      reinitialize_system restarts the conference system, all_mics_off cuts
+      every speaker, and the antenna channel and power change the radio link
+      of every wireless unit on that module. None can be undone from here.
+  - models: [all]
+    severity: info
+    text: >
+      Every change to a setting is pushed to every connected client, so after
+      reading the system settings once on connecting nothing is polled.
+      Conference units cannot be listed over this protocol: their serial
+      numbers or bus positions come from the central unit or Conference
+      Manager, and their status, speaking time, battery and RF are read with
+      the get commands, after which changes arrive unasked. Wired units
+      always answer with their bus position, even when addressed by serial
+      number. Opened for commands only, nothing is read.
+  - models: [all]
+    severity: info
+    text: >
+      Sennheiser asks for about 100 ms between commands; the core keeps that.
+      Equalizers run from +12 dB (wire 1) to -12 dB (wire 25); a relative
+      change (adjust_*) moves the wire value, so a positive step lowers an
+      equalizer band. The central unit accepts connections about 45 s after
+      it starts.
+
+state:
+  auto_frequency_selection: { type: bool, description: "Antenna modules choose their frequency automatically (AutoFreqSelection)" }
+  blink_on_request: { type: bool, description: "Microphone rings blink for a request to speak (BlinkOnReq)" }
+  clear_cleans_request_list: { type: bool, description: "Clearing also empties the request list (ClearDoesCleanRequestList)" }
+  conference_mode: { type: string, description: "Conference mode: automatic, overrun, request or push_to_talk (ConferenceMode)" }
+  wireless_unit_shutdown: { type: bool, description: "Participants may switch wireless units off (EnableSUwShutdown)" }
+  floor_eq_high: { type: string, description: "Unit loudspeakers' treble in dB, -12 to +12 (FloorEqualizerHigh)" }
+  floor_eq_mid: { type: string, description: "Unit loudspeakers' mid in dB, -12 to +12 (FloorEqualizerMid)" }
+  floor_eq_low: { type: string, description: "Unit loudspeakers' bass in dB, -12 to +12 (FloorEqualizerLow)" }
+  floor_mix: { type: string, description: "Gain reduction per open microphone in dB (0.0 to 3.0 in 0.5 steps), or linear division (FloorMix)" }
+  floor_volume: { type: int, description: "Unit loudspeaker volume, 0 to 32 (FloorVolume)" }
+  hd_recording: { type: bool, description: "Recording to the central unit's disk (HdRecordIsActive)" }
+  talk_time_limit: { type: int, description: "Speaking time limit in minutes, 0 unlimited (LimitOfTalkTime)" }
+  max_open_mics: { type: int, description: "Most microphones on at once, 1 to 10 (MaxOpenMic)" }
+  max_requests: { type: int, description: "Longest request list, 1 to 10 (MaxSpeakReqListLength)" }
+  open_access: { type: bool, description: "Open access mode (OpenAccessMode)" }
+  premonition_time: { type: string, description: "Warning before the speaking time ends, in seconds: 0 to 120 in steps of 10 (PremonitionTime)" }
+  unit_feedback_suppression: { type: string, description: "Unit loudspeaker feedback suppression: off, low or high (SpeakerFeedbackSuppression)" }
+  mic_loudspeaker_mute: { type: bool, description: "A unit's loudspeaker mutes while its microphone is on (SwitchableMicVolumeIsActive)" }
+  talk_time_hard_cut_off: { type: bool, description: "The microphone is cut off when the speaking time ends (TalkTimeExpirationHardCutOff)" }
+  talk_time_limit_active: { type: bool, description: "Speaking time limit on (TalkTimeLimitIsActive)" }
+  xlr_mix_minus: { type: bool, description: "XLR mix-minus on (XLRMixMinusIsActive)" }
+  xlr_in: { type: bool, description: "XLR input on (XLRinStatus)" }
+  xlr_in_sensitivity: { type: string, description: "XLR input sensitivity in dBu, -18.0 to +18.0 in 1.5 dB steps (XLRinSensitivity)" }
+  xlr_in_eq_high: { type: string, description: "XLR input treble in dB, -12 to +12 (XLRinEqHigh)" }
+  xlr_in_eq_mid: { type: string, description: "XLR input mid in dB, -12 to +12 (XLRinEqMid)" }
+  xlr_in_eq_low: { type: string, description: "XLR input bass in dB, -12 to +12 (XLRinEqLow)" }
+  xlr_out: { type: bool, description: "XLR output on (XLRoutStatus)" }
+  xlr_out_volume: { type: int, description: "XLR output volume in dB, -20 to +11 (XLRoutVolume)" }
+  xlr_out_eq_high: { type: string, description: "XLR output treble in dB, -12 to +12 (XLRoutEqHigh)" }
+  xlr_out_eq_mid: { type: string, description: "XLR output mid in dB, -12 to +12 (XLRoutEqMid)" }
+  xlr_out_eq_low: { type: string, description: "XLR output bass in dB, -12 to +12 (XLRoutEqLow)" }
+  xlr_out_feedback_suppression: { type: string, description: "XLR output feedback suppression: off, low or high (XLROutFeedbackSuppression)" }
+  antenna_modules.*.rf_channel: { type: int, description: "RF channel, 1-30, or 31 while searching (AmRfChannel), keyed by serial number" }
+  antenna_modules.*.rf_power: { type: string, description: "RF output power in percent: 0, 20, 40, 60, 80 or 100 (AmRfOutputPower)" }
+  wired_units.*.status: { type: string, description: "Microphone status: on, on_muted, on_premonition, on_premonition_muted, on_overrun, on_overrun_muted, off, off_request, mapping, service_calibrate or mapping_request (MicStatus), keyed by bus position" }
+  units.*.status: { type: string, description: "Microphone status: on, on_muted, on_premonition, on_premonition_muted, on_overrun, on_overrun_muted, off, off_request, mapping, service_calibrate or mapping_request (MicStatusSN), keyed by serial number" }
+  wired_units.*.talk_time: { type: int, description: "A wired unit's speaking time so far, in seconds (LapsedTalkTime)" }
+  units.*.talk_time: { type: int, description: "A unit's speaking time so far, in seconds (LapsedTalkTimeSN)" }
+  units.*.battery: { type: int, description: "A wireless unit's battery charge in percent (MicBatteryStatus)" }
+  units.*.external_power: { type: bool, description: "Whether a wireless unit runs on its external power supply (MicExtPowerSupply)" }
+  units.*.rf_quality: { type: int, description: "A wireless unit's RF quality in percent (MicRfStatus)" }
+  hd_recording_error: { type: bool, description: "Recording to disk with a disk error (HdRecordError)" }
+  error.code: { type: int, description: "Last error code: 1000 invalid command, 1010 invalid parameter, 1020 out of range, 1030 relative change not supported, 1040 wrong number of parameters, 1050 get not allowed, 1060 set not allowed, 1070 not possible now" }
+  error.message: { type: string, description: "Last error text" }
+
+telemetry:
+  poll:
+    send: ["AutoFreqSelection", "BlinkOnReq", "ClearDoesCleanRequestList", "ConferenceMode", "EnableSUwShutdown", "FloorEqualizerHigh", "FloorEqualizerMid", "FloorEqualizerLow", "FloorMix", "FloorVolume", "HdRecordIsActive", "LimitOfTalkTime", "MaxOpenMic", "MaxSpeakReqListLength", "OpenAccessMode", "PremonitionTime", "SpeakerFeedbackSuppression", "SwitchableMicVolumeIsActive", "TalkTimeExpirationHardCutOff", "TalkTimeLimitIsActive", "XLRMixMinusIsActive", "XLRinStatus", "XLRinSensitivity", "XLRinEqHigh", "XLRinEqMid", "XLRinEqLow", "XLRoutStatus", "XLRoutVolume", "XLRoutEqHigh", "XLRoutEqMid", "XLRoutEqLow", "XLROutFeedbackSuppression", "HdRecordError"]
+  updates:
+    - match: "^\\s*AutoFreqSelection ([01])$"
+      state: { "auto_frequency_selection": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^\\s*BlinkOnReq ([01])$"
+      state: { "blink_on_request": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^\\s*ClearDoesCleanRequestList ([01])$"
+      state: { "clear_cleans_request_list": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^\\s*ConferenceMode ([0-9]+)$"
+      state: { "conference_mode": { value: "{1}", map: { "1": "automatic", "2": "overrun", "3": "request", "4": "push_to_talk" } } }
+    - match: "^\\s*EnableSUwShutdown ([01])$"
+      state: { "wireless_unit_shutdown": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^\\s*FloorEqualizerHigh ([0-9]+)$"
+      state: { "floor_eq_high": { value: "{1}", map: { "1": "12", "2": "11", "3": "10", "4": "9", "5": "8", "6": "7", "7": "6", "8": "5", "9": "4", "10": "3", "11": "2", "12": "1", "13": "0", "14": "-1", "15": "-2", "16": "-3", "17": "-4", "18": "-5", "19": "-6", "20": "-7", "21": "-8", "22": "-9", "23": "-10", "24": "-11", "25": "-12" } } }
+    - match: "^\\s*FloorEqualizerMid ([0-9]+)$"
+      state: { "floor_eq_mid": { value: "{1}", map: { "1": "12", "2": "11", "3": "10", "4": "9", "5": "8", "6": "7", "7": "6", "8": "5", "9": "4", "10": "3", "11": "2", "12": "1", "13": "0", "14": "-1", "15": "-2", "16": "-3", "17": "-4", "18": "-5", "19": "-6", "20": "-7", "21": "-8", "22": "-9", "23": "-10", "24": "-11", "25": "-12" } } }
+    - match: "^\\s*FloorEqualizerLow ([0-9]+)$"
+      state: { "floor_eq_low": { value: "{1}", map: { "1": "12", "2": "11", "3": "10", "4": "9", "5": "8", "6": "7", "7": "6", "8": "5", "9": "4", "10": "3", "11": "2", "12": "1", "13": "0", "14": "-1", "15": "-2", "16": "-3", "17": "-4", "18": "-5", "19": "-6", "20": "-7", "21": "-8", "22": "-9", "23": "-10", "24": "-11", "25": "-12" } } }
+    - match: "^\\s*FloorMix ([0-9]+)$"
+      state: { "floor_mix": { value: "{1}", map: { "1": "0.0", "2": "0.5", "3": "1.0", "4": "1.5", "5": "2.0", "6": "2.5", "7": "3.0", "8": "linear" } } }
+    - match: "^\\s*FloorVolume (-?[0-9]+)$"
+      state: { "floor_volume": "{1}" }
+    - match: "^\\s*HdRecordIsActive ([01])$"
+      state: { "hd_recording": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^\\s*LimitOfTalkTime (-?[0-9]+)$"
+      state: { "talk_time_limit": "{1}" }
+    - match: "^\\s*MaxOpenMic (-?[0-9]+)$"
+      state: { "max_open_mics": "{1}" }
+    - match: "^\\s*MaxSpeakReqListLength (-?[0-9]+)$"
+      state: { "max_requests": "{1}" }
+    - match: "^\\s*OpenAccessMode ([01])$"
+      state: { "open_access": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^\\s*PremonitionTime ([0-9]+)$"
+      state: { "premonition_time": { value: "{1}", map: { "1": "0", "2": "10", "3": "20", "4": "30", "5": "40", "6": "50", "7": "60", "8": "70", "9": "80", "10": "90", "11": "100", "12": "110", "13": "120" } } }
+    - match: "^\\s*SpeakerFeedbackSuppression ([0-9]+)$"
+      state: { "unit_feedback_suppression": { value: "{1}", map: { "1": "off", "2": "low", "3": "high" } } }
+    - match: "^\\s*SwitchableMicVolumeIsActive ([01])$"
+      state: { "mic_loudspeaker_mute": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^\\s*TalkTimeExpirationHardCutOff ([01])$"
+      state: { "talk_time_hard_cut_off": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^\\s*TalkTimeLimitIsActive ([01])$"
+      state: { "talk_time_limit_active": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^\\s*XLRMixMinusIsActive ([01])$"
+      state: { "xlr_mix_minus": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^\\s*XLRinStatus ([01])$"
+      state: { "xlr_in": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^\\s*XLRinSensitivity ([0-9]+)$"
+      state: { "xlr_in_sensitivity": { value: "{1}", map: { "1": "-18.0", "2": "-16.5", "3": "-15.0", "4": "-13.5", "5": "-12.0", "6": "-10.5", "7": "-9.0", "8": "-7.5", "9": "-6.0", "10": "-4.5", "11": "-3.0", "12": "-1.5", "13": "0.0", "14": "1.5", "15": "3.0", "16": "4.5", "17": "6.0", "18": "7.5", "19": "9.0", "20": "10.5", "21": "12.0", "22": "13.5", "23": "15.0", "24": "16.5", "25": "18.0" } } }
+    - match: "^\\s*XLRinEqHigh ([0-9]+)$"
+      state: { "xlr_in_eq_high": { value: "{1}", map: { "1": "12", "2": "11", "3": "10", "4": "9", "5": "8", "6": "7", "7": "6", "8": "5", "9": "4", "10": "3", "11": "2", "12": "1", "13": "0", "14": "-1", "15": "-2", "16": "-3", "17": "-4", "18": "-5", "19": "-6", "20": "-7", "21": "-8", "22": "-9", "23": "-10", "24": "-11", "25": "-12" } } }
+    - match: "^\\s*XLRinEqMid ([0-9]+)$"
+      state: { "xlr_in_eq_mid": { value: "{1}", map: { "1": "12", "2": "11", "3": "10", "4": "9", "5": "8", "6": "7", "7": "6", "8": "5", "9": "4", "10": "3", "11": "2", "12": "1", "13": "0", "14": "-1", "15": "-2", "16": "-3", "17": "-4", "18": "-5", "19": "-6", "20": "-7", "21": "-8", "22": "-9", "23": "-10", "24": "-11", "25": "-12" } } }
+    - match: "^\\s*XLRinEqLow ([0-9]+)$"
+      state: { "xlr_in_eq_low": { value: "{1}", map: { "1": "12", "2": "11", "3": "10", "4": "9", "5": "8", "6": "7", "7": "6", "8": "5", "9": "4", "10": "3", "11": "2", "12": "1", "13": "0", "14": "-1", "15": "-2", "16": "-3", "17": "-4", "18": "-5", "19": "-6", "20": "-7", "21": "-8", "22": "-9", "23": "-10", "24": "-11", "25": "-12" } } }
+    - match: "^\\s*XLRoutStatus ([01])$"
+      state: { "xlr_out": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^\\s*XLRoutVolume (-?[0-9]+)$"
+      state: { "xlr_out_volume": "{1:-21}" }
+    - match: "^\\s*XLRoutEqHigh ([0-9]+)$"
+      state: { "xlr_out_eq_high": { value: "{1}", map: { "1": "12", "2": "11", "3": "10", "4": "9", "5": "8", "6": "7", "7": "6", "8": "5", "9": "4", "10": "3", "11": "2", "12": "1", "13": "0", "14": "-1", "15": "-2", "16": "-3", "17": "-4", "18": "-5", "19": "-6", "20": "-7", "21": "-8", "22": "-9", "23": "-10", "24": "-11", "25": "-12" } } }
+    - match: "^\\s*XLRoutEqMid ([0-9]+)$"
+      state: { "xlr_out_eq_mid": { value: "{1}", map: { "1": "12", "2": "11", "3": "10", "4": "9", "5": "8", "6": "7", "7": "6", "8": "5", "9": "4", "10": "3", "11": "2", "12": "1", "13": "0", "14": "-1", "15": "-2", "16": "-3", "17": "-4", "18": "-5", "19": "-6", "20": "-7", "21": "-8", "22": "-9", "23": "-10", "24": "-11", "25": "-12" } } }
+    - match: "^\\s*XLRoutEqLow ([0-9]+)$"
+      state: { "xlr_out_eq_low": { value: "{1}", map: { "1": "12", "2": "11", "3": "10", "4": "9", "5": "8", "6": "7", "7": "6", "8": "5", "9": "4", "10": "3", "11": "2", "12": "1", "13": "0", "14": "-1", "15": "-2", "16": "-3", "17": "-4", "18": "-5", "19": "-6", "20": "-7", "21": "-8", "22": "-9", "23": "-10", "24": "-11", "25": "-12" } } }
+    - match: "^\\s*XLROutFeedbackSuppression ([0-9]+)$"
+      state: { "xlr_out_feedback_suppression": { value: "{1}", map: { "1": "off", "2": "low", "3": "high" } } }
+    - match: "^\\s*AmRfChannel (AM[0-9]+) ([0-9]+)$"
+      state: { "antenna_modules.{1}.rf_channel": "{2}" }
+    - match: "^\\s*AmRfOutputPower (AM[0-9]+) ([1-6])$"
+      state: { "antenna_modules.{1}.rf_power": { value: "{2}", map: { "1": "0", "2": "20", "3": "40", "4": "60", "5": "80", "6": "100" } } }
+    - match: "^\\s*MicStatus ([A-Z0-9]+) ([0-9]+)$"
+      state: { "wired_units.{1}.status": { value: "{2}", map: { "1": "on", "2": "on_muted", "3": "on_premonition", "4": "on_premonition_muted", "5": "on_overrun", "6": "on_overrun_muted", "7": "off", "8": "off_request", "9": "mapping", "10": "service_calibrate", "11": "mapping_request" } } }
+    - match: "^\\s*MicStatusSN ([A-Z0-9]+) ([0-9]+)$"
+      state: { "units.{1}.status": { value: "{2}", map: { "1": "on", "2": "on_muted", "3": "on_premonition", "4": "on_premonition_muted", "5": "on_overrun", "6": "on_overrun_muted", "7": "off", "8": "off_request", "9": "mapping", "10": "service_calibrate", "11": "mapping_request" } } }
+    - match: "^\\s*LapsedTalkTime ([A-Z0-9]+) ([0-9]+)$"
+      state: { "wired_units.{1}.talk_time": "{2}" }
+    - match: "^\\s*LapsedTalkTimeSN ([A-Z0-9]+) ([0-9]+)$"
+      state: { "units.{1}.talk_time": "{2}" }
+    - match: "^\\s*MicBatteryStatus ([A-Z0-9]+) ([0-9]+)$"
+      state: { "units.{1}.battery": "{2}" }
+    - match: "^\\s*MicExtPowerSupply ([A-Z0-9]+) ([01])$"
+      state: { "units.{1}.external_power": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^\\s*MicRfStatus ([A-Z0-9]+) ([0-9]+)$"
+      state: { "units.{1}.rf_quality": "{2}" }
+    - match: "^\\s*HdRecordError ([01])$"
+      state: { hd_recording_error: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^\\s*error ([0-9]+): ?(.*)$"
+      state: { error.code: "{1}", error.message: "{2}" }

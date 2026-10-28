@@ -3259,6 +3259,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the LED white balance, color correction, seam correction and gradation bit layouts (sub-commands 0x92, 0x93, 0x97, 0x9B, 0x9C, 0x9F, 0xA2), sent and read as hex. ([specs/samsung-mdc.yaml:2938](specs/samsung-mdc.yaml#L2938))
 - [ ] Check the menu size reply's sub-command echo (the document prints 0x83 for 0x85); any echo is taken as the reply. ([specs/samsung-mdc.yaml:2903](specs/samsung-mdc.yaml#L2903))
 
+## sennheiser-adn — Sennheiser ADN conference system
+
+- [ ] Confirm that replies and updates are "Keyword value;" with nothing between messages, or record the separator the central unit sends. ([specs/sennheiser-adn.yaml:35](specs/sennheiser-adn.yaml#L35))
+- [ ] Record how many clients the central unit accepts on 53252 and whether a new client gets anything unasked on connecting. ([specs/sennheiser-adn.yaml:42](specs/sennheiser-adn.yaml#L42))
+- [ ] Confirm the reply to MicButtonSN for a wired unit is MicStatus with its bus position. ([specs/sennheiser-adn.yaml:852](specs/sennheiser-adn.yaml#L852))
+- [ ] Confirm the direction of relative equalizer changes (#1 moves the wire value up, towards -12 dB). ([specs/sennheiser-adn.yaml:248](specs/sennheiser-adn.yaml#L248))
+
 ## sennheiser-chg-70n — Sennheiser CHG 70N
 
 - [ ] Confirm the charger answers a command datagram with the method's new value (or an /osc/error entry) to the sender's port, so each command is acknowledged by its reply. ([specs/sennheiser-chg-70n.yaml:66](specs/sennheiser-chg-70n.yaml#L66))
