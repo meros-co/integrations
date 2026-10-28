@@ -7,8 +7,8 @@ category: recorder
 # PIXNET, the web control of the Video Devices PIX 250i, 260i and 270i and the Sound Devices 970, on port 80: each
 # command is an HTTP POST under /sounddevices/. Sound Devices' "PIXNET Web API" document (v1.02) could not be
 # retrieved (its site and the copy found elsewhere refuse automated access), so every call here is taken from the
-# Bitfocus Companion module and is inferred. The recorders' state is not read: the document's status replies are
-# not public.
+# Bitfocus Companion module and is inferred. The recorder's transport status is polled and kept as the text it
+# answers, since the document's reply fields are not public.
 source:
   - title: "bitfocus/companion-module-sounddevices-pixnet (MIT)"
     author: Bitfocus AS and contributors
@@ -30,8 +30,9 @@ source:
     note: >
       Manufacturer document, named here because it is the authority: sounddevices.com answers automated requests
       with 403 and a copy found on another site with an error, so nothing was taken from it. Search results
-      describe its transport status request (GET /sounddevices/transport) and settings; their reply shapes are
-      unknown, so the spec reads no state.
+      describe its transport status request (GET /sounddevices/transport), answered with the transport state and
+      the current file name as JSON (an example reply holds stop and a file name); the field names are not
+      known, so the reply is kept as the text it is.
 
 transport:
   type: http
@@ -159,6 +160,19 @@ commands:
     expect: *ok
     returns: ack
 
+state:
+  transport.reply: { type: string, description: "The recorder's answer to the transport status request (GET /sounddevices/transport) as the text it sends, JSON holding the transport state and the current file name; polled every second" }
+
+telemetry:
+  poll:
+    every_ms: 1000
+    send:
+      - { method: GET, path: /sounddevices/transport }
+  updates:
+    - path: "^/sounddevices/transport$"
+      match: '(?s)^\s*(\S.*?)\s*$'
+      state: { transport.reply: "{1}" }
+
 quirks:
   - models: [all]
     severity: critical
@@ -169,8 +183,10 @@ quirks:
     text: >
       Sound Devices' PIXNET Web API document (v1.02) could not be retrieved; every call and its form (a POST of {}
       to /sounddevices/..., the RemoteApi argument encoding, the key codes and setting names) are taken from the
-      Bitfocus Companion module and inferred, as is the 200 answer. The recorder's state (transport, timecode,
-      files, settings) is not read, because the shape of its status replies is not public.
+      Bitfocus Companion module and inferred, as is the 200 answer. The transport status request (GET
+      /sounddevices/transport) is named by search results describing the document; its reply, JSON with the
+      transport state and current file name, is kept whole in transport.reply because its field names are not
+      public. Timecode, files and settings are not read: no public source names their requests.
   - models: [all]
     severity: info
     text: >
