@@ -32,7 +32,7 @@ use serde_json::{json, Map, Value as Json};
 
 use super::snmp::{
     self, command_error, parse_oids, varbind_json, Client, Notification, Reply, Request, Security,
-    SnmpError, User, VarBind, Version,
+    SnmpError, User, VarBind,
 };
 use super::snmp_ber::{hex, Oid, Value, SET_TYPES};
 use crate::catalog::Params;
