@@ -89,7 +89,8 @@ impl Family {
     fn of(model: &str) -> Family {
         match model {
             "ad4d" | "ad4q" => Family::Axient,
-            "slxd4" | "slxd4d" => Family::Slxd,
+            // SLX-D+ speaks the SLX-D strings and adds its own.
+            "slxd4" | "slxd4d" | "slxd4-plus" | "slxd4d-plus" | "slxd4q-plus" => Family::Slxd,
             "p10t" => Family::Psm1000,
             // ulxd4, ulxd4d, ulxd4q, qlxd4: QLX-D speaks the ULX-D strings.
             _ => Family::Ulxd,
@@ -375,6 +376,12 @@ impl Shure {
         self.model == "qlxd4"
     }
 
+    /// SLX-D+ (SLXD+ Command Strings v1.0): SLX-D plus network settings,
+    /// Dante names, encryption, remote pairing and the link commands.
+    fn is_slxd_plus(&self) -> bool {
+        self.model.ends_with("-plus")
+    }
+
     fn send(&self, cx: &mut Cx, body: &str) {
         let terminator = if self.family == Family::Psm1000 {
             "\r\n"
@@ -426,7 +433,13 @@ impl Shure {
                     device.extend(["ENCRYPTION_MODE", "QUADVERSITY_MODE"]);
                     device.extend(["NET_SETTINGS SC", "NET_SETTINGS D1", "NET_SETTINGS D2"]);
                 }
-                Family::Slxd => device.push("LOCK_STATUS"),
+                Family::Slxd => {
+                    device.push("LOCK_STATUS");
+                    if self.is_slxd_plus() {
+                        device.extend(["ENCRYPTION_MODE", "NA_DEVICE_NAME", "APP_CONN_ENABLED"]);
+                        device.extend(["NET_SETTINGS SC", "NET_SETTINGS D1", "NET_SETTINGS D2"]);
+                    }
+                }
                 Family::Ulxd if !self.is_qlxd() => {
                     device.extend(["MODEL", "ENCRYPTION", "SCAN_LOCK", "SYNC_LOCK"]);
                     device.push("NET_SETTINGS SC");
@@ -537,7 +550,11 @@ impl Shure {
         if let Some(i) = &index {
             body.push_str(&format!(" {i}"));
         }
-        body.push_str(&format!(" {value}"));
+        // A SET without a value (SLX-D+'s LINK_TX_REBOOT) has nothing after
+        // the parameter.
+        if !value.is_empty() {
+            body.push_str(&format!(" {value}"));
+        }
         self.send(cx, &body);
         self.pending.push_back(Pending {
             id,
@@ -651,6 +668,7 @@ impl Shure {
             "SYNC_LOCK" => json!({"sync_lock": on}),
             "LOCK_STATUS" => json!({"transmitter_lock": word(v)}),
             "NA_DEVICE_NAME" => json!({"dante_name": text(v)}),
+            "APP_CONN_ENABLED" => json!({"app_connection": on}),
             "FLASH" => json!({"flash": on}),
             "NET_SETTINGS" => {
                 let [interface, mode, ip, mask, gateway, rest @ ..] = msg.args.as_slice() else {
@@ -817,6 +835,20 @@ impl Shure {
                 tx(json!({"model": word(v)}))
             }
             ("TX_DEVICE_ID", _) => tx(json!({"device_id": text(v)})),
+            // SLX-D+ names the transmitter slot (always 1) before the value.
+            ("LINK_TX_MODEL", Family::Slxd) => tx(json!({"model": word(v)})),
+            ("LINK_STATUS", Family::Slxd) => json!({"link_status": word(v)}),
+            ("LINK_TX_BATT_MINS", Family::Slxd) => tx(json!({"battery_minutes": minutes(v)})),
+            ("LINK_TX_REBOOT", Family::Slxd) => json!({"transmitter_reboot": word(v)}),
+            // ON, OFF, or REQUEST / ACCEPT / REJECT with the transmitter's name.
+            ("REM_PAIR", Family::Slxd) => {
+                let (state, transmitter) = match msg.args.as_slice() {
+                    [state] => (state.as_str(), ""),
+                    [state, name, ..] => (state.as_str(), name.as_str()),
+                    _ => return None,
+                };
+                json!({"remote_pairing": word(state), "remote_pairing_transmitter": transmitter})
+            }
             ("TX_FW_VER", _) => tx(json!({"firmware": text(v.trim_end_matches('*'))})),
             ("TX_OFFSET", _) => tx(json!({"offset_db": gauge(v).map(|o| o - 12)})),
             ("TX_RF_PWR", Family::Ulxd) => tx(json!({"rf_power": word(v)})),
@@ -1108,7 +1140,9 @@ impl Module for Shure {
                 self.request(cx, id, None, param, None, &mode, Some(mode.clone()));
             }
             "set_network" => {
-                if !matches!(family, Family::Axient | Family::Ulxd) || self.is_qlxd() {
+                if !(matches!(family, Family::Axient | Family::Ulxd) || self.is_slxd_plus())
+                    || self.is_qlxd()
+                {
                     return self.unsupported(cx, id, name);
                 }
                 let interface = match choice("interface") {
@@ -1181,6 +1215,34 @@ impl Module for Shure {
                 };
                 self.request(cx, id, channel, param, slot(), &value, None);
             }
+            "start_remote_pairing"
+            | "accept_remote_pairing"
+            | "reject_remote_pairing"
+            | "reboot_transmitter"
+                if !self.is_slxd_plus() =>
+            {
+                self.unsupported(cx, id, name)
+            }
+            "start_remote_pairing" => self.set(cx, id, channel, "REM_PAIR", "ON"),
+            "accept_remote_pairing" | "reject_remote_pairing" => {
+                let transmitter = choice("transmitter");
+                if transmitter.is_empty() || transmitter.contains(['{', '}', '<', '>']) {
+                    return Self::refuse(cx, id, "the transmitter's name is required".into());
+                }
+                let word = if name == "accept_remote_pairing" {
+                    "ACCEPT"
+                } else {
+                    "REJECT"
+                };
+                self.set(
+                    cx,
+                    id,
+                    channel,
+                    "REM_PAIR",
+                    &format!("{word} {{{transmitter}}}"),
+                );
+            }
+            "reboot_transmitter" => self.set(cx, id, channel, "LINK_TX_REBOOT", ""),
             "set_audio_input_level"
             | "set_rf_power"
             | "set_audio_tx_mode"
@@ -2296,5 +2358,76 @@ mod tests {
         let mut cx = Cx::new(30);
         m.stop(&mut cx);
         assert_eq!(sent(&cx.take()), ["< SET 2 METER_RATE 00000 >"]);
+    }
+
+    #[test]
+    fn slxd_plus_reads_its_extra_settings_and_pairs_remotely() {
+        let (_, a) = connected("slxd4d-plus", 2);
+        let out = sent(&a);
+        for want in [
+            "< GET ENCRYPTION_MODE >",
+            "< GET NA_DEVICE_NAME >",
+            "< GET APP_CONN_ENABLED >",
+            "< GET NET_SETTINGS D1 >",
+        ] {
+            assert!(out.iter().any(|s| s == want), "{want} not in {out:?}");
+        }
+
+        let mut m = ready("slxd4d-plus", 2);
+        let s = state(&feed(&mut m, 10, "< REP 1 LINK_STATUS 1 LINKED.ACTIVE >"));
+        assert_eq!(s["channels"]["1"]["link_status"], json!("linked_active"));
+        let s = state(&feed(&mut m, 11, "< REP 1 LINK_TX_MODEL 1 SLXD2+ >"));
+        assert_eq!(s["channels"]["1"]["transmitter"]["model"], json!("slxd2+"));
+        let s = state(&feed(&mut m, 12, "< REP 2 LINK_TX_BATT_MINS 00360 >"));
+        assert_eq!(
+            s["channels"]["2"]["transmitter"]["battery_minutes"],
+            json!(360)
+        );
+        let s = state(&feed(&mut m, 13, "< REP 1 REM_PAIR REQUEST {Remote1} >"));
+        assert_eq!(s["channels"]["1"]["remote_pairing"], json!("request"));
+        assert_eq!(
+            s["channels"]["1"]["remote_pairing_transmitter"],
+            json!("Remote1")
+        );
+        let s = state(&feed(&mut m, 14, "< REP APP_CONN_ENABLED ON >"));
+        assert_eq!(s["device"]["app_connection"], json!(true));
+
+        let a = run(
+            &mut m,
+            20,
+            1,
+            "accept_remote_pairing",
+            json!({"channel": 1, "transmitter": "Remote1"}),
+        );
+        assert_eq!(sent(&a), ["< SET 1 REM_PAIR ACCEPT {Remote1} >"]);
+        assert!(acked(
+            &feed(&mut m, 21, "< REP 1 REM_PAIR ACCEPT {Remote1} >"),
+            1
+        ));
+        let a = run(&mut m, 30, 2, "reboot_transmitter", json!({"channel": 2}));
+        assert_eq!(sent(&a), ["< SET 2 LINK_TX_REBOOT >"]);
+        assert!(acked(
+            &feed(&mut m, 31, "< REP 2 LINK_TX_REBOOT RESET >"),
+            2
+        ));
+        let a = run(
+            &mut m,
+            40,
+            3,
+            "set_network",
+            json!({"interface": "control", "mode": "auto"}),
+        );
+        assert_eq!(sent(&a), ["< SET NET_SETTINGS SC AUTO na na na >"]);
+
+        // Plain SLX-D has none of it.
+        let mut m = ready("slxd4d", 2);
+        let a = run(&mut m, 10, 4, "start_remote_pairing", json!({"channel": 1}));
+        assert!(a.iter().any(|x| matches!(
+            x,
+            Action::Complete {
+                id: 4,
+                result: Err(CommandError::UnsupportedForModel { .. })
+            }
+        )));
     }
 }

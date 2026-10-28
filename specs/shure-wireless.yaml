@@ -70,6 +70,17 @@ source:
       ALL), TX_MODEL, and < SAMPLE ch ALL audPeak audRms rfRssi > with the 120
       offset. SLX-D+ and the SLXD4Q+ have their own document and are not
       covered here.
+  - title: SLXD+ Command Strings, Version 1.0 (2026-A)
+    author: Shure
+    url: https://www.shure.com/en-US/docs/commandstrings/SLXDplus
+    note: >
+      Manufacturer document (PDF docId 11433). The SLX-D strings plus
+      ENCRYPTION_MODE, NA_DEVICE_NAME, NA_CHAN_NAME, NET_SETTINGS (SC, D1, D2)
+      and APP_CONN_ENABLED p.6-9; REM_PAIR (ON, then REQUEST, ACCEPT or REJECT
+      with the transmitter's name, OFF on timeout), INTERFERENCE_STATUS and
+      ENCRYPTION_STATUS p.11-12; LINK_TX_MODEL and LINK_STATUS with the slot 1,
+      LINK_TX_BATT_MINS and LINK_TX_REBOOT p.16-19, in place of SLX-D's
+      TX_MODEL.
   - title: PSM1000 Command Strings (current web edition, read 14 October 2026)
     author: Shure
     url: https://www.shure.com/en-US/docs/commandstrings/PSM1000
@@ -153,6 +164,24 @@ models:
     channels: 2
     supports: [set_gain, set_frequency, set_group_channel, set_channel_name, set_device_id, flash, set_meter_rate]
     verification: none
+  - id: slxd4-plus
+    name: Shure SLX-D+ SLXD4+ (1 channel)
+    channels: 1
+    supports: [set_gain, set_frequency, set_group_channel, set_channel_name, set_device_id, flash, set_meter_rate, set_network,
+               start_remote_pairing, accept_remote_pairing, reject_remote_pairing, reboot_transmitter]
+    verification: none
+  - id: slxd4d-plus
+    name: Shure SLX-D+ SLXD4D+ (2 channels)
+    channels: 2
+    supports: [set_gain, set_frequency, set_group_channel, set_channel_name, set_device_id, flash, set_meter_rate, set_network,
+               start_remote_pairing, accept_remote_pairing, reject_remote_pairing, reboot_transmitter]
+    verification: none
+  - id: slxd4q-plus
+    name: Shure SLX-D+ SLXD4Q+ (4 channels)
+    channels: 4
+    supports: [set_gain, set_frequency, set_group_channel, set_channel_name, set_device_id, flash, set_meter_rate, set_network,
+               start_remote_pairing, accept_remote_pairing, reject_remote_pairing, reboot_transmitter]
+    verification: none
   - id: p10t
     name: Shure PSM1000 P10T IEM transmitter (2 channels)
     channels: 2
@@ -170,6 +199,44 @@ commands:
       muted:   { type: bool, default: true,
         label: Mute,
         description: "On mutes the channel's audio, off unmutes it." }
+    returns: ack
+
+  start_remote_pairing:
+    summary: Start Bluetooth remote pairing on a channel (SLX-D+ REM_PAIR ON); a transmitter's request then arrives in state
+    params:
+      channel: { type: int, min: 1, max: 4, required: true,
+        label: Channel,
+        description: "Receiver channel, numbered from 1 as on the front panel; one channel pairs at a time." }
+    returns: ack
+
+  accept_remote_pairing:
+    summary: Accept a transmitter's remote pairing request (SLX-D+ REM_PAIR ACCEPT)
+    params:
+      channel: { type: int, min: 1, max: 4, required: true,
+        label: Channel,
+        description: "Receiver channel whose pairing request to answer." }
+      transmitter: { type: string, required: true, max_length: 31, pattern: "^[^{}<>]+$",
+        label: Transmitter,
+        description: "The transmitter's name as its REQUEST gave it (channels.*.remote_pairing_transmitter)." }
+    returns: ack
+
+  reject_remote_pairing:
+    summary: Reject a transmitter's remote pairing request (SLX-D+ REM_PAIR REJECT)
+    params:
+      channel: { type: int, min: 1, max: 4, required: true,
+        label: Channel,
+        description: "Receiver channel whose pairing request to answer." }
+      transmitter: { type: string, required: true, max_length: 31, pattern: "^[^{}<>]+$",
+        label: Transmitter,
+        description: "The transmitter's name as its REQUEST gave it." }
+    returns: ack
+
+  reboot_transmitter:
+    summary: Restart the transmitter linked to a channel (SLX-D+ LINK_TX_REBOOT); the link status is reported
+    params:
+      channel: { type: int, min: 1, max: 4, required: true,
+        label: Channel,
+        description: "Receiver channel whose linked transmitter to restart." }
     returns: ack
 
   rf_mute:
@@ -494,7 +561,7 @@ state:
   device.scan_lock:                 { type: bool, description: "ULX-D scan lock" }
   device.sync_lock:                 { type: bool, description: "ULX-D IR sync lock" }
   device.transmitter_lock:          { type: string, description: "SLX-D LOCK_STATUS: off, menu or all" }
-  device.dante_name:                { type: string, description: "Dante device name (dual and quad ULX-D)" }
+  device.dante_name:                { type: string, description: "Dante device name (dual and quad ULX-D, SLX-D+)" }
   device.flash:                     { type: bool, description: "The front panel is flashing to identify the unit" }
   device.network.*.mode:            { type: string, description: "auto or manual, per interface: control, dante_primary, dante_secondary (Axient Digital, ULX-D; read on connecting)" }
   device.network.*.address:         { type: string, description: "IPv4 address of the interface" }
@@ -502,7 +569,12 @@ state:
   device.network.*.gateway:         { type: string, description: "IPv4 gateway; absent when none is used" }
   device.network.*.mac:             { type: string, description: "MAC address of the interface, lower case" }
   channels.*.name:                  { type: string, description: "Channel name, padding removed" }
-  channels.*.dante_name:            { type: string, description: "Dante channel name (dual and quad ULX-D)" }
+  channels.*.dante_name:            { type: string, description: "Dante channel name (dual and quad ULX-D, SLX-D+)" }
+  channels.*.link_status:           { type: string, description: "SLX-D+ transmitter link: empty, linked_inactive or linked_active" }
+  channels.*.transmitter_reboot:    { type: string, description: "SLX-D+ answer to the last transmitter restart: empty, linked_inactive or reset (restarted)" }
+  channels.*.remote_pairing:        { type: string, description: "SLX-D+ remote pairing: on (waiting), request (a transmitter asks), accept, reject or off" }
+  channels.*.remote_pairing_transmitter: { type: string, description: "Name of the transmitter in the last pairing message, \"\" when none" }
+  device.app_connection:            { type: bool, description: "SLX-D+ app connection enabled (APP_CONN_ENABLED)" }
   channels.*.frequency_khz:         { type: int, unit: kHz, description: "Carrier frequency" }
   channels.*.frequency2_khz:        { type: int, unit: kHz, description: "Second carrier frequency of an Axient Digital FD-C channel" }
   channels.*.group:                 { type: string, description: "Group of the frequency plan; absent when the frequency is off the plan (--)" }
@@ -572,7 +644,7 @@ state:
   channels.*.slots.*.battery_minutes:     { type: int, unit: min, description: "The slot's transmitter runtime" }
 
 quirks:
-  - models: [slxd4, slxd4d]
+  - models: [slxd4, slxd4d, slxd4-plus, slxd4d-plus, slxd4q-plus]
     severity: critical
     text: >
       SLX-D has no mute command, so mute is not offered. Setting gain to
@@ -588,7 +660,7 @@ quirks:
       again, so audio is lost in the meantime. regenerate_encryption_key only
       works with encryption set to manual.
 
-  - models: [ad4d, ad4q, ulxd4, ulxd4d, ulxd4q]
+  - models: [ad4d, ad4q, ulxd4, ulxd4d, ulxd4q, slxd4-plus, slxd4d-plus, slxd4q-plus]
     severity: critical
     text: >
       set_network is not answered: on the control interface the receiver moves
@@ -597,7 +669,7 @@ quirks:
       settings are never reported on change, so the core reads them on
       connecting only.
 
-  - models: [slxd4, slxd4d]
+  - models: [slxd4, slxd4d, slxd4-plus, slxd4d-plus, slxd4q-plus]
     severity: warning
     text: >
       Command strings are disabled by default on SLX-D. Until network control
@@ -624,7 +696,7 @@ quirks:
       - 40. 255 (and 65533-65535 for battery minutes, 65535 for cycles) mean
       unknown and are reported as absent, never as a reading.
 
-  - models: [ad4d, ad4q, slxd4, slxd4d]
+  - models: [ad4d, ad4q, slxd4, slxd4d, slxd4-plus, slxd4d-plus, slxd4q-plus]
     severity: info
     text: >
       Names are set with at most 8 characters, though Axient Digital and SLX-D
@@ -648,12 +720,23 @@ quirks:
       through its slot (1-8) on the receiver channel; slots are read once on
       connecting and kept current from the receiver's reports.
 
-  - models: [ulxd4, ulxd4d, ulxd4q, qlxd4, slxd4, slxd4d]
+  - models: [ulxd4, ulxd4d, ulxd4q, qlxd4, slxd4, slxd4d, slxd4-plus, slxd4d-plus, slxd4q-plus]
     severity: info
     text: >
       The transmitter's offset, RF power, locks and battery are reported by the
       receiver but cannot be changed over command strings, and SLX-D's mic/line
       output level is a hardware switch, reported only.
+
+  - models: [slxd4-plus, slxd4d-plus, slxd4q-plus]
+    severity: info
+    text: >
+      SLX-D+ reads its encryption mode, Dante names, network settings and app
+      connection on connecting (none can be changed but the network). Remote
+      pairing runs on one channel at a time: start_remote_pairing, then a
+      transmitter's REQUEST arrives in state with its name, answered with
+      accept_remote_pairing or reject_remote_pairing; it ends by itself (OFF)
+      after a timeout. reboot_transmitter restarts the linked transmitter,
+      interrupting its audio.
 
   - models: [ad4q]
     severity: info
