@@ -678,6 +678,10 @@ struct Push {
     /// offered under, as that GET's reply would be (a Blackmagic camera's
     /// property pushes, in the format its REST GET returns).
     as_reply: Option<AsReply>,
+    /// `token`: a request over the transport answered with a token, fetched
+    /// before each opening, and the JSON path to it in the answer; the
+    /// messages name it `{push.token}` (CamStreamer's ws_authorization.cgi).
+    token: Option<(Value, String)>,
 }
 
 /// `as_reply` (`telemetry.sse`, `telemetry.websocket`): each message is also
@@ -1015,6 +1019,10 @@ pub(crate) struct SpecEngine {
     /// The push websocket's messages wait for a session to name
     /// (`{session.id}`): sent once the login answers.
     push_waits_session: bool,
+    /// `telemetry.websocket.token`: the request fetching it, in flight, and
+    /// the token for the websocket's messages (`{push.token}`). A secret.
+    push_token_request: Option<RequestId>,
+    push_token: Option<String>,
     /// `transport.sign`: values worked out for each request.
     sign: Option<sign::Sign>,
     /// `transport.aws`: what `auth: aws-sigv4` signs for.
@@ -1960,7 +1968,12 @@ impl SpecEngine {
             }
             Some(o) => listen_port(o.get("listen_port"), &ctx.settings)?,
         };
-        let push = match spec.telemetry.as_ref().and_then(|t| t.get("websocket")) {
+        // A list of websockets, each for some models: the first for this one.
+        let websocket = match spec.telemetry.as_ref().and_then(|t| t.get("websocket")) {
+            Some(Value::Array(blocks)) => blocks.iter().find(|b| for_model(b, &ctx.model)),
+            other => other,
+        };
+        let push = match websocket {
             None => None,
             Some(w) => {
                 // A port, or `{setting: name}` naming the operator's (an
@@ -2122,6 +2135,26 @@ impl SpecEngine {
                     url,
                     idle,
                     as_reply: as_reply_of(w.get("as_reply"), "telemetry.websocket")?,
+                    token: match w.get("token") {
+                        None => None,
+                        Some(t) if kind == "http" => {
+                            let request = t
+                                .get("request")
+                                .filter(|r| r.is_object())
+                                .cloned()
+                                .ok_or("telemetry.websocket.token.request is a request")?;
+                            let path = str_field(t, "json")
+                                .filter(|p| p.starts_with('$'))
+                                .ok_or("telemetry.websocket.token.json is a JSON path")?;
+                            Some((request, path.to_string()))
+                        }
+                        Some(_) => {
+                            return Err(
+                                "telemetry.websocket.token is fetched over an http transport"
+                                    .into(),
+                            )
+                        }
+                    },
                 })
             }
         };
@@ -2270,6 +2303,8 @@ impl SpecEngine {
             session_token: None,
             session_value: None,
             push_waits_session: false,
+            push_token_request: None,
+            push_token: None,
             sign: signer,
             aws,
             jar,
@@ -4131,7 +4166,96 @@ impl SpecEngine {
         }
     }
 
+    /// Open the push websocket, first fetching its token when it takes one
+    /// (`telemetry.websocket.token`).
     fn open_push(&mut self, cx: &mut Cx) {
+        if !self.monitor || self.refused.is_some() {
+            return;
+        }
+        let Some((item, _)) = self.push.as_ref().and_then(|p| p.token.clone()) else {
+            self.open_push_socket(cx);
+            return;
+        };
+        if self.push_token_request.is_some() {
+            return;
+        }
+        let (no_params, no_specs) = (Params::new(), BTreeMap::new());
+        let built = self.build(&item, &self.values(&no_params, &no_specs));
+        match built {
+            Ok(Outgoing::Http(mut request, _)) => {
+                self.finish_request(cx, &mut request);
+                let id = self.next_request;
+                self.next_request += 1;
+                self.push_token_request = Some(id);
+                cx.http(id, request);
+            }
+            Ok(_) => cx.log(Level::Warning, "push websocket token: not an HTTP request"),
+            Err(e) => cx.log(
+                Level::Warning,
+                format!("push websocket token not asked for: {e}"),
+            ),
+        }
+    }
+
+    /// The answer to the push websocket's token request: the token, and
+    /// the websocket opened; or a refusal, or another try later. The answer
+    /// is never offered to the rules.
+    fn push_token_answered(&mut self, cx: &mut Cx, result: Result<HttpResponse, String>) {
+        self.push_token_request = None;
+        let path = match self.push.as_ref().and_then(|p| p.token.as_ref()) {
+            Some((_, path)) => path.clone(),
+            None => return,
+        };
+        let token = match &result {
+            Ok(r) if (200..300).contains(&r.status) => serde_json::from_slice::<Value>(&r.body)
+                .ok()
+                .and_then(|doc| match expect::json_path(&doc, &path) {
+                    Some(Value::String(t)) if !t.is_empty() => Some(t.clone()),
+                    _ => None,
+                }),
+            _ => None,
+        };
+        if let Some(token) = token {
+            self.push_token = Some(token);
+            self.open_push_socket(cx);
+            return;
+        }
+        if let (
+            Ok(r),
+            Transport::Http {
+                auth,
+                refusal,
+                refusal_body,
+                ..
+            },
+        ) = (&result, &self.transport)
+        {
+            if *auth != HttpAuth::None
+                && refused_by_status(refusal, refusal_body, r.status, &r.body)
+            {
+                self.refuse(
+                    cx,
+                    format!(
+                        "the device refused the credential on its websocket token request (HTTP {})",
+                        r.status
+                    ),
+                );
+                return;
+            }
+        }
+        let reason = match &result {
+            Ok(r) => format!("HTTP {}, no token in the answer", r.status),
+            Err(_) => "the request failed".to_string(),
+        };
+        cx.log(
+            Level::Info,
+            format!("push websocket token not obtained ({reason}); trying again"),
+        );
+        cx.set_timer(PUSH_RECONNECT, self.push_backoff);
+        self.push_backoff = (self.push_backoff * 2).min(RECONNECT_MAX);
+    }
+
+    fn open_push_socket(&mut self, cx: &mut Cx) {
         if !self.monitor {
             return;
         }
@@ -4331,8 +4455,17 @@ impl SpecEngine {
         if let Some(every) = self.push.as_ref().and_then(|p| p.every) {
             cx.set_timer(PUSH_RENEW, every);
         }
-        let empty = Params::new();
-        let empty_specs = BTreeMap::new();
+        // `{push.token}`: the token fetched for this opening, a string.
+        let mut empty = Params::new();
+        let mut empty_specs = BTreeMap::new();
+        if let Some(token) = &self.push_token {
+            empty.insert("push.token".into(), Value::String(token.clone()));
+            empty_specs.insert(
+                "push.token".to_string(),
+                serde_json::from_value::<ParamSpec>(serde_json::json!({"type": "string"}))
+                    .expect("a string parameter"),
+            );
+        }
         let session_on = self.session_on();
         let mut waits = false;
         let mut sent = Vec::new();
@@ -4763,6 +4896,12 @@ impl Module for SpecEngine {
     }
 
     fn http_response(&mut self, cx: &mut Cx, id: RequestId, result: Result<HttpResponse, String>) {
+        if self.push_token_request == Some(id) {
+            if self.refused.is_none() {
+                self.push_token_answered(cx, result);
+            }
+            return;
+        }
         if self
             .oauth
             .as_ref()

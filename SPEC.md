@@ -2640,6 +2640,36 @@ and never logged, since it may hold a token. The transport's credential and
 or 403 answer to its opening is a refusal of that token: refreshed once if it
 can be, as on the transport, and otherwise the terminal refusal of §2.
 
+A device that opens its websocket only to a client holding a short-lived
+token, asked for over its HTTP API just before (CamStreamer's apps: a token
+from `ws_authorization.cgi`, valid 30 seconds, sent as the first message),
+names that request under `token`, with the JSON path of the token in its
+answer:
+
+```yaml
+telemetry:
+  websocket:
+    path: /local/camstreamer/events
+    subprotocol: events
+    token: { request: { method: GET, path: /local/camstreamer/api/ws_authorization.cgi }, json: $.data }
+    send: ['{"authorization":{push.token:json}}']
+```
+
+Before each opening (and reopening) the core sends the request over the
+transport, with its credential, scheme and headers as any request; the
+answer's string at `json` is `{push.token}` in the `send` messages, and the
+websocket opens. The answer is never offered to the rules, logged or kept in
+state. A request the device refuses with one of `refusal_status` is the
+terminal refusal of §2; an answer without the token, or none, is tried again
+with the websocket's backoff. `token` needs an http transport, and
+`{push.token}` is named only in its websocket's messages.
+
+A family whose models push on different websockets (CamStreamer's apps, one
+model each) gives `telemetry.websocket` as a list, each block naming its
+`models`; the first block for the device's model (one naming no models is
+for every model) is its websocket, and a model no block is for has none. The rules stay shared; a rule naming `models`
+(below, "Rules per model") reads one app's messages only.
+
 `idle_ms` reopens the websocket when nothing at all has arrived on it for
 that long, for a service that sends keepalives, where silence means a dead
 connection.

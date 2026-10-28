@@ -320,3 +320,86 @@ fn computed_credentials_use_the_wall_clock_as_each_request_goes() {
     let (_, request) = requests(&cx.take()).remove(0);
     assert_eq!(header(&request, "X-Auth-Key"), None);
 }
+
+#[test]
+fn a_push_websocket_can_open_with_a_token_fetched_just_before() {
+    // CamStreamer: a token from ws_authorization.cgi, sent as the first
+    // message, for each opening.
+    let mut e = open(
+        "camstreamer",
+        "app-6",
+        json!({"username": "root", "password": "pw", "scheme": "http", "auth": "digest"}),
+        true,
+    );
+    let mut cx = Cx::new(0);
+    e.start(&mut cx);
+    let actions = cx.take();
+    assert!(!actions
+        .iter()
+        .any(|a| matches!(a, Action::WsOpen { socket: PUSH, .. })));
+    let (token, request) = requests(&actions)
+        .into_iter()
+        .find(|(_, r)| r.url.contains("ws_authorization"))
+        .expect("the token request");
+    assert!(request
+        .url
+        .ends_with("/local/camstreamer/api/ws_authorization.cgi"));
+    assert!(request.digest.is_some(), "with the camera's credential");
+    let mut cx = Cx::new(1);
+    e.http_response(
+        &mut cx,
+        token,
+        reply(
+            r#"{"status":200,"message":"ok","data":"9lZ2rs9W8xeRZkTQTfsq"}"#,
+            &[],
+        ),
+    );
+    let actions = cx.take();
+    let opened = actions.iter().find_map(|a| match a {
+        Action::WsOpen {
+            socket: PUSH,
+            request,
+        } => Some(request.clone()),
+        _ => None,
+    });
+    let opened = opened.expect("the websocket opens");
+    assert_eq!(opened.url, "ws://127.0.0.1:80/local/camstreamer/events");
+    // The token's answer is never state.
+    assert!(!actions.iter().any(|a| matches!(a, Action::State(_))));
+    let mut cx = Cx::new(2);
+    e.ws(&mut cx, PUSH, WsInput::Opened);
+    assert_eq!(
+        pushed(&cx.take()),
+        vec![r#"{"authorization":"9lZ2rs9W8xeRZkTQTfsq"}"#.to_string()]
+    );
+    // Closed: a fresh token before it opens again.
+    let mut cx = Cx::new(3);
+    e.ws(
+        &mut cx,
+        PUSH,
+        WsInput::Closed {
+            code: None,
+            reason: "closed".into(),
+        },
+    );
+    cx.take();
+    let mut cx = Cx::new(4);
+    e.timer(&mut cx, PUSH_RECONNECT);
+    let actions = cx.take();
+    assert!(requests(&actions)
+        .iter()
+        .any(|(_, r)| r.url.contains("ws_authorization")));
+    // A model without a websocket opens none.
+    let mut e = open(
+        "camstreamer",
+        "camscripter",
+        json!({"scheme": "http"}),
+        true,
+    );
+    let mut cx = Cx::new(0);
+    e.start(&mut cx);
+    let actions = cx.take();
+    assert!(!requests(&actions)
+        .iter()
+        .any(|(_, r)| r.url.contains("ws_authorization")));
+}
