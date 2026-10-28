@@ -319,3 +319,11 @@ _km_reread("reread-take", "/api/v2/take/set.json", {"pro_id": "1", "time": 1},
            [{"method": "POST", "target": "/api/v2/take/get.json?pro_id=1"}, _km_g("/api/v2/window/list.json?pro_id=1")])
 _km_reread("reread-ndi-discovery", "/api/discovery/scan/addManualIp.json", {"ip": []},
            [_km_g("/api/discovery/scan/groupChecked.json"), _km_g("/api/discovery/scan/getManualIps.json")])
+
+# The session: with a password, a command's first request is the login, and
+# the token goes in the app header from then on (the engine's session tests
+# cover the header). The other vectors leave the password empty.
+V.append({"spec": KM, "command": "get_general", "input": {}, "file": "get_general-login",
+          "settings": {"password": "Admin123"},
+          "expect_request": {"method": "POST", "target": "/api/v2/users/login.json",
+                             "body": '{"username":"admin","password":"Admin123"}', "content_type": "application/json"}})

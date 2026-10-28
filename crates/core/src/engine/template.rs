@@ -195,11 +195,17 @@ impl Values<'_> {
     }
 
     fn lookup(&self, name: &str) -> Result<(&Value, ParamType), String> {
-        if name == "session.id" {
-            return self
-                .session
+        // `{session.id}`, and `{session.<name>}` for a string named by
+        // `capture.values`: the session is then an object of them.
+        if let Some(key) = name.strip_prefix("session.") {
+            let found = match self.session {
+                Some(Value::Object(o)) => o.get(key),
+                Some(v) if key == "id" => Some(v),
+                _ => None,
+            };
+            return found
                 .map(|v| (v, ParamType::String))
-                .ok_or_else(|| "'session.id': no session is held".to_string());
+                .ok_or_else(|| format!("'{name}': no session is held"));
         }
         let (values, specs, key) = match name.strip_prefix("settings.") {
             Some(key) => (self.settings, self.setting_specs, key),

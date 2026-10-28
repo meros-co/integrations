@@ -25,11 +25,13 @@ _post("login", {"username": "admin", "password": "wrong"}, "/api/r1/users/login.
       expect_result={"error": {"error": "device_error"}})
 http(R1, "logout", {}, "GET", "/api/r1/users/logout.json",
      http_reply={"status": 200, "body": _OK}, expect_result={"ok": {"kind": "ack"}})
-# Sent with a token the recorder no longer accepts.
-http(R1, "logout", {}, "GET", "/api/r1/users/logout.json", file="logout.token-error",
-     settings={"token": "3ee69a2f13b71cc57061845bc3bf04c5"},
-     http_reply={"status": 200, "body": '{"msg":"Token.Error","result":"error"}'},
-     expect_result={"error": {"error": "device_error"}})
+# With a password, the session logs in first (the engine's session tests
+# cover the token in Authorization and the cookie, and the login again on
+# Token.Error).
+V.append({"spec": R1, "command": "logout", "input": {}, "file": "logout.login",
+          "settings": {"password": "admin"},
+          "expect_request": {"method": "POST", "target": "/api/r1/users/login.json",
+                             "body": '{"username":"admin","password":"admin"}', "content_type": "application/json"}})
 _post("change_password", {"username": "admin", "old_password": "admin", "new_password": "Admin1"},
       "/api/r1/users/modify.json", '{"oldpassword":"admin","username":"admin","password":"Admin1"}',
       http_reply={"status": 200, "body": _OK}, expect_result={"ok": {"kind": "ack"}})

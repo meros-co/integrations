@@ -1,0 +1,1639 @@
+spec: 1
+id: aws-elemental-medialive
+name: AWS Elemental MediaLive (API)
+vendor: AWS Elemental
+category: other
+
+# AWS Elemental MediaLive, the cloud live encoding service: its REST API at
+# medialive.<region>.amazonaws.com, every request signed with AWS Signature
+# Version 4. Every operation of the API is a command (channels, inputs,
+# input security groups, schedules and their actions, multiplexes and
+# programs, Link input devices, reservations and offerings, tags, the
+# workflow monitor, MediaLive Anywhere clusters, nodes, networks and SDI
+# sources); request bodies are the API's JSON as it documents them. State
+# follows the channels, inputs, multiplexes, input devices and input
+# security groups, polled.
+
+source:
+  - title: AWS Elemental MediaLive API Reference
+    author: Amazon Web Services
+    url: https://docs.aws.amazon.com/medialive/latest/apireference/what-is.html
+    note: >
+      Manufacturer document, read 2026-10-28: the REST resources under /prod
+      (channels, channel class, schedule, start and stop, thumbnails, alerts;
+      inputs and partners; input security groups; multiplexes and programs;
+      input devices and their transfers, claim, reboot, start, stop and
+      maintenance window; offerings, purchase and reservations; tags; batch
+      delete, start and stop; account configuration; the workflow monitor's
+      CloudWatch alarm templates, EventBridge rule templates, their groups
+      and signal maps with monitor deployments; MediaLive Anywhere clusters,
+      nodes, networks, channel placement groups and SDI sources; versions),
+      their methods, path and query parameters, JSON request and response
+      members, and success statuses.
+  - title: AWS MediaLive service model (medialive 2017-10-14)
+    author: Amazon Web Services (botocore, Apache License 2.0)
+    url: https://github.com/boto/botocore/blob/develop/botocore/data/medialive/2017-10-14/service-2.json
+    note: >
+      AWS's machine-readable definition of the same API (LICENSE checked:
+      Apache 2.0), read 2026-10-28 to list every operation exactly: its
+      method, request URI, query parameters (maxResults bounds, nextToken),
+      body members and their required ones, and its success status. The
+      signing name is medialive, the protocol rest-json, the signature
+      version 4.
+  - title: AWS Signature Version 4 for API requests
+    author: Amazon Web Services
+    url: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_sigv-create-signed-request.html
+    note: >
+      Read 2026-10-28: the canonical request, the string to sign, the
+      signing key from the secret, date, region and service, the
+      Authorization header, X-Amz-Date and X-Amz-Security-Token for temporary
+      credentials.
+  - title: MediaLive service endpoints
+    author: Amazon Web Services
+    url: https://docs.aws.amazon.com/general/latest/gr/medialive.html
+    note: >
+      Read 2026-10-28: the API's host for each region,
+      medialive.<region>.amazonaws.com, over HTTPS.
+
+transport:
+  type: http
+  port: 443
+  scheme: https
+  auth: aws-sigv4
+  aws: { service: medialive, region: { setting: region } }
+  timeout_ms: 15000
+  # AWS answers a credential it does not take with HTTP 403 and a message
+  # naming the token or the signature; other 403s (a permission the key
+  # lacks for one operation) fail only their command.
+  refusal_status: [403]
+  refusal_status_body:
+    match: "(?i)(security token included in the request is (invalid|expired)|signature we calculated does not match|signature expired|request signature|unrecognizedclient|invalidsignature|expiredtoken)"
+  probe: { method: GET, path: /prod/channels, query: { maxResults: "1" } }
+
+settings:
+  region:
+    type: string
+    required: true
+    max_length: 32
+    pattern: "^[a-z]{2}(-[a-z]+)+-[0-9]+$"
+    label: Region
+    description: "The AWS Region the device was opened for, such as us-west-2: requests are signed for it, and the host is medialive.<region>.amazonaws.com."
+  access_key_id:
+    type: string
+    required: true
+    max_length: 128
+    label: Access key ID
+    description: "The AWS access key ID of an IAM user or role allowed to use MediaLive."
+  secret_access_key:
+    type: string
+    secret: true
+    required: true
+    max_length: 128
+    label: Secret access key
+    description: "That key's secret; it signs each request and is never sent."
+  session_token:
+    type: string
+    secret: true
+    default: ""
+    max_length: 4096
+    label: Session token
+    description: "The session token of temporary credentials (from AWS STS), sent as X-Amz-Security-Token; empty for long-term keys."
+
+ports:
+  - { port: 443, protocol: https, role: control, note: "medialive.<region>.amazonaws.com: open the device with that host name" }
+
+models:
+  - id: medialive
+    name: AWS Elemental MediaLive
+    supports:
+      - accept_input_device_transfer
+      - batch_delete
+      - batch_start
+      - batch_stop
+      - batch_update_schedule
+      - cancel_input_device_transfer
+      - claim_device
+      - create_channel
+      - create_input
+      - create_input_security_group
+      - create_multiplex
+      - create_multiplex_program
+      - create_partner_input
+      - create_tags
+      - delete_channel
+      - delete_input
+      - delete_input_security_group
+      - delete_multiplex
+      - delete_multiplex_program
+      - delete_reservation
+      - delete_schedule
+      - delete_tags
+      - describe_account_configuration
+      - describe_channel
+      - describe_input
+      - describe_input_device
+      - describe_input_security_group
+      - describe_multiplex
+      - describe_multiplex_program
+      - describe_offering
+      - describe_reservation
+      - describe_schedule
+      - describe_schedule_page
+      - describe_thumbnails
+      - list_channels
+      - list_channels_page
+      - list_input_device_transfers
+      - list_input_device_transfers_page
+      - list_input_devices
+      - list_input_devices_page
+      - list_input_security_groups
+      - list_input_security_groups_page
+      - list_inputs
+      - list_inputs_page
+      - list_multiplex_programs
+      - list_multiplex_programs_page
+      - list_multiplexes
+      - list_multiplexes_page
+      - list_offerings
+      - list_offerings_page
+      - list_reservations
+      - list_reservations_page
+      - list_tags_for_resource
+      - purchase_offering
+      - reboot_input_device
+      - reject_input_device_transfer
+      - start_channel
+      - start_input_device
+      - start_input_device_maintenance_window
+      - start_multiplex
+      - stop_channel
+      - stop_input_device
+      - stop_multiplex
+      - transfer_input_device
+      - update_account_configuration
+      - update_channel
+      - update_channel_class
+      - update_input
+      - update_input_device
+      - update_input_security_group
+      - update_multiplex
+      - update_multiplex_program
+      - update_reservation
+      - restart_channel_pipelines
+      - create_cloudwatch_alarm_template
+      - create_cloudwatch_alarm_template_group
+      - create_eventbridge_rule_template
+      - create_eventbridge_rule_template_group
+      - create_signal_map
+      - delete_cloudwatch_alarm_template
+      - delete_cloudwatch_alarm_template_group
+      - delete_eventbridge_rule_template
+      - delete_eventbridge_rule_template_group
+      - delete_signal_map
+      - get_cloudwatch_alarm_template
+      - get_cloudwatch_alarm_template_group
+      - get_eventbridge_rule_template
+      - get_eventbridge_rule_template_group
+      - get_signal_map
+      - list_cloudwatch_alarm_template_groups
+      - list_cloudwatch_alarm_template_groups_page
+      - list_cloudwatch_alarm_templates
+      - list_cloudwatch_alarm_templates_page
+      - list_eventbridge_rule_template_groups
+      - list_eventbridge_rule_template_groups_page
+      - list_eventbridge_rule_templates
+      - list_eventbridge_rule_templates_page
+      - list_signal_maps
+      - list_signal_maps_page
+      - start_delete_monitor_deployment
+      - start_monitor_deployment
+      - start_update_signal_map
+      - update_cloudwatch_alarm_template
+      - update_cloudwatch_alarm_template_group
+      - update_eventbridge_rule_template
+      - update_eventbridge_rule_template_group
+      - create_channel_placement_group
+      - create_cluster
+      - create_network
+      - create_node
+      - create_node_registration_script
+      - delete_channel_placement_group
+      - delete_cluster
+      - delete_network
+      - delete_node
+      - describe_channel_placement_group
+      - describe_cluster
+      - describe_network
+      - describe_node
+      - list_channel_placement_groups
+      - list_channel_placement_groups_page
+      - list_clusters
+      - list_clusters_page
+      - list_networks
+      - list_networks_page
+      - list_nodes
+      - list_nodes_page
+      - update_channel_placement_group
+      - update_cluster
+      - update_network
+      - update_node
+      - update_node_state
+      - list_versions
+      - create_sdi_source
+      - delete_sdi_source
+      - describe_sdi_source
+      - list_sdi_sources
+      - list_sdi_sources_page
+      - update_sdi_source
+      - list_alerts
+      - list_alerts_page
+      - list_cluster_alerts
+      - list_cluster_alerts_page
+      - list_multiplex_alerts
+      - list_multiplex_alerts_page
+    verification: none
+
+commands:
+  accept_input_device_transfer:
+    summary: "Accept input device transfer (POST /prod/inputDevices/{inputDeviceId}/accept, AcceptInputDeviceTransfer)"
+    params:
+      input_device_id: {"type": "string", "required": true, "max_length": 256, "label": "Input device ID", "description": "The Link device's ID, as input_devices.<id> in state lists it."}
+    send: {"method": "POST", "path": "/prod/inputDevices/{input_device_id}/accept"}
+    expect: { status: 200 }
+    returns: ack
+  batch_delete:
+    summary: "Batch delete (POST /prod/batch/delete, BatchDelete)"
+    params:
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The BatchDelete request's JSON object as the API reference gives it, with any of channelIds, inputIds, inputSecurityGroupIds, multiplexIds."}
+    send: {"method": "POST", "path": "/prod/batch/delete", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  batch_start:
+    summary: "Batch start (POST /prod/batch/start, BatchStart)"
+    params:
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The BatchStart request's JSON object as the API reference gives it, with any of channelIds, multiplexIds."}
+    send: {"method": "POST", "path": "/prod/batch/start", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  batch_stop:
+    summary: "Batch stop (POST /prod/batch/stop, BatchStop)"
+    params:
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The BatchStop request's JSON object as the API reference gives it, with any of channelIds, multiplexIds."}
+    send: {"method": "POST", "path": "/prod/batch/stop", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  batch_update_schedule:
+    summary: "Batch update schedule (PUT /prod/channels/{channelId}/schedule, BatchUpdateSchedule)"
+    params:
+      channel_id: {"type": "string", "required": true, "max_length": 256, "label": "Channel ID", "description": "The channel's ID, as channels.<id> in state lists it."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The BatchUpdateSchedule request's JSON object as the API reference gives it, with any of creates, deletes."}
+    send: {"method": "PUT", "path": "/prod/channels/{channel_id}/schedule", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  cancel_input_device_transfer:
+    summary: "Cancel input device transfer (POST /prod/inputDevices/{inputDeviceId}/cancel, CancelInputDeviceTransfer)"
+    params:
+      input_device_id: {"type": "string", "required": true, "max_length": 256, "label": "Input device ID", "description": "The Link device's ID, as input_devices.<id> in state lists it."}
+    send: {"method": "POST", "path": "/prod/inputDevices/{input_device_id}/cancel"}
+    expect: { status: 200 }
+    returns: ack
+  claim_device:
+    summary: "Claim device (POST /prod/claimDevice, ClaimDevice)"
+    params:
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The ClaimDevice request's JSON object as the API reference gives it, with any of id."}
+    send: {"method": "POST", "path": "/prod/claimDevice", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200 }
+    returns: ack
+  create_channel:
+    summary: "Create channel (POST /prod/channels, CreateChannel)"
+    params:
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The CreateChannel request's JSON object as the API reference gives it, with any of cdiInputSpecification, channelClass, destinations, encoderSettings, inputAttachments, inputSpecification, logLevel, maintenance, name, requestId, reserved, roleArn, tags, vpc, anywhereSettings, channelEngineVersion, dryRun, linkedChannelSettings, channelSecurityGroups, inferenceSettings."}
+    send: {"method": "POST", "path": "/prod/channels", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 201, json_path: "$" }
+    returns: value
+  create_input:
+    summary: "Create input (POST /prod/inputs, CreateInput)"
+    params:
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The CreateInput request's JSON object as the API reference gives it, with any of destinations, inputDevices, inputSecurityGroups, mediaConnectFlows, name, requestId, roleArn, sources, tags, type, vpc, srtSettings, inputNetworkLocation, multicastSettings, smpte2110ReceiverGroupSettings, sdiSources, routerSettings."}
+    send: {"method": "POST", "path": "/prod/inputs", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 201, json_path: "$" }
+    returns: value
+  create_input_security_group:
+    summary: "Create input security group (POST /prod/inputSecurityGroups, CreateInputSecurityGroup)"
+    params:
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The CreateInputSecurityGroup request's JSON object as the API reference gives it, with any of tags, whitelistRules."}
+    send: {"method": "POST", "path": "/prod/inputSecurityGroups", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  create_multiplex:
+    summary: "Create multiplex (POST /prod/multiplexes, CreateMultiplex)"
+    params:
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The CreateMultiplex request's JSON object as the API reference gives it, with any of availabilityZones, multiplexSettings, name, requestId, tags (availabilityZones, multiplexSettings, name, requestId required)."}
+    send: {"method": "POST", "path": "/prod/multiplexes", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 201, json_path: "$" }
+    returns: value
+  create_multiplex_program:
+    summary: "Create multiplex program (POST /prod/multiplexes/{multiplexId}/programs, CreateMultiplexProgram)"
+    params:
+      multiplex_id: {"type": "string", "required": true, "max_length": 256, "label": "Multiplex ID", "description": "The multiplex's ID, as multiplexes.<id> in state lists it."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The CreateMultiplexProgram request's JSON object as the API reference gives it, with any of multiplexProgramSettings, programName, requestId (multiplexProgramSettings, programName, requestId required)."}
+    send: {"method": "POST", "path": "/prod/multiplexes/{multiplex_id}/programs", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 201, json_path: "$" }
+    returns: value
+  create_partner_input:
+    summary: "Create partner input (POST /prod/inputs/{inputId}/partners, CreatePartnerInput)"
+    params:
+      input_id: {"type": "string", "required": true, "max_length": 256, "label": "Input ID", "description": "The input's ID, as inputs.<id> in state lists it."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The CreatePartnerInput request's JSON object as the API reference gives it, with any of requestId, tags."}
+    send: {"method": "POST", "path": "/prod/inputs/{input_id}/partners", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 201, json_path: "$" }
+    returns: value
+  create_tags:
+    summary: "Create tags (POST /prod/tags/{resource-arn}, CreateTags)"
+    params:
+      resource_arn: {"type": "string", "required": true, "max_length": 2048, "label": "Resource ARN", "description": "The ARN of the channel, input, multiplex or other resource whose tags are meant."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The CreateTags request's JSON object as the API reference gives it, with any of tags."}
+    send: {"method": "POST", "path": "/prod/tags/{resource_arn}", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 204 }
+    returns: ack
+  delete_channel:
+    summary: "Delete channel (DELETE /prod/channels/{channelId}, DeleteChannel)"
+    params:
+      channel_id: {"type": "string", "required": true, "max_length": 256, "label": "Channel ID", "description": "The channel's ID, as channels.<id> in state lists it."}
+    send: {"method": "DELETE", "path": "/prod/channels/{channel_id}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  delete_input:
+    summary: "Delete input (DELETE /prod/inputs/{inputId}, DeleteInput)"
+    params:
+      input_id: {"type": "string", "required": true, "max_length": 256, "label": "Input ID", "description": "The input's ID, as inputs.<id> in state lists it."}
+    send: {"method": "DELETE", "path": "/prod/inputs/{input_id}"}
+    expect: { status: 200 }
+    returns: ack
+  delete_input_security_group:
+    summary: "Delete input security group (DELETE /prod/inputSecurityGroups/{inputSecurityGroupId}, DeleteInputSecurityGroup)"
+    params:
+      input_security_group_id: {"type": "string", "required": true, "max_length": 256, "label": "Input security group ID", "description": "The input security group's ID, as input_security_groups.<id> in state lists it."}
+    send: {"method": "DELETE", "path": "/prod/inputSecurityGroups/{input_security_group_id}"}
+    expect: { status: 200 }
+    returns: ack
+  delete_multiplex:
+    summary: "Delete multiplex (DELETE /prod/multiplexes/{multiplexId}, DeleteMultiplex)"
+    params:
+      multiplex_id: {"type": "string", "required": true, "max_length": 256, "label": "Multiplex ID", "description": "The multiplex's ID, as multiplexes.<id> in state lists it."}
+    send: {"method": "DELETE", "path": "/prod/multiplexes/{multiplex_id}"}
+    expect: { status: 202, json_path: "$" }
+    returns: value
+  delete_multiplex_program:
+    summary: "Delete multiplex program (DELETE /prod/multiplexes/{multiplexId}/programs/{programName}, DeleteMultiplexProgram)"
+    params:
+      multiplex_id: {"type": "string", "required": true, "max_length": 256, "label": "Multiplex ID", "description": "The multiplex's ID, as multiplexes.<id> in state lists it."}
+      program_name: {"type": "string", "required": true, "max_length": 256, "label": "Program name", "description": "The multiplex program's name."}
+    send: {"method": "DELETE", "path": "/prod/multiplexes/{multiplex_id}/programs/{program_name}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  delete_reservation:
+    summary: "Delete reservation (DELETE /prod/reservations/{reservationId}, DeleteReservation)"
+    params:
+      reservation_id: {"type": "string", "required": true, "max_length": 256, "label": "Reservation ID", "description": "The reservation's ID, from list_reservations."}
+    send: {"method": "DELETE", "path": "/prod/reservations/{reservation_id}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  delete_schedule:
+    summary: "Delete schedule (DELETE /prod/channels/{channelId}/schedule, DeleteSchedule)"
+    params:
+      channel_id: {"type": "string", "required": true, "max_length": 256, "label": "Channel ID", "description": "The channel's ID, as channels.<id> in state lists it."}
+    send: {"method": "DELETE", "path": "/prod/channels/{channel_id}/schedule"}
+    expect: { status: 200 }
+    returns: ack
+  delete_tags:
+    summary: "Delete tags (DELETE /prod/tags/{resource-arn}, DeleteTags)"
+    params:
+      resource_arn: {"type": "string", "required": true, "max_length": 2048, "label": "Resource ARN", "description": "The ARN of the channel, input, multiplex or other resource whose tags are meant."}
+      tag_key: {"type": "string", "required": true, "max_length": 128, "label": "Tag key", "description": "The key of the tag to remove."}
+    send: {"method": "DELETE", "path": "/prod/tags/{resource_arn}", "query": {"tagKeys": "{tag_key}"}}
+    expect: { status: 204 }
+    returns: ack
+  describe_account_configuration:
+    summary: "Describe account configuration (GET /prod/accountConfiguration, DescribeAccountConfiguration)"
+    send: {"method": "GET", "path": "/prod/accountConfiguration"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  describe_channel:
+    summary: "Describe channel (GET /prod/channels/{channelId}, DescribeChannel)"
+    params:
+      channel_id: {"type": "string", "required": true, "max_length": 256, "label": "Channel ID", "description": "The channel's ID, as channels.<id> in state lists it."}
+    send: {"method": "GET", "path": "/prod/channels/{channel_id}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  describe_input:
+    summary: "Describe input (GET /prod/inputs/{inputId}, DescribeInput)"
+    params:
+      input_id: {"type": "string", "required": true, "max_length": 256, "label": "Input ID", "description": "The input's ID, as inputs.<id> in state lists it."}
+    send: {"method": "GET", "path": "/prod/inputs/{input_id}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  describe_input_device:
+    summary: "Describe input device (GET /prod/inputDevices/{inputDeviceId}, DescribeInputDevice)"
+    params:
+      input_device_id: {"type": "string", "required": true, "max_length": 256, "label": "Input device ID", "description": "The Link device's ID, as input_devices.<id> in state lists it."}
+    send: {"method": "GET", "path": "/prod/inputDevices/{input_device_id}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  describe_input_security_group:
+    summary: "Describe input security group (GET /prod/inputSecurityGroups/{inputSecurityGroupId}, DescribeInputSecurityGroup)"
+    params:
+      input_security_group_id: {"type": "string", "required": true, "max_length": 256, "label": "Input security group ID", "description": "The input security group's ID, as input_security_groups.<id> in state lists it."}
+    send: {"method": "GET", "path": "/prod/inputSecurityGroups/{input_security_group_id}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  describe_multiplex:
+    summary: "Describe multiplex (GET /prod/multiplexes/{multiplexId}, DescribeMultiplex)"
+    params:
+      multiplex_id: {"type": "string", "required": true, "max_length": 256, "label": "Multiplex ID", "description": "The multiplex's ID, as multiplexes.<id> in state lists it."}
+    send: {"method": "GET", "path": "/prod/multiplexes/{multiplex_id}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  describe_multiplex_program:
+    summary: "Describe multiplex program (GET /prod/multiplexes/{multiplexId}/programs/{programName}, DescribeMultiplexProgram)"
+    params:
+      multiplex_id: {"type": "string", "required": true, "max_length": 256, "label": "Multiplex ID", "description": "The multiplex's ID, as multiplexes.<id> in state lists it."}
+      program_name: {"type": "string", "required": true, "max_length": 256, "label": "Program name", "description": "The multiplex program's name."}
+    send: {"method": "GET", "path": "/prod/multiplexes/{multiplex_id}/programs/{program_name}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  describe_offering:
+    summary: "Describe offering (GET /prod/offerings/{offeringId}, DescribeOffering)"
+    params:
+      offering_id: {"type": "string", "required": true, "max_length": 256, "label": "Offering ID", "description": "The reservation offering's ID, from list_offerings."}
+    send: {"method": "GET", "path": "/prod/offerings/{offering_id}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  describe_reservation:
+    summary: "Describe reservation (GET /prod/reservations/{reservationId}, DescribeReservation)"
+    params:
+      reservation_id: {"type": "string", "required": true, "max_length": 256, "label": "Reservation ID", "description": "The reservation's ID, from list_reservations."}
+    send: {"method": "GET", "path": "/prod/reservations/{reservation_id}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  describe_schedule:
+    summary: "Describe schedule (GET /prod/channels/{channelId}/schedule, DescribeSchedule)"
+    params:
+      channel_id: {"type": "string", "required": true, "max_length": 256, "label": "Channel ID", "description": "The channel's ID, as channels.<id> in state lists it."}
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/channels/{channel_id}/schedule", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  describe_schedule_page:
+    summary: "Describe schedule, the page after a next token (GET /prod/channels/{channelId}/schedule, DescribeSchedule)"
+    params:
+      channel_id: {"type": "string", "required": true, "max_length": 256, "label": "Channel ID", "description": "The channel's ID, as channels.<id> in state lists it."}
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/channels/{channel_id}/schedule", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  describe_thumbnails:
+    summary: "Describe thumbnails (GET /prod/channels/{channelId}/thumbnails, DescribeThumbnails)"
+    params:
+      channel_id: {"type": "string", "required": true, "max_length": 256, "label": "Channel ID", "description": "The channel's ID, as channels.<id> in state lists it."}
+      pipeline_id: {"type": "enum", "values": ["0", "1"], "default": "0", "label": "Pipeline", "description": "The channel pipeline whose thumbnail is meant, 0 or 1 (a single-pipeline channel has only 0)."}
+      thumbnail_type: {"type": "enum", "values": ["CURRENT_ACTIVE"], "default": "CURRENT_ACTIVE", "label": "Thumbnail type", "description": "Which thumbnail: CURRENT_ACTIVE, the input the pipeline is encoding now."}
+    send: {"method": "GET", "path": "/prod/channels/{channel_id}/thumbnails", "query": {"pipelineId": "{pipeline_id}", "thumbnailType": "{thumbnail_type}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_channels:
+    summary: "List channels (GET /prod/channels, ListChannels)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/channels", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_channels_page:
+    summary: "List channels, the page after a next token (GET /prod/channels, ListChannels)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/channels", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_input_device_transfers:
+    summary: "List input device transfers (GET /prod/inputDeviceTransfers, ListInputDeviceTransfers)"
+    params:
+      transfer_type: {"type": "enum", "values": ["INCOMING", "OUTGOING"], "default": "INCOMING", "label": "Transfer type", "description": "INCOMING for transfers offered to this account, OUTGOING for those it has offered."}
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/inputDeviceTransfers", "query": {"transferType": "{transfer_type}", "maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_input_device_transfers_page:
+    summary: "List input device transfers, the page after a next token (GET /prod/inputDeviceTransfers, ListInputDeviceTransfers)"
+    params:
+      transfer_type: {"type": "enum", "values": ["INCOMING", "OUTGOING"], "default": "INCOMING", "label": "Transfer type", "description": "INCOMING for transfers offered to this account, OUTGOING for those it has offered."}
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/inputDeviceTransfers", "query": {"transferType": "{transfer_type}", "maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_input_devices:
+    summary: "List input devices (GET /prod/inputDevices, ListInputDevices)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/inputDevices", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_input_devices_page:
+    summary: "List input devices, the page after a next token (GET /prod/inputDevices, ListInputDevices)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/inputDevices", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_input_security_groups:
+    summary: "List input security groups (GET /prod/inputSecurityGroups, ListInputSecurityGroups)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/inputSecurityGroups", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_input_security_groups_page:
+    summary: "List input security groups, the page after a next token (GET /prod/inputSecurityGroups, ListInputSecurityGroups)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/inputSecurityGroups", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_inputs:
+    summary: "List inputs (GET /prod/inputs, ListInputs)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/inputs", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_inputs_page:
+    summary: "List inputs, the page after a next token (GET /prod/inputs, ListInputs)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/inputs", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_multiplex_programs:
+    summary: "List multiplex programs (GET /prod/multiplexes/{multiplexId}/programs, ListMultiplexPrograms)"
+    params:
+      multiplex_id: {"type": "string", "required": true, "max_length": 256, "label": "Multiplex ID", "description": "The multiplex's ID, as multiplexes.<id> in state lists it."}
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/multiplexes/{multiplex_id}/programs", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_multiplex_programs_page:
+    summary: "List multiplex programs, the page after a next token (GET /prod/multiplexes/{multiplexId}/programs, ListMultiplexPrograms)"
+    params:
+      multiplex_id: {"type": "string", "required": true, "max_length": 256, "label": "Multiplex ID", "description": "The multiplex's ID, as multiplexes.<id> in state lists it."}
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/multiplexes/{multiplex_id}/programs", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_multiplexes:
+    summary: "List multiplexes (GET /prod/multiplexes, ListMultiplexes)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/multiplexes", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_multiplexes_page:
+    summary: "List multiplexes, the page after a next token (GET /prod/multiplexes, ListMultiplexes)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/multiplexes", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_offerings:
+    summary: "List offerings (GET /prod/offerings, ListOfferings)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/offerings", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_offerings_page:
+    summary: "List offerings, the page after a next token (GET /prod/offerings, ListOfferings)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/offerings", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_reservations:
+    summary: "List reservations (GET /prod/reservations, ListReservations)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/reservations", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_reservations_page:
+    summary: "List reservations, the page after a next token (GET /prod/reservations, ListReservations)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/reservations", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_tags_for_resource:
+    summary: "List tags for resource (GET /prod/tags/{resource-arn}, ListTagsForResource)"
+    params:
+      resource_arn: {"type": "string", "required": true, "max_length": 2048, "label": "Resource ARN", "description": "The ARN of the channel, input, multiplex or other resource whose tags are meant."}
+    send: {"method": "GET", "path": "/prod/tags/{resource_arn}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  purchase_offering:
+    summary: "Purchase offering (POST /prod/offerings/{offeringId}/purchase, PurchaseOffering)"
+    params:
+      offering_id: {"type": "string", "required": true, "max_length": 256, "label": "Offering ID", "description": "The reservation offering's ID, from list_offerings."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The PurchaseOffering request's JSON object as the API reference gives it, with any of count, name, renewalSettings, requestId, start, tags (count required)."}
+    send: {"method": "POST", "path": "/prod/offerings/{offering_id}/purchase", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 201, json_path: "$" }
+    returns: value
+  reboot_input_device:
+    summary: "Reboot input device (POST /prod/inputDevices/{inputDeviceId}/reboot, RebootInputDevice)"
+    params:
+      input_device_id: {"type": "string", "required": true, "max_length": 256, "label": "Input device ID", "description": "The Link device's ID, as input_devices.<id> in state lists it."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The RebootInputDevice request's JSON object as the API reference gives it, with any of force."}
+    send: {"method": "POST", "path": "/prod/inputDevices/{input_device_id}/reboot", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200 }
+    returns: ack
+  reject_input_device_transfer:
+    summary: "Reject input device transfer (POST /prod/inputDevices/{inputDeviceId}/reject, RejectInputDeviceTransfer)"
+    params:
+      input_device_id: {"type": "string", "required": true, "max_length": 256, "label": "Input device ID", "description": "The Link device's ID, as input_devices.<id> in state lists it."}
+    send: {"method": "POST", "path": "/prod/inputDevices/{input_device_id}/reject"}
+    expect: { status: 200 }
+    returns: ack
+  start_channel:
+    summary: "Start channel (POST /prod/channels/{channelId}/start, StartChannel)"
+    params:
+      channel_id: {"type": "string", "required": true, "max_length": 256, "label": "Channel ID", "description": "The channel's ID, as channels.<id> in state lists it."}
+    send: {"method": "POST", "path": "/prod/channels/{channel_id}/start"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  start_input_device:
+    summary: "Start input device (POST /prod/inputDevices/{inputDeviceId}/start, StartInputDevice)"
+    params:
+      input_device_id: {"type": "string", "required": true, "max_length": 256, "label": "Input device ID", "description": "The Link device's ID, as input_devices.<id> in state lists it."}
+    send: {"method": "POST", "path": "/prod/inputDevices/{input_device_id}/start"}
+    expect: { status: 200 }
+    returns: ack
+  start_input_device_maintenance_window:
+    summary: "Start input device maintenance window (POST /prod/inputDevices/{inputDeviceId}/startInputDeviceMaintenanceWindow, StartInputDeviceMaintenanceWindow)"
+    params:
+      input_device_id: {"type": "string", "required": true, "max_length": 256, "label": "Input device ID", "description": "The Link device's ID, as input_devices.<id> in state lists it."}
+    send: {"method": "POST", "path": "/prod/inputDevices/{input_device_id}/startInputDeviceMaintenanceWindow"}
+    expect: { status: 200 }
+    returns: ack
+  start_multiplex:
+    summary: "Start multiplex (POST /prod/multiplexes/{multiplexId}/start, StartMultiplex)"
+    params:
+      multiplex_id: {"type": "string", "required": true, "max_length": 256, "label": "Multiplex ID", "description": "The multiplex's ID, as multiplexes.<id> in state lists it."}
+    send: {"method": "POST", "path": "/prod/multiplexes/{multiplex_id}/start"}
+    expect: { status: 202, json_path: "$" }
+    returns: value
+  stop_channel:
+    summary: "Stop channel (POST /prod/channels/{channelId}/stop, StopChannel)"
+    params:
+      channel_id: {"type": "string", "required": true, "max_length": 256, "label": "Channel ID", "description": "The channel's ID, as channels.<id> in state lists it."}
+    send: {"method": "POST", "path": "/prod/channels/{channel_id}/stop"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  stop_input_device:
+    summary: "Stop input device (POST /prod/inputDevices/{inputDeviceId}/stop, StopInputDevice)"
+    params:
+      input_device_id: {"type": "string", "required": true, "max_length": 256, "label": "Input device ID", "description": "The Link device's ID, as input_devices.<id> in state lists it."}
+    send: {"method": "POST", "path": "/prod/inputDevices/{input_device_id}/stop"}
+    expect: { status: 200 }
+    returns: ack
+  stop_multiplex:
+    summary: "Stop multiplex (POST /prod/multiplexes/{multiplexId}/stop, StopMultiplex)"
+    params:
+      multiplex_id: {"type": "string", "required": true, "max_length": 256, "label": "Multiplex ID", "description": "The multiplex's ID, as multiplexes.<id> in state lists it."}
+    send: {"method": "POST", "path": "/prod/multiplexes/{multiplex_id}/stop"}
+    expect: { status: 202, json_path: "$" }
+    returns: value
+  transfer_input_device:
+    summary: "Transfer input device (POST /prod/inputDevices/{inputDeviceId}/transfer, TransferInputDevice)"
+    params:
+      input_device_id: {"type": "string", "required": true, "max_length": 256, "label": "Input device ID", "description": "The Link device's ID, as input_devices.<id> in state lists it."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The TransferInputDevice request's JSON object as the API reference gives it, with any of targetCustomerId, targetRegion, transferMessage."}
+    send: {"method": "POST", "path": "/prod/inputDevices/{input_device_id}/transfer", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200 }
+    returns: ack
+  update_account_configuration:
+    summary: "Update account configuration (PUT /prod/accountConfiguration, UpdateAccountConfiguration)"
+    params:
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateAccountConfiguration request's JSON object as the API reference gives it, with any of accountConfiguration."}
+    send: {"method": "PUT", "path": "/prod/accountConfiguration", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  update_channel:
+    summary: "Update channel (PUT /prod/channels/{channelId}, UpdateChannel)"
+    params:
+      channel_id: {"type": "string", "required": true, "max_length": 256, "label": "Channel ID", "description": "The channel's ID, as channels.<id> in state lists it."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateChannel request's JSON object as the API reference gives it, with any of cdiInputSpecification, destinations, encoderSettings, inputAttachments, inputSpecification, logLevel, maintenance, name, roleArn, channelEngineVersion, dryRun, anywhereSettings, linkedChannelSettings, channelSecurityGroups, inferenceSettings, specialRouterSettings."}
+    send: {"method": "PUT", "path": "/prod/channels/{channel_id}", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  update_channel_class:
+    summary: "Update channel class (PUT /prod/channels/{channelId}/channelClass, UpdateChannelClass)"
+    params:
+      channel_id: {"type": "string", "required": true, "max_length": 256, "label": "Channel ID", "description": "The channel's ID, as channels.<id> in state lists it."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateChannelClass request's JSON object as the API reference gives it, with any of channelClass, destinations (channelClass required)."}
+    send: {"method": "PUT", "path": "/prod/channels/{channel_id}/channelClass", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  update_input:
+    summary: "Update input (PUT /prod/inputs/{inputId}, UpdateInput)"
+    params:
+      input_id: {"type": "string", "required": true, "max_length": 256, "label": "Input ID", "description": "The input's ID, as inputs.<id> in state lists it."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateInput request's JSON object as the API reference gives it, with any of destinations, inputDevices, inputSecurityGroups, mediaConnectFlows, name, roleArn, sources, srtSettings, multicastSettings, smpte2110ReceiverGroupSettings, sdiSources, specialRouterSettings."}
+    send: {"method": "PUT", "path": "/prod/inputs/{input_id}", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  update_input_device:
+    summary: "Update input device (PUT /prod/inputDevices/{inputDeviceId}, UpdateInputDevice)"
+    params:
+      input_device_id: {"type": "string", "required": true, "max_length": 256, "label": "Input device ID", "description": "The Link device's ID, as input_devices.<id> in state lists it."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateInputDevice request's JSON object as the API reference gives it, with any of hdDeviceSettings, name, uhdDeviceSettings, availabilityZone."}
+    send: {"method": "PUT", "path": "/prod/inputDevices/{input_device_id}", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  update_input_security_group:
+    summary: "Update input security group (PUT /prod/inputSecurityGroups/{inputSecurityGroupId}, UpdateInputSecurityGroup)"
+    params:
+      input_security_group_id: {"type": "string", "required": true, "max_length": 256, "label": "Input security group ID", "description": "The input security group's ID, as input_security_groups.<id> in state lists it."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateInputSecurityGroup request's JSON object as the API reference gives it, with any of tags, whitelistRules."}
+    send: {"method": "PUT", "path": "/prod/inputSecurityGroups/{input_security_group_id}", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  update_multiplex:
+    summary: "Update multiplex (PUT /prod/multiplexes/{multiplexId}, UpdateMultiplex)"
+    params:
+      multiplex_id: {"type": "string", "required": true, "max_length": 256, "label": "Multiplex ID", "description": "The multiplex's ID, as multiplexes.<id> in state lists it."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateMultiplex request's JSON object as the API reference gives it, with any of multiplexSettings, name, packetIdentifiersMapping."}
+    send: {"method": "PUT", "path": "/prod/multiplexes/{multiplex_id}", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  update_multiplex_program:
+    summary: "Update multiplex program (PUT /prod/multiplexes/{multiplexId}/programs/{programName}, UpdateMultiplexProgram)"
+    params:
+      multiplex_id: {"type": "string", "required": true, "max_length": 256, "label": "Multiplex ID", "description": "The multiplex's ID, as multiplexes.<id> in state lists it."}
+      program_name: {"type": "string", "required": true, "max_length": 256, "label": "Program name", "description": "The multiplex program's name."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateMultiplexProgram request's JSON object as the API reference gives it, with any of multiplexProgramSettings."}
+    send: {"method": "PUT", "path": "/prod/multiplexes/{multiplex_id}/programs/{program_name}", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  update_reservation:
+    summary: "Update reservation (PUT /prod/reservations/{reservationId}, UpdateReservation)"
+    params:
+      reservation_id: {"type": "string", "required": true, "max_length": 256, "label": "Reservation ID", "description": "The reservation's ID, from list_reservations."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateReservation request's JSON object as the API reference gives it, with any of name, renewalSettings."}
+    send: {"method": "PUT", "path": "/prod/reservations/{reservation_id}", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  restart_channel_pipelines:
+    summary: "Restart channel pipelines (POST /prod/channels/{channelId}/restartChannelPipelines, RestartChannelPipelines)"
+    params:
+      channel_id: {"type": "string", "required": true, "max_length": 256, "label": "Channel ID", "description": "The channel's ID, as channels.<id> in state lists it."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The RestartChannelPipelines request's JSON object as the API reference gives it, with any of pipelineIds."}
+    send: {"method": "POST", "path": "/prod/channels/{channel_id}/restartChannelPipelines", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  create_cloudwatch_alarm_template:
+    summary: "Create CloudWatch alarm template (POST /prod/cloudwatch-alarm-templates, CreateCloudWatchAlarmTemplate)"
+    params:
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The CreateCloudWatchAlarmTemplate request's JSON object as the API reference gives it, with any of comparisonOperator, datapointsToAlarm, description, evaluationPeriods, groupIdentifier, metricName, name, period, statistic, tags, targetResourceType, threshold, treatMissingData, requestId (comparisonOperator, evaluationPeriods, groupIdentifier, metricName, name, period, statistic, targetResourceType, threshold, treatMissingData required)."}
+    send: {"method": "POST", "path": "/prod/cloudwatch-alarm-templates", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 201, json_path: "$" }
+    returns: value
+  create_cloudwatch_alarm_template_group:
+    summary: "Create CloudWatch alarm template group (POST /prod/cloudwatch-alarm-template-groups, CreateCloudWatchAlarmTemplateGroup)"
+    params:
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The CreateCloudWatchAlarmTemplateGroup request's JSON object as the API reference gives it, with any of description, name, tags, requestId (name required)."}
+    send: {"method": "POST", "path": "/prod/cloudwatch-alarm-template-groups", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 201, json_path: "$" }
+    returns: value
+  create_eventbridge_rule_template:
+    summary: "Create EventBridge rule template (POST /prod/eventbridge-rule-templates, CreateEventBridgeRuleTemplate)"
+    params:
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The CreateEventBridgeRuleTemplate request's JSON object as the API reference gives it, with any of description, eventTargets, eventType, groupIdentifier, name, tags, requestId (eventType, groupIdentifier, name required)."}
+    send: {"method": "POST", "path": "/prod/eventbridge-rule-templates", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 201, json_path: "$" }
+    returns: value
+  create_eventbridge_rule_template_group:
+    summary: "Create EventBridge rule template group (POST /prod/eventbridge-rule-template-groups, CreateEventBridgeRuleTemplateGroup)"
+    params:
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The CreateEventBridgeRuleTemplateGroup request's JSON object as the API reference gives it, with any of description, name, tags, requestId (name required)."}
+    send: {"method": "POST", "path": "/prod/eventbridge-rule-template-groups", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 201, json_path: "$" }
+    returns: value
+  create_signal_map:
+    summary: "Create signal map (POST /prod/signal-maps, CreateSignalMap)"
+    params:
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The CreateSignalMap request's JSON object as the API reference gives it, with any of cloudWatchAlarmTemplateGroupIdentifiers, description, discoveryEntryPointArn, eventBridgeRuleTemplateGroupIdentifiers, name, tags, requestId (discoveryEntryPointArn, name required)."}
+    send: {"method": "POST", "path": "/prod/signal-maps", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 201, json_path: "$" }
+    returns: value
+  delete_cloudwatch_alarm_template:
+    summary: "Delete CloudWatch alarm template (DELETE /prod/cloudwatch-alarm-templates/{identifier}, DeleteCloudWatchAlarmTemplate)"
+    params:
+      identifier: {"type": "string", "required": true, "max_length": 256, "label": "Identifier", "description": "The ID or ARN of the workflow monitor resource (signal map, template or template group)."}
+    send: {"method": "DELETE", "path": "/prod/cloudwatch-alarm-templates/{identifier}"}
+    expect: { status: 204 }
+    returns: ack
+  delete_cloudwatch_alarm_template_group:
+    summary: "Delete CloudWatch alarm template group (DELETE /prod/cloudwatch-alarm-template-groups/{identifier}, DeleteCloudWatchAlarmTemplateGroup)"
+    params:
+      identifier: {"type": "string", "required": true, "max_length": 256, "label": "Identifier", "description": "The ID or ARN of the workflow monitor resource (signal map, template or template group)."}
+    send: {"method": "DELETE", "path": "/prod/cloudwatch-alarm-template-groups/{identifier}"}
+    expect: { status: 204 }
+    returns: ack
+  delete_eventbridge_rule_template:
+    summary: "Delete EventBridge rule template (DELETE /prod/eventbridge-rule-templates/{identifier}, DeleteEventBridgeRuleTemplate)"
+    params:
+      identifier: {"type": "string", "required": true, "max_length": 256, "label": "Identifier", "description": "The ID or ARN of the workflow monitor resource (signal map, template or template group)."}
+    send: {"method": "DELETE", "path": "/prod/eventbridge-rule-templates/{identifier}"}
+    expect: { status: 204 }
+    returns: ack
+  delete_eventbridge_rule_template_group:
+    summary: "Delete EventBridge rule template group (DELETE /prod/eventbridge-rule-template-groups/{identifier}, DeleteEventBridgeRuleTemplateGroup)"
+    params:
+      identifier: {"type": "string", "required": true, "max_length": 256, "label": "Identifier", "description": "The ID or ARN of the workflow monitor resource (signal map, template or template group)."}
+    send: {"method": "DELETE", "path": "/prod/eventbridge-rule-template-groups/{identifier}"}
+    expect: { status: 204 }
+    returns: ack
+  delete_signal_map:
+    summary: "Delete signal map (DELETE /prod/signal-maps/{identifier}, DeleteSignalMap)"
+    params:
+      identifier: {"type": "string", "required": true, "max_length": 256, "label": "Identifier", "description": "The ID or ARN of the workflow monitor resource (signal map, template or template group)."}
+    send: {"method": "DELETE", "path": "/prod/signal-maps/{identifier}"}
+    expect: { status: 204 }
+    returns: ack
+  get_cloudwatch_alarm_template:
+    summary: "Get CloudWatch alarm template (GET /prod/cloudwatch-alarm-templates/{identifier}, GetCloudWatchAlarmTemplate)"
+    params:
+      identifier: {"type": "string", "required": true, "max_length": 256, "label": "Identifier", "description": "The ID or ARN of the workflow monitor resource (signal map, template or template group)."}
+    send: {"method": "GET", "path": "/prod/cloudwatch-alarm-templates/{identifier}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_cloudwatch_alarm_template_group:
+    summary: "Get CloudWatch alarm template group (GET /prod/cloudwatch-alarm-template-groups/{identifier}, GetCloudWatchAlarmTemplateGroup)"
+    params:
+      identifier: {"type": "string", "required": true, "max_length": 256, "label": "Identifier", "description": "The ID or ARN of the workflow monitor resource (signal map, template or template group)."}
+    send: {"method": "GET", "path": "/prod/cloudwatch-alarm-template-groups/{identifier}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_eventbridge_rule_template:
+    summary: "Get EventBridge rule template (GET /prod/eventbridge-rule-templates/{identifier}, GetEventBridgeRuleTemplate)"
+    params:
+      identifier: {"type": "string", "required": true, "max_length": 256, "label": "Identifier", "description": "The ID or ARN of the workflow monitor resource (signal map, template or template group)."}
+    send: {"method": "GET", "path": "/prod/eventbridge-rule-templates/{identifier}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_eventbridge_rule_template_group:
+    summary: "Get EventBridge rule template group (GET /prod/eventbridge-rule-template-groups/{identifier}, GetEventBridgeRuleTemplateGroup)"
+    params:
+      identifier: {"type": "string", "required": true, "max_length": 256, "label": "Identifier", "description": "The ID or ARN of the workflow monitor resource (signal map, template or template group)."}
+    send: {"method": "GET", "path": "/prod/eventbridge-rule-template-groups/{identifier}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_signal_map:
+    summary: "Get signal map (GET /prod/signal-maps/{identifier}, GetSignalMap)"
+    params:
+      identifier: {"type": "string", "required": true, "max_length": 256, "label": "Identifier", "description": "The ID or ARN of the workflow monitor resource (signal map, template or template group)."}
+    send: {"method": "GET", "path": "/prod/signal-maps/{identifier}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_cloudwatch_alarm_template_groups:
+    summary: "List CloudWatch alarm template groups (GET /prod/cloudwatch-alarm-template-groups, ListCloudWatchAlarmTemplateGroups)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/cloudwatch-alarm-template-groups", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_cloudwatch_alarm_template_groups_page:
+    summary: "List CloudWatch alarm template groups, the page after a next token (GET /prod/cloudwatch-alarm-template-groups, ListCloudWatchAlarmTemplateGroups)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/cloudwatch-alarm-template-groups", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_cloudwatch_alarm_templates:
+    summary: "List CloudWatch alarm templates (GET /prod/cloudwatch-alarm-templates, ListCloudWatchAlarmTemplates)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/cloudwatch-alarm-templates", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_cloudwatch_alarm_templates_page:
+    summary: "List CloudWatch alarm templates, the page after a next token (GET /prod/cloudwatch-alarm-templates, ListCloudWatchAlarmTemplates)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/cloudwatch-alarm-templates", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_eventbridge_rule_template_groups:
+    summary: "List EventBridge rule template groups (GET /prod/eventbridge-rule-template-groups, ListEventBridgeRuleTemplateGroups)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/eventbridge-rule-template-groups", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_eventbridge_rule_template_groups_page:
+    summary: "List EventBridge rule template groups, the page after a next token (GET /prod/eventbridge-rule-template-groups, ListEventBridgeRuleTemplateGroups)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/eventbridge-rule-template-groups", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_eventbridge_rule_templates:
+    summary: "List EventBridge rule templates (GET /prod/eventbridge-rule-templates, ListEventBridgeRuleTemplates)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/eventbridge-rule-templates", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_eventbridge_rule_templates_page:
+    summary: "List EventBridge rule templates, the page after a next token (GET /prod/eventbridge-rule-templates, ListEventBridgeRuleTemplates)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/eventbridge-rule-templates", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_signal_maps:
+    summary: "List signal maps (GET /prod/signal-maps, ListSignalMaps)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/signal-maps", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_signal_maps_page:
+    summary: "List signal maps, the page after a next token (GET /prod/signal-maps, ListSignalMaps)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/signal-maps", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  start_delete_monitor_deployment:
+    summary: "Start delete monitor deployment (DELETE /prod/signal-maps/{identifier}/monitor-deployment, StartDeleteMonitorDeployment)"
+    params:
+      identifier: {"type": "string", "required": true, "max_length": 256, "label": "Identifier", "description": "The ID or ARN of the workflow monitor resource (signal map, template or template group)."}
+    send: {"method": "DELETE", "path": "/prod/signal-maps/{identifier}/monitor-deployment"}
+    expect: { status: 202, json_path: "$" }
+    returns: value
+  start_monitor_deployment:
+    summary: "Start monitor deployment (POST /prod/signal-maps/{identifier}/monitor-deployment, StartMonitorDeployment)"
+    params:
+      identifier: {"type": "string", "required": true, "max_length": 256, "label": "Identifier", "description": "The ID or ARN of the workflow monitor resource (signal map, template or template group)."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The StartMonitorDeployment request's JSON object as the API reference gives it, with any of dryRun."}
+    send: {"method": "POST", "path": "/prod/signal-maps/{identifier}/monitor-deployment", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 202, json_path: "$" }
+    returns: value
+  start_update_signal_map:
+    summary: "Start update signal map (PATCH /prod/signal-maps/{identifier}, StartUpdateSignalMap)"
+    params:
+      identifier: {"type": "string", "required": true, "max_length": 256, "label": "Identifier", "description": "The ID or ARN of the workflow monitor resource (signal map, template or template group)."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The StartUpdateSignalMap request's JSON object as the API reference gives it, with any of cloudWatchAlarmTemplateGroupIdentifiers, description, discoveryEntryPointArn, eventBridgeRuleTemplateGroupIdentifiers, forceRediscovery, name."}
+    send: {"method": "PATCH", "path": "/prod/signal-maps/{identifier}", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 202, json_path: "$" }
+    returns: value
+  update_cloudwatch_alarm_template:
+    summary: "Update CloudWatch alarm template (PATCH /prod/cloudwatch-alarm-templates/{identifier}, UpdateCloudWatchAlarmTemplate)"
+    params:
+      identifier: {"type": "string", "required": true, "max_length": 256, "label": "Identifier", "description": "The ID or ARN of the workflow monitor resource (signal map, template or template group)."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateCloudWatchAlarmTemplate request's JSON object as the API reference gives it, with any of comparisonOperator, datapointsToAlarm, description, evaluationPeriods, groupIdentifier, metricName, name, period, statistic, targetResourceType, threshold, treatMissingData."}
+    send: {"method": "PATCH", "path": "/prod/cloudwatch-alarm-templates/{identifier}", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  update_cloudwatch_alarm_template_group:
+    summary: "Update CloudWatch alarm template group (PATCH /prod/cloudwatch-alarm-template-groups/{identifier}, UpdateCloudWatchAlarmTemplateGroup)"
+    params:
+      identifier: {"type": "string", "required": true, "max_length": 256, "label": "Identifier", "description": "The ID or ARN of the workflow monitor resource (signal map, template or template group)."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateCloudWatchAlarmTemplateGroup request's JSON object as the API reference gives it, with any of description."}
+    send: {"method": "PATCH", "path": "/prod/cloudwatch-alarm-template-groups/{identifier}", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  update_eventbridge_rule_template:
+    summary: "Update EventBridge rule template (PATCH /prod/eventbridge-rule-templates/{identifier}, UpdateEventBridgeRuleTemplate)"
+    params:
+      identifier: {"type": "string", "required": true, "max_length": 256, "label": "Identifier", "description": "The ID or ARN of the workflow monitor resource (signal map, template or template group)."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateEventBridgeRuleTemplate request's JSON object as the API reference gives it, with any of description, eventTargets, eventType, groupIdentifier, name."}
+    send: {"method": "PATCH", "path": "/prod/eventbridge-rule-templates/{identifier}", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  update_eventbridge_rule_template_group:
+    summary: "Update EventBridge rule template group (PATCH /prod/eventbridge-rule-template-groups/{identifier}, UpdateEventBridgeRuleTemplateGroup)"
+    params:
+      identifier: {"type": "string", "required": true, "max_length": 256, "label": "Identifier", "description": "The ID or ARN of the workflow monitor resource (signal map, template or template group)."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateEventBridgeRuleTemplateGroup request's JSON object as the API reference gives it, with any of description."}
+    send: {"method": "PATCH", "path": "/prod/eventbridge-rule-template-groups/{identifier}", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  create_channel_placement_group:
+    summary: "Create channel placement group (POST /prod/clusters/{clusterId}/channelplacementgroups, CreateChannelPlacementGroup)"
+    params:
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The CreateChannelPlacementGroup request's JSON object as the API reference gives it, with any of name, nodes, requestId, tags."}
+    send: {"method": "POST", "path": "/prod/clusters/{cluster_id}/channelplacementgroups", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 201, json_path: "$" }
+    returns: value
+  create_cluster:
+    summary: "Create cluster (POST /prod/clusters, CreateCluster)"
+    params:
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The CreateCluster request's JSON object as the API reference gives it, with any of clusterType, instanceRoleArn, name, networkSettings, requestId, tags."}
+    send: {"method": "POST", "path": "/prod/clusters", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 201, json_path: "$" }
+    returns: value
+  create_network:
+    summary: "Create network (POST /prod/networks, CreateNetwork)"
+    params:
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The CreateNetwork request's JSON object as the API reference gives it, with any of ipPools, name, requestId, routes, tags."}
+    send: {"method": "POST", "path": "/prod/networks", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 201, json_path: "$" }
+    returns: value
+  create_node:
+    summary: "Create node (POST /prod/clusters/{clusterId}/nodes, CreateNode)"
+    params:
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The CreateNode request's JSON object as the API reference gives it, with any of name, nodeInterfaceMappings, requestId, role, tags."}
+    send: {"method": "POST", "path": "/prod/clusters/{cluster_id}/nodes", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 201, json_path: "$" }
+    returns: value
+  create_node_registration_script:
+    summary: "Create node registration script (POST /prod/clusters/{clusterId}/nodeRegistrationScript, CreateNodeRegistrationScript)"
+    params:
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The CreateNodeRegistrationScript request's JSON object as the API reference gives it, with any of id, name, nodeInterfaceMappings, requestId, role."}
+    send: {"method": "POST", "path": "/prod/clusters/{cluster_id}/nodeRegistrationScript", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  delete_channel_placement_group:
+    summary: "Delete channel placement group (DELETE /prod/clusters/{clusterId}/channelplacementgroups/{channelPlacementGroupId}, DeleteChannelPlacementGroup)"
+    params:
+      channel_placement_group_id: {"type": "string", "required": true, "max_length": 256, "label": "Channel placement group ID", "description": "The channel placement group's ID, within its cluster."}
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+    send: {"method": "DELETE", "path": "/prod/clusters/{cluster_id}/channelplacementgroups/{channel_placement_group_id}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  delete_cluster:
+    summary: "Delete cluster (DELETE /prod/clusters/{clusterId}, DeleteCluster)"
+    params:
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+    send: {"method": "DELETE", "path": "/prod/clusters/{cluster_id}"}
+    expect: { status: 202, json_path: "$" }
+    returns: value
+  delete_network:
+    summary: "Delete network (DELETE /prod/networks/{networkId}, DeleteNetwork)"
+    params:
+      network_id: {"type": "string", "required": true, "max_length": 256, "label": "Network ID", "description": "The MediaLive Anywhere network's ID."}
+    send: {"method": "DELETE", "path": "/prod/networks/{network_id}"}
+    expect: { status: 202, json_path: "$" }
+    returns: value
+  delete_node:
+    summary: "Delete node (DELETE /prod/clusters/{clusterId}/nodes/{nodeId}, DeleteNode)"
+    params:
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+      node_id: {"type": "string", "required": true, "max_length": 256, "label": "Node ID", "description": "The MediaLive Anywhere node's ID, within its cluster."}
+    send: {"method": "DELETE", "path": "/prod/clusters/{cluster_id}/nodes/{node_id}"}
+    expect: { status: 202, json_path: "$" }
+    returns: value
+  describe_channel_placement_group:
+    summary: "Describe channel placement group (GET /prod/clusters/{clusterId}/channelplacementgroups/{channelPlacementGroupId}, DescribeChannelPlacementGroup)"
+    params:
+      channel_placement_group_id: {"type": "string", "required": true, "max_length": 256, "label": "Channel placement group ID", "description": "The channel placement group's ID, within its cluster."}
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+    send: {"method": "GET", "path": "/prod/clusters/{cluster_id}/channelplacementgroups/{channel_placement_group_id}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  describe_cluster:
+    summary: "Describe cluster (GET /prod/clusters/{clusterId}, DescribeCluster)"
+    params:
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+    send: {"method": "GET", "path": "/prod/clusters/{cluster_id}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  describe_network:
+    summary: "Describe network (GET /prod/networks/{networkId}, DescribeNetwork)"
+    params:
+      network_id: {"type": "string", "required": true, "max_length": 256, "label": "Network ID", "description": "The MediaLive Anywhere network's ID."}
+    send: {"method": "GET", "path": "/prod/networks/{network_id}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  describe_node:
+    summary: "Describe node (GET /prod/clusters/{clusterId}/nodes/{nodeId}, DescribeNode)"
+    params:
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+      node_id: {"type": "string", "required": true, "max_length": 256, "label": "Node ID", "description": "The MediaLive Anywhere node's ID, within its cluster."}
+    send: {"method": "GET", "path": "/prod/clusters/{cluster_id}/nodes/{node_id}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_channel_placement_groups:
+    summary: "List channel placement groups (GET /prod/clusters/{clusterId}/channelplacementgroups, ListChannelPlacementGroups)"
+    params:
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/clusters/{cluster_id}/channelplacementgroups", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_channel_placement_groups_page:
+    summary: "List channel placement groups, the page after a next token (GET /prod/clusters/{clusterId}/channelplacementgroups, ListChannelPlacementGroups)"
+    params:
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/clusters/{cluster_id}/channelplacementgroups", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_clusters:
+    summary: "List clusters (GET /prod/clusters, ListClusters)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/clusters", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_clusters_page:
+    summary: "List clusters, the page after a next token (GET /prod/clusters, ListClusters)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/clusters", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_networks:
+    summary: "List networks (GET /prod/networks, ListNetworks)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/networks", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_networks_page:
+    summary: "List networks, the page after a next token (GET /prod/networks, ListNetworks)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/networks", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_nodes:
+    summary: "List nodes (GET /prod/clusters/{clusterId}/nodes, ListNodes)"
+    params:
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/clusters/{cluster_id}/nodes", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_nodes_page:
+    summary: "List nodes, the page after a next token (GET /prod/clusters/{clusterId}/nodes, ListNodes)"
+    params:
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/clusters/{cluster_id}/nodes", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  update_channel_placement_group:
+    summary: "Update channel placement group (PUT /prod/clusters/{clusterId}/channelplacementgroups/{channelPlacementGroupId}, UpdateChannelPlacementGroup)"
+    params:
+      channel_placement_group_id: {"type": "string", "required": true, "max_length": 256, "label": "Channel placement group ID", "description": "The channel placement group's ID, within its cluster."}
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateChannelPlacementGroup request's JSON object as the API reference gives it, with any of name, nodes."}
+    send: {"method": "PUT", "path": "/prod/clusters/{cluster_id}/channelplacementgroups/{channel_placement_group_id}", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  update_cluster:
+    summary: "Update cluster (PUT /prod/clusters/{clusterId}, UpdateCluster)"
+    params:
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateCluster request's JSON object as the API reference gives it, with any of name, networkSettings."}
+    send: {"method": "PUT", "path": "/prod/clusters/{cluster_id}", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  update_network:
+    summary: "Update network (PUT /prod/networks/{networkId}, UpdateNetwork)"
+    params:
+      network_id: {"type": "string", "required": true, "max_length": 256, "label": "Network ID", "description": "The MediaLive Anywhere network's ID."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateNetwork request's JSON object as the API reference gives it, with any of ipPools, name, routes."}
+    send: {"method": "PUT", "path": "/prod/networks/{network_id}", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  update_node:
+    summary: "Update node (PUT /prod/clusters/{clusterId}/nodes/{nodeId}, UpdateNode)"
+    params:
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+      node_id: {"type": "string", "required": true, "max_length": 256, "label": "Node ID", "description": "The MediaLive Anywhere node's ID, within its cluster."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateNode request's JSON object as the API reference gives it, with any of name, role, sdiSourceMappings."}
+    send: {"method": "PUT", "path": "/prod/clusters/{cluster_id}/nodes/{node_id}", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 201, json_path: "$" }
+    returns: value
+  update_node_state:
+    summary: "Update node state (PUT /prod/clusters/{clusterId}/nodes/{nodeId}/state, UpdateNodeState)"
+    params:
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+      node_id: {"type": "string", "required": true, "max_length": 256, "label": "Node ID", "description": "The MediaLive Anywhere node's ID, within its cluster."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateNodeState request's JSON object as the API reference gives it, with any of state."}
+    send: {"method": "PUT", "path": "/prod/clusters/{cluster_id}/nodes/{node_id}/state", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 201, json_path: "$" }
+    returns: value
+  list_versions:
+    summary: "List versions (GET /prod/versions, ListVersions)"
+    send: {"method": "GET", "path": "/prod/versions"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  create_sdi_source:
+    summary: "Create sdi source (POST /prod/sdiSources, CreateSdiSource)"
+    params:
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The CreateSdiSource request's JSON object as the API reference gives it, with any of mode, name, requestId, tags, type."}
+    send: {"method": "POST", "path": "/prod/sdiSources", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  delete_sdi_source:
+    summary: "Delete sdi source (DELETE /prod/sdiSources/{sdiSourceId}, DeleteSdiSource)"
+    params:
+      sdi_source_id: {"type": "string", "required": true, "max_length": 256, "label": "SDI source ID", "description": "The SDI source's ID."}
+    send: {"method": "DELETE", "path": "/prod/sdiSources/{sdi_source_id}"}
+    expect: { status: 202, json_path: "$" }
+    returns: value
+  describe_sdi_source:
+    summary: "Describe sdi source (GET /prod/sdiSources/{sdiSourceId}, DescribeSdiSource)"
+    params:
+      sdi_source_id: {"type": "string", "required": true, "max_length": 256, "label": "SDI source ID", "description": "The SDI source's ID."}
+    send: {"method": "GET", "path": "/prod/sdiSources/{sdi_source_id}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_sdi_sources:
+    summary: "List sdi sources (GET /prod/sdiSources, ListSdiSources)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/sdiSources", "query": {"maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_sdi_sources_page:
+    summary: "List sdi sources, the page after a next token (GET /prod/sdiSources, ListSdiSources)"
+    params:
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/sdiSources", "query": {"maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  update_sdi_source:
+    summary: "Update sdi source (PUT /prod/sdiSources/{sdiSourceId}, UpdateSdiSource)"
+    params:
+      sdi_source_id: {"type": "string", "required": true, "max_length": 256, "label": "SDI source ID", "description": "The SDI source's ID."}
+      body: {"type": "json", "required": true, "label": "Request body", "description": "The UpdateSdiSource request's JSON object as the API reference gives it, with any of mode, name, type."}
+    send: {"method": "PUT", "path": "/prod/sdiSources/{sdi_source_id}", "body": "{body}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_alerts:
+    summary: "List alerts (GET /prod/channels/{channelId}/alerts, ListAlerts)"
+    params:
+      channel_id: {"type": "string", "required": true, "max_length": 256, "label": "Channel ID", "description": "The channel's ID, as channels.<id> in state lists it."}
+      state: {"type": "enum", "values": ["SET", "CLEARED", "ALL"], "default": "ALL", "label": "State", "description": "Which alerts: SET those still raised, CLEARED those cleared, ALL both."}
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/channels/{channel_id}/alerts", "query": {"stateFilter": "{state}", "maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_alerts_page:
+    summary: "List alerts, the page after a next token (GET /prod/channels/{channelId}/alerts, ListAlerts)"
+    params:
+      channel_id: {"type": "string", "required": true, "max_length": 256, "label": "Channel ID", "description": "The channel's ID, as channels.<id> in state lists it."}
+      state: {"type": "enum", "values": ["SET", "CLEARED", "ALL"], "default": "ALL", "label": "State", "description": "Which alerts: SET those still raised, CLEARED those cleared, ALL both."}
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/channels/{channel_id}/alerts", "query": {"stateFilter": "{state}", "maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_cluster_alerts:
+    summary: "List cluster alerts (GET /prod/clusters/{clusterId}/alerts, ListClusterAlerts)"
+    params:
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+      state: {"type": "enum", "values": ["SET", "CLEARED", "ALL"], "default": "ALL", "label": "State", "description": "Which alerts: SET those still raised, CLEARED those cleared, ALL both."}
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/clusters/{cluster_id}/alerts", "query": {"stateFilter": "{state}", "maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_cluster_alerts_page:
+    summary: "List cluster alerts, the page after a next token (GET /prod/clusters/{clusterId}/alerts, ListClusterAlerts)"
+    params:
+      cluster_id: {"type": "string", "required": true, "max_length": 256, "label": "Cluster ID", "description": "The MediaLive Anywhere cluster's ID."}
+      state: {"type": "enum", "values": ["SET", "CLEARED", "ALL"], "default": "ALL", "label": "State", "description": "Which alerts: SET those still raised, CLEARED those cleared, ALL both."}
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/clusters/{cluster_id}/alerts", "query": {"stateFilter": "{state}", "maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_multiplex_alerts:
+    summary: "List multiplex alerts (GET /prod/multiplexes/{multiplexId}/alerts, ListMultiplexAlerts)"
+    params:
+      multiplex_id: {"type": "string", "required": true, "max_length": 256, "label": "Multiplex ID", "description": "The multiplex's ID, as multiplexes.<id> in state lists it."}
+      state: {"type": "enum", "values": ["SET", "CLEARED", "ALL"], "default": "ALL", "label": "State", "description": "Which alerts: SET those still raised, CLEARED those cleared, ALL both."}
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+    send: {"method": "GET", "path": "/prod/multiplexes/{multiplex_id}/alerts", "query": {"stateFilter": "{state}", "maxResults": "{max_results}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_multiplex_alerts_page:
+    summary: "List multiplex alerts, the page after a next token (GET /prod/multiplexes/{multiplexId}/alerts, ListMultiplexAlerts)"
+    params:
+      multiplex_id: {"type": "string", "required": true, "max_length": 256, "label": "Multiplex ID", "description": "The multiplex's ID, as multiplexes.<id> in state lists it."}
+      state: {"type": "enum", "values": ["SET", "CLEARED", "ALL"], "default": "ALL", "label": "State", "description": "Which alerts: SET those still raised, CLEARED those cleared, ALL both."}
+      max_results: {"type": "int", "min": 1, "max": 1000, "default": 1000, "label": "Page size", "description": "How many items the page holds at most, 1 to 1000."}
+      next_token: {"type": "string", "required": true, "max_length": 4096, "label": "Next token", "description": "The nextToken of the page before, which names the page to return."}
+    send: {"method": "GET", "path": "/prod/multiplexes/{multiplex_id}/alerts", "query": {"stateFilter": "{state}", "maxResults": "{max_results}", "nextToken": "{next_token}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Open the device with the API's host name for its region
+      (medialive.us-west-2.amazonaws.com and so on) on port 443, and set the
+      region setting to the same region: each request is signed for it with
+      AWS Signature Version 4, from the access key ID and secret access key
+      (and the session token of temporary credentials). The signature holds
+      the host's clock, which AWS refuses when it is more than 5 minutes
+      off: keep the host on NTP. A refused credential (HTTP 403 naming the
+      token or the signature) stops the device until its settings change;
+      a 403 for a permission the key lacks fails that command only.
+  - models: [all]
+    severity: critical
+    text: >
+      These act at once and none asks for confirmation. stop_channel,
+      batch_stop, stop_multiplex, restart_channel_pipelines and
+      stop_input_device interrupt what is on air; batch_update_schedule's
+      actions (input switches, SCTE-35 splices, static and motion graphics,
+      pauses) take effect at their times; the delete_* commands,
+      batch_delete and delete_schedule cannot be undone; purchase_offering
+      buys a reservation that is billed for its whole term and cannot be
+      cancelled; transfer_input_device and claim_device change which account
+      owns a Link device; update_channel_class changes the channel's
+      pipelines. Running channels and multiplexes are billed by the hour.
+  - models: [all]
+    severity: info
+    text: >
+      Bodies are the API's own JSON (the request members the API reference
+      gives for each operation, named as it names them), passed whole in the
+      body parameter; answers are the API's JSON, returned whole. List
+      operations return one page: list_* asks for the most the operation
+      allows (max_results), and list_*_page the page after a nextToken an
+      answer gave. The optional filters of list_offerings,
+      list_reservations, the workflow monitor's lists and the alert lists'
+      state are the API's too; only the alert state filter is offered here,
+      the others' results being filtered by the consumer. delete_tags
+      removes one tag key per call. describe_input_device_thumbnail answers
+      a JPEG image, which a command's result (JSON) cannot carry, so it is
+      not offered; describe_thumbnails gives a channel's thumbnails as
+      base64 in JSON.
+  - models: [all]
+    severity: info
+    text: >
+      State is polled: the channels every 10 seconds (one page of up to
+      1,000), and the inputs, multiplexes, Link input devices and input
+      security groups every 60 seconds; a channel or input deleted is gone at
+      the next read. A command's answer that describes a channel, input,
+      multiplex, input device or security group (describe, create, update,
+      start, stop, delete) updates its state at once. A schedule, a
+      multiplex's programs, alerts, reservations and the workflow monitor
+      are read by their commands. AWS meters API calls per account and
+      throttles bursts (HTTP 429), which fail the command or poll they
+      answer.
+
+state:
+  channels.*.name: { type: string, description: "The channel's name, by its ID" }
+  channels.*.state: { type: string, description: "CREATING, CREATE_FAILED, IDLE, STARTING, RUNNING, RECOVERING, STOPPING, DELETING, DELETED, UPDATING or UPDATE_FAILED, by its ID" }
+  channels.*.arn: { type: string, description: "The channel's ARN, by its ID" }
+  channels.*.channel_class: { type: string, description: "STANDARD (two pipelines) or SINGLE_PIPELINE, by its ID" }
+  channels.*.pipelines_running: { type: int, description: "How many of the channel's pipelines run, by its ID" }
+  channels.*.log_level: { type: string, description: "The CloudWatch log level: ERROR, WARNING, INFO, DEBUG or DISABLED, by its ID" }
+  channels.*.engine_version: { type: string, description: "The channel engine version it runs, when it names one, by its ID" }
+  channels.*.input_attachments: { type: string, description: "The inputs attached, as JSON text of the API's inputAttachments, by its ID" }
+  channels.*.destinations: { type: string, description: "The output destinations, as JSON text of the API's destinations, by its ID" }
+  inputs.*.name: { type: string, description: "The input's name, by its ID" }
+  inputs.*.state: { type: string, description: "CREATING, DETACHED, ATTACHED, DELETING or DELETED, by its ID" }
+  inputs.*.arn: { type: string, description: "The input's ARN, by its ID" }
+  inputs.*.type: { type: string, description: "The input type, such as RTMP_PUSH, RTP_PUSH, URL_PULL, MP4_FILE, MEDIACONNECT, INPUT_DEVICE, SRT_CALLER, by its ID" }
+  inputs.*.input_class: { type: string, description: "STANDARD or SINGLE_PIPELINE, by its ID" }
+  inputs.*.source_type: { type: string, description: "STATIC or DYNAMIC, by its ID" }
+  inputs.*.attached_channels: { type: string, description: "The IDs of the channels it is attached to, as JSON text, by its ID" }
+  inputs.*.destinations: { type: string, description: "Its push endpoints, as JSON text of the API's destinations, by its ID" }
+  inputs.*.sources: { type: string, description: "Its pull sources, as JSON text of the API's sources, by its ID" }
+  inputs.*.security_groups: { type: string, description: "The IDs of its input security groups, as JSON text, by its ID" }
+  multiplexes.*.name: { type: string, description: "The multiplex's name, by its ID" }
+  multiplexes.*.state: { type: string, description: "CREATING, CREATE_FAILED, IDLE, STARTING, RUNNING, RECOVERING, STOPPING, DELETING or DELETED, by its ID" }
+  multiplexes.*.arn: { type: string, description: "The multiplex's ARN, by its ID" }
+  multiplexes.*.pipelines_running: { type: int, description: "How many of its pipelines run, by its ID" }
+  multiplexes.*.program_count: { type: int, description: "How many programs it carries, by its ID" }
+  multiplexes.*.availability_zones: { type: string, description: "Its two Availability Zones, as JSON text, by its ID" }
+  input_devices.*.name: { type: string, description: "The Link device's name, by its ID" }
+  input_devices.*.connection_state: { type: string, description: "DISCONNECTED or CONNECTED, by its ID" }
+  input_devices.*.type: { type: string, description: "HD, UHD or the type the API reports, by its ID" }
+  input_devices.*.arn: { type: string, description: "The device's ARN, by its ID" }
+  input_devices.*.device_update_status: { type: string, description: "UP_TO_DATE, NOT_UP_TO_DATE or UPDATING, by its ID" }
+  input_devices.*.settings_sync_state: { type: string, description: "SYNCED or SYNCING, by its ID" }
+  input_devices.*.serial_number: { type: string, description: "The device's serial number, by its ID" }
+  input_devices.*.mac_address: { type: string, description: "The device's MAC address, by its ID" }
+  input_devices.*.availability_zone: { type: string, description: "The Availability Zone it is set to, by its ID" }
+  input_devices.*.output_type: { type: string, description: "What it feeds: NONE, MEDIALIVE_INPUT or MEDIACONNECT_FLOW, by its ID" }
+  input_security_groups.*.state: { type: string, description: "IDLE, IN_USE, UPDATING or DELETED, by its ID" }
+  input_security_groups.*.arn: { type: string, description: "The group's ARN, by its ID" }
+  input_security_groups.*.whitelist_rules: { type: string, description: "Its allowed CIDR blocks, as JSON text of the API's whitelistRules, by its ID" }
+  input_security_groups.*.inputs: { type: string, description: "The IDs of the inputs using it, as JSON text, by its ID" }
+  account.kms_key_id: { type: string, description: "The KMS key the account encrypts its channels' secrets with, empty for the default" }
+
+telemetry:
+  poll:
+    - every_ms: 10000
+      send:
+        - { method: GET, path: /prod/channels, query: { maxResults: "1000" } }
+    - every_ms: 60000
+      send:
+        - { method: GET, path: /prod/inputs, query: { maxResults: "1000" } }
+        - { method: GET, path: /prod/multiplexes, query: { maxResults: "1000" } }
+        - { method: GET, path: /prod/inputDevices, query: { maxResults: "1000" } }
+        - { method: GET, path: /prod/inputSecurityGroups, query: { maxResults: "1000" } }
+        - { method: GET, path: /prod/accountConfiguration }
+  updates:
+    - path: "^/prod/channels\\?"
+      json_each: "$.channels"
+      json: { id: "$.id", name: "$.name", state: "$.state", arn: "$.arn", channel_class: "$.channelClass", pipelines_running: "$.pipelinesRunningCount", log_level: "$.logLevel", engine_version: "$.channelEngineVersion.version", input_attachments: "$.inputAttachments", destinations: "$.destinations" }
+      replace: channels
+      state:
+        "channels.{id:key}.name": "{name}"
+        "channels.{id:key}.state": "{state}"
+        "channels.{id:key}.arn": "{arn}"
+        "channels.{id:key}.channel_class": "{channel_class}"
+        "channels.{id:key}.pipelines_running": "{pipelines_running}"
+        "channels.{id:key}.log_level": "{log_level}"
+        "channels.{id:key}.engine_version": "{engine_version}"
+        "channels.{id:key}.input_attachments": "{input_attachments}"
+        "channels.{id:key}.destinations": "{destinations}"
+    - path: "^/prod/channels/[^/?]+(/(start|stop))?$"
+      json_match: {"$.id": "^."}
+      json: { id: "$.id", name: "$.name", state: "$.state", arn: "$.arn", channel_class: "$.channelClass", pipelines_running: "$.pipelinesRunningCount", log_level: "$.logLevel", engine_version: "$.channelEngineVersion.version", input_attachments: "$.inputAttachments", destinations: "$.destinations" }
+      state:
+        "channels.{id:key}.name": "{name}"
+        "channels.{id:key}.state": "{state}"
+        "channels.{id:key}.arn": "{arn}"
+        "channels.{id:key}.channel_class": "{channel_class}"
+        "channels.{id:key}.pipelines_running": "{pipelines_running}"
+        "channels.{id:key}.log_level": "{log_level}"
+        "channels.{id:key}.engine_version": "{engine_version}"
+        "channels.{id:key}.input_attachments": "{input_attachments}"
+        "channels.{id:key}.destinations": "{destinations}"
+    - path: "^/prod/channels(/[^/?]+)?$"
+      json_match: {"$.channel.id": "^."}
+      json: { id: "$.channel.id", name: "$.channel.name", state: "$.channel.state", arn: "$.channel.arn", channel_class: "$.channel.channelClass", pipelines_running: "$.channel.pipelinesRunningCount", log_level: "$.channel.logLevel", engine_version: "$.channel.channelEngineVersion.version", input_attachments: "$.channel.inputAttachments", destinations: "$.channel.destinations" }
+      state:
+        "channels.{id:key}.name": "{name}"
+        "channels.{id:key}.state": "{state}"
+        "channels.{id:key}.arn": "{arn}"
+        "channels.{id:key}.channel_class": "{channel_class}"
+        "channels.{id:key}.pipelines_running": "{pipelines_running}"
+        "channels.{id:key}.log_level": "{log_level}"
+        "channels.{id:key}.engine_version": "{engine_version}"
+        "channels.{id:key}.input_attachments": "{input_attachments}"
+        "channels.{id:key}.destinations": "{destinations}"
+    - path: "^/prod/inputs\\?"
+      json_each: "$.inputs"
+      json: { id: "$.id", name: "$.name", state: "$.state", arn: "$.arn", type: "$.type", input_class: "$.inputClass", source_type: "$.inputSourceType", attached_channels: "$.attachedChannels", destinations: "$.destinations", sources: "$.sources", security_groups: "$.securityGroups" }
+      replace: inputs
+      state:
+        "inputs.{id:key}.name": "{name}"
+        "inputs.{id:key}.state": "{state}"
+        "inputs.{id:key}.arn": "{arn}"
+        "inputs.{id:key}.type": "{type}"
+        "inputs.{id:key}.input_class": "{input_class}"
+        "inputs.{id:key}.source_type": "{source_type}"
+        "inputs.{id:key}.attached_channels": "{attached_channels}"
+        "inputs.{id:key}.destinations": "{destinations}"
+        "inputs.{id:key}.sources": "{sources}"
+        "inputs.{id:key}.security_groups": "{security_groups}"
+    - path: "^/prod/inputs/[^/?]+(/(start|stop))?$"
+      json_match: {"$.id": "^."}
+      json: { id: "$.id", name: "$.name", state: "$.state", arn: "$.arn", type: "$.type", input_class: "$.inputClass", source_type: "$.inputSourceType", attached_channels: "$.attachedChannels", destinations: "$.destinations", sources: "$.sources", security_groups: "$.securityGroups" }
+      state:
+        "inputs.{id:key}.name": "{name}"
+        "inputs.{id:key}.state": "{state}"
+        "inputs.{id:key}.arn": "{arn}"
+        "inputs.{id:key}.type": "{type}"
+        "inputs.{id:key}.input_class": "{input_class}"
+        "inputs.{id:key}.source_type": "{source_type}"
+        "inputs.{id:key}.attached_channels": "{attached_channels}"
+        "inputs.{id:key}.destinations": "{destinations}"
+        "inputs.{id:key}.sources": "{sources}"
+        "inputs.{id:key}.security_groups": "{security_groups}"
+    - path: "^/prod/inputs(/[^/?]+)?$"
+      json_match: {"$.input.id": "^."}
+      json: { id: "$.input.id", name: "$.input.name", state: "$.input.state", arn: "$.input.arn", type: "$.input.type", input_class: "$.input.inputClass", source_type: "$.input.inputSourceType", attached_channels: "$.input.attachedChannels", destinations: "$.input.destinations", sources: "$.input.sources", security_groups: "$.input.securityGroups" }
+      state:
+        "inputs.{id:key}.name": "{name}"
+        "inputs.{id:key}.state": "{state}"
+        "inputs.{id:key}.arn": "{arn}"
+        "inputs.{id:key}.type": "{type}"
+        "inputs.{id:key}.input_class": "{input_class}"
+        "inputs.{id:key}.source_type": "{source_type}"
+        "inputs.{id:key}.attached_channels": "{attached_channels}"
+        "inputs.{id:key}.destinations": "{destinations}"
+        "inputs.{id:key}.sources": "{sources}"
+        "inputs.{id:key}.security_groups": "{security_groups}"
+    - path: "^/prod/multiplexes\\?"
+      json_each: "$.multiplexes"
+      json: { id: "$.id", name: "$.name", state: "$.state", arn: "$.arn", pipelines_running: "$.pipelinesRunningCount", program_count: "$.programCount", availability_zones: "$.availabilityZones" }
+      replace: multiplexes
+      state:
+        "multiplexes.{id:key}.name": "{name}"
+        "multiplexes.{id:key}.state": "{state}"
+        "multiplexes.{id:key}.arn": "{arn}"
+        "multiplexes.{id:key}.pipelines_running": "{pipelines_running}"
+        "multiplexes.{id:key}.program_count": "{program_count}"
+        "multiplexes.{id:key}.availability_zones": "{availability_zones}"
+    - path: "^/prod/multiplexes/[^/?]+(/(start|stop))?$"
+      json_match: {"$.id": "^."}
+      json: { id: "$.id", name: "$.name", state: "$.state", arn: "$.arn", pipelines_running: "$.pipelinesRunningCount", program_count: "$.programCount", availability_zones: "$.availabilityZones" }
+      state:
+        "multiplexes.{id:key}.name": "{name}"
+        "multiplexes.{id:key}.state": "{state}"
+        "multiplexes.{id:key}.arn": "{arn}"
+        "multiplexes.{id:key}.pipelines_running": "{pipelines_running}"
+        "multiplexes.{id:key}.program_count": "{program_count}"
+        "multiplexes.{id:key}.availability_zones": "{availability_zones}"
+    - path: "^/prod/multiplexes(/[^/?]+)?$"
+      json_match: {"$.multiplex.id": "^."}
+      json: { id: "$.multiplex.id", name: "$.multiplex.name", state: "$.multiplex.state", arn: "$.multiplex.arn", pipelines_running: "$.multiplex.pipelinesRunningCount", program_count: "$.multiplex.programCount", availability_zones: "$.multiplex.availabilityZones" }
+      state:
+        "multiplexes.{id:key}.name": "{name}"
+        "multiplexes.{id:key}.state": "{state}"
+        "multiplexes.{id:key}.arn": "{arn}"
+        "multiplexes.{id:key}.pipelines_running": "{pipelines_running}"
+        "multiplexes.{id:key}.program_count": "{program_count}"
+        "multiplexes.{id:key}.availability_zones": "{availability_zones}"
+    - path: "^/prod/inputDevices\\?"
+      json_each: "$.inputDevices"
+      json: { id: "$.id", name: "$.name", connection_state: "$.connectionState", type: "$.type", arn: "$.arn", device_update_status: "$.deviceUpdateStatus", settings_sync_state: "$.deviceSettingsSyncState", serial_number: "$.serialNumber", mac_address: "$.macAddress", availability_zone: "$.availabilityZone", output_type: "$.outputType" }
+      replace: input_devices
+      state:
+        "input_devices.{id:key}.name": "{name}"
+        "input_devices.{id:key}.connection_state": "{connection_state}"
+        "input_devices.{id:key}.type": "{type}"
+        "input_devices.{id:key}.arn": "{arn}"
+        "input_devices.{id:key}.device_update_status": "{device_update_status}"
+        "input_devices.{id:key}.settings_sync_state": "{settings_sync_state}"
+        "input_devices.{id:key}.serial_number": "{serial_number}"
+        "input_devices.{id:key}.mac_address": "{mac_address}"
+        "input_devices.{id:key}.availability_zone": "{availability_zone}"
+        "input_devices.{id:key}.output_type": "{output_type}"
+    - path: "^/prod/inputDevices/[^/?]+(/(start|stop))?$"
+      json_match: {"$.id": "^."}
+      json: { id: "$.id", name: "$.name", connection_state: "$.connectionState", type: "$.type", arn: "$.arn", device_update_status: "$.deviceUpdateStatus", settings_sync_state: "$.deviceSettingsSyncState", serial_number: "$.serialNumber", mac_address: "$.macAddress", availability_zone: "$.availabilityZone", output_type: "$.outputType" }
+      state:
+        "input_devices.{id:key}.name": "{name}"
+        "input_devices.{id:key}.connection_state": "{connection_state}"
+        "input_devices.{id:key}.type": "{type}"
+        "input_devices.{id:key}.arn": "{arn}"
+        "input_devices.{id:key}.device_update_status": "{device_update_status}"
+        "input_devices.{id:key}.settings_sync_state": "{settings_sync_state}"
+        "input_devices.{id:key}.serial_number": "{serial_number}"
+        "input_devices.{id:key}.mac_address": "{mac_address}"
+        "input_devices.{id:key}.availability_zone": "{availability_zone}"
+        "input_devices.{id:key}.output_type": "{output_type}"
+    - path: "^/prod/inputSecurityGroups\\?"
+      json_each: "$.inputSecurityGroups"
+      json: { id: "$.id", state: "$.state", arn: "$.arn", whitelist_rules: "$.whitelistRules", inputs: "$.inputs" }
+      replace: input_security_groups
+      state:
+        "input_security_groups.{id:key}.state": "{state}"
+        "input_security_groups.{id:key}.arn": "{arn}"
+        "input_security_groups.{id:key}.whitelist_rules": "{whitelist_rules}"
+        "input_security_groups.{id:key}.inputs": "{inputs}"
+    - path: "^/prod/inputSecurityGroups/[^/?]+(/(start|stop))?$"
+      json_match: {"$.id": "^."}
+      json: { id: "$.id", state: "$.state", arn: "$.arn", whitelist_rules: "$.whitelistRules", inputs: "$.inputs" }
+      state:
+        "input_security_groups.{id:key}.state": "{state}"
+        "input_security_groups.{id:key}.arn": "{arn}"
+        "input_security_groups.{id:key}.whitelist_rules": "{whitelist_rules}"
+        "input_security_groups.{id:key}.inputs": "{inputs}"
+    - path: "^/prod/inputSecurityGroups(/[^/?]+)?$"
+      json_match: {"$.securityGroup.id": "^."}
+      json: { id: "$.securityGroup.id", state: "$.securityGroup.state", arn: "$.securityGroup.arn", whitelist_rules: "$.securityGroup.whitelistRules", inputs: "$.securityGroup.inputs" }
+      state:
+        "input_security_groups.{id:key}.state": "{state}"
+        "input_security_groups.{id:key}.arn": "{arn}"
+        "input_security_groups.{id:key}.whitelist_rules": "{whitelist_rules}"
+        "input_security_groups.{id:key}.inputs": "{inputs}"
+    - path: "^/prod/accountConfiguration$"
+      json: { kms: "$.accountConfiguration.kmsKeyId" }
+      state: { account.kms_key_id: "{kms}" }

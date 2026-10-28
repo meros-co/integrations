@@ -57,7 +57,9 @@ transport:
   https_port: 443
   scheme: { setting: scheme }
   accept_invalid_certs: true
-  auth: digest
+  # HTTP Digest (Core 5.9.1), or a WS-Security UsernameToken in each SOAP
+  # header for legacy devices that take only that.
+  auth: { setting: auth }
   timeout_ms: 8000
   probe:
     method: POST
@@ -66,6 +68,8 @@ transport:
     body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tt=\"http://www.onvif.org/ver10/schema\" xmlns:tds=\"http://www.onvif.org/ver10/device/wsdl\"><s:Body><tds:GetSystemDateAndTime/></s:Body></s:Envelope>"
 
 settings:
+  auth: { type: enum, values: [digest, wsse], default: digest, label: Authentication,
+          description: "digest, HTTP Digest as conformant devices take it, or wsse, a WS-Security UsernameToken with a password digest in each message, for legacy devices that take only that." }
   username: { type: string, default: admin, label: Username, description: "An ONVIF user of the device with operator rights (administrator for settings and reboot)." }
   password: { type: string, secret: true, label: Password, description: "The ONVIF user's password." }
   scheme: { type: enum, values: [http, https], default: http, label: Connection, description: "http on port 80, or https on port 443 with the device's certificate accepted unchecked." }
@@ -870,11 +874,16 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      Authentication is HTTP Digest, which the Core Specification requires of conformant devices.
-      Legacy devices that accept only WS-Security UsernameToken (a SHA-1 digest of a fresh nonce,
-      the time and the password in the SOAP header) cannot be reached with credentials: the spec
-      format has no nonce, clock or SHA-1 for a message body. Such a device works only with
-      authentication turned off.
+      Authentication is HTTP Digest by default, which the Core Specification requires of
+      conformant devices. Legacy devices that accept only WS-Security UsernameToken take auth
+      wsse: each message then carries a UsernameToken in its SOAP header, with a fresh nonce, the
+      time (Created) and the password digest Base64(SHA-1(nonce + created + password)), the
+      password itself never sent. Such a device compares Created with its own clock and refuses a
+      message outside its tolerance (often a few seconds), so the host and the device must keep
+      the same time (NTP; get_system_date_and_time, which needs no credential, shows the
+      device's). A refused UsernameToken is answered with a SOAP fault (ter:NotAuthorized) under
+      HTTP 400 or 401; a 401 stops the device until its settings change, a 400 fails that
+      command.
   - models: [all]
     severity: info
     text: >

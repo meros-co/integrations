@@ -45,15 +45,26 @@ transport:
   type: http
   port: 4316
   scheme: http
-  auth: header
-  auth_header: Authorization
   timeout_ms: 4000
   probe: { method: GET, path: /api/v2/core/system }
+  # With "require authentication" on, the session logs in with the username
+  # and password settings and sends the token as Authorization, as it is; a
+  # login answered 401 is a wrong username or password.
+  session:
+    when_set: password
+    login: { method: POST, path: /api/v2/core/login, content_type: application/json,
+             body: '{"username":{settings.username:json},"password":{settings.password:json}}' }
+    capture: { json: $.token, header: Authorization }
+    relogin: { status: [401] }
+    refused: { status: [401] }
 
 settings:
-  token: { type: string, secret: true, default: "", max_length: 512,
-    label: Login token,
-    description: "The token OpenLP's login answers with (the login command returns it), for a remote that requires authentication; leave empty when it does not." }
+  username: { type: string, default: openlp, max_length: 256,
+    label: Username,
+    description: "The username set in OpenLP's remote settings, which the core logs in as when the remote requires authentication." }
+  password: { type: string, secret: true, default: "", max_length: 256,
+    label: Password,
+    description: "The password set in OpenLP's remote settings; leave it empty when the remote does not require authentication, and nothing logs in." }
   websocket_port: { type: int, min: 1, max: 65535, default: 4317,
     label: Websocket port,
     description: "The port of OpenLP's websocket server, 4317 unless moved in OpenLP's remote settings (get_system reports it); state is pushed there." }
@@ -225,13 +236,13 @@ commands:
     returns: value
 
   login:
-    summary: Log in and get the token for the token setting (POST /core/login); a wrong login answers 401
+    summary: Log in and return a token, beside the session the core keeps (POST /core/login); a wrong login answers 401
     params:
       username: { type: string, max_length: 256, required: true, label: Username,
         description: "The username set in OpenLP's remote settings." }
-      password: { type: string, max_length: 256, required: true, label: Password,
+      password: { type: string, max_length: 256, required: true, secret: true, label: Password,
         description: "The password set in OpenLP's remote settings." }
-    send: { method: POST, path: /api/v2/core/login, body: '{"username":{username:json},"password":{password:json}}', content_type: application/json }
+    send: { method: POST, path: /api/v2/core/login, session: false, body: '{"username":{username:json},"password":{password:json}}', content_type: application/json }
     expect: { status: 200, json_path: "$.token" }
     returns: value
 
@@ -467,10 +478,12 @@ quirks:
     text: >
       The remote has to be enabled in OpenLP's settings (Remote tab), and serves the local
       network. With "require authentication" on, every command marked as needing a login answers
-      401 without one, which stops the device here until it is opened again: run login with the
-      remote's username and password, put the token it returns in the token setting and open the
-      device again. The token goes as the Authorization header with nothing before it, as the
-      documentation shows. Reading (the live item, service list, themes, system) needs no login.
+      401 without one: with the password setting set, the core logs in with the username and
+      password settings, keeps the token the answer holds, and sends it as the Authorization
+      header with nothing before it, as the documentation shows; a request answered 401 has it
+      log in again and send the request once more, and a login answered 401 (a wrong username or
+      password) is the terminal refusal of the credential. Reading (the live item, service list,
+      themes, system) needs no login.
 
   - models: [all]
     severity: warning
