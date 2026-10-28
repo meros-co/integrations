@@ -179,6 +179,16 @@ fn a_vendor_group_selects_its_integrations() {
     if cfg!(feature = "sennheiser-l-6000") {
         expected.push("sennheiser-l-6000");
     }
+    for (built, id) in [
+        (cfg!(feature = "sennheiser-adn"), "sennheiser-adn"),
+        (cfg!(feature = "sennheiser-tc-bar"), "sennheiser-tc-bar"),
+        (cfg!(feature = "sennheiser-tcc-m"), "sennheiser-tcc-m"),
+        (cfg!(feature = "sennheiser-tcc2"), "sennheiser-tcc2"),
+    ] {
+        if built {
+            expected.push(id);
+        }
+    }
     expected.sort();
     assert_eq!(ids, expected);
     let options = api::core_options(&json!({"devices": ["vendor-shure"]})).unwrap();
@@ -187,10 +197,14 @@ fn a_vendor_group_selects_its_integrations() {
         shure.catalog().devices.keys().collect::<Vec<_>>(),
         [
             "shure-ani",
+            "shure-chargers",
             "shure-imx-room",
             "shure-mxa",
+            "shure-mxcw",
             "shure-mxn5",
+            "shure-mxw",
             "shure-p300",
+            "shure-uhfr",
             "shure-wireless"
         ]
     );
