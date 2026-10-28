@@ -924,12 +924,12 @@ quirks:
     text: >
       Sub-second streams (WebRTC playback under a second behind) are a
       resource apart from live streams, with their own ids and a smaller
-      set of settings (name, enabled, country and domain lists). The
-      account's first 100 are polled every 15 seconds with the followed
-      stream (sub_second_streams.<id>: name, enabled, broadcasting status,
-      embed URL); one deleted elsewhere stays in state until the
-      integration is opened again, while delete_sub_second_stream removes
-      it at once. Their answers hold the ingest key, which is never kept.
+      set of settings (name, enabled, country and domain lists). Every one
+      on the account is polled every 15 seconds with the followed stream,
+      100 a page (sub_second_streams.<id>: name, enabled, broadcasting
+      status, embed URL), and the list replaces the last, so one deleted
+      elsewhere leaves state. Their answers hold the ingest key, which is
+      never kept.
 
   - models: [all]
     severity: info
@@ -1026,7 +1026,8 @@ telemetry:
     send:
       - { method: GET, path: "/v2/live_streams/{settings.stream_id}" }
       - { method: GET, path: "/v2/live_streams/{settings.stream_id}/stats" }
-      - { method: GET, path: /v2/sub_second_streams, query: { page: "1", limit: "100" } }
+      - { method: GET, path: /v2/sub_second_streams, query: { page: "1", limit: "100" },
+          pages: { items: "$", page: page, size: limit } }
   updates:
     # Polls, get_stream, every stream update and every platform change
     # answer the stream.
@@ -1107,7 +1108,13 @@ telemetry:
         streams.{1}.tracks.{track}.sample_rate: "{sample_rate}"
         streams.{1}.tracks.{track}.channels: "{channels}"
 
-    # Sub-second streams: the poll's list, and each answer about one.
+    # Sub-second streams: the poll's list (every page joined) replaces them,
+    # so one deleted elsewhere leaves; a list page and each answer about one
+    # add to them.
+    - path: '^/v2/sub_second_streams\?page=1&limit=100$'
+      json_match: { "$": '^\[' }
+      json: {}
+      replace: sub_second_streams
     - path: '^/v2/sub_second_streams\?'
       json_each: "$"
       json: &sub_second

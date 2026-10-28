@@ -184,6 +184,8 @@ telemetry(CS, "sub-second-streams", settings=_CSS, inbound_http={
     "path": "/v2/sub_second_streams?page=1&limit=100",
     "body": json.dumps([{**_SSOBJ, "settings": {"country_block": [], "country_whitelist": ["GB"], "domain_whitelist": []},
                          "broadcasting_status": "online"}])},
+    # The poll's whole list replaces the last: one deleted elsewhere leaves.
+    state_before={"sub_second_streams": {"b" * 24: {"name": "gone"}}},
     expect_state={"sub_second_streams": {_SS: {**_SSSTATE, "broadcasting_status": "online", "country_block": "[]",
                                                "country_whitelist": '["GB"]', "domain_whitelist": "[]"}}})
 telemetry(CS, "sub-second-stream-created", settings=_CSS, inbound_http={
