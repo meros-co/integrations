@@ -153,6 +153,9 @@ _jv("delete_preset", {"preset": 5}, "SetPTZPreset", '"No":5,"Operation":"Delete"
 _jv("get_camera_status_minimum", {}, "GetCamStatusMinimum")
 _jv("get_pan_tilt_position", {}, "GetPTPosition")
 _jv("start_jpeg_encoding", {}, "JpegEncode", '"Operate":"Start"')
+# Saved to the host file named (never written by a vector).
+V.append({"spec": JV, "command": "save_jpeg_still", "input": {"to": {"file": "still.jpg"}}, "settings": dict(JV_SET),
+          "expect_request": {"method": "GET", "target": "/cgi-bin/get_jpg.cgi"}})
 _jv("stop_jpeg_encoding", {}, "JpegEncode", '"Operate":"Stop"')
 _jv("set_jpeg_size", {"size": "640x360"}, "SetJpegEncodeSize", '"Size":"640x360"')
 _jv("get_ifb_settings", {}, "GetIFBSettings", model="gy-hm660")
