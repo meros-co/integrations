@@ -2521,6 +2521,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what /appCommand/perform answers for a command done, an unknown command name and an index out of range (status and body; the text success is assumed for done). ([specs/logos-proclaim.yaml:327](specs/logos-proclaim.yaml#L327))
 - [ ] Check what a song part command does with an index past the song's parts, and that a part without a number is shown when the index is left out. ([specs/logos-proclaim.yaml:340](specs/logos-proclaim.yaml#L340))
 
+## lyntec-rpc — LynTec RPC remote power control panels (TCP/IP protocol)
+
+- [ ] Record the exact /p2.rpc answer (line breaks, spacing, the order of breakers=, zones= and events=), and what a control GET returns. ([specs/lyntec-rpc.yaml:43](specs/lyntec-rpc.yaml#L43))
+- [ ] Check whether a panel whose web pages need a login asks for it on /p2.rpc too (Basic, Digest or none). ([specs/lyntec-rpc.yaml:28](specs/lyntec-rpc.yaml#L28))
+- [ ] Check what a panel in Emergency Override answers a control GET with over HTTP. ([specs/lyntec-rpc.yaml:112](specs/lyntec-rpc.yaml#L112))
+- [ ] Check zone numbers above 12 on panels with more zones, and breaker numbering across RPS expansion panels. ([specs/lyntec-rpc.yaml:125](specs/lyntec-rpc.yaml#L125))
+
 ## madrix — MADRIX 5 (OSC and HTTP Remote)
 
 - [ ] Record the OSC feedback MADRIX sends: its addresses, argument types, and that it goes to the sender's address on the Destination Network Port. ([specs/madrix.yaml:1491](specs/madrix.yaml#L1491))

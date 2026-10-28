@@ -1,0 +1,126 @@
+spec: 1
+id: lyntec-rpc
+name: LynTec RPC remote power control panels (TCP/IP protocol)
+vendor: LynTec
+category: other
+source:
+  - title: "LynTec RPC Instruction Bulletin 139-0498-01, Appendix B: RS-232 and TCP/IP Protocols (pp. 44-50)"
+    author: LynTec
+    url: "https://www.manualsdir.com/manuals/458874/lyntec-rpc.html?page=49"
+    note: >
+      The manufacturer's manual, read from this public copy (LynTec's own link to the bulletin no longer serves
+      it). TCP/IP control (firmware 1.18a or later) by HTTP GET: /p2.rpc?IPBnnn=1 or =0 turns breaker nnn on or
+      off (up to 167 breakers in a four-panel system), IPZnnn zones (breaker groups set up in the panel's web
+      pages), IPEnnn events (1 All Breakers ON, 2 All Breakers OFF, 3 Hurry OFF, 4 Emergency Override, 5 Audio
+      Timer (future), 6 Brown-Out, 7 DMX); GET /p2.rpc answers breakers=..., zones=... and events=..., one digit
+      per item from 1: breakers 0 off, 1 on, 2 tripped, 3 faulty, 4 empty; zones and events 0 off, 1 on, 2
+      processing. The default address 192.168.1.250 and web login (Appendix A, p.40-41). The binary RS-232
+      protocol of pp. 44-48 (start byte 0xB0, end 0xF0) is not this integration's.
+  - title: "How To | Use simple Command Buttons to control the Lyntec RPC panel via TCP/IP"
+    author: Q-SYS (QSC)
+    url: "https://support.qsys.com/how-to-%7C-use-simple-command-buttons-to-control-the-lyntec-rpc-panel-via-tcpip"
+    note: "Corroboration: the GET strings sent to the panel's address on port 80, GET /p2.rpc?IPZ002=1 for zone 2 on."
+
+transport:
+  type: http
+  port: 80
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe: { method: GET, path: /p2.rpc }
+
+ports:
+  - { port: 80, protocol: http, role: control, note: "the panel's web server" }
+
+models:
+  - id: rpc
+    name: "LynTec RPC panelboards with remotely operated breakers (RPC firmware 1.18a or later), with RPS expansion panels"
+    supports: [get_status, set_breaker, set_zone, set_event]
+    verification: none
+
+commands:
+  get_status:
+    summary: Read every breaker's, zone's and event's status (GET /p2.rpc), as the panel's text breakers=... zones=... events=...
+    send: { method: GET, path: /p2.rpc }
+    expect: { status: 200 }
+    returns: text
+  set_breaker:
+    summary: Turn a breaker on or off (GET /p2.rpc?IPBnnn=1 or =0), then read the status back
+    params:
+      breaker: { type: int, min: 1, max: 167, required: true, label: Breaker,
+                 description: "The breaker, numbered as in the panel's web set-up, 1 to 167 across up to four panels." }
+      power: { type: bool, required: true, label: Power, description: "True closes the breaker, powering its circuit; false opens it." }
+    send:
+      - { method: GET, path: /p2.rpc, raw_query: "IPB{breaker:03d}={power:bool01}" }
+      - { method: GET, path: /p2.rpc }
+    expect: { status: 200 }
+    returns: ack
+  set_zone:
+    summary: Turn a zone (a group of breakers set up in the panel) on or off (GET /p2.rpc?IPZnnn=1 or =0), then read the status back
+    params:
+      zone: { type: int, min: 1, max: 12, required: true, label: Zone, description: "The zone, 1 to 12, as set up in the panel's web pages." }
+      power: { type: bool, required: true, label: Power, description: "True switches the zone's breakers on in its sequence; false switches them off." }
+    send:
+      - { method: GET, path: /p2.rpc, raw_query: "IPZ{zone:03d}={power:bool01}" }
+      - { method: GET, path: /p2.rpc }
+    expect: { status: 200 }
+    returns: ack
+  set_event:
+    summary: Turn an event on or off (GET /p2.rpc?IPEnnn=1 or =0), then read the status back
+    params:
+      event: { type: int, min: 1, max: 7, required: true, label: Event,
+               description: "1 All Breakers ON, 2 All Breakers OFF, 3 Hurry OFF (every breaker off fast), 4 Emergency Override, 5 Audio Timer (future), 6 Brown-Out, 7 DMX." }
+      power: { type: bool, required: true, label: Power, description: "True starts the event; false ends it." }
+    send:
+      - { method: GET, path: /p2.rpc, raw_query: "IPE{event:03d}={power:bool01}" }
+      - { method: GET, path: /p2.rpc }
+    expect: { status: 200 }
+    returns: ack
+
+state:
+  breakers.*.status: { type: string, description: "The breaker's status, by breaker number from 1: off, on, tripped, faulty or empty" }
+  zones.*.status: { type: string, description: "The zone's status, by zone from 1: off, on or processing (sequencing)" }
+  events.*.status: { type: string, description: "The event's status, by event from 1 (see set_event): off, on or processing" }
+
+telemetry:
+  poll:
+    send: [{ method: GET, path: /p2.rpc }]
+    every_ms: 2000
+  updates:
+    - match: 'breakers=([0-4]+)'
+      match_each: '([0-4])'
+      match_each_in: 1
+      replace: breakers
+      state: { "breakers.{index:+1}.status": { value: "{2}", map: { "0": "off", "1": "on", "2": "tripped", "3": "faulty", "4": "empty" } } }
+    - match: 'zones=([0-2]+)'
+      match_each: '([0-2])'
+      match_each_in: 1
+      replace: zones
+      state: { "zones.{index:+1}.status": { value: "{2}", map: { "0": "off", "1": "on", "2": "processing" } } }
+    - match: 'events=([0-2]+)'
+      match_each: '([0-2])'
+      match_each_in: 1
+      replace: events
+      state: { "events.{index:+1}.status": { value: "{2}", map: { "0": "off", "1": "on", "2": "processing" } } }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Breaker, zone and event commands switch power at once: off opens breakers under load, event 2 (All Breakers
+      OFF) and event 3 (Hurry OFF) switch everything off, and event 4 (Emergency Override) is the panel's
+      emergency mode, in which it answers breaker, zone and event commands with its override response and acts on
+      none of them.
+  - models: [all]
+    severity: info
+    text: >
+      The protocol reads back each breaker's, zone's and event's status, which is polled every 2 s; zone
+      membership, sequencing, names, schedules, contact closures and the panel's set-up are made in its web pages
+      and are not reachable over this protocol (API limit).
+  - models: [all]
+    severity: warning
+    text: >
+      The bulletin shows the controls as bare GET lines with no login; whether a panel whose web pages ask for a
+      password asks for it on /p2.rpc too, and what /p2.rpc answers to a control GET, is not documented: each
+      control is followed by a status read. Zones beyond 12 and breaker numbers beyond the panel's are not
+      described.
