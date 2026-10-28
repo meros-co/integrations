@@ -414,7 +414,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | Panasonic AV-HS410, AV-UHS500, AV-HLC100, AV-HSW10, AV-HS6000 | Panasonic switcher TCP protocol | On request |
 | OSEE GoStream Deck / Duet | TCP / UDP protocol | On request |
 | Livestream Studio | TCP 9923 text API | Community (Livestream publishes no document; the Companion module's commands were found by its users) |
-| Telestream Wirecast | No network control API (local AppleScript / COM only) | Closed |
+| Telestream Wirecast | Local scripting (AppleScript / COM) | Community |
 | Ecamm Live | Local HTTP API | Community |
 | Meld Studio | WebSocket JSON | Public |
 | Grass Valley K-Frame / Kayenne / Korona | Proprietary | Closed |
