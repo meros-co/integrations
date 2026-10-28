@@ -206,6 +206,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &["labgruppen-lake", "labgruppen-nlb60e"],
     ),
     ("vendor-lawo", &["emberplus"]),
+    ("vendor-lectrosonics", &["lectrosonics-aspen"]),
     ("vendor-lg", &["lg-display"]),
     ("vendor-lightware", &["lightware-lw2", "lightware-lw3"]),
     ("vendor-ma-lighting", &["grandma2", "grandma3"]),

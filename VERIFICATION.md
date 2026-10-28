@@ -2211,6 +2211,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what `Subnet.VDN<n> ?` answers for a named slot (name and serial separated by one space assumed) and an empty one (* assumed). ([specs/labgruppen-nlb60e.yaml:246](specs/labgruppen-nlb60e.yaml#L246))
 - [ ] Record an amplifier's `Status ?` answer for 2-, 4- and 8-channel models: three values, then nine per channel from A. ([specs/labgruppen-nlb60e.yaml:275](specs/labgruppen-nlb60e.yaml#L275))
 
+## lectrosonics-aspen — Lectrosonics ASPEN processors
+
+- [ ] Confirm that a verbose wildcard query is answered as OK target(*)={...} (and OK target(*,bus)={...} for crosspoints), the values in address order. ([specs/lectrosonics-aspen.yaml:4370](specs/lectrosonics-aspen.yaml#L4370))
+- [ ] Confirm that a verbose update is answered with the value read back, as OK target(address)=value, and a verbose query of a target without an address as OK target=value. ([specs/lectrosonics-aspen.yaml:10](specs/lectrosonics-aspen.yaml#L10))
+- [ ] Record the RS-232 port's default speed and line settings (8N1 without flow control assumed) and the cable wiring. ([specs/lectrosonics-aspen.yaml:61](specs/lectrosonics-aspen.yaml#L61))
+- [ ] Confirm that the device answers its first request on a new TCP connection without any greeting, and how many TCP clients it takes on each port. ([specs/lectrosonics-aspen.yaml:56](specs/lectrosonics-aspen.yaml#L56))
+- [ ] Record what the device sends for a command a model lacks and for a value out of range (ERROR assumed for both). ([specs/lectrosonics-aspen.yaml:55](specs/lectrosonics-aspen.yaml#L55))
+- [ ] Check the virtual programmable input functions on SPNConference and SPNTrio (their pages give the range 0-16 but list 0-19). ([specs/lectrosonics-aspen.yaml:3270](specs/lectrosonics-aspen.yaml#L3270))
+- [ ] Check the time array (the reference says four values and shows three). ([specs/lectrosonics-aspen.yaml:3515](specs/lectrosonics-aspen.yaml#L3515))
+
 ## lg-display — LG signage displays and commercial TVs
 
 - [ ] Confirm the display takes the protocol on TCP 9761 with no greeting or login, and answers as over RS-232C; no LG document read names the port. ([specs/lg-display.yaml:3257](specs/lg-display.yaml#L3257))
