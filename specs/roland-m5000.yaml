@@ -1,0 +1,962 @@
+spec: 1
+id: roland-m5000
+name: Roland M-5000 / M-5000C live mixing console (LAN or RS-232C control)
+vendor: Roland
+category: mixer
+
+# The console's RS-232C/Telnet command set: three letters, ":" and
+# comma-separated parameters, then ";" (Reference p.6-7). Control commands
+# (ending in C) are answered by ack, request commands (ending in Q) by a reply
+# command (ending in S), both by ERR:n; on failure. Over Telnet (TCP 8023) the
+# stx before each command is dropped, ack becomes the text OK, and each line
+# ends in CR LF (p.4, p.6). The console reports nothing when a setting changes
+# on its own surface (p.6), so state comes from the replies to requests.
+source:
+  - title: "RS-232C/Telnet Reference, Model M-5000/M-5000C, Version 1.20 (Nov. 19th 2015)"
+    author: Roland Corporation
+    url: https://static.roland.com/assets/media/pdf/M-5000_M-5000C_RS-232C_Telnet_e02_W.pdf
+    note: >
+      Manufacturer document. RS-232C connector, speeds, 8N1, Xon/Xoff p.2-3;
+      Telnet on TCP 8023, character mode with remote echo, CR/LF/CR-LF in and
+      CR-LF out p.4; conversion of stx and ack for Telnet and the special OK
+      and QUIT commands p.6, p.8; command format and exchange, and that no
+      change on the console is transmitted p.6-7; channel tokens p.9; control
+      commands PTC, EQC, AXC, PNC p.9-10, MUC, FDC, RFC, SCC p.11, RSC, SSC,
+      SNC, DBC p.12, PBC, LBC, DMC, RTC, RLC, RIC p.12-14; request commands
+      and replies CNQ/CNS to RRQ/RRS p.14-20; ERR, ERS and EPS p.20-21.
+  - title: "MIDI Implementation, Model M-5000/M-5000C, Version 1.20 (Nov. 10th 2015)"
+    author: Roland Corporation
+    url: https://static.roland.com/assets/media/pdf/M-5000_M-5000C_MIDI_e01_W.pdf
+    note: >
+      Manufacturer document, read to confirm that only MIDI (not the LAN or
+      RS-232C command set) transmits fader and mute changes made on the
+      console; MIDI is not used here.
+
+transport:
+  type: line-tcp
+  port: 8023
+  framing: terminated
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # A command's reply is OK (ack) or ERR:n;, a request's its reply command
+  # (two letters and S). The console echoes what it receives over Telnet
+  # (p.4); the echoed command ends in C or Q and is never a reply. ERS and EPS
+  # are sent unprompted (p.20-21) and go to the telemetry rules only.
+  reply_match: '^[\x02\x11\x13]*(?:OK|\x06|ERR:[0-9]+;|(?:CN|PT|EQ|AX|PN|MU|FD|SC|VR|RC|DB|PB|LB|DM|RT|RL|RI|RN|RR)S:)'
+  probe: "VRQ;"
+  # The same command set on the RS-232C connector: stx (02H) before each
+  # command, the ";" ends it with no line ending, and a control command is
+  # answered by the single byte ack (06H) (p.6-7). 4800 to 115200 bps, 115200
+  # set on the console by default, 8 data bits, no parity, 1 stop bit,
+  # Xon/Xoff on (p.2-3).
+  serial:
+    baud_rate: { default: 115200, values: [4800, 9600, 14400, 31250, 38400, 57600, 115200] }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: xon-xoff
+    overrides:
+      framing: delimited
+      open: "\u0002"
+      close: ""
+      reply_framing: terminated
+      reply_terminators: [";", "\u0006"]
+      reply_match: '^[\x02\x11\x13]*(?:\x06|ERR:[0-9]+;|(?:CN|PT|EQ|AX|PN|MU|FD|SC|VR|RC|DB|PB|LB|DM|RT|RL|RI|RN|RR)S:)'
+
+ports:
+  - { port: 8023, protocol: tcp, role: control, when: "link tcp" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The RS-232C connector, D-sub 9-pin: RXD, TXD and GND are used" }
+
+models:
+  - id: m-5000
+    name: Roland M-5000 Live Mixing Console
+    supports:
+      - set_phantom
+      - get_phantom
+      - set_eq
+      - get_eq
+      - set_aux_send
+      - set_aux_send_off
+      - get_aux_send
+      - set_pan
+      - get_pan
+      - set_mute
+      - get_mute
+      - set_fader
+      - set_fader_off
+      - adjust_fader
+      - get_fader
+      - get_channel_name
+      - recall_scene
+      - recall_scene_relative
+      - store_scene
+      - store_scene_named
+      - store_scene_with_m48
+      - new_scene
+      - new_scene_with_m48
+      - get_scene
+      - set_display_brightness
+      - get_display_brightness
+      - set_panel_brightness
+      - get_panel_brightness
+      - set_lamp_brightness
+      - get_lamp_brightness
+      - set_monitor_dimmer
+      - get_monitor_dimmer
+      - recorder_transport
+      - recorder_locate
+      - recorder_select_song
+      - recorder_move_song
+      - recorder_next_song
+      - recorder_previous_song
+      - get_recorder_status
+      - get_recorder_position
+      - get_recorder_song
+      - get_recorder_song_name
+      - get_recorder_song_name_of
+      - get_recorder_remaining
+      - get_reac_status
+      - get_version
+      - resend_last_reply
+    verification: none
+  - id: m-5000c
+    name: Roland M-5000C Live Mixing Console (compact)
+    supports:
+      - set_phantom
+      - get_phantom
+      - set_eq
+      - get_eq
+      - set_aux_send
+      - set_aux_send_off
+      - get_aux_send
+      - set_pan
+      - get_pan
+      - set_mute
+      - get_mute
+      - set_fader
+      - set_fader_off
+      - adjust_fader
+      - get_fader
+      - get_channel_name
+      - recall_scene
+      - recall_scene_relative
+      - store_scene
+      - store_scene_named
+      - store_scene_with_m48
+      - new_scene
+      - new_scene_with_m48
+      - get_scene
+      - set_display_brightness
+      - get_display_brightness
+      - set_panel_brightness
+      - get_panel_brightness
+      - set_lamp_brightness
+      - get_lamp_brightness
+      - set_monitor_dimmer
+      - get_monitor_dimmer
+      - recorder_transport
+      - recorder_locate
+      - recorder_select_song
+      - recorder_move_song
+      - recorder_next_song
+      - recorder_previous_song
+      - get_recorder_status
+      - get_recorder_position
+      - get_recorder_song
+      - get_recorder_song_name
+      - get_recorder_song_name_of
+      - get_recorder_remaining
+      - get_reac_status
+      - get_version
+      - resend_last_reply
+    verification: none
+    notes: >
+      Same command set as the M-5000 (Reference p.1).
+
+maps:
+  pan: {"-100": "L100", "-99": "L99", "-98": "L98", "-97": "L97", "-96": "L96", "-95": "L95", "-94": "L94", "-93": "L93", "-92": "L92", "-91": "L91", "-90": "L90", "-89": "L89", "-88": "L88", "-87": "L87", "-86": "L86", "-85": "L85", "-84": "L84", "-83": "L83", "-82": "L82", "-81": "L81", "-80": "L80", "-79": "L79", "-78": "L78", "-77": "L77", "-76": "L76", "-75": "L75", "-74": "L74", "-73": "L73", "-72": "L72", "-71": "L71", "-70": "L70", "-69": "L69", "-68": "L68", "-67": "L67", "-66": "L66", "-65": "L65", "-64": "L64", "-63": "L63", "-62": "L62", "-61": "L61", "-60": "L60", "-59": "L59", "-58": "L58", "-57": "L57", "-56": "L56", "-55": "L55", "-54": "L54", "-53": "L53", "-52": "L52", "-51": "L51", "-50": "L50", "-49": "L49", "-48": "L48", "-47": "L47", "-46": "L46", "-45": "L45", "-44": "L44", "-43": "L43", "-42": "L42", "-41": "L41", "-40": "L40", "-39": "L39", "-38": "L38", "-37": "L37", "-36": "L36", "-35": "L35", "-34": "L34", "-33": "L33", "-32": "L32", "-31": "L31", "-30": "L30", "-29": "L29", "-28": "L28", "-27": "L27", "-26": "L26", "-25": "L25", "-24": "L24", "-23": "L23", "-22": "L22", "-21": "L21", "-20": "L20", "-19": "L19", "-18": "L18", "-17": "L17", "-16": "L16", "-15": "L15", "-14": "L14", "-13": "L13", "-12": "L12", "-11": "L11", "-10": "L10", "-9": "L9", "-8": "L8", "-7": "L7", "-6": "L6", "-5": "L5", "-4": "L4", "-3": "L3", "-2": "L2", "-1": "L1", "0": "C", "1": "R1", "2": "R2", "3": "R3", "4": "R4", "5": "R5", "6": "R6", "7": "R7", "8": "R8", "9": "R9", "10": "R10", "11": "R11", "12": "R12", "13": "R13", "14": "R14", "15": "R15", "16": "R16", "17": "R17", "18": "R18", "19": "R19", "20": "R20", "21": "R21", "22": "R22", "23": "R23", "24": "R24", "25": "R25", "26": "R26", "27": "R27", "28": "R28", "29": "R29", "30": "R30", "31": "R31", "32": "R32", "33": "R33", "34": "R34", "35": "R35", "36": "R36", "37": "R37", "38": "R38", "39": "R39", "40": "R40", "41": "R41", "42": "R42", "43": "R43", "44": "R44", "45": "R45", "46": "R46", "47": "R47", "48": "R48", "49": "R49", "50": "R50", "51": "R51", "52": "R52", "53": "R53", "54": "R54", "55": "R55", "56": "R56", "57": "R57", "58": "R58", "59": "R59", "60": "R60", "61": "R61", "62": "R62", "63": "R63", "64": "R64", "65": "R65", "66": "R66", "67": "R67", "68": "R68", "69": "R69", "70": "R70", "71": "R71", "72": "R72", "73": "R73", "74": "R74", "75": "R75", "76": "R76", "77": "R77", "78": "R78", "79": "R79", "80": "R80", "81": "R81", "82": "R82", "83": "R83", "84": "R84", "85": "R85", "86": "R86", "87": "R87", "88": "R88", "89": "R89", "90": "R90", "91": "R91", "92": "R92", "93": "R93", "94": "R94", "95": "R95", "96": "R96", "97": "R97", "98": "R98", "99": "R99", "100": "R100"}
+  m48: { "0": "0", "1": "01", "2": "02", "3": "03", "4": "04", "5": "05", "6": "06", "7": "07", "8": "08", "9": "09", "10": "10", "11": "11", "12": "12", "13": "13", "14": "14", "15": "15", "16": "16" }
+  recorder_action: { stop: "S", play: "P", rec_pause: "R" }
+
+commands:
+  set_phantom:
+    summary: "Turn an input's phantom power (+48V) on or off (PTC, p.9-10)"
+    params:
+      channel: { type: string, required: true, max_length: 6, pattern: '^(?:I(?:[1-9]|[1-9][0-9]|1[01][0-9]|12[0-8])|U(?:[1-9]|[1-9][0-9]|1[0-8][0-9]|19[0-2]))$', label: Channel,
+                 description: "The channel whose phantom power to switch, by the console's token: I1-I128 input channels; U1-U192 user faders (USER1 1-64, USER2 65-128, USER3 129-192), which reach the channel assigned to them." }
+      enabled: { type: bool, required: true, label: Phantom power, description: "On supplies +48V to the input, off removes it." }
+    send: "PTC:{channel},{enabled:bool01};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  get_phantom:
+    summary: "Read an input's phantom power (PTQ, p.14); the reply goes to state"
+    params:
+      channel: { type: string, required: true, max_length: 6, pattern: '^(?:I(?:[1-9]|[1-9][0-9]|1[01][0-9]|12[0-8])|U(?:[1-9]|[1-9][0-9]|1[0-8][0-9]|19[0-2]))$', label: Channel,
+                 description: "The channel to read, by the console's token: I1-I128 input channels; U1-U192 user faders (USER1 1-64, USER2 65-128, USER3 129-192), which reach the channel assigned to them." }
+    send: "PTQ:{channel};"
+    expect: { reply_contains: "PTS:{channel},", matches: 'PTS:[^,]+,([01]);' }
+    returns: value
+
+  set_eq:
+    summary: "Turn a channel's EQ on or off (EQC, p.10)"
+    params:
+      channel: { type: string, required: true, max_length: 6, pattern: '^(?:I(?:[1-9]|[1-9][0-9]|1[01][0-9]|12[0-8])|SG(?:[1-9]|[1-5][0-9]|6[0-4])|AX(?:[1-9]|[1-5][0-9]|6[0-4])|MM(?:[1-9]|[1-5][0-9]|6[0-4])|MX(?:[1-9]|[1-5][0-9]|6[0-4])|MA[12]|U(?:[1-9]|[1-9][0-9]|1[0-8][0-9]|19[0-2]))$', label: Channel,
+                 description: "The channel whose EQ to switch, by the console's token: I1-I128 input channels; SG1-SG64 subgroups; AX1-AX64 AUX buses; MM1-MM64 MIX-MINUS buses; MX1-MX64 matrices; MA1-MA2 mains; U1-U192 user faders (USER1 1-64, USER2 65-128, USER3 129-192), which reach the channel assigned to them." }
+      enabled: { type: bool, required: true, label: EQ, description: "On turns the channel EQ on, off bypasses it." }
+    send: "EQC:{channel},{enabled:bool01};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  get_eq:
+    summary: "Read whether a channel's EQ is on (EQQ, p.14-15)"
+    params:
+      channel: { type: string, required: true, max_length: 6, pattern: '^(?:I(?:[1-9]|[1-9][0-9]|1[01][0-9]|12[0-8])|SG(?:[1-9]|[1-5][0-9]|6[0-4])|AX(?:[1-9]|[1-5][0-9]|6[0-4])|MM(?:[1-9]|[1-5][0-9]|6[0-4])|MX(?:[1-9]|[1-5][0-9]|6[0-4])|MA[12]|U(?:[1-9]|[1-9][0-9]|1[0-8][0-9]|19[0-2]))$', label: Channel,
+                 description: "The channel to read, by the console's token: I1-I128 input channels; SG1-SG64 subgroups; AX1-AX64 AUX buses; MM1-MM64 MIX-MINUS buses; MX1-MX64 matrices; MA1-MA2 mains; U1-U192 user faders (USER1 1-64, USER2 65-128, USER3 129-192), which reach the channel assigned to them." }
+    send: "EQQ:{channel};"
+    expect: { reply_contains: "EQS:{channel},", matches: 'EQS:[^,]+,([01]);' }
+    returns: value
+
+  set_aux_send:
+    summary: "Set an input's send level and pan to an AUX bus (AXC, p.10); the pan is ignored on a mono AUX"
+    params:
+      channel: { type: string, required: true, max_length: 6, pattern: '^(?:I(?:[1-9]|[1-9][0-9]|1[01][0-9]|12[0-8])|U(?:[1-9]|[1-9][0-9]|1[0-8][0-9]|19[0-2]))$', label: Channel,
+                 description: "The channel whose send to set, by the console's token: I1-I128 input channels; U1-U192 user faders (USER1 1-64, USER2 65-128, USER3 129-192), which reach the channel assigned to them." }
+      aux: { type: int, min: 1, max: 64, required: true, label: AUX bus, description: "The AUX bus the send feeds, 1 to 64." }
+      level: { type: float, min: -80.0, max: 10.0, required: true, label: Send level, description: "Send level in dB, -80.0 to +10.0 in 0.1 dB steps; set_aux_send_off sends -inf." }
+      pan: { type: int, min: -100, max: 100, required: true, label: Pan,
+                 description: "Pan from -100 (L100) through 0 (C) to 100 (R100) in steps of 1." }
+    send: "AXC:{channel},AX{aux},{level:.1f},{pan:map.pan};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  set_aux_send_off:
+    summary: "Set an input's send to an AUX bus to -inf, with its pan (AXC, p.10)"
+    params:
+      channel: { type: string, required: true, max_length: 6, pattern: '^(?:I(?:[1-9]|[1-9][0-9]|1[01][0-9]|12[0-8])|U(?:[1-9]|[1-9][0-9]|1[0-8][0-9]|19[0-2]))$', label: Channel,
+                 description: "The channel whose send to set, by the console's token: I1-I128 input channels; U1-U192 user faders (USER1 1-64, USER2 65-128, USER3 129-192), which reach the channel assigned to them." }
+      aux: { type: int, min: 1, max: 64, required: true, label: AUX bus, description: "The AUX bus the send feeds, 1 to 64." }
+      pan: { type: int, min: -100, max: 100, required: true, label: Pan,
+                 description: "Pan from -100 (L100) through 0 (C) to 100 (R100) in steps of 1." }
+    send: "AXC:{channel},AX{aux},INF,{pan:map.pan};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  get_aux_send:
+    summary: "Read an input's send level and pan to an AUX bus (AXQ, p.15); the reply goes to state, and returns the level"
+    params:
+      channel: { type: string, required: true, max_length: 6, pattern: '^(?:I(?:[1-9]|[1-9][0-9]|1[01][0-9]|12[0-8])|U(?:[1-9]|[1-9][0-9]|1[0-8][0-9]|19[0-2]))$', label: Channel,
+                 description: "The channel to read, by the console's token: I1-I128 input channels; U1-U192 user faders (USER1 1-64, USER2 65-128, USER3 129-192), which reach the channel assigned to them." }
+      aux: { type: int, min: 1, max: 64, required: true, label: AUX bus, description: "The AUX bus the send feeds, 1 to 64." }
+    send: "AXQ:{channel},AX{aux};"
+    expect: { reply_contains: "AXS:{channel},AX{aux},", matches: 'AXS:[^,]+,[^,]+,([^,]+),' }
+    returns: value
+
+  set_pan:
+    summary: "Set a channel's pan (PNC, p.10)"
+    params:
+      channel: { type: string, required: true, max_length: 6, pattern: '^(?:I(?:[1-9]|[1-9][0-9]|1[01][0-9]|12[0-8])|SG(?:[1-9]|[1-5][0-9]|6[0-4])|AX(?:[1-9]|[1-5][0-9]|6[0-4])|U(?:[1-9]|[1-9][0-9]|1[0-8][0-9]|19[0-2]))$', label: Channel,
+                 description: "The channel to pan, by the console's token: I1-I128 input channels; SG1-SG64 subgroups; AX1-AX64 AUX buses; U1-U192 user faders (USER1 1-64, USER2 65-128, USER3 129-192), which reach the channel assigned to them." }
+      pan: { type: int, min: -100, max: 100, required: true, label: Pan,
+                 description: "Pan from -100 (L100) through 0 (C) to 100 (R100) in steps of 1." }
+    send: "PNC:{channel},{pan:map.pan};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  get_pan:
+    summary: "Read a channel's pan (PNQ, p.15), as the console writes it (L45, C, R100)"
+    params:
+      channel: { type: string, required: true, max_length: 6, pattern: '^(?:I(?:[1-9]|[1-9][0-9]|1[01][0-9]|12[0-8])|SG(?:[1-9]|[1-5][0-9]|6[0-4])|AX(?:[1-9]|[1-5][0-9]|6[0-4])|U(?:[1-9]|[1-9][0-9]|1[0-8][0-9]|19[0-2]))$', label: Channel,
+                 description: "The channel to read, by the console's token: I1-I128 input channels; SG1-SG64 subgroups; AX1-AX64 AUX buses; U1-U192 user faders (USER1 1-64, USER2 65-128, USER3 129-192), which reach the channel assigned to them." }
+    send: "PNQ:{channel};"
+    expect: { reply_contains: "PNS:{channel},", matches: 'PNS:[^,]+,([LCR0-9]+);' }
+    returns: value
+
+  set_mute:
+    summary: "Mute or unmute a channel, DCA or mute group (MUC, p.11)"
+    params:
+      channel: { type: string, required: true, max_length: 6, pattern: '^(?:I(?:[1-9]|[1-9][0-9]|1[01][0-9]|12[0-8])|SG(?:[1-9]|[1-5][0-9]|6[0-4])|AX(?:[1-9]|[1-5][0-9]|6[0-4])|MM(?:[1-9]|[1-5][0-9]|6[0-4])|MX(?:[1-9]|[1-5][0-9]|6[0-4])|MA[12]|DCA(?:[1-9]|1[0-9]|2[0-4])|MG[1-8]|U(?:[1-9]|[1-9][0-9]|1[0-8][0-9]|19[0-2]))$', label: Channel,
+                 description: "The channel to mute or unmute, by the console's token: I1-I128 input channels; SG1-SG64 subgroups; AX1-AX64 AUX buses; MM1-MM64 MIX-MINUS buses; MX1-MX64 matrices; MA1-MA2 mains; DCA1-DCA24; MG1-MG8 mute groups; U1-U192 user faders (USER1 1-64, USER2 65-128, USER3 129-192), which reach the channel assigned to them." }
+      muted: { type: bool, required: true, label: Muted, description: "On mutes, off unmutes." }
+    send: "MUC:{channel},{muted:bool01};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  get_mute:
+    summary: "Read a channel's, DCA's or mute group's mute (MUQ, p.16)"
+    params:
+      channel: { type: string, required: true, max_length: 6, pattern: '^(?:I(?:[1-9]|[1-9][0-9]|1[01][0-9]|12[0-8])|SG(?:[1-9]|[1-5][0-9]|6[0-4])|AX(?:[1-9]|[1-5][0-9]|6[0-4])|MM(?:[1-9]|[1-5][0-9]|6[0-4])|MX(?:[1-9]|[1-5][0-9]|6[0-4])|MA[12]|DCA(?:[1-9]|1[0-9]|2[0-4])|MG[1-8]|U(?:[1-9]|[1-9][0-9]|1[0-8][0-9]|19[0-2]))$', label: Channel,
+                 description: "The channel to read, by the console's token: I1-I128 input channels; SG1-SG64 subgroups; AX1-AX64 AUX buses; MM1-MM64 MIX-MINUS buses; MX1-MX64 matrices; MA1-MA2 mains; DCA1-DCA24; MG1-MG8 mute groups; U1-U192 user faders (USER1 1-64, USER2 65-128, USER3 129-192), which reach the channel assigned to them." }
+    send: "MUQ:{channel};"
+    expect: { reply_contains: "MUS:{channel},", matches: 'MUS:[^,]+,([01]);' }
+    returns: value
+
+  set_fader:
+    summary: "Set a fader level in dB (FDC, p.11)"
+    params:
+      channel: { type: string, required: true, max_length: 6, pattern: '^(?:I(?:[1-9]|[1-9][0-9]|1[01][0-9]|12[0-8])|SG(?:[1-9]|[1-5][0-9]|6[0-4])|AX(?:[1-9]|[1-5][0-9]|6[0-4])|MM(?:[1-9]|[1-5][0-9]|6[0-4])|MX(?:[1-9]|[1-5][0-9]|6[0-4])|MA[12]|MON[12]|DCA(?:[1-9]|1[0-9]|2[0-4])|U(?:[1-9]|[1-9][0-9]|1[0-8][0-9]|19[0-2]))$', label: Channel,
+                 description: "The channel whose fader to move, by the console's token: I1-I128 input channels; SG1-SG64 subgroups; AX1-AX64 AUX buses; MM1-MM64 MIX-MINUS buses; MX1-MX64 matrices; MA1-MA2 mains; MON1-MON2 monitors; DCA1-DCA24; U1-U192 user faders (USER1 1-64, USER2 65-128, USER3 129-192), which reach the channel assigned to them." }
+      level: { type: float, min: -80.0, max: 10.0, required: true, label: Level, description: "Fader level in dB, -80.0 to +10.0 in 0.1 dB steps; set_fader_off sets -inf." }
+    send: "FDC:{channel},{level:.1f};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  set_fader_off:
+    summary: "Set a fader to -inf (FDC with INF, p.11)"
+    params:
+      channel: { type: string, required: true, max_length: 6, pattern: '^(?:I(?:[1-9]|[1-9][0-9]|1[01][0-9]|12[0-8])|SG(?:[1-9]|[1-5][0-9]|6[0-4])|AX(?:[1-9]|[1-5][0-9]|6[0-4])|MM(?:[1-9]|[1-5][0-9]|6[0-4])|MX(?:[1-9]|[1-5][0-9]|6[0-4])|MA[12]|MON[12]|DCA(?:[1-9]|1[0-9]|2[0-4])|U(?:[1-9]|[1-9][0-9]|1[0-8][0-9]|19[0-2]))$', label: Channel,
+                 description: "The channel whose fader to close, by the console's token: I1-I128 input channels; SG1-SG64 subgroups; AX1-AX64 AUX buses; MM1-MM64 MIX-MINUS buses; MX1-MX64 matrices; MA1-MA2 mains; MON1-MON2 monitors; DCA1-DCA24; U1-U192 user faders (USER1 1-64, USER2 65-128, USER3 129-192), which reach the channel assigned to them." }
+    send: "FDC:{channel},INF;"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  adjust_fader:
+    summary: "Move a fader by a relative amount (RFC, p.11); refused (ERR:5) for 0.0, upwards at +10.0 and downwards at -inf"
+    params:
+      channel: { type: string, required: true, max_length: 6, pattern: '^(?:I(?:[1-9]|[1-9][0-9]|1[01][0-9]|12[0-8])|SG(?:[1-9]|[1-5][0-9]|6[0-4])|AX(?:[1-9]|[1-5][0-9]|6[0-4])|MM(?:[1-9]|[1-5][0-9]|6[0-4])|MX(?:[1-9]|[1-5][0-9]|6[0-4])|MA[12]|MON[12]|DCA(?:[1-9]|1[0-9]|2[0-4])|U(?:[1-9]|[1-9][0-9]|1[0-8][0-9]|19[0-2]))$', label: Channel,
+                 description: "The channel whose fader to move, by the console's token: I1-I128 input channels; SG1-SG64 subgroups; AX1-AX64 AUX buses; MM1-MM64 MIX-MINUS buses; MX1-MX64 matrices; MA1-MA2 mains; MON1-MON2 monitors; DCA1-DCA24; U1-U192 user faders (USER1 1-64, USER2 65-128, USER3 129-192), which reach the channel assigned to them." }
+      change: { type: float, min: -99.9, max: 99.9, required: true, label: Change, description: "Amount to move the fader in dB, -99.9 to +99.9 in 0.1 dB steps, positive upwards." }
+    send: "RFC:{channel},{change:.1f};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  get_fader:
+    summary: "Read a fader level (FDQ, p.16): dB as text, or INF"
+    params:
+      channel: { type: string, required: true, max_length: 6, pattern: '^(?:I(?:[1-9]|[1-9][0-9]|1[01][0-9]|12[0-8])|SG(?:[1-9]|[1-5][0-9]|6[0-4])|AX(?:[1-9]|[1-5][0-9]|6[0-4])|MM(?:[1-9]|[1-5][0-9]|6[0-4])|MX(?:[1-9]|[1-5][0-9]|6[0-4])|MA[12]|MON[12]|DCA(?:[1-9]|1[0-9]|2[0-4])|U(?:[1-9]|[1-9][0-9]|1[0-8][0-9]|19[0-2]))$', label: Channel,
+                 description: "The channel to read, by the console's token: I1-I128 input channels; SG1-SG64 subgroups; AX1-AX64 AUX buses; MM1-MM64 MIX-MINUS buses; MX1-MX64 matrices; MA1-MA2 mains; MON1-MON2 monitors; DCA1-DCA24; U1-U192 user faders (USER1 1-64, USER2 65-128, USER3 129-192), which reach the channel assigned to them." }
+    send: "FDQ:{channel};"
+    expect: { reply_contains: "FDS:{channel},", matches: 'FDS:[^,]+,([^;]+);' }
+    returns: value
+
+  get_channel_name:
+    summary: "Read a channel's name (CNQ, p.14)"
+    params:
+      channel: { type: string, required: true, max_length: 6, pattern: '^(?:I(?:[1-9]|[1-9][0-9]|1[01][0-9]|12[0-8])|SG(?:[1-9]|[1-5][0-9]|6[0-4])|AX(?:[1-9]|[1-5][0-9]|6[0-4])|MM(?:[1-9]|[1-5][0-9]|6[0-4])|MX(?:[1-9]|[1-5][0-9]|6[0-4])|MA[12]|DCA(?:[1-9]|1[0-9]|2[0-4])|MG[1-8]|U(?:[1-9]|[1-9][0-9]|1[0-8][0-9]|19[0-2]))$', label: Channel,
+                 description: "The channel whose name to read, by the console's token: I1-I128 input channels; SG1-SG64 subgroups; AX1-AX64 AUX buses; MM1-MM64 MIX-MINUS buses; MX1-MX64 matrices; MA1-MA2 mains; DCA1-DCA24; MG1-MG8 mute groups; U1-U192 user faders (USER1 1-64, USER2 65-128, USER3 129-192), which reach the channel assigned to them." }
+    send: "CNQ:{channel};"
+    expect: { reply_contains: "CNS:{channel},", matches: 'CNS:[^,]+,"([^"]*)"' }
+    returns: value
+
+  recall_scene:
+    summary: "Recall a scene (SCC, p.11); refused (ERR:5) for a scene that does not exist"
+    params:
+      scene: { type: float, min: 1.0, max: 300.0, required: true, label: Scene,
+              description: "Scene number, 1.00 to 300.00 in steps of 0.01, as the console numbers scenes." }
+    send: "SCC:{scene:.2f};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  recall_scene_relative:
+    summary: "Recall the scene a number of scenes before or after the current one (RSC, p.12)"
+    params:
+      offset: { type: int, min: -299, max: 299, required: true, label: Offset, description: "How many scenes to move, negative for earlier scenes; refused when the result lies outside 1.00-300.00." }
+    send: "RSC:{offset};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  store_scene:
+    summary: "Store the current settings to an existing scene, keeping its name and M-48 setting (SSC, p.12)"
+    params:
+      scene: { type: float, min: 1.0, max: 300.0, required: true, label: Scene,
+              description: "Scene number, 1.00 to 300.00 in steps of 0.01, as the console numbers scenes." }
+    send: "SSC:{scene:.2f};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  store_scene_named:
+    summary: "Store the current settings to an existing scene under a new name (SSC, p.12)"
+    params:
+      scene: { type: float, min: 1.0, max: 300.0, required: true, label: Scene,
+              description: "Scene number, 1.00 to 300.00 in steps of 0.01, as the console numbers scenes." }
+      name: { type: string, required: true, max_length: 32, pattern: '^[^,;"]+$', label: Scene name,
+             description: "The scene's name, up to 32 characters, without commas, semicolons or quotes." }
+    send: "SSC:{scene:.2f},{name};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  store_scene_with_m48:
+    summary: "Store the current settings to an existing scene with a name and M-48 memory (SSC, p.12)"
+    params:
+      scene: { type: float, min: 1.0, max: 300.0, required: true, label: Scene,
+              description: "Scene number, 1.00 to 300.00 in steps of 0.01, as the console numbers scenes." }
+      name: { type: string, required: true, max_length: 32, pattern: '^[^,;"]+$', label: Scene name,
+             description: "The scene's name, up to 32 characters, without commas, semicolons or quotes." }
+      memory: { type: int, min: 0, max: 16, required: true, label: M-48 memory,
+              description: "The M-48 personal mixer memory the scene recalls, 1 to 16, or 0 for none." }
+    send: "SSC:{scene:.2f},{name},{memory:map.m48};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  new_scene:
+    summary: "Store the current settings as a new scene after the current one (SNC, p.12); refused when 300 scenes exist"
+    params:
+      name: { type: string, required: true, max_length: 32, pattern: '^[^,;"]+$', label: Scene name,
+             description: "The scene's name, up to 32 characters, without commas, semicolons or quotes." }
+    send: "SNC:{name};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  new_scene_with_m48:
+    summary: "Store the current settings as a new scene after the current one, with an M-48 memory (SNC, p.12)"
+    params:
+      name: { type: string, required: true, max_length: 32, pattern: '^[^,;"]+$', label: Scene name,
+             description: "The scene's name, up to 32 characters, without commas, semicolons or quotes." }
+      memory: { type: int, min: 0, max: 16, required: true, label: M-48 memory,
+              description: "The M-48 personal mixer memory the scene recalls, 1 to 16, or 0 for none." }
+    send: "SNC:{name},{memory:map.m48};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  get_scene:
+    summary: "Read the scene last recalled, its number and name (SCQ, p.16-17); refused when none has been recalled"
+    send: "SCQ;"
+    expect: { reply_contains: "SCS:", matches: 'SCS:([0-9.]+),' }
+    returns: value
+
+  set_display_brightness:
+    summary: "Set the display brightness (DBC, p.12)"
+    params:
+      brightness: { type: int, min: 0, max: 100, required: true, label: Brightness, description: "Brightness in percent, 0 to 100." }
+    send: "DBC:{brightness};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  get_display_brightness:
+    summary: "Read the display brightness (DBQ, p.17-18)"
+    send: "DBQ;"
+    expect: { reply_contains: "DBS:", matches: 'DBS:([0-9]+);' }
+    returns: value
+
+  set_panel_brightness:
+    summary: "Set the panel brightness (PBC, p.12-13)"
+    params:
+      brightness: { type: int, min: 0, max: 100, required: true, label: Brightness, description: "Brightness in percent, 0 to 100." }
+    send: "PBC:{brightness};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  get_panel_brightness:
+    summary: "Read the panel brightness (PBQ, p.18)"
+    send: "PBQ;"
+    expect: { reply_contains: "PBS:", matches: 'PBS:([0-9]+);' }
+    returns: value
+
+  set_lamp_brightness:
+    summary: "Set the lamp (LAMP jack) brightness (LBC, p.13)"
+    params:
+      brightness: { type: int, min: 0, max: 100, required: true, label: Brightness, description: "Brightness in percent, 0 to 100." }
+    send: "LBC:{brightness};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  get_lamp_brightness:
+    summary: "Read the lamp (LAMP jack) brightness (LBQ, p.18)"
+    send: "LBQ;"
+    expect: { reply_contains: "LBS:", matches: 'LBS:([0-9]+);' }
+    returns: value
+
+  set_monitor_dimmer:
+    summary: "Turn a monitor's dimmer on or off (DMC, p.13)"
+    params:
+      monitor: { type: enum, values: [MON1, MON2], required: true, label: Monitor, description: "MON1 or MON2." }
+      enabled: { type: bool, required: true, label: Dimmer, description: "On dims the monitor, off returns it to its level." }
+    send: "DMC:{monitor},{enabled:bool01};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  get_monitor_dimmer:
+    summary: "Read whether a monitor's dimmer is on (DMQ, p.18)"
+    params:
+      monitor: { type: enum, values: [MON1, MON2], required: true, label: Monitor, description: "MON1 or MON2." }
+    send: "DMQ:{monitor};"
+    expect: { reply_contains: "DMS:{monitor},", matches: 'DMS:[^,]+,([01]);' }
+    returns: value
+
+  recorder_transport:
+    summary: "Stop, play or record-pause the USB memory recorder (RTC, p.13); play from record-pause starts recording"
+    params:
+      action: { type: enum, values: [stop, play, rec_pause], required: true, label: Action,
+                description: "stop, play (or start recording from record-pause), or rec_pause to arm recording." }
+    send: "RTC:{action:map.recorder_action};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  recorder_locate:
+    summary: "Move the playback position of the USB memory recorder (RLC, p.13); valid only during playback"
+    params:
+      hours: { type: int, min: 0, max: 99, required: true, label: Hours, description: "Hours into the song." }
+      minutes: { type: int, min: 0, max: 59, required: true, label: Minutes, description: "Minutes past the hour." }
+      seconds: { type: int, min: 0, max: 59, required: true, label: Seconds, description: "Seconds past the minute." }
+    send: "RLC:{hours:02d}h{minutes:02d}m{seconds:02d}s;"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  recorder_select_song:
+    summary: "Select a song of the USB memory recorder by number (RIC, p.13-14)"
+    params:
+      song: { type: int, min: 0, max: 999, required: true, label: Song, description: "Song number, 0 to 999." }
+    send: "RIC:{song};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  recorder_move_song:
+    summary: "Select the song a number of songs before or after the current one (RIC with + or -, p.13-14)"
+    params:
+      offset: { type: int, min: -999, max: 999, required: true, label: Offset, description: "Songs to move, negative for earlier songs; 0 is refused." }
+    send: "RIC:{offset:signed};"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  recorder_next_song:
+    summary: "Select the next song of the USB memory recorder (RIC:N, p.13-14)"
+    send: "RIC:N;"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  recorder_previous_song:
+    summary: "Select the previous song of the USB memory recorder (RIC:P, p.13-14)"
+    send: "RIC:P;"
+    expect: { matches: '(?:^|[\x02\x11\x13])(?:OK|\x06)' }
+    returns: ack
+
+  get_recorder_status:
+    summary: "Read the USB memory recorder's status (RTQ, p.18-19): -1 unavailable, 0 stopped, 1 playing, 2 recording, 3 preparing playback, 4 record-pause"
+    send: "RTQ;"
+    expect: { reply_contains: "RTS:", matches: 'RTS:(-?[0-9]+);' }
+    returns: value
+
+  get_recorder_position:
+    summary: "Read the USB memory recorder's playback position (RLQ, p.19), as HHhMMmSSs with leading fields left out"
+    send: "RLQ;"
+    expect: { reply_contains: "RLS:", matches: 'RLS:([0-9hms]*);' }
+    returns: value
+
+  get_recorder_song:
+    summary: "Read the current song number and the number of songs (RIQ, p.19); returns the current song"
+    send: "RIQ;"
+    expect: { reply_contains: "RIS:", matches: 'RIS:([0-9]+),' }
+    returns: value
+
+  get_recorder_song_name:
+    summary: "Read the current song's number and name (RNQ, p.19); returns the name"
+    send: "RNQ;"
+    expect: { reply_contains: "RNS:", matches: 'RNS:[0-9]+,"([^";]*)' }
+    returns: value
+
+  get_recorder_song_name_of:
+    summary: "Read a song's name by number (RNQ:a, p.19)"
+    params:
+      song: { type: int, min: 0, max: 999, required: true, label: Song, description: "Song number, 0 to 999." }
+    send: "RNQ:{song};"
+    expect: { reply_contains: "RNS:{song},", matches: 'RNS:[0-9]+,"([^";]*)' }
+    returns: value
+
+  get_recorder_remaining:
+    summary: "Read the remaining recording time of the USB memory (RRQ, p.19-20), as HHhMMmSSs"
+    send: "RRQ;"
+    expect: { reply_contains: "RRS:", matches: 'RRS:([0-9hms]*);' }
+    returns: value
+
+  get_reac_status:
+    summary: "Read a REAC port's connection status (RCQ, p.17): 0 not connected, 1 establishing, 2 connected"
+    params:
+      port: { type: enum, values: [A, B], required: true, label: REAC port, description: "REAC port A or B." }
+    send: "RCQ:{port};"
+    expect: { reply_contains: "RCS:{port},", matches: 'RCS:[AB],([0-2]);' }
+    returns: value
+
+  get_version:
+    summary: "Read the mixer engine's version (VRQ, p.17)"
+    send: "VRQ;"
+    expect: { reply_contains: "VRS:", matches: 'VRS:([^;]+);' }
+    returns: value
+
+  resend_last_reply:
+    summary: "Ask the console to send its last reply again (ERR:0 from the host, p.20)"
+    send: "ERR:0;"
+    expect: { matches: '^[\x02\x11\x13]*(?:[A-Z]{2}S:|OK|\x06)' }
+    returns: text
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      recall_scene, recall_scene_relative and the M-48 memory a scene carries
+      change the whole console at once; store_scene, store_scene_named and
+      store_scene_with_m48 overwrite a scene's stored settings. Neither can
+      be undone from here.
+  - models: [all]
+    severity: warning
+    text: >
+      The console sends nothing when a setting is changed on its own surface
+      (p.6), so state comes from polling: the scene and the USB memory
+      recorder every two seconds, faders and mutes every ten, and names,
+      pans, EQ and phantom switches every minute. A change on the console
+      shows up only at the next poll. AUX send levels (128 inputs by 64 AUX
+      buses) are not polled; get_aux_send reads one into state. User faders
+      (U1-U192) reach whichever channel is assigned to them and are not
+      polled; state is kept by the channel's own token.
+  - models: [all]
+    severity: info
+    text: >
+      Over Telnet the console echoes what it receives (character mode with
+      remote echo, p.4); the echo is never taken as a reply. Telnet option
+      negotiation is not documented; the core sends none. Over RS-232C the
+      host may send ack after a request's reply (optional, p.6-7); the core
+      does not.
+  - models: [all]
+    severity: info
+    text: >
+      Channel names are 12 characters (p.14); the console may pad shorter
+      names. Scene names are up to 32 characters and are sent without quotes
+      (p.12). Scene numbers are decimals, 1.00 to 300.00; the scene in state
+      is the number as the console wrote it. ERR:0 syntax error, ERR:2 busy,
+      ERR:5 out of range (or a channel that does not have the parameter),
+      ERR:6 other error (p.20). ERS (console errors: 0 fan stopped, 1 lithium
+      battery low, 10-12 RS-232C errors, 99 abnormal stop) and EPS (REAC
+      device errors) are sent unprompted (p.20-21).
+
+state:
+  channels.*.name:              { type: string, description: "Channel name (CNS), keyed by the console's channel token (I1, SG3, AX12, MM1, MX4, MA1, DCA2, MG5)" }
+  channels.*.fader:             { type: string, unit: dB, description: "Fader level in dB as the console writes it (-80.0 to 10.0), or \"-inf\"" }
+  channels.*.mute:              { type: bool, description: "Muted" }
+  channels.*.pan:               { type: int, description: "Pan, -100 (L100) through 0 (C) to 100 (R100)" }
+  channels.*.eq:                { type: bool, description: "EQ on" }
+  channels.*.phantom:           { type: bool, description: "Phantom power (+48V) on" }
+  channels.*.aux_sends.*.level: { type: string, unit: dB, description: "Send level to the AUX bus (keyed AX1-AX64) in dB, or \"-inf\"; read by get_aux_send only" }
+  channels.*.aux_sends.*.pan:   { type: int, description: "Send pan to the AUX bus, -100 to 100; 0 on a mono AUX" }
+  scene.number:                 { type: string, description: "Scene last recalled, 1.00-300.00 as the console writes it" }
+  scene.name:                   { type: string, description: "Name of the scene last recalled" }
+  brightness.display:           { type: int, unit: "%", description: "Display brightness" }
+  brightness.panel:             { type: int, unit: "%", description: "Panel brightness" }
+  brightness.lamp:              { type: int, unit: "%", description: "LAMP jack brightness" }
+  monitors.*.dimmer:            { type: bool, description: "Dimmer on, keyed MON1 or MON2" }
+  recorder.status:              { type: string, description: "USB memory recorder: unavailable, stopped, playing, recording, preparing or rec_pause" }
+  recorder.position:            { type: string, description: "Playback position as HHhMMmSSs, leading fields left out by the console" }
+  recorder.song:                { type: int, description: "Current song number" }
+  recorder.song_count:          { type: int, description: "Number of songs" }
+  recorder.songs.*.name:        { type: string, description: "Song name, keyed by song number" }
+  recorder.remaining:           { type: string, description: "Remaining recording time as HHhMMmSSs" }
+  reac.*.status:                { type: string, description: "REAC port A or B: disconnected, establishing or connected" }
+  reac.*.error:                 { type: string, description: "Last REAC device error, keyed A, B, D1, D2, E1, E2: fan_stopped, temperature or transmission" }
+  device.version:               { type: string, description: "Mixer engine version" }
+  device.error:                 { type: int, description: "Last console error status code (ERS): 0 fan stopped, 1 lithium battery low, 10 RS-232C framing, 11 parity, 12 receive buffer full, 99 abnormal system stop" }
+
+telemetry:
+  # Nothing is pushed but REAC status and errors (p.6, p.17, p.20-21): see
+  # the polling quirk.
+  subscribe:
+    send: ["VRQ;"]
+  poll:
+    - every_ms: 2000
+      send: [
+        "SCQ;", "RTQ;", "RLQ;", "RIQ;", "RNQ;"]
+    - every_ms: 10000
+      send: [
+        "FDQ:I1;", "FDQ:I2;", "FDQ:I3;", "FDQ:I4;", "FDQ:I5;", "FDQ:I6;", "FDQ:I7;", "FDQ:I8;", "FDQ:I9;",
+        "FDQ:I10;", "FDQ:I11;", "FDQ:I12;", "FDQ:I13;", "FDQ:I14;", "FDQ:I15;", "FDQ:I16;", "FDQ:I17;", "FDQ:I18;",
+        "FDQ:I19;", "FDQ:I20;", "FDQ:I21;", "FDQ:I22;", "FDQ:I23;", "FDQ:I24;", "FDQ:I25;", "FDQ:I26;", "FDQ:I27;",
+        "FDQ:I28;", "FDQ:I29;", "FDQ:I30;", "FDQ:I31;", "FDQ:I32;", "FDQ:I33;", "FDQ:I34;", "FDQ:I35;", "FDQ:I36;",
+        "FDQ:I37;", "FDQ:I38;", "FDQ:I39;", "FDQ:I40;", "FDQ:I41;", "FDQ:I42;", "FDQ:I43;", "FDQ:I44;", "FDQ:I45;",
+        "FDQ:I46;", "FDQ:I47;", "FDQ:I48;", "FDQ:I49;", "FDQ:I50;", "FDQ:I51;", "FDQ:I52;", "FDQ:I53;", "FDQ:I54;",
+        "FDQ:I55;", "FDQ:I56;", "FDQ:I57;", "FDQ:I58;", "FDQ:I59;", "FDQ:I60;", "FDQ:I61;", "FDQ:I62;", "FDQ:I63;",
+        "FDQ:I64;", "FDQ:I65;", "FDQ:I66;", "FDQ:I67;", "FDQ:I68;", "FDQ:I69;", "FDQ:I70;", "FDQ:I71;", "FDQ:I72;",
+        "FDQ:I73;", "FDQ:I74;", "FDQ:I75;", "FDQ:I76;", "FDQ:I77;", "FDQ:I78;", "FDQ:I79;", "FDQ:I80;", "FDQ:I81;",
+        "FDQ:I82;", "FDQ:I83;", "FDQ:I84;", "FDQ:I85;", "FDQ:I86;", "FDQ:I87;", "FDQ:I88;", "FDQ:I89;", "FDQ:I90;",
+        "FDQ:I91;", "FDQ:I92;", "FDQ:I93;", "FDQ:I94;", "FDQ:I95;", "FDQ:I96;", "FDQ:I97;", "FDQ:I98;", "FDQ:I99;",
+        "FDQ:I100;", "FDQ:I101;", "FDQ:I102;", "FDQ:I103;", "FDQ:I104;", "FDQ:I105;", "FDQ:I106;", "FDQ:I107;",
+        "FDQ:I108;", "FDQ:I109;", "FDQ:I110;", "FDQ:I111;", "FDQ:I112;", "FDQ:I113;", "FDQ:I114;", "FDQ:I115;",
+        "FDQ:I116;", "FDQ:I117;", "FDQ:I118;", "FDQ:I119;", "FDQ:I120;", "FDQ:I121;", "FDQ:I122;", "FDQ:I123;",
+        "FDQ:I124;", "FDQ:I125;", "FDQ:I126;", "FDQ:I127;", "FDQ:I128;", "FDQ:SG1;", "FDQ:SG2;", "FDQ:SG3;",
+        "FDQ:SG4;", "FDQ:SG5;", "FDQ:SG6;", "FDQ:SG7;", "FDQ:SG8;", "FDQ:SG9;", "FDQ:SG10;", "FDQ:SG11;",
+        "FDQ:SG12;", "FDQ:SG13;", "FDQ:SG14;", "FDQ:SG15;", "FDQ:SG16;", "FDQ:SG17;", "FDQ:SG18;", "FDQ:SG19;",
+        "FDQ:SG20;", "FDQ:SG21;", "FDQ:SG22;", "FDQ:SG23;", "FDQ:SG24;", "FDQ:SG25;", "FDQ:SG26;", "FDQ:SG27;",
+        "FDQ:SG28;", "FDQ:SG29;", "FDQ:SG30;", "FDQ:SG31;", "FDQ:SG32;", "FDQ:SG33;", "FDQ:SG34;", "FDQ:SG35;",
+        "FDQ:SG36;", "FDQ:SG37;", "FDQ:SG38;", "FDQ:SG39;", "FDQ:SG40;", "FDQ:SG41;", "FDQ:SG42;", "FDQ:SG43;",
+        "FDQ:SG44;", "FDQ:SG45;", "FDQ:SG46;", "FDQ:SG47;", "FDQ:SG48;", "FDQ:SG49;", "FDQ:SG50;", "FDQ:SG51;",
+        "FDQ:SG52;", "FDQ:SG53;", "FDQ:SG54;", "FDQ:SG55;", "FDQ:SG56;", "FDQ:SG57;", "FDQ:SG58;", "FDQ:SG59;",
+        "FDQ:SG60;", "FDQ:SG61;", "FDQ:SG62;", "FDQ:SG63;", "FDQ:SG64;", "FDQ:AX1;", "FDQ:AX2;", "FDQ:AX3;",
+        "FDQ:AX4;", "FDQ:AX5;", "FDQ:AX6;", "FDQ:AX7;", "FDQ:AX8;", "FDQ:AX9;", "FDQ:AX10;", "FDQ:AX11;",
+        "FDQ:AX12;", "FDQ:AX13;", "FDQ:AX14;", "FDQ:AX15;", "FDQ:AX16;", "FDQ:AX17;", "FDQ:AX18;", "FDQ:AX19;",
+        "FDQ:AX20;", "FDQ:AX21;", "FDQ:AX22;", "FDQ:AX23;", "FDQ:AX24;", "FDQ:AX25;", "FDQ:AX26;", "FDQ:AX27;",
+        "FDQ:AX28;", "FDQ:AX29;", "FDQ:AX30;", "FDQ:AX31;", "FDQ:AX32;", "FDQ:AX33;", "FDQ:AX34;", "FDQ:AX35;",
+        "FDQ:AX36;", "FDQ:AX37;", "FDQ:AX38;", "FDQ:AX39;", "FDQ:AX40;", "FDQ:AX41;", "FDQ:AX42;", "FDQ:AX43;",
+        "FDQ:AX44;", "FDQ:AX45;", "FDQ:AX46;", "FDQ:AX47;", "FDQ:AX48;", "FDQ:AX49;", "FDQ:AX50;", "FDQ:AX51;",
+        "FDQ:AX52;", "FDQ:AX53;", "FDQ:AX54;", "FDQ:AX55;", "FDQ:AX56;", "FDQ:AX57;", "FDQ:AX58;", "FDQ:AX59;",
+        "FDQ:AX60;", "FDQ:AX61;", "FDQ:AX62;", "FDQ:AX63;", "FDQ:AX64;", "FDQ:MM1;", "FDQ:MM2;", "FDQ:MM3;",
+        "FDQ:MM4;", "FDQ:MM5;", "FDQ:MM6;", "FDQ:MM7;", "FDQ:MM8;", "FDQ:MM9;", "FDQ:MM10;", "FDQ:MM11;",
+        "FDQ:MM12;", "FDQ:MM13;", "FDQ:MM14;", "FDQ:MM15;", "FDQ:MM16;", "FDQ:MM17;", "FDQ:MM18;", "FDQ:MM19;",
+        "FDQ:MM20;", "FDQ:MM21;", "FDQ:MM22;", "FDQ:MM23;", "FDQ:MM24;", "FDQ:MM25;", "FDQ:MM26;", "FDQ:MM27;",
+        "FDQ:MM28;", "FDQ:MM29;", "FDQ:MM30;", "FDQ:MM31;", "FDQ:MM32;", "FDQ:MM33;", "FDQ:MM34;", "FDQ:MM35;",
+        "FDQ:MM36;", "FDQ:MM37;", "FDQ:MM38;", "FDQ:MM39;", "FDQ:MM40;", "FDQ:MM41;", "FDQ:MM42;", "FDQ:MM43;",
+        "FDQ:MM44;", "FDQ:MM45;", "FDQ:MM46;", "FDQ:MM47;", "FDQ:MM48;", "FDQ:MM49;", "FDQ:MM50;", "FDQ:MM51;",
+        "FDQ:MM52;", "FDQ:MM53;", "FDQ:MM54;", "FDQ:MM55;", "FDQ:MM56;", "FDQ:MM57;", "FDQ:MM58;", "FDQ:MM59;",
+        "FDQ:MM60;", "FDQ:MM61;", "FDQ:MM62;", "FDQ:MM63;", "FDQ:MM64;", "FDQ:MX1;", "FDQ:MX2;", "FDQ:MX3;",
+        "FDQ:MX4;", "FDQ:MX5;", "FDQ:MX6;", "FDQ:MX7;", "FDQ:MX8;", "FDQ:MX9;", "FDQ:MX10;", "FDQ:MX11;",
+        "FDQ:MX12;", "FDQ:MX13;", "FDQ:MX14;", "FDQ:MX15;", "FDQ:MX16;", "FDQ:MX17;", "FDQ:MX18;", "FDQ:MX19;",
+        "FDQ:MX20;", "FDQ:MX21;", "FDQ:MX22;", "FDQ:MX23;", "FDQ:MX24;", "FDQ:MX25;", "FDQ:MX26;", "FDQ:MX27;",
+        "FDQ:MX28;", "FDQ:MX29;", "FDQ:MX30;", "FDQ:MX31;", "FDQ:MX32;", "FDQ:MX33;", "FDQ:MX34;", "FDQ:MX35;",
+        "FDQ:MX36;", "FDQ:MX37;", "FDQ:MX38;", "FDQ:MX39;", "FDQ:MX40;", "FDQ:MX41;", "FDQ:MX42;", "FDQ:MX43;",
+        "FDQ:MX44;", "FDQ:MX45;", "FDQ:MX46;", "FDQ:MX47;", "FDQ:MX48;", "FDQ:MX49;", "FDQ:MX50;", "FDQ:MX51;",
+        "FDQ:MX52;", "FDQ:MX53;", "FDQ:MX54;", "FDQ:MX55;", "FDQ:MX56;", "FDQ:MX57;", "FDQ:MX58;", "FDQ:MX59;",
+        "FDQ:MX60;", "FDQ:MX61;", "FDQ:MX62;", "FDQ:MX63;", "FDQ:MX64;", "FDQ:MA1;", "FDQ:MA2;", "FDQ:MON1;",
+        "FDQ:MON2;", "FDQ:DCA1;", "FDQ:DCA2;", "FDQ:DCA3;", "FDQ:DCA4;", "FDQ:DCA5;", "FDQ:DCA6;", "FDQ:DCA7;",
+        "FDQ:DCA8;", "FDQ:DCA9;", "FDQ:DCA10;", "FDQ:DCA11;", "FDQ:DCA12;", "FDQ:DCA13;", "FDQ:DCA14;", "FDQ:DCA15;",
+        "FDQ:DCA16;", "FDQ:DCA17;", "FDQ:DCA18;", "FDQ:DCA19;", "FDQ:DCA20;", "FDQ:DCA21;", "FDQ:DCA22;",
+        "FDQ:DCA23;", "FDQ:DCA24;", "MUQ:I1;", "MUQ:I2;", "MUQ:I3;", "MUQ:I4;", "MUQ:I5;", "MUQ:I6;", "MUQ:I7;",
+        "MUQ:I8;", "MUQ:I9;", "MUQ:I10;", "MUQ:I11;", "MUQ:I12;", "MUQ:I13;", "MUQ:I14;", "MUQ:I15;", "MUQ:I16;",
+        "MUQ:I17;", "MUQ:I18;", "MUQ:I19;", "MUQ:I20;", "MUQ:I21;", "MUQ:I22;", "MUQ:I23;", "MUQ:I24;", "MUQ:I25;",
+        "MUQ:I26;", "MUQ:I27;", "MUQ:I28;", "MUQ:I29;", "MUQ:I30;", "MUQ:I31;", "MUQ:I32;", "MUQ:I33;", "MUQ:I34;",
+        "MUQ:I35;", "MUQ:I36;", "MUQ:I37;", "MUQ:I38;", "MUQ:I39;", "MUQ:I40;", "MUQ:I41;", "MUQ:I42;", "MUQ:I43;",
+        "MUQ:I44;", "MUQ:I45;", "MUQ:I46;", "MUQ:I47;", "MUQ:I48;", "MUQ:I49;", "MUQ:I50;", "MUQ:I51;", "MUQ:I52;",
+        "MUQ:I53;", "MUQ:I54;", "MUQ:I55;", "MUQ:I56;", "MUQ:I57;", "MUQ:I58;", "MUQ:I59;", "MUQ:I60;", "MUQ:I61;",
+        "MUQ:I62;", "MUQ:I63;", "MUQ:I64;", "MUQ:I65;", "MUQ:I66;", "MUQ:I67;", "MUQ:I68;", "MUQ:I69;", "MUQ:I70;",
+        "MUQ:I71;", "MUQ:I72;", "MUQ:I73;", "MUQ:I74;", "MUQ:I75;", "MUQ:I76;", "MUQ:I77;", "MUQ:I78;", "MUQ:I79;",
+        "MUQ:I80;", "MUQ:I81;", "MUQ:I82;", "MUQ:I83;", "MUQ:I84;", "MUQ:I85;", "MUQ:I86;", "MUQ:I87;", "MUQ:I88;",
+        "MUQ:I89;", "MUQ:I90;", "MUQ:I91;", "MUQ:I92;", "MUQ:I93;", "MUQ:I94;", "MUQ:I95;", "MUQ:I96;", "MUQ:I97;",
+        "MUQ:I98;", "MUQ:I99;", "MUQ:I100;", "MUQ:I101;", "MUQ:I102;", "MUQ:I103;", "MUQ:I104;", "MUQ:I105;",
+        "MUQ:I106;", "MUQ:I107;", "MUQ:I108;", "MUQ:I109;", "MUQ:I110;", "MUQ:I111;", "MUQ:I112;", "MUQ:I113;",
+        "MUQ:I114;", "MUQ:I115;", "MUQ:I116;", "MUQ:I117;", "MUQ:I118;", "MUQ:I119;", "MUQ:I120;", "MUQ:I121;",
+        "MUQ:I122;", "MUQ:I123;", "MUQ:I124;", "MUQ:I125;", "MUQ:I126;", "MUQ:I127;", "MUQ:I128;", "MUQ:SG1;",
+        "MUQ:SG2;", "MUQ:SG3;", "MUQ:SG4;", "MUQ:SG5;", "MUQ:SG6;", "MUQ:SG7;", "MUQ:SG8;", "MUQ:SG9;", "MUQ:SG10;",
+        "MUQ:SG11;", "MUQ:SG12;", "MUQ:SG13;", "MUQ:SG14;", "MUQ:SG15;", "MUQ:SG16;", "MUQ:SG17;", "MUQ:SG18;",
+        "MUQ:SG19;", "MUQ:SG20;", "MUQ:SG21;", "MUQ:SG22;", "MUQ:SG23;", "MUQ:SG24;", "MUQ:SG25;", "MUQ:SG26;",
+        "MUQ:SG27;", "MUQ:SG28;", "MUQ:SG29;", "MUQ:SG30;", "MUQ:SG31;", "MUQ:SG32;", "MUQ:SG33;", "MUQ:SG34;",
+        "MUQ:SG35;", "MUQ:SG36;", "MUQ:SG37;", "MUQ:SG38;", "MUQ:SG39;", "MUQ:SG40;", "MUQ:SG41;", "MUQ:SG42;",
+        "MUQ:SG43;", "MUQ:SG44;", "MUQ:SG45;", "MUQ:SG46;", "MUQ:SG47;", "MUQ:SG48;", "MUQ:SG49;", "MUQ:SG50;",
+        "MUQ:SG51;", "MUQ:SG52;", "MUQ:SG53;", "MUQ:SG54;", "MUQ:SG55;", "MUQ:SG56;", "MUQ:SG57;", "MUQ:SG58;",
+        "MUQ:SG59;", "MUQ:SG60;", "MUQ:SG61;", "MUQ:SG62;", "MUQ:SG63;", "MUQ:SG64;", "MUQ:AX1;", "MUQ:AX2;",
+        "MUQ:AX3;", "MUQ:AX4;", "MUQ:AX5;", "MUQ:AX6;", "MUQ:AX7;", "MUQ:AX8;", "MUQ:AX9;", "MUQ:AX10;", "MUQ:AX11;",
+        "MUQ:AX12;", "MUQ:AX13;", "MUQ:AX14;", "MUQ:AX15;", "MUQ:AX16;", "MUQ:AX17;", "MUQ:AX18;", "MUQ:AX19;",
+        "MUQ:AX20;", "MUQ:AX21;", "MUQ:AX22;", "MUQ:AX23;", "MUQ:AX24;", "MUQ:AX25;", "MUQ:AX26;", "MUQ:AX27;",
+        "MUQ:AX28;", "MUQ:AX29;", "MUQ:AX30;", "MUQ:AX31;", "MUQ:AX32;", "MUQ:AX33;", "MUQ:AX34;", "MUQ:AX35;",
+        "MUQ:AX36;", "MUQ:AX37;", "MUQ:AX38;", "MUQ:AX39;", "MUQ:AX40;", "MUQ:AX41;", "MUQ:AX42;", "MUQ:AX43;",
+        "MUQ:AX44;", "MUQ:AX45;", "MUQ:AX46;", "MUQ:AX47;", "MUQ:AX48;", "MUQ:AX49;", "MUQ:AX50;", "MUQ:AX51;",
+        "MUQ:AX52;", "MUQ:AX53;", "MUQ:AX54;", "MUQ:AX55;", "MUQ:AX56;", "MUQ:AX57;", "MUQ:AX58;", "MUQ:AX59;",
+        "MUQ:AX60;", "MUQ:AX61;", "MUQ:AX62;", "MUQ:AX63;", "MUQ:AX64;", "MUQ:MM1;", "MUQ:MM2;", "MUQ:MM3;",
+        "MUQ:MM4;", "MUQ:MM5;", "MUQ:MM6;", "MUQ:MM7;", "MUQ:MM8;", "MUQ:MM9;", "MUQ:MM10;", "MUQ:MM11;",
+        "MUQ:MM12;", "MUQ:MM13;", "MUQ:MM14;", "MUQ:MM15;", "MUQ:MM16;", "MUQ:MM17;", "MUQ:MM18;", "MUQ:MM19;",
+        "MUQ:MM20;", "MUQ:MM21;", "MUQ:MM22;", "MUQ:MM23;", "MUQ:MM24;", "MUQ:MM25;", "MUQ:MM26;", "MUQ:MM27;",
+        "MUQ:MM28;", "MUQ:MM29;", "MUQ:MM30;", "MUQ:MM31;", "MUQ:MM32;", "MUQ:MM33;", "MUQ:MM34;", "MUQ:MM35;",
+        "MUQ:MM36;", "MUQ:MM37;", "MUQ:MM38;", "MUQ:MM39;", "MUQ:MM40;", "MUQ:MM41;", "MUQ:MM42;", "MUQ:MM43;",
+        "MUQ:MM44;", "MUQ:MM45;", "MUQ:MM46;", "MUQ:MM47;", "MUQ:MM48;", "MUQ:MM49;", "MUQ:MM50;", "MUQ:MM51;",
+        "MUQ:MM52;", "MUQ:MM53;", "MUQ:MM54;", "MUQ:MM55;", "MUQ:MM56;", "MUQ:MM57;", "MUQ:MM58;", "MUQ:MM59;",
+        "MUQ:MM60;", "MUQ:MM61;", "MUQ:MM62;", "MUQ:MM63;", "MUQ:MM64;", "MUQ:MX1;", "MUQ:MX2;", "MUQ:MX3;",
+        "MUQ:MX4;", "MUQ:MX5;", "MUQ:MX6;", "MUQ:MX7;", "MUQ:MX8;", "MUQ:MX9;", "MUQ:MX10;", "MUQ:MX11;",
+        "MUQ:MX12;", "MUQ:MX13;", "MUQ:MX14;", "MUQ:MX15;", "MUQ:MX16;", "MUQ:MX17;", "MUQ:MX18;", "MUQ:MX19;",
+        "MUQ:MX20;", "MUQ:MX21;", "MUQ:MX22;", "MUQ:MX23;", "MUQ:MX24;", "MUQ:MX25;", "MUQ:MX26;", "MUQ:MX27;",
+        "MUQ:MX28;", "MUQ:MX29;", "MUQ:MX30;", "MUQ:MX31;", "MUQ:MX32;", "MUQ:MX33;", "MUQ:MX34;", "MUQ:MX35;",
+        "MUQ:MX36;", "MUQ:MX37;", "MUQ:MX38;", "MUQ:MX39;", "MUQ:MX40;", "MUQ:MX41;", "MUQ:MX42;", "MUQ:MX43;",
+        "MUQ:MX44;", "MUQ:MX45;", "MUQ:MX46;", "MUQ:MX47;", "MUQ:MX48;", "MUQ:MX49;", "MUQ:MX50;", "MUQ:MX51;",
+        "MUQ:MX52;", "MUQ:MX53;", "MUQ:MX54;", "MUQ:MX55;", "MUQ:MX56;", "MUQ:MX57;", "MUQ:MX58;", "MUQ:MX59;",
+        "MUQ:MX60;", "MUQ:MX61;", "MUQ:MX62;", "MUQ:MX63;", "MUQ:MX64;", "MUQ:MA1;", "MUQ:MA2;", "MUQ:DCA1;",
+        "MUQ:DCA2;", "MUQ:DCA3;", "MUQ:DCA4;", "MUQ:DCA5;", "MUQ:DCA6;", "MUQ:DCA7;", "MUQ:DCA8;", "MUQ:DCA9;",
+        "MUQ:DCA10;", "MUQ:DCA11;", "MUQ:DCA12;", "MUQ:DCA13;", "MUQ:DCA14;", "MUQ:DCA15;", "MUQ:DCA16;",
+        "MUQ:DCA17;", "MUQ:DCA18;", "MUQ:DCA19;", "MUQ:DCA20;", "MUQ:DCA21;", "MUQ:DCA22;", "MUQ:DCA23;",
+        "MUQ:DCA24;", "MUQ:MG1;", "MUQ:MG2;", "MUQ:MG3;", "MUQ:MG4;", "MUQ:MG5;", "MUQ:MG6;", "MUQ:MG7;", "MUQ:MG8;"]
+    - every_ms: 60000
+      send: [
+        "CNQ:I1;", "CNQ:I2;", "CNQ:I3;", "CNQ:I4;", "CNQ:I5;", "CNQ:I6;", "CNQ:I7;", "CNQ:I8;", "CNQ:I9;",
+        "CNQ:I10;", "CNQ:I11;", "CNQ:I12;", "CNQ:I13;", "CNQ:I14;", "CNQ:I15;", "CNQ:I16;", "CNQ:I17;", "CNQ:I18;",
+        "CNQ:I19;", "CNQ:I20;", "CNQ:I21;", "CNQ:I22;", "CNQ:I23;", "CNQ:I24;", "CNQ:I25;", "CNQ:I26;", "CNQ:I27;",
+        "CNQ:I28;", "CNQ:I29;", "CNQ:I30;", "CNQ:I31;", "CNQ:I32;", "CNQ:I33;", "CNQ:I34;", "CNQ:I35;", "CNQ:I36;",
+        "CNQ:I37;", "CNQ:I38;", "CNQ:I39;", "CNQ:I40;", "CNQ:I41;", "CNQ:I42;", "CNQ:I43;", "CNQ:I44;", "CNQ:I45;",
+        "CNQ:I46;", "CNQ:I47;", "CNQ:I48;", "CNQ:I49;", "CNQ:I50;", "CNQ:I51;", "CNQ:I52;", "CNQ:I53;", "CNQ:I54;",
+        "CNQ:I55;", "CNQ:I56;", "CNQ:I57;", "CNQ:I58;", "CNQ:I59;", "CNQ:I60;", "CNQ:I61;", "CNQ:I62;", "CNQ:I63;",
+        "CNQ:I64;", "CNQ:I65;", "CNQ:I66;", "CNQ:I67;", "CNQ:I68;", "CNQ:I69;", "CNQ:I70;", "CNQ:I71;", "CNQ:I72;",
+        "CNQ:I73;", "CNQ:I74;", "CNQ:I75;", "CNQ:I76;", "CNQ:I77;", "CNQ:I78;", "CNQ:I79;", "CNQ:I80;", "CNQ:I81;",
+        "CNQ:I82;", "CNQ:I83;", "CNQ:I84;", "CNQ:I85;", "CNQ:I86;", "CNQ:I87;", "CNQ:I88;", "CNQ:I89;", "CNQ:I90;",
+        "CNQ:I91;", "CNQ:I92;", "CNQ:I93;", "CNQ:I94;", "CNQ:I95;", "CNQ:I96;", "CNQ:I97;", "CNQ:I98;", "CNQ:I99;",
+        "CNQ:I100;", "CNQ:I101;", "CNQ:I102;", "CNQ:I103;", "CNQ:I104;", "CNQ:I105;", "CNQ:I106;", "CNQ:I107;",
+        "CNQ:I108;", "CNQ:I109;", "CNQ:I110;", "CNQ:I111;", "CNQ:I112;", "CNQ:I113;", "CNQ:I114;", "CNQ:I115;",
+        "CNQ:I116;", "CNQ:I117;", "CNQ:I118;", "CNQ:I119;", "CNQ:I120;", "CNQ:I121;", "CNQ:I122;", "CNQ:I123;",
+        "CNQ:I124;", "CNQ:I125;", "CNQ:I126;", "CNQ:I127;", "CNQ:I128;", "CNQ:SG1;", "CNQ:SG2;", "CNQ:SG3;",
+        "CNQ:SG4;", "CNQ:SG5;", "CNQ:SG6;", "CNQ:SG7;", "CNQ:SG8;", "CNQ:SG9;", "CNQ:SG10;", "CNQ:SG11;",
+        "CNQ:SG12;", "CNQ:SG13;", "CNQ:SG14;", "CNQ:SG15;", "CNQ:SG16;", "CNQ:SG17;", "CNQ:SG18;", "CNQ:SG19;",
+        "CNQ:SG20;", "CNQ:SG21;", "CNQ:SG22;", "CNQ:SG23;", "CNQ:SG24;", "CNQ:SG25;", "CNQ:SG26;", "CNQ:SG27;",
+        "CNQ:SG28;", "CNQ:SG29;", "CNQ:SG30;", "CNQ:SG31;", "CNQ:SG32;", "CNQ:SG33;", "CNQ:SG34;", "CNQ:SG35;",
+        "CNQ:SG36;", "CNQ:SG37;", "CNQ:SG38;", "CNQ:SG39;", "CNQ:SG40;", "CNQ:SG41;", "CNQ:SG42;", "CNQ:SG43;",
+        "CNQ:SG44;", "CNQ:SG45;", "CNQ:SG46;", "CNQ:SG47;", "CNQ:SG48;", "CNQ:SG49;", "CNQ:SG50;", "CNQ:SG51;",
+        "CNQ:SG52;", "CNQ:SG53;", "CNQ:SG54;", "CNQ:SG55;", "CNQ:SG56;", "CNQ:SG57;", "CNQ:SG58;", "CNQ:SG59;",
+        "CNQ:SG60;", "CNQ:SG61;", "CNQ:SG62;", "CNQ:SG63;", "CNQ:SG64;", "CNQ:AX1;", "CNQ:AX2;", "CNQ:AX3;",
+        "CNQ:AX4;", "CNQ:AX5;", "CNQ:AX6;", "CNQ:AX7;", "CNQ:AX8;", "CNQ:AX9;", "CNQ:AX10;", "CNQ:AX11;",
+        "CNQ:AX12;", "CNQ:AX13;", "CNQ:AX14;", "CNQ:AX15;", "CNQ:AX16;", "CNQ:AX17;", "CNQ:AX18;", "CNQ:AX19;",
+        "CNQ:AX20;", "CNQ:AX21;", "CNQ:AX22;", "CNQ:AX23;", "CNQ:AX24;", "CNQ:AX25;", "CNQ:AX26;", "CNQ:AX27;",
+        "CNQ:AX28;", "CNQ:AX29;", "CNQ:AX30;", "CNQ:AX31;", "CNQ:AX32;", "CNQ:AX33;", "CNQ:AX34;", "CNQ:AX35;",
+        "CNQ:AX36;", "CNQ:AX37;", "CNQ:AX38;", "CNQ:AX39;", "CNQ:AX40;", "CNQ:AX41;", "CNQ:AX42;", "CNQ:AX43;",
+        "CNQ:AX44;", "CNQ:AX45;", "CNQ:AX46;", "CNQ:AX47;", "CNQ:AX48;", "CNQ:AX49;", "CNQ:AX50;", "CNQ:AX51;",
+        "CNQ:AX52;", "CNQ:AX53;", "CNQ:AX54;", "CNQ:AX55;", "CNQ:AX56;", "CNQ:AX57;", "CNQ:AX58;", "CNQ:AX59;",
+        "CNQ:AX60;", "CNQ:AX61;", "CNQ:AX62;", "CNQ:AX63;", "CNQ:AX64;", "CNQ:MM1;", "CNQ:MM2;", "CNQ:MM3;",
+        "CNQ:MM4;", "CNQ:MM5;", "CNQ:MM6;", "CNQ:MM7;", "CNQ:MM8;", "CNQ:MM9;", "CNQ:MM10;", "CNQ:MM11;",
+        "CNQ:MM12;", "CNQ:MM13;", "CNQ:MM14;", "CNQ:MM15;", "CNQ:MM16;", "CNQ:MM17;", "CNQ:MM18;", "CNQ:MM19;",
+        "CNQ:MM20;", "CNQ:MM21;", "CNQ:MM22;", "CNQ:MM23;", "CNQ:MM24;", "CNQ:MM25;", "CNQ:MM26;", "CNQ:MM27;",
+        "CNQ:MM28;", "CNQ:MM29;", "CNQ:MM30;", "CNQ:MM31;", "CNQ:MM32;", "CNQ:MM33;", "CNQ:MM34;", "CNQ:MM35;",
+        "CNQ:MM36;", "CNQ:MM37;", "CNQ:MM38;", "CNQ:MM39;", "CNQ:MM40;", "CNQ:MM41;", "CNQ:MM42;", "CNQ:MM43;",
+        "CNQ:MM44;", "CNQ:MM45;", "CNQ:MM46;", "CNQ:MM47;", "CNQ:MM48;", "CNQ:MM49;", "CNQ:MM50;", "CNQ:MM51;",
+        "CNQ:MM52;", "CNQ:MM53;", "CNQ:MM54;", "CNQ:MM55;", "CNQ:MM56;", "CNQ:MM57;", "CNQ:MM58;", "CNQ:MM59;",
+        "CNQ:MM60;", "CNQ:MM61;", "CNQ:MM62;", "CNQ:MM63;", "CNQ:MM64;", "CNQ:MX1;", "CNQ:MX2;", "CNQ:MX3;",
+        "CNQ:MX4;", "CNQ:MX5;", "CNQ:MX6;", "CNQ:MX7;", "CNQ:MX8;", "CNQ:MX9;", "CNQ:MX10;", "CNQ:MX11;",
+        "CNQ:MX12;", "CNQ:MX13;", "CNQ:MX14;", "CNQ:MX15;", "CNQ:MX16;", "CNQ:MX17;", "CNQ:MX18;", "CNQ:MX19;",
+        "CNQ:MX20;", "CNQ:MX21;", "CNQ:MX22;", "CNQ:MX23;", "CNQ:MX24;", "CNQ:MX25;", "CNQ:MX26;", "CNQ:MX27;",
+        "CNQ:MX28;", "CNQ:MX29;", "CNQ:MX30;", "CNQ:MX31;", "CNQ:MX32;", "CNQ:MX33;", "CNQ:MX34;", "CNQ:MX35;",
+        "CNQ:MX36;", "CNQ:MX37;", "CNQ:MX38;", "CNQ:MX39;", "CNQ:MX40;", "CNQ:MX41;", "CNQ:MX42;", "CNQ:MX43;",
+        "CNQ:MX44;", "CNQ:MX45;", "CNQ:MX46;", "CNQ:MX47;", "CNQ:MX48;", "CNQ:MX49;", "CNQ:MX50;", "CNQ:MX51;",
+        "CNQ:MX52;", "CNQ:MX53;", "CNQ:MX54;", "CNQ:MX55;", "CNQ:MX56;", "CNQ:MX57;", "CNQ:MX58;", "CNQ:MX59;",
+        "CNQ:MX60;", "CNQ:MX61;", "CNQ:MX62;", "CNQ:MX63;", "CNQ:MX64;", "CNQ:MA1;", "CNQ:MA2;", "CNQ:DCA1;",
+        "CNQ:DCA2;", "CNQ:DCA3;", "CNQ:DCA4;", "CNQ:DCA5;", "CNQ:DCA6;", "CNQ:DCA7;", "CNQ:DCA8;", "CNQ:DCA9;",
+        "CNQ:DCA10;", "CNQ:DCA11;", "CNQ:DCA12;", "CNQ:DCA13;", "CNQ:DCA14;", "CNQ:DCA15;", "CNQ:DCA16;",
+        "CNQ:DCA17;", "CNQ:DCA18;", "CNQ:DCA19;", "CNQ:DCA20;", "CNQ:DCA21;", "CNQ:DCA22;", "CNQ:DCA23;",
+        "CNQ:DCA24;", "CNQ:MG1;", "CNQ:MG2;", "CNQ:MG3;", "CNQ:MG4;", "CNQ:MG5;", "CNQ:MG6;", "CNQ:MG7;", "CNQ:MG8;",
+        "PNQ:I1;", "PNQ:I2;", "PNQ:I3;", "PNQ:I4;", "PNQ:I5;", "PNQ:I6;", "PNQ:I7;", "PNQ:I8;", "PNQ:I9;",
+        "PNQ:I10;", "PNQ:I11;", "PNQ:I12;", "PNQ:I13;", "PNQ:I14;", "PNQ:I15;", "PNQ:I16;", "PNQ:I17;", "PNQ:I18;",
+        "PNQ:I19;", "PNQ:I20;", "PNQ:I21;", "PNQ:I22;", "PNQ:I23;", "PNQ:I24;", "PNQ:I25;", "PNQ:I26;", "PNQ:I27;",
+        "PNQ:I28;", "PNQ:I29;", "PNQ:I30;", "PNQ:I31;", "PNQ:I32;", "PNQ:I33;", "PNQ:I34;", "PNQ:I35;", "PNQ:I36;",
+        "PNQ:I37;", "PNQ:I38;", "PNQ:I39;", "PNQ:I40;", "PNQ:I41;", "PNQ:I42;", "PNQ:I43;", "PNQ:I44;", "PNQ:I45;",
+        "PNQ:I46;", "PNQ:I47;", "PNQ:I48;", "PNQ:I49;", "PNQ:I50;", "PNQ:I51;", "PNQ:I52;", "PNQ:I53;", "PNQ:I54;",
+        "PNQ:I55;", "PNQ:I56;", "PNQ:I57;", "PNQ:I58;", "PNQ:I59;", "PNQ:I60;", "PNQ:I61;", "PNQ:I62;", "PNQ:I63;",
+        "PNQ:I64;", "PNQ:I65;", "PNQ:I66;", "PNQ:I67;", "PNQ:I68;", "PNQ:I69;", "PNQ:I70;", "PNQ:I71;", "PNQ:I72;",
+        "PNQ:I73;", "PNQ:I74;", "PNQ:I75;", "PNQ:I76;", "PNQ:I77;", "PNQ:I78;", "PNQ:I79;", "PNQ:I80;", "PNQ:I81;",
+        "PNQ:I82;", "PNQ:I83;", "PNQ:I84;", "PNQ:I85;", "PNQ:I86;", "PNQ:I87;", "PNQ:I88;", "PNQ:I89;", "PNQ:I90;",
+        "PNQ:I91;", "PNQ:I92;", "PNQ:I93;", "PNQ:I94;", "PNQ:I95;", "PNQ:I96;", "PNQ:I97;", "PNQ:I98;", "PNQ:I99;",
+        "PNQ:I100;", "PNQ:I101;", "PNQ:I102;", "PNQ:I103;", "PNQ:I104;", "PNQ:I105;", "PNQ:I106;", "PNQ:I107;",
+        "PNQ:I108;", "PNQ:I109;", "PNQ:I110;", "PNQ:I111;", "PNQ:I112;", "PNQ:I113;", "PNQ:I114;", "PNQ:I115;",
+        "PNQ:I116;", "PNQ:I117;", "PNQ:I118;", "PNQ:I119;", "PNQ:I120;", "PNQ:I121;", "PNQ:I122;", "PNQ:I123;",
+        "PNQ:I124;", "PNQ:I125;", "PNQ:I126;", "PNQ:I127;", "PNQ:I128;", "PNQ:SG1;", "PNQ:SG2;", "PNQ:SG3;",
+        "PNQ:SG4;", "PNQ:SG5;", "PNQ:SG6;", "PNQ:SG7;", "PNQ:SG8;", "PNQ:SG9;", "PNQ:SG10;", "PNQ:SG11;",
+        "PNQ:SG12;", "PNQ:SG13;", "PNQ:SG14;", "PNQ:SG15;", "PNQ:SG16;", "PNQ:SG17;", "PNQ:SG18;", "PNQ:SG19;",
+        "PNQ:SG20;", "PNQ:SG21;", "PNQ:SG22;", "PNQ:SG23;", "PNQ:SG24;", "PNQ:SG25;", "PNQ:SG26;", "PNQ:SG27;",
+        "PNQ:SG28;", "PNQ:SG29;", "PNQ:SG30;", "PNQ:SG31;", "PNQ:SG32;", "PNQ:SG33;", "PNQ:SG34;", "PNQ:SG35;",
+        "PNQ:SG36;", "PNQ:SG37;", "PNQ:SG38;", "PNQ:SG39;", "PNQ:SG40;", "PNQ:SG41;", "PNQ:SG42;", "PNQ:SG43;",
+        "PNQ:SG44;", "PNQ:SG45;", "PNQ:SG46;", "PNQ:SG47;", "PNQ:SG48;", "PNQ:SG49;", "PNQ:SG50;", "PNQ:SG51;",
+        "PNQ:SG52;", "PNQ:SG53;", "PNQ:SG54;", "PNQ:SG55;", "PNQ:SG56;", "PNQ:SG57;", "PNQ:SG58;", "PNQ:SG59;",
+        "PNQ:SG60;", "PNQ:SG61;", "PNQ:SG62;", "PNQ:SG63;", "PNQ:SG64;", "PNQ:AX1;", "PNQ:AX2;", "PNQ:AX3;",
+        "PNQ:AX4;", "PNQ:AX5;", "PNQ:AX6;", "PNQ:AX7;", "PNQ:AX8;", "PNQ:AX9;", "PNQ:AX10;", "PNQ:AX11;",
+        "PNQ:AX12;", "PNQ:AX13;", "PNQ:AX14;", "PNQ:AX15;", "PNQ:AX16;", "PNQ:AX17;", "PNQ:AX18;", "PNQ:AX19;",
+        "PNQ:AX20;", "PNQ:AX21;", "PNQ:AX22;", "PNQ:AX23;", "PNQ:AX24;", "PNQ:AX25;", "PNQ:AX26;", "PNQ:AX27;",
+        "PNQ:AX28;", "PNQ:AX29;", "PNQ:AX30;", "PNQ:AX31;", "PNQ:AX32;", "PNQ:AX33;", "PNQ:AX34;", "PNQ:AX35;",
+        "PNQ:AX36;", "PNQ:AX37;", "PNQ:AX38;", "PNQ:AX39;", "PNQ:AX40;", "PNQ:AX41;", "PNQ:AX42;", "PNQ:AX43;",
+        "PNQ:AX44;", "PNQ:AX45;", "PNQ:AX46;", "PNQ:AX47;", "PNQ:AX48;", "PNQ:AX49;", "PNQ:AX50;", "PNQ:AX51;",
+        "PNQ:AX52;", "PNQ:AX53;", "PNQ:AX54;", "PNQ:AX55;", "PNQ:AX56;", "PNQ:AX57;", "PNQ:AX58;", "PNQ:AX59;",
+        "PNQ:AX60;", "PNQ:AX61;", "PNQ:AX62;", "PNQ:AX63;", "PNQ:AX64;", "EQQ:I1;", "EQQ:I2;", "EQQ:I3;", "EQQ:I4;",
+        "EQQ:I5;", "EQQ:I6;", "EQQ:I7;", "EQQ:I8;", "EQQ:I9;", "EQQ:I10;", "EQQ:I11;", "EQQ:I12;", "EQQ:I13;",
+        "EQQ:I14;", "EQQ:I15;", "EQQ:I16;", "EQQ:I17;", "EQQ:I18;", "EQQ:I19;", "EQQ:I20;", "EQQ:I21;", "EQQ:I22;",
+        "EQQ:I23;", "EQQ:I24;", "EQQ:I25;", "EQQ:I26;", "EQQ:I27;", "EQQ:I28;", "EQQ:I29;", "EQQ:I30;", "EQQ:I31;",
+        "EQQ:I32;", "EQQ:I33;", "EQQ:I34;", "EQQ:I35;", "EQQ:I36;", "EQQ:I37;", "EQQ:I38;", "EQQ:I39;", "EQQ:I40;",
+        "EQQ:I41;", "EQQ:I42;", "EQQ:I43;", "EQQ:I44;", "EQQ:I45;", "EQQ:I46;", "EQQ:I47;", "EQQ:I48;", "EQQ:I49;",
+        "EQQ:I50;", "EQQ:I51;", "EQQ:I52;", "EQQ:I53;", "EQQ:I54;", "EQQ:I55;", "EQQ:I56;", "EQQ:I57;", "EQQ:I58;",
+        "EQQ:I59;", "EQQ:I60;", "EQQ:I61;", "EQQ:I62;", "EQQ:I63;", "EQQ:I64;", "EQQ:I65;", "EQQ:I66;", "EQQ:I67;",
+        "EQQ:I68;", "EQQ:I69;", "EQQ:I70;", "EQQ:I71;", "EQQ:I72;", "EQQ:I73;", "EQQ:I74;", "EQQ:I75;", "EQQ:I76;",
+        "EQQ:I77;", "EQQ:I78;", "EQQ:I79;", "EQQ:I80;", "EQQ:I81;", "EQQ:I82;", "EQQ:I83;", "EQQ:I84;", "EQQ:I85;",
+        "EQQ:I86;", "EQQ:I87;", "EQQ:I88;", "EQQ:I89;", "EQQ:I90;", "EQQ:I91;", "EQQ:I92;", "EQQ:I93;", "EQQ:I94;",
+        "EQQ:I95;", "EQQ:I96;", "EQQ:I97;", "EQQ:I98;", "EQQ:I99;", "EQQ:I100;", "EQQ:I101;", "EQQ:I102;",
+        "EQQ:I103;", "EQQ:I104;", "EQQ:I105;", "EQQ:I106;", "EQQ:I107;", "EQQ:I108;", "EQQ:I109;", "EQQ:I110;",
+        "EQQ:I111;", "EQQ:I112;", "EQQ:I113;", "EQQ:I114;", "EQQ:I115;", "EQQ:I116;", "EQQ:I117;", "EQQ:I118;",
+        "EQQ:I119;", "EQQ:I120;", "EQQ:I121;", "EQQ:I122;", "EQQ:I123;", "EQQ:I124;", "EQQ:I125;", "EQQ:I126;",
+        "EQQ:I127;", "EQQ:I128;", "EQQ:SG1;", "EQQ:SG2;", "EQQ:SG3;", "EQQ:SG4;", "EQQ:SG5;", "EQQ:SG6;", "EQQ:SG7;",
+        "EQQ:SG8;", "EQQ:SG9;", "EQQ:SG10;", "EQQ:SG11;", "EQQ:SG12;", "EQQ:SG13;", "EQQ:SG14;", "EQQ:SG15;",
+        "EQQ:SG16;", "EQQ:SG17;", "EQQ:SG18;", "EQQ:SG19;", "EQQ:SG20;", "EQQ:SG21;", "EQQ:SG22;", "EQQ:SG23;",
+        "EQQ:SG24;", "EQQ:SG25;", "EQQ:SG26;", "EQQ:SG27;", "EQQ:SG28;", "EQQ:SG29;", "EQQ:SG30;", "EQQ:SG31;",
+        "EQQ:SG32;", "EQQ:SG33;", "EQQ:SG34;", "EQQ:SG35;", "EQQ:SG36;", "EQQ:SG37;", "EQQ:SG38;", "EQQ:SG39;",
+        "EQQ:SG40;", "EQQ:SG41;", "EQQ:SG42;", "EQQ:SG43;", "EQQ:SG44;", "EQQ:SG45;", "EQQ:SG46;", "EQQ:SG47;",
+        "EQQ:SG48;", "EQQ:SG49;", "EQQ:SG50;", "EQQ:SG51;", "EQQ:SG52;", "EQQ:SG53;", "EQQ:SG54;", "EQQ:SG55;",
+        "EQQ:SG56;", "EQQ:SG57;", "EQQ:SG58;", "EQQ:SG59;", "EQQ:SG60;", "EQQ:SG61;", "EQQ:SG62;", "EQQ:SG63;",
+        "EQQ:SG64;", "EQQ:AX1;", "EQQ:AX2;", "EQQ:AX3;", "EQQ:AX4;", "EQQ:AX5;", "EQQ:AX6;", "EQQ:AX7;", "EQQ:AX8;",
+        "EQQ:AX9;", "EQQ:AX10;", "EQQ:AX11;", "EQQ:AX12;", "EQQ:AX13;", "EQQ:AX14;", "EQQ:AX15;", "EQQ:AX16;",
+        "EQQ:AX17;", "EQQ:AX18;", "EQQ:AX19;", "EQQ:AX20;", "EQQ:AX21;", "EQQ:AX22;", "EQQ:AX23;", "EQQ:AX24;",
+        "EQQ:AX25;", "EQQ:AX26;", "EQQ:AX27;", "EQQ:AX28;", "EQQ:AX29;", "EQQ:AX30;", "EQQ:AX31;", "EQQ:AX32;",
+        "EQQ:AX33;", "EQQ:AX34;", "EQQ:AX35;", "EQQ:AX36;", "EQQ:AX37;", "EQQ:AX38;", "EQQ:AX39;", "EQQ:AX40;",
+        "EQQ:AX41;", "EQQ:AX42;", "EQQ:AX43;", "EQQ:AX44;", "EQQ:AX45;", "EQQ:AX46;", "EQQ:AX47;", "EQQ:AX48;",
+        "EQQ:AX49;", "EQQ:AX50;", "EQQ:AX51;", "EQQ:AX52;", "EQQ:AX53;", "EQQ:AX54;", "EQQ:AX55;", "EQQ:AX56;",
+        "EQQ:AX57;", "EQQ:AX58;", "EQQ:AX59;", "EQQ:AX60;", "EQQ:AX61;", "EQQ:AX62;", "EQQ:AX63;", "EQQ:AX64;",
+        "EQQ:MM1;", "EQQ:MM2;", "EQQ:MM3;", "EQQ:MM4;", "EQQ:MM5;", "EQQ:MM6;", "EQQ:MM7;", "EQQ:MM8;", "EQQ:MM9;",
+        "EQQ:MM10;", "EQQ:MM11;", "EQQ:MM12;", "EQQ:MM13;", "EQQ:MM14;", "EQQ:MM15;", "EQQ:MM16;", "EQQ:MM17;",
+        "EQQ:MM18;", "EQQ:MM19;", "EQQ:MM20;", "EQQ:MM21;", "EQQ:MM22;", "EQQ:MM23;", "EQQ:MM24;", "EQQ:MM25;",
+        "EQQ:MM26;", "EQQ:MM27;", "EQQ:MM28;", "EQQ:MM29;", "EQQ:MM30;", "EQQ:MM31;", "EQQ:MM32;", "EQQ:MM33;",
+        "EQQ:MM34;", "EQQ:MM35;", "EQQ:MM36;", "EQQ:MM37;", "EQQ:MM38;", "EQQ:MM39;", "EQQ:MM40;", "EQQ:MM41;",
+        "EQQ:MM42;", "EQQ:MM43;", "EQQ:MM44;", "EQQ:MM45;", "EQQ:MM46;", "EQQ:MM47;", "EQQ:MM48;", "EQQ:MM49;",
+        "EQQ:MM50;", "EQQ:MM51;", "EQQ:MM52;", "EQQ:MM53;", "EQQ:MM54;", "EQQ:MM55;", "EQQ:MM56;", "EQQ:MM57;",
+        "EQQ:MM58;", "EQQ:MM59;", "EQQ:MM60;", "EQQ:MM61;", "EQQ:MM62;", "EQQ:MM63;", "EQQ:MM64;", "EQQ:MX1;",
+        "EQQ:MX2;", "EQQ:MX3;", "EQQ:MX4;", "EQQ:MX5;", "EQQ:MX6;", "EQQ:MX7;", "EQQ:MX8;", "EQQ:MX9;", "EQQ:MX10;",
+        "EQQ:MX11;", "EQQ:MX12;", "EQQ:MX13;", "EQQ:MX14;", "EQQ:MX15;", "EQQ:MX16;", "EQQ:MX17;", "EQQ:MX18;",
+        "EQQ:MX19;", "EQQ:MX20;", "EQQ:MX21;", "EQQ:MX22;", "EQQ:MX23;", "EQQ:MX24;", "EQQ:MX25;", "EQQ:MX26;",
+        "EQQ:MX27;", "EQQ:MX28;", "EQQ:MX29;", "EQQ:MX30;", "EQQ:MX31;", "EQQ:MX32;", "EQQ:MX33;", "EQQ:MX34;",
+        "EQQ:MX35;", "EQQ:MX36;", "EQQ:MX37;", "EQQ:MX38;", "EQQ:MX39;", "EQQ:MX40;", "EQQ:MX41;", "EQQ:MX42;",
+        "EQQ:MX43;", "EQQ:MX44;", "EQQ:MX45;", "EQQ:MX46;", "EQQ:MX47;", "EQQ:MX48;", "EQQ:MX49;", "EQQ:MX50;",
+        "EQQ:MX51;", "EQQ:MX52;", "EQQ:MX53;", "EQQ:MX54;", "EQQ:MX55;", "EQQ:MX56;", "EQQ:MX57;", "EQQ:MX58;",
+        "EQQ:MX59;", "EQQ:MX60;", "EQQ:MX61;", "EQQ:MX62;", "EQQ:MX63;", "EQQ:MX64;", "EQQ:MA1;", "EQQ:MA2;",
+        "PTQ:I1;", "PTQ:I2;", "PTQ:I3;", "PTQ:I4;", "PTQ:I5;", "PTQ:I6;", "PTQ:I7;", "PTQ:I8;", "PTQ:I9;",
+        "PTQ:I10;", "PTQ:I11;", "PTQ:I12;", "PTQ:I13;", "PTQ:I14;", "PTQ:I15;", "PTQ:I16;", "PTQ:I17;", "PTQ:I18;",
+        "PTQ:I19;", "PTQ:I20;", "PTQ:I21;", "PTQ:I22;", "PTQ:I23;", "PTQ:I24;", "PTQ:I25;", "PTQ:I26;", "PTQ:I27;",
+        "PTQ:I28;", "PTQ:I29;", "PTQ:I30;", "PTQ:I31;", "PTQ:I32;", "PTQ:I33;", "PTQ:I34;", "PTQ:I35;", "PTQ:I36;",
+        "PTQ:I37;", "PTQ:I38;", "PTQ:I39;", "PTQ:I40;", "PTQ:I41;", "PTQ:I42;", "PTQ:I43;", "PTQ:I44;", "PTQ:I45;",
+        "PTQ:I46;", "PTQ:I47;", "PTQ:I48;", "PTQ:I49;", "PTQ:I50;", "PTQ:I51;", "PTQ:I52;", "PTQ:I53;", "PTQ:I54;",
+        "PTQ:I55;", "PTQ:I56;", "PTQ:I57;", "PTQ:I58;", "PTQ:I59;", "PTQ:I60;", "PTQ:I61;", "PTQ:I62;", "PTQ:I63;",
+        "PTQ:I64;", "PTQ:I65;", "PTQ:I66;", "PTQ:I67;", "PTQ:I68;", "PTQ:I69;", "PTQ:I70;", "PTQ:I71;", "PTQ:I72;",
+        "PTQ:I73;", "PTQ:I74;", "PTQ:I75;", "PTQ:I76;", "PTQ:I77;", "PTQ:I78;", "PTQ:I79;", "PTQ:I80;", "PTQ:I81;",
+        "PTQ:I82;", "PTQ:I83;", "PTQ:I84;", "PTQ:I85;", "PTQ:I86;", "PTQ:I87;", "PTQ:I88;", "PTQ:I89;", "PTQ:I90;",
+        "PTQ:I91;", "PTQ:I92;", "PTQ:I93;", "PTQ:I94;", "PTQ:I95;", "PTQ:I96;", "PTQ:I97;", "PTQ:I98;", "PTQ:I99;",
+        "PTQ:I100;", "PTQ:I101;", "PTQ:I102;", "PTQ:I103;", "PTQ:I104;", "PTQ:I105;", "PTQ:I106;", "PTQ:I107;",
+        "PTQ:I108;", "PTQ:I109;", "PTQ:I110;", "PTQ:I111;", "PTQ:I112;", "PTQ:I113;", "PTQ:I114;", "PTQ:I115;",
+        "PTQ:I116;", "PTQ:I117;", "PTQ:I118;", "PTQ:I119;", "PTQ:I120;", "PTQ:I121;", "PTQ:I122;", "PTQ:I123;",
+        "PTQ:I124;", "PTQ:I125;", "PTQ:I126;", "PTQ:I127;", "PTQ:I128;", "DBQ;", "PBQ;", "LBQ;", "DMQ:MON1;",
+        "DMQ:MON2;", "RRQ;", "RCQ:A;", "RCQ:B;"]
+  updates:
+    - match: '^[\x02\x11\x13]*CNS:([A-Z]+[0-9]+),"([^"]*)";'
+      state: { "channels.{1}.name": "{2}" }
+    - match: '^[\x02\x11\x13]*FDS:([A-Z]+[0-9]+),(-?[0-9]+\.[0-9]);'
+      state: { "channels.{1}.fader": "{2}" }
+    - match: '^[\x02\x11\x13]*FDS:([A-Z]+[0-9]+),INF;'
+      state: { "channels.{1}.fader": "-inf" }
+    - match: '^[\x02\x11\x13]*MUS:([A-Z]+[0-9]+),([01]);'
+      state: { "channels.{1}.mute": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^[\x02\x11\x13]*PNS:([A-Z]+[0-9]+),L([0-9]+);'
+      state: { "channels.{1}.pan": "-{2}" }
+    - match: '^[\x02\x11\x13]*PNS:([A-Z]+[0-9]+),C;'
+      state: { "channels.{1}.pan": "0" }
+    - match: '^[\x02\x11\x13]*PNS:([A-Z]+[0-9]+),R([0-9]+);'
+      state: { "channels.{1}.pan": "{2}" }
+    - match: '^[\x02\x11\x13]*EQS:([A-Z]+[0-9]+),([01]);'
+      state: { "channels.{1}.eq": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^[\x02\x11\x13]*PTS:([A-Z]+[0-9]+),([01]);'
+      state: { "channels.{1}.phantom": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^[\x02\x11\x13]*AXS:([A-Z]+[0-9]+),(AX[0-9]+),(-?[0-9]+\.[0-9]),'
+      state: { "channels.{1}.aux_sends.{2}.level": "{3}" }
+    - match: '^[\x02\x11\x13]*AXS:([A-Z]+[0-9]+),(AX[0-9]+),INF,'
+      state: { "channels.{1}.aux_sends.{2}.level": "-inf" }
+    - match: '^[\x02\x11\x13]*AXS:([A-Z]+[0-9]+),(AX[0-9]+),[^,]+,L([0-9]+);'
+      state: { "channels.{1}.aux_sends.{2}.pan": "-{3}" }
+    - match: '^[\x02\x11\x13]*AXS:([A-Z]+[0-9]+),(AX[0-9]+),[^,]+,(?:C|0);'
+      state: { "channels.{1}.aux_sends.{2}.pan": "0" }
+    - match: '^[\x02\x11\x13]*AXS:([A-Z]+[0-9]+),(AX[0-9]+),[^,]+,R([0-9]+);'
+      state: { "channels.{1}.aux_sends.{2}.pan": "{3}" }
+    - match: '^[\x02\x11\x13]*SCS:([0-9]+\.[0-9]+),"([^"]*)";'
+      state: { scene.number: "{1}", scene.name: "{2}" }
+    - match: '^[\x02\x11\x13]*DBS:([0-9]+);'
+      state: { brightness.display: "{1}" }
+    - match: '^[\x02\x11\x13]*PBS:([0-9]+);'
+      state: { brightness.panel: "{1}" }
+    - match: '^[\x02\x11\x13]*LBS:([0-9]+);'
+      state: { brightness.lamp: "{1}" }
+    - match: '^[\x02\x11\x13]*DMS:(MON[12]),([01]);'
+      state: { "monitors.{1}.dimmer": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^[\x02\x11\x13]*RTS:(-?[0-9]+);'
+      state: { recorder.status: { value: "{1}", map: { "-1": unavailable, "0": stopped, "1": playing, "2": recording, "3": preparing, "4": rec_pause } } }
+    - match: '^[\x02\x11\x13]*RLS:([0-9hms]*);'
+      state: { recorder.position: "{1}" }
+    - match: '^[\x02\x11\x13]*RIS:([0-9]+),([0-9]+);'
+      state: { recorder.song: "{1}", recorder.song_count: "{2}" }
+    - match: '^[\x02\x11\x13]*RNS:([0-9]+),"([^";]*)"?;'
+      state: { "recorder.songs.{1}.name": "{2}" }
+    - match: '^[\x02\x11\x13]*RRS:([0-9hms]*);'
+      state: { recorder.remaining: "{1}" }
+    - match: '^[\x02\x11\x13]*RCS:([AB]),([0-2]);'
+      state: { "reac.{1}.status": { value: "{2}", map: { "0": disconnected, "1": establishing, "2": connected } } }
+    - match: '^[\x02\x11\x13]*EPS:(A|B|D1|D2|E1|E2),([0-2]);'
+      state: { "reac.{1}.error": { value: "{2}", map: { "0": fan_stopped, "1": temperature, "2": transmission } } }
+    - match: '^[\x02\x11\x13]*ERS:([0-9]+);'
+      state: { device.error: "{1}" }
+    - match: '^[\x02\x11\x13]*VRS:([^;]+);'
+      state: { device.version: "{1}" }

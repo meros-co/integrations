@@ -3066,6 +3066,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the argument types and ranges: an int 1 for actions, an int 1 or 0 for switches, 0/1 for A/B, layout and playback mode, floats 0.0 to 1.0 for volume and color, and the units of currentPosition (assumed a fraction) and crossfadeDuration (assumed seconds); and the types of the feedback values (play as an OSC boolean, the meters' scale). ([specs/rogueamoeba-farrago.yaml:509](specs/rogueamoeba-farrago.yaml#L509))
 - [ ] Check that play on a playing tile stops it (or pauses it with pausing allowed), and what /set/<set>/position does with its value. ([specs/rogueamoeba-farrago.yaml:520](specs/rogueamoeba-farrago.yaml#L520))
 
+## roland-m5000 — Roland M-5000 / M-5000C
+
+- [ ] Over Telnet, confirm that each reply (OK, ERR:n; and request replies) is a line ended by CR LF with no stx, and that the echo of the command arrives as its own line before the reply. ([specs/roland-m5000.yaml:47](specs/roland-m5000.yaml#L47))
+- [ ] Check whether the console sends Telnet option negotiation (IAC) bytes on connecting, and how many Telnet sessions it accepts. ([specs/roland-m5000.yaml:605](specs/roland-m5000.yaml#L605))
+- [ ] On RS-232C, confirm the reply framing (stx before reply commands, a bare 06H ack, no line ending) and that Xon/Xoff is used. ([specs/roland-m5000.yaml:59](specs/roland-m5000.yaml#L59))
+- [ ] Confirm that a request through a user fader (U1-U192) is answered with the U token, not the assigned channel's. ([specs/roland-m5000.yaml:600](specs/roland-m5000.yaml#L600))
+- [ ] Check whether channel names shorter than 12 characters are padded with spaces in CNS replies. ([specs/roland-m5000.yaml:613](specs/roland-m5000.yaml#L613))
+- [ ] Confirm the RNS reply's song name is closed by a quote (the reference's example leaves it out). ([specs/roland-m5000.yaml:951](specs/roland-m5000.yaml#L951))
+- [ ] Measure whether the console keeps up with the polls (about 830 fader and mute requests every ten seconds) without slowing its surface or answering ERR:2 busy. ([specs/roland-m5000.yaml:657](specs/roland-m5000.yaml#L657))
+
 ## roland-p20hd — Roland P-20HD
 
 - [ ] Confirm the login exchange: USR sent on connecting with no prompt, ACK after USR and after PSS, NAK on refusal. ([specs/roland-p20hd.yaml:588](specs/roland-p20hd.yaml#L588))

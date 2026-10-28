@@ -48,9 +48,9 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-anomes", &["millumin"]),
     ("vendor-arkaos", &["arkaos-mediamaster"]),
     ("vendor-atlona", &["atlona-matrix"]),
-    ("vendor-avstumpfl", &["avstumpfl-pixera"]),
     ("vendor-avolites", &["avolites-titan"]),
     ("vendor-avproedge", &["avproedge-matrix"]),
+    ("vendor-avstumpfl", &["avstumpfl-pixera"]),
     ("vendor-aximmetry", &["aximmetry"]),
     ("vendor-axis", &["axis-ptz"]),
     (
@@ -90,10 +90,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-boinx", &["boinx-mimolive"]),
     ("vendor-brightsign", &["brightsign-dws", "brightsign-udp"]),
     ("vendor-brompton", &["brompton-tessera"]),
+    ("vendor-bss", &["bss-london"]),
     ("vendor-canon", &["canon-ptz"]),
     ("vendor-casparcg", &["casparcg"]),
     ("vendor-castr", &["castr"]),
-    ("vendor-bss", &["bss-london"]),
     ("vendor-chamsys", &["chamsys-magicq", "chamsys-magicq-udp"]),
     ("vendor-characterworks", &["characterworks"]),
     (
@@ -111,6 +111,12 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-cockos", &["cockos-reaper", "cockos-reaper-web"]),
     ("vendor-dahua", &["dahua-ptz"]),
     (
+        "vendor-dataton",
+        &["dataton-watchout6", "dataton-watchout7"],
+    ),
+    ("vendor-datavideo", &["datavideo-switcher"]),
+    ("vendor-dbaudio", &["dbaudio"]),
+    (
         "vendor-denon",
         &[
             "denon-dn500av",
@@ -119,14 +125,8 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "denon-dn500r",
         ],
     ),
-    ("vendor-digico", &["digico-sd"]),
-    (
-        "vendor-dataton",
-        &["dataton-watchout6", "dataton-watchout7"],
-    ),
-    ("vendor-datavideo", &["datavideo-switcher"]),
-    ("vendor-dbaudio", &["dbaudio"]),
     ("vendor-dhd", &["dhd-aes67", "dhd-control-api", "dhd-ecp"]),
+    ("vendor-digico", &["digico-sd"]),
     (
         "vendor-digitalprojection",
         &[
@@ -237,10 +237,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-obs", &["obs-studio"]),
     ("vendor-obsbot", &["obsbot-tail"]),
     ("vendor-obsidian", &["obsidian-onyx", "obsidian-onyx-osc"]),
+    ("vendor-omt", &["omt", "omt-discovery"]),
     ("vendor-ontime", &["ontime", "ontime-osc"]),
     ("vendor-onvif", &["onvif-ptz"]),
     ("vendor-openlp", &["openlp"]),
-    ("vendor-omt", &["omt", "omt-discovery"]),
     ("vendor-opensong", &["opensong"]),
     (
         "vendor-panasonic",
@@ -271,6 +271,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     (
         "vendor-roland",
         &[
+            "roland-m5000",
             "roland-p20hd",
             "roland-v1200hd",
             "roland-v160hd",
