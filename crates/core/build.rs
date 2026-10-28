@@ -230,7 +230,14 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "magewell-ultra-stream",
         ],
     ),
-    ("vendor-matrox", &["matrox-monarch-hd", "matrox-monarch-hdx", "matrox-monarch-lcs"]),
+    (
+        "vendor-matrox",
+        &[
+            "matrox-monarch-hd",
+            "matrox-monarch-hdx",
+            "matrox-monarch-lcs",
+        ],
+    ),
     ("vendor-megapixel", &["megapixel-helios"]),
     ("vendor-meros", &["meros-camera"]),
     ("vendor-meta", &["facebook-account", "facebook-live"]),
