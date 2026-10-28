@@ -1040,14 +1040,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## camstreamer — CamStreamer apps for Axis cameras
 
-- [ ] Confirm the 6.x stream list's path (/local/camstreamer/stream_list.cgi; the page also writes /local/camstreamer/stream/stream_list.cgi for one stream) and whether its answer is the bare {"streamList": [...]} or wrapped in {status, message, data}. ([specs/camstreamer.yaml:635](specs/camstreamer.yaml#L635))
-- [ ] Confirm set_stream_enabled.cgi takes stream_id and enabled (the page writes stream_id=?stream_id=), on 6.x and 4.x. ([specs/camstreamer.yaml:162](specs/camstreamer.yaml#L162))
-- [ ] Confirm set_stream's body is one stream object (the page shows only the whole streamList). ([specs/camstreamer.yaml:153](specs/camstreamer.yaml#L153))
-- [ ] Record how an unlicensed app answers its API calls (status and body). ([specs/camstreamer.yaml:529](specs/camstreamer.yaml#L529))
-- [ ] Confirm param.cgi lists CamOverlay.Enabled and camswitcher.masterAudio as root.CamOverlay.Enabled= and root.camswitcher.masterAudio= lines (the group names' case as the page writes them). ([specs/camstreamer.yaml:688](specs/camstreamer.yaml#L688))
-- [ ] Confirm CamScripter's PackageConfigurations parameter is camscripter.PackageConfigurations in param.cgi, and network_camera_list.cgi's path under /local/camscripter/. ([specs/camstreamer.yaml:497](specs/camstreamer.yaml#L497))
-- [ ] Record the shape of playlist_queue_list.cgi's and clips.cgi's answers, to keep the queue in state. ([specs/camstreamer.yaml:395](specs/camstreamer.yaml#L395))
-- [ ] Confirm upload_custom_image takes the picture as the raw POST body (as curl --data-binary sends it). ([specs/camstreamer.yaml:357](specs/camstreamer.yaml#L357))
+- [ ] Confirm the 6.x stream list's path (/local/camstreamer/stream_list.cgi; the page also writes /local/camstreamer/stream/stream_list.cgi for one stream) and whether its answer is the bare {"streamList": [...]} or wrapped in {status, message, data}. ([specs/camstreamer.yaml:744](specs/camstreamer.yaml#L744))
+- [ ] Confirm set_stream_enabled.cgi takes stream_id and enabled (the page writes stream_id=?stream_id=), on 6.x and 4.x. ([specs/camstreamer.yaml:164](specs/camstreamer.yaml#L164))
+- [ ] Confirm set_stream's body is one stream object (the page shows only the whole streamList). ([specs/camstreamer.yaml:155](specs/camstreamer.yaml#L155))
+- [ ] Record how an unlicensed app answers its API calls (status and body). ([specs/camstreamer.yaml:531](specs/camstreamer.yaml#L531))
+- [ ] Confirm param.cgi lists CamOverlay.Enabled and camswitcher.masterAudio as root.CamOverlay.Enabled= and root.camswitcher.masterAudio= lines (the group names' case as the page writes them). ([specs/camstreamer.yaml:797](specs/camstreamer.yaml#L797))
+- [ ] Confirm CamScripter's PackageConfigurations parameter is camscripter.PackageConfigurations in param.cgi, and network_camera_list.cgi's path under /local/camscripter/. ([specs/camstreamer.yaml:499](specs/camstreamer.yaml#L499))
+- [ ] Record the shape of playlist_queue_list.cgi's and clips.cgi's answers, to keep the queue in state. ([specs/camstreamer.yaml:397](specs/camstreamer.yaml#L397))
+- [ ] Confirm upload_custom_image takes the picture as the raw POST body (as curl --data-binary sends it). ([specs/camstreamer.yaml:359](specs/camstreamer.yaml#L359))
+- [ ] Check that the apps' events websockets answer on the camera's HTTP port as ws (the document gives wss only) and take the subprotocol events. ([specs/camstreamer.yaml:750](specs/camstreamer.yaml#L750))
+- [ ] Confirm that ws_authorization.cgi takes the camera's Digest credential and answers valid JSON with the token in data (CamStreamer 6.x, CamSwitcher) or message (CamStreamer 4.x, CamOverlay; the document's 4.x and CamOverlay examples have a trailing comma). ([specs/camstreamer.yaml:759](specs/camstreamer.yaml#L759))
+- [ ] Check that the first message {"authorization": token} is answered {"type":"authorization","state":"OK"} and followed by the init messages on every app, and that CamStreamer's StreamState values are 0/1 numbers. ([specs/camstreamer.yaml:754](specs/camstreamer.yaml#L754))
+- [ ] Record whether CamSwitcher sends an event when it stops switching (none is documented, so switcher.started is never set false). ([specs/camstreamer.yaml:669](specs/camstreamer.yaml#L669))
 
 ## canon-ptz — Canon PTZ and pro video cameras (XC protocol)
 
