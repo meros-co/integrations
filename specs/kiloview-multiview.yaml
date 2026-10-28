@@ -13,7 +13,7 @@ source:
       2026, the newest Multiview Pro API there, checked 2026-10-27); the
       English API page https://www.kiloview.com/en/docs/multiview/api/
       links only the older Multiview Server HTTP API 1.0 (spec
-      kiloview-multiview-server). Read in machine translation. The source
+      kiloview-multiview-server). Read in the Chinese original. The source
       of every request, field and reply here: 2.1 URL rules (the /api/v2
       paths, port 81, the app request header carrying the user name and
       token); 2.2 replies; 3 login; 4 global configuration (general,
@@ -181,7 +181,7 @@ commands:
 
   # ── 4 Global configuration ───────────────────────────────────────────
   get_general:
-    summary: Return the device name, version, websocket port, languages and QR code address (GET /api/v2/config/general.json)
+    summary: Return the device name, version, websocket port, languages, logos and QR code address (GET /api/v2/config/general.json)
     send: { method: GET, path: /api/v2/config/general.json }
     expect: &data { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
     returns: value
@@ -516,7 +516,7 @@ commands:
       program: *program
       window: *window
       color: &color { type: string, required: true, max_length: 16, pattern: '^#[0-9A-Fa-f]{3,8}$', label: Color, description: "A CSS hex color, such as #fff." }
-      size: { type: int, min: 1, max: 200, required: true, label: Size, description: "The font size." }
+      size: { type: int, min: 1, required: true, label: Size, description: "The font size." }
     send: { method: POST, path: /api/v2/window/set_state_control.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"type":"font","config":{"color":{color:json},"size":{size}}}' }
     expect: *ok
     returns: ack
@@ -610,12 +610,12 @@ commands:
     expect: *ok
     returns: ack
   set_pane_audio:
-    summary: Set a pane's audio in the mix output to always on, follow PGM, or off (POST /api/v2/window/set_audio_type.json)
+    summary: Set a pane's audio in the mix output to always on, follow, or off (POST /api/v2/window/set_audio_type.json)
     params:
       program: *program
       window: *window
       pane: *pane
-      mix: { type: enum, values: [always, follow, close], required: true, label: Audio mix, description: "always (locked in the mix), follow (in the mix while on PGM) or close (muted)." }
+      mix: { type: enum, values: [always, follow, close], required: true, label: Audio mix, description: "always (locked on), follow, or close (muted), as 6.8 names them; it does not say what follow follows." }
     send: { method: POST, path: /api/v2/window/set_audio_type.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"mix_type":{mix:json}}' }
     expect: *ok
     returns: ack
@@ -707,7 +707,7 @@ commands:
     params:
       program: *program
       window: *window
-      ip: { type: string, required: true, max_length: 64, label: Address, description: "The address the preview is for, as the document's example gives it." }
+      ip: { type: string, required: true, max_length: 64, label: Address, description: "The IP address 9.1 calls the video source's." }
     send: { method: GET, path: /api/v2/webrtc/get_sdp.json, query: { pro_id: "{program}", win_id: "{window}", ip: "{ip}" } }
     expect: *data
     returns: value
@@ -872,7 +872,7 @@ commands:
     summary: Take a program's PVW to PGM with a transition (POST /api/v2/take/set.json, progress 1.0)
     params:
       program: *program
-      time: &take_time { type: int, min: 0, required: true, label: Duration, description: "The transition's duration in seconds; 0 cuts." }
+      time: &take_time { type: int, min: 0, required: true, label: Duration, description: "The transition's duration in seconds." }
       transition: &transition { type: int, min: 1, default: 1, label: Transition, description: "The transition effect's id in get_transitions' list; 1 (fade) by default." }
     send: { method: POST, path: /api/v2/take/set.json, content_type: application/json, body: '{"pro_id":{program:json},"time":{time},"progress":1.0,"select":{transition}}' }
     expect: *ok
@@ -912,8 +912,8 @@ quirks:
     text: >
       Authentication: every request carries the header app, a JSON object
       with the user name and the token (2.1). The login answers its token
-      in the JSON body (data.token), which the core cannot capture into a
-      session, so it is a setting: run login and store the token with
+      in the JSON body (data.token) and the app header carries it inside a
+      JSON object, so the token is a setting: run login and store it with
       update_settings. A request with a missing or wrong token is answered
       with {"result": "error"}, which fails the command; the document does
       not say whether the token expires.
@@ -957,7 +957,10 @@ quirks:
       the host's network; set_pane_source takes the source from another
       pane (from) as the document's example does, and its stream_id is the
       NDI source's name. The PTZ data fields follow 9.2's list (one value
-      per type); ptz_is_supported answers ok or error.
+      per type); ptz_is_supported answers ok or error. A pane's audio_enable
+      (set_pane) is in no read, so it is not read back; pane coordinates are read as the
+      document gives them (0 to 100 in its examples, percent of the window
+      it appears).
 
 state:
   # config/general.json, config/nav/nav
@@ -967,6 +970,8 @@ state:
   general.qrcode: { type: string, description: "The address the QR code points to" }
   general.language_switch: { type: bool, description: "Whether the language switch is shown" }
   general.logo_shown: { type: bool, description: "Whether the logo is shown" }
+  general.logo_url: { type: string, description: "The logo's path (logoImgUrl)" }
+  general.login_logo_url: { type: string, description: "The login page logo's path (loginImgUrl), such as ./img/logo.png" }
   general.languages: { type: string, description: "The languages offered, as JSON text of {value, name, default}" }
   general.nav_shown: { type: bool, description: "Whether the navigation bar is shown (main_nav.home)" }
   # resolution/list, frameRate/list, take/transition/list, window/get_output_list, get_screen_list
@@ -1081,7 +1086,7 @@ telemetry:
   updates:
     - path: "^/api/v2/config/general\\.json$"
       json_match: { "$.result": "^ok$" }
-      json: { name: "$.data.deviceName", version: "$.data.version", ws: "$.data.websocketPort", qr: "$.data.qrcode", lang: "$.data.languageShow", logo: "$.data.logoImgShow", langs: "$.data.languageOptions" }
+      json: { name: "$.data.deviceName", version: "$.data.version", ws: "$.data.websocketPort", qr: "$.data.qrcode", lang: "$.data.languageShow", logo: "$.data.logoImgShow", logo_url: "$.data.logoImgUrl", login_logo: "$.data.loginImgUrl", langs: "$.data.languageOptions" }
       state:
         general.device_name: "{name}"
         general.version: "{version}"
@@ -1089,6 +1094,8 @@ telemetry:
         general.qrcode: "{qr}"
         general.language_switch: "{lang}"
         general.logo_shown: "{logo}"
+        general.logo_url: "{logo_url}"
+        general.login_logo_url: "{login_logo}"
         general.languages: "{langs}"
     - path: "^/api/v2/config/nav/nav$"
       json_match: { "$.result": "^ok$" }

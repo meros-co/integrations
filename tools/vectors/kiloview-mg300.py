@@ -363,26 +363,28 @@ _mg_post("add_gateway_rtsp_stream", {"name": "RS96", "session": "ch96", "port": 
          '"auth":false,"user":"","pwd":"","multicast_enable":false,"multicast_addr":"224.0.1.0","multicast_ttl":127,'
          '"multicast_port_min":31000,"multicast_port_max":31004}')
 _mg_post("add_gateway_rtp_stream", {"name": "RTP", "address": "239.1.1.1", "port": 5000, "load_type": 33,
-                                    "service_name": "Stage", "service_provider": "Kiloview"},
+                                    "service_name": "Stage", "service_provider": "Kiloview", "ttl": 64,
+                                    "pcr_period": 40, "transport_stream_id": 1, "start_pid": 256, "pmt_start_pid": 4096, "tables_version": 0},
          "/api/gate/stream/add",
          '{"name":"RTP","protocol":"rtp","is_enable":false,"address":"239.1.1.1","port":5000,"load_type":33,"ttl":64,'
          '"ts_service_name":"Stage","ts_service_provider":"Kiloview","ts_pcr_period":40,"ts_transport_stream_id":1,'
          '"ts_start_pid":256,"ts_pmt_start_pid":4096,"ts_tables_version":0}')
-_mg_post("add_gateway_ts_stream", {"name": "TS", "address": "239.1.1.2", "port": 5002, "bind_port": 6000},
+_mg_post("add_gateway_ts_stream", {"name": "TS", "address": "239.1.1.2", "port": 5002, "bind_port": 6000, "ttl": 64,
+                                   "pts_pcr_delay": 0, "pcr_period": 40, "transport_stream_id": 1, "start_pid": 256, "pmt_start_pid": 4096, "tables_version": 0},
          "/api/gate/stream/add",
          '{"name":"TS","protocol":"ts","is_enable":false,"address":"239.1.1.2","port":5002,"bind_port":6000,"ttl":64,'
          '"ts_pts_pcr_delay":0,"ts_service_name":"","ts_service_provider":"","ts_pcr_period":40,'
          '"ts_transport_stream_id":1,"ts_start_pid":256,"ts_pmt_start_pid":4096,"ts_tables_version":0}')
-_mg_post("add_gateway_srt_stream", {"name": "SRT", "mode": "Listener", "port": 9000},
+_mg_post("add_gateway_srt_stream", {"name": "SRT", "mode": "Listener", "port": 9000, "pcr_period": 40, "start_pid": 256, "pmt_start_pid": 4096, "tables_version": 0},
          "/api/gate/stream/add",
          '{"name":"SRT","protocol":"srt","is_enable":false,"connection_mode":"Listener","address":"",'
          '"listener_port":9000,"latency":125,"encryption":"0","passphrase":"","ts_service_name":"",'
          '"ts_service_provider":"","ts_pcr_period":40,"ts_start_pid":256,"ts_pmt_start_pid":4096,'
          '"ts_tables_version":0}')
-_mg_post("add_gateway_hls_stream", {"name": "HLS", "session": "live1"}, "/api/gate/stream/add",
+_mg_post("add_gateway_hls_stream", {"name": "HLS", "session": "live1", "segment_time": 2, "max_segments": 5}, "/api/gate/stream/add",
          '{"name":"HLS","protocol":"hls","is_enable":false,"mode":"server","session":"live1","segment_time":2,'
          '"max_segments":5}')
-_mg_post("add_gateway_ndi_hx_stream", {"name": "NDI", "channel_name": "Stage", "connection": "multicast",
+_mg_post("add_gateway_ndi_hx_stream", {"name": "NDI", "channel_name": "Stage", "connection": "multicast", "ttl": 64,
                                        "netmask": "255.255.0.0", "netprefix": "239.255.0.0"},
          "/api/gate/stream/add",
          '{"name":"NDI","protocol":"ndi_hx","is_enable":false,"channel_name":"Stage","ttl":64,'
@@ -400,26 +402,28 @@ _mg_post("update_gateway_rtsp_stream", {"id": _MG_GW, "session": "ch1", "port": 
          '{"id":"%s","protocol":"rtsp","session":"ch1","port":554,"http_tunnel_port":8554,"auth":true,"user":"a",'
          '"pwd":"b","multicast_enable":true,"multicast_addr":"224.0.1.0","multicast_ttl":127,'
          '"multicast_port_min":31000,"multicast_port_max":31004}' % _MG_GW)
-_mg_post("update_gateway_rtp_stream", {"id": _MG_GW, "address": "239.1.1.1", "port": 5000, "load_type": 33},
+_mg_post("update_gateway_rtp_stream", {"id": _MG_GW, "address": "239.1.1.1", "port": 5000, "load_type": 33,
+                                       "ttl": 64, "pcr_period": 40, "transport_stream_id": 1, "start_pid": 256, "pmt_start_pid": 4096, "tables_version": 0},
          "/api/gate/stream/update",
          '{"id":"%s","protocol":"rtp","address":"239.1.1.1","port":5000,"load_type":33,"ttl":64,'
          '"ts_service_name":"","ts_service_provider":"","ts_pcr_period":40,"ts_transport_stream_id":1,'
          '"ts_start_pid":256,"ts_pmt_start_pid":4096,"ts_tables_version":0}' % _MG_GW)
-_mg_post("update_gateway_ts_stream", {"id": _MG_GW, "address": "239.1.1.2", "port": 5002, "pts_pcr_delay": 100},
+_mg_post("update_gateway_ts_stream", {"id": _MG_GW, "address": "239.1.1.2", "port": 5002, "pts_pcr_delay": 100,
+                                      "ttl": 64, "pcr_period": 40, "transport_stream_id": 1, "start_pid": 256, "pmt_start_pid": 4096, "tables_version": 0},
          "/api/gate/stream/update",
          '{"id":"%s","protocol":"ts","address":"239.1.1.2","port":5002,"bind_port":0,"ttl":64,"ts_pts_pcr_delay":100,'
          '"ts_service_name":"","ts_service_provider":"","ts_pcr_period":40,"ts_transport_stream_id":1,'
          '"ts_start_pid":256,"ts_pmt_start_pid":4096,"ts_tables_version":0}' % _MG_GW)
 _mg_post("update_gateway_srt_stream", {"id": _MG_GW, "mode": "Caller", "address": "10.0.0.9", "port": 9000,
-                                       "latency": 500},
+                                       "latency": 500, "pcr_period": 40, "start_pid": 256, "pmt_start_pid": 4096, "tables_version": 0},
          "/api/gate/stream/update",
          '{"id":"%s","protocol":"srt","connection_mode":"Caller","address":"10.0.0.9","listener_port":9000,'
          '"latency":500,"encryption":"0","passphrase":"","ts_service_name":"","ts_service_provider":"",'
          '"ts_pcr_period":40,"ts_start_pid":256,"ts_pmt_start_pid":4096,"ts_tables_version":0}' % _MG_GW)
-_mg_post("update_gateway_hls_stream", {"id": _MG_GW, "session": "live2", "segment_time": 4},
+_mg_post("update_gateway_hls_stream", {"id": _MG_GW, "session": "live2", "segment_time": 4, "max_segments": 5},
          "/api/gate/stream/update",
          '{"id":"%s","protocol":"hls","mode":"server","session":"live2","segment_time":4,"max_segments":5}' % _MG_GW)
-_mg_post("update_gateway_ndi_hx_stream", {"id": _MG_GW, "channel_name": "Stage 2"}, "/api/gate/stream/update",
+_mg_post("update_gateway_ndi_hx_stream", {"id": _MG_GW, "channel_name": "Stage 2", "ttl": 64}, "/api/gate/stream/update",
          '{"id":"%s","protocol":"ndi_hx","channel_name":"Stage 2","ttl":64,"connection":"","netmask":"",'
          '"netprefix":""}' % _MG_GW)
 _mg_post("rename_gateway_stream", {"id": _MG_GW, "name": "rtmp0"}, "/api/gate/stream/update",
@@ -605,7 +609,7 @@ _mg_t("encoder", "/api/output/encode/get?output_id=1",
           "deinterlace_mode": "weave", "code_frame": 0, "out_mixer_fps": 60},
           "sub": {"pic_width": 640, "pic_height": 360, "fps": 30, "bitrate": 3000}}},
       {"outputs": {"1": {"encoder": {"enabled": False, "codec": "H264", "profile": "high", "width": 1, "height": 1,
-                                     "follows_resolution": True, "grey": False, "fps": "auto", "mode": "VBR",
+                                     "follows_resolution": True, "grayscale": False, "fps": "auto", "mode": "VBR",
                                      "bitrate": 6000, "max_bitrate": 20000, "gop": 60, "deinterlace": "weave",
                                      "reference_frames": 0, "mixer_fps": 60,
                                      "sub": {"width": 640, "height": 360, "fps": 30, "bitrate": 3000}}}}})

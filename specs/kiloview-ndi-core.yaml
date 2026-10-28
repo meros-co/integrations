@@ -41,9 +41,9 @@ transport:
   type: http
   port: 80
   scheme: http
-  # Every request but login, system/info and user/token/permanent carries
-  # the bearer token (the header tables: "Bearer" + space + token), sent
-  # while the token setting is set.
+  # Every request but login and system/info lists the bearer token in its
+  # header table ("Bearer" + space + token); it is sent while the token
+  # setting is set.
   auth: bearer
   timeout_ms: 5000
   # Every request carries the language header (cn or en).
@@ -329,7 +329,7 @@ commands:
 
   # ── 4 Service management ─────────────────────────────────────────────
   restart_service:
-    summary: Restart the server's service, stopping every NDI output until it is back
+    summary: Restart the server's service (4.1)
     send: { method: POST, path: /api/cube/v2/server/reboot }
     expect: *ok
     returns: ack
@@ -821,8 +821,9 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      Authentication: every request but system/info, login and
-      user/token/permanent carries "Authorization: Bearer <token>". The
+      Authentication: every request but system/info and login lists
+      "Authorization: Bearer <token>" in its header table (user/token/permanent
+      too, though it takes a user name and password). The
       login answers its token in the JSON body (and the event websocket
       takes it in its URL), which the core cannot capture into a session, so
       the token is a setting. Run get_long_term_token once (a token that
@@ -844,7 +845,8 @@ quirks:
       save_template overwrites a template; delete_panel(s), delete_input(s),
       delete_output(s), delete_template, delete_rotation_list, delete_user
       and delete_discovery cannot be undone; enable_panel off disables a
-      panel; restart_service stops every output until the service is back;
+      panel; restart_service restarts the server's service (what that does
+      to running outputs is not documented);
       update_authorization replaces the license. None asks for
       confirmation.
   - models: [all]

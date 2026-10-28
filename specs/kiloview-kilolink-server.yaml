@@ -101,6 +101,7 @@ models:
       - set_firmware_description
       - get_devices
       - get_devices_under
+      - get_devices_by_mode
       - change_own_password
       - change_own_nickname
       - reboot_devices
@@ -289,10 +290,18 @@ commands:
     expect: *data
     returns: value
   get_devices_under:
-    summary: Return the devices under a node, of a type and mode, with their counts (POST /api/tools/getDeviceList.json)
+    summary: Return the devices under a node, of one type or all, with their counts (POST /api/tools/getDeviceList.json)
     params:
       dn: *dn
-      device_type: { type: string, default: all, max_length: 64, label: Device type, description: "The device type to list, as get_device_types returns them; all for every type." }
+      device_type: &device_type { type: string, default: all, max_length: 64, label: Device type, description: "The device type to list, as get_device_types returns them; all for every type." }
+    send: { method: POST, path: /api/tools/getDeviceList.json, content_type: application/json, body: '{"dn":{dn:json},"device_type":{device_type:json}}' }
+    expect: *data
+    returns: value
+  get_devices_by_mode:
+    summary: Return the devices under a node in one mode, of one type or all, with their counts (POST /api/tools/getDeviceList.json)
+    params:
+      dn: { type: string, default: "cn=admin,dc=kiloview,dc=com", max_length: 512, label: Node DN, description: "The distinguished name of the node to list under; the root by default." }
+      device_type: *device_type
       device_mode: { type: string, required: true, max_length: 32, label: Device mode, description: "The device mode to list, as get_device_modes returns them, such as encoder." }
     send: { method: POST, path: /api/tools/getDeviceList.json, content_type: application/json, body: '{"dn":{dn:json},"device_type":{device_type:json},"device_mode":{device_mode:json}}' }
     expect: *data
@@ -300,7 +309,7 @@ commands:
   change_own_password:
     summary: Change the logged-in user's password (POST /api/tools/changeSelfPassword.json)
     params:
-      password: { type: string, required: true, secret: true, max_length: 128, label: New password, description: "The new password, with upper and lower case letters and digits." }
+      password: { type: string, required: true, secret: true, max_length: 128, label: New password, description: "The new password; the web console asks to log in again after a change (user manual 4.3.2), so log in again and store the new token." }
     send: { method: POST, path: /api/tools/changeSelfPassword.json, content_type: application/json, body: '{"new":{password:json}}' }
     expect: *ok
     returns: ack
@@ -427,10 +436,10 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      API limits: firmware upload (/api/tools/uploadFirmware.json) gives
-      only a desc URL parameter and no body format, so it is not offered
-      (use the web console); the server's own settings (ports, streaming
-      services, logs) are not in the API.
+      Not offered: firmware upload (/api/tools/uploadFirmware.json), whose
+      document gives only a desc URL parameter and no body or field name for
+      the file (use the web console). API limits: the server's own settings
+      (ports, streaming services, logs) are not in the API.
 
 state:
   menu.device_control: { type: bool, description: "Whether the logged-in user sees device management" }
