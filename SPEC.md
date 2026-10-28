@@ -1012,7 +1012,7 @@ ports:
 | Field | Meaning |
 |---|---|
 | `port` | The default. `null` when there is none and one must be given; a `note` then says so |
-| `protocol` | `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls`, `ssh`, `serial`: a serial port of the host, with `port: null` and `setting: serial_port` (§2, `line-serial`), `midi`: a MIDI port of the host, with `port: null` and `setting: midi_input` or `midi_output` (native modules only, see [Native modules](#native-modules)), or `icmp`: ICMP echo, which has no port (`port: null`) |
+| `protocol` | `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls`, `ssh`, `serial`: a serial port of the host, with `port: null` and `setting: serial_port` (§2, `line-serial`), `midi`: a MIDI port of the host, with `port: null` and `setting: midi_input` or `midi_output` (native modules only, see [Native modules](#native-modules)), `icmp`: ICMP echo, which has no port (`port: null`), or `applescript`: Apple events to an application on the Mac running the core, which has no port either (`port: null`; native modules only, see [Native modules](#native-modules)) |
 | `role` | `control` (where commands go; the port given when opening a device overrides the transport's, not an HTTP endpoint's), `push` (a websocket or event stream beside it), `feedback` (where the device sends replies or changes), `notification` (pushed status the device starts), `discovery` |
 | `listener` | Who listens: `device` (the default) or `core` |
 | `setting` | The setting that changes this port, if any |
@@ -2771,6 +2771,23 @@ in the HTTP service, each with its `name` and whether it is an `input`, an
 `output` or both. The list is empty in a build without a MIDI integration,
 on Android, and on a host whose MIDI system cannot be reached (on Linux:
 without `libasound.so.2` or without the ALSA sequencer).
+
+A native module can drive an application on the Mac the core runs on
+through the application's AppleScript dictionary (`Cx::osascript`): the
+session runs the script with `osascript -e`, never through a shell, and
+gives the module what it printed, or its error text (`execution error: ...
+(-1728)`), ending it after the timeout the module gives. Each script is the
+module's own fixed text from the application's published dictionary; a value
+a caller gives goes into it only as an AppleScript string literal, its
+backslashes and quotes escaped and its line breaks and tabs joined in as the
+`return`, `linefeed` and `tab` constants, any other control character being
+refused before the script is built. There is no way for a spec or a caller to
+run a script of its own. Such a spec lists an `applescript` control entry in
+`ports`, `port: null`, and the device is opened without a host. On any other
+system than macOS, and until macOS allows the program running the core to
+control the application (Privacy & Security, Automation), the device is
+disconnected with a reason saying so and its commands fail with
+`transport`.
 
 The MIDI integrations (`generic-midi`, `midi-show-control`) share one link
 (`link` `rtp`, `rtp_host` or `port`): an RTP-MIDI session (Apple's MIDI

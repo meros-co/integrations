@@ -626,7 +626,9 @@ mod tests {
             let Some(declared) = spec
                 .ports
                 .iter()
-                .find(|p| p.role == "control" && p.when.is_none())
+                // Apple events reach an application on the host, with no
+                // port at all.
+                .find(|p| p.role == "control" && p.when.is_none() && p.protocol != "applescript")
             else {
                 continue;
             };
