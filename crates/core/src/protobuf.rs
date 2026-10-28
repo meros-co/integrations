@@ -38,7 +38,9 @@ const BASE64: GeneralPurpose = GeneralPurpose::new(
     GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
 );
 
-/// A field's type.
+/// A field's type. Every proto3 type is here, though a schema may use
+/// only some (DMXControl's has none of the fixed types).
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Kind {
     Double,

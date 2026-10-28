@@ -65,7 +65,6 @@ const CONNECTION_WINDOW: i64 = 1 << 24;
 
 /// RST_STREAM and GOAWAY error codes (§7).
 pub(crate) const NO_ERROR: u32 = 0x0;
-pub(crate) const PROTOCOL_ERROR: u32 = 0x1;
 pub(crate) const CANCEL: u32 = 0x8;
 
 /// What the peer did.

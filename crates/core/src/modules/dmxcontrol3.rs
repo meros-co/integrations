@@ -84,7 +84,6 @@ const FLUSH_EVERY: Millis = 100;
 
 const CLIENT_SERVICE: &str = "/LumosProtobufCommon.ClientService";
 const CONNECTED: &str = "/LumosProtobufCommon.ConnectedClientService";
-const NET_SERVICE: &str = "/LumosProtobufCommon.DMXCNetService";
 
 /// One method a command calls (generated).
 #[derive(Debug)]

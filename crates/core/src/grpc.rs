@@ -263,6 +263,7 @@ impl Client {
     }
 
     /// Whether a call is still open.
+    #[cfg(test)]
     pub(crate) fn is_open(&self, call: CallId) -> bool {
         self.calls.contains_key(&call)
     }
@@ -586,7 +587,6 @@ pub(crate) mod server {
         Cancel {
             stream: u32,
         },
-        Ping,
     }
 
     pub(crate) struct Server {
