@@ -545,7 +545,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 | Devices | Protocol | Documentation |
 |---|---|---|
-| Clear-Com Arcadia / FreeSpeak / LQ / Eclipse HX | REST (Arcadia, LQ); EHX for Eclipse | Public (REST); on request (Eclipse) |
+| Clear-Com Arcadia / FreeSpeak / LQ / Eclipse HX | REST (Arcadia, FreeSpeak, LQ); EHX for Eclipse | Not published: the CCM REST API has no public documentation (only third parties' reverse-engineered notes); on request (Eclipse) |
 | Riedel Artist / Bolero / SmartPanel | RRCS (XML-RPC over HTTP) / Ember+ | On request |
 | Green-GO | Proprietary UDP | Reverse-engineered |
 | Unity Intercom | TCP API | Unknown |
