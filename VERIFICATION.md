@@ -2922,6 +2922,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm GET /v1/datalink lists every DataLink key as <data><key/><value/></data> elements. ([specs/newtek-tricaster.yaml:686](specs/newtek-tricaster.yaml#L686))
 - [ ] Confirm Vizrt Vectar and Viz Vectar Plus answer the same shortcuts, dictionaries and change notification websocket as a TriCaster, and their input count for the net commands. ([specs/newtek-tricaster.yaml:852](specs/newtek-tricaster.yaml#L852))
 
+## nimble-streamer — Nimble Streamer (native API)
+
+- [ ] Confirm a server without management_token answers every call, and record how a server with a token refuses a request without salt and hash (status and body). ([specs/nimble-streamer.yaml:466](specs/nimble-streamer.yaml#L466))
+- [ ] Confirm the POST calls without a body (sync_panel_settings, reload_config, reload_ssl_certificates, dvr reload and cleanup, the Advertizer markers) are accepted with an empty body, and record what they answer. ([specs/nimble-streamer.yaml:86](specs/nimble-streamer.yaml#L86))
+- [ ] Confirm get_cache_key is a POST with a JSON body (the reference's curl example sends -d to it). ([specs/nimble-streamer.yaml:427](specs/nimble-streamer.yaml#L427))
+- [ ] Confirm create_rtmp_republish_rule takes dest_port as a number (the reference's example sends it as a string). ([specs/nimble-streamer.yaml:150](specs/nimble-streamer.yaml#L150))
+- [ ] Confirm live_streams_status gives bandwidth and publish_time as strings of digits (as in the reference's example) or numbers, both read as integers. ([specs/nimble-streamer.yaml:575](specs/nimble-streamer.yaml#L575))
+- [ ] Record the shapes of mpeg2ts_status, srt and rist statistics, ndi/list and dvr_status replies beyond the reference's examples, to keep them in state. ([specs/nimble-streamer.yaml:490](specs/nimble-streamer.yaml#L490))
+
 ## nmos-node — AMWA NMOS Node (IS-04, IS-05, IS-08, IS-07)
 
 - [ ] Check against a real Node (and nmos-cpp's node) that GET /x-nmos/node answers as the liveness probe. ([specs/nmos-node.yaml:59](specs/nmos-node.yaml#L59))
