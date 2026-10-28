@@ -1901,10 +1901,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## foscam-ptz — Foscam HD IP cameras (CGI)
 
-- [ ] Check how current firmware answers a wrong password (result -2 with HTTP 200 assumed) and whether it locks the account out after repeated failures. ([specs/foscam-ptz.yaml:813](specs/foscam-ptz.yaml#L813))
-- [ ] Check whether setContrast takes "contrast" (the parameter table) or "constrast" (the guide's example). ([specs/foscam-ptz.yaml:827](specs/foscam-ptz.yaml#L827))
-- [ ] Record getPTZPresetPointList and ptzGetCruiseMapList replies to confirm the cnt then pointN or mapN element order the rules read. ([specs/foscam-ptz.yaml:737](specs/foscam-ptz.yaml#L737))
-- [ ] Check which commands newer firmware adds or renames against the V1.0.4 guide (PTZ position, IR modes, newer image settings). ([specs/foscam-ptz.yaml:834](specs/foscam-ptz.yaml#L834))
+- [ ] Check how current firmware answers a wrong password (result -2 with HTTP 200 assumed) and whether it locks the account out after repeated failures. ([specs/foscam-ptz.yaml:860](specs/foscam-ptz.yaml#L860))
+- [ ] Check whether setContrast takes "contrast" (the parameter table) or "constrast" (the guide's example). ([specs/foscam-ptz.yaml:874](specs/foscam-ptz.yaml#L874))
+- [ ] Record getPTZPresetPointList and ptzGetCruiseMapList replies to confirm the cnt then pointN or mapN element order the rules read. ([specs/foscam-ptz.yaml:784](specs/foscam-ptz.yaml#L784))
+- [ ] Check which commands newer firmware adds or renames against the V1.0.4 guide (PTZ position, IR modes, newer image settings). ([specs/foscam-ptz.yaml:881](specs/foscam-ptz.yaml#L881))
+- [ ] Confirm /configs/export/configs.bin serves the exported file right after exportConfig answers, without usr and pwd. ([specs/foscam-ptz.yaml:548](specs/foscam-ptz.yaml#L548))
+- [ ] Confirm fwUpgrade answers its upgradeResult within three minutes of the upload (the guide gives 120 s for application firmware and 60 s for system firmware), and that importConfig and fwUpgrade accept any part file name. ([specs/foscam-ptz.yaml:568](specs/foscam-ptz.yaml#L568))
 
 ## freeshow — FreeShow
 

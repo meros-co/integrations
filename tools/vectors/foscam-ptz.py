@@ -154,3 +154,25 @@ _fct("system-time", "getSystemTime",
      "<day>27</day><hour>14</hour><minute>5</minute><sec>9</sec></CGI_Result>",
      {"time": {"source": "manual", "ntp_server": "time.nist.gov", "zone": -3600, "dst": False, "year": 2026, "month": 10,
                "day": 27, "hour": 14, "minute": 5, "second": 9}})
+# Files: saved to the host file named (never written by a vector), or sent
+# as multipart parts.
+_fc("save_snapshot", {"to": {"file": "snap.jpg"}}, "snapPicture2")
+_fc("export_config", {"to": {"file": "configs.bin"}}, "exportConfig")
+_fc("get_log", {"offset": 10, "count": 10}, "getLog&offset=10&count=10")
+
+
+def _fc_form(field, filename, data):
+    import hashlib
+    digest = hashlib.sha256(field.encode() + b"\0" + data + b"\0").hexdigest()
+    boundary = "----form-" + digest[:16]
+    body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{field}\"; filename=\"{filename}\"\r\n"
+            "Content-Type: application/octet-stream\r\n\r\n").encode() + data + f"\r\n--{boundary}--\r\n".encode()
+    return body.hex(), f"multipart/form-data; boundary={boundary}"
+
+
+for _cmd, _cgi, _field, _name in [("import_config", "importConfig", "setting_file", "configs.bin"),
+                                  ("upgrade_firmware", "fwUpgrade", "fw_file", "firmware.bin")]:
+    _b, _c = _fc_form(_field, _name, b"ABC")
+    V.append({"spec": FC, "command": _cmd, "input": {"file": "QUJD"}, "settings": dict(FC_SET),
+              "expect_request": {"method": "POST", "target": CGI + _cgi + FCA, "body_hex": _b, "content_type": _c}})
+

@@ -59,12 +59,12 @@ models:
   - id: foscam-ptz
     name: Foscam HD PTZ camera
     supports: &all
-      [get_image_settings, set_brightness, set_contrast, set_hue, set_saturation, set_sharpness, reset_image_settings, get_mirror_flip, set_mirror, set_flip, set_power_frequency, get_video_streams, set_video_stream, get_main_stream_type, get_sub_stream_type, set_main_stream_type, set_sub_stream_format, get_osd, set_osd, get_mask_areas, set_mask_areas, get_mask_enabled, set_mask_enabled, move, stop, reset_position, get_ptz_speed, set_ptz_speed, get_presets, add_preset, delete_preset, goto_preset, get_cruise_maps, get_cruise_map, set_cruise_map, delete_cruise_map, start_cruise, stop_cruise, zoom_in, zoom_out, zoom_stop, get_zoom_speed, set_zoom_speed, get_self_test_mode, set_self_test_mode, get_self_test_preset, set_self_test_preset, get_rs485, set_rs485, get_device_state, get_device_info, get_device_name, set_device_name, ir_led_on, ir_led_off, get_ir_led_mode, set_ir_led_mode, get_system_time, set_time_from_ntp, set_time_manually, reboot, factory_reset]
+      [get_image_settings, set_brightness, set_contrast, set_hue, set_saturation, set_sharpness, reset_image_settings, get_mirror_flip, set_mirror, set_flip, set_power_frequency, get_video_streams, set_video_stream, get_main_stream_type, get_sub_stream_type, set_main_stream_type, set_sub_stream_format, get_osd, set_osd, get_mask_areas, set_mask_areas, get_mask_enabled, set_mask_enabled, move, stop, reset_position, get_ptz_speed, set_ptz_speed, get_presets, add_preset, delete_preset, goto_preset, get_cruise_maps, get_cruise_map, set_cruise_map, delete_cruise_map, start_cruise, stop_cruise, zoom_in, zoom_out, zoom_stop, get_zoom_speed, set_zoom_speed, get_self_test_mode, set_self_test_mode, get_self_test_preset, set_self_test_preset, get_rs485, set_rs485, get_device_state, get_device_info, get_device_name, set_device_name, ir_led_on, ir_led_off, get_ir_led_mode, set_ir_led_mode, get_system_time, set_time_from_ntp, set_time_manually, reboot, save_snapshot, export_config, import_config, upgrade_firmware, get_log, factory_reset]
     verification: none
   - id: foscam-fixed
     name: Foscam HD camera without pan/tilt
     supports:
-      [get_image_settings, set_brightness, set_contrast, set_hue, set_saturation, set_sharpness, reset_image_settings, get_mirror_flip, set_mirror, set_flip, set_power_frequency, get_video_streams, set_video_stream, get_main_stream_type, get_sub_stream_type, set_main_stream_type, set_sub_stream_format, get_osd, set_osd, get_mask_areas, set_mask_areas, get_mask_enabled, set_mask_enabled, get_device_state, get_device_info, get_device_name, set_device_name, ir_led_on, ir_led_off, get_ir_led_mode, set_ir_led_mode, get_system_time, set_time_from_ntp, set_time_manually, reboot, factory_reset]
+      [get_image_settings, set_brightness, set_contrast, set_hue, set_saturation, set_sharpness, reset_image_settings, get_mirror_flip, set_mirror, set_flip, set_power_frequency, get_video_streams, set_video_stream, get_main_stream_type, get_sub_stream_type, set_main_stream_type, set_sub_stream_format, get_osd, set_osd, get_mask_areas, set_mask_areas, get_mask_enabled, set_mask_enabled, get_device_state, get_device_info, get_device_name, set_device_name, ir_led_on, ir_led_off, get_ir_led_mode, set_ir_led_mode, get_system_time, set_time_from_ntp, set_time_manually, reboot, save_snapshot, export_config, import_config, upgrade_firmware, get_log, factory_reset]
     verification: none
 
 commands:
@@ -538,6 +538,53 @@ commands:
       - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getSystemTime&usr={settings.username:url}&pwd={settings.password:url}" }
     expect: { status: 200, matches: '<result>0</result>' }
     returns: ack
+  save_snapshot:
+    summary: "Take a snapshot at the main stream's resolution and save the JPEG to a host file (snapPicture2)"
+    params:
+      to: { type: save, required: true, label: Save to, description: "The host file the download is written to; replaced once the whole file has arrived." }
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=snapPicture2&usr={settings.username:url}&pwd={settings.password:url}", save: to }
+    expect: { status: 200 }
+    returns: file
+  export_config:
+    summary: "Export the configuration and save the file to a host file (exportConfig, then /configs/export/configs.bin)"
+    params:
+      to: { type: save, required: true, label: Save to, description: "The host file the download is written to; replaced once the whole file has arrived." }
+    send:
+      - { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=exportConfig&usr={settings.username:url}&pwd={settings.password:url}" }
+      - { method: GET, path: /configs/export/configs.bin, save: to }
+    expect: { status: 200 }
+    returns: file
+  import_config:
+    summary: "Send a configuration file export_config saved, from a host file; the camera restarts (importConfig, multipart setting_file)"
+    params:
+      file: { type: binary, required: true, label: Configuration file, description: "A configuration file export_config saved, given as a host file (or base64)." }
+    send:
+      method: POST
+      path: /cgi-bin/CGIProxy.fcgi
+      raw_query: "cmd=importConfig&usr={settings.username:url}&pwd={settings.password:url}"
+      multipart: [{ name: setting_file, binary: file, filename: configs.bin, content_type: application/octet-stream }]
+    expect: { status: 200 }
+    returns: ack
+  upgrade_firmware:
+    summary: "Upgrade the firmware from a host file; the camera restarts (fwUpgrade, multipart fw_file); waits up to three minutes for the answer"
+    params:
+      file: { type: binary, required: true, label: Firmware file, description: "Foscam's firmware file for this camera, given as a host file (or base64)." }
+    timeout_ms: 180000
+    send:
+      method: POST
+      path: /cgi-bin/CGIProxy.fcgi
+      raw_query: "cmd=fwUpgrade&usr={settings.username:url}&pwd={settings.password:url}"
+      multipart: [{ name: fw_file, binary: file, filename: firmware.bin, content_type: application/octet-stream }]
+    expect: { status: 200 }
+    returns: text
+  get_log:
+    summary: "Read up to 10 entries of the system log from an offset: totalCnt, curCnt and log0 onward, each time, user, IP and log id (getLog)"
+    params:
+      offset: { type: int, min: 0, max: 999, default: 0, label: From, description: "The first entry to read, from 0; the camera keeps 1000 at most." }
+      count: { type: int, min: 1, max: 10, default: 10, label: Entries, description: "How many entries to read, 10 at most." }
+    send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=getLog&offset={offset}&count={count}&usr={settings.username:url}&pwd={settings.password:url}" }
+    expect: { status: 200, matches: '<result>0</result>' }
+    returns: text
   reboot:
     summary: "Restart the camera"
     send: { method: GET, path: /cgi-bin/CGIProxy.fcgi, raw_query: "cmd=rebootSystem&usr={settings.username:url}&pwd={settings.password:url}" }
@@ -834,11 +881,12 @@ quirks:
     severity: info
     text: >
       Not covered: network, Wi-Fi, port, UPnP, DDNS, FTP, SMTP and P2P settings, user accounts,
-      motion detection and alarm configuration, snapshots and the MJPEG stream, multi-device
-      lists, the firewall, the log, configuration export and import and firmware upgrade (the last
-      three move files the spec format cannot fetch or post as the camera expects).
+      motion detection and alarm configuration, the MJPEG stream, multi-device lists and the
+      firewall. Snapshots (save_snapshot), the log (get_log), configuration export and import
+      and firmware upgrade move their files to and from host files.
   - models: [all]
     severity: critical
     text: >
       factory_reset restores every setting; delete_preset, set_cruise_map and delete_cruise_map
-      overwrite or delete stored positions; reboot drops the video.
+      overwrite or delete stored positions; reboot drops the video; import_config replaces the
+      configuration and upgrade_firmware the firmware, each restarting the camera.
