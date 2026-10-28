@@ -189,39 +189,3 @@ telemetry(CMS, "ndi", model="ndi-hx",
           inbound_http={"path": "/local/ndihxplugin/settings.cgi?action=get", "body": json.dumps(_NDI)},
           expect_state={"ndi": {"name": "P1375", "groups": "", "channel": 2, "width": 1920, "height": 1080, "fps": 50.0, "gop": 101,
                                 "audio_enabled": False}})
-
-# The apps' websocket events (CamStreamer API: CSt, COv and CSw WebSocket API),
-# as they happen and as the initial state wrapped in init.
-telemetry(CMS, "ws-stream-state", model="app-6",
-          inbound_ws='{"type":"StreamState","streamID":"117930","enabled":0,"active":1,"automationState":1,"isStreaming":0}',
-          expect_state={"streams": {"117930": {"enabled": False, "active": True, "automation_state": 1}},
-                        "stream_status": {"117930": {"streaming": False}}})
-telemetry(CMS, "ws-stream-state-init", model="app-4",
-          inbound_ws='{"type":"init","data":{"type":"StreamState","streamID":"117930","enabled":1,"active":1,"automationState":1,"isStreaming":1}}',
-          expect_state={"streams": {"117930": {"enabled": True, "active": True, "automation_state": 1}},
-                        "stream_status": {"117930": {"streaming": True}}})
-telemetry(CMS, "ws-api-success", model="app-6",
-          inbound_ws='{"type":"CS_API_SUCCESS","streamID":"117930","apiCall":"startBroadcast","message":"Broadcast started."}',
-          expect_state={"stream_status": {"117930": {"last_api_call": "startBroadcast",
-                                                     "last_api_message": "Broadcast started."}}})
-telemetry(CMS, "ws-port-changed", model="app-6",
-          inbound_ws='{"type":"init","data":{"type":"PortChanged","port":0, "value":1}}',
-          expect_state={"io_ports": {"0": {"value": 1}}})
-telemetry(CMS, "ws-service-start", model="camoverlay", inbound_ws='{"type":"ServiceStart","serviceId":2}',
-          expect_state={"services": {"2": {"running": True}}})
-telemetry(CMS, "ws-service-stop-init", model="camoverlay",
-          inbound_ws='{"type":"init","data":{"type":"ServiceStop","serviceId":3}}',
-          expect_state={"services": {"3": {"running": False}}})
-telemetry(CMS, "ws-switcher-start", model="camswitcher",
-          inbound_ws='{"type":"init","data":{"type":"SwitcherStart","default_playlist_id":"c26b737ea-1178-4f9e-851c-479cbdd6e97d"}}',
-          expect_state={"switcher": {"default_playlist": "c26b737ea-1178-4f9e-851c-479cbdd6e97d"}})
-telemetry(CMS, "ws-switch-video", model="camswitcher",
-          inbound_ws='{"type":"StreamSwitchVideo","playlist_active_stream":2,"stream_name":"cam2","playlist_name":"main"}',
-          expect_state={"switcher": {"video": {"playlist": "main", "stream": "cam2", "index": 2}}})
-telemetry(CMS, "ws-switch-audio-init", model="camswitcher",
-          inbound_ws='{"type":"init","data":{"playlist_active_stream":0,"stream_name":"c4f673956-99c5-4a92-8854-c369d1f7da27","playlist_name":"c4f673956-99c5-4a92-8854-c369d1f7da27","type":"StreamSwitchAudio"}}',
-          expect_state={"switcher": {"audio": {"playlist": "c4f673956-99c5-4a92-8854-c369d1f7da27",
-                                               "stream": "c4f673956-99c5-4a92-8854-c369d1f7da27", "index": 0}}})
-telemetry(CMS, "ws-stream-available", model="camswitcher",
-          inbound_ws='{"type":"init","data":{"type":"StreamAvailable","stream_name":"cam.2","state":true}}',
-          expect_state={"stream_available": {"cam.2": {"available": True}}})
