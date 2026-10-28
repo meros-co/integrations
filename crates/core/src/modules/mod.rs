@@ -48,8 +48,6 @@ mod analogway;
 mod apc_rack_pdu_profile;
 #[cfg(feature = "apc-ups")]
 mod apc_ups_profile;
-#[cfg(feature = "apple-keynote")]
-mod apple_keynote;
 #[cfg(feature = "artnet")]
 mod artnet;
 #[cfg(feature = "blackmagic-atem")]
@@ -483,8 +481,6 @@ pub(crate) fn construct(
         #[cfg(feature = "probel-swp08")]
         "probel-swp08" => Ok(Box::new(swp08::Swp08::new(spec, context)?)),
         // The clock connects to the core, told apart by its address.
-        #[cfg(feature = "apple-keynote")]
-        "apple-keynote" => Ok(Box::new(apple_keynote::Keynote::new(context)?)),
         #[cfg(feature = "piclock")]
         "piclock" => Ok(Box::new(piclock::PiClock::new(context)?)),
         #[cfg(feature = "pjlink")]

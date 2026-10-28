@@ -40,7 +40,6 @@ NATIVE = {
     "analogway-midra4k": "AWJ over TCP 10606",
     "apc-rack-pdu": "SNMP v1, v2c or v3 over UDP 161 (PowerNet-MIB); traps and informs",
     "apc-ups": "SNMP v1, v2c or v3 over UDP 161 (PowerNet-MIB); traps and informs",
-    "apple-keynote": "AppleScript (Apple events through osascript) to Keynote on the core's Mac",
     "artnet": "Art-Net 4 over UDP 6454 (broadcast poll, unicast DMX); sends and receives",
     "barco-projection-protocol": "Barco Projection Protocol, binary over TCP 43680 or RS-232",
     "biamp-tesira": "Tesira Text Protocol over Telnet, TCP 23",
