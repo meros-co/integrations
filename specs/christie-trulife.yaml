@@ -442,6 +442,7 @@ commands:
     summary: "Turn the projector on or off (PWR)"
     params:
       value: { type: "bool", required: true, label: "On", description: "True turns the projector on, false turns it off (it cools down, then goes to standby)." }
+    timeout_ms: 180000
     send: "#PWR {value:bool01}"
     expect: { reply_contains: "PWR {value:bool01}", matches: '^\(#?[A-Za-z]' }
     returns: ack
@@ -529,6 +530,7 @@ commands:
     summary: "Select the CAVE board scaler FPGA image, DisplayPort or SDVoE (CAV+MODE)"
     params:
       value: { type: "int", min: 0, max: 1, required: true, label: "Input FPGA mode", description: "0 = DisplayPort mode, 1 = SDVoE mode; the scaler FPGA reloads, which takes 15 to 20 seconds." }
+    timeout_ms: 180000
     send: "#CAV+MODE {value}"
     expect: { reply_contains: "CAV+MODE {value}", matches: '^\(#?[A-Za-z]' }
     returns: ack
@@ -1209,6 +1211,7 @@ commands:
     returns: value
   calibrate_lens:
     summary: "Calibrate every lens motor (LCB 1)"
+    timeout_ms: 180000
     send: "#LCB 1"
     expect: { reply_contains: "LCB 1", matches: '^\(#?[A-Za-z]' }
     returns: ack
@@ -1219,6 +1222,7 @@ commands:
     returns: ack
   calibrate_zoom:
     summary: "Calibrate the zoom motor (LCB+ZOOM 1)"
+    timeout_ms: 180000
     send: "#LCB+ZOOM 1"
     expect: { reply_contains: "LCB+ZOOM 1", matches: '^\(#?[A-Za-z]' }
     returns: ack
@@ -1441,6 +1445,7 @@ commands:
     returns: ack
   toggle_high_frame_rate:
     summary: "Turn high frame rate mode on if it is off, off if it is on; the projector reboots (HFR+ENBL, standby only, HFR or Mirage license)"
+    timeout_ms: 180000
     send: "#HFR+ENBL"
     expect: { reply_contains: "HFR+ENBL", matches: '^\(#?[A-Za-z]' }
     returns: ack
@@ -1801,6 +1806,7 @@ commands:
     returns: ack
   reboot:
     summary: "Reboot the projector (RBT 111, standby only)"
+    timeout_ms: 180000
     send: "#RBT 111"
     expect: { reply_contains: "RBT 111", matches: '^\(#?[A-Za-z]' }
     returns: ack
@@ -1860,6 +1866,7 @@ commands:
     summary: "Run a built-in self test suite and read its results (BST)"
     params:
       suite: { type: "int", min: 0, max: 99, required: true, label: "Suite", description: "Suite as BST?L lists it: 0 = all tests, 1 = image processor board, 2 = formatter, 3 = active backplane, 4 = video path, 5 = IMXB (4K40-RGB)." }
+    timeout_ms: 180000
     send: "BST {suite}"
     expect: { reply_contains: "BST!", matches: 'BST!(.*)\)$' }
     returns: value
@@ -1867,6 +1874,7 @@ commands:
     summary: "Run one built-in self test and read its result (BST+TEST)"
     params:
       test: { type: "int", min: 0, max: 99, required: true, label: "Test", description: "Test as BST+TEST?L lists it." }
+    timeout_ms: 180000
     send: "BST+TEST {test}"
     expect: { reply_contains: "BST+TEST!", matches: 'BST\+TEST!(.*)\)$' }
     returns: value
@@ -2648,9 +2656,9 @@ quirks:
     text: >
       The references say that while powering up (20 seconds or more) the projector answers late but keeps every
       request queued, and that the acknowledgment of a set comes only when it has been carried out. The reply
-      timeout is therefore 30 s. Power on and off, lens calibration, the CAV+MODE FPGA reload (15 to 20 s), BST
-      self tests and the rebooting commands (toggle_high_frame_rate, reboot) can still outlast it, so such a
-      command may report a timeout although the projector accepted it. The power state is read with PWR? every 5 s
+      timeout is therefore 30 s, and three minutes for the commands that take longer: power on and off, lens
+      calibration, the CAV+MODE FPGA reload (15 to 20 s), BST self tests and the rebooting commands
+      (toggle_high_frame_rate, reboot). The power state is read with PWR? every 5 s
       and after each power echo.
   - models: [all]
     severity: info
