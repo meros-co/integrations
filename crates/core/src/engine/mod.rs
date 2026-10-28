@@ -9,6 +9,7 @@
 //! as the answer to a later command. Liveness probes queue like commands for the
 //! same reason.
 
+mod acknowledge;
 mod expect;
 pub(crate) use expect::json_path;
 pub(crate) mod framing;
@@ -614,6 +615,67 @@ struct Push {
     /// offered under, as that GET's reply would be (a Blackmagic camera's
     /// property pushes, in the format its REST GET returns).
     as_reply: Option<AsReply>,
+    /// `token`: a request whose answer holds a token the websocket is opened
+    /// with, asked for again before each opening (CamStreamer's
+    /// `ws_authorization.cgi`, a token valid for 30 seconds).
+    token: Option<PushToken>,
+}
+
+/// `telemetry.websocket.token`: the request, and where its answer holds the
+/// token: a JSON path, or a regex's first group over the body.
+#[derive(Debug, Clone)]
+struct PushToken {
+    request: Value,
+    json_path: Option<String>,
+    re: Option<Regex>,
+}
+
+impl PushToken {
+    fn parse(v: Option<&Value>) -> Result<Option<PushToken>, String> {
+        let Some(v) = v else {
+            return Ok(None);
+        };
+        let request = v
+            .get("request")
+            .filter(|r| r.is_object())
+            .ok_or("telemetry.websocket.token needs a request")?
+            .clone();
+        let json_path = str_field(v, "json_path").map(str::to_string);
+        let re = match str_field(v, "match") {
+            Some(p) => {
+                Some(Regex::new(p).map_err(|e| format!("telemetry.websocket.token.match: {e}"))?)
+            }
+            None => None,
+        };
+        if json_path.is_some() == re.is_some() {
+            return Err("telemetry.websocket.token takes json_path or match".into());
+        }
+        Ok(Some(PushToken {
+            request,
+            json_path,
+            re,
+        }))
+    }
+
+    /// The token in an answer's body, when it holds one.
+    fn read(&self, body: &[u8]) -> Option<String> {
+        let token = match (&self.json_path, &self.re) {
+            (Some(path), _) => {
+                let doc: Value = serde_json::from_slice(body).ok()?;
+                match expect::json_path(&doc, path)? {
+                    Value::String(s) => s.clone(),
+                    Value::Number(n) => n.to_string(),
+                    _ => return None,
+                }
+            }
+            (None, Some(re)) => {
+                let text = std::str::from_utf8(body).ok()?;
+                re.captures(text)?.get(1)?.as_str().to_string()
+            }
+            (None, None) => return None,
+        };
+        (!token.is_empty()).then_some(token)
+    }
 }
 
 /// `as_reply` (`telemetry.sse`, `telemetry.websocket`): each message is also
@@ -862,6 +924,10 @@ struct Job {
     login: bool,
     /// Sent once more after a fresh login: a second "session ended" stands.
     relogged: bool,
+    /// The request for the push websocket's token
+    /// (`telemetry.websocket.token`): its answer is never offered to the
+    /// rules, and opens the websocket.
+    push_token: bool,
     /// A `then_send` item's captures: the types of `params`, which hold
     /// them.
     specs: Option<Arc<BTreeMap<String, ParamSpec>>>,
@@ -877,6 +943,7 @@ impl Job {
             setup,
             login: false,
             relogged: false,
+            push_token: false,
             specs: None,
         }
     }
@@ -952,6 +1019,10 @@ pub(crate) struct SpecEngine {
     session_value: Option<Value>,
     /// `telemetry.websocket`: a push channel beside the transport.
     push: Option<Push>,
+    /// The token the push websocket is being opened with
+    /// (`telemetry.websocket.token`). A secret: never logged, offered to the
+    /// rules or kept in state.
+    push_token: Option<String>,
     push_backoff: Millis,
     /// `telemetry.sse`: an event stream beside an HTTP transport.
     events: Option<HttpRequest>,
@@ -978,6 +1049,9 @@ pub(crate) struct SpecEngine {
     outbox: VecDeque<Paced>,
     /// The pacing timer let the command in flight's next message go.
     pace_pass: bool,
+    /// `transport.acknowledge`: what the device sends by itself and wants
+    /// answered (SPEC.md §2, Acknowledgements).
+    acknowledge: acknowledge::Acknowledge,
 }
 
 fn str_field<'a>(v: &'a Value, key: &str) -> Option<&'a str> {
@@ -1806,6 +1880,15 @@ impl SpecEngine {
             )?,
         };
         let keepalive = keepalive_of(&t, &transport)?;
+        let acknowledge = acknowledge::Acknowledge::parse(t.get("acknowledge"))?;
+        if !acknowledge.is_empty()
+            && !matches!(
+                transport,
+                Transport::LineTcp { .. } | Transport::LineUdp { .. } | Transport::Ws { .. }
+            )
+        {
+            return Err("transport.acknowledge needs a line or websocket transport".into());
+        }
         // A list of probes, each for some models: the first for this one.
         let probe = match t.get("probe") {
             Some(Value::Array(items)) => items.iter().find(|i| for_model(i, &ctx.model)).cloned(),
@@ -1857,7 +1940,13 @@ impl SpecEngine {
             }
             Some(o) => listen_port(o.get("listen_port"), &ctx.settings)?,
         };
-        let push = match spec.telemetry.as_ref().and_then(|t| t.get("websocket")) {
+        // A list names each entry's `models`: the first for this one is used,
+        // and a model none names has no push websocket.
+        let push_entry = match spec.telemetry.as_ref().and_then(|t| t.get("websocket")) {
+            Some(Value::Array(entries)) => entries.iter().find(|e| for_model(e, &ctx.model)),
+            other => other,
+        };
+        let push = match push_entry {
             None => None,
             Some(w) => {
                 // A port, or `{setting: name}` naming the operator's (an
@@ -2019,6 +2108,7 @@ impl SpecEngine {
                     url,
                     idle,
                     as_reply: as_reply_of(w.get("as_reply"), "telemetry.websocket")?,
+                    token: PushToken::parse(w.get("token"))?,
                 })
             }
         };
@@ -2167,6 +2257,7 @@ impl SpecEngine {
             session_token: None,
             session_value: None,
             push,
+            push_token: None,
             push_backoff: RECONNECT_MIN,
             events,
             events_json,
@@ -2176,6 +2267,7 @@ impl SpecEngine {
             pacer,
             outbox: VecDeque::new(),
             pace_pass: false,
+            acknowledge,
         })
     }
 
@@ -2478,9 +2570,10 @@ impl SpecEngine {
             let outgoing = self.build(&item, &values)?;
             let text = match (&self.transport, line_message(&item)) {
                 (_, _) if matches!(outgoing, Outgoing::Http(..)) => None,
-                (Transport::LineTcp { .. } | Transport::LineUdp { .. }, Some(template)) => {
-                    Some(render(template, &values, no_escape)?)
-                }
+                (
+                    Transport::LineTcp { .. } | Transport::LineUdp { .. } | Transport::Ws { .. },
+                    Some(template),
+                ) => Some(render(template, &values, no_escape)?),
                 _ => None,
             };
             let pace = pace_text(&outgoing, text.as_deref());
@@ -2652,6 +2745,12 @@ impl SpecEngine {
                 }
                 return;
             };
+            if let Some(text) = &text {
+                self.acknowledge.sent(text, cx.now() + self.timeout);
+            }
+            let Some(flight) = self.current.as_mut() else {
+                return;
+            };
             flight.request_text = text;
             // A request to an endpoint goes to another server: not paced.
             let groups = (!matches!(&outgoing, Outgoing::Http(_, route) if *route != Route::Main))
@@ -2791,6 +2890,9 @@ impl SpecEngine {
     /// Send a message that awaits no reply (`on_connect`, a subscription),
     /// in its turn under the pacing.
     fn emit(&mut self, cx: &mut Cx, outgoing: Outgoing, text: Option<&str>) {
+        if let Some(text) = text {
+            self.acknowledge.sent(text, cx.now() + self.timeout);
+        }
         if self.pacer.is_off()
             || matches!(&outgoing, Outgoing::Http(_, route) if *route != Route::Main)
         {
@@ -2826,10 +2928,11 @@ impl SpecEngine {
         }
     }
 
-    /// A line message's text without framing, on a line transport.
+    /// A text message's text without framing, on a line or websocket
+    /// transport: what pacing groups and a reply's `request_match` read.
     fn line_text(&self, item: &Value, values: &Values) -> Option<String> {
         match self.transport {
-            Transport::LineTcp { .. } | Transport::LineUdp { .. } => {
+            Transport::LineTcp { .. } | Transport::LineUdp { .. } | Transport::Ws { .. } => {
                 line_message(item).and_then(|t| render(t, values, no_escape).ok())
             }
             _ => None,
@@ -3519,6 +3622,7 @@ impl SpecEngine {
     fn opened(&mut self, cx: &mut Cx) {
         self.backoff = RECONNECT_MIN;
         self.last_heard = cx.now();
+        self.acknowledge.reset();
         self.prompt_wait = None;
         self.refusals.clear();
         self.quiet_done = false;
@@ -3613,8 +3717,18 @@ impl SpecEngine {
             // connection step still waits for its answer (a login), they
             // queue behind it: DHD's Control API takes nothing before its
             // auth message is answered.
-            Transport::Ws { .. } => {
-                self.queue.iter().any(|j| j.setup)
+            //
+            // A device whose replies `reply_match` tells from its pushes
+            // (QLC+'s `QLC+API|...` answers) has them queued as on a line
+            // transport, each awaiting its reply, so a rule can tie the
+            // reply to the message it answers (`request_match`).
+            Transport::Ws {
+                ref reply_match,
+                replies,
+                ..
+            } => {
+                (replies && reply_match.is_some())
+                    || self.queue.iter().any(|j| j.setup)
                     || self.current.as_ref().is_some_and(|f| f.job.setup)
             }
         };
@@ -3768,6 +3882,34 @@ impl SpecEngine {
         self.offer(cx, &telemetry::Inbound::Text(text));
     }
 
+    /// `transport.acknowledge`: a message the device sent by itself that it
+    /// wants answered is answered at once, whether or not the device is
+    /// monitored, since the answer keeps the connection (or stops the device
+    /// repeating itself), not state. It is not paced: the device waits for
+    /// it, and nothing else waits behind it.
+    fn answer_unasked(&mut self, cx: &mut Cx, message: &str, error: bool) {
+        if self.acknowledge.is_empty() || self.refused.is_some() {
+            return;
+        }
+        let Some((rule, captures)) = self.acknowledge.heard(message, error, cx.now()) else {
+            return;
+        };
+        let (send, framed) = (rule.send.clone(), rule.framed);
+        let (params, specs) = telemetry::capture_params(&captures);
+        let values = self.values(&params, &specs);
+        let outgoing = match render(&send, &values, no_escape) {
+            Err(e) => Err(e),
+            Ok(text) if matches!(self.transport, Transport::Ws { .. }) => Ok(Outgoing::Ws(text)),
+            // As it is, without the framing: Denon's ACK is the byte alone.
+            Ok(text) if !framed => Ok(Outgoing::Bytes(text.into_bytes())),
+            Ok(_) => self.build(&Value::String(send), &values),
+        };
+        match outgoing {
+            Ok(outgoing) => self.emit_now(cx, outgoing),
+            Err(e) => cx.log(Level::Warning, format!("acknowledgement not sent: {e}")),
+        }
+    }
+
     fn inbound_text(&mut self, cx: &mut Cx, message: String) {
         if self.refusals.iter().any(|(re, _)| re.is_match(&message)) {
             self.refuse(cx, format!("login refused: {}", message.trim()));
@@ -3777,6 +3919,8 @@ impl SpecEngine {
         // text that happens to match is not about the login.
         self.refusals
             .retain(|(_, accepted)| !accepted.as_ref().is_some_and(|a| a.is_match(&message)));
+        let error = matches!(&self.transport, Transport::LineTcp { error_match: Some(re), .. } if re.is_match(&message));
+        self.answer_unasked(cx, &message, error);
         let waiting = match self.current.as_ref().and_then(|f| f.awaiting.as_ref()) {
             Some(Await::Text(None)) => true,
             // `expect.reply_contains`: a message that does not hold the text
@@ -3908,7 +4052,7 @@ impl SpecEngine {
         }
         self.refusals
             .retain(|(_, accepted)| !accepted.as_ref().is_some_and(|a| a.is_match(&text)));
-        self.apply_message(cx, &text);
+        self.answer_unasked(cx, &text, false);
         let ours =
             match self.current.as_ref().and_then(|f| f.awaiting.as_ref()) {
                 Some(Await::Ws(Some(fields))) => serde_json::from_str::<Value>(&text)
@@ -3934,6 +4078,15 @@ impl SpecEngine {
                 },
                 _ => false,
             };
+        // The reply to the message in flight is offered with that message's
+        // text, for a rule that needs to know what it answers.
+        let request = ours
+            .then(|| self.current.as_ref().and_then(|f| f.request_text.clone()))
+            .flatten();
+        match request {
+            Some(request) => self.offer_answer(cx, &text, &request),
+            None => self.apply_message(cx, &text),
+        }
         if ours {
             self.reply(cx, Reply::Text(text));
         } else {
@@ -3952,9 +4105,123 @@ impl SpecEngine {
     }
 
     fn open_push(&mut self, cx: &mut Cx) {
-        if !self.monitor {
+        if !self.monitor || self.refused.is_some() {
             return;
         }
+        let Some(push) = &self.push else {
+            return;
+        };
+        // A token first: asked for over the transport, in the queue, and the
+        // websocket opened with it when the answer comes.
+        if let Some(token) = &push.token {
+            let asked = self.queue.iter().any(|j| j.push_token)
+                || self.current.as_ref().is_some_and(|f| f.job.push_token);
+            if !asked {
+                let item = token.request.clone();
+                self.queue.push_back(Job {
+                    push_token: true,
+                    ..Job::internal(Some(item), false)
+                });
+                self.pump(cx);
+            }
+            return;
+        }
+        self.open_push_now(cx);
+    }
+
+    /// The push websocket's `send` items and `url` take the token as
+    /// `{token}`, a string.
+    fn token_params(&self) -> (Params, BTreeMap<String, ParamSpec>) {
+        let mut params = Params::new();
+        let mut specs = BTreeMap::new();
+        if let Some(token) = &self.push_token {
+            params.insert("token".into(), Value::String(token.clone()));
+            if let Ok(spec) = serde_json::from_value(serde_json::json!({"type": "string"})) {
+                specs.insert("token".into(), spec);
+            }
+        }
+        (params, specs)
+    }
+
+    /// The token request answered: the websocket opens with the token, or
+    /// the request is made again after the push websocket's backoff.
+    fn push_token_answered(&mut self, cx: &mut Cx, result: Result<HttpResponse, String>) {
+        cx.cancel_timer(REPLY);
+        let Some(flight) = self.current.take() else {
+            return;
+        };
+        if flight.route == Route::Main {
+            cx.round_trip(cx.now().saturating_sub(flight.sent_at));
+            self.pacer.answered(cx.now());
+        }
+        let refused = match (&self.transport, &result) {
+            (
+                Transport::Http {
+                    auth,
+                    refusal,
+                    refusal_body,
+                    ..
+                },
+                Ok(response),
+            ) => {
+                *auth != HttpAuth::None
+                    && flight.route == Route::Main
+                    && refused_by_status(refusal, refusal_body, response.status, &response.body)
+            }
+            _ => false,
+        };
+        let token = match &result {
+            Ok(r) if (200..300).contains(&r.status) => self
+                .push
+                .as_ref()
+                .and_then(|p| p.token.as_ref())
+                .and_then(|t| t.read(&r.body)),
+            _ => None,
+        };
+        match (token, result) {
+            _ if refused => {
+                self.refuse(
+                    cx,
+                    "the device refused the credential asking for the websocket's token".into(),
+                );
+                return;
+            }
+            (Some(token), _) => {
+                if flight.route == Route::Main {
+                    self.heard(cx);
+                }
+                self.push_token = Some(token);
+                self.open_push_now(cx);
+            }
+            // Never the body: it may hold a token.
+            (None, Ok(r)) => {
+                cx.log(
+                    Level::Warning,
+                    format!(
+                        "no websocket token in the answer (HTTP {}); asking again",
+                        r.status
+                    ),
+                );
+                self.push_retry(cx);
+            }
+            (None, Err(_)) => {
+                cx.log(
+                    Level::Warning,
+                    "the websocket token was not answered; asking again",
+                );
+                self.push_retry(cx);
+            }
+        }
+        self.pump(cx);
+    }
+
+    /// Open the push websocket again after its backoff.
+    fn push_retry(&mut self, cx: &mut Cx) {
+        cx.set_timer(PUSH_RECONNECT, self.push_backoff);
+        self.push_backoff = (self.push_backoff * 2).min(RECONNECT_MAX);
+    }
+
+    fn open_push_now(&mut self, cx: &mut Cx) {
         let Some(push) = &self.push else {
             return;
         };
@@ -3962,13 +4229,9 @@ impl SpecEngine {
         if let Some(template) = &push.url {
             // Rendered from the settings now, so a refreshed token is used;
             // each value percent-encoded, as in a query.
-            let (no_params, no_specs) = (Params::new(), BTreeMap::new());
-            let rendered = render(
-                template,
-                &self.values(&no_params, &no_specs),
-                percent_encode,
-            )
-            .and_then(|url| check_push_url(&url).map(|()| url));
+            let (token, token_specs) = self.token_params();
+            let rendered = render(template, &self.values(&token, &token_specs), percent_encode)
+                .and_then(|url| check_push_url(&url).map(|()| url));
             match rendered {
                 Ok(url) => request.url = url,
                 Err(e) => {
@@ -4151,9 +4414,9 @@ impl SpecEngine {
         if let Some(every) = self.push.as_ref().and_then(|p| p.every) {
             cx.set_timer(PUSH_RENEW, every);
         }
-        let empty = Params::new();
-        let empty_specs = BTreeMap::new();
-        let values = self.values(&empty, &empty_specs);
+        // `{token}`: the token the websocket was opened with, if any.
+        let (token, token_specs) = self.token_params();
+        let values = self.values(&token, &token_specs);
         for item in items {
             match item.as_str().map(|t| render(t, &values, no_escape)) {
                 Some(Ok(text)) => cx.ws_send(PUSH, format!("{prefix}{text}")),
@@ -4552,6 +4815,14 @@ impl Module for SpecEngine {
             self.current.as_ref().and_then(|f| f.awaiting.as_ref()),
             Some(Await::Http(r)) if *r == id
         );
+        // The token's answer: never offered to the rules.
+        if ours && self.current.as_ref().is_some_and(|f| f.job.push_token) {
+            self.request_paths.remove(&id);
+            if self.refused.is_none() {
+                self.push_token_answered(cx, result);
+            }
+            return;
+        }
         // The login's answer holds the session: never offered to the rules.
         if ours && self.current.as_ref().is_some_and(|f| f.job.login) {
             self.request_paths.remove(&id);
@@ -4686,6 +4957,14 @@ impl Module for SpecEngine {
                     return;
                 };
                 self.pacer.answered(cx.now());
+                // The token not answered: asked for again after a while.
+                if flight.job.push_token {
+                    cx.log(
+                        Level::Warning,
+                        "the websocket token was not answered; asking again",
+                    );
+                    self.push_retry(cx);
+                }
                 match flight.id {
                     Some(id) => cx.complete(id, Err(CommandError::Timeout)),
                     None => {
@@ -4854,6 +5133,7 @@ impl Module for SpecEngine {
             push.request = new.request;
             push.credentialed = new.credentialed;
             push.send = new.send;
+            push.token = new.token;
         }
         // A refresh in flight was for the old tokens: its answer is ignored.
         self.oauth = fresh.oauth;
@@ -4946,6 +5226,8 @@ fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 
 #[cfg(test)]
 mod pacing_tests;
+#[cfg(test)]
+mod stream_tests;
 #[cfg(test)]
 mod vectors;
 

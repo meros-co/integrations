@@ -468,13 +468,26 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
 
     transport = doc.get("transport") or {}
     websocket = (doc.get("telemetry") or {}).get("websocket")
+    # A list gives one websocket per model (SPEC.md §8): each entry is checked.
+    websockets = ([w for w in websocket if isinstance(w, dict)] if isinstance(websocket, list)
+                  else [websocket] if isinstance(websocket, dict) else [])
+    if isinstance(websocket, list):
+        model_ids = {m.get("id") for m in doc.get("models") or []}
+        named: set = set()
+        for i, w in enumerate(websockets):
+            for m in w.get("models") or []:
+                if m not in model_ids:
+                    errors.append(f"telemetry.websocket[{i}].models: no model '{m}'")
+                elif m in named:
+                    errors.append(f"telemetry.websocket[{i}].models: model '{m}' has an earlier entry")
+                named.add(m)
     schemes = [("transport", transport.get("scheme"),
                 {"ws", "wss"} if transport_type == "ws"
                 else {"tcp", "tls"} if transport_type == "line-tcp" else {"http", "https"})]
-    if websocket:
-        schemes.append(("telemetry.websocket", websocket.get("scheme"), {"ws", "wss"}))
-    for where_, block in (("telemetry.websocket", websocket or {}),
-                          ("telemetry.sse", (doc.get("telemetry") or {}).get("sse") or {})):
+    for w in websockets:
+        schemes.append(("telemetry.websocket", w.get("scheme"), {"ws", "wss"}))
+    for where_, block in [("telemetry.websocket", w) for w in websockets] + [
+                          ("telemetry.sse", (doc.get("telemetry") or {}).get("sse") or {})]:
         reply = block.get("as_reply")
         if reply is None:
             continue
@@ -501,14 +514,15 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
     for where_, obj, default in [
             ("transport", transport, "ws" if transport_type == "ws"
              else "tcp" if transport_type == "line-tcp" else "http"),
-            ("telemetry.websocket", websocket or {}, "ws")]:
+            *[("telemetry.websocket", w, "ws") for w in websockets]]:
         scheme = obj.get("scheme", default)
         if obj.get("accept_invalid_certs") is True and scheme in ("ws", "http", "tcp"):
             errors.append(f"{where_}.accept_invalid_certs needs a TLS scheme (wss, https, tls or a setting)")
-    if websocket:
+    for websocket in websockets:
         url = websocket.get("url")
         if url is not None:
-            errors += check_template("text", url, {}, settings, "telemetry.websocket.url")
+            errors += check_template("text", url, {"token": {"type": "string", "required": True}}
+                                     if websocket.get("token") else {}, settings, "telemetry.websocket.url")
             # The scheme and host are literal; only the path and query may
             # hold placeholders.
             m = re.match(r"^(wss?)://(\[[^\]]*\]|[^/?:{]+)", url)
@@ -524,9 +538,28 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                 errors.append(f"telemetry.websocket.port names unknown setting '{port.get('setting')}'")
             elif decl.get("type") != "int":
                 errors.append("telemetry.websocket.port's setting must be an int")
+        # `token` (SPEC.md §8): a request whose answer holds the token, read
+        # by a JSON path or a regex's first group; `{token}` then names it.
+        token = websocket.get("token")
+        token_param = {}
+        if token is not None:
+            token_param = {"token": {"type": "string", "required": True}}
+            if not isinstance(token.get("request"), dict):
+                errors.append("telemetry.websocket.token needs a request")
+            else:
+                for context, text in template_strings([token["request"]]):
+                    errors += check_template(context, text, {}, settings, "telemetry.websocket.token.request")
+            if ("json_path" in token) == ("match" in token):
+                errors.append("telemetry.websocket.token takes json_path or match")
+            if "match" in token:
+                try:
+                    if re.compile(token["match"]).groups < 1:
+                        errors.append("telemetry.websocket.token.match needs a group holding the token")
+                except re.error as e:
+                    errors.append(f"telemetry.websocket.token.match: {e}")
         for i, text in enumerate(websocket.get("send", []) if isinstance(websocket.get("send"), list)
                                  else [websocket.get("send")] if websocket.get("send") else []):
-            errors += check_template("text", text, {}, settings, f"telemetry.websocket.send[{i}]")
+            errors += check_template("text", text, token_param, settings, f"telemetry.websocket.send[{i}]")
     auth = transport.get("auth")
     methods = set() if isinstance(auth, dict) else {auth}
     if isinstance(auth, dict):
@@ -624,9 +657,10 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         errors += check_template("text", text, {}, settings, f"transport.headers.{name}")
     if ("header" in methods) != bool(transport.get("auth_header")):
         errors.append("auth: header and auth_header go together")
-    sio = (websocket or {}).get("socketio")
-    if isinstance(sio, dict) and sio.get("auth"):
-        errors += check_template("text", sio["auth"], {}, settings, "telemetry.websocket.socketio.auth")
+    for w in websockets:
+        sio = w.get("socketio")
+        if isinstance(sio, dict) and sio.get("auth"):
+            errors += check_template("text", sio["auth"], {}, settings, "telemetry.websocket.socketio.auth")
     for method in sorted(methods & {"basic", "digest"}):
         if not {"username", "password"} <= settings.keys():
             errors.append(f"auth: {method} needs 'username' and 'password' settings")
@@ -930,8 +964,9 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                 re.compile(asked)
             except re.error as e:
                 errors.append(f"{where}.request_match: {e}")
-            if "match" not in rule or transport_type not in ("line-tcp", "line-serial", "line-udp"):
-                errors.append(f"{where}: a request_match regex goes with match, on a line transport")
+            # On a websocket, the message a reply answers (SPEC.md §2, ws).
+            if "match" not in rule or transport_type not in ("line-tcp", "line-serial", "line-udp", "ws"):
+                errors.append(f"{where}: a request_match regex goes with match, on a line or websocket transport")
         if "match_each" in rule and ("match" not in rule or "path" in rule) and "address" not in rule:
             errors.append(f"{where}: match_each reads the rest of a message a match rule matched, "
                           "or a capture of an address rule")
@@ -1232,6 +1267,51 @@ def pacing_checks(doc: dict) -> list[str]:
     return errors
 
 
+def acknowledge_checks(doc: dict) -> list[str]:
+    """`transport.acknowledge` (SPEC.md §2, Acknowledgements): on a line or
+    websocket transport, each entry selects with match or json_match, its
+    regexes compile as RE2, and its answer names only its captures and the
+    settings."""
+    t = doc.get("transport") or {}
+    block = t.get("acknowledge")
+    if block is None:
+        return []
+    errors: list[str] = []
+    if t.get("type") not in ("line-tcp", "line-serial", "line-udp", "ws"):
+        errors.append("transport.acknowledge needs a line-tcp, line-serial, line-udp or ws transport")
+    settings = doc.get("settings") or {}
+    entries = block if isinstance(block, list) else [block]
+    for i, entry in enumerate(entries):
+        at = f"transport.acknowledge[{i}]"
+        if ("match" in entry) == ("json_match" in entry):
+            errors.append(f"{at}: give match or json_match, not both")
+        groups = 0
+        patterns = [("match", entry["match"])] if "match" in entry else []
+        patterns += [(f"json_match {k}", v) for k, v in (entry.get("json_match") or {}).items()]
+        patterns += [("answers", entry["answers"])] if "answers" in entry else []
+        for what, pattern in patterns:
+            try:
+                compiled = re.compile(pattern)
+            except (re.error, TypeError) as e:
+                errors.append(f"{at}.{what}: {e}")
+                continue
+            if re.search(r"\(\?<?[=!]|\\[1-9]", pattern):
+                errors.append(f"{at}.{what}: lookaround and backreferences are not RE2")
+            if what != "answers":
+                groups += compiled.groups
+        for k in (entry.get("json_match") or {}):
+            if not k.startswith("$"):
+                errors.append(f"{at}.json_match: '{k}' is not a JSON path")
+        names = set(entry.get("json") or {})
+        for m in PLACEHOLDER.finditer(entry.get("send") or ""):
+            name = m.group(1)
+            if name.startswith("settings."):
+                errors += check_template("text", m.group(0), {}, settings, f"{at}.send")
+            elif not ((name.isdigit() and 1 <= int(name) <= groups) or name in names):
+                errors.append(f"{at}.send: '{{{name}}}' is not one of the entry's captures")
+    return errors
+
+
 def expand_serial(doc: dict) -> list[str]:
     """A line-tcp transport's `serial` block stands for the `link` setting and
     the six serial settings (SPEC.md §2, "The same protocol on a serial
@@ -1408,7 +1488,7 @@ def main() -> int:
 
         errors = expand_serial(doc)
         errors += cross_field_checks(doc, rel) + port_checks(doc) + serial_checks(doc) + midi_checks(doc) + label_checks(doc)
-        errors += pacing_checks(doc)
+        errors += pacing_checks(doc) + acknowledge_checks(doc)
 
         # Spec ids are the consumer-facing contract; they must be unique.
         spec_id = doc["id"]

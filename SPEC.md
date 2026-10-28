@@ -989,7 +989,14 @@ Every message, reply or not, is also offered to the telemetry rules (§8).
 device pushes and what it sends back goes to the rules. While a step with
 `await_reply` (a login) still waits for its answer, they queue behind it
 instead, each taking the next message as its reply, since such a device
-accepts nothing before the login is answered (DHD's Control API). Pings are answered by
+accepts nothing before the login is answered (DHD's Control API). A device
+whose replies `reply_match` tells from what it pushes has its telemetry
+messages queued instead, as on `line-tcp`: each poll, subscription and
+`then_send` message is sent in turn and takes the next message matching
+`reply_match` as its reply, so a rule can tie a reply to the message it
+answers with `request_match` (§8, "Replies and what they answer"). QLC+
+answers `QLC+API|getFunctionStatus|<id>` with `QLC+API|getFunctionStatus|Running`,
+naming no function, while it pushes `GM_VALUE|...` at any time. Pings are answered by
 the core. `wss` uses TLS 1.2 or later and checks the device's certificate
 against the same public roots as `https`; a device with a self-signed
 certificate declares `accept_invalid_certs: true`, as for `http`: the
@@ -1164,6 +1171,61 @@ keeps the connection rather than state; it is paced like any message. The
 timer starts when the connection is ready and stops when it is lost or the
 credential refused. A device that answers its keep-alive should rather have
 a `probe`, which checks the answer.
+
+### Acknowledgements
+
+Some devices want the host to answer what they send by themselves. A Denon
+Professional or TASCAM Blu-ray player notifies each change of its status and
+waits 30 ms for the host's ACK, sending the status once more without it; a
+RED camera keeps an RCP2 connection only while the client echoes its
+`rcp_session` messages back. `acknowledge` on a `line-tcp`, `line-serial`,
+`line-udp` or `ws` transport lists what such messages look like and the
+answer to each:
+
+```yaml
+transport:
+  type: line-tcp
+  port: 9030
+  framing: terminated
+  terminator: cr
+  acknowledge:
+    match: "^@0"                  # a status, from "@0" to CR
+    send: "\u0006"                # the ACK byte
+    framed: false                 # alone: no CR after it
+    answers: '^@0\?'              # a status request is answered with a status
+```
+
+Each entry selects messages with `match`, a regex over the message's text
+(its captures `{1}`, `{2}`, ...), or on a websocket or a JSON line
+protocol with `json_match` and `json`, as a telemetry rule does (§8, JSON
+messages). `send` is a template over those captures and the settings, framed
+as any message is unless `framed: false` sends it exactly as rendered. A
+`json` name stands for its value as JSON text, a string with its quotes, so
+an echo sends back exactly what the device sent, whatever its type. A
+list of entries answers each message with the first entry it matches. A RED
+camera's session:
+
+```yaml
+  acknowledge:
+    - json_match: { "$.type": "^rcp_session$", "$.status": "^open$" }
+      json: { data: "$.data" }
+      send: '{"type":"rcp_session","data":{data}}'
+```
+
+Every message an entry matches is answered at once, whether or not it is
+also taken as a command's reply and whether or not the device is monitored:
+the answer keeps the connection, or stops the device repeating itself, and
+is no request for state. It awaits no reply and is not paced, since the
+device waits for it. A device that sends the same message as the answer to
+a request (the Denon player answers `@0?ST` with ACK and then `@0STPL`,
+which it also notifies when the status changes) names those requests with
+`answers`, a regex over the text of each message sent: after each one sent,
+the next message an entry matches is its answer and is not acknowledged,
+unless it has not come within the transport's `timeout_ms`, or an error
+answer (`error_match`) came instead. The messages still go to the
+telemetry rules as any message does. `tools/validate.py` checks the
+regexes and the templates' placeholders; the engine's own tests play the
+exchange.
 
 ### Settings and connection setup
 
@@ -2244,6 +2306,21 @@ alike, and never a message the device pushes. Rules without
 `request_match` see replies as before. A telemetry vector for such a rule
 gives `request`, the text of the message the `inbound` reply answers.
 
+The same holds on a `ws` transport, for a text message and the reply taken
+for it, in order or by `reply_json` (§2, `ws`); with `reply_match` there,
+telemetry messages are queued so that each has its reply. QLC+'s statuses
+are read for each function its list names:
+
+```yaml
+    - match: "^QLC\\+API\\|getFunctionsList\\|"
+      match_each: '(\d+)\|([^|]*)(?:\||$)'
+      state: { "functions.{1}.name": "{2}" }
+      then_send: ["QLC+API|getFunctionStatus|{1}"]
+    - match: "^QLC\\+API\\|getFunctionStatus\\|(.*?)\\s*$"
+      request_match: '^QLC\+API\|getFunctionStatus\|(\d+)$'
+      state: { "functions.{2}.status": "{1}" }
+```
+
 With `then_send` (below, "Re-reads on a push"), a reply can have more read: the NLB's VDN table
 names each amplifier, and each name has that amplifier's status, power and
 mutes read in turn.
@@ -2440,6 +2517,40 @@ and never logged, since it may hold a token. The transport's credential and
 `headers` do not go to the other host. When the URL names a setting, a 401
 or 403 answer to its opening is a refusal of that token: refreshed once if it
 can be, as on the transport, and otherwise the terminal refusal of §2.
+
+A device that opens its websocket only to a token it hands out first gives
+the request for it as `token`. CamStreamer's apps answer
+`ws_authorization.cgi` with a token valid for 30 seconds or until the first
+connection, and take it as the websocket's first message:
+
+```yaml
+telemetry:
+  websocket:
+    path: /local/camstreamer/events
+    subprotocol: events
+    token:
+      request: { method: GET, path: /local/camstreamer/api/ws_authorization.cgi }
+      match: '"data"\s*:\s*"([^"]+)"'    # or json_path: "$.data"
+    send: ['{"authorization":{token:json}}']
+```
+
+Before each opening and reopening, the core sends `request`, a request like a
+poll item's (on the transport, with its credential and session, or on an
+`endpoint`), in the command queue, and reads the token from its answer: the
+string or number at `json_path`, or the first group of `match`, a regex over
+the body (for an answer that is not quite JSON). The websocket then opens,
+and `{token}`, a string, names the token in `send` and in `url`. An answer
+without a token, or no answer, is tried again after the websocket's backoff
+(1 s doubling to 30 s); a refusal of the credential is the terminal refusal
+of §2. The token is a secret: its answer is never offered to the telemetry
+rules, and it is never logged or kept in state. Nothing is asked for while
+the device is open for commands only, since the websocket is not opened.
+
+A family whose models push on different websockets (each of CamStreamer's
+apps on its own path, with its own token) gives `websocket` as a list, each
+entry naming its `models`; the first entry for the device's model is used,
+and a model no entry names opens none. `tools/validate.py` checks that each
+model is named once.
 
 `idle_ms` reopens the websocket when nothing at all has arrived on it for
 that long, for a service that sends keepalives, where silence means a dead
