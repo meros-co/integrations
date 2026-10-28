@@ -520,7 +520,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 |---|---|---|
 | ProPresenter 6 and early 7 (legacy remote) | WebSocket JSON | Community |
 | Microsoft PowerPoint without the OSCPoint add-in (`oscpoint`) | Local automation through a helper | Closed |
-| Apple Keynote | AppleScript through a helper on the Mac (the core has no local-automation transport yet) | Public |
+| Apple Keynote | No network control API (local AppleScript only) | Closed |
 | MediaShout | TCP / HTTP | Unknown |
 
 ### Media servers
