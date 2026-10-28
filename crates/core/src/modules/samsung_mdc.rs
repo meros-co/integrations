@@ -624,6 +624,7 @@ impl SamsungMdc {
                     // public root; the library this follows checks none.
                     accept_invalid_certs: true,
                     preamble: Some(GREETING.to_vec()),
+                    alpn: Vec::new(),
                 },
             ),
             (link, _) => link.open(cx, SOCKET),

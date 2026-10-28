@@ -33,6 +33,18 @@ pub(crate) fn client_config(accept_invalid_certs: bool) -> Arc<ClientConfig> {
         .clone()
 }
 
+/// The client configuration offering these application protocols (ALPN),
+/// the shared one when there are none.
+pub(crate) fn client_config_alpn(accept_invalid_certs: bool, alpn: &[String]) -> Arc<ClientConfig> {
+    let shared = client_config(accept_invalid_certs);
+    if alpn.is_empty() {
+        return shared;
+    }
+    let mut config = (*shared).clone();
+    config.alpn_protocols = alpn.iter().map(|p| p.as_bytes().to_vec()).collect();
+    Arc::new(config)
+}
+
 fn build(accept_invalid_certs: bool) -> ClientConfig {
     let provider = provider();
     let builder = ClientConfig::builder_with_provider(provider.clone())

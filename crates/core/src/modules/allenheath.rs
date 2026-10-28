@@ -611,6 +611,7 @@ impl AllenHeath {
                     server_name: self.device.ip().to_string(),
                     accept_invalid_certs: true,
                     preamble: None,
+                    alpn: Vec::new(),
                 },
             );
         } else {
@@ -1110,6 +1111,7 @@ mod tests {
                 server_name: "10.0.0.20".into(),
                 accept_invalid_certs: true,
                 preamble: None,
+                alpn: Vec::new(),
             },
         }));
         let mut cx = Cx::new(10);

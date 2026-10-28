@@ -3583,6 +3583,7 @@ impl SpecEngine {
                             server_name: server_name.clone(),
                             accept_invalid_certs: *accept_invalid_certs,
                             preamble: None,
+                            alpn: Vec::new(),
                         },
                     ),
                     (None, None) => cx.tcp_open(SOCKET, to),
@@ -7301,6 +7302,7 @@ mod tests {
                 server_name: "10.0.0.5".into(),
                 accept_invalid_certs: true,
                 preamble: None,
+                alpn: Vec::new(),
             },
         }));
         assert!(
@@ -7311,6 +7313,7 @@ mod tests {
                     server_name: "pj.example".into(),
                     accept_invalid_certs: true,
                     preamble: None,
+                    alpn: Vec::new(),
                 },
             })
         );
