@@ -49,7 +49,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-anomes", &["millumin"]),
     ("vendor-arkaos", &["arkaos-mediamaster"]),
     ("vendor-artisticlicence", &["artnet"]),
-    ("vendor-atlona", &["atlona-matrix", "atlona-ms52w", "atlona-sw510w-rest"]),
+    (
+        "vendor-atlona",
+        &["atlona-matrix", "atlona-ms52w", "atlona-sw510w-rest"],
+    ),
     ("vendor-avstumpfl", &["avstumpfl-pixera"]),
     ("vendor-avolites", &["avolites-titan"]),
     ("vendor-avproedge", &["avproedge-matrix"]),
