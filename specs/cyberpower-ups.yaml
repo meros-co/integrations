@@ -1,0 +1,715 @@
+spec: 1
+id: cyberpower-ups
+name: CyberPower UPS (SNMP)
+vendor: CyberPower
+category: other
+implementation: native
+reason: >
+  SNMP: BER-encoded requests over UDP, matched to their responses, retransmitted, walked with GETBULK, and on v3
+  authenticated and encrypted with keys derived from passwords (see generic-snmp). The UPS's battery, input,
+  output, outlets and sensors are objects and table rows the agent lists only when walked, and its traps arrive
+  on a port of the core's. The integration is the SNMP manager with CPS-MIB's UPS objects named.
+
+source:
+  - title: "CyberPower MIB v2.13 (CyberPower_MIB_v2.13.MIB, CPS-MIB, created 12/03/2025)"
+    author: CyberPower Systems
+    url: "https://www.cyberpowersystems.com/products/software/mib-files/"
+    note: >
+      The ups group (enterprises 3808.1.1.1: identification, battery, input, output, configuration, control, test,
+      outlets, phases and system), the environmentSensor and environmentSensor2 groups (3808.1.1.4 and .8), every
+      object's OID, syntax, access and enumeration, and the TRAP-TYPEs of the cps enterprise. Facts only (names,
+      numbers, enumerations) are used; the MIB's text is not reproduced.
+  - title: "CyberPower RMCARD302 Remote Management Card user's manual"
+    author: CyberPower Systems
+    url: "https://dl4jz3rbrsfum.cloudfront.net/documents/CyberPower_UM_RMCARD302.pdf"
+    note: "The card's SNMP agent (v1, v2c, v3 with MD5/SHA and DES/AES), its trap receivers, and the MIB offered for download."
+  - title: "RFC 3416, RFC 3418 and the SNMP RFCs generic-snmp cites"
+    author: IETF
+    url: "https://www.rfc-editor.org/rfc/rfc3416"
+    note: "The protocol (GETBULK walks, SET, traps); the system group (sysDescr, sysUpTime...)."
+
+models:
+  - id: ups
+    name: "CyberPower UPS with a Remote Management Card (RMCARD205, RMCARD305, RMCARD302 and later) or a built-in network port"
+    supports: [get, walk, set, refresh, set_advance_config_alarm, set_advance_config_alarm_timer, set_advance_config_auto_restore, set_advance_config_battery_runtime_threshold, set_advance_config_cold_start, set_advance_config_deep_discharge_protection, set_advance_config_energy_reset, set_advance_config_high_transfer_volt, set_advance_config_low_battery_run_time, set_advance_config_low_battery_threshold, set_advance_config_low_transfer_volt, set_advance_config_min_return_capacity, set_advance_config_output_voltage, set_advance_config_recharged_capacity, set_advance_config_return_delay, set_advance_config_sensitivity, set_advance_config_set_eeprom_defaults, set_advance_config_shutoff_delay, set_advance_config_sleep_after_all_client_shut, set_advance_config_sleep_delay, set_advance_control_flash_and_beep, set_advance_control_reboot_ups, set_advance_control_simulate_power_fail, set_advance_control_sleep_after_delay, set_advance_control_turn_on_ups, set_advance_control_ups_off, set_advance_control_ups_sleep, set_advance_test_diagnostic_schedule, set_advance_test_diagnostics, set_advance_test_indicators, set_advance_test_runtime_estimation, set_bank_outlet_control_control_outlet_command, set_base_battery_last_replace_date, set_base_config_device_accept_this_device, set_base_config_device_device_name, set_base_config_device_va_rating, set_base_control_conserve_battery, set_base_ident_name, set_environment2_contact_name, set_environment2_contact_normal_state, set_environment2_humid_high_threshold, set_environment2_humid_hysteresis, set_environment2_humid_low_threshold, set_environment2_humid_rate_of_change, set_environment2_ident_location, set_environment2_ident_name, set_environment2_temp_high_threshold, set_environment2_temp_hysteresis, set_environment2_temp_low_threshold, set_environment2_temp_rate_of_change, set_environment2_temp_unit, set_environment_contact_name, set_environment_contact_normal_state, set_environment_humid_high_threshold, set_environment_humid_hysteresis, set_environment_humid_low_threshold, set_environment_humid_rate_of_change, set_environment_ident_location, set_environment_ident_name, set_environment_temp_celsius_high_threshold, set_environment_temp_celsius_hysteresis, set_environment_temp_celsius_low_threshold, set_environment_temp_celsius_rate_of_change, set_environment_temp_high_threshold, set_environment_temp_hysteresis, set_environment_temp_low_threshold, set_environment_temp_rate_of_change, set_individual_outlet_config_name, set_individual_outlet_config_power_off_time, set_individual_outlet_config_power_on_time, set_individual_outlet_config_reboot_duration, set_individual_outlet_control_command]
+    verification: none
+    notes: >
+      Walks CPS-MIB's ups group and the EnviroSensor groups; a UPS fills the parts its model has (outlet banks on
+      models with switched outlets, phase tables on three-phase models).
+
+settings:
+  version: { type: enum, values: [v1, v2c, v3], default: v2c, label: SNMP version,
+             description: "The SNMP version the agent is asked with: v1 and v2c use a community string, v3 a user with authentication and privacy." }
+  community: { type: string, secret: true, max_length: 255, default: public, label: Community,
+               description: "v1 and v2c: the community string for reads, and for SETs when no write community is set." }
+  write_community: { type: string, secret: true, max_length: 255, default: "", label: Write community,
+                     description: "v1 and v2c: the community string SETs are sent with, often private; empty uses the community." }
+  user: { type: string, max_length: 32, default: "", label: User,
+          description: "v3: the user name (securityName) the agent knows." }
+  security_level: { type: enum, values: [no_auth_no_priv, auth_no_priv, auth_priv], default: auth_priv, label: Security level,
+                    description: "v3: no_auth_no_priv sends messages unauthenticated, auth_no_priv authenticates them, auth_priv also encrypts them." }
+  auth_protocol: { type: enum, values: [md5, sha, sha224, sha256, sha384, sha512], default: sha, label: Authentication protocol,
+                   description: "v3: HMAC-MD5-96, HMAC-SHA-96 (sha) or HMAC-SHA-2 (RFC 7860), as the user is set up on the agent." }
+  auth_password: { type: string, secret: true, max_length: 256, default: "", label: Authentication password,
+                   description: "v3: the user's authentication password, at least 8 characters." }
+  priv_protocol: { type: enum, values: [des, aes, aes192, aes256], default: aes, label: Privacy protocol,
+                   description: "v3 at auth_priv: CBC-DES, AES-128 (aes, RFC 3826), or AES-192 or AES-256 as draft-blumenthal-aes-usm-04 defines them." }
+  priv_password: { type: string, secret: true, max_length: 256, default: "", label: Privacy password,
+                   description: "v3 at auth_priv: the user's privacy password, at least 8 characters." }
+  context_name: { type: string, max_length: 32, default: "", label: Context name,
+                  description: "v3: the context requests are made in, empty for the agent's default context." }
+  context_engine_id: { type: string, pattern: '^[0-9A-Fa-fxX :.-]*$', max_length: 100, default: "", label: Context engine ID,
+                       description: "v3: the contextEngineID in hex, for an agent proxying another engine; empty uses the agent's own snmpEngineID." }
+  timeout_ms: { type: int, min: 1, max: 60000, default: 1500, label: Timeout,
+                description: "Milliseconds to wait for each response before sending the request again." }
+  retries: { type: int, min: 0, max: 10, default: 2, label: Retries,
+             description: "How many times an unanswered request is sent again before it fails with timeout." }
+  max_repetitions: { type: int, min: 1, max: 1000, default: 20, label: GETBULK repetitions,
+                     description: "Objects asked for per GETBULK request while walking." }
+  poll_interval_ms: { type: int, min: 100, max: 86400000, default: 10000, label: Poll interval,
+                      description: "Milliseconds between walks of the device's objects, and reads of sysUpTime.0, the liveness check." }
+  trap_port: { type: int, min: 1, max: 65535, label: Notification port,
+               description: "The UDP port traps and informs are received on, 162 as standard; unset receives none." }
+  trap_bind_address: { type: string, pattern: '^[0-9A-Fa-f.:]*$', max_length: 45, default: "", label: Notification bind address,
+                       description: "The local address to receive notifications on with a port of this device's own; empty shares the port with every SNMP device of the core, each hearing its own agent." }
+  trap_community: { type: string, secret: true, max_length: 255, default: "", label: Notification community,
+                    description: "v1 and v2c notifications: accept only this community; empty accepts any." }
+  local_engine_id: { type: string, pattern: '^[0-9A-Fa-fxX :.-]*$', max_length: 100, default: "", label: Local engine ID,
+                     description: "v3 informs: this receiver's snmpEngineID in hex, 5 to 32 bytes, as configured on the agent; empty uses a random one for each opening." }
+
+ports:
+  - { port: 161, protocol: udp, role: control, note: "the agent; requests go from an ephemeral port of the core's" }
+  - { port: null, protocol: udp, role: notification, listener: core, setting: trap_port, note: "traps and informs, when trap_port is set (162 as standard)" }
+
+commands:
+  get:
+    summary: >
+      GET objects by OID and return {varbinds: [{oid, type, value, hex}]}, for objects the named commands and state
+      do not cover; an object state holds is updated from the answer too
+    params:
+      oids: { type: string, pattern: '^[0-9., ;]+$', max_length: 65536, required: true, label: OIDs,
+              description: "One or more OIDs in dotted decimal, separated by commas or spaces, such as 1.3.6.1.2.1.1.3.0." }
+    returns: value
+  walk:
+    summary: Every object under an OID, in order, as {varbinds}
+    params:
+      oid: { type: string, pattern: '^\.?[0-9]+(\.[0-9]+)+$', max_length: 1024, required: true, label: OID,
+             description: "The subtree's root in dotted decimal." }
+      limit: { type: int, min: 1, max: 100000000, label: Object limit,
+               description: "Stop after this many objects; unset walks the whole subtree." }
+    returns: value
+  set:
+    summary: >
+      SET one object by OID to a typed value and return the agent's response as {varbinds}; fails with the agent's
+      error-status (notWritable, wrongValue...) as the code
+    params:
+      oid: { type: string, pattern: '^\.?[0-9]+(\.[0-9]+)+$', max_length: 1024, required: true, label: OID,
+             description: "The object instance to set, in dotted decimal." }
+      type: { type: enum, values: [integer, string, hex, oid, ip_address, counter32, gauge32, timeticks, counter64, opaque], required: true, label: Type,
+              description: "The value's SNMP type: string is UTF-8 text and hex is bytes for an OCTET STRING; gauge32 is also Unsigned32." }
+      value: { type: string, max_length: 65536, required: true, label: Value,
+               description: "The value as text: a decimal number, text, hex bytes, a dotted OID or an IPv4 address, as the type asks." }
+    returns: value
+  refresh:
+    summary: Read the system group and walk every object now; answered when they have been read
+    returns: ack
+  set_base_ident_name:
+    summary: "Set upsBaseIdentName, then read its group back"
+    params:
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new base ident name. }
+    returns: ack
+  set_base_battery_last_replace_date:
+    summary: "Set upsBaseBatteryLastReplaceDate, then read its group back"
+    params:
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new base battery last replace date. }
+    returns: ack
+  set_base_config_device_device_name:
+    summary: "Set deviceName of one upsBaseConfigDeviceEntry row, then read its table back"
+    params:
+      device_index: { type: int, min: 1, max: 255, required: true, label: Device index, description: "The row of upsBaseConfigDeviceEntry to write, by its deviceIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new device name. }
+    returns: ack
+  set_base_config_device_va_rating:
+    summary: "Set vaRating of one upsBaseConfigDeviceEntry row, then read its table back"
+    params:
+      device_index: { type: int, min: 1, max: 255, required: true, label: Device index, description: "The row of upsBaseConfigDeviceEntry to write, by its deviceIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new va rating, as the MIB counts it." }
+    returns: ack
+  set_base_config_device_accept_this_device:
+    summary: "Set acceptThisDevice of one upsBaseConfigDeviceEntry row, then read its table back"
+    params:
+      device_index: { type: int, min: 1, max: 255, required: true, label: Device index, description: "The row of upsBaseConfigDeviceEntry to write, by its deviceIndex." }
+      value: { type: enum, values: ["yes", "no"], required: true, label: Value, description: "The new accept this device, as CPS-MIB names its values." }
+    returns: ack
+  set_advance_config_output_voltage:
+    summary: "Set upsAdvanceConfigOutputVoltage, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new advance config output voltage, in V." }
+    returns: ack
+  set_advance_config_high_transfer_volt:
+    summary: "Set upsAdvanceConfigHighTransferVolt, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new advance config high transfer volt, in V." }
+    returns: ack
+  set_advance_config_low_transfer_volt:
+    summary: "Set upsAdvanceConfigLowTransferVolt, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new advance config low transfer volt, in V." }
+    returns: ack
+  set_advance_config_alarm:
+    summary: "Set upsAdvanceConfigAlarm, then read its group back"
+    params:
+      value: { type: enum, values: [timed, enable, disable, mute], required: true, label: Value, description: "The new advance config alarm, as CPS-MIB names its values." }
+    returns: ack
+  set_advance_config_alarm_timer:
+    summary: "Set upsAdvanceConfigAlarmTimer, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 4294967295, required: true, label: Value, description: "The new advance config alarm timer, in 1/100 s." }
+    returns: ack
+  set_advance_config_min_return_capacity:
+    summary: "Set upsAdvanceConfigMinReturnCapacity, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new advance config min return capacity, as the MIB counts it." }
+    returns: ack
+  set_advance_config_sensitivity:
+    summary: "Set upsAdvanceConfigSensitivity, then read its group back"
+    params:
+      value: { type: enum, values: [auto, low, medium, high], required: true, label: Value, description: "The new advance config sensitivity, as CPS-MIB names its values." }
+    returns: ack
+  set_advance_config_low_battery_run_time:
+    summary: "Set upsAdvanceConfigLowBatteryRunTime, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 4294967295, required: true, label: Value, description: "The new advance config low battery run time, in 1/100 s." }
+    returns: ack
+  set_advance_config_return_delay:
+    summary: "Set upsAdvanceConfigReturnDelay, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 4294967295, required: true, label: Value, description: "The new advance config return delay, in 1/100 s." }
+    returns: ack
+  set_advance_config_shutoff_delay:
+    summary: "Set upsAdvanceConfigShutoffDelay, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 4294967295, required: true, label: Value, description: "The new advance config shutoff delay, in 1/100 s." }
+    returns: ack
+  set_advance_config_sleep_delay:
+    summary: "Set upsAdvanceConfigSleepDelay, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 4294967295, required: true, label: Value, description: "The new advance config sleep delay, in 1/100 s." }
+    returns: ack
+  set_advance_config_set_eeprom_defaults:
+    summary: "Set upsAdvanceConfigSetEEPROMDefaults, then read its group back"
+    params:
+      value: { type: enum, values: [no_set_eeprom_defaults, set_eeprom_defaults], required: true, label: Value, description: "The new advance config set eeprom defaults, as CPS-MIB names its values." }
+    returns: ack
+  set_advance_config_auto_restore:
+    summary: "Set upsAdvanceConfigAutoRestore, then read its group back"
+    params:
+      value: { type: enum, values: [disable, enable], required: true, label: Value, description: "The new advance config auto restore, as CPS-MIB names its values." }
+    returns: ack
+  set_advance_config_recharged_capacity:
+    summary: "Set upsAdvanceConfigRechargedCapacity, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new advance config recharged capacity, as the MIB counts it." }
+    returns: ack
+  set_advance_config_cold_start:
+    summary: "Set upsAdvanceConfigColdStart, then read its group back"
+    params:
+      value: { type: enum, values: [disable, enable], required: true, label: Value, description: "The new advance config cold start, as CPS-MIB names its values." }
+    returns: ack
+  set_advance_config_deep_discharge_protection:
+    summary: "Set upsAdvanceConfigDeepDischargeProtection, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new advance config deep discharge protection, as the MIB counts it." }
+    returns: ack
+  set_advance_config_sleep_after_all_client_shut:
+    summary: "Set upsAdvanceConfigSleepAfterAllClientShut, then read its group back"
+    params:
+      value: { type: enum, values: [disable, enable], required: true, label: Value, description: "The new advance config sleep after all client shut, as CPS-MIB names its values." }
+    returns: ack
+  set_advance_config_low_battery_threshold:
+    summary: "Set upsAdvanceConfigLowBatteryThreshold, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new advance config low battery threshold, as the MIB counts it." }
+    returns: ack
+  set_advance_config_energy_reset:
+    summary: "Set upsAdvanceConfigEnergyReset, then read its group back"
+    params:
+      value: { type: enum, values: [no_operation, reset], required: true, label: Value, description: "The new advance config energy reset, as CPS-MIB names its values." }
+    returns: ack
+  set_advance_config_battery_runtime_threshold:
+    summary: "Set upsAdvanceConfigBatteryRuntimeThreshold, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new advance config battery runtime threshold, in min." }
+    returns: ack
+  set_base_control_conserve_battery:
+    summary: "Set upsBaseControlConserveBattery, then read its group back"
+    params:
+      value: { type: enum, values: [no_turn_off_ups, turn_off_ups_to_conserve_battery], required: true, label: Value, description: "The new base control conserve battery, as CPS-MIB names its values." }
+    returns: ack
+  set_advance_control_ups_off:
+    summary: "Set upsAdvanceControlUpsOff, then read its group back"
+    params:
+      value: { type: enum, values: [no_turn_ups_off, turn_ups_off, turn_ups_off_gracefully], required: true, label: Value, description: "The new advance control ups off, as CPS-MIB names its values." }
+    returns: ack
+  set_advance_control_reboot_ups:
+    summary: "Set upsAdvanceControlRebootUps, then read its group back"
+    params:
+      value: { type: enum, values: [no_reboot_ups, reboot_ups], required: true, label: Value, description: "The new advance control reboot ups, as CPS-MIB names its values." }
+    returns: ack
+  set_advance_control_ups_sleep:
+    summary: "Set upsAdvanceControlUpsSleep, then read its group back"
+    params:
+      value: { type: enum, values: [no_put_ups_to_sleep, put_ups_to_sleep, put_ups_to_sleep_gracefully], required: true, label: Value, description: "The new advance control ups sleep, as CPS-MIB names its values." }
+    returns: ack
+  set_advance_control_simulate_power_fail:
+    summary: "Set upsAdvanceControlSimulatePowerFail, then read its group back"
+    params:
+      value: { type: enum, values: [no_simulate_power_failure, simulate_power_failure], required: true, label: Value, description: "The new advance control simulate power fail, as CPS-MIB names its values." }
+    returns: ack
+  set_advance_control_flash_and_beep:
+    summary: "Set upsAdvanceControlFlashAndBeep, then read its group back"
+    params:
+      value: { type: enum, values: [no_flash_and_beep, flash_and_beep], required: true, label: Value, description: "The new advance control flash and beep, as CPS-MIB names its values." }
+    returns: ack
+  set_advance_control_turn_on_ups:
+    summary: "Set upsAdvanceControlTurnOnUPS, then read its group back"
+    params:
+      value: { type: enum, values: [no_turn_on_ups, turn_on_ups], required: true, label: Value, description: "The new advance control turn on ups, as CPS-MIB names its values." }
+    returns: ack
+  set_advance_control_sleep_after_delay:
+    summary: "Set upsAdvanceSleepAfterDelay, then read its group back"
+    params:
+      value: { type: int, min: -1, max: 600, required: true, label: Value, description: "The new advance sleep after delay, in seconds." }
+    returns: ack
+  set_advance_test_diagnostic_schedule:
+    summary: "Set upsAdvanceTestDiagnosticSchedule, then read its group back"
+    params:
+      value: { type: enum, values: [unknown, biweekly, weekly, at_turn_on, never], required: true, label: Value, description: "The new advance test diagnostic schedule, as CPS-MIB names its values." }
+    returns: ack
+  set_advance_test_diagnostics:
+    summary: "Set upsAdvanceTestDiagnostics, then read its group back"
+    params:
+      value: { type: enum, values: [no_test_diagnostics, test_diagnostics], required: true, label: Value, description: "The new advance test diagnostics, as CPS-MIB names its values." }
+    returns: ack
+  set_advance_test_indicators:
+    summary: "Set upsAdvanceTestIndicators, then read its group back"
+    params:
+      value: { type: enum, values: [no_test_indicators, test_indicators], required: true, label: Value, description: "The new advance test indicators, as CPS-MIB names its values." }
+    returns: ack
+  set_advance_test_runtime_estimation:
+    summary: "Set upsAdvanceTestRuntimeEstimation, then read its group back"
+    params:
+      value: { type: enum, values: [no_perform_estimation, perform_estimation, cancel_current_estimation], required: true, label: Value, description: "The new advance test runtime estimation, as CPS-MIB names its values." }
+    returns: ack
+  set_bank_outlet_control_control_outlet_command:
+    summary: "Set upsBankControlOutletCommand of one upsBankOutletControlEntry row, then read its table back"
+    params:
+      control_index: { type: int, min: 1, max: 24, required: true, label: Bank control index, description: "The row of upsBankOutletControlEntry to write, by its upsBankControlIndex." }
+      value: { type: enum, values: [immediate_on, immediate_off, bank_not_exist, critical_bank], required: true, label: Value, description: "The new bank control outlet command, as CPS-MIB names its values." }
+    returns: ack
+  set_individual_outlet_config_name:
+    summary: "Set upsIndividualOutletConfigName of one upsIndividualOutletConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 1, max: 96, required: true, label: Individual outlet config index, description: "The row of upsIndividualOutletConfigEntry to write, by its upsIndividualOutletConfigIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new individual outlet config name. }
+    returns: ack
+  set_individual_outlet_config_power_on_time:
+    summary: "Set upsIndividualOutletConfigPowerOnTime of one upsIndividualOutletConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 1, max: 96, required: true, label: Individual outlet config index, description: "The row of upsIndividualOutletConfigEntry to write, by its upsIndividualOutletConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new individual outlet config power on time, in s." }
+    returns: ack
+  set_individual_outlet_config_power_off_time:
+    summary: "Set upsIndividualOutletConfigPowerOffTime of one upsIndividualOutletConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 1, max: 96, required: true, label: Individual outlet config index, description: "The row of upsIndividualOutletConfigEntry to write, by its upsIndividualOutletConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new individual outlet config power off time, in s." }
+    returns: ack
+  set_individual_outlet_config_reboot_duration:
+    summary: "Set upsIndividualOutletConfigRebootDuration of one upsIndividualOutletConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 1, max: 96, required: true, label: Individual outlet config index, description: "The row of upsIndividualOutletConfigEntry to write, by its upsIndividualOutletConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new individual outlet config reboot duration, in s." }
+    returns: ack
+  set_individual_outlet_control_command:
+    summary: "Set upsIndividualOutletControlCommand of one upsIndividualOutletControlEntry row, then read its table back"
+    params:
+      index: { type: int, min: 1, max: 96, required: true, label: Individual outlet control index, description: "The row of upsIndividualOutletControlEntry to write, by its upsIndividualOutletControlIndex." }
+      value: { type: enum, values: [immediate_on, immediate_off, immediate_reboot, delayed_on, delayed_off, delayed_reboot, cancel_pending_command], required: true, label: Value, description: "The new individual outlet control command, as CPS-MIB names its values." }
+    returns: ack
+  set_environment_ident_name:
+    summary: "Set envirIdentName, then read its group back"
+    params:
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new ident name. }
+    returns: ack
+  set_environment_ident_location:
+    summary: "Set envirIdentLocation, then read its group back"
+    params:
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new ident location. }
+    returns: ack
+  set_environment_temp_high_threshold:
+    summary: "Set envirTempHighThreshold, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new temp high threshold, in °F." }
+    returns: ack
+  set_environment_temp_low_threshold:
+    summary: "Set envirTempLowThreshold, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new temp low threshold, in °F." }
+    returns: ack
+  set_environment_temp_rate_of_change:
+    summary: "Set envirTempRateOfChange, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new temp rate of change, in °F." }
+    returns: ack
+  set_environment_temp_hysteresis:
+    summary: "Set envirTempHysteresis, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new temp hysteresis, in °F." }
+    returns: ack
+  set_environment_temp_celsius_high_threshold:
+    summary: "Set envirTempCelsiusHighThreshold, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new temp celsius high threshold, in °C." }
+    returns: ack
+  set_environment_temp_celsius_low_threshold:
+    summary: "Set envirTempCelsiusLowThreshold, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new temp celsius low threshold, in °C." }
+    returns: ack
+  set_environment_temp_celsius_rate_of_change:
+    summary: "Set envirTempCelsiusRateOfChange, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new temp celsius rate of change, in °C." }
+    returns: ack
+  set_environment_temp_celsius_hysteresis:
+    summary: "Set envirTempCelsiusHysteresis, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new temp celsius hysteresis, in °C." }
+    returns: ack
+  set_environment_humid_high_threshold:
+    summary: "Set envirHumidHighThreshold, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new humid high threshold, as the MIB counts it." }
+    returns: ack
+  set_environment_humid_low_threshold:
+    summary: "Set envirHumidLowThreshold, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new humid low threshold, as the MIB counts it." }
+    returns: ack
+  set_environment_humid_rate_of_change:
+    summary: "Set envirHumidRateOfChange, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new humid rate of change, as the MIB counts it." }
+    returns: ack
+  set_environment_humid_hysteresis:
+    summary: "Set envirHumidHysteresis, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new humid hysteresis, as the MIB counts it." }
+    returns: ack
+  set_environment_contact_name:
+    summary: "Set envirContactName of one envirContactEntry row, then read its table back"
+    params:
+      index: { type: int, min: 1, max: 4, required: true, label: Contact index, description: "The row of envirContactEntry to write, by its envirContactIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new contact name. }
+    returns: ack
+  set_environment_contact_normal_state:
+    summary: "Set envirContactNormalState of one envirContactEntry row, then read its table back"
+    params:
+      index: { type: int, min: 1, max: 4, required: true, label: Contact index, description: "The row of envirContactEntry to write, by its envirContactIndex." }
+      value: { type: enum, values: [normal_open, normal_close], required: true, label: Value, description: "The new contact normal state, as CPS-MIB names its values." }
+    returns: ack
+  set_environment2_ident_name:
+    summary: "Set envir2IdentName of one envir2IdentEntry row, then read its table back"
+    params:
+      index: { type: int, min: 1, max: 8, required: true, label: Ident index, description: "The row of envir2IdentEntry to write, by its envir2IdentIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new ident name. }
+    returns: ack
+  set_environment2_ident_location:
+    summary: "Set envir2IdentLocation of one envir2IdentEntry row, then read its table back"
+    params:
+      index: { type: int, min: 1, max: 8, required: true, label: Ident index, description: "The row of envir2IdentEntry to write, by its envir2IdentIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new ident location. }
+    returns: ack
+  set_environment2_temp_unit:
+    summary: "Set envir2TempUnit, then read its group back"
+    params:
+      value: { type: enum, values: [celsius, fahrenheit], required: true, label: Value, description: "The new temp unit, as CPS-MIB names its values." }
+    returns: ack
+  set_environment2_temp_high_threshold:
+    summary: "Set envir2TempHighThreshold of one envir2TempEntry row, then read its table back"
+    params:
+      temperature_index: { type: int, min: 1, max: 8, required: true, label: Temperature index, description: "The row of envir2TempEntry to write, by its envir2TemperatureIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new temp high threshold, as the MIB counts it." }
+    returns: ack
+  set_environment2_temp_low_threshold:
+    summary: "Set envir2TempLowThreshold of one envir2TempEntry row, then read its table back"
+    params:
+      temperature_index: { type: int, min: 1, max: 8, required: true, label: Temperature index, description: "The row of envir2TempEntry to write, by its envir2TemperatureIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new temp low threshold, as the MIB counts it." }
+    returns: ack
+  set_environment2_temp_rate_of_change:
+    summary: "Set envir2TempRateOfChange of one envir2TempEntry row, then read its table back"
+    params:
+      temperature_index: { type: int, min: 1, max: 8, required: true, label: Temperature index, description: "The row of envir2TempEntry to write, by its envir2TemperatureIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new temp rate of change, as the MIB counts it." }
+    returns: ack
+  set_environment2_temp_hysteresis:
+    summary: "Set envir2TempHysteresis of one envir2TempEntry row, then read its table back"
+    params:
+      temperature_index: { type: int, min: 1, max: 8, required: true, label: Temperature index, description: "The row of envir2TempEntry to write, by its envir2TemperatureIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new temp hysteresis, as the MIB counts it." }
+    returns: ack
+  set_environment2_humid_high_threshold:
+    summary: "Set envir2HumidHighThreshold of one envir2HumidEntry row, then read its table back"
+    params:
+      humidity_index: { type: int, min: 1, max: 8, required: true, label: Humidity index, description: "The row of envir2HumidEntry to write, by its envir2HumidityIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new humid high threshold, as the MIB counts it." }
+    returns: ack
+  set_environment2_humid_low_threshold:
+    summary: "Set envir2HumidLowThreshold of one envir2HumidEntry row, then read its table back"
+    params:
+      humidity_index: { type: int, min: 1, max: 8, required: true, label: Humidity index, description: "The row of envir2HumidEntry to write, by its envir2HumidityIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new humid low threshold, as the MIB counts it." }
+    returns: ack
+  set_environment2_humid_rate_of_change:
+    summary: "Set envir2HumidRateOfChange of one envir2HumidEntry row, then read its table back"
+    params:
+      humidity_index: { type: int, min: 1, max: 8, required: true, label: Humidity index, description: "The row of envir2HumidEntry to write, by its envir2HumidityIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new humid rate of change, as the MIB counts it." }
+    returns: ack
+  set_environment2_humid_hysteresis:
+    summary: "Set envir2HumidHysteresis of one envir2HumidEntry row, then read its table back"
+    params:
+      humidity_index: { type: int, min: 1, max: 8, required: true, label: Humidity index, description: "The row of envir2HumidEntry to write, by its envir2HumidityIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new humid hysteresis, as the MIB counts it." }
+    returns: ack
+  set_environment2_contact_name:
+    summary: "Set envir2ContactName of one envir2ContactEntry row, then read its table back"
+    params:
+      index: { type: int, min: 1, max: 32, required: true, label: Contact index, description: "The row of envir2ContactEntry to write, by its envir2ContactIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new contact name. }
+    returns: ack
+  set_environment2_contact_normal_state:
+    summary: "Set envir2ContactNormalState of one envir2ContactEntry row, then read its table back"
+    params:
+      index: { type: int, min: 1, max: 32, required: true, label: Contact index, description: "The row of envir2ContactEntry to write, by its envir2ContactIndex." }
+      value: { type: enum, values: [normal_open, normal_close], required: true, label: Value, description: "The new contact normal state, as CPS-MIB names its values." }
+    returns: ack
+
+state:
+  version: { type: string, description: "The SNMP version used: v1, v2c or v3" }
+  system.description: { type: string, description: "sysDescr.0: the agent's description of the device" }
+  system.object_id: { type: string, description: "sysObjectID.0: the vendor's OID for the device type" }
+  system.uptime: { type: int, unit: "1/100 s", description: "sysUpTime.0, in hundredths of a second (TimeTicks)" }
+  system.contact: { type: string, description: "sysContact.0" }
+  system.name: { type: string, description: "sysName.0" }
+  system.location: { type: string, description: "sysLocation.0" }
+  engine.id: { type: string, description: "v3: the agent's snmpEngineID in hex" }
+  engine.boots: { type: int, description: "v3: the agent's snmpEngineBoots" }
+  engine.time: { type: int, unit: s, description: "v3: the agent's snmpEngineTime when last heard" }
+  local_engine_id: { type: string, description: "With trap_port: this receiver's snmpEngineID in hex, to configure on agents sending v3 informs" }
+  traps.count: { type: int, description: "Notifications received since opening" }
+  traps.last: { type: object, description: "The last notification: {kind (trap or inform), version, source, trap_oid, name (the MIB's name for it, or null), uptime, varbinds, and for v1 enterprise, agent_address, generic_trap, specific_trap, and for v3 user}" }
+  base_ident.model: { type: string, description: upsBaseIdentModel (CPS-MIB) }
+  base_ident.name: { type: string, description: upsBaseIdentName (CPS-MIB) }
+  advance_ident.firmware_revision: { type: string, description: upsAdvanceIdentFirmwareRevision (CPS-MIB) }
+  advance_ident.date_of_manufacture: { type: string, description: upsAdvanceIdentDateOfManufacture (CPS-MIB) }
+  advance_ident.serial_number: { type: string, description: upsAdvanceIdentSerialNumber (CPS-MIB) }
+  advance_ident.agent_firmware_revision: { type: string, description: upsAdvanceIdentAgentFirmwareRevision (CPS-MIB) }
+  advance_ident.lcd_firmware_version: { type: string, description: upsAdvanceIdentLCDFirmwareVersion (CPS-MIB) }
+  advance_ident.power_rating: { type: int, description: upsAdvanceIdentPowerRating (CPS-MIB) }
+  advance_ident.load_power: { type: int, description: upsAdvanceIdentLoadPower (CPS-MIB) }
+  advance_ident.current_rating: { type: int, unit: "0.1 A", description: upsAdvanceIdentCurrentRating (CPS-MIB) }
+  advance_ident.agent_serial_number: { type: string, description: upsAdvanceIdentAgentSerialNumber (CPS-MIB) }
+  base_battery.status: { type: string, description: "upsBaseBatteryStatus (CPS-MIB): unknown, battery_normal, battery_low, battery_not_present" }
+  base_battery.time_on_battery: { type: int, unit: "1/100 s", description: upsBaseBatteryTimeOnBattery (CPS-MIB) }
+  base_battery.last_replace_date: { type: string, description: upsBaseBatteryLastReplaceDate (CPS-MIB) }
+  base_battery.age_recommand: { type: int, description: upsBaseBatteryAgeRecommand (CPS-MIB) }
+  advance_battery.capacity: { type: int, description: upsAdvanceBatteryCapacity (CPS-MIB) }
+  advance_battery.voltage: { type: int, description: upsAdvanceBatteryVoltage (CPS-MIB) }
+  advance_battery.temperature: { type: int, unit: °C, description: upsAdvanceBatteryTemperature (CPS-MIB) }
+  advance_battery.run_time_remaining: { type: int, unit: "1/100 s", description: upsAdvanceBatteryRunTimeRemaining (CPS-MIB) }
+  advance_battery.replace_indicator: { type: string, description: "upsAdvanceBatteryReplaceIndicator (CPS-MIB): no_battery_needs_replacing, battery_needs_replacing" }
+  advance_battery.full_charge_voltage: { type: int, description: upsAdvanceBatteryFullChargeVoltage (CPS-MIB) }
+  advance_battery.current: { type: int, description: upsAdvanceBatteryCurrent (CPS-MIB) }
+  advance_battery.voltage_rating: { type: int, description: upsAdvanceBatteryVoltageRating (CPS-MIB) }
+  advance_battery.life: { type: int, description: upsAdvanceBatteryLife (CPS-MIB) }
+  base_input.phase: { type: int, description: upsBaseInputPhase (CPS-MIB) }
+  advance_input.line_voltage: { type: int, description: upsAdvanceInputLineVoltage (CPS-MIB) }
+  advance_input.max_line_voltage: { type: int, description: upsAdvanceInputMaxLineVoltage (CPS-MIB) }
+  advance_input.min_line_voltage: { type: int, description: upsAdvanceInputMinLineVoltage (CPS-MIB) }
+  advance_input.frequency: { type: int, description: upsAdvanceInputFrequency (CPS-MIB) }
+  advance_input.line_fail_cause: { type: string, description: "upsAdvanceInputLineFailCause (CPS-MIB): no_transfer, high_line_voltage, brownout, self_test" }
+  advance_input.status: { type: string, description: "upsAdvanceInputStatus (CPS-MIB): normal, over_voltage, under_voltage, frequency_failure, blackout, power_failure" }
+  advance_input.watt: { type: int, description: upsAdvanceInputWatt (CPS-MIB) }
+  base_output.status: { type: string, description: "upsBaseOutputStatus (CPS-MIB): unknown, on_line, on_battery, on_boost, on_sleep, off, rebooting, on_eco, on_bypass, on_buck, on_overload" }
+  base_output.phase: { type: int, description: upsBaseOutputPhase (CPS-MIB) }
+  base_output.working_frequency: { type: string, description: upsBaseOutputWorkingFrequency (CPS-MIB) }
+  advance_output.voltage: { type: int, description: upsAdvanceOutputVoltage (CPS-MIB) }
+  advance_output.frequency: { type: int, description: upsAdvanceOutputFrequency (CPS-MIB) }
+  advance_output.load: { type: int, description: upsAdvanceOutputLoad (CPS-MIB) }
+  advance_output.current: { type: int, description: upsAdvanceOutputCurrent (CPS-MIB) }
+  advance_output.power: { type: int, description: upsAdvanceOutputPower (CPS-MIB) }
+  advance_output.energy: { type: int, description: upsAdvanceOutputEnergy (CPS-MIB) }
+  advance_output.energy_start_time: { type: string, description: upsAdvanceOutputEnergyStartTime (CPS-MIB) }
+  advance_output.apparent_output_power: { type: int, description: upsAdvanceApparentOutputPower (CPS-MIB) }
+  base_config.num_devices: { type: int, description: upsBaseConfigNumDevices (CPS-MIB) }
+  base_config_device.*.device_name: { type: string, description: deviceName (CPS-MIB) }
+  base_config_device.*.va_rating: { type: int, description: vaRating (CPS-MIB) }
+  base_config_device.*.accept_this_device: { type: string, description: "acceptThisDevice (CPS-MIB): yes, no" }
+  advance_config.output_voltage: { type: int, unit: V, description: upsAdvanceConfigOutputVoltage (CPS-MIB) }
+  advance_config.high_transfer_volt: { type: int, unit: V, description: upsAdvanceConfigHighTransferVolt (CPS-MIB) }
+  advance_config.low_transfer_volt: { type: int, unit: V, description: upsAdvanceConfigLowTransferVolt (CPS-MIB) }
+  advance_config.alarm: { type: string, description: "upsAdvanceConfigAlarm (CPS-MIB): timed, enable, disable, mute" }
+  advance_config.alarm_timer: { type: int, unit: "1/100 s", description: upsAdvanceConfigAlarmTimer (CPS-MIB) }
+  advance_config.min_return_capacity: { type: int, description: upsAdvanceConfigMinReturnCapacity (CPS-MIB) }
+  advance_config.sensitivity: { type: string, description: "upsAdvanceConfigSensitivity (CPS-MIB): auto, low, medium, high" }
+  advance_config.low_battery_run_time: { type: int, unit: "1/100 s", description: upsAdvanceConfigLowBatteryRunTime (CPS-MIB) }
+  advance_config.return_delay: { type: int, unit: "1/100 s", description: upsAdvanceConfigReturnDelay (CPS-MIB) }
+  advance_config.shutoff_delay: { type: int, unit: "1/100 s", description: upsAdvanceConfigShutoffDelay (CPS-MIB) }
+  advance_config.sleep_delay: { type: int, unit: "1/100 s", description: upsAdvanceConfigSleepDelay (CPS-MIB) }
+  advance_config.set_eeprom_defaults: { type: string, description: "upsAdvanceConfigSetEEPROMDefaults (CPS-MIB): no_set_eeprom_defaults, set_eeprom_defaults" }
+  advance_config.auto_restore: { type: string, description: "upsAdvanceConfigAutoRestore (CPS-MIB): disable, enable" }
+  advance_config.recharged_capacity: { type: int, description: upsAdvanceConfigRechargedCapacity (CPS-MIB) }
+  advance_config.cold_start: { type: string, description: "upsAdvanceConfigColdStart (CPS-MIB): disable, enable" }
+  advance_config.deep_discharge_protection: { type: int, description: upsAdvanceConfigDeepDischargeProtection (CPS-MIB) }
+  advance_config.sleep_after_all_client_shut: { type: string, description: "upsAdvanceConfigSleepAfterAllClientShut (CPS-MIB): disable, enable" }
+  advance_config.low_battery_threshold: { type: int, description: upsAdvanceConfigLowBatteryThreshold (CPS-MIB) }
+  advance_config.energy_reset: { type: string, description: "upsAdvanceConfigEnergyReset (CPS-MIB): no_operation, reset" }
+  advance_config.battery_runtime_threshold: { type: int, unit: min, description: upsAdvanceConfigBatteryRuntimeThreshold (CPS-MIB) }
+  base_control.conserve_battery: { type: string, description: "upsBaseControlConserveBattery (CPS-MIB): no_turn_off_ups, turn_off_ups_to_conserve_battery" }
+  advance_control.ups_off: { type: string, description: "upsAdvanceControlUpsOff (CPS-MIB): no_turn_ups_off, turn_ups_off, turn_ups_off_gracefully" }
+  advance_control.reboot_ups: { type: string, description: "upsAdvanceControlRebootUps (CPS-MIB): no_reboot_ups, reboot_ups" }
+  advance_control.ups_sleep: { type: string, description: "upsAdvanceControlUpsSleep (CPS-MIB): no_put_ups_to_sleep, put_ups_to_sleep, put_ups_to_sleep_gracefully" }
+  advance_control.simulate_power_fail: { type: string, description: "upsAdvanceControlSimulatePowerFail (CPS-MIB): no_simulate_power_failure, simulate_power_failure" }
+  advance_control.flash_and_beep: { type: string, description: "upsAdvanceControlFlashAndBeep (CPS-MIB): no_flash_and_beep, flash_and_beep" }
+  advance_control.turn_on_ups: { type: string, description: "upsAdvanceControlTurnOnUPS (CPS-MIB): no_turn_on_ups, turn_on_ups" }
+  advance_control.sleep_after_delay: { type: int, unit: seconds, description: upsAdvanceSleepAfterDelay (CPS-MIB) }
+  advance_test.diagnostic_schedule: { type: string, description: "upsAdvanceTestDiagnosticSchedule (CPS-MIB): unknown, biweekly, weekly, at_turn_on, never" }
+  advance_test.diagnostics: { type: string, description: "upsAdvanceTestDiagnostics (CPS-MIB): no_test_diagnostics, test_diagnostics" }
+  advance_test.diagnostics_results: { type: string, description: "upsAdvanceTestDiagnosticsResults (CPS-MIB): ok, failed, invalid_test, test_in_progress" }
+  advance_test.last_diagnostics_date: { type: string, description: upsAdvanceTestLastDiagnosticsDate (CPS-MIB) }
+  advance_test.indicators: { type: string, description: "upsAdvanceTestIndicators (CPS-MIB): no_test_indicators, test_indicators" }
+  advance_test.runtime_estimation: { type: string, description: "upsAdvanceTestRuntimeEstimation (CPS-MIB): no_perform_estimation, perform_estimation, cancel_current_estimation" }
+  advance_test.estimation_results: { type: string, description: "upsAdvanceTestEstimationResults (CPS-MIB): ok, invalid_estimation, estimation_in_progress" }
+  advance_test.estimation_date: { type: string, description: upsAdvanceTestEstimationDate (CPS-MIB) }
+  bank_outlet_control.*.control_outlet_command: { type: string, description: "upsBankControlOutletCommand (CPS-MIB): immediate_on, immediate_off, bank_not_exist, critical_bank" }
+  individual_outlet.table_size: { type: int, description: upsIndividualOutletTableSize (CPS-MIB) }
+  individual_outlet_config.*.name: { type: string, description: upsIndividualOutletConfigName (CPS-MIB) }
+  individual_outlet_config.*.power_on_time: { type: int, unit: s, description: upsIndividualOutletConfigPowerOnTime (CPS-MIB) }
+  individual_outlet_config.*.power_off_time: { type: int, unit: s, description: upsIndividualOutletConfigPowerOffTime (CPS-MIB) }
+  individual_outlet_config.*.reboot_duration: { type: int, unit: s, description: upsIndividualOutletConfigRebootDuration (CPS-MIB) }
+  individual_outlet_info.*.name: { type: string, description: upsIndividualOutletInfoName (CPS-MIB) }
+  individual_outlet_info.*.bank: { type: int, description: upsIndividualOutletInfoBank (CPS-MIB) }
+  individual_outlet_status.*.name: { type: string, description: upsIndividualOutletStatusName (CPS-MIB) }
+  individual_outlet_status.*.state: { type: string, description: "upsIndividualOutletStatusState (CPS-MIB): outlet_status_on, outlet_status_off" }
+  individual_outlet_status.*.command_pending: { type: string, description: "upsIndividualOutletStatusCommandPending (CPS-MIB): outlet_status_command_pending, outlet_status_no_command_pending" }
+  individual_outlet_control.*.name: { type: string, description: upsIndividualOutletControlName (CPS-MIB) }
+  individual_outlet_control.*.command: { type: string, description: "upsIndividualOutletControlCommand (CPS-MIB): immediate_on, immediate_off, immediate_reboot, delayed_on, delayed_off, delayed_reboot, cancel_pending_command" }
+  phase_input_table_size: { type: int, description: upsPhaseInputTableSize (CPS-MIB) }
+  phase_input.*.voltage: { type: int, description: upsPhaseInputVoltage (CPS-MIB) }
+  phase_input.*.current: { type: int, description: upsPhaseInputCurrent (CPS-MIB) }
+  phase_input.*.frequency: { type: int, description: upsPhaseInputFrequency (CPS-MIB) }
+  phase_input.*.power_factor: { type: int, description: upsPhaseInputPowerFactor (CPS-MIB) }
+  phase_output_table_size: { type: int, description: upsPhaseOutputTableSize (CPS-MIB) }
+  phase_output.*.voltage: { type: int, description: upsPhaseOutputVoltage (CPS-MIB) }
+  phase_output.*.current: { type: int, description: upsPhaseOutputCurrent (CPS-MIB) }
+  phase_output.*.frequency: { type: int, description: upsPhaseOutputFrequency (CPS-MIB) }
+  phase_output.*.power_factor: { type: int, description: upsPhaseOutputPowerFactor (CPS-MIB) }
+  phase_output.*.power: { type: int, description: upsPhaseOutputPower (CPS-MIB) }
+  phase_bypass_table_size: { type: int, description: upsPhaseBypassTableSize (CPS-MIB) }
+  phase_bypass.*.voltage: { type: int, description: upsPhaseBypassVoltage (CPS-MIB) }
+  phase_bypass.*.current: { type: int, description: upsPhaseBypassCurrent (CPS-MIB) }
+  phase_bypass.*.frequency: { type: int, description: upsPhaseBypassFrequency (CPS-MIB) }
+  phase_bypass.*.power_factor: { type: int, description: upsPhaseBypassPowerFactor (CPS-MIB) }
+  ups_system.status: { type: string, description: "upsStatus (CPS-MIB): normal, overheat, hardwarefault" }
+  ups_system.temperature: { type: int, unit: °C, description: upsTemperature (CPS-MIB) }
+  ups_system.fault_code: { type: string, description: upsFaultCode (CPS-MIB) }
+  environment.ident.name: { type: string, description: envirIdentName (CPS-MIB) }
+  environment.ident.location: { type: string, description: envirIdentLocation (CPS-MIB) }
+  environment.temp.temperature: { type: int, description: envirTemperature (CPS-MIB) }
+  environment.temp.high_threshold: { type: int, unit: °F, description: envirTempHighThreshold (CPS-MIB) }
+  environment.temp.low_threshold: { type: int, unit: °F, description: envirTempLowThreshold (CPS-MIB) }
+  environment.temp.rate_of_change: { type: int, unit: °F, description: envirTempRateOfChange (CPS-MIB) }
+  environment.temp.hysteresis: { type: int, unit: °F, description: envirTempHysteresis (CPS-MIB) }
+  environment.temp.temperature_celsius: { type: int, description: envirTemperatureCelsius (CPS-MIB) }
+  environment.temp.celsius_high_threshold: { type: int, unit: °C, description: envirTempCelsiusHighThreshold (CPS-MIB) }
+  environment.temp.celsius_low_threshold: { type: int, unit: °C, description: envirTempCelsiusLowThreshold (CPS-MIB) }
+  environment.temp.celsius_rate_of_change: { type: int, unit: °C, description: envirTempCelsiusRateOfChange (CPS-MIB) }
+  environment.temp.celsius_hysteresis: { type: int, unit: °C, description: envirTempCelsiusHysteresis (CPS-MIB) }
+  environment.humid.humidity: { type: int, description: envirHumidity (CPS-MIB) }
+  environment.humid.high_threshold: { type: int, description: envirHumidHighThreshold (CPS-MIB) }
+  environment.humid.low_threshold: { type: int, description: envirHumidLowThreshold (CPS-MIB) }
+  environment.humid.rate_of_change: { type: int, description: envirHumidRateOfChange (CPS-MIB) }
+  environment.humid.hysteresis: { type: int, description: envirHumidHysteresis (CPS-MIB) }
+  environment.contact_table_size: { type: int, description: envirContactTableSize (CPS-MIB) }
+  environment.contact.*.name: { type: string, description: envirContactName (CPS-MIB) }
+  environment.contact.*.status: { type: string, description: "envirContactStatus (CPS-MIB): contact_normal, contact_abnormal" }
+  environment.contact.*.normal_state: { type: string, description: "envirContactNormalState (CPS-MIB): normal_open, normal_close" }
+  environment2.ident_table_size: { type: int, description: envir2IdentTableSize (CPS-MIB) }
+  environment2.ident.*.module_position: { type: int, description: envir2IdentModulePosition (CPS-MIB) }
+  environment2.ident.*.name: { type: string, description: envir2IdentName (CPS-MIB) }
+  environment2.ident.*.location: { type: string, description: envir2IdentLocation (CPS-MIB) }
+  environment2.ident.*.serial_number: { type: string, description: envir2IdentSerialNumber (CPS-MIB) }
+  environment2.temp_table_size: { type: int, description: envir2TempTableSize (CPS-MIB) }
+  environment2.temp_unit: { type: string, description: "envir2TempUnit (CPS-MIB): celsius, fahrenheit" }
+  environment2.temp.*.module_position: { type: int, description: envir2TempModulePosition (CPS-MIB) }
+  environment2.temp.*.temperature: { type: int, description: envir2Temperature (CPS-MIB) }
+  environment2.temp.*.high_threshold: { type: int, description: envir2TempHighThreshold (CPS-MIB) }
+  environment2.temp.*.low_threshold: { type: int, description: envir2TempLowThreshold (CPS-MIB) }
+  environment2.temp.*.rate_of_change: { type: int, description: envir2TempRateOfChange (CPS-MIB) }
+  environment2.temp.*.hysteresis: { type: int, description: envir2TempHysteresis (CPS-MIB) }
+  environment2.humid_table_size: { type: int, description: envir2HumidTableSize (CPS-MIB) }
+  environment2.humid.*.module_position: { type: int, description: envir2HumidModulePosition (CPS-MIB) }
+  environment2.humid.*.humidity: { type: int, description: envir2Humidity (CPS-MIB) }
+  environment2.humid.*.high_threshold: { type: int, description: envir2HumidHighThreshold (CPS-MIB) }
+  environment2.humid.*.low_threshold: { type: int, description: envir2HumidLowThreshold (CPS-MIB) }
+  environment2.humid.*.rate_of_change: { type: int, description: envir2HumidRateOfChange (CPS-MIB) }
+  environment2.humid.*.hysteresis: { type: int, description: envir2HumidHysteresis (CPS-MIB) }
+  environment2.contact_table_size: { type: int, description: envir2ContactTableSize (CPS-MIB) }
+  environment2.contact.*.module_position: { type: int, description: envir2ContactModulePosition (CPS-MIB) }
+  environment2.contact.*.module_number: { type: int, description: envir2ContactModuleNumber (CPS-MIB) }
+  environment2.contact.*.name: { type: string, description: envir2ContactName (CPS-MIB) }
+  environment2.contact.*.status: { type: string, description: "envir2ContactStatus (CPS-MIB): contact_normal, contact_abnormal" }
+  environment2.contact.*.normal_state: { type: string, description: "envir2ContactNormalState (CPS-MIB): normal_open, normal_close" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      The control commands act on the UPS's output at once and cannot be undone live: set_advance_control_ups_off,
+      set_advance_control_reboot_ups, set_advance_control_ups_sleep, set_advance_control_sleep_after_delay,
+      set_advance_control_simulate_power_fail, set_base_control_conserve_battery,
+      set_bank_outlet_control_control_outlet_command and set_individual_outlet_control_command turn off, reboot or
+      put the load to sleep; set_advance_test_runtime_estimation discharges the battery; and
+      set_advance_config_set_eeprom_defaults puts the UPS's settings back to the factory's.
+  - models: [all]
+    severity: info
+    text: >
+      State and commands are named after CPS-MIB's ups group, the "ups" prefix left off: each table is keyed by the
+      row index the agent gives, enumerations are the MIB's labels in snake case, and numbers are as the MIB counts
+      them, with the unit in each key's description where the MIB states it. EnviroSensor readings are under
+      environment and environment2, as the agent fills them.
+  - models: [all]
+    severity: info
+    text: >
+      A control object reads back as the state it caused rather than the action written, so each command reads its
+      group or table again after the SET; the result of a delayed action shows at a later poll.
+  - models: [all]
+    severity: info
+    text: >
+      Each notification received is a message event, {event: message, address, args, source}: address is its
+      snmpTrapOID (a v1 trap's as RFC 3584 §3.1 derives it, enterprises.3808.0.n for CPS-MIB's traps), args is the
+      same object as traps.last with the MIB's trap name, and a notification starts a poll half a second later.
+  - models: [all]
+    severity: info
+    text: >
+      v1 and v2c agents drop requests with a wrong community without answering, so a wrong community looks like an
+      agent that is not there (disconnected, commands time out). SETs need the write community the card is
+      configured with (write_community), or a v3 user with write access.
+  - models: [all]
+    severity: info
+    text: >
+      Opening for commands only walks nothing; a GET of sysUpTime.0 each interval stays as the liveness check, and
+      notifications are still received.

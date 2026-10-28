@@ -1650,6 +1650,205 @@ pub(crate) fn listen_bind(address: Option<IpAddr>, port: u16, any_sender: bool) 
     }
 }
 
+/// OIDs in dotted decimal, separated by commas, semicolons or spaces.
+pub(crate) fn parse_oids(text: &str) -> Result<Vec<Oid>, String> {
+    let oids: Vec<Oid> = text
+        .split([',', ';', ' '])
+        .filter(|e| !e.is_empty())
+        .map(Oid::parse)
+        .collect::<Result<_, _>>()?;
+    if oids.is_empty() {
+        return Err("give at least one OID".into());
+    }
+    Ok(oids)
+}
+
+/// A variable binding as JSON: {oid, type, value}, and `hex` for an
+/// OCTET STRING or Opaque.
+pub(crate) fn varbind_json(vb: &VarBind) -> serde_json::Value {
+    let mut o = serde_json::json!({
+        "oid": vb.oid.to_string(),
+        "type": vb.value.type_name(),
+        "value": vb.value.to_json(),
+    });
+    if let Some(bytes) = vb.value.bytes() {
+        o["hex"] = serde_json::json!(ber::hex(bytes));
+    }
+    o
+}
+
+/// A failed request as a command's error.
+pub(crate) fn command_error(e: &SnmpError) -> crate::module::CommandError {
+    match e {
+        SnmpError::Timeout => crate::module::CommandError::Timeout,
+        SnmpError::Status { status, .. } => crate::module::CommandError::DeviceError {
+            code: Some(status_name(*status)),
+            message: e.to_string(),
+        },
+        SnmpError::Auth(m) => crate::module::CommandError::Auth { message: m.clone() },
+        SnmpError::Protocol(m) => crate::module::CommandError::DeviceError {
+            code: None,
+            message: m.clone(),
+        },
+    }
+}
+
+/// The settings every SNMP integration shares (generic-snmp's, which the
+/// vendor integrations declare too): the agent, its security and timing,
+/// and where notifications are received.
+pub(crate) struct Settings {
+    /// None when opened with no host, to receive notifications only.
+    pub(crate) agent: Option<SocketAddr>,
+    pub(crate) security: Security,
+    /// The v3 user, which also checks v3 notifications.
+    pub(crate) user: Option<User>,
+    pub(crate) timeout: Millis,
+    pub(crate) retries: u32,
+    pub(crate) max_repetitions: u32,
+    pub(crate) interval: Millis,
+    pub(crate) trap: Option<(Option<IpAddr>, u16)>,
+    pub(crate) trap_community: Vec<u8>,
+    pub(crate) local_engine_id: Vec<u8>,
+    /// Random: starts request-ids and the privacy salt.
+    pub(crate) seed: u64,
+}
+
+fn text_setting<'a>(s: &'a crate::catalog::Params, name: &str) -> &'a str {
+    s.get(name)
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("")
+        .trim()
+}
+
+fn random_seed() -> u64 {
+    let mut bytes = [0u8; 8];
+    match getrandom::fill(&mut bytes) {
+        Ok(()) => u64::from_be_bytes(bytes),
+        // Uniqueness is what the salt and request-ids need.
+        Err(_) => u64::from(std::process::id()).wrapping_mul(0x9E37_79B9_7F4A_7C15),
+    }
+}
+
+impl Settings {
+    /// Read the shared settings of a device being opened; `interval` is the
+    /// poll interval when `poll_interval_ms` is not given. A device needs a
+    /// host unless it receives notifications (`trap_port`).
+    pub(crate) fn parse(
+        ctx: &crate::module::OpenContext,
+        interval: Millis,
+    ) -> Result<Settings, String> {
+        let s = &ctx.settings;
+        let num = |k: &str, d: u64| s.get(k).and_then(serde_json::Value::as_u64).unwrap_or(d);
+        let version = match text_setting(s, "version") {
+            "v1" => Version::V1,
+            "" | "v2c" => Version::V2c,
+            "v3" => Version::V3,
+            other => return Err(format!("version '{other}' is not v1, v2c or v3")),
+        };
+        let raw = |k: &str| s.get(k).and_then(serde_json::Value::as_str);
+        let user = if version == Version::V3 {
+            let level = match text_setting(s, "security_level") {
+                "no_auth_no_priv" => Level::NoAuthNoPriv,
+                "auth_no_priv" => Level::AuthNoPriv,
+                "" | "auth_priv" => Level::AuthPriv,
+                other => return Err(format!("unknown security_level '{other}'")),
+            };
+            let auth = Auth::from_name(match text_setting(s, "auth_protocol") {
+                "" => "sha",
+                a => a,
+            })
+            .ok_or("auth_protocol is not md5, sha, sha224, sha256, sha384 or sha512")?;
+            let privacy = Privacy::from_name(match text_setting(s, "priv_protocol") {
+                "" => "aes",
+                p => p,
+            })
+            .ok_or("priv_protocol is not des, aes, aes192 or aes256")?;
+            let name = text_setting(s, "user");
+            if name.is_empty() {
+                return Err("SNMPv3 needs the user setting".into());
+            }
+            // Passwords are taken as given, spaces included.
+            let password = |k: &str| raw(k).unwrap_or("").to_string();
+            Some(User::new(
+                name,
+                level,
+                Some((auth, &password("auth_password"))),
+                Some((privacy, &password("priv_password"))),
+            )?)
+        } else {
+            None
+        };
+        let hex_setting = |k: &str| -> Result<Option<Vec<u8>>, String> {
+            match text_setting(s, k) {
+                "" => Ok(None),
+                h => ber::parse_hex(h).map(Some).map_err(|e| format!("{k}: {e}")),
+            }
+        };
+        let context_engine_id = hex_setting("context_engine_id")?;
+        let seed = random_seed();
+        let local_engine_id = match hex_setting("local_engine_id")? {
+            Some(id) if (5..=32).contains(&id.len()) => id,
+            Some(_) => return Err("local_engine_id must be 5 to 32 bytes (RFC 3411)".into()),
+            // RFC 3411's format 5 (octets) behind the high bit, with random
+            // octets: unique, though not kept across restarts.
+            None => {
+                let mut id = vec![0x80, 0, 0, 0, 5];
+                id.extend_from_slice(&seed.to_be_bytes());
+                id
+            }
+        };
+        let trap = match s.get("trap_port").and_then(serde_json::Value::as_u64) {
+            None => None,
+            Some(p) => {
+                let address = match text_setting(s, "trap_bind_address") {
+                    "" => None,
+                    a => Some(
+                        a.parse::<IpAddr>()
+                            .map_err(|_| format!("trap_bind_address '{a}' is not an IP address"))?,
+                    ),
+                };
+                Some((
+                    address,
+                    u16::try_from(p).map_err(|_| "trap_port is out of range")?,
+                ))
+            }
+        };
+        let agent = if ctx.host.is_unspecified() {
+            if trap.is_none() {
+                return Err("give the agent's address as host, or set trap_port to receive notifications from any sender".into());
+            }
+            None
+        } else {
+            Some(SocketAddr::new(ctx.host, ctx.port.unwrap_or(161)))
+        };
+        let security = match &user {
+            Some(user) => Security::V3 {
+                user: user.clone(),
+                context_name: text_setting(s, "context_name").as_bytes().to_vec(),
+                context_engine_id,
+            },
+            None => Security::Community {
+                version,
+                read: raw("community").unwrap_or("public").as_bytes().to_vec(),
+                write: raw("write_community").unwrap_or("").as_bytes().to_vec(),
+            },
+        };
+        Ok(Settings {
+            agent,
+            security,
+            user,
+            timeout: num("timeout_ms", 1500).max(1),
+            retries: num("retries", 2) as u32,
+            max_repetitions: num("max_repetitions", 20).max(1) as u32,
+            interval: num("poll_interval_ms", interval).max(100),
+            trap,
+            trap_community: raw("trap_community").unwrap_or("").as_bytes().to_vec(),
+            local_engine_id,
+            seed,
+        })
+    }
+}
+
 /// An agent's side of the exchange, for tests of modules built on this
 /// layer: it answers GET, GETNEXT, GETBULK and SET over a sorted table,
 /// for v1, v2c and v3 with one user, and sends notifications.

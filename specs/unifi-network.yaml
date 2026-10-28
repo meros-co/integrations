@@ -1,0 +1,1421 @@
+spec: 1
+id: unifi-network
+name: UniFi Network (Network API)
+vendor: Ubiquiti
+category: other
+source:
+  - title: "UniFi Network API reference, version 11.0.97 (OpenAPI document and Getting Started)"
+    author: Ubiquiti
+    url: "https://developer.ui.com/network/v11.0.97/gettingstarted"
+    note: >
+      The Network application's official API, served by a UniFi console at https://<console>/proxy/network/integration
+      (and through Ubiquiti's cloud connector), with an API key created in the application sent in X-API-Key. Every
+      operation of the 11.0.97 OpenAPI document (/network/v11.0.97/openapi.json): application info, sites, devices
+      pending adoption, adopted devices (list, details with ports, PoE and radios, latest statistics, adopt,
+      remove, restart), port actions (POWER_CYCLE of a port's PoE), connected clients and their guest-access
+      actions, networks (VLANs), Wi-Fi broadcasts, firewall zones and policies and their ordering, ACL rules and
+      their ordering, DNS policies, traffic matching lists, hotspot vouchers, WANs, VPN servers and site-to-site
+      tunnels, RADIUS profiles, device tags, LAGs, MC-LAG domains, switch stacks, countries and DPI applications
+      and categories; paging with offset and limit (25 by default, at most 200) and the filter syntax.
+
+transport:
+  type: http
+  port: 443
+  scheme: https
+  # A console serves its own certificate.
+  accept_invalid_certs: true
+  auth: header
+  auth_header: X-API-Key
+  timeout_ms: 8000
+  probe: { method: GET, path: /proxy/network/integration/v1/info }
+
+settings:
+  token: { type: string, secret: true, max_length: 256, label: API key,
+           description: "An API key created in the Network application's Integrations section on the console (Create New API Key), sent as X-API-Key." }
+  site_id: { type: string, required: true, pattern: '^[0-9A-Fa-f-]{36}$', max_length: 36, label: Site ID,
+             description: "The site this device reads and controls, as list_sites gives its id." }
+
+ports:
+  - { port: 443, protocol: https, role: control, note: "the UniFi console's web server" }
+
+models:
+  - id: network
+    name: "UniFi Network application on a UniFi console (Cloud Gateway, Dream Machine, Cloud Key, UniFi OS Server), its switches, gateways and access points"
+    supports: [list_countries, list_countries_filtered, list_dpi_applications, list_dpi_applications_filtered, list_dpi_application_categories, list_dpi_application_categories_filtered, get_application_info, list_pending_devices, list_pending_devices_filtered, list_sites, list_sites_filtered, list_acl_rules, list_acl_rules_filtered, create_acl_rule, get_user_defined_acl_rule_ordering, reorder_user_defined_acl_rules, delete_acl_rule, get_acl_rule, update_acl_rule, list_clients, list_clients_filtered, get_client, client_action, list_device_tags, list_device_tags_filtered, list_devices, list_devices_filtered, adopt_devices, remove_device, get_device, restart_device, power_cycle_port, get_device_statistics, list_dns_policies, list_dns_policies_filtered, create_dns_policy, delete_dns_policy, get_dns_policy, update_dns_policy, list_firewall_policies, list_firewall_policies_filtered, create_firewall_policy, get_user_defined_firewall_policy_ordering, reorder_user_defined_firewall_policies, delete_firewall_policy, get_firewall_policy, patch_firewall_policy, update_firewall_policy, list_firewall_zones, list_firewall_zones_filtered, create_custom_firewall_zone, delete_custom_firewall_zone, get_firewall_zone, update_firewall_zone, delete_vouchers, list_vouchers, list_vouchers_filtered, generate_vouchers, delete_voucher, get_voucher_details, list_networks, list_networks_filtered, create_network, delete_network, get_network_details, update_network, get_network_references, list_radius_profiles, list_radius_profiles_filtered, list_lags, list_lags_filtered, get_lag, list_mc_lag_domains, list_mc_lag_domains_filtered, get_mc_lag_domain, list_switch_stacks, list_switch_stacks_filtered, get_switch_stack, list_traffic_matching_lists, list_traffic_matching_lists_filtered, create_traffic_matching_list, delete_traffic_matching_list, get_traffic_matching_list, update_traffic_matching_list, list_vpn_servers, list_vpn_servers_filtered, list_site_to_site_vpn_tunnels, list_site_to_site_vpn_tunnels_filtered, list_wan_interfaces, list_wifi_broadcasts, list_wifi_broadcasts_filtered, create_wifi_broadcast, delete_wifi_broadcast, get_wifi_broadcast_details, update_wifi_broadcast]
+    verification: none
+    notes: >
+      One device per site: devices, ports, clients and the site's configuration as the Network application reports
+      them. A switch's ports, PoE and uplinks are read through it; the application, not the switch, is reached.
+
+commands:
+  list_countries:
+    summary: List Countries (GET /v1/countries)
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: /proxy/network/integration/v1/countries, query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_countries_filtered:
+    summary: "List Countries (GET /v1/countries), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: /proxy/network/integration/v1/countries, query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_dpi_applications:
+    summary: List DPI Applications (GET /v1/dpi/applications)
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: /proxy/network/integration/v1/dpi/applications, query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_dpi_applications_filtered:
+    summary: "List DPI Applications (GET /v1/dpi/applications), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: /proxy/network/integration/v1/dpi/applications, query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_dpi_application_categories:
+    summary: List DPI Application Categories (GET /v1/dpi/categories)
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: /proxy/network/integration/v1/dpi/categories, query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_dpi_application_categories_filtered:
+    summary: "List DPI Application Categories (GET /v1/dpi/categories), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: /proxy/network/integration/v1/dpi/categories, query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  get_application_info:
+    summary: Get Application Info (GET /v1/info)
+    send: { method: GET, path: /proxy/network/integration/v1/info }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_pending_devices:
+    summary: List Devices Pending Adoption (GET /v1/pending-devices)
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: /proxy/network/integration/v1/pending-devices, query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_pending_devices_filtered:
+    summary: "List Devices Pending Adoption (GET /v1/pending-devices), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: /proxy/network/integration/v1/pending-devices, query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_sites:
+    summary: List Local Sites (GET /v1/sites)
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: /proxy/network/integration/v1/sites, query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_sites_filtered:
+    summary: "List Local Sites (GET /v1/sites), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: /proxy/network/integration/v1/sites, query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_acl_rules:
+    summary: "List ACL Rules (GET /v1/sites/{siteId}/acl-rules)"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/acl-rules", query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_acl_rules_filtered:
+    summary: "List ACL Rules (GET /v1/sites/{siteId}/acl-rules), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/acl-rules", query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  create_acl_rule:
+    summary: "Create ACL Rule (POST /v1/sites/{siteId}/acl-rules)"
+    params:
+      body: { type: json, required: true, label: Body, description: "The request body, a \"ACL rule update\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: POST, path: "/proxy/network/integration/v1/sites/{settings.site_id}/acl-rules", body: "{body}", content_type: application/json }
+    expect: { status: 201, json_path: $ }
+    returns: value
+  get_user_defined_acl_rule_ordering:
+    summary: "Get User-Defined ACL Rule Ordering (GET /v1/sites/{siteId}/acl-rules/ordering)"
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/acl-rules/ordering" }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  reorder_user_defined_acl_rules:
+    summary: "Reorder User-Defined ACL Rules (PUT /v1/sites/{siteId}/acl-rules/ordering)"
+    params:
+      body: { type: json, required: true, label: Body, description: "The request body, a \"ACL rule ordering\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: PUT, path: "/proxy/network/integration/v1/sites/{settings.site_id}/acl-rules/ordering", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  delete_acl_rule:
+    summary: "Delete ACL Rule (DELETE /v1/sites/{siteId}/acl-rules/{aclRuleId})"
+    params:
+      acl_rule_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Acl rule ID, description: "The aclRuleId the reference names in this operation's path." }
+    send: { method: DELETE, path: "/proxy/network/integration/v1/sites/{settings.site_id}/acl-rules/{acl_rule_id}" }
+    expect: { status: 200 }
+    returns: ack
+  get_acl_rule:
+    summary: "Get ACL Rule (GET /v1/sites/{siteId}/acl-rules/{aclRuleId})"
+    params:
+      acl_rule_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Acl rule ID, description: "The aclRuleId the reference names in this operation's path." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/acl-rules/{acl_rule_id}" }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  update_acl_rule:
+    summary: "Update ACL Rule (PUT /v1/sites/{siteId}/acl-rules/{aclRuleId})"
+    params:
+      acl_rule_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Acl rule ID, description: "The aclRuleId the reference names in this operation's path." }
+      body: { type: json, required: true, label: Body, description: "The request body, a \"ACL rule update\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: PUT, path: "/proxy/network/integration/v1/sites/{settings.site_id}/acl-rules/{acl_rule_id}", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_clients:
+    summary: "List Connected Clients (GET /v1/sites/{siteId}/clients)"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/clients", query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_clients_filtered:
+    summary: "List Connected Clients (GET /v1/sites/{siteId}/clients), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/clients", query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  get_client:
+    summary: "Get Connected Client Details (GET /v1/sites/{siteId}/clients/{clientId})"
+    params:
+      client_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Client ID, description: "The clientId the reference names in this operation's path." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/clients/{client_id}" }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  client_action:
+    summary: "Execute Client Action (POST /v1/sites/{siteId}/clients/{clientId}/actions)"
+    params:
+      client_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Client ID, description: "The clientId the reference names in this operation's path." }
+      body: { type: json, required: true, label: Body, description: "The request body, a \"Client action request\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: POST, path: "/proxy/network/integration/v1/sites/{settings.site_id}/clients/{client_id}/actions", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_device_tags:
+    summary: "List Device Tags (GET /v1/sites/{siteId}/device-tags)"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/device-tags", query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_device_tags_filtered:
+    summary: "List Device Tags (GET /v1/sites/{siteId}/device-tags), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/device-tags", query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_devices:
+    summary: "List Adopted Devices (GET /v1/sites/{siteId}/devices)"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/devices", query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_devices_filtered:
+    summary: "List Adopted Devices (GET /v1/sites/{siteId}/devices), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/devices", query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  adopt_devices:
+    summary: "Adopt Devices (POST /v1/sites/{siteId}/devices)"
+    params:
+      body: { type: json, required: true, label: Body, description: "The request body, a \"IntegrationDeviceAdoptionRequestDto\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: POST, path: "/proxy/network/integration/v1/sites/{settings.site_id}/devices", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  remove_device:
+    summary: "Remove (Unadopt) Device (DELETE /v1/sites/{siteId}/devices/{deviceId})"
+    params:
+      device_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Device ID, description: "The deviceId the reference names in this operation's path." }
+    send: { method: DELETE, path: "/proxy/network/integration/v1/sites/{settings.site_id}/devices/{device_id}" }
+    expect: { status: 200 }
+    returns: ack
+  get_device:
+    summary: "Get Adopted Device Details (GET /v1/sites/{siteId}/devices/{deviceId})"
+    params:
+      device_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Device ID, description: "The deviceId the reference names in this operation's path." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/devices/{device_id}" }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  restart_device:
+    summary: "Execute Adopted Device Action (POST /v1/sites/{siteId}/devices/{deviceId}/actions)"
+    params:
+      device_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Device ID, description: "The deviceId the reference names in this operation's path." }
+    send: { method: POST, path: "/proxy/network/integration/v1/sites/{settings.site_id}/devices/{device_id}/actions", body: "{\"action\":\"RESTART\"}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  power_cycle_port:
+    summary: "Execute Port Action (POST /v1/sites/{siteId}/devices/{deviceId}/interfaces/ports/{portIdx}/actions)"
+    params:
+      port_idx: { type: int, min: 0, max: 2147483647, required: true, label: Port idx, description: "The portIdx the reference names in this operation's path." }
+      device_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Device ID, description: "The deviceId the reference names in this operation's path." }
+    send: { method: POST, path: "/proxy/network/integration/v1/sites/{settings.site_id}/devices/{device_id}/interfaces/ports/{port_idx}/actions", body: "{\"action\":\"POWER_CYCLE\"}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  get_device_statistics:
+    summary: "Get Latest Adopted Device Statistics (GET /v1/sites/{siteId}/devices/{deviceId}/statistics/latest)"
+    params:
+      device_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Device ID, description: "The deviceId the reference names in this operation's path." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/devices/{device_id}/statistics/latest" }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_dns_policies:
+    summary: "List DNS Policies (GET /v1/sites/{siteId}/dns/policies)"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/dns/policies", query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_dns_policies_filtered:
+    summary: "List DNS Policies (GET /v1/sites/{siteId}/dns/policies), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/dns/policies", query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  create_dns_policy:
+    summary: "Create DNS Policy (POST /v1/sites/{siteId}/dns/policies)"
+    params:
+      body: { type: json, required: true, label: Body, description: "The request body, a \"Create or update DNS policy\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: POST, path: "/proxy/network/integration/v1/sites/{settings.site_id}/dns/policies", body: "{body}", content_type: application/json }
+    expect: { status: 201, json_path: $ }
+    returns: value
+  delete_dns_policy:
+    summary: "Delete DNS Policy (DELETE /v1/sites/{siteId}/dns/policies/{dnsPolicyId})"
+    params:
+      dns_policy_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Dns policy ID, description: "The dnsPolicyId the reference names in this operation's path." }
+    send: { method: DELETE, path: "/proxy/network/integration/v1/sites/{settings.site_id}/dns/policies/{dns_policy_id}" }
+    expect: { status: 200 }
+    returns: ack
+  get_dns_policy:
+    summary: "Get DNS Policy (GET /v1/sites/{siteId}/dns/policies/{dnsPolicyId})"
+    params:
+      dns_policy_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Dns policy ID, description: "The dnsPolicyId the reference names in this operation's path." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/dns/policies/{dns_policy_id}" }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  update_dns_policy:
+    summary: "Update DNS Policy (PUT /v1/sites/{siteId}/dns/policies/{dnsPolicyId})"
+    params:
+      dns_policy_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Dns policy ID, description: "The dnsPolicyId the reference names in this operation's path." }
+      body: { type: json, required: true, label: Body, description: "The request body, a \"Create or update DNS policy\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: PUT, path: "/proxy/network/integration/v1/sites/{settings.site_id}/dns/policies/{dns_policy_id}", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_firewall_policies:
+    summary: "List Firewall Policies (GET /v1/sites/{siteId}/firewall/policies)"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/firewall/policies", query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_firewall_policies_filtered:
+    summary: "List Firewall Policies (GET /v1/sites/{siteId}/firewall/policies), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/firewall/policies", query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  create_firewall_policy:
+    summary: "Create Firewall Policy (POST /v1/sites/{siteId}/firewall/policies)"
+    params:
+      body: { type: json, required: true, label: Body, description: "The request body, a \"Create or update firewall policy\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: POST, path: "/proxy/network/integration/v1/sites/{settings.site_id}/firewall/policies", body: "{body}", content_type: application/json }
+    expect: { status: 201, json_path: $ }
+    returns: value
+  get_user_defined_firewall_policy_ordering:
+    summary: "Get User-Defined Firewall Policy Ordering (GET /v1/sites/{siteId}/firewall/policies/ordering)"
+    params:
+      source_firewall_zone_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Source firewall zone ID, description: "The sourceFirewallZoneId the reference names in this operation's query." }
+      destination_firewall_zone_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Destination firewall zone ID, description: "The destinationFirewallZoneId the reference names in this operation's query." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/firewall/policies/ordering", query: { sourceFirewallZoneId: "{source_firewall_zone_id}", destinationFirewallZoneId: "{destination_firewall_zone_id}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  reorder_user_defined_firewall_policies:
+    summary: "Reorder User-Defined Firewall Policies (PUT /v1/sites/{siteId}/firewall/policies/ordering)"
+    params:
+      source_firewall_zone_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Source firewall zone ID, description: "The sourceFirewallZoneId the reference names in this operation's query." }
+      destination_firewall_zone_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Destination firewall zone ID, description: "The destinationFirewallZoneId the reference names in this operation's query." }
+      body: { type: json, required: true, label: Body, description: "The request body, a \"IntegrationFirewallPolicyOrderingDto\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: PUT, path: "/proxy/network/integration/v1/sites/{settings.site_id}/firewall/policies/ordering", query: { sourceFirewallZoneId: "{source_firewall_zone_id}", destinationFirewallZoneId: "{destination_firewall_zone_id}" }, body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  delete_firewall_policy:
+    summary: "Delete Firewall Policy (DELETE /v1/sites/{siteId}/firewall/policies/{firewallPolicyId})"
+    params:
+      firewall_policy_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Firewall policy ID, description: "The firewallPolicyId the reference names in this operation's path." }
+    send: { method: DELETE, path: "/proxy/network/integration/v1/sites/{settings.site_id}/firewall/policies/{firewall_policy_id}" }
+    expect: { status: 200 }
+    returns: ack
+  get_firewall_policy:
+    summary: "Get Firewall Policy (GET /v1/sites/{siteId}/firewall/policies/{firewallPolicyId})"
+    params:
+      firewall_policy_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Firewall policy ID, description: "The firewallPolicyId the reference names in this operation's path." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/firewall/policies/{firewall_policy_id}" }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  patch_firewall_policy:
+    summary: "Patch Firewall Policy (PATCH /v1/sites/{siteId}/firewall/policies/{firewallPolicyId})"
+    params:
+      firewall_policy_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Firewall policy ID, description: "The firewallPolicyId the reference names in this operation's path." }
+      body: { type: json, required: true, label: Body, description: "The request body, a \"Patch firewall policy\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: PATCH, path: "/proxy/network/integration/v1/sites/{settings.site_id}/firewall/policies/{firewall_policy_id}", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  update_firewall_policy:
+    summary: "Update Firewall Policy (PUT /v1/sites/{siteId}/firewall/policies/{firewallPolicyId})"
+    params:
+      firewall_policy_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Firewall policy ID, description: "The firewallPolicyId the reference names in this operation's path." }
+      body: { type: json, required: true, label: Body, description: "The request body, a \"Create or update firewall policy\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: PUT, path: "/proxy/network/integration/v1/sites/{settings.site_id}/firewall/policies/{firewall_policy_id}", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_firewall_zones:
+    summary: "List Firewall Zones (GET /v1/sites/{siteId}/firewall/zones)"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/firewall/zones", query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_firewall_zones_filtered:
+    summary: "List Firewall Zones (GET /v1/sites/{siteId}/firewall/zones), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/firewall/zones", query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  create_custom_firewall_zone:
+    summary: "Create Custom Firewall Zone (POST /v1/sites/{siteId}/firewall/zones)"
+    params:
+      body: { type: json, required: true, label: Body, description: "The request body, a \"Create or update firewall zone\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: POST, path: "/proxy/network/integration/v1/sites/{settings.site_id}/firewall/zones", body: "{body}", content_type: application/json }
+    expect: { status: 201, json_path: $ }
+    returns: value
+  delete_custom_firewall_zone:
+    summary: "Delete Custom Firewall Zone (DELETE /v1/sites/{siteId}/firewall/zones/{firewallZoneId})"
+    params:
+      firewall_zone_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Firewall zone ID, description: "The firewallZoneId the reference names in this operation's path." }
+    send: { method: DELETE, path: "/proxy/network/integration/v1/sites/{settings.site_id}/firewall/zones/{firewall_zone_id}" }
+    expect: { status: 200 }
+    returns: ack
+  get_firewall_zone:
+    summary: "Get Firewall Zone (GET /v1/sites/{siteId}/firewall/zones/{firewallZoneId})"
+    params:
+      firewall_zone_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Firewall zone ID, description: "The firewallZoneId the reference names in this operation's path." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/firewall/zones/{firewall_zone_id}" }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  update_firewall_zone:
+    summary: "Update Firewall Zone (PUT /v1/sites/{siteId}/firewall/zones/{firewallZoneId})"
+    params:
+      firewall_zone_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Firewall zone ID, description: "The firewallZoneId the reference names in this operation's path." }
+      body: { type: json, required: true, label: Body, description: "The request body, a \"Create or update firewall zone\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: PUT, path: "/proxy/network/integration/v1/sites/{settings.site_id}/firewall/zones/{firewall_zone_id}", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  delete_vouchers:
+    summary: "Delete Vouchers (DELETE /v1/sites/{siteId}/hotspot/vouchers)"
+    params:
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "The filter the reference names in this operation's query." }
+    send: { method: DELETE, path: "/proxy/network/integration/v1/sites/{settings.site_id}/hotspot/vouchers", query: { filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_vouchers:
+    summary: "List Vouchers (GET /v1/sites/{siteId}/hotspot/vouchers)"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 1000, default: 100, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/hotspot/vouchers", query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_vouchers_filtered:
+    summary: "List Vouchers (GET /v1/sites/{siteId}/hotspot/vouchers), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 1000, default: 100, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/hotspot/vouchers", query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  generate_vouchers:
+    summary: "Generate Vouchers (POST /v1/sites/{siteId}/hotspot/vouchers)"
+    params:
+      body: { type: json, required: true, label: Body, description: "The request body, a \"Hotspot voucher creation request\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: POST, path: "/proxy/network/integration/v1/sites/{settings.site_id}/hotspot/vouchers", body: "{body}", content_type: application/json }
+    expect: { status: 201, json_path: $ }
+    returns: value
+  delete_voucher:
+    summary: "Delete Voucher (DELETE /v1/sites/{siteId}/hotspot/vouchers/{voucherId})"
+    params:
+      voucher_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Voucher ID, description: "The voucherId the reference names in this operation's path." }
+    send: { method: DELETE, path: "/proxy/network/integration/v1/sites/{settings.site_id}/hotspot/vouchers/{voucher_id}" }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  get_voucher_details:
+    summary: "Get Voucher Details (GET /v1/sites/{siteId}/hotspot/vouchers/{voucherId})"
+    params:
+      voucher_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Voucher ID, description: "The voucherId the reference names in this operation's path." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/hotspot/vouchers/{voucher_id}" }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_networks:
+    summary: "List Networks (GET /v1/sites/{siteId}/networks)"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/networks", query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_networks_filtered:
+    summary: "List Networks (GET /v1/sites/{siteId}/networks), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/networks", query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  create_network:
+    summary: "Create Network (POST /v1/sites/{siteId}/networks)"
+    params:
+      body: { type: json, required: true, label: Body, description: "The request body, a \"Create or update Network\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: POST, path: "/proxy/network/integration/v1/sites/{settings.site_id}/networks", body: "{body}", content_type: application/json }
+    expect: { status: 201, json_path: $ }
+    returns: value
+  delete_network:
+    summary: "Delete Network (DELETE /v1/sites/{siteId}/networks/{networkId})"
+    params:
+      network_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Network ID, description: "The networkId the reference names in this operation's path." }
+      force: { type: bool, default: false, label: Force, description: True deletes it even where it is still in use. }
+    send: { method: DELETE, path: "/proxy/network/integration/v1/sites/{settings.site_id}/networks/{network_id}", query: { force: "{force}" } }
+    expect: { status: 200 }
+    returns: ack
+  get_network_details:
+    summary: "Get Network Details (GET /v1/sites/{siteId}/networks/{networkId})"
+    params:
+      network_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Network ID, description: "The networkId the reference names in this operation's path." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/networks/{network_id}" }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  update_network:
+    summary: "Update Network (PUT /v1/sites/{siteId}/networks/{networkId})"
+    params:
+      network_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Network ID, description: "The networkId the reference names in this operation's path." }
+      body: { type: json, required: true, label: Body, description: "The request body, a \"Create or update Network\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: PUT, path: "/proxy/network/integration/v1/sites/{settings.site_id}/networks/{network_id}", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  get_network_references:
+    summary: "Get Network References (GET /v1/sites/{siteId}/networks/{networkId}/references)"
+    params:
+      network_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Network ID, description: "The networkId the reference names in this operation's path." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/networks/{network_id}/references" }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_radius_profiles:
+    summary: "List Radius Profiles (GET /v1/sites/{siteId}/radius/profiles)"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/radius/profiles", query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_radius_profiles_filtered:
+    summary: "List Radius Profiles (GET /v1/sites/{siteId}/radius/profiles), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/radius/profiles", query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_lags:
+    summary: "List LAGs (GET /v1/sites/{siteId}/switching/lags)"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/switching/lags", query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_lags_filtered:
+    summary: "List LAGs (GET /v1/sites/{siteId}/switching/lags), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/switching/lags", query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  get_lag:
+    summary: "Get LAG Details (GET /v1/sites/{siteId}/switching/lags/{lagId})"
+    params:
+      lag_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Lag ID, description: "The lagId the reference names in this operation's path." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/switching/lags/{lag_id}" }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_mc_lag_domains:
+    summary: "List MC-LAG Domains (GET /v1/sites/{siteId}/switching/mc-lag-domains)"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/switching/mc-lag-domains", query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_mc_lag_domains_filtered:
+    summary: "List MC-LAG Domains (GET /v1/sites/{siteId}/switching/mc-lag-domains), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/switching/mc-lag-domains", query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  get_mc_lag_domain:
+    summary: "Get MC-LAG Domain (GET /v1/sites/{siteId}/switching/mc-lag-domains/{mcLagDomainId})"
+    params:
+      mc_lag_domain_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Mc lag domain ID, description: "The mcLagDomainId the reference names in this operation's path." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/switching/mc-lag-domains/{mc_lag_domain_id}" }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_switch_stacks:
+    summary: "List Switch Stacks (GET /v1/sites/{siteId}/switching/switch-stacks)"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/switching/switch-stacks", query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_switch_stacks_filtered:
+    summary: "List Switch Stacks (GET /v1/sites/{siteId}/switching/switch-stacks), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/switching/switch-stacks", query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  get_switch_stack:
+    summary: "Get Switch Stack (GET /v1/sites/{siteId}/switching/switch-stacks/{switchStackId})"
+    params:
+      switch_stack_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Switch stack ID, description: "The switchStackId the reference names in this operation's path." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/switching/switch-stacks/{switch_stack_id}" }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_traffic_matching_lists:
+    summary: "List Traffic Matching Lists (GET /v1/sites/{siteId}/traffic-matching-lists)"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/traffic-matching-lists", query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_traffic_matching_lists_filtered:
+    summary: "List Traffic Matching Lists (GET /v1/sites/{siteId}/traffic-matching-lists), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/traffic-matching-lists", query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  create_traffic_matching_list:
+    summary: "Create Traffic Matching List (POST /v1/sites/{siteId}/traffic-matching-lists)"
+    params:
+      body: { type: json, required: true, label: Body, description: "The request body, a \"Create or update traffic matching list\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: POST, path: "/proxy/network/integration/v1/sites/{settings.site_id}/traffic-matching-lists", body: "{body}", content_type: application/json }
+    expect: { status: 201, json_path: $ }
+    returns: value
+  delete_traffic_matching_list:
+    summary: "Delete Traffic Matching List (DELETE /v1/sites/{siteId}/traffic-matching-lists/{trafficMatchingListId})"
+    params:
+      traffic_matching_list_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Traffic matching list ID, description: "The trafficMatchingListId the reference names in this operation's path." }
+    send: { method: DELETE, path: "/proxy/network/integration/v1/sites/{settings.site_id}/traffic-matching-lists/{traffic_matching_list_id}" }
+    expect: { status: 200 }
+    returns: ack
+  get_traffic_matching_list:
+    summary: "Get Traffic Matching List (GET /v1/sites/{siteId}/traffic-matching-lists/{trafficMatchingListId})"
+    params:
+      traffic_matching_list_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Traffic matching list ID, description: "The trafficMatchingListId the reference names in this operation's path." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/traffic-matching-lists/{traffic_matching_list_id}" }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  update_traffic_matching_list:
+    summary: "Update Traffic Matching List (PUT /v1/sites/{siteId}/traffic-matching-lists/{trafficMatchingListId})"
+    params:
+      traffic_matching_list_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Traffic matching list ID, description: "The trafficMatchingListId the reference names in this operation's path." }
+      body: { type: json, required: true, label: Body, description: "The request body, a \"Create or update traffic matching list\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: PUT, path: "/proxy/network/integration/v1/sites/{settings.site_id}/traffic-matching-lists/{traffic_matching_list_id}", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_vpn_servers:
+    summary: "List VPN Servers (GET /v1/sites/{siteId}/vpn/servers)"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/vpn/servers", query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_vpn_servers_filtered:
+    summary: "List VPN Servers (GET /v1/sites/{siteId}/vpn/servers), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/vpn/servers", query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_site_to_site_vpn_tunnels:
+    summary: "List Site-To-Site VPN Tunnels (GET /v1/sites/{siteId}/vpn/site-to-site-tunnels)"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/vpn/site-to-site-tunnels", query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_site_to_site_vpn_tunnels_filtered:
+    summary: "List Site-To-Site VPN Tunnels (GET /v1/sites/{siteId}/vpn/site-to-site-tunnels), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/vpn/site-to-site-tunnels", query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_wan_interfaces:
+    summary: "List WAN Interfaces (GET /v1/sites/{siteId}/wans)"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/wans", query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_wifi_broadcasts:
+    summary: "List Wifi Broadcasts (GET /v1/sites/{siteId}/wifi/broadcasts)"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/wifi/broadcasts", query: { offset: "{offset}", limit: "{limit}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  list_wifi_broadcasts_filtered:
+    summary: "List Wifi Broadcasts (GET /v1/sites/{siteId}/wifi/broadcasts), filtered"
+    params:
+      offset: { type: int, min: 0, max: 2147483647, default: 0, label: Offset, description: "How many items to skip before the first returned, from 0." }
+      limit: { type: int, min: 0, max: 200, default: 25, label: Limit, description: "How many items to return, at most 200 (25 by default)." }
+      filter: { type: string, max_length: 4096, required: true, label: Filter, description: "A filter expression in the API's syntax, such as name.eq('Studio'), on the properties the reference lists for this endpoint." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/wifi/broadcasts", query: { offset: "{offset}", limit: "{limit}", filter: "{filter}" } }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  create_wifi_broadcast:
+    summary: "Create Wifi Broadcast (POST /v1/sites/{siteId}/wifi/broadcasts)"
+    params:
+      body: { type: json, required: true, label: Body, description: "The request body, a \"Wifi broadcast create or update\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: POST, path: "/proxy/network/integration/v1/sites/{settings.site_id}/wifi/broadcasts", body: "{body}", content_type: application/json }
+    expect: { status: 201, json_path: $ }
+    returns: value
+  delete_wifi_broadcast:
+    summary: "Delete Wifi Broadcast (DELETE /v1/sites/{siteId}/wifi/broadcasts/{wifiBroadcastId})"
+    params:
+      wifi_broadcast_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Wifi broadcast ID, description: "The wifiBroadcastId the reference names in this operation's path." }
+      force: { type: bool, default: false, label: Force, description: True deletes it even where it is still in use. }
+    send: { method: DELETE, path: "/proxy/network/integration/v1/sites/{settings.site_id}/wifi/broadcasts/{wifi_broadcast_id}", query: { force: "{force}" } }
+    expect: { status: 200 }
+    returns: ack
+  get_wifi_broadcast_details:
+    summary: "Get Wifi Broadcast Details (GET /v1/sites/{siteId}/wifi/broadcasts/{wifiBroadcastId})"
+    params:
+      wifi_broadcast_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Wifi broadcast ID, description: "The wifiBroadcastId the reference names in this operation's path." }
+    send: { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/wifi/broadcasts/{wifi_broadcast_id}" }
+    expect: { status: 200, json_path: $ }
+    returns: value
+  update_wifi_broadcast:
+    summary: "Update Wifi Broadcast (PUT /v1/sites/{siteId}/wifi/broadcasts/{wifiBroadcastId})"
+    params:
+      wifi_broadcast_id: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", max_length: 36, required: true, label: Wifi broadcast ID, description: "The wifiBroadcastId the reference names in this operation's path." }
+      body: { type: json, required: true, label: Body, description: "The request body, a \"Wifi broadcast create or update\" object as the UniFi Network API 11.0.97 reference defines it." }
+    send: { method: PUT, path: "/proxy/network/integration/v1/sites/{settings.site_id}/wifi/broadcasts/{wifi_broadcast_id}", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: $ }
+    returns: value
+
+state:
+  sites.*.internal_reference: { type: string, description: "The internalReference property of the reference's \"Site overview\"" }
+  sites.*.name: { type: string, description: "The name property of the reference's \"Site overview\"" }
+  pending_devices.*.adoption_target_site_ids: { type: string, description: "The adoptionTargetSiteIds property of the reference's \"Device pending adoption\", as JSON text" }
+  pending_devices.*.features: { type: string, description: "The features property of the reference's \"Device pending adoption\", as JSON text" }
+  pending_devices.*.firmware_updatable: { type: bool, description: "The firmwareUpdatable property of the reference's \"Device pending adoption\"" }
+  pending_devices.*.firmware_version: { type: string, description: "The firmwareVersion property of the reference's \"Device pending adoption\"" }
+  pending_devices.*.ip_address: { type: string, description: "The ipAddress property of the reference's \"Device pending adoption\"" }
+  pending_devices.*.model: { type: string, description: "The model property of the reference's \"Device pending adoption\"" }
+  pending_devices.*.state: { type: string, description: "The state property of the reference's \"Device pending adoption\": ONLINE, OFFLINE, PENDING_ADOPTION, UPDATING, GETTING_READY, ADOPTING, DELETING, CONNECTION_INTERRUPTED, ISOLATED, U5G_INCORRECT_TOPOLOGY" }
+  pending_devices.*.supported: { type: bool, description: "The supported property of the reference's \"Device pending adoption\"" }
+  devices.*.features: { type: string, description: "The features property of the reference's \"Adopted device overview\", as JSON text" }
+  devices.*.firmware_updatable: { type: bool, description: Whether a newer firmware can be installed (Adopted device details) }
+  devices.*.firmware_version: { type: string, description: The firmware version (Adopted device details) }
+  devices.*.interfaces: { type: string, description: "The interfaces property of the reference's \"Adopted device overview\", as JSON text" }
+  devices.*.ip_address: { type: string, description: "The ipAddress property of the reference's \"Adopted device overview\"" }
+  devices.*.mac_address: { type: string, description: "The macAddress property of the reference's \"Adopted device overview\"" }
+  devices.*.model: { type: string, description: "The model property of the reference's \"Adopted device overview\"" }
+  devices.*.name: { type: string, description: "The name property of the reference's \"Adopted device overview\"" }
+  devices.*.state: { type: string, description: "The state property of the reference's \"Adopted device overview\": ONLINE, OFFLINE, PENDING_ADOPTION, UPDATING, GETTING_READY, ADOPTING, DELETING, CONNECTION_INTERRUPTED, ISOLATED, U5G_INCORRECT_TOPOLOGY" }
+  devices.*.supported: { type: bool, description: "The supported property of the reference's \"Adopted device overview\"" }
+  clients.*.access: { type: string, description: "The access property of the reference's \"Client overview\", as JSON text" }
+  clients.*.connected_at: { type: string, description: "The connectedAt property of the reference's \"Client overview\"" }
+  clients.*.ip_address: { type: string, description: "The ipAddress property of the reference's \"Client overview\"" }
+  clients.*.name: { type: string, description: "The name property of the reference's \"Client overview\"" }
+  clients.*.type: { type: string, description: "The type property of the reference's \"Client overview\"" }
+  device_tags.*.device_ids: { type: string, description: "The deviceIds property of the reference's \"Device tag\", as JSON text" }
+  device_tags.*.metadata: { type: string, description: "The metadata property of the reference's \"Device tag\", as JSON text" }
+  device_tags.*.name: { type: string, description: "The name property of the reference's \"Device tag\"" }
+  networks.*.default: { type: bool, description: "The default property of the reference's \"Network overview\"" }
+  networks.*.enabled: { type: bool, description: "The enabled property of the reference's \"Network overview\"" }
+  networks.*.management: { type: string, description: "The management property of the reference's \"Network overview\"" }
+  networks.*.metadata: { type: string, description: "The metadata property of the reference's \"Network overview\", as JSON text" }
+  networks.*.name: { type: string, description: "The name property of the reference's \"Network overview\"" }
+  networks.*.vlan_id: { type: int, description: "The vlanId property of the reference's \"Network overview\"" }
+  wifi_broadcasts.*.broadcasting_device_filter: { type: string, description: "The broadcastingDeviceFilter property of the reference's \"Wifi broadcast overview\", as JSON text" }
+  wifi_broadcasts.*.enabled: { type: bool, description: "The enabled property of the reference's \"Wifi broadcast overview\"" }
+  wifi_broadcasts.*.metadata: { type: string, description: "The metadata property of the reference's \"Wifi broadcast overview\", as JSON text" }
+  wifi_broadcasts.*.name: { type: string, description: "The name property of the reference's \"Wifi broadcast overview\"" }
+  wifi_broadcasts.*.network: { type: string, description: "The network property of the reference's \"Wifi broadcast overview\", as JSON text" }
+  wifi_broadcasts.*.security_configuration: { type: string, description: "The securityConfiguration property of the reference's \"Wifi broadcast overview\", as JSON text" }
+  wifi_broadcasts.*.type: { type: string, description: "The type property of the reference's \"Wifi broadcast overview\"" }
+  firewall_zones.*.metadata: { type: string, description: "The metadata property of the reference's \"Firewall zone\", as JSON text" }
+  firewall_zones.*.name: { type: string, description: "The name property of the reference's \"Firewall zone\"" }
+  firewall_zones.*.network_ids: { type: string, description: "The networkIds property of the reference's \"Firewall zone\", as JSON text" }
+  firewall_policies.*.action: { type: string, description: "The action property of the reference's \"Firewall policy\", as JSON text" }
+  firewall_policies.*.connection_state_filter: { type: string, description: "The connectionStateFilter property of the reference's \"Firewall policy\", as JSON text" }
+  firewall_policies.*.description: { type: string, description: "The description property of the reference's \"Firewall policy\"" }
+  firewall_policies.*.destination: { type: string, description: "The destination property of the reference's \"Firewall policy\", as JSON text" }
+  firewall_policies.*.enabled: { type: bool, description: "The enabled property of the reference's \"Firewall policy\"" }
+  firewall_policies.*.index: { type: int, description: "The index property of the reference's \"Firewall policy\"" }
+  firewall_policies.*.ip_protocol_scope: { type: string, description: "The ipProtocolScope property of the reference's \"Firewall policy\", as JSON text" }
+  firewall_policies.*.ipsec_filter: { type: string, description: "The ipsecFilter property of the reference's \"Firewall policy\": MATCH_ENCRYPTED, MATCH_NOT_ENCRYPTED" }
+  firewall_policies.*.logging_enabled: { type: bool, description: "The loggingEnabled property of the reference's \"Firewall policy\"" }
+  firewall_policies.*.metadata: { type: string, description: "The metadata property of the reference's \"Firewall policy\", as JSON text" }
+  firewall_policies.*.name: { type: string, description: "The name property of the reference's \"Firewall policy\"" }
+  firewall_policies.*.report_flow_enabled: { type: bool, description: "The reportFlowEnabled property of the reference's \"Firewall policy\"" }
+  firewall_policies.*.schedule: { type: string, description: "The schedule property of the reference's \"Firewall policy\", as JSON text" }
+  firewall_policies.*.source: { type: string, description: "The source property of the reference's \"Firewall policy\", as JSON text" }
+  acl_rules.*.action: { type: string, description: "The action property of the reference's \"ACL ruleObject\": ALLOW, BLOCK" }
+  acl_rules.*.description: { type: string, description: "The description property of the reference's \"ACL ruleObject\"" }
+  acl_rules.*.destination_filter: { type: string, description: "The destinationFilter property of the reference's \"ACL ruleObject\", as JSON text" }
+  acl_rules.*.enabled: { type: bool, description: "The enabled property of the reference's \"ACL ruleObject\"" }
+  acl_rules.*.enforcing_device_filter: { type: string, description: "The enforcingDeviceFilter property of the reference's \"ACL ruleObject\", as JSON text" }
+  acl_rules.*.index: { type: int, description: "The index property of the reference's \"ACL ruleObject\"" }
+  acl_rules.*.metadata: { type: string, description: "The metadata property of the reference's \"ACL ruleObject\", as JSON text" }
+  acl_rules.*.name: { type: string, description: "The name property of the reference's \"ACL ruleObject\"" }
+  acl_rules.*.source_filter: { type: string, description: "The sourceFilter property of the reference's \"ACL ruleObject\", as JSON text" }
+  acl_rules.*.type: { type: string, description: "The type property of the reference's \"ACL ruleObject\"" }
+  dns_policies.*.domain: { type: string, description: "The domain property of the reference's \"DNS policy\"" }
+  dns_policies.*.enabled: { type: bool, description: "The enabled property of the reference's \"DNS policy\"" }
+  dns_policies.*.metadata: { type: string, description: "The metadata property of the reference's \"DNS policy\", as JSON text" }
+  dns_policies.*.type: { type: string, description: "The type property of the reference's \"DNS policy\"" }
+  traffic_matching_lists.*.name: { type: string, description: "The name property of the reference's \"Traffic matching list\"" }
+  traffic_matching_lists.*.type: { type: string, description: "The type property of the reference's \"Traffic matching list\"" }
+  vouchers.*.activated_at: { type: string, description: "The activatedAt property of the reference's \"Hotspot voucher details\"" }
+  vouchers.*.authorized_guest_count: { type: int, description: "The authorizedGuestCount property of the reference's \"Hotspot voucher details\"" }
+  vouchers.*.authorized_guest_limit: { type: int, description: "The authorizedGuestLimit property of the reference's \"Hotspot voucher details\"" }
+  vouchers.*.code: { type: string, description: "The code property of the reference's \"Hotspot voucher details\"" }
+  vouchers.*.created_at: { type: string, description: "The createdAt property of the reference's \"Hotspot voucher details\"" }
+  vouchers.*.data_usage_limit_m_bytes: { type: int, description: "The dataUsageLimitMBytes property of the reference's \"Hotspot voucher details\"" }
+  vouchers.*.expired: { type: bool, description: "The expired property of the reference's \"Hotspot voucher details\"" }
+  vouchers.*.expires_at: { type: string, description: "The expiresAt property of the reference's \"Hotspot voucher details\"" }
+  vouchers.*.name: { type: string, description: "The name property of the reference's \"Hotspot voucher details\"" }
+  vouchers.*.rx_rate_limit_kbps: { type: int, description: "The rxRateLimitKbps property of the reference's \"Hotspot voucher details\"" }
+  vouchers.*.time_limit_minutes: { type: int, description: "The timeLimitMinutes property of the reference's \"Hotspot voucher details\"" }
+  vouchers.*.tx_rate_limit_kbps: { type: int, description: "The txRateLimitKbps property of the reference's \"Hotspot voucher details\"" }
+  wans.*.name: { type: string, description: "The name property of the reference's \"WAN overview\"" }
+  vpn_servers.*.enabled: { type: bool, description: "The enabled property of the reference's \"VPN server overview\"" }
+  vpn_servers.*.metadata: { type: string, description: "The metadata property of the reference's \"VPN server overview\", as JSON text" }
+  vpn_servers.*.name: { type: string, description: "The name property of the reference's \"VPN server overview\"" }
+  vpn_servers.*.type: { type: string, description: "The type property of the reference's \"VPN server overview\"" }
+  vpn_tunnels.*.metadata: { type: string, description: "The metadata property of the reference's \"Site-to-site VPN tunnel overview\", as JSON text" }
+  vpn_tunnels.*.name: { type: string, description: "The name property of the reference's \"Site-to-site VPN tunnel overview\"" }
+  vpn_tunnels.*.type: { type: string, description: "The type property of the reference's \"Site-to-site VPN tunnel overview\"" }
+  radius_profiles.*.metadata: { type: string, description: "The metadata property of the reference's \"Radius Profile Overview\", as JSON text" }
+  radius_profiles.*.name: { type: string, description: "The name property of the reference's \"Radius Profile Overview\"" }
+  lags.*.metadata: { type: string, description: "The metadata property of the reference's \"LAG details\", as JSON text" }
+  lags.*.type: { type: string, description: "The type property of the reference's \"LAG details\"" }
+  mc_lag_domains.*.lags: { type: string, description: "The lags property of the reference's \"IntegrationMcLagDomainDto\", as JSON text" }
+  mc_lag_domains.*.metadata: { type: string, description: "The metadata property of the reference's \"IntegrationMcLagDomainDto\", as JSON text" }
+  mc_lag_domains.*.name: { type: string, description: "The name property of the reference's \"IntegrationMcLagDomainDto\"" }
+  mc_lag_domains.*.peers: { type: string, description: "The peers property of the reference's \"IntegrationMcLagDomainDto\", as JSON text" }
+  switch_stacks.*.device_id: { type: string, description: "The deviceId property of the reference's \"IntegrationSwitchStackDto\"" }
+  switch_stacks.*.lags: { type: string, description: "The lags property of the reference's \"IntegrationSwitchStackDto\", as JSON text" }
+  switch_stacks.*.metadata: { type: string, description: "The metadata property of the reference's \"IntegrationSwitchStackDto\", as JSON text" }
+  switch_stacks.*.name: { type: string, description: "The name property of the reference's \"IntegrationSwitchStackDto\"" }
+  switch_stacks.*.units: { type: string, description: "The units property of the reference's \"IntegrationSwitchStackDto\", as JSON text" }
+  devices.*.configuration_id: { type: string, description: The configuration the device runs (Adopted device details) }
+  devices.*.adopted_at: { type: string, description: When the device was adopted (ISO 8601) (Adopted device details) }
+  devices.*.provisioned_at: { type: string, description: When the device was last provisioned (ISO 8601) (Adopted device details) }
+  devices.*.uplink_device_id: { type: string, description: The device this one is uplinked to (Adopted device details) }
+  devices.*.features_detail: { type: string, description: "The device's features (switching with its LAGs, access point), as JSON text (Adopted device details)" }
+  devices.*.ports.*.state: { type: string, description: "Link state: UP, DOWN or UNKNOWN, by port index" }
+  devices.*.ports.*.connector: { type: string, description: "The connector: RJ45, SFP, SFPPLUS, SFP28 or QSFP28, by port index" }
+  devices.*.ports.*.speed_mbps: { type: int, description: "The link speed in Mbit/s, by port index" }
+  devices.*.ports.*.max_speed_mbps: { type: int, description: "The port's highest speed in Mbit/s, by port index" }
+  devices.*.ports.*.poe_enabled: { type: bool, description: "Whether PoE is enabled on the port, by port index" }
+  devices.*.ports.*.poe_state: { type: string, description: "PoE state: UP, DOWN, LIMITED or UNKNOWN, by port index" }
+  devices.*.ports.*.poe_standard: { type: string, description: "The PoE standard: 802.3af, 802.3at or 802.3bt, by port index" }
+  devices.*.ports.*.poe_type: { type: int, description: "The PoE type, 1 to 4, by port index" }
+  devices.*.radios.*.frequency_ghz: { type: float, description: "The radio's band in GHz, by radio from 0" }
+  devices.*.radios.*.channel: { type: int, description: "The channel, by radio from 0" }
+  devices.*.radios.*.channel_width_mhz: { type: int, description: "The channel width in MHz, by radio from 0" }
+  devices.*.radios.*.wlan_standard: { type: string, description: "The Wi-Fi standard, such as 802.11ax, by radio from 0" }
+  devices.*.radios.*.tx_power_mode: { type: string, description: "Transmit power: AUTO, LOW, MEDIUM, HIGH, CUSTOM or DISABLED, by radio from 0" }
+  devices.*.statistics.uptime_sec: { type: int, unit: s, description: Seconds since the device started (Latest statistics for a device) }
+  devices.*.statistics.cpu_utilization_pct: { type: float, unit: "%", description: CPU use (Latest statistics for a device) }
+  devices.*.statistics.memory_utilization_pct: { type: float, unit: "%", description: Memory use (Latest statistics for a device) }
+  devices.*.statistics.load_average_1min: { type: float, description: Load average over a minute (Latest statistics for a device) }
+  devices.*.statistics.load_average_5min: { type: float, description: Load average over 5 minutes (Latest statistics for a device) }
+  devices.*.statistics.load_average_15min: { type: float, description: Load average over 15 minutes (Latest statistics for a device) }
+  devices.*.statistics.last_heartbeat_at: { type: string, description: When the device last checked in (ISO 8601) (Latest statistics for a device) }
+  devices.*.statistics.next_heartbeat_at: { type: string, description: When it is next expected (ISO 8601) (Latest statistics for a device) }
+  devices.*.statistics.uplink_rx_rate_bps: { type: int, unit: bit/s, description: Uplink receive rate (Latest statistics for a device) }
+  devices.*.statistics.uplink_tx_rate_bps: { type: int, unit: bit/s, description: Uplink transmit rate (Latest statistics for a device) }
+  devices.*.statistics.radios: { type: string, description: "Each radio's band and transmit retries, as JSON text (Latest statistics for a device)" }
+  application.version: { type: string, description: "The UniFi Network application's version (Application info)" }
+  acl_rule_order: { type: string, description: "The user-defined ACL rules' ids in order, as JSON text (ACL rule ordering)" }
+
+telemetry:
+  poll:
+    - every_ms: 15000
+      send:
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/devices", query: { offset: "0", limit: "200" } }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/clients", query: { offset: "0", limit: "200" } }
+    - every_ms: 60000
+      send:
+        - { method: GET, path: /proxy/network/integration/v1/info }
+        - { method: GET, path: /proxy/network/integration/v1/sites, query: { offset: "0", limit: "200" } }
+        - { method: GET, path: /proxy/network/integration/v1/pending-devices, query: { offset: "0", limit: "200" } }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/device-tags", query: { offset: "0", limit: "200" } }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/networks", query: { offset: "0", limit: "200" } }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/wifi/broadcasts", query: { offset: "0", limit: "200" } }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/firewall/zones", query: { offset: "0", limit: "200" } }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/firewall/policies", query: { offset: "0", limit: "200" } }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/acl-rules", query: { offset: "0", limit: "200" } }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/dns/policies", query: { offset: "0", limit: "200" } }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/traffic-matching-lists", query: { offset: "0", limit: "200" } }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/hotspot/vouchers", query: { offset: "0", limit: "200" } }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/wans", query: { offset: "0", limit: "200" } }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/vpn/servers", query: { offset: "0", limit: "200" } }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/vpn/site-to-site-tunnels", query: { offset: "0", limit: "200" } }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/radius/profiles", query: { offset: "0", limit: "200" } }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/switching/lags", query: { offset: "0", limit: "200" } }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/switching/mc-lag-domains", query: { offset: "0", limit: "200" } }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/switching/switch-stacks", query: { offset: "0", limit: "200" } }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/acl-rules/ordering" }
+  updates:
+    - path: "^/proxy/network/integration/v1/sites\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        internal_reference: $.internalReference
+        name: $.name
+      replace: sites
+      state:
+        "sites.{id:key}.internal_reference": "{internal_reference}"
+        "sites.{id:key}.name": "{name}"
+    - path: "^/proxy/network/integration/v1/pending-devices\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        mac: $.macAddress
+        adoption_target_site_ids: $.adoptionTargetSiteIds
+        features: $.features
+        firmware_updatable: $.firmwareUpdatable
+        firmware_version: $.firmwareVersion
+        ip_address: $.ipAddress
+        model: $.model
+        state: $.state
+        supported: $.supported
+      replace: pending_devices
+      state:
+        "pending_devices.{mac:key}.adoption_target_site_ids": "{adoption_target_site_ids}"
+        "pending_devices.{mac:key}.features": "{features}"
+        "pending_devices.{mac:key}.firmware_updatable": "{firmware_updatable}"
+        "pending_devices.{mac:key}.firmware_version": "{firmware_version}"
+        "pending_devices.{mac:key}.ip_address": "{ip_address}"
+        "pending_devices.{mac:key}.model": "{model}"
+        "pending_devices.{mac:key}.state": "{state}"
+        "pending_devices.{mac:key}.supported": "{supported}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/devices\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        features: $.features
+        firmware_updatable: $.firmwareUpdatable
+        firmware_version: $.firmwareVersion
+        interfaces: $.interfaces
+        ip_address: $.ipAddress
+        mac_address: $.macAddress
+        model: $.model
+        name: $.name
+        state: $.state
+        supported: $.supported
+      replace: devices
+      state:
+        "devices.{id:key}.features": "{features}"
+        "devices.{id:key}.firmware_updatable": "{firmware_updatable}"
+        "devices.{id:key}.firmware_version": "{firmware_version}"
+        "devices.{id:key}.interfaces": "{interfaces}"
+        "devices.{id:key}.ip_address": "{ip_address}"
+        "devices.{id:key}.mac_address": "{mac_address}"
+        "devices.{id:key}.model": "{model}"
+        "devices.{id:key}.name": "{name}"
+        "devices.{id:key}.state": "{state}"
+        "devices.{id:key}.supported": "{supported}"
+      then_send:
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/devices/{id}" }
+        - { method: GET, path: "/proxy/network/integration/v1/sites/{settings.site_id}/devices/{id}/statistics/latest" }
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/clients\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        access: $.access
+        connected_at: $.connectedAt
+        ip_address: $.ipAddress
+        name: $.name
+        type: $.type
+      replace: clients
+      state:
+        "clients.{id:key}.access": "{access}"
+        "clients.{id:key}.connected_at": "{connected_at}"
+        "clients.{id:key}.ip_address": "{ip_address}"
+        "clients.{id:key}.name": "{name}"
+        "clients.{id:key}.type": "{type}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/device-tags\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        device_ids: $.deviceIds
+        metadata: $.metadata
+        name: $.name
+      replace: device_tags
+      state:
+        "device_tags.{id:key}.device_ids": "{device_ids}"
+        "device_tags.{id:key}.metadata": "{metadata}"
+        "device_tags.{id:key}.name": "{name}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/networks\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        default: $.default
+        enabled: $.enabled
+        management: $.management
+        metadata: $.metadata
+        name: $.name
+        vlan_id: $.vlanId
+      replace: networks
+      state:
+        "networks.{id:key}.default": "{default}"
+        "networks.{id:key}.enabled": "{enabled}"
+        "networks.{id:key}.management": "{management}"
+        "networks.{id:key}.metadata": "{metadata}"
+        "networks.{id:key}.name": "{name}"
+        "networks.{id:key}.vlan_id": "{vlan_id}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/wifi/broadcasts\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        broadcasting_device_filter: $.broadcastingDeviceFilter
+        enabled: $.enabled
+        metadata: $.metadata
+        name: $.name
+        network: $.network
+        security_configuration: $.securityConfiguration
+        type: $.type
+      replace: wifi_broadcasts
+      state:
+        "wifi_broadcasts.{id:key}.broadcasting_device_filter": "{broadcasting_device_filter}"
+        "wifi_broadcasts.{id:key}.enabled": "{enabled}"
+        "wifi_broadcasts.{id:key}.metadata": "{metadata}"
+        "wifi_broadcasts.{id:key}.name": "{name}"
+        "wifi_broadcasts.{id:key}.network": "{network}"
+        "wifi_broadcasts.{id:key}.security_configuration": "{security_configuration}"
+        "wifi_broadcasts.{id:key}.type": "{type}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/firewall/zones\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        metadata: $.metadata
+        name: $.name
+        network_ids: $.networkIds
+      replace: firewall_zones
+      state:
+        "firewall_zones.{id:key}.metadata": "{metadata}"
+        "firewall_zones.{id:key}.name": "{name}"
+        "firewall_zones.{id:key}.network_ids": "{network_ids}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/firewall/policies\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        action: $.action
+        connection_state_filter: $.connectionStateFilter
+        description: $.description
+        destination: $.destination
+        enabled: $.enabled
+        index: $.index
+        ip_protocol_scope: $.ipProtocolScope
+        ipsec_filter: $.ipsecFilter
+        logging_enabled: $.loggingEnabled
+        metadata: $.metadata
+        name: $.name
+        report_flow_enabled: $.reportFlowEnabled
+        schedule: $.schedule
+        source: $.source
+      replace: firewall_policies
+      state:
+        "firewall_policies.{id:key}.action": "{action}"
+        "firewall_policies.{id:key}.connection_state_filter": "{connection_state_filter}"
+        "firewall_policies.{id:key}.description": "{description}"
+        "firewall_policies.{id:key}.destination": "{destination}"
+        "firewall_policies.{id:key}.enabled": "{enabled}"
+        "firewall_policies.{id:key}.index": "{index}"
+        "firewall_policies.{id:key}.ip_protocol_scope": "{ip_protocol_scope}"
+        "firewall_policies.{id:key}.ipsec_filter": "{ipsec_filter}"
+        "firewall_policies.{id:key}.logging_enabled": "{logging_enabled}"
+        "firewall_policies.{id:key}.metadata": "{metadata}"
+        "firewall_policies.{id:key}.name": "{name}"
+        "firewall_policies.{id:key}.report_flow_enabled": "{report_flow_enabled}"
+        "firewall_policies.{id:key}.schedule": "{schedule}"
+        "firewall_policies.{id:key}.source": "{source}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/acl-rules\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        action: $.action
+        description: $.description
+        destination_filter: $.destinationFilter
+        enabled: $.enabled
+        enforcing_device_filter: $.enforcingDeviceFilter
+        index: $.index
+        metadata: $.metadata
+        name: $.name
+        source_filter: $.sourceFilter
+        type: $.type
+      replace: acl_rules
+      state:
+        "acl_rules.{id:key}.action": "{action}"
+        "acl_rules.{id:key}.description": "{description}"
+        "acl_rules.{id:key}.destination_filter": "{destination_filter}"
+        "acl_rules.{id:key}.enabled": "{enabled}"
+        "acl_rules.{id:key}.enforcing_device_filter": "{enforcing_device_filter}"
+        "acl_rules.{id:key}.index": "{index}"
+        "acl_rules.{id:key}.metadata": "{metadata}"
+        "acl_rules.{id:key}.name": "{name}"
+        "acl_rules.{id:key}.source_filter": "{source_filter}"
+        "acl_rules.{id:key}.type": "{type}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/dns/policies\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        domain: $.domain
+        enabled: $.enabled
+        metadata: $.metadata
+        type: $.type
+      replace: dns_policies
+      state:
+        "dns_policies.{id:key}.domain": "{domain}"
+        "dns_policies.{id:key}.enabled": "{enabled}"
+        "dns_policies.{id:key}.metadata": "{metadata}"
+        "dns_policies.{id:key}.type": "{type}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/traffic-matching-lists\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        name: $.name
+        type: $.type
+      replace: traffic_matching_lists
+      state:
+        "traffic_matching_lists.{id:key}.name": "{name}"
+        "traffic_matching_lists.{id:key}.type": "{type}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/hotspot/vouchers\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        activated_at: $.activatedAt
+        authorized_guest_count: $.authorizedGuestCount
+        authorized_guest_limit: $.authorizedGuestLimit
+        code: $.code
+        created_at: $.createdAt
+        data_usage_limit_m_bytes: $.dataUsageLimitMBytes
+        expired: $.expired
+        expires_at: $.expiresAt
+        name: $.name
+        rx_rate_limit_kbps: $.rxRateLimitKbps
+        time_limit_minutes: $.timeLimitMinutes
+        tx_rate_limit_kbps: $.txRateLimitKbps
+      replace: vouchers
+      state:
+        "vouchers.{id:key}.activated_at": "{activated_at}"
+        "vouchers.{id:key}.authorized_guest_count": "{authorized_guest_count}"
+        "vouchers.{id:key}.authorized_guest_limit": "{authorized_guest_limit}"
+        "vouchers.{id:key}.code": "{code}"
+        "vouchers.{id:key}.created_at": "{created_at}"
+        "vouchers.{id:key}.data_usage_limit_m_bytes": "{data_usage_limit_m_bytes}"
+        "vouchers.{id:key}.expired": "{expired}"
+        "vouchers.{id:key}.expires_at": "{expires_at}"
+        "vouchers.{id:key}.name": "{name}"
+        "vouchers.{id:key}.rx_rate_limit_kbps": "{rx_rate_limit_kbps}"
+        "vouchers.{id:key}.time_limit_minutes": "{time_limit_minutes}"
+        "vouchers.{id:key}.tx_rate_limit_kbps": "{tx_rate_limit_kbps}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/wans\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        name: $.name
+      replace: wans
+      state:
+        "wans.{id:key}.name": "{name}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/vpn/servers\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        enabled: $.enabled
+        metadata: $.metadata
+        name: $.name
+        type: $.type
+      replace: vpn_servers
+      state:
+        "vpn_servers.{id:key}.enabled": "{enabled}"
+        "vpn_servers.{id:key}.metadata": "{metadata}"
+        "vpn_servers.{id:key}.name": "{name}"
+        "vpn_servers.{id:key}.type": "{type}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/vpn/site-to-site-tunnels\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        metadata: $.metadata
+        name: $.name
+        type: $.type
+      replace: vpn_tunnels
+      state:
+        "vpn_tunnels.{id:key}.metadata": "{metadata}"
+        "vpn_tunnels.{id:key}.name": "{name}"
+        "vpn_tunnels.{id:key}.type": "{type}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/radius/profiles\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        metadata: $.metadata
+        name: $.name
+      replace: radius_profiles
+      state:
+        "radius_profiles.{id:key}.metadata": "{metadata}"
+        "radius_profiles.{id:key}.name": "{name}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/switching/lags\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        metadata: $.metadata
+        type: $.type
+      replace: lags
+      state:
+        "lags.{id:key}.metadata": "{metadata}"
+        "lags.{id:key}.type": "{type}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/switching/mc-lag-domains\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        lags: $.lags
+        metadata: $.metadata
+        name: $.name
+        peers: $.peers
+      replace: mc_lag_domains
+      state:
+        "mc_lag_domains.{id:key}.lags": "{lags}"
+        "mc_lag_domains.{id:key}.metadata": "{metadata}"
+        "mc_lag_domains.{id:key}.name": "{name}"
+        "mc_lag_domains.{id:key}.peers": "{peers}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/switching/switch-stacks\\?offset=0&limit=200$"
+      json_each: $.data
+      json:
+        id: $.id
+        device_id: $.deviceId
+        lags: $.lags
+        metadata: $.metadata
+        name: $.name
+        units: $.units
+      replace: switch_stacks
+      state:
+        "switch_stacks.{id:key}.device_id": "{device_id}"
+        "switch_stacks.{id:key}.lags": "{lags}"
+        "switch_stacks.{id:key}.metadata": "{metadata}"
+        "switch_stacks.{id:key}.name": "{name}"
+        "switch_stacks.{id:key}.units": "{units}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/devices/([0-9A-Fa-f-]{36})$"
+      json:
+        firmware_updatable: $.firmwareUpdatable
+        firmware_version: $.firmwareVersion
+        configuration_id: $.configurationId
+        adopted_at: $.adoptedAt
+        provisioned_at: $.provisionedAt
+        uplink_device_id: $.uplink.deviceId
+        features_detail: $.features
+      state:
+        "devices.{1}.firmware_updatable": "{firmware_updatable}"
+        "devices.{1}.firmware_version": "{firmware_version}"
+        "devices.{1}.configuration_id": "{configuration_id}"
+        "devices.{1}.adopted_at": "{adopted_at}"
+        "devices.{1}.provisioned_at": "{provisioned_at}"
+        "devices.{1}.uplink_device_id": "{uplink_device_id}"
+        "devices.{1}.features_detail": "{features_detail}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/devices/([0-9A-Fa-f-]{36})$"
+      json_each: $.interfaces.ports
+      json:
+        idx: $.idx
+        state: $.state
+        connector: $.connector
+        speed_mbps: $.speedMbps
+        max_speed_mbps: $.maxSpeedMbps
+        poe_enabled: $.poe.enabled
+        poe_state: $.poe.state
+        poe_standard: $.poe.standard
+        poe_type: $.poe.type
+      replace: "devices.{1}.ports"
+      state:
+        "devices.{1}.ports.{idx}.state": "{state}"
+        "devices.{1}.ports.{idx}.connector": "{connector}"
+        "devices.{1}.ports.{idx}.speed_mbps": "{speed_mbps}"
+        "devices.{1}.ports.{idx}.max_speed_mbps": "{max_speed_mbps}"
+        "devices.{1}.ports.{idx}.poe_enabled": "{poe_enabled}"
+        "devices.{1}.ports.{idx}.poe_state": "{poe_state}"
+        "devices.{1}.ports.{idx}.poe_standard": "{poe_standard}"
+        "devices.{1}.ports.{idx}.poe_type": "{poe_type}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/devices/([0-9A-Fa-f-]{36})$"
+      json_each: $.interfaces.radios
+      json:
+        frequency_ghz: $.frequencyGHz
+        channel: $.channel
+        channel_width_mhz: $.channelWidthMHz
+        wlan_standard: $.wlanStandard
+        tx_power_mode: $.txPowerMode
+      replace: "devices.{1}.radios"
+      state:
+        "devices.{1}.radios.{index}.frequency_ghz": "{frequency_ghz}"
+        "devices.{1}.radios.{index}.channel": "{channel}"
+        "devices.{1}.radios.{index}.channel_width_mhz": "{channel_width_mhz}"
+        "devices.{1}.radios.{index}.wlan_standard": "{wlan_standard}"
+        "devices.{1}.radios.{index}.tx_power_mode": "{tx_power_mode}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/devices/([0-9A-Fa-f-]{36})/statistics/latest$"
+      json:
+        uptime_sec: $.uptimeSec
+        cpu_utilization_pct: $.cpuUtilizationPct
+        memory_utilization_pct: $.memoryUtilizationPct
+        load_average_1min: $.loadAverage1Min
+        load_average_5min: $.loadAverage5Min
+        load_average_15min: $.loadAverage15Min
+        last_heartbeat_at: $.lastHeartbeatAt
+        next_heartbeat_at: $.nextHeartbeatAt
+        uplink_rx_rate_bps: $.uplink.rxRateBps
+        uplink_tx_rate_bps: $.uplink.txRateBps
+        radios: $.interfaces.radios
+      state:
+        "devices.{1}.statistics.uptime_sec": "{uptime_sec}"
+        "devices.{1}.statistics.cpu_utilization_pct": "{cpu_utilization_pct}"
+        "devices.{1}.statistics.memory_utilization_pct": "{memory_utilization_pct}"
+        "devices.{1}.statistics.load_average_1min": "{load_average_1min}"
+        "devices.{1}.statistics.load_average_5min": "{load_average_5min}"
+        "devices.{1}.statistics.load_average_15min": "{load_average_15min}"
+        "devices.{1}.statistics.last_heartbeat_at": "{last_heartbeat_at}"
+        "devices.{1}.statistics.next_heartbeat_at": "{next_heartbeat_at}"
+        "devices.{1}.statistics.uplink_rx_rate_bps": "{uplink_rx_rate_bps}"
+        "devices.{1}.statistics.uplink_tx_rate_bps": "{uplink_tx_rate_bps}"
+        "devices.{1}.statistics.radios": "{radios}"
+    - path: ^/proxy/network/integration/v1/info$
+      json:
+        version: $.applicationVersion
+      state:
+        application.version: "{version}"
+    - path: "^/proxy/network/integration/v1/sites/[^/]+/acl-rules/ordering$"
+      json:
+        ids: $.orderedAclRuleIds
+      state:
+        acl_rule_order: "{ids}"
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      power_cycle_port cuts a port's PoE power and turns it on again (the device on it restarts), restart_device
+      restarts a switch, gateway or access point (everything behind it loses its link), and remove_device unadopts a
+      device. Deleting or changing networks, firewall policies and zones, ACL rules, Wi-Fi broadcasts or DNS
+      policies changes traffic at once; delete_network and delete_wifi_broadcast refuse a network or broadcast in
+      use unless force is set.
+  - models: [all]
+    severity: info
+    text: >
+      API limits (11.0.97): a port's PoE can be power-cycled but not turned on or off, and a port's VLAN, profile,
+      speed and enabled state cannot be read or written; networks (VLANs) are created, changed and deleted as a
+      whole. LAGs, MC-LAG domains and switch stacks are read only. Statistics are the latest only.
+  - models: [all]
+    severity: info
+    text: >
+      State is polled: devices (each one's details, ports, PoE and radios, and latest statistics read after the
+      list) and clients every 15 s, the rest every minute. Each list is read with offset 0 and limit 200, the most
+      the API returns at once, so a site with more than 200 of something keeps the first 200 in state; the list
+      commands take offset, limit and a filter to read the rest. Nested and polymorphic properties (a firewall
+      policy's source and destination, a Wi-Fi broadcast's security) are kept as JSON text; get_* commands return
+      the full objects.
+  - models: [all]
+    severity: info
+    text: >
+      Request bodies (body) are the objects the reference defines for each operation, sent as given; the API
+      validates them and answers 400 with its error otherwise. Ubiquiti's cloud connector (api.ui.com, the same
+      API under /v1/connector/consoles/<console id>/proxy/network/integration) is not used: the console is reached
+      on the local network.

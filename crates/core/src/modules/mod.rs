@@ -44,6 +44,10 @@ mod allenheath_sq;
     feature = "analogway-midra4k"
 ))]
 mod analogway;
+#[cfg(feature = "apc-rack-pdu")]
+mod apc_rack_pdu_profile;
+#[cfg(feature = "apc-ups")]
+mod apc_ups_profile;
 #[cfg(feature = "artnet")]
 mod artnet;
 #[cfg(feature = "blackmagic-atem")]
@@ -56,6 +60,12 @@ mod barco_projection_table;
 mod bss_london;
 #[cfg(feature = "christie-pandorasbox")]
 mod christie_pandorasbox;
+#[cfg(any(feature = "cyberpower-pdu", feature = "cyberpower-ups"))]
+mod cps_traps;
+#[cfg(feature = "cyberpower-pdu")]
+mod cyberpower_pdu_profile;
+#[cfg(feature = "cyberpower-ups")]
+mod cyberpower_ups_profile;
 #[cfg(feature = "datavideo-switcher")]
 mod datavideo_switcher;
 #[cfg(feature = "datavideo-switcher")]
@@ -165,10 +175,14 @@ mod pigpio;
 mod pjlink;
 #[cfg(feature = "posistagenet")]
 mod posistagenet;
+#[cfg(any(feature = "apc-rack-pdu", feature = "apc-ups"))]
+mod powernet_traps;
 #[cfg(feature = "ptp")]
 mod ptp;
 #[cfg(feature = "qsys")]
 mod qsys;
+#[cfg(feature = "middle-atlantic-racklink")]
+mod racklink;
 #[cfg(feature = "resolume")]
 mod resolume_push;
 #[cfg(any(feature = "generic-midi", feature = "midi-show-control"))]
@@ -193,11 +207,42 @@ mod sennheiser_mcp;
 mod sennheiser_spectera;
 #[cfg(feature = "shure-wireless")]
 mod shure;
-#[cfg(feature = "generic-snmp")]
+#[cfg(any(
+    feature = "generic-snmp",
+    feature = "apc-rack-pdu",
+    feature = "apc-ups",
+    feature = "cyberpower-pdu",
+    feature = "cyberpower-ups",
+    feature = "ups-mib"
+))]
 mod snmp;
-#[cfg(feature = "generic-snmp")]
+#[cfg(any(
+    feature = "generic-snmp",
+    feature = "apc-rack-pdu",
+    feature = "apc-ups",
+    feature = "cyberpower-pdu",
+    feature = "cyberpower-ups",
+    feature = "ups-mib"
+))]
 mod snmp_ber;
-#[cfg(feature = "generic-snmp")]
+#[cfg(any(
+    feature = "apc-rack-pdu",
+    feature = "apc-ups",
+    feature = "cyberpower-pdu",
+    feature = "cyberpower-ups",
+    feature = "ups-mib"
+))]
+mod snmp_device;
+#[cfg(all(test, feature = "apc-rack-pdu"))]
+mod snmp_device_session_tests;
+#[cfg(any(
+    feature = "generic-snmp",
+    feature = "apc-rack-pdu",
+    feature = "apc-ups",
+    feature = "cyberpower-pdu",
+    feature = "cyberpower-ups",
+    feature = "ups-mib"
+))]
 mod snmp_usm;
 #[cfg(feature = "sony-bravia-serial")]
 mod sony_bravia_serial;
@@ -233,6 +278,8 @@ mod tsl;
 mod ultimatte_presets;
 #[cfg(feature = "blackmagic-ultimatte")]
 mod ultimatte_zip;
+#[cfg(feature = "ups-mib")]
+mod ups_mib_profile;
 #[cfg(feature = "vdcp")]
 mod vdcp;
 #[cfg(feature = "visca")]
@@ -472,6 +519,33 @@ pub(crate) fn construct(
         "generic-ping" => Ok(Box::new(generic_ping::GenericPing::new(context)?)),
         #[cfg(feature = "generic-snmp")]
         "generic-snmp" => Ok(Box::new(generic_snmp::GenericSnmp::new(context)?)),
+        #[cfg(feature = "apc-rack-pdu")]
+        "apc-rack-pdu" => Ok(Box::new(snmp_device::SnmpDevice::new(
+            &apc_rack_pdu_profile::PROFILE,
+            context,
+        )?)),
+        #[cfg(feature = "apc-ups")]
+        "apc-ups" => Ok(Box::new(snmp_device::SnmpDevice::new(
+            &apc_ups_profile::PROFILE,
+            context,
+        )?)),
+        #[cfg(feature = "cyberpower-pdu")]
+        "cyberpower-pdu" => Ok(Box::new(snmp_device::SnmpDevice::new(
+            &cyberpower_pdu_profile::PROFILE,
+            context,
+        )?)),
+        #[cfg(feature = "cyberpower-ups")]
+        "cyberpower-ups" => Ok(Box::new(snmp_device::SnmpDevice::new(
+            &cyberpower_ups_profile::PROFILE,
+            context,
+        )?)),
+        #[cfg(feature = "ups-mib")]
+        "ups-mib" => Ok(Box::new(snmp_device::SnmpDevice::new(
+            &ups_mib_profile::PROFILE,
+            context,
+        )?)),
+        #[cfg(feature = "middle-atlantic-racklink")]
+        "middle-atlantic-racklink" => Ok(Box::new(racklink::RackLink::new(context)?)),
         #[cfg(feature = "generic-http")]
         "generic-http" => Ok(Box::new(generic_http::GenericHttp::new(context)?)),
         #[cfg(feature = "generic-websocket")]

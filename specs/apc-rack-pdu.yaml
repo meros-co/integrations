@@ -1,0 +1,1072 @@
+spec: 1
+id: apc-rack-pdu
+name: APC Rack PDU (SNMP)
+vendor: APC (Schneider Electric)
+category: other
+implementation: native
+reason: >
+  SNMP: BER-encoded requests over UDP, matched to their responses, retransmitted, walked with GETBULK, and on v3
+  authenticated and encrypted with keys derived from passwords (see generic-snmp). The PDU's outlets, banks,
+  phases and sensors are table rows the agent lists only when walked, and its traps arrive on a port of the
+  core's. The integration is the SNMP manager with PowerNet-MIB's Rack PDU objects named.
+
+source:
+  - title: "APC PowerNet MIB v4.6.0 (powernet460.mib, document APC_POWERNETMIB_EN), 09 Jul 2026"
+    author: APC by Schneider Electric
+    url: "https://www.se.com/ww/en/download/document/APC_POWERNETMIB_EN/"
+    note: >
+      The rPDU2 group (enterprises 318.1.1.26: ident, device, phase, bank, switched and metered outlets,
+      temperature, humidity, discrete and analog sensors, group totals, phase-to-phase voltages, the advanced
+      bank and phase tables) and the rPDU group (318.1.1.12: ident, load, outlets, power supply, status), every
+      object's OID, syntax, access, units and enumeration, and the TRAP-TYPEs of the apc enterprise. Facts only
+      (names, numbers, enumerations) are used; the MIB's text is not reproduced.
+  - title: "Scripting with APC by Schneider Electric Switched Rack Power Distribution Units (PDUs), FAQ FA156163"
+    author: Schneider Electric
+    url: "https://www.se.com/ww/en/faqs/FA156163/"
+    note: >
+      AP86XX and AP89XX switched Rack PDUs are controlled through rPDU2's switched outlet table
+      (rPDU2.rPDU2Outlet.rPDU2OutletSwitched) over SNMP v1 or v3; AP79XX switched Rack PDUs support outlet control
+      through PowerNet-MIB too.
+  - title: "RFC 3416, RFC 3418 and the SNMP RFCs generic-snmp cites"
+    author: IETF
+    url: "https://www.rfc-editor.org/rfc/rfc3416"
+    note: "The protocol (GETBULK walks, SET, traps); the system group (sysDescr, sysUpTime...)."
+
+models:
+  - id: rack-pdu-2g
+    name: "APC Rack PDU 2G and later (metered, switched, metered-by-outlet: AP84xx, AP86xx, AP88xx, AP89xx and others implementing rPDU2)"
+    supports: [get, walk, set, refresh, set_adv_bank_config_bank_peak_current_reset, set_adv_bank_config_low_load_current_threshold, set_adv_bank_config_near_overload_current_threshold, set_adv_bank_config_overload_current_threshold, set_adv_bank_config_overload_restriction, set_adv_phase_config_low_load_current_threshold, set_adv_phase_config_near_overload_current_threshold, set_adv_phase_config_overload_current_threshold, set_adv_phase_config_overload_restriction, set_adv_phase_config_phase_peak_current_reset, set_bank_config_bank_peak_current_reset, set_bank_config_low_load_current_threshold, set_bank_config_near_overload_current_threshold, set_bank_config_overload_current_threshold, set_bank_config_overload_restriction, set_device_config_coldstart_delay, set_device_config_contact, set_device_config_device_energy_reset, set_device_config_device_peak_power_reset, set_device_config_display_orientation, set_device_config_location, set_device_config_low_load_power_threshold, set_device_config_module, set_device_config_name, set_device_config_near_overload_power_threshold, set_device_config_outlets_energy_reset, set_device_config_outlets_peak_load_reset, set_device_config_overload_power_threshold, set_device_control_command, set_group_energy_reset, set_outlet_metered_config_external_link, set_outlet_metered_config_low_load_current_threshold, set_outlet_metered_config_name, set_outlet_metered_config_near_overload_current_threshold, set_outlet_metered_config_overload_current_threshold, set_outlet_switched_config_external_link, set_outlet_switched_config_name, set_outlet_switched_config_power_off_time, set_outlet_switched_config_power_on_time, set_outlet_switched_config_reboot_duration, set_outlet_switched_control_command, set_phase_config_low_load_current_threshold, set_phase_config_near_overload_current_threshold, set_phase_config_overload_current_threshold, set_phase_config_overload_restriction, set_phase_config_phase_peak_current_reset, set_sensor_analog_voltage_config_alarm_enable, set_sensor_analog_voltage_config_hysteresis, set_sensor_analog_voltage_config_name, set_sensor_analog_voltage_config_thresh_max, set_sensor_analog_voltage_config_thresh_min, set_sensor_discrete_config_abnormal_severity, set_sensor_discrete_config_name, set_sensor_discrete_config_normal_state, set_sensor_temp_humidity_config_humidity_alarm_enable, set_sensor_temp_humidity_config_humidity_high_thresh, set_sensor_temp_humidity_config_humidity_hysteresis, set_sensor_temp_humidity_config_humidity_low_thresh, set_sensor_temp_humidity_config_humidity_max_thresh, set_sensor_temp_humidity_config_humidity_min_thresh, set_sensor_temp_humidity_config_name, set_sensor_temp_humidity_config_temp_high_thresh_c, set_sensor_temp_humidity_config_temp_high_thresh_f, set_sensor_temp_humidity_config_temp_hysteresis_c, set_sensor_temp_humidity_config_temp_hysteresis_f, set_sensor_temp_humidity_config_temp_low_thresh_c, set_sensor_temp_humidity_config_temp_low_thresh_f, set_sensor_temp_humidity_config_temp_max_thresh_c, set_sensor_temp_humidity_config_temp_max_thresh_f, set_sensor_temp_humidity_config_temp_min_thresh_c, set_sensor_temp_humidity_config_temp_min_thresh_f, set_sensor_temp_humidity_config_temp_peak_reset, set_sensor_temp_humidity_config_temperature_alarm_enable]
+    verification: none
+    notes: >
+      Walks PowerNet-MIB's rPDU2 group. Which tables a unit fills depends on what it has: a metered PDU lists no
+      switched outlets, and a unit in a network port sharing group lists each device's rows with its module number.
+  - id: rack-pdu
+    name: "APC Rack PDU, first generation (switched and metered: AP78xx, AP79xx)"
+    supports: [get, walk, set, refresh, set_ident_device_display_orientation, set_ident_device_lineto_line_voltage, set_ident_device_lineto_neutral_voltage, set_ident_device_power_factor, set_ident_name, set_load_bank_config_low_load_threshold, set_load_bank_config_near_overload_threshold, set_load_bank_config_overload_threshold, set_load_phase_config_low_load_threshold, set_load_phase_config_near_overload_threshold, set_load_phase_config_overload_threshold, set_outlet_bank_overload_restriction, set_outlet_config_monitored_low_load_threshold, set_outlet_config_monitored_name, set_outlet_config_monitored_near_overload_threshold, set_outlet_config_monitored_overload_threshold, set_outlet_config_outlet_name, set_outlet_config_power_off_time, set_outlet_config_power_on_time, set_outlet_config_reboot_duration, set_outlet_control_outlet_command, set_outlet_device_dev_coldstart_delay, set_outlet_device_dev_command, set_outlet_phase_overload_restriction]
+    verification: none
+    notes: Walks PowerNet-MIB's rPDU group.
+
+settings:
+  version: { type: enum, values: [v1, v2c, v3], default: v2c, label: SNMP version,
+             description: "The SNMP version the agent is asked with: v1 and v2c use a community string, v3 a user with authentication and privacy." }
+  community: { type: string, secret: true, max_length: 255, default: public, label: Community,
+               description: "v1 and v2c: the community string for reads, and for SETs when no write community is set." }
+  write_community: { type: string, secret: true, max_length: 255, default: "", label: Write community,
+                     description: "v1 and v2c: the community string SETs are sent with, often private; empty uses the community." }
+  user: { type: string, max_length: 32, default: "", label: User,
+          description: "v3: the user name (securityName) the agent knows." }
+  security_level: { type: enum, values: [no_auth_no_priv, auth_no_priv, auth_priv], default: auth_priv, label: Security level,
+                    description: "v3: no_auth_no_priv sends messages unauthenticated, auth_no_priv authenticates them, auth_priv also encrypts them." }
+  auth_protocol: { type: enum, values: [md5, sha, sha224, sha256, sha384, sha512], default: sha, label: Authentication protocol,
+                   description: "v3: HMAC-MD5-96, HMAC-SHA-96 (sha) or HMAC-SHA-2 (RFC 7860), as the user is set up on the agent." }
+  auth_password: { type: string, secret: true, max_length: 256, default: "", label: Authentication password,
+                   description: "v3: the user's authentication password, at least 8 characters." }
+  priv_protocol: { type: enum, values: [des, aes, aes192, aes256], default: aes, label: Privacy protocol,
+                   description: "v3 at auth_priv: CBC-DES, AES-128 (aes, RFC 3826), or AES-192 or AES-256 as draft-blumenthal-aes-usm-04 defines them." }
+  priv_password: { type: string, secret: true, max_length: 256, default: "", label: Privacy password,
+                   description: "v3 at auth_priv: the user's privacy password, at least 8 characters." }
+  context_name: { type: string, max_length: 32, default: "", label: Context name,
+                  description: "v3: the context requests are made in, empty for the agent's default context." }
+  context_engine_id: { type: string, pattern: '^[0-9A-Fa-fxX :.-]*$', max_length: 100, default: "", label: Context engine ID,
+                       description: "v3: the contextEngineID in hex, for an agent proxying another engine; empty uses the agent's own snmpEngineID." }
+  timeout_ms: { type: int, min: 1, max: 60000, default: 1500, label: Timeout,
+                description: "Milliseconds to wait for each response before sending the request again." }
+  retries: { type: int, min: 0, max: 10, default: 2, label: Retries,
+             description: "How many times an unanswered request is sent again before it fails with timeout." }
+  max_repetitions: { type: int, min: 1, max: 1000, default: 20, label: GETBULK repetitions,
+                     description: "Objects asked for per GETBULK request while walking." }
+  poll_interval_ms: { type: int, min: 100, max: 86400000, default: 10000, label: Poll interval,
+                      description: "Milliseconds between walks of the device's objects, and reads of sysUpTime.0, the liveness check." }
+  trap_port: { type: int, min: 1, max: 65535, label: Notification port,
+               description: "The UDP port traps and informs are received on, 162 as standard; unset receives none." }
+  trap_bind_address: { type: string, pattern: '^[0-9A-Fa-f.:]*$', max_length: 45, default: "", label: Notification bind address,
+                       description: "The local address to receive notifications on with a port of this device's own; empty shares the port with every SNMP device of the core, each hearing its own agent." }
+  trap_community: { type: string, secret: true, max_length: 255, default: "", label: Notification community,
+                    description: "v1 and v2c notifications: accept only this community; empty accepts any." }
+  local_engine_id: { type: string, pattern: '^[0-9A-Fa-fxX :.-]*$', max_length: 100, default: "", label: Local engine ID,
+                     description: "v3 informs: this receiver's snmpEngineID in hex, 5 to 32 bytes, as configured on the agent; empty uses a random one for each opening." }
+
+ports:
+  - { port: 161, protocol: udp, role: control, note: "the agent; requests go from an ephemeral port of the core's" }
+  - { port: null, protocol: udp, role: notification, listener: core, setting: trap_port, note: "traps and informs, when trap_port is set (162 as standard)" }
+
+commands:
+  get:
+    summary: >
+      GET objects by OID and return {varbinds: [{oid, type, value, hex}]}, for objects the named commands and state
+      do not cover; an object state holds is updated from the answer too
+    params:
+      oids: { type: string, pattern: '^[0-9., ;]+$', max_length: 65536, required: true, label: OIDs,
+              description: "One or more OIDs in dotted decimal, separated by commas or spaces, such as 1.3.6.1.2.1.1.3.0." }
+    returns: value
+  walk:
+    summary: Every object under an OID, in order, as {varbinds}
+    params:
+      oid: { type: string, pattern: '^\.?[0-9]+(\.[0-9]+)+$', max_length: 1024, required: true, label: OID,
+             description: "The subtree's root in dotted decimal." }
+      limit: { type: int, min: 1, max: 100000000, label: Object limit,
+               description: "Stop after this many objects; unset walks the whole subtree." }
+    returns: value
+  set:
+    summary: >
+      SET one object by OID to a typed value and return the agent's response as {varbinds}; fails with the agent's
+      error-status (notWritable, wrongValue...) as the code
+    params:
+      oid: { type: string, pattern: '^\.?[0-9]+(\.[0-9]+)+$', max_length: 1024, required: true, label: OID,
+             description: "The object instance to set, in dotted decimal." }
+      type: { type: enum, values: [integer, string, hex, oid, ip_address, counter32, gauge32, timeticks, counter64, opaque], required: true, label: Type,
+              description: "The value's SNMP type: string is UTF-8 text and hex is bytes for an OCTET STRING; gauge32 is also Unsigned32." }
+      value: { type: string, max_length: 65536, required: true, label: Value,
+               description: "The value as text: a decimal number, text, hex bytes, a dotted OID or an IPv4 address, as the type asks." }
+    returns: value
+  refresh:
+    summary: Read the system group and walk every object now; answered when they have been read
+    returns: ack
+  set_device_config_module:
+    summary: "Set rPDU2DeviceConfigModule of one rPDU2DeviceConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Device config index, description: "The row of rPDU2DeviceConfigEntry to write, by its rPDU2DeviceConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new device config module, as the MIB counts it." }
+    returns: ack
+  set_device_config_name:
+    summary: "Set rPDU2DeviceConfigName of one rPDU2DeviceConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Device config index, description: "The row of rPDU2DeviceConfigEntry to write, by its rPDU2DeviceConfigIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new device config name. }
+    returns: ack
+  set_device_config_location:
+    summary: "Set rPDU2DeviceConfigLocation of one rPDU2DeviceConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Device config index, description: "The row of rPDU2DeviceConfigEntry to write, by its rPDU2DeviceConfigIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new device config location. }
+    returns: ack
+  set_device_config_display_orientation:
+    summary: "Set rPDU2DeviceConfigDisplayOrientation of one rPDU2DeviceConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Device config index, description: "The row of rPDU2DeviceConfigEntry to write, by its rPDU2DeviceConfigIndex." }
+      value: { type: enum, values: [display_normal, display_reverse], required: true, label: Value, description: "The new device config display orientation, as PowerNet-MIB names its values." }
+    returns: ack
+  set_device_config_coldstart_delay:
+    summary: "Set rPDU2DeviceConfigColdstartDelay of one rPDU2DeviceConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Device config index, description: "The row of rPDU2DeviceConfigEntry to write, by its rPDU2DeviceConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new device config coldstart delay, in s." }
+    returns: ack
+  set_device_config_low_load_power_threshold:
+    summary: "Set rPDU2DeviceConfigLowLoadPowerThreshold of one rPDU2DeviceConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Device config index, description: "The row of rPDU2DeviceConfigEntry to write, by its rPDU2DeviceConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new device config low load power threshold, in 0.1 kW." }
+    returns: ack
+  set_device_config_near_overload_power_threshold:
+    summary: "Set rPDU2DeviceConfigNearOverloadPowerThreshold of one rPDU2DeviceConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Device config index, description: "The row of rPDU2DeviceConfigEntry to write, by its rPDU2DeviceConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new device config near overload power threshold, in 0.1 kW." }
+    returns: ack
+  set_device_config_overload_power_threshold:
+    summary: "Set rPDU2DeviceConfigOverloadPowerThreshold of one rPDU2DeviceConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Device config index, description: "The row of rPDU2DeviceConfigEntry to write, by its rPDU2DeviceConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new device config overload power threshold, in 0.1 kW." }
+    returns: ack
+  set_device_config_device_peak_power_reset:
+    summary: "Set rPDU2DeviceConfigDevicePeakPowerReset of one rPDU2DeviceConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Device config index, description: "The row of rPDU2DeviceConfigEntry to write, by its rPDU2DeviceConfigIndex." }
+      value: { type: enum, values: [no_operation, reset, not_supported], required: true, label: Value, description: "The new device config device peak power reset, as PowerNet-MIB names its values." }
+    returns: ack
+  set_device_config_device_energy_reset:
+    summary: "Set rPDU2DeviceConfigDeviceEnergyReset of one rPDU2DeviceConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Device config index, description: "The row of rPDU2DeviceConfigEntry to write, by its rPDU2DeviceConfigIndex." }
+      value: { type: enum, values: [no_operation, reset, not_supported], required: true, label: Value, description: "The new device config device energy reset, as PowerNet-MIB names its values." }
+    returns: ack
+  set_device_config_outlets_energy_reset:
+    summary: "Set rPDU2DeviceConfigOutletsEnergyReset of one rPDU2DeviceConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Device config index, description: "The row of rPDU2DeviceConfigEntry to write, by its rPDU2DeviceConfigIndex." }
+      value: { type: enum, values: [no_operation, reset, not_supported], required: true, label: Value, description: "The new device config outlets energy reset, as PowerNet-MIB names its values." }
+    returns: ack
+  set_device_config_outlets_peak_load_reset:
+    summary: "Set rPDU2DeviceConfigOutletsPeakLoadReset of one rPDU2DeviceConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Device config index, description: "The row of rPDU2DeviceConfigEntry to write, by its rPDU2DeviceConfigIndex." }
+      value: { type: enum, values: [no_operation, reset, not_supported], required: true, label: Value, description: "The new device config outlets peak load reset, as PowerNet-MIB names its values." }
+    returns: ack
+  set_device_config_contact:
+    summary: "Set rPDU2DeviceConfigContact of one rPDU2DeviceConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Device config index, description: "The row of rPDU2DeviceConfigEntry to write, by its rPDU2DeviceConfigIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new device config contact. }
+    returns: ack
+  set_device_control_command:
+    summary: "Set rPDU2DeviceControlCommand of one rPDU2DeviceControlEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Device control index, description: "The row of rPDU2DeviceControlEntry to write, by its rPDU2DeviceControlIndex." }
+      value: { type: enum, values: [immediate_all_on, delayed_all_on, immediate_all_off, immediate_all_reboot, delayed_all_reboot, no_command_all, delayed_all_off, cancel_all_pending_commands], required: true, label: Value, description: "The new device control command, as PowerNet-MIB names its values." }
+    returns: ack
+  set_phase_config_overload_restriction:
+    summary: "Set rPDU2PhaseConfigOverloadRestriction of one rPDU2PhaseConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Phase config index, description: "The row of rPDU2PhaseConfigEntry to write, by its rPDU2PhaseConfigIndex." }
+      value: { type: enum, values: [always_allow_turn_on, restrict_on_near_overload, restrict_on_overload, not_supported], required: true, label: Value, description: "The new phase config overload restriction, as PowerNet-MIB names its values." }
+    returns: ack
+  set_phase_config_low_load_current_threshold:
+    summary: "Set rPDU2PhaseConfigLowLoadCurrentThreshold of one rPDU2PhaseConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Phase config index, description: "The row of rPDU2PhaseConfigEntry to write, by its rPDU2PhaseConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new phase config low load current threshold, in A." }
+    returns: ack
+  set_phase_config_near_overload_current_threshold:
+    summary: "Set rPDU2PhaseConfigNearOverloadCurrentThreshold of one rPDU2PhaseConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Phase config index, description: "The row of rPDU2PhaseConfigEntry to write, by its rPDU2PhaseConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new phase config near overload current threshold, in A." }
+    returns: ack
+  set_phase_config_overload_current_threshold:
+    summary: "Set rPDU2PhaseConfigOverloadCurrentThreshold of one rPDU2PhaseConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Phase config index, description: "The row of rPDU2PhaseConfigEntry to write, by its rPDU2PhaseConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new phase config overload current threshold, in A." }
+    returns: ack
+  set_phase_config_phase_peak_current_reset:
+    summary: "Set rPDU2PhaseConfigPhasePeakCurrentReset of one rPDU2PhaseConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Phase config index, description: "The row of rPDU2PhaseConfigEntry to write, by its rPDU2PhaseConfigIndex." }
+      value: { type: enum, values: [no_operation, reset], required: true, label: Value, description: "The new phase config phase peak current reset, as PowerNet-MIB names its values." }
+    returns: ack
+  set_bank_config_overload_restriction:
+    summary: "Set rPDU2BankConfigOverloadRestriction of one rPDU2BankConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Bank config index, description: "The row of rPDU2BankConfigEntry to write, by its rPDU2BankConfigIndex." }
+      value: { type: enum, values: [always_allow_turn_on, restrict_on_near_overload, restrict_on_overload, not_supported], required: true, label: Value, description: "The new bank config overload restriction, as PowerNet-MIB names its values." }
+    returns: ack
+  set_bank_config_low_load_current_threshold:
+    summary: "Set rPDU2BankConfigLowLoadCurrentThreshold of one rPDU2BankConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Bank config index, description: "The row of rPDU2BankConfigEntry to write, by its rPDU2BankConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new bank config low load current threshold, in A." }
+    returns: ack
+  set_bank_config_near_overload_current_threshold:
+    summary: "Set rPDU2BankConfigNearOverloadCurrentThreshold of one rPDU2BankConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Bank config index, description: "The row of rPDU2BankConfigEntry to write, by its rPDU2BankConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new bank config near overload current threshold, in A." }
+    returns: ack
+  set_bank_config_overload_current_threshold:
+    summary: "Set rPDU2BankConfigOverloadCurrentThreshold of one rPDU2BankConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Bank config index, description: "The row of rPDU2BankConfigEntry to write, by its rPDU2BankConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new bank config overload current threshold, in A." }
+    returns: ack
+  set_bank_config_bank_peak_current_reset:
+    summary: "Set rPDU2BankConfigBankPeakCurrentReset of one rPDU2BankConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Bank config index, description: "The row of rPDU2BankConfigEntry to write, by its rPDU2BankConfigIndex." }
+      value: { type: enum, values: [no_operation, reset], required: true, label: Value, description: "The new bank config bank peak current reset, as PowerNet-MIB names its values." }
+    returns: ack
+  set_outlet_switched_config_name:
+    summary: "Set rPDU2OutletSwitchedConfigName of one rPDU2OutletSwitchedConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet switched config index, description: "The row of rPDU2OutletSwitchedConfigEntry to write, by its rPDU2OutletSwitchedConfigIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new outlet switched config name. }
+    returns: ack
+  set_outlet_switched_config_power_on_time:
+    summary: "Set rPDU2OutletSwitchedConfigPowerOnTime of one rPDU2OutletSwitchedConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet switched config index, description: "The row of rPDU2OutletSwitchedConfigEntry to write, by its rPDU2OutletSwitchedConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet switched config power on time, in s." }
+    returns: ack
+  set_outlet_switched_config_power_off_time:
+    summary: "Set rPDU2OutletSwitchedConfigPowerOffTime of one rPDU2OutletSwitchedConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet switched config index, description: "The row of rPDU2OutletSwitchedConfigEntry to write, by its rPDU2OutletSwitchedConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet switched config power off time, in s." }
+    returns: ack
+  set_outlet_switched_config_reboot_duration:
+    summary: "Set rPDU2OutletSwitchedConfigRebootDuration of one rPDU2OutletSwitchedConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet switched config index, description: "The row of rPDU2OutletSwitchedConfigEntry to write, by its rPDU2OutletSwitchedConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet switched config reboot duration, as the MIB counts it." }
+    returns: ack
+  set_outlet_switched_config_external_link:
+    summary: "Set rPDU2OutletSwitchedConfigExternalLink of one rPDU2OutletSwitchedConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet switched config index, description: "The row of rPDU2OutletSwitchedConfigEntry to write, by its rPDU2OutletSwitchedConfigIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new outlet switched config external link. }
+    returns: ack
+  set_outlet_switched_control_command:
+    summary: "Set rPDU2OutletSwitchedControlCommand of one rPDU2OutletSwitchedControlEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet switched control index, description: "The row of rPDU2OutletSwitchedControlEntry to write, by its rPDU2OutletSwitchedControlIndex." }
+      value: { type: enum, values: [immediate_on, immediate_off, immediate_reboot, outlet_unknown, delayed_on, delayed_off, delayed_reboot, cancel_pending_command], required: true, label: Value, description: "The new outlet switched control command, as PowerNet-MIB names its values." }
+    returns: ack
+  set_outlet_metered_config_name:
+    summary: "Set rPDU2OutletMeteredConfigName of one rPDU2OutletMeteredConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet metered config index, description: "The row of rPDU2OutletMeteredConfigEntry to write, by its rPDU2OutletMeteredConfigIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new outlet metered config name. }
+    returns: ack
+  set_outlet_metered_config_low_load_current_threshold:
+    summary: "Set rPDU2OutletMeteredConfigLowLoadCurrentThreshold of one rPDU2OutletMeteredConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet metered config index, description: "The row of rPDU2OutletMeteredConfigEntry to write, by its rPDU2OutletMeteredConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet metered config low load current threshold, in W." }
+    returns: ack
+  set_outlet_metered_config_near_overload_current_threshold:
+    summary: "Set rPDU2OutletMeteredConfigNearOverloadCurrentThreshold of one rPDU2OutletMeteredConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet metered config index, description: "The row of rPDU2OutletMeteredConfigEntry to write, by its rPDU2OutletMeteredConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet metered config near overload current threshold, in W." }
+    returns: ack
+  set_outlet_metered_config_overload_current_threshold:
+    summary: "Set rPDU2OutletMeteredConfigOverloadCurrentThreshold of one rPDU2OutletMeteredConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet metered config index, description: "The row of rPDU2OutletMeteredConfigEntry to write, by its rPDU2OutletMeteredConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet metered config overload current threshold, in W." }
+    returns: ack
+  set_outlet_metered_config_external_link:
+    summary: "Set rPDU2OutletMeteredConfigExternalLink of one rPDU2OutletMeteredConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet metered config index, description: "The row of rPDU2OutletMeteredConfigEntry to write, by its rPDU2OutletMeteredConfigIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new outlet metered config external link. }
+    returns: ack
+  set_sensor_temp_humidity_config_name:
+    summary: "Set rPDU2SensorTempHumidityConfigName of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new sensor temp humidity config name. }
+    returns: ack
+  set_sensor_temp_humidity_config_temperature_alarm_enable:
+    summary: "Set rPDU2SensorTempHumidityConfigTemperatureAlarmEnable of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: enum, values: [disabled, enabled], required: true, label: Value, description: "The new sensor temp humidity config temperature alarm enable, as PowerNet-MIB names its values." }
+    returns: ack
+  set_sensor_temp_humidity_config_humidity_alarm_enable:
+    summary: "Set rPDU2SensorTempHumidityConfigHumidityAlarmEnable of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: enum, values: [disabled, enabled], required: true, label: Value, description: "The new sensor temp humidity config humidity alarm enable, as PowerNet-MIB names its values." }
+    returns: ack
+  set_sensor_temp_humidity_config_temp_max_thresh_f:
+    summary: "Set rPDU2SensorTempHumidityConfigTempMaxThreshF of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new sensor temp humidity config temp max thresh f, in °F." }
+    returns: ack
+  set_sensor_temp_humidity_config_temp_high_thresh_f:
+    summary: "Set rPDU2SensorTempHumidityConfigTempHighThreshF of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new sensor temp humidity config temp high thresh f, in °F." }
+    returns: ack
+  set_sensor_temp_humidity_config_temp_hysteresis_f:
+    summary: "Set rPDU2SensorTempHumidityConfigTempHysteresisF of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new sensor temp humidity config temp hysteresis f, in °F." }
+    returns: ack
+  set_sensor_temp_humidity_config_temp_max_thresh_c:
+    summary: "Set rPDU2SensorTempHumidityConfigTempMaxThreshC of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new sensor temp humidity config temp max thresh c, in °C." }
+    returns: ack
+  set_sensor_temp_humidity_config_temp_high_thresh_c:
+    summary: "Set rPDU2SensorTempHumidityConfigTempHighThreshC of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new sensor temp humidity config temp high thresh c, in °C." }
+    returns: ack
+  set_sensor_temp_humidity_config_temp_hysteresis_c:
+    summary: "Set rPDU2SensorTempHumidityConfigTempHysteresisC of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new sensor temp humidity config temp hysteresis c, in °C." }
+    returns: ack
+  set_sensor_temp_humidity_config_humidity_low_thresh:
+    summary: "Set rPDU2SensorTempHumidityConfigHumidityLowThresh of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new sensor temp humidity config humidity low thresh, in %." }
+    returns: ack
+  set_sensor_temp_humidity_config_humidity_min_thresh:
+    summary: "Set rPDU2SensorTempHumidityConfigHumidityMinThresh of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new sensor temp humidity config humidity min thresh, in %." }
+    returns: ack
+  set_sensor_temp_humidity_config_humidity_hysteresis:
+    summary: "Set rPDU2SensorTempHumidityConfigHumidityHysteresis of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new sensor temp humidity config humidity hysteresis, in %." }
+    returns: ack
+  set_sensor_temp_humidity_config_temp_peak_reset:
+    summary: "Set rPDU2SensorTempHumidityConfigTempPeakReset of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: enum, values: [no_operation, reset], required: true, label: Value, description: "The new sensor temp humidity config temp peak reset, as PowerNet-MIB names its values." }
+    returns: ack
+  set_sensor_temp_humidity_config_temp_low_thresh_f:
+    summary: "Set rPDU2SensorTempHumidityConfigTempLowThreshF of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new sensor temp humidity config temp low thresh f, in °F." }
+    returns: ack
+  set_sensor_temp_humidity_config_temp_min_thresh_f:
+    summary: "Set rPDU2SensorTempHumidityConfigTempMinThreshF of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new sensor temp humidity config temp min thresh f, in °F." }
+    returns: ack
+  set_sensor_temp_humidity_config_temp_low_thresh_c:
+    summary: "Set rPDU2SensorTempHumidityConfigTempLowThreshC of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new sensor temp humidity config temp low thresh c, in °C." }
+    returns: ack
+  set_sensor_temp_humidity_config_temp_min_thresh_c:
+    summary: "Set rPDU2SensorTempHumidityConfigTempMinThreshC of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new sensor temp humidity config temp min thresh c, in °C." }
+    returns: ack
+  set_sensor_temp_humidity_config_humidity_max_thresh:
+    summary: "Set rPDU2SensorTempHumidityConfigHumidityMaxThresh of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new sensor temp humidity config humidity max thresh, in %." }
+    returns: ack
+  set_sensor_temp_humidity_config_humidity_high_thresh:
+    summary: "Set rPDU2SensorTempHumidityConfigHumidityHighThresh of one rPDU2SensorTempHumidityConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor temp humidity config index, description: "The row of rPDU2SensorTempHumidityConfigEntry to write, by its rPDU2SensorTempHumidityConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new sensor temp humidity config humidity high thresh, in %." }
+    returns: ack
+  set_sensor_discrete_config_name:
+    summary: "Set rPDU2SensorDiscreteConfigName of one rPDU2SensorDiscreteConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor discrete config index, description: "The row of rPDU2SensorDiscreteConfigEntry to write, by its rPDU2SensorDiscreteConfigIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new sensor discrete config name. }
+    returns: ack
+  set_sensor_discrete_config_normal_state:
+    summary: "Set rPDU2SensorDiscreteConfigNormalState of one rPDU2SensorDiscreteConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor discrete config index, description: "The row of rPDU2SensorDiscreteConfigEntry to write, by its rPDU2SensorDiscreteConfigIndex." }
+      value: { type: enum, values: [normally_open, normally_closed], required: true, label: Value, description: "The new sensor discrete config normal state, as PowerNet-MIB names its values." }
+    returns: ack
+  set_sensor_discrete_config_abnormal_severity:
+    summary: "Set rPDU2SensorDiscreteConfigAbnormalSeverity of one rPDU2SensorDiscreteConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Sensor discrete config index, description: "The row of rPDU2SensorDiscreteConfigEntry to write, by its rPDU2SensorDiscreteConfigIndex." }
+      value: { type: enum, values: [informational, warning, critical], required: true, label: Value, description: "The new sensor discrete config abnormal severity, as PowerNet-MIB names its values." }
+    returns: ack
+  set_sensor_analog_voltage_config_name:
+    summary: "Set rPDU2SensorAnalogVoltageConfigName of one rPDU2SensorAnalogVoltageConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 255, required: true, label: Sensor analog voltage config index, description: "The row of rPDU2SensorAnalogVoltageConfigEntry to write, by its rPDU2SensorAnalogVoltageConfigIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new sensor analog voltage config name. }
+    returns: ack
+  set_sensor_analog_voltage_config_thresh_min:
+    summary: "Set rPDU2SensorAnalogVoltageConfigThreshMin of one rPDU2SensorAnalogVoltageConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 255, required: true, label: Sensor analog voltage config index, description: "The row of rPDU2SensorAnalogVoltageConfigEntry to write, by its rPDU2SensorAnalogVoltageConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new sensor analog voltage config thresh min, in 0.01 V." }
+    returns: ack
+  set_sensor_analog_voltage_config_thresh_max:
+    summary: "Set rPDU2SensorAnalogVoltageConfigThreshMax of one rPDU2SensorAnalogVoltageConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 255, required: true, label: Sensor analog voltage config index, description: "The row of rPDU2SensorAnalogVoltageConfigEntry to write, by its rPDU2SensorAnalogVoltageConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new sensor analog voltage config thresh max, in 0.01 V." }
+    returns: ack
+  set_sensor_analog_voltage_config_hysteresis:
+    summary: "Set rPDU2SensorAnalogVoltageConfigHysteresis of one rPDU2SensorAnalogVoltageConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 255, required: true, label: Sensor analog voltage config index, description: "The row of rPDU2SensorAnalogVoltageConfigEntry to write, by its rPDU2SensorAnalogVoltageConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new sensor analog voltage config hysteresis, in 0.01 V." }
+    returns: ack
+  set_sensor_analog_voltage_config_alarm_enable:
+    summary: "Set rPDU2SensorAnalogVoltageConfigAlarmEnable of one rPDU2SensorAnalogVoltageConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 255, required: true, label: Sensor analog voltage config index, description: "The row of rPDU2SensorAnalogVoltageConfigEntry to write, by its rPDU2SensorAnalogVoltageConfigIndex." }
+      value: { type: enum, values: [disabled, enabled], required: true, label: Value, description: "The new sensor analog voltage config alarm enable, as PowerNet-MIB names its values." }
+    returns: ack
+  set_group_energy_reset:
+    summary: "Set rPDU2GroupEnergyReset, then read its group back"
+    params:
+      value: { type: enum, values: [no_operation, reset, not_supported], required: true, label: Value, description: "The new group energy reset, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_bank_config_overload_restriction:
+    summary: "Set rPDU2AdvBankConfigOverloadRestriction of one rPDU2AdvBankConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Adv bank config index, description: "The row of rPDU2AdvBankConfigEntry to write, by its rPDU2AdvBankConfigIndex." }
+      value: { type: enum, values: [always_allow_turn_on, restrict_on_near_overload, restrict_on_overload, not_supported], required: true, label: Value, description: "The new adv bank config overload restriction, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_bank_config_low_load_current_threshold:
+    summary: "Set rPDU2AdvBankConfigLowLoadCurrentThreshold of one rPDU2AdvBankConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Adv bank config index, description: "The row of rPDU2AdvBankConfigEntry to write, by its rPDU2AdvBankConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv bank config low load current threshold, in 0.1 A." }
+    returns: ack
+  set_adv_bank_config_near_overload_current_threshold:
+    summary: "Set rPDU2AdvBankConfigNearOverloadCurrentThreshold of one rPDU2AdvBankConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Adv bank config index, description: "The row of rPDU2AdvBankConfigEntry to write, by its rPDU2AdvBankConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv bank config near overload current threshold, in 0.1 A." }
+    returns: ack
+  set_adv_bank_config_overload_current_threshold:
+    summary: "Set rPDU2AdvBankConfigOverloadCurrentThreshold of one rPDU2AdvBankConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Adv bank config index, description: "The row of rPDU2AdvBankConfigEntry to write, by its rPDU2AdvBankConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv bank config overload current threshold, in 0.1 A." }
+    returns: ack
+  set_adv_bank_config_bank_peak_current_reset:
+    summary: "Set rPDU2AdvBankConfigBankPeakCurrentReset of one rPDU2AdvBankConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Adv bank config index, description: "The row of rPDU2AdvBankConfigEntry to write, by its rPDU2AdvBankConfigIndex." }
+      value: { type: enum, values: [no_operation, reset], required: true, label: Value, description: "The new adv bank config bank peak current reset, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_phase_config_overload_restriction:
+    summary: "Set rPDU2AdvPhaseConfigOverloadRestriction of one rPDU2AdvPhaseConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Adv phase config index, description: "The row of rPDU2AdvPhaseConfigEntry to write, by its rPDU2AdvPhaseConfigIndex." }
+      value: { type: enum, values: [always_allow_turn_on, restrict_on_near_overload, restrict_on_overload, not_supported], required: true, label: Value, description: "The new adv phase config overload restriction, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_phase_config_low_load_current_threshold:
+    summary: "Set rPDU2AdvPhaseConfigLowLoadCurrentThreshold of one rPDU2AdvPhaseConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Adv phase config index, description: "The row of rPDU2AdvPhaseConfigEntry to write, by its rPDU2AdvPhaseConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv phase config low load current threshold, in 0.1 A." }
+    returns: ack
+  set_adv_phase_config_near_overload_current_threshold:
+    summary: "Set rPDU2AdvPhaseConfigNearOverloadCurrentThreshold of one rPDU2AdvPhaseConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Adv phase config index, description: "The row of rPDU2AdvPhaseConfigEntry to write, by its rPDU2AdvPhaseConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv phase config near overload current threshold, in 0.1 A." }
+    returns: ack
+  set_adv_phase_config_overload_current_threshold:
+    summary: "Set rPDU2AdvPhaseConfigOverloadCurrentThreshold of one rPDU2AdvPhaseConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Adv phase config index, description: "The row of rPDU2AdvPhaseConfigEntry to write, by its rPDU2AdvPhaseConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv phase config overload current threshold, in 0.1 A." }
+    returns: ack
+  set_adv_phase_config_phase_peak_current_reset:
+    summary: "Set rPDU2AdvPhaseConfigPhasePeakCurrentReset of one rPDU2AdvPhaseConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Adv phase config index, description: "The row of rPDU2AdvPhaseConfigEntry to write, by its rPDU2AdvPhaseConfigIndex." }
+      value: { type: enum, values: [no_operation, reset], required: true, label: Value, description: "The new adv phase config phase peak current reset, as PowerNet-MIB names its values." }
+    returns: ack
+  set_ident_name:
+    summary: "Set rPDUIdentName, then read its group back"
+    params:
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new ident name. }
+    returns: ack
+  set_ident_device_display_orientation:
+    summary: "Set rPDUIdentDeviceDisplayOrientation, then read its group back"
+    params:
+      value: { type: enum, values: [display_normal, display_reverse], required: true, label: Value, description: "The new ident device display orientation, as PowerNet-MIB names its values." }
+    returns: ack
+  set_ident_device_lineto_line_voltage:
+    summary: "Set rPDUIdentDeviceLinetoLineVoltage, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new ident device lineto line voltage, in V." }
+    returns: ack
+  set_ident_device_power_factor:
+    summary: "Set rPDUIdentDevicePowerFactor, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new ident device power factor, as the MIB counts it." }
+    returns: ack
+  set_ident_device_lineto_neutral_voltage:
+    summary: "Set rPDUIdentDeviceLinetoNeutralVoltage, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new ident device lineto neutral voltage, in V." }
+    returns: ack
+  set_load_phase_config_low_load_threshold:
+    summary: "Set rPDULoadPhaseConfigLowLoadThreshold of one rPDULoadPhaseConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Load phase config index, description: "The row of rPDULoadPhaseConfigEntry to write, by its rPDULoadPhaseConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new load phase config low load threshold, in A." }
+    returns: ack
+  set_load_phase_config_near_overload_threshold:
+    summary: "Set rPDULoadPhaseConfigNearOverloadThreshold of one rPDULoadPhaseConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Load phase config index, description: "The row of rPDULoadPhaseConfigEntry to write, by its rPDULoadPhaseConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new load phase config near overload threshold, in A." }
+    returns: ack
+  set_load_phase_config_overload_threshold:
+    summary: "Set rPDULoadPhaseConfigOverloadThreshold of one rPDULoadPhaseConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Load phase config index, description: "The row of rPDULoadPhaseConfigEntry to write, by its rPDULoadPhaseConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new load phase config overload threshold, in A." }
+    returns: ack
+  set_load_bank_config_low_load_threshold:
+    summary: "Set rPDULoadBankConfigLowLoadThreshold of one rPDULoadBankConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Load bank config index, description: "The row of rPDULoadBankConfigEntry to write, by its rPDULoadBankConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new load bank config low load threshold, in A." }
+    returns: ack
+  set_load_bank_config_near_overload_threshold:
+    summary: "Set rPDULoadBankConfigNearOverloadThreshold of one rPDULoadBankConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Load bank config index, description: "The row of rPDULoadBankConfigEntry to write, by its rPDULoadBankConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new load bank config near overload threshold, in A." }
+    returns: ack
+  set_load_bank_config_overload_threshold:
+    summary: "Set rPDULoadBankConfigOverloadThreshold of one rPDULoadBankConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Load bank config index, description: "The row of rPDULoadBankConfigEntry to write, by its rPDULoadBankConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new load bank config overload threshold, in A." }
+    returns: ack
+  set_outlet_device_dev_command:
+    summary: "Set rPDUOutletDevCommand, then read its group back"
+    params:
+      value: { type: enum, values: [no_command_all, immediate_all_on, immediate_all_off, immediate_all_reboot, delayed_all_on, delayed_all_off, delayed_all_reboot, cancel_all_pending_commands], required: true, label: Value, description: "The new outlet dev command, as PowerNet-MIB names its values." }
+    returns: ack
+  set_outlet_device_dev_coldstart_delay:
+    summary: "Set rPDUOutletDevColdstartDelay, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet dev coldstart delay, in s." }
+    returns: ack
+  set_outlet_phase_overload_restriction:
+    summary: "Set rPDUOutletPhaseOverloadRestriction of one rPDUOutletPhaseEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet phase index, description: "The row of rPDUOutletPhaseEntry to write, by its rPDUOutletPhaseIndex." }
+      value: { type: enum, values: [always_allow_turn_on, restrict_on_near_overload, restrict_on_overload], required: true, label: Value, description: "The new outlet phase overload restriction, as PowerNet-MIB names its values." }
+    returns: ack
+  set_outlet_control_outlet_command:
+    summary: "Set rPDUOutletControlOutletCommand of one rPDUOutletControlEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet control index, description: "The row of rPDUOutletControlEntry to write, by its rPDUOutletControlIndex." }
+      value: { type: enum, values: [immediate_on, immediate_off, immediate_reboot, delayed_on, delayed_off, delayed_reboot, cancel_pending_command], required: true, label: Value, description: "The new outlet control outlet command, as PowerNet-MIB names its values." }
+    returns: ack
+  set_outlet_config_outlet_name:
+    summary: "Set rPDUOutletConfigOutletName of one rPDUOutletConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet config index, description: "The row of rPDUOutletConfigEntry to write, by its rPDUOutletConfigIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new outlet config outlet name. }
+    returns: ack
+  set_outlet_config_power_on_time:
+    summary: "Set rPDUOutletConfigPowerOnTime of one rPDUOutletConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet config index, description: "The row of rPDUOutletConfigEntry to write, by its rPDUOutletConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet config power on time, in s." }
+    returns: ack
+  set_outlet_config_power_off_time:
+    summary: "Set rPDUOutletConfigPowerOffTime of one rPDUOutletConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet config index, description: "The row of rPDUOutletConfigEntry to write, by its rPDUOutletConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet config power off time, in s." }
+    returns: ack
+  set_outlet_config_reboot_duration:
+    summary: "Set rPDUOutletConfigRebootDuration of one rPDUOutletConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet config index, description: "The row of rPDUOutletConfigEntry to write, by its rPDUOutletConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet config reboot duration, in s." }
+    returns: ack
+  set_outlet_config_monitored_name:
+    summary: "Set rPDUOutletConfigMonitoredName of one rPDUOutletConfigMonitoredEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet config monitored index, description: "The row of rPDUOutletConfigMonitoredEntry to write, by its rPDUOutletConfigMonitoredIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new outlet config monitored name. }
+    returns: ack
+  set_outlet_config_monitored_low_load_threshold:
+    summary: "Set rPDUOutletConfigMonitoredLowLoadThreshold of one rPDUOutletConfigMonitoredEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet config monitored index, description: "The row of rPDUOutletConfigMonitoredEntry to write, by its rPDUOutletConfigMonitoredIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet config monitored low load threshold, in A." }
+    returns: ack
+  set_outlet_config_monitored_near_overload_threshold:
+    summary: "Set rPDUOutletConfigMonitoredNearOverloadThreshold of one rPDUOutletConfigMonitoredEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet config monitored index, description: "The row of rPDUOutletConfigMonitoredEntry to write, by its rPDUOutletConfigMonitoredIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet config monitored near overload threshold, in A." }
+    returns: ack
+  set_outlet_config_monitored_overload_threshold:
+    summary: "Set rPDUOutletConfigMonitoredOverloadThreshold of one rPDUOutletConfigMonitoredEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet config monitored index, description: "The row of rPDUOutletConfigMonitoredEntry to write, by its rPDUOutletConfigMonitoredIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet config monitored overload threshold, in A." }
+    returns: ack
+  set_outlet_bank_overload_restriction:
+    summary: "Set rPDUOutletBankOverloadRestriction of one rPDUOutletBankEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet bank index, description: "The row of rPDUOutletBankEntry to write, by its rPDUOutletBankIndex." }
+      value: { type: enum, values: [always_allow_turn_on, restrict_on_near_overload, restrict_on_overload], required: true, label: Value, description: "The new outlet bank overload restriction, as PowerNet-MIB names its values." }
+    returns: ack
+
+state:
+  version: { type: string, description: "The SNMP version used: v1, v2c or v3" }
+  system.description: { type: string, description: "sysDescr.0: the agent's description of the device" }
+  system.object_id: { type: string, description: "sysObjectID.0: the vendor's OID for the device type" }
+  system.uptime: { type: int, unit: "1/100 s", description: "sysUpTime.0, in hundredths of a second (TimeTicks)" }
+  system.contact: { type: string, description: "sysContact.0" }
+  system.name: { type: string, description: "sysName.0" }
+  system.location: { type: string, description: "sysLocation.0" }
+  engine.id: { type: string, description: "v3: the agent's snmpEngineID in hex" }
+  engine.boots: { type: int, description: "v3: the agent's snmpEngineBoots" }
+  engine.time: { type: int, unit: s, description: "v3: the agent's snmpEngineTime when last heard" }
+  local_engine_id: { type: string, description: "With trap_port: this receiver's snmpEngineID in hex, to configure on agents sending v3 informs" }
+  traps.count: { type: int, description: "Notifications received since opening" }
+  traps.last: { type: object, description: "The last notification: {kind (trap or inform), version, source, trap_oid, name (the MIB's name for it, or null), uptime, varbinds, and for v1 enterprise, agent_address, generic_trap, specific_trap, and for v3 user}" }
+  ident_table_size: { type: int, description: rPDU2IdentTableSize (PowerNet-MIB) }
+  ident.*.module: { type: int, description: rPDU2IdentModule (PowerNet-MIB) }
+  ident.*.name: { type: string, description: rPDU2IdentName (PowerNet-MIB) }
+  ident.*.location: { type: string, description: rPDU2IdentLocation (PowerNet-MIB) }
+  ident.*.hardware_rev: { type: string, description: rPDU2IdentHardwareRev (PowerNet-MIB) }
+  ident.*.firmware_rev: { type: string, description: rPDU2IdentFirmwareRev (PowerNet-MIB) }
+  ident.*.date_of_manufacture: { type: string, description: rPDU2IdentDateOfManufacture (PowerNet-MIB) }
+  ident.*.model_number: { type: string, description: rPDU2IdentModelNumber (PowerNet-MIB) }
+  ident.*.serial_number: { type: string, description: rPDU2IdentSerialNumber (PowerNet-MIB) }
+  ident.*.contact: { type: string, description: rPDU2IdentContact (PowerNet-MIB) }
+  ident.*.boot_monitor_rev: { type: string, description: rPDU2IdentBootMonitorRev (PowerNet-MIB) }
+  ident.*.long_description: { type: string, description: rPDU2IdentLongDescription (PowerNet-MIB) }
+  ident.*.nmc_serial_number: { type: string, description: rPDU2IdentNMCSerialNumber (PowerNet-MIB) }
+  ident.*.indent_app_build_date: { type: string, description: rPDU2IndentAppBuildDate (PowerNet-MIB) }
+  ident.*.indent_aos_build_date: { type: string, description: rPDU2IndentAOSBuildDate (PowerNet-MIB) }
+  ident.*.indent_boot_mon_build_date: { type: string, description: rPDU2IndentBootMonBuildDate (PowerNet-MIB) }
+  device_table_size: { type: int, description: rPDU2DeviceTableSize (PowerNet-MIB) }
+  device_config.*.module: { type: int, description: rPDU2DeviceConfigModule (PowerNet-MIB) }
+  device_config.*.name: { type: string, description: rPDU2DeviceConfigName (PowerNet-MIB) }
+  device_config.*.location: { type: string, description: rPDU2DeviceConfigLocation (PowerNet-MIB) }
+  device_config.*.display_orientation: { type: string, description: "rPDU2DeviceConfigDisplayOrientation (PowerNet-MIB): display_normal, display_reverse" }
+  device_config.*.coldstart_delay: { type: int, unit: s, description: rPDU2DeviceConfigColdstartDelay (PowerNet-MIB) }
+  device_config.*.low_load_power_threshold: { type: int, unit: "0.1 kW", description: rPDU2DeviceConfigLowLoadPowerThreshold (PowerNet-MIB) }
+  device_config.*.near_overload_power_threshold: { type: int, unit: "0.1 kW", description: rPDU2DeviceConfigNearOverloadPowerThreshold (PowerNet-MIB) }
+  device_config.*.overload_power_threshold: { type: int, unit: "0.1 kW", description: rPDU2DeviceConfigOverloadPowerThreshold (PowerNet-MIB) }
+  device_config.*.device_peak_power_reset: { type: string, description: "rPDU2DeviceConfigDevicePeakPowerReset (PowerNet-MIB): no_operation, reset, not_supported" }
+  device_config.*.device_energy_reset: { type: string, description: "rPDU2DeviceConfigDeviceEnergyReset (PowerNet-MIB): no_operation, reset, not_supported" }
+  device_config.*.outlets_energy_reset: { type: string, description: "rPDU2DeviceConfigOutletsEnergyReset (PowerNet-MIB): no_operation, reset, not_supported" }
+  device_config.*.outlets_peak_load_reset: { type: string, description: "rPDU2DeviceConfigOutletsPeakLoadReset (PowerNet-MIB): no_operation, reset, not_supported" }
+  device_config.*.contact: { type: string, description: rPDU2DeviceConfigContact (PowerNet-MIB) }
+  device_properties.*.module: { type: int, description: rPDU2DevicePropertiesModule (PowerNet-MIB) }
+  device_properties.*.name: { type: string, description: rPDU2DevicePropertiesName (PowerNet-MIB) }
+  device_properties.*.num_outlets: { type: int, description: rPDU2DevicePropertiesNumOutlets (PowerNet-MIB) }
+  device_properties.*.num_switched_outlets: { type: int, description: rPDU2DevicePropertiesNumSwitchedOutlets (PowerNet-MIB) }
+  device_properties.*.num_metered_outlets: { type: int, description: rPDU2DevicePropertiesNumMeteredOutlets (PowerNet-MIB) }
+  device_properties.*.num_phases: { type: int, description: rPDU2DevicePropertiesNumPhases (PowerNet-MIB) }
+  device_properties.*.num_metered_banks: { type: int, description: rPDU2DevicePropertiesNumMeteredBanks (PowerNet-MIB) }
+  device_properties.*.max_current_rating: { type: int, unit: A, description: rPDU2DevicePropertiesMaxCurrentRating (PowerNet-MIB) }
+  device_properties.*.orientation: { type: string, description: "rPDU2DevicePropertiesOrientation (PowerNet-MIB): horizontal, vertical, vertical_is_xv2, vertical_is_xv3" }
+  device_properties.*.outlet_layout: { type: string, description: "rPDU2DevicePropertiesOutletLayout (PowerNet-MIB): seq_phase_to_neutral, seq_phase_to_phase, seq_ph_to_neu21_ph_to_ph, seq_ph_to_ph_grouped, seq_ph_to_n_grouped, seq_p_to_n1516_p_to_p_grouped, seq_ph_to_ph2x_grouped, seq_ph_to_n2x_grouped, seq_not_applicable, seq_ph_to_n_ph_to_ph_ph_to_n" }
+  device_properties.*.max_phase_current_rating: { type: int, unit: A, description: rPDU2DevicePropertiesMaxPhaseCurrentRating (PowerNet-MIB) }
+  device_properties.*.device_power_rating: { type: int, unit: "0.1 kW", description: rPDU2DevicePropertiesDevicePowerRating (PowerNet-MIB) }
+  device_status.*.module: { type: int, description: rPDU2DeviceStatusModule (PowerNet-MIB) }
+  device_status.*.name: { type: string, description: rPDU2DeviceStatusName (PowerNet-MIB) }
+  device_status.*.load_state: { type: string, description: "rPDU2DeviceStatusLoadState (PowerNet-MIB): low_load, normal, near_overload, overload, notsupported" }
+  device_status.*.power: { type: int, unit: "0.01 kW", description: rPDU2DeviceStatusPower (PowerNet-MIB) }
+  device_status.*.peak_power: { type: int, unit: "0.01 kW", description: rPDU2DeviceStatusPeakPower (PowerNet-MIB) }
+  device_status.*.peak_power_timestamp: { type: string, description: rPDU2DeviceStatusPeakPowerTimestamp (PowerNet-MIB) }
+  device_status.*.peak_power_start_time: { type: string, description: rPDU2DeviceStatusPeakPowerStartTime (PowerNet-MIB) }
+  device_status.*.energy: { type: int, unit: "0.1 kWh", description: rPDU2DeviceStatusEnergy (PowerNet-MIB) }
+  device_status.*.energy_start_time: { type: string, description: rPDU2DeviceStatusEnergyStartTime (PowerNet-MIB) }
+  device_status.*.command_pending: { type: string, description: "rPDU2DeviceStatusCommandPending (PowerNet-MIB): command_pending, no_command_pending, command_pending_unknown" }
+  device_status.*.power_supply_alarm: { type: string, description: "rPDU2DeviceStatusPowerSupplyAlarm (PowerNet-MIB): normal, alarm" }
+  device_status.*.power_supply_1_status: { type: string, description: "rPDU2DeviceStatusPowerSupply1Status (PowerNet-MIB): normal, alarm, not_installed" }
+  device_status.*.power_supply_2_status: { type: string, description: "rPDU2DeviceStatusPowerSupply2Status (PowerNet-MIB): normal, alarm, not_installed" }
+  device_status.*.outlets_energy_start_time: { type: string, description: rPDU2DeviceStatusOutletsEnergyStartTime (PowerNet-MIB) }
+  device_status.*.apparent_power: { type: int, unit: "0.01 kVA", description: rPDU2DeviceStatusApparentPower (PowerNet-MIB) }
+  device_status.*.power_factor: { type: int, unit: "0.01", description: rPDU2DeviceStatusPowerFactor (PowerNet-MIB) }
+  device_status.*.nps_type: { type: string, description: "rPDU2DeviceStatusNPSType (PowerNet-MIB): not_nps, host, guest" }
+  device_control.*.module: { type: int, description: rPDU2DeviceControlModule (PowerNet-MIB) }
+  device_control.*.name: { type: string, description: rPDU2DeviceControlName (PowerNet-MIB) }
+  device_control.*.command: { type: string, description: "rPDU2DeviceControlCommand (PowerNet-MIB): immediate_all_on, delayed_all_on, immediate_all_off, immediate_all_reboot, delayed_all_reboot, no_command_all, delayed_all_off, cancel_all_pending_commands" }
+  phase_table_size: { type: int, description: rPDU2PhaseTableSize (PowerNet-MIB) }
+  phase_config.*.module: { type: int, description: rPDU2PhaseConfigModule (PowerNet-MIB) }
+  phase_config.*.number: { type: int, description: rPDU2PhaseConfigNumber (PowerNet-MIB) }
+  phase_config.*.overload_restriction: { type: string, description: "rPDU2PhaseConfigOverloadRestriction (PowerNet-MIB): always_allow_turn_on, restrict_on_near_overload, restrict_on_overload, not_supported" }
+  phase_config.*.low_load_current_threshold: { type: int, unit: A, description: rPDU2PhaseConfigLowLoadCurrentThreshold (PowerNet-MIB) }
+  phase_config.*.near_overload_current_threshold: { type: int, unit: A, description: rPDU2PhaseConfigNearOverloadCurrentThreshold (PowerNet-MIB) }
+  phase_config.*.overload_current_threshold: { type: int, unit: A, description: rPDU2PhaseConfigOverloadCurrentThreshold (PowerNet-MIB) }
+  phase_config.*.phase_peak_current_reset: { type: string, description: "rPDU2PhaseConfigPhasePeakCurrentReset (PowerNet-MIB): no_operation, reset" }
+  phase_properties.*.module: { type: int, description: rPDU2PhasePropertiesModule (PowerNet-MIB) }
+  phase_properties.*.number: { type: int, description: rPDU2PhasePropertiesNumber (PowerNet-MIB) }
+  phase_status.*.module: { type: int, description: rPDU2PhaseStatusModule (PowerNet-MIB) }
+  phase_status.*.number: { type: int, description: rPDU2PhaseStatusNumber (PowerNet-MIB) }
+  phase_status.*.load_state: { type: string, description: "rPDU2PhaseStatusLoadState (PowerNet-MIB): low_load, normal, near_overload, overload" }
+  phase_status.*.current: { type: int, unit: "0.1 A", description: rPDU2PhaseStatusCurrent (PowerNet-MIB) }
+  phase_status.*.voltage: { type: int, unit: V, description: rPDU2PhaseStatusVoltage (PowerNet-MIB) }
+  phase_status.*.power: { type: int, unit: "0.01 kW", description: rPDU2PhaseStatusPower (PowerNet-MIB) }
+  phase_status.*.apparent_power: { type: int, unit: "0.01 kVA", description: rPDU2PhaseStatusApparentPower (PowerNet-MIB) }
+  phase_status.*.power_factor: { type: int, unit: "0.01", description: rPDU2PhaseStatusPowerFactor (PowerNet-MIB) }
+  phase_status.*.peak_current: { type: int, unit: "0.1 A", description: rPDU2PhaseStatusPeakCurrent (PowerNet-MIB) }
+  phase_status.*.peak_current_timestamp: { type: string, description: rPDU2PhaseStatusPeakCurrentTimestamp (PowerNet-MIB) }
+  phase_status.*.peak_current_start_time: { type: string, description: rPDU2PhaseStatusPeakCurrentStartTime (PowerNet-MIB) }
+  bank_table_size: { type: int, description: rPDU2BankTableSize (PowerNet-MIB) }
+  bank_config.*.module: { type: int, description: rPDU2BankConfigModule (PowerNet-MIB) }
+  bank_config.*.number: { type: int, description: rPDU2BankConfigNumber (PowerNet-MIB) }
+  bank_config.*.overload_restriction: { type: string, description: "rPDU2BankConfigOverloadRestriction (PowerNet-MIB): always_allow_turn_on, restrict_on_near_overload, restrict_on_overload, not_supported" }
+  bank_config.*.low_load_current_threshold: { type: int, unit: A, description: rPDU2BankConfigLowLoadCurrentThreshold (PowerNet-MIB) }
+  bank_config.*.near_overload_current_threshold: { type: int, unit: A, description: rPDU2BankConfigNearOverloadCurrentThreshold (PowerNet-MIB) }
+  bank_config.*.overload_current_threshold: { type: int, unit: A, description: rPDU2BankConfigOverloadCurrentThreshold (PowerNet-MIB) }
+  bank_config.*.bank_peak_current_reset: { type: string, description: "rPDU2BankConfigBankPeakCurrentReset (PowerNet-MIB): no_operation, reset" }
+  bank_properties.*.module: { type: int, description: rPDU2BankPropertiesModule (PowerNet-MIB) }
+  bank_properties.*.number: { type: int, description: rPDU2BankPropertiesNumber (PowerNet-MIB) }
+  bank_properties.*.phase_layout: { type: int, description: rPDU2BankPropertiesPhaseLayout (PowerNet-MIB) }
+  bank_properties.*.breaker_rating: { type: int, unit: A, description: rPDU2BankPropertiesBreakerRating (PowerNet-MIB) }
+  bank_status.*.module: { type: int, description: rPDU2BankStatusModule (PowerNet-MIB) }
+  bank_status.*.number: { type: int, description: rPDU2BankStatusNumber (PowerNet-MIB) }
+  bank_status.*.load_state: { type: string, description: "rPDU2BankStatusLoadState (PowerNet-MIB): low_load, normal, near_overload, overload" }
+  bank_status.*.current: { type: int, unit: "0.1 A", description: rPDU2BankStatusCurrent (PowerNet-MIB) }
+  bank_status.*.peak_current: { type: int, unit: "0.1 A", description: rPDU2BankStatusPeakCurrent (PowerNet-MIB) }
+  bank_status.*.peak_current_timestamp: { type: string, description: rPDU2BankStatusPeakCurrentTimestamp (PowerNet-MIB) }
+  bank_status.*.peak_current_start_time: { type: string, description: rPDU2BankStatusPeakCurrentStartTime (PowerNet-MIB) }
+  outlet.switched_table_size: { type: int, description: rPDU2OutletSwitchedTableSize (PowerNet-MIB) }
+  outlet_switched_config.*.module: { type: int, description: rPDU2OutletSwitchedConfigModule (PowerNet-MIB) }
+  outlet_switched_config.*.name: { type: string, description: rPDU2OutletSwitchedConfigName (PowerNet-MIB) }
+  outlet_switched_config.*.number: { type: int, description: rPDU2OutletSwitchedConfigNumber (PowerNet-MIB) }
+  outlet_switched_config.*.power_on_time: { type: int, unit: s, description: rPDU2OutletSwitchedConfigPowerOnTime (PowerNet-MIB) }
+  outlet_switched_config.*.power_off_time: { type: int, unit: s, description: rPDU2OutletSwitchedConfigPowerOffTime (PowerNet-MIB) }
+  outlet_switched_config.*.reboot_duration: { type: int, description: rPDU2OutletSwitchedConfigRebootDuration (PowerNet-MIB) }
+  outlet_switched_config.*.external_link: { type: string, description: rPDU2OutletSwitchedConfigExternalLink (PowerNet-MIB) }
+  outlet_switched_properties.*.module: { type: int, description: rPDU2OutletSwitchedPropertiesModule (PowerNet-MIB) }
+  outlet_switched_properties.*.name: { type: string, description: rPDU2OutletSwitchedPropertiesName (PowerNet-MIB) }
+  outlet_switched_properties.*.number: { type: int, description: rPDU2OutletSwitchedPropertiesNumber (PowerNet-MIB) }
+  outlet_switched_properties.*.phase_layout: { type: int, description: rPDU2OutletSwitchedPropertiesPhaseLayout (PowerNet-MIB) }
+  outlet_switched_properties.*.bank: { type: int, description: rPDU2OutletSwitchedPropertiesBank (PowerNet-MIB) }
+  outlet_switched_status.*.module: { type: int, description: rPDU2OutletSwitchedStatusModule (PowerNet-MIB) }
+  outlet_switched_status.*.name: { type: string, description: rPDU2OutletSwitchedStatusName (PowerNet-MIB) }
+  outlet_switched_status.*.number: { type: int, description: rPDU2OutletSwitchedStatusNumber (PowerNet-MIB) }
+  outlet_switched_status.*.state: { type: string, description: "rPDU2OutletSwitchedStatusState (PowerNet-MIB): off, on" }
+  outlet_switched_status.*.command_pending: { type: string, description: "rPDU2OutletSwitchedStatusCommandPending (PowerNet-MIB): command_pending, no_command_pending, command_pending_unknown" }
+  outlet_switched_status.*.external_link: { type: string, description: rPDU2OutletSwitchedStatusExternalLink (PowerNet-MIB) }
+  outlet_switched_control.*.module: { type: int, description: rPDU2OutletSwitchedControlModule (PowerNet-MIB) }
+  outlet_switched_control.*.name: { type: string, description: rPDU2OutletSwitchedControlName (PowerNet-MIB) }
+  outlet_switched_control.*.number: { type: int, description: rPDU2OutletSwitchedControlNumber (PowerNet-MIB) }
+  outlet_switched_control.*.command: { type: string, description: "rPDU2OutletSwitchedControlCommand (PowerNet-MIB): immediate_on, immediate_off, immediate_reboot, outlet_unknown, delayed_on, delayed_off, delayed_reboot, cancel_pending_command" }
+  outlet.metered_table_size: { type: int, description: rPDU2OutletMeteredTableSize (PowerNet-MIB) }
+  outlet_metered_config.*.module: { type: int, description: rPDU2OutletMeteredConfigModule (PowerNet-MIB) }
+  outlet_metered_config.*.name: { type: string, description: rPDU2OutletMeteredConfigName (PowerNet-MIB) }
+  outlet_metered_config.*.number: { type: int, description: rPDU2OutletMeteredConfigNumber (PowerNet-MIB) }
+  outlet_metered_config.*.low_load_current_threshold: { type: int, unit: W, description: rPDU2OutletMeteredConfigLowLoadCurrentThreshold (PowerNet-MIB) }
+  outlet_metered_config.*.near_overload_current_threshold: { type: int, unit: W, description: rPDU2OutletMeteredConfigNearOverloadCurrentThreshold (PowerNet-MIB) }
+  outlet_metered_config.*.overload_current_threshold: { type: int, unit: W, description: rPDU2OutletMeteredConfigOverloadCurrentThreshold (PowerNet-MIB) }
+  outlet_metered_config.*.external_link: { type: string, description: rPDU2OutletMeteredConfigExternalLink (PowerNet-MIB) }
+  outlet_metered_properties.*.module: { type: int, description: rPDU2OutletMeteredPropertiesModule (PowerNet-MIB) }
+  outlet_metered_properties.*.name: { type: string, description: rPDU2OutletMeteredPropertiesName (PowerNet-MIB) }
+  outlet_metered_properties.*.number: { type: int, description: rPDU2OutletMeteredPropertiesNumber (PowerNet-MIB) }
+  outlet_metered_properties.*.layout: { type: int, description: rPDU2OutletMeteredPropertiesLayout (PowerNet-MIB) }
+  outlet_metered_properties.*.power_rating: { type: int, description: rPDU2OutletMeteredPropertiesPowerRating (PowerNet-MIB) }
+  outlet_metered_properties.*.bank: { type: int, description: rPDU2OutletMeteredPropertiesBank (PowerNet-MIB) }
+  outlet_metered_status.*.module: { type: int, description: rPDU2OutletMeteredStatusModule (PowerNet-MIB) }
+  outlet_metered_status.*.name: { type: string, description: rPDU2OutletMeteredStatusName (PowerNet-MIB) }
+  outlet_metered_status.*.number: { type: int, description: rPDU2OutletMeteredStatusNumber (PowerNet-MIB) }
+  outlet_metered_status.*.state: { type: string, description: "rPDU2OutletMeteredStatusState (PowerNet-MIB): low_load, normal, near_overload, overload" }
+  outlet_metered_status.*.current: { type: int, unit: "0.1 A", description: rPDU2OutletMeteredStatusCurrent (PowerNet-MIB) }
+  outlet_metered_status.*.power: { type: int, description: rPDU2OutletMeteredStatusPower (PowerNet-MIB) }
+  outlet_metered_status.*.peak_power: { type: int, description: rPDU2OutletMeteredStatusPeakPower (PowerNet-MIB) }
+  outlet_metered_status.*.peak_power_timestamp: { type: string, description: rPDU2OutletMeteredStatusPeakPowerTimestamp (PowerNet-MIB) }
+  outlet_metered_status.*.peak_power_start_time: { type: string, description: rPDU2OutletMeteredStatusPeakPowerStartTime (PowerNet-MIB) }
+  outlet_metered_status.*.energy: { type: int, unit: "0.1 kWh", description: rPDU2OutletMeteredStatusEnergy (PowerNet-MIB) }
+  outlet_metered_status.*.receptacle_type: { type: string, description: rPDU2OutletMeteredStatusReceptacleType (PowerNet-MIB) }
+  outlet_metered_status.*.external_link: { type: string, description: rPDU2OutletMeteredStatusExternalLink (PowerNet-MIB) }
+  sensor.temp_humidity_table_size: { type: int, description: rPDU2SensorTempHumidityTableSize (PowerNet-MIB) }
+  sensor_temp_humidity_config.*.module: { type: int, description: rPDU2SensorTempHumidityConfigModule (PowerNet-MIB) }
+  sensor_temp_humidity_config.*.name: { type: string, description: rPDU2SensorTempHumidityConfigName (PowerNet-MIB) }
+  sensor_temp_humidity_config.*.number: { type: int, description: rPDU2SensorTempHumidityConfigNumber (PowerNet-MIB) }
+  sensor_temp_humidity_config.*.temperature_alarm_enable: { type: string, description: "rPDU2SensorTempHumidityConfigTemperatureAlarmEnable (PowerNet-MIB): disabled, enabled" }
+  sensor_temp_humidity_config.*.humidity_alarm_enable: { type: string, description: "rPDU2SensorTempHumidityConfigHumidityAlarmEnable (PowerNet-MIB): disabled, enabled" }
+  sensor_temp_humidity_config.*.temp_max_thresh_f: { type: int, unit: °F, description: rPDU2SensorTempHumidityConfigTempMaxThreshF (PowerNet-MIB) }
+  sensor_temp_humidity_config.*.temp_high_thresh_f: { type: int, unit: °F, description: rPDU2SensorTempHumidityConfigTempHighThreshF (PowerNet-MIB) }
+  sensor_temp_humidity_config.*.temp_hysteresis_f: { type: int, unit: °F, description: rPDU2SensorTempHumidityConfigTempHysteresisF (PowerNet-MIB) }
+  sensor_temp_humidity_config.*.temp_max_thresh_c: { type: int, unit: °C, description: rPDU2SensorTempHumidityConfigTempMaxThreshC (PowerNet-MIB) }
+  sensor_temp_humidity_config.*.temp_high_thresh_c: { type: int, unit: °C, description: rPDU2SensorTempHumidityConfigTempHighThreshC (PowerNet-MIB) }
+  sensor_temp_humidity_config.*.temp_hysteresis_c: { type: int, unit: °C, description: rPDU2SensorTempHumidityConfigTempHysteresisC (PowerNet-MIB) }
+  sensor_temp_humidity_config.*.humidity_low_thresh: { type: int, unit: "%", description: rPDU2SensorTempHumidityConfigHumidityLowThresh (PowerNet-MIB) }
+  sensor_temp_humidity_config.*.humidity_min_thresh: { type: int, unit: "%", description: rPDU2SensorTempHumidityConfigHumidityMinThresh (PowerNet-MIB) }
+  sensor_temp_humidity_config.*.humidity_hysteresis: { type: int, unit: "%", description: rPDU2SensorTempHumidityConfigHumidityHysteresis (PowerNet-MIB) }
+  sensor_temp_humidity_config.*.temp_peak_reset: { type: string, description: "rPDU2SensorTempHumidityConfigTempPeakReset (PowerNet-MIB): no_operation, reset" }
+  sensor_temp_humidity_config.*.temp_low_thresh_f: { type: int, unit: °F, description: rPDU2SensorTempHumidityConfigTempLowThreshF (PowerNet-MIB) }
+  sensor_temp_humidity_config.*.temp_min_thresh_f: { type: int, unit: °F, description: rPDU2SensorTempHumidityConfigTempMinThreshF (PowerNet-MIB) }
+  sensor_temp_humidity_config.*.temp_low_thresh_c: { type: int, unit: °C, description: rPDU2SensorTempHumidityConfigTempLowThreshC (PowerNet-MIB) }
+  sensor_temp_humidity_config.*.temp_min_thresh_c: { type: int, unit: °C, description: rPDU2SensorTempHumidityConfigTempMinThreshC (PowerNet-MIB) }
+  sensor_temp_humidity_config.*.humidity_max_thresh: { type: int, unit: "%", description: rPDU2SensorTempHumidityConfigHumidityMaxThresh (PowerNet-MIB) }
+  sensor_temp_humidity_config.*.humidity_high_thresh: { type: int, unit: "%", description: rPDU2SensorTempHumidityConfigHumidityHighThresh (PowerNet-MIB) }
+  sensor_temp_humidity_status.*.module: { type: int, description: rPDU2SensorTempHumidityStatusModule (PowerNet-MIB) }
+  sensor_temp_humidity_status.*.name: { type: string, description: rPDU2SensorTempHumidityStatusName (PowerNet-MIB) }
+  sensor_temp_humidity_status.*.number: { type: int, description: rPDU2SensorTempHumidityStatusNumber (PowerNet-MIB) }
+  sensor_temp_humidity_status.*.type: { type: string, description: "rPDU2SensorTempHumidityStatusType (PowerNet-MIB): temperature_only, temperature_humidity, comms_lost, not_installed" }
+  sensor_temp_humidity_status.*.comm_status: { type: string, description: "rPDU2SensorTempHumidityStatusCommStatus (PowerNet-MIB): not_installed, comms_ok, comms_lost" }
+  sensor_temp_humidity_status.*.temp_f: { type: int, unit: "0.1 °F", description: rPDU2SensorTempHumidityStatusTempF (PowerNet-MIB) }
+  sensor_temp_humidity_status.*.temp_c: { type: int, unit: "0.1 °C", description: rPDU2SensorTempHumidityStatusTempC (PowerNet-MIB) }
+  sensor_temp_humidity_status.*.temp_status: { type: string, description: "rPDU2SensorTempHumidityStatusTempStatus (PowerNet-MIB): not_present, below_min, below_low, normal, above_high, above_max" }
+  sensor_temp_humidity_status.*.relative_humidity: { type: int, unit: "%", description: rPDU2SensorTempHumidityStatusRelativeHumidity (PowerNet-MIB) }
+  sensor_temp_humidity_status.*.humidity_status: { type: string, description: "rPDU2SensorTempHumidityStatusHumidityStatus (PowerNet-MIB): not_present, below_min, below_low, normal, above_high, above_max" }
+  sensor_temp_humidity_status.*.temp_peak_f: { type: int, unit: "0.1 °F", description: rPDU2SensorTempHumidityStatusTempPeakF (PowerNet-MIB) }
+  sensor_temp_humidity_status.*.temp_peak_c: { type: int, unit: "0.1 °C", description: rPDU2SensorTempHumidityStatusTempPeakC (PowerNet-MIB) }
+  sensor_temp_humidity_status.*.temp_peak_timestamp: { type: string, description: rPDU2SensorTempHumidityStatusTempPeakTimestamp (PowerNet-MIB) }
+  sensor_temp_humidity_status.*.temp_peak_start_time: { type: string, description: rPDU2SensorTempHumidityStatusTempPeakStartTime (PowerNet-MIB) }
+  sensor.discrete_table_size: { type: int, description: rPDU2SensorDiscreteTableSize (PowerNet-MIB) }
+  sensor_discrete_config.*.module: { type: int, description: rPDU2SensorDiscreteConfigModule (PowerNet-MIB) }
+  sensor_discrete_config.*.name: { type: string, description: rPDU2SensorDiscreteConfigName (PowerNet-MIB) }
+  sensor_discrete_config.*.number: { type: int, description: rPDU2SensorDiscreteConfigNumber (PowerNet-MIB) }
+  sensor_discrete_config.*.normal_state: { type: string, description: "rPDU2SensorDiscreteConfigNormalState (PowerNet-MIB): normally_open, normally_closed" }
+  sensor_discrete_config.*.abnormal_severity: { type: string, description: "rPDU2SensorDiscreteConfigAbnormalSeverity (PowerNet-MIB): informational, warning, critical" }
+  sensor_discrete_status.*.module: { type: int, description: rPDU2SensorDiscreteStatusModule (PowerNet-MIB) }
+  sensor_discrete_status.*.name: { type: string, description: rPDU2SensorDiscreteStatusName (PowerNet-MIB) }
+  sensor_discrete_status.*.number: { type: int, description: rPDU2SensorDiscreteStatusNumber (PowerNet-MIB) }
+  sensor_discrete_status.*.type: { type: string, description: "rPDU2SensorDiscreteStatusType (PowerNet-MIB): not_connected, door_contact_sensor, smoke_sensor, motion_detector, vibration_sensor, dry_contact_sensor, spot_leak_sensor" }
+  sensor_discrete_status.*.comm_status: { type: string, description: "rPDU2SensorDiscreteStatusCommStatus (PowerNet-MIB): not_installed, comms_ok, comms_lost" }
+  sensor_discrete_status.*.current_state: { type: string, description: "rPDU2SensorDiscreteStatusCurrentState (PowerNet-MIB): open, closed, unknown" }
+  sensor_discrete_status.*.alarm_state: { type: string, description: "rPDU2SensorDiscreteStatusAlarmState (PowerNet-MIB): normal, alarm" }
+  sensor.analog_voltage_table_size: { type: int, description: rPDU2SensorAnalogVoltageTableSize (PowerNet-MIB) }
+  sensor_analog_voltage_status.*.module: { type: int, description: rPDU2SensorAnalogVoltageStatusModule (PowerNet-MIB) }
+  sensor_analog_voltage_status.*.number: { type: int, description: rPDU2SensorAnalogVoltageStatusNumber (PowerNet-MIB) }
+  sensor_analog_voltage_status.*.name: { type: string, description: rPDU2SensorAnalogVoltageStatusName (PowerNet-MIB) }
+  sensor_analog_voltage_status.*.comm_status: { type: string, description: "rPDU2SensorAnalogVoltageStatusCommStatus (PowerNet-MIB): not_installed, comms_ok, comms_lost" }
+  sensor_analog_voltage_status.*.hundredth_volts: { type: int, unit: "0.01 V", description: rPDU2SensorAnalogVoltageStatusHundredthVolts (PowerNet-MIB) }
+  sensor_analog_voltage_status.*.thresh_status: { type: string, description: "rPDU2SensorAnalogVoltageStatusThreshStatus (PowerNet-MIB): not_present, below_min, below_low, normal, above_high, above_max" }
+  sensor_analog_voltage_config.*.module: { type: int, description: rPDU2SensorAnalogVoltageConfigModule (PowerNet-MIB) }
+  sensor_analog_voltage_config.*.number: { type: int, description: rPDU2SensorAnalogVoltageConfigNumber (PowerNet-MIB) }
+  sensor_analog_voltage_config.*.name: { type: string, description: rPDU2SensorAnalogVoltageConfigName (PowerNet-MIB) }
+  sensor_analog_voltage_config.*.thresh_min: { type: int, unit: "0.01 V", description: rPDU2SensorAnalogVoltageConfigThreshMin (PowerNet-MIB) }
+  sensor_analog_voltage_config.*.thresh_max: { type: int, unit: "0.01 V", description: rPDU2SensorAnalogVoltageConfigThreshMax (PowerNet-MIB) }
+  sensor_analog_voltage_config.*.hysteresis: { type: int, unit: "0.01 V", description: rPDU2SensorAnalogVoltageConfigHysteresis (PowerNet-MIB) }
+  sensor_analog_voltage_config.*.alarm_enable: { type: string, description: "rPDU2SensorAnalogVoltageConfigAlarmEnable (PowerNet-MIB): disabled, enabled" }
+  group.number_of_devices: { type: int, description: rPDU2GroupNumberOfDevices (PowerNet-MIB) }
+  group.total_power: { type: int, unit: "0.01 kW", description: rPDU2GroupTotalPower (PowerNet-MIB) }
+  group.total_energy: { type: int, unit: "0.1 kWh", description: rPDU2GroupTotalEnergy (PowerNet-MIB) }
+  group.energy_reset: { type: string, description: "rPDU2GroupEnergyReset (PowerNet-MIB): no_operation, reset, not_supported" }
+  phase_to_phase_status_table_size: { type: int, description: rPDU2PhaseToPhaseStatusTableSize (PowerNet-MIB) }
+  phase_to_phase_status.*.module: { type: int, description: rPDU2PhaseToPhaseStatusModule (PowerNet-MIB) }
+  phase_to_phase_status.*.voltage_1_to_2: { type: int, unit: V, description: rPDU2PhaseToPhaseStatusVoltage1to2 (PowerNet-MIB) }
+  phase_to_phase_status.*.voltage_2_to_3: { type: int, unit: V, description: rPDU2PhaseToPhaseStatusVoltage2to3 (PowerNet-MIB) }
+  phase_to_phase_status.*.voltage_3_to_1: { type: int, unit: V, description: rPDU2PhaseToPhaseStatusVoltage3to1 (PowerNet-MIB) }
+  adv_bank_config.*.module: { type: int, description: rPDU2AdvBankConfigModule (PowerNet-MIB) }
+  adv_bank_config.*.number: { type: int, description: rPDU2AdvBankConfigNumber (PowerNet-MIB) }
+  adv_bank_config.*.overload_restriction: { type: string, description: "rPDU2AdvBankConfigOverloadRestriction (PowerNet-MIB): always_allow_turn_on, restrict_on_near_overload, restrict_on_overload, not_supported" }
+  adv_bank_config.*.low_load_current_threshold: { type: int, unit: "0.1 A", description: rPDU2AdvBankConfigLowLoadCurrentThreshold (PowerNet-MIB) }
+  adv_bank_config.*.near_overload_current_threshold: { type: int, unit: "0.1 A", description: rPDU2AdvBankConfigNearOverloadCurrentThreshold (PowerNet-MIB) }
+  adv_bank_config.*.overload_current_threshold: { type: int, unit: "0.1 A", description: rPDU2AdvBankConfigOverloadCurrentThreshold (PowerNet-MIB) }
+  adv_bank_config.*.bank_peak_current_reset: { type: string, description: "rPDU2AdvBankConfigBankPeakCurrentReset (PowerNet-MIB): no_operation, reset" }
+  adv_phase_config.*.module: { type: int, description: rPDU2AdvPhaseConfigModule (PowerNet-MIB) }
+  adv_phase_config.*.number: { type: int, description: rPDU2AdvPhaseConfigNumber (PowerNet-MIB) }
+  adv_phase_config.*.overload_restriction: { type: string, description: "rPDU2AdvPhaseConfigOverloadRestriction (PowerNet-MIB): always_allow_turn_on, restrict_on_near_overload, restrict_on_overload, not_supported" }
+  adv_phase_config.*.low_load_current_threshold: { type: int, unit: "0.1 A", description: rPDU2AdvPhaseConfigLowLoadCurrentThreshold (PowerNet-MIB) }
+  adv_phase_config.*.near_overload_current_threshold: { type: int, unit: "0.1 A", description: rPDU2AdvPhaseConfigNearOverloadCurrentThreshold (PowerNet-MIB) }
+  adv_phase_config.*.overload_current_threshold: { type: int, unit: "0.1 A", description: rPDU2AdvPhaseConfigOverloadCurrentThreshold (PowerNet-MIB) }
+  adv_phase_config.*.phase_peak_current_reset: { type: string, description: "rPDU2AdvPhaseConfigPhasePeakCurrentReset (PowerNet-MIB): no_operation, reset" }
+  ident_name: { type: string, description: rPDUIdentName (PowerNet-MIB) }
+  ident_hardware_rev: { type: string, description: rPDUIdentHardwareRev (PowerNet-MIB) }
+  ident_firmware_rev: { type: string, description: rPDUIdentFirmwareRev (PowerNet-MIB) }
+  ident_date_of_manufacture: { type: string, description: rPDUIdentDateOfManufacture (PowerNet-MIB) }
+  ident_model_number: { type: string, description: rPDUIdentModelNumber (PowerNet-MIB) }
+  ident_serial_number: { type: string, description: rPDUIdentSerialNumber (PowerNet-MIB) }
+  ident_device_rating: { type: int, unit: A, description: rPDUIdentDeviceRating (PowerNet-MIB) }
+  ident_device_num_outlets: { type: int, description: rPDUIdentDeviceNumOutlets (PowerNet-MIB) }
+  ident_device_num_phases: { type: int, description: rPDUIdentDeviceNumPhases (PowerNet-MIB) }
+  ident_device_num_breakers: { type: int, description: rPDUIdentDeviceNumBreakers (PowerNet-MIB) }
+  ident_device_breaker_rating: { type: int, unit: A, description: rPDUIdentDeviceBreakerRating (PowerNet-MIB) }
+  ident_device_orientation: { type: string, description: "rPDUIdentDeviceOrientation (PowerNet-MIB): orient_horizontal, orient_vertical" }
+  ident_device_outlet_layout: { type: string, description: "rPDUIdentDeviceOutletLayout (PowerNet-MIB): seq_phase_to_neutral, seq_phase_to_phase, seq_ph_to_neu21_ph_to_ph, seq_ph_to_ph_grouped, seq_ph_to_n_grouped, seq_p_to_n1516_p_to_p_grouped, seq_ph_to_ph2x_grouped, seq_ph_to_n2x_grouped, seq_not_applicable" }
+  ident_device_display_orientation: { type: string, description: "rPDUIdentDeviceDisplayOrientation (PowerNet-MIB): display_normal, display_reverse" }
+  ident_device_lineto_line_voltage: { type: int, unit: V, description: rPDUIdentDeviceLinetoLineVoltage (PowerNet-MIB) }
+  ident_device_power_watts: { type: int, unit: W, description: rPDUIdentDevicePowerWatts (PowerNet-MIB) }
+  ident_device_power_factor: { type: int, description: rPDUIdentDevicePowerFactor (PowerNet-MIB) }
+  ident_device_power_va: { type: int, description: rPDUIdentDevicePowerVA (PowerNet-MIB) }
+  ident_device_lineto_neutral_voltage: { type: int, unit: V, description: rPDUIdentDeviceLinetoNeutralVoltage (PowerNet-MIB) }
+  load_device.dev_max_phase_load: { type: int, unit: A, description: rPDULoadDevMaxPhaseLoad (PowerNet-MIB) }
+  load_device.dev_num_phases: { type: int, description: rPDULoadDevNumPhases (PowerNet-MIB) }
+  load_device.dev_max_bank_load: { type: int, unit: A, description: rPDULoadDevMaxBankLoad (PowerNet-MIB) }
+  load_device.dev_num_banks: { type: int, description: rPDULoadDevNumBanks (PowerNet-MIB) }
+  load_device.dev_bank_table_size: { type: int, description: rPDULoadDevBankTableSize (PowerNet-MIB) }
+  load_dev_bank.*.number: { type: int, description: rPDULoadDevBankNumber (PowerNet-MIB) }
+  load_dev_bank.*.max_load: { type: int, unit: A, description: rPDULoadDevBankMaxLoad (PowerNet-MIB) }
+  load_device.dev_max_outlet_table_size: { type: int, description: rPDULoadDevMaxOutletTableSize (PowerNet-MIB) }
+  load_dev_max_outlet.*.outlet_number: { type: int, description: rPDULoadDevOutletNumber (PowerNet-MIB) }
+  load_dev_max_outlet.*.load: { type: int, unit: A, description: rPDULoadDevMaxOutletLoad (PowerNet-MIB) }
+  load_phase_config.*.low_load_threshold: { type: int, unit: A, description: rPDULoadPhaseConfigLowLoadThreshold (PowerNet-MIB) }
+  load_phase_config.*.near_overload_threshold: { type: int, unit: A, description: rPDULoadPhaseConfigNearOverloadThreshold (PowerNet-MIB) }
+  load_phase_config.*.overload_threshold: { type: int, unit: A, description: rPDULoadPhaseConfigOverloadThreshold (PowerNet-MIB) }
+  load_phase_config.*.alarm: { type: string, description: "rPDULoadPhaseConfigAlarm (PowerNet-MIB): no_load_alarm, under_current_alarm, near_over_current_alarm, over_current_alarm" }
+  load_status.*.load: { type: int, unit: "0.1 A", description: rPDULoadStatusLoad (PowerNet-MIB) }
+  load_status.*.load_state: { type: string, description: "rPDULoadStatusLoadState (PowerNet-MIB): phase_load_normal, phase_load_low, phase_load_near_overload, phase_load_overload" }
+  load_status.*.phase_number: { type: int, description: rPDULoadStatusPhaseNumber (PowerNet-MIB) }
+  load_status.*.bank_number: { type: int, description: rPDULoadStatusBankNumber (PowerNet-MIB) }
+  load_bank_config.*.low_load_threshold: { type: int, unit: A, description: rPDULoadBankConfigLowLoadThreshold (PowerNet-MIB) }
+  load_bank_config.*.near_overload_threshold: { type: int, unit: A, description: rPDULoadBankConfigNearOverloadThreshold (PowerNet-MIB) }
+  load_bank_config.*.overload_threshold: { type: int, unit: A, description: rPDULoadBankConfigOverloadThreshold (PowerNet-MIB) }
+  load_bank_config.*.alarm: { type: string, description: "rPDULoadBankConfigAlarm (PowerNet-MIB): no_load_alarm, under_current_alarm, near_over_current_alarm, over_current_alarm" }
+  outlet_device.dev_command: { type: string, description: "rPDUOutletDevCommand (PowerNet-MIB): no_command_all, immediate_all_on, immediate_all_off, immediate_all_reboot, delayed_all_on, delayed_all_off, delayed_all_reboot, cancel_all_pending_commands" }
+  outlet_device.dev_coldstart_delay: { type: int, unit: s, description: rPDUOutletDevColdstartDelay (PowerNet-MIB) }
+  outlet_device.dev_num_cntrl_outlets: { type: int, description: rPDUOutletDevNumCntrlOutlets (PowerNet-MIB) }
+  outlet_device.dev_num_total_outlets: { type: int, description: rPDUOutletDevNumTotalOutlets (PowerNet-MIB) }
+  outlet_device.dev_monitored_outlets: { type: int, description: rPDUOutletDevMonitoredOutlets (PowerNet-MIB) }
+  outlet_phase.*.overload_restriction: { type: string, description: "rPDUOutletPhaseOverloadRestriction (PowerNet-MIB): always_allow_turn_on, restrict_on_near_overload, restrict_on_overload" }
+  outlet_control.*.outlet_name: { type: string, description: rPDUOutletControlOutletName (PowerNet-MIB) }
+  outlet_control.*.outlet_phase: { type: string, description: "rPDUOutletControlOutletPhase (PowerNet-MIB): phase1, phase2, phase3, phase1_2, phase2_3, phase3_1" }
+  outlet_control.*.outlet_command: { type: string, description: "rPDUOutletControlOutletCommand (PowerNet-MIB): immediate_on, immediate_off, immediate_reboot, delayed_on, delayed_off, delayed_reboot, cancel_pending_command" }
+  outlet_control.*.outlet_bank: { type: int, description: rPDUOutletControlOutletBank (PowerNet-MIB) }
+  outlet_config.*.outlet_name: { type: string, description: rPDUOutletConfigOutletName (PowerNet-MIB) }
+  outlet_config.*.outlet_phase: { type: string, description: "rPDUOutletConfigOutletPhase (PowerNet-MIB): phase1, phase2, phase3, phase1_2, phase2_3, phase3_1" }
+  outlet_config.*.power_on_time: { type: int, unit: s, description: rPDUOutletConfigPowerOnTime (PowerNet-MIB) }
+  outlet_config.*.power_off_time: { type: int, unit: s, description: rPDUOutletConfigPowerOffTime (PowerNet-MIB) }
+  outlet_config.*.reboot_duration: { type: int, unit: s, description: rPDUOutletConfigRebootDuration (PowerNet-MIB) }
+  outlet_config.*.outlet_bank: { type: int, description: rPDUOutletConfigOutletBank (PowerNet-MIB) }
+  outlet_config_monitored_table_size: { type: int, description: rPDUOutletConfigMonitoredTableSize (PowerNet-MIB) }
+  outlet_config_monitored.*.name: { type: string, description: rPDUOutletConfigMonitoredName (PowerNet-MIB) }
+  outlet_config_monitored.*.number: { type: int, description: rPDUOutletConfigMonitoredNumber (PowerNet-MIB) }
+  outlet_config_monitored.*.low_load_threshold: { type: int, unit: A, description: rPDUOutletConfigMonitoredLowLoadThreshold (PowerNet-MIB) }
+  outlet_config_monitored.*.near_overload_threshold: { type: int, unit: A, description: rPDUOutletConfigMonitoredNearOverloadThreshold (PowerNet-MIB) }
+  outlet_config_monitored.*.overload_threshold: { type: int, unit: A, description: rPDUOutletConfigMonitoredOverloadThreshold (PowerNet-MIB) }
+  outlet_status.*.outlet_name: { type: string, description: rPDUOutletStatusOutletName (PowerNet-MIB) }
+  outlet_status.*.outlet_phase: { type: string, description: "rPDUOutletStatusOutletPhase (PowerNet-MIB): phase1, phase2, phase3, phase1_2, phase2_3, phase3_1" }
+  outlet_status.*.outlet_state: { type: string, description: "rPDUOutletStatusOutletState (PowerNet-MIB): outlet_status_on, outlet_status_off" }
+  outlet_status.*.command_pending: { type: string, description: "rPDUOutletStatusCommandPending (PowerNet-MIB): outlet_status_command_pending, outlet_status_no_command_pending" }
+  outlet_status.*.outlet_bank: { type: int, description: rPDUOutletStatusOutletBank (PowerNet-MIB) }
+  outlet_status.*.load: { type: int, unit: "0.1 A", description: rPDUOutletStatusLoad (PowerNet-MIB) }
+  outlet_bank.*.overload_restriction: { type: string, description: "rPDUOutletBankOverloadRestriction (PowerNet-MIB): always_allow_turn_on, restrict_on_near_overload, restrict_on_overload" }
+  power_supply_device.1_status: { type: string, description: "rPDUPowerSupply1Status (PowerNet-MIB): power_supply_one_ok, power_supply_one_failed" }
+  power_supply_device.2_status: { type: string, description: "rPDUPowerSupply2Status (PowerNet-MIB): power_supply_two_ok, power_supply_two_failed, power_supply_two_not_present" }
+  power_supply_device.alarm: { type: string, description: "rPDUPowerSupplyAlarm (PowerNet-MIB): all_available_power_supplies_ok, power_supply_one_failed, power_supply_two_failed, power_supply_oneand_two_failed" }
+  status.bank_table_size: { type: int, description: rPDUStatusBankTableSize (PowerNet-MIB) }
+  status_bank.*.number: { type: int, description: rPDUStatusBankNumber (PowerNet-MIB) }
+  status_bank.*.state: { type: string, description: "rPDUStatusBankState (PowerNet-MIB): bank_load_normal, bank_load_low, bank_load_near_overload, bank_load_overload" }
+  status.phase_table_size: { type: int, description: rPDUStatusPhaseTableSize (PowerNet-MIB) }
+  status_phase.*.number: { type: int, description: rPDUStatusPhaseNumber (PowerNet-MIB) }
+  status_phase.*.state: { type: string, description: "rPDUStatusPhaseState (PowerNet-MIB): phase_load_normal, phase_load_low, phase_load_near_overload, phase_load_overload" }
+  status.outlet_table_size: { type: int, description: rPDUStatusOutletTableSize (PowerNet-MIB) }
+  status_outlet.*.number: { type: int, description: rPDUStatusOutletNumber (PowerNet-MIB) }
+  status_outlet.*.state: { type: string, description: "rPDUStatusOutletState (PowerNet-MIB): outlet_load_normal, outlet_load_low, outlet_load_near_overload, outlet_load_overload" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      set_outlet_switched_control_command, set_device_control_command (rPDU2), set_outlet_control_outlet_command and
+      set_outlet_device_dev_command (rPDU) switch outlets at once: immediate_off and the reboots cut the power of whatever is
+      plugged in, and there is no undo. The delayed actions use each outlet's configured power-on and power-off
+      times, and cancel_pending_command (or cancel_all_pending_commands) stops one that has not run yet.
+  - models: [all]
+    severity: info
+    text: >
+      State and commands are named after PowerNet-MIB: each table is keyed by the row index the agent gives (an
+      outlet's own number is its number field), enumerations are the MIB's labels in snake case, and numbers are
+      as the MIB counts them (tenths of amps, hundredths of kilowatts...), with the unit in each key's description
+      where the MIB states it. Many objects read -1 on models without the feature.
+  - models: [all]
+    severity: info
+    text: >
+      A control object reads back as the state it caused rather than the action written (an outlet's control
+      command reads immediate_on or immediate_off), so each command reads its whole table again after the SET.
+      A walk sees the result of a delayed action only at a later poll.
+  - models: [all]
+    severity: info
+    text: >
+      Each notification received is a message event, {event: message, address, args, source}: address is its
+      snmpTrapOID (a v1 trap's as RFC 3584 §3.1 derives it, enterprises.318.0.n for PowerNet-MIB's traps), args is
+      the same object as traps.last with the MIB's trap name, and a notification starts a poll half a second later.
+      Point the PDU's trap receiver at the core's address and trap_port.
+  - models: [all]
+    severity: info
+    text: >
+      v1 and v2c agents drop requests with a wrong community without answering, so a wrong community looks like an
+      agent that is not there (disconnected, commands time out). SETs need the write community the PDU is
+      configured with (write_community), or a v3 user with write access.
+  - models: [all]
+    severity: info
+    text: >
+      Opening for commands only walks nothing; a GET of sysUpTime.0 each interval stays as the liveness check, and
+      notifications are still received.

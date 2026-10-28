@@ -261,6 +261,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that lua with backslash-escaped quotes runs set_pda_value_by_index, connect and send_ui_event as sent, and what the server answers when Lua raises an error. ([specs/analogway-picturall.yaml:554](specs/analogway-picturall.yaml#L554))
 - [ ] Find the parameter names of a layer's transform, colour, crop and draw mode with object_info on a server, to give them typed commands. ([specs/analogway-picturall.yaml:576](specs/analogway-picturall.yaml#L576))
 
+## apc-rack-pdu — APC Rack PDU (SNMP)
+
+- [ ] Confirm which models implement rPDU2 (AP84xx, AP86xx, AP88xx, AP89xx, APDU9xxx) and which only rPDU (AP78xx, AP79xx); the FAQ names only AP86XX/AP89XX for rPDU2. ([specs/apc-rack-pdu.yaml:37](specs/apc-rack-pdu.yaml#L37))
+- [ ] Walk a 2G PDU and check every table is keyed by a single integer index, as the MIB declares, and that a metered PDU lists no switched outlet rows. ([specs/apc-rack-pdu.yaml:41](specs/apc-rack-pdu.yaml#L41))
+- [ ] Check an outlet's control command reads back as immediate_on or immediate_off after a SET, and when a delayed action's result shows in the switched status table. ([specs/apc-rack-pdu.yaml:1052](specs/apc-rack-pdu.yaml#L1052))
+- [ ] Check the units taken from the MIB's descriptions (tenths of amps, hundredths of kilowatts, tenths of kilowatt-hours) against the PDU's display. ([specs/apc-rack-pdu.yaml:1047](specs/apc-rack-pdu.yaml#L1047))
+- [ ] Receive a v1 trap from the PDU (an outlet turned off) and check its snmpTrapOID is enterprises.318.0.n and is named. ([specs/apc-rack-pdu.yaml:1059](specs/apc-rack-pdu.yaml#L1059))
+- [ ] Check a first-generation PDU (AP79xx) answers GETBULK walks of the rPDU group over v2c, or needs v1. ([specs/apc-rack-pdu.yaml:44](specs/apc-rack-pdu.yaml#L44))
+
+## apc-ups — APC UPS (SNMP)
+
+- [ ] Walk a Smart-UPS with a Network Management Card 2 or 3 and check which groups it fills, and that every table is keyed by single integer indexes as the MIB declares. ([specs/apc-ups.yaml:36](specs/apc-ups.yaml#L36))
+- [ ] Check that upsAdvControlUpsOff and the other control objects read back their idle value (no_turn_ups_off) after a SET, and when a graceful turn-off shows in upsBasicOutputStatus. ([specs/apc-ups.yaml:1629](specs/apc-ups.yaml#L1629))
+- [ ] Check the units taken from the MIB's descriptions (tenths of volts in the high-precision objects, TimeTicks runtimes) against the UPS's display. ([specs/apc-ups.yaml:1624](specs/apc-ups.yaml#L1624))
+- [ ] Receive a v1 trap (on battery, then back on line) and check it is named and that the poll after it shows the change. ([specs/apc-ups.yaml:1636](specs/apc-ups.yaml#L1636))
+
 ## arkaos-mediamaster — ArKaos MediaMaster
 
 - [ ] Confirm the Remote Command Service listens on TCP 45678 and takes each command as a line ended by CR LF; the user guide does not say. ([specs/arkaos-mediamaster.yaml:49](specs/arkaos-mediamaster.yaml#L49))
@@ -1297,6 +1313,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the device-state socket (/ws/device-state) and the Automator's WebSocket messages, so state can be pushed instead of polled. ([specs/cuez-automator.yaml:437](specs/cuez-automator.yaml#L437))
 - [ ] Confirm a step index counts the trigger itself as 0, and what /api/trigger/step/<n> answers past the last step. ([specs/cuez-automator.yaml:104](specs/cuez-automator.yaml#L104))
 - [ ] Record the shapes of /api/timer, /api/macro/ and /api/trigger/current so timers, macros and the current trigger can be kept in state. ([specs/cuez-automator.yaml:241](specs/cuez-automator.yaml#L241))
+
+## cyberpower-ups — CyberPower UPS (SNMP)
+
+- [ ] Walk a UPS through an RMCARD205 and an RMCARD305 and check which groups each fills, and that every table is keyed by single integer indexes. ([specs/cyberpower-ups.yaml:33](specs/cyberpower-ups.yaml#L33))
+- [ ] Check that the UPS control objects read back their idle value after a SET, and when a turn-off or sleep shows in the output status. ([specs/cyberpower-ups.yaml:697](specs/cyberpower-ups.yaml#L697))
+- [ ] Check the units taken from the MIB's descriptions against the UPS's display. ([specs/cyberpower-ups.yaml:692](specs/cyberpower-ups.yaml#L692))
+- [ ] Receive a v1 trap (on battery, then back on line) and check it is named and that the poll after it shows the change. ([specs/cyberpower-ups.yaml:703](specs/cyberpower-ups.yaml#L703))
 
 ## dahua-ptz — Dahua and Amcrest PTZ cameras (HTTP CGI, public subset)
 
@@ -2674,6 +2697,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what /appCommand/perform answers for a command done, an unknown command name and an index out of range (status and body; the text success is assumed for done). ([specs/logos-proclaim.yaml:327](specs/logos-proclaim.yaml#L327))
 - [ ] Check what a song part command does with an index past the song's parts, and that a part without a number is shown when the index is left out. ([specs/logos-proclaim.yaml:340](specs/logos-proclaim.yaml#L340))
 
+## luminex-gigacore — Luminex GigaCore Gen2 switches (web API)
+
+- [ ] Check the websocket API's notifications for a section subscription: that path is the subscribed path and new_value the whole section, and whether it needs the Basic login. ([specs/luminex-gigacore.yaml:4912](specs/luminex-gigacore.yaml#L4912))
+- [ ] Check the write-only actions' bodies where the reference gives no default (reboot's wait) and what the switch answers to an empty one. ([specs/luminex-gigacore.yaml:77](specs/luminex-gigacore.yaml#L77))
+- [ ] Check leaf PUT bodies (a bare JSON value such as "Port 3" or true) on firmware 1.9.2 and earlier. ([specs/luminex-gigacore.yaml:951](specs/luminex-gigacore.yaml#L951))
+- [ ] Check every section's GET on models without the feature (PoE, SFP, Milan, display, extension board). ([specs/luminex-gigacore.yaml:59](specs/luminex-gigacore.yaml#L59))
+
+## lyntec-rpc — LynTec RPC remote power control panels (TCP/IP protocol)
+
+- [ ] Record the exact /p2.rpc answer (line breaks, spacing, the order of breakers=, zones= and events=), and what a control GET returns. ([specs/lyntec-rpc.yaml:43](specs/lyntec-rpc.yaml#L43))
+- [ ] Check whether a panel whose web pages need a login asks for it on /p2.rpc too (Basic, Digest or none). ([specs/lyntec-rpc.yaml:28](specs/lyntec-rpc.yaml#L28))
+- [ ] Check what a panel in Emergency Override answers a control GET with over HTTP. ([specs/lyntec-rpc.yaml:112](specs/lyntec-rpc.yaml#L112))
+- [ ] Check zone numbers above 12 on panels with more zones, and breaker numbering across RPS expansion panels. ([specs/lyntec-rpc.yaml:125](specs/lyntec-rpc.yaml#L125))
+
 ## madrix — MADRIX 5 (OSC and HTTP Remote)
 
 - [ ] Record the OSC feedback MADRIX sends: its addresses, argument types, and that it goes to the sender's address on the Destination Network Port. ([specs/madrix.yaml:1491](specs/madrix.yaml#L1491))
@@ -2960,6 +2997,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Confirm that general purpose OSC is received over UDP on 38033, and record the argument types Spacemap Go accepts (ints, floats, a string for the trajectory are assumed). ([specs/meyersound-spacemap-go.yaml:28](specs/meyersound-spacemap-go.yaml#L28))
 - [ ] Confirm the position command takes X then Y as two arguments in one message. ([specs/meyersound-spacemap-go.yaml:50](specs/meyersound-spacemap-go.yaml#L50))
+
+## middle-atlantic-racklink — Middle Atlantic RackLink power (control protocol)
+
+- [ ] Check the status change registration: its length byte (the document says 6 while listing six data bytes), which bit is "bit 1", and that the unit then pushes outlet, contact, sequence, EPO and reading changes. ([specs/middle-atlantic-racklink.yaml:268](specs/middle-atlantic-racklink.yaml#L268))
+- [ ] Check the sequencing response's subcommand (the document shows 0x01 where a response would be 0x10) and its states. ([specs/middle-atlantic-racklink.yaml:127](specs/middle-atlantic-racklink.yaml#L127))
+- [ ] Check the current energy management state response (0x60): occupancy first and a letter per outlet (INFOCOMM 4:2012) or 16 letters (I-00472). ([specs/middle-atlantic-racklink.yaml:168](specs/middle-atlantic-racklink.yaml#L168))
+- [ ] Check the temperature's unit in sensor readings and thresholds (the log gives Fahrenheit). ([specs/middle-atlantic-racklink.yaml:282](specs/middle-atlantic-racklink.yaml#L282))
+- [ ] Check how often the unit pings and that answering each ping keeps the connection, on Select, Premium and Premium+. ([specs/middle-atlantic-racklink.yaml:9](specs/middle-atlantic-racklink.yaml#L9))
+- [ ] Check RS-232 on a Premium: the same messages at 9600 8N1, and whether it needs the login. ([specs/middle-atlantic-racklink.yaml:53](specs/middle-atlantic-racklink.yaml#L53))
 
 ## midi-show-control — MIDI Show Control (MSC) device
 
@@ -4082,6 +4128,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the control data carries subCompositionName for each sub-composition (the reference lists it, its example omits it). ([specs/singular-live.yaml:272](specs/singular-live.yaml#L272))
 - [ ] Check that GET requests are not counted against the rate limits (only the POST/PATCH control and command endpoints are listed). ([specs/singular-live.yaml:261](specs/singular-live.yaml#L261))
 
+## snapav-wattbox — SnapAV WattBox IP power (Integration Protocol)
+
+- [ ] Record the login exchange: the exact prompts, what a wrong password is answered with, and whether "Successfully Logged In!" follows a good one on every model and firmware. ([specs/snapav-wattbox.yaml:59](specs/snapav-wattbox.yaml#L59))
+- [ ] Check what "API locked" looks like and how long the lock lasts after failed logins. ([specs/snapav-wattbox.yaml:65](specs/snapav-wattbox.yaml#L65))
+- [ ] Record which "~" messages a unit pushes (an outlet switched from its front panel or web page), so they can be read instead of waiting for the next poll. ([specs/snapav-wattbox.yaml:413](specs/snapav-wattbox.yaml#L413))
+- [ ] Check ?ServiceTag on units with v1.7 firmware, which the document does not list. ([specs/snapav-wattbox.yaml:103](specs/snapav-wattbox.yaml#L103))
+- [ ] Check what non-metered models answer ?OutletPowerStatus and ?PowerStatus with (#Error is assumed). ([specs/snapav-wattbox.yaml:83](specs/snapav-wattbox.yaml#L83))
+- [ ] Check !NetworkSet with the host name alone selects DHCP, as the document implies without giving the exact message. ([specs/snapav-wattbox.yaml:259](specs/snapav-wattbox.yaml#L259))
+
 ## sofie-chef — Sofie Chef
 
 - [ ] Record the REST answers: GET /api/status and /api/list bodies (the list is read as the WebSocket list body) and the PUT routes' status and body. ([specs/sofie-chef.yaml:177](specs/sofie-chef.yaml#L177))
@@ -4508,6 +4563,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm Create Channel Stream Schedule Segment takes duration as a string, and that segment ids hold only base64 characters (letters, digits, +, /, =). ([specs/twitch.yaml:1024](specs/twitch.yaml#L1024))
 - [ ] Confirm Update Channel Stream Schedule takes its vacation fields as query parameters, not a body, and answers 204. ([specs/twitch.yaml:1073](specs/twitch.yaml#L1073))
 - [ ] Confirm Delete Videos answers 200 with the deleted ids, and what it answers for a video that is not the channel's. ([specs/twitch.yaml:1160](specs/twitch.yaml#L1160))
+
+## unifi-network — UniFi Network (Network API)
+
+- [ ] Check the API on a self-hosted UniFi OS Server and a Cloud Key: port, path prefix and certificate. ([specs/unifi-network.yaml:43](specs/unifi-network.yaml#L43))
+- [ ] Check power_cycle_port's off time and that it refuses ports without PoE. ([specs/unifi-network.yaml:1395](specs/unifi-network.yaml#L1395))
+- [ ] Check the filter syntax and its percent-encoding as sent in the query (name.eq('x')). ([specs/unifi-network.yaml:257](specs/unifi-network.yaml#L257))
+- [ ] Check the polled lists with offset=0&limit=200 on a large site, and the load of reading each device's details and statistics every 15 s. ([specs/unifi-network.yaml:1409](specs/unifi-network.yaml#L1409))
+
+## ups-mib — UPS over SNMP (UPS-MIB, RFC 1628)
+
+- [ ] Walk an Eaton Network-M2 or Network-M3 card and a CyberPower RMCARD and check which UPS-MIB groups each fills. ([specs/ups-mib.yaml:39](specs/ups-mib.yaml#L39))
+- [ ] Start a quick battery test with set_test_id and check the card accepts upsTestSpinLock written back with upsTestId, and refuses it when the lock changed. ([specs/ups-mib.yaml:287](specs/ups-mib.yaml#L287))
+- [ ] Check that a UPS cancels a counting-down shutdown when -1 is written to upsShutdownAfterDelay. ([specs/ups-mib.yaml:283](specs/ups-mib.yaml#L283))
+- [ ] Receive upsTrapOnBattery and upsTrapAlarmEntryAdded from a card, and check the alarm table is replaced as alarms come and go. ([specs/ups-mib.yaml:302](specs/ups-mib.yaml#L302))
 
 ## vaddio-roboshot — Vaddio RoboSHOT PTZ cameras (Telnet API)
 

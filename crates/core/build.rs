@@ -48,6 +48,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-anomes", &["millumin"]),
+    ("vendor-apc", &["apc-rack-pdu", "apc-ups"]),
     ("vendor-arkaos", &["arkaos-mediamaster"]),
     ("vendor-artisticlicence", &["artnet"]),
     (
@@ -120,6 +121,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-chyron", &["chyron-prime"]),
     ("vendor-clock8001", &["clock-8001"]),
     ("vendor-cockos", &["cockos-reaper", "cockos-reaper-web"]),
+    ("vendor-cyberpower", &["cyberpower-pdu", "cyberpower-ups"]),
     ("vendor-dahua", &["dahua-ptz"]),
     ("vendor-dandugan", &["dandugan-model-e"]),
     ("vendor-dashare", &["dashare-multiplay"]),
@@ -190,6 +192,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "http-snapshot",
             "midi-show-control",
             "osc-listener",
+            "ups-mib",
         ],
     ),
     ("vendor-google", &["youtube-live"]),
@@ -245,6 +248,8 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-lg", &["lg-display"]),
     ("vendor-lightkey", &["lightkey"]),
     ("vendor-lightware", &["lightware-lw2", "lightware-lw3"]),
+    ("vendor-luminex", &["luminex-gigacore"]),
+    ("vendor-lyntec", &["lyntec-rpc"]),
     ("vendor-ma-lighting", &["grandma2", "grandma3"]),
     (
         "vendor-magewell",
@@ -266,6 +271,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-megapixel", &["megapixel-helios"]),
     ("vendor-meros", &["meros-camera"]),
     ("vendor-meta", &["facebook-account", "facebook-live"]),
+    ("vendor-middleatlantic", &["middle-atlantic-racklink"]),
     (
         "vendor-meyersound",
         &["meyersound-galaxy", "meyersound-spacemap-go"],
@@ -390,6 +396,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-singular", &["singular-datastream", "singular-live"]),
+    ("vendor-snapav", &["snapav-wattbox"]),
     ("vendor-sofie", &["sofie-chef", "sofie-core"]),
     ("vendor-softouch", &["softouch-easyworship"]),
     (
@@ -454,6 +461,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ),
     ("vendor-tvone", &["tvone-coriomaster"]),
     ("vendor-twitch", &["twitch"]),
+    ("vendor-ubiquiti", &["unifi-network"]),
     ("vendor-vaddio", &["vaddio-roboshot"]),
     ("vendor-vdoninja", &["vdoninja"]),
     ("vendor-ventuz", &["ventuz-director"]),
