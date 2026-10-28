@@ -97,7 +97,7 @@ models:
 commands:
   # ── 3 General configuration ──────────────────────────────────────────
   get_general:
-    summary: Return the device name, languages, logo and QR code address (GET /api/config/general/get.json)
+    summary: Return the device name, languages, logo, logo address and QR code address (GET /api/config/general/get.json)
     send: { method: GET, path: /api/config/general/get.json }
     expect: &data { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
     returns: value
@@ -123,7 +123,7 @@ commands:
     params:
       layout: &layout { type: string, required: true, max_length: 16, pattern: '^[0-9]+$', label: Layout, description: "The layout's id, as layouts.<id> in state lists it (the template's id when adding)." }
       name: &layout_name { type: string, required: true, max_length: 64, label: Name, description: "The layout's name, unique among layouts." }
-      grids: &grids { type: json, required: true, label: Grids, description: "Every grid as an object with x, y, width and height, in percent of the window." }
+      grids: &grids { type: json, required: true, label: Grids, description: "Every grid as an object with x, y, width and height, which the document's examples give from 0 to 100 (percent of the window, it appears)." }
     send: { method: POST, path: /api/pattern/add.json, content_type: application/json, body: '{"id":{layout:json},"name":{name:json},"data":{grids}}' }
     expect: &ok { status: 200, json_equals: { "$.result": "ok" } }
     returns: ack
@@ -309,7 +309,7 @@ commands:
       window: *window_int
       grid: *grid
       name: { type: string, required: true, max_length: 128, label: Name, description: "The grid's name shown on it." }
-      size: { type: int, min: 1, max: 200, required: true, label: Font size, description: "The name's font size." }
+      size: { type: int, min: 1, required: true, label: Font size, description: "The name's font size." }
       color: { type: string, required: true, max_length: 16, pattern: '^#[0-9A-Fa-f]{3,8}$', label: Font color, description: "The name's color as a CSS hex color, such as #265ddd." }
       safe_area: { type: bool, required: true, label: Safe area, description: "Whether the safe area is shown." }
       audio_meter: { type: bool, required: true, label: Audio meter, description: "Whether the audio meter is shown." }
@@ -362,7 +362,7 @@ commands:
       safe_area: { type: bool, default: false, label: Safe area, description: "Whether safe areas are copied with the pictures." }
       audio_meter: { type: bool, default: false, label: Audio meters, description: "Whether audio meters are copied with the pictures." }
       border: { type: bool, default: false, label: Border, description: "Whether borders are copied with the pictures." }
-      sync_volume: { type: bool, default: false, label: Sync volume, description: "Whether the volume follows." }
+      sync_volume: { type: bool, default: false, label: Sync volume, description: "Whether the volume follows; get_take does not report it, so it is not read back." }
     send: { method: POST, path: /api/ndi/set_take.json, content_type: application/json, body: '{"output":"{window}","takeTarget":"{target}","autoTake":{auto_take},"centerLine":{center_cross},"title":{title},"safeFrame":{safe_area},"volumeMeter":{audio_meter},"border":{border},"syncVolume":{sync_volume}}' }
     expect: *ok
     returns: ack
@@ -493,7 +493,10 @@ quirks:
       so the border and audio gain are read as one setting; 8.4's example
       leaves out autoTake, which its table lists (it is sent). set_ndi_status
       is answered with {output, enable}, not the usual result, so it
-      succeeds on HTTP 200.
+      succeeds on HTTP 200. API limits: 8.3's Take read has no syncVolume,
+      so set_take's sync_volume is not read back; 6.5 names the toolbar
+      item only as "item name", so set_toolbar takes the four names 6.4's
+      reply uses.
   - models: [all]
     severity: info
     text: >
@@ -510,6 +513,7 @@ state:
   general.language_switch: { type: bool, description: "Whether the language switch icon is shown" }
   general.languages: { type: string, description: "The languages offered, as JSON text of {value, name, default}" }
   general.logo_shown: { type: bool, description: "Whether the logo is shown" }
+  general.logo_url: { type: string, description: "The logo image's address, empty for none" }
   general.qrcode: { type: string, description: "The address the QR code points to" }
   general.nav_shown: { type: bool, description: "Whether the navigation bar is shown" }
   layouts.*.name: { type: string, description: "An added layout, keyed by id: its name" }
@@ -597,12 +601,13 @@ telemetry:
   updates:
     - path: "^/api/config/general/get\\.json$"
       json_match: { "$.result": "^ok$" }
-      json: { name: "$.data.deviceName", lang: "$.data.languageShow", langs: "$.data.languageOptions", logo: "$.data.logoShow", qr: "$.data.qrcode" }
+      json: { name: "$.data.deviceName", lang: "$.data.languageShow", langs: "$.data.languageOptions", logo: "$.data.logoShow", logo_url: "$.data.logoUrl", qr: "$.data.qrcode" }
       state:
         general.device_name: "{name}"
         general.language_switch: "{lang}"
         general.languages: "{langs}"
         general.logo_shown: "{logo}"
+        general.logo_url: "{logo_url}"
         general.qrcode: "{qr}"
     - path: "^/api/config/nav/nav\\.json$"
       json_match: { "$.result": "^ok$" }

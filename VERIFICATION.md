@@ -2226,6 +2226,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that set_grid_audio's volume on means unmuted, off muted. ([specs/kiloview-multiview-server.yaml:273](specs/kiloview-multiview-server.yaml#L273))
 - [ ] Check that close_window and the other requests accept window ids as the examples type them (string in some, number in others). ([specs/kiloview-multiview-server.yaml:173](specs/kiloview-multiview-server.yaml#L173))
 - [ ] Check what get_window_sdp's stream_id is. ([specs/kiloview-multiview-server.yaml:458](specs/kiloview-multiview-server.yaml#L458))
+- [ ] Check that layout grids' x, y, width and height are percentages of the window (the examples run from 0 to 100). ([specs/kiloview-multiview-server.yaml:126](specs/kiloview-multiview-server.yaml#L126))
+- [ ] Check that set_toolbar's type takes soundColumn, securityBox, centerline and nameEnable, the names 6.4's reply uses (6.5 says only "item name"). ([specs/kiloview-multiview-server.yaml:240](specs/kiloview-multiview-server.yaml#L240))
+- [ ] Check whether any read reports set_take's syncVolume (8.3's reply has none). ([specs/kiloview-multiview-server.yaml:365](specs/kiloview-multiview-server.yaml#L365))
 
 ## kiloview-n60 — Kiloview N60 / N50
 
