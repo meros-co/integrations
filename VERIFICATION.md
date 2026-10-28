@@ -3356,6 +3356,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On firmware 1.3.x (API 17.0), check which subscriptions are refused (the aoip status, metering) and whether the rest still subscribe in their batch. ([specs/sennheiser-spectera.yaml:619](specs/sennheiser-spectera.yaml#L619))
 - [ ] Confirm bandwidthMode 10000 is accepted but never transmits, as the release notes say, which is why set_rf_bandwidth offers 6000 and 8000 only. ([specs/sennheiser-spectera.yaml:559](specs/sennheiser-spectera.yaml#L559))
 
+## sennheiser-tcc2 — Sennheiser TeamConnect Ceiling 2
+
+- [ ] Confirm the three subscriptions (device and beam, audio, meters limited to 250 ms) are accepted with a 60 s lifetime, renewed every 20 s, and that their notifications fit a datagram. ([specs/sennheiser-tcc2.yaml:597](specs/sennheiser-tcc2.yaml#L597))
+- [ ] Confirm that the noise gate threshold and hold time, Dante output gain, AEC reference gain, voice lift emergency mute time and installation type accept writes (the document gives examples but does not mark them writeable). ([specs/sennheiser-tcc2.yaml:220](specs/sennheiser-tcc2.yaml#L220))
+- [ ] Confirm that null elements in /audio/exclusion/zones and /audio/exclusion/active keep those zones, and what the device answers. ([specs/sennheiser-tcc2.yaml:395](specs/sennheiser-tcc2.yaml#L395))
+- [ ] Confirm that the manual addresses and auto false in one message move the device, and what it answers before moving. ([specs/sennheiser-tcc2.yaml:354](specs/sennheiser-tcc2.yaml#L354))
+- [ ] Check whether the TCC2 also takes SSC over TCP 45 (Sennheiser documents UDP only). ([specs/sennheiser-tcc2.yaml:41](specs/sennheiser-tcc2.yaml#L41))
+- [ ] Record the device time's format in answers (seconds since 2000) and whether it can be set while synchronised. ([specs/sennheiser-tcc2.yaml:172](specs/sennheiser-tcc2.yaml#L172))
+
 ## sharp-display — Sharp professional displays (S-Format)
 
 - [ ] Record the login exchange on TCP 10008: the exact `Login:` and `Password:` prompts (trailing space, any line ending), the `OK` after the password, and what a wrong user name or password is answered with (Sharp documents nothing). ([specs/sharp-display.yaml:101](specs/sharp-display.yaml#L101))
