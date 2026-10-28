@@ -821,3 +821,41 @@ def _with_params(spec):
 
 
 _with_params(X)
+
+# ── Meters ────────────────────────────────────────────────────────────────
+# With the meters setting on, /meters ,siii <bank> 0 0 <time factor> for
+# banks 1-3 follow /xremote on connecting (p.16). A blob holds a
+# little-endian count, then little-endian floats, linear (1.0 full scale),
+# kept in dB with a -90 dB floor.
+def _x32_meter_request(bank, factor):
+    return hexs(osc("/meters", ("s", f"/meters/{bank}"), ("i", 0), ("i", 0), ("i", factor)))
+
+
+def _x32_meter_blob(values):
+    return struct.pack("<i", len(values)) + b"".join(struct.pack("<f", v) for v in values)
+
+
+def _x32_meter_db(v):
+    return 0.0 if v == 1.0 else 20.0 if v == 10.0 else -90.0
+
+
+_X32_M1 = [1.0 if i % 3 == 0 else 10.0 if i % 3 == 1 else 0.0 for i in range(96)]
+telemetry(X, "meters-channels", settings={"meters": True, "meter_time_factor": 4},
+          expect_connect_wire_hex=[hexs(osc("/xremote")), _x32_meter_request(1, 4), _x32_meter_request(2, 4),
+                                   _x32_meter_request(3, 4), hexs(osc("/ch/01/mix/on"))],
+          inbound_hex=hexs(osc("/meters/1", ("b", _x32_meter_blob(_X32_M1)))),
+          expect_state={"channels": {str(n + 1): {"meter_db": _x32_meter_db(_X32_M1[n]),
+                                                  "gate_meter_db": _x32_meter_db(_X32_M1[32 + n]),
+                                                  "dyn_meter_db": _x32_meter_db(_X32_M1[64 + n])}
+                                     for n in range(32)}})
+_X32_M2 = [1.0] * 16 + [10.0] * 6 + [0.0, 1.0, 10.0] + [0.0] * 16 + [1.0] * 6 + [10.0, 0.0]
+telemetry(X, "meters-buses", inbound_hex=hexs(osc("/meters/2", ("b", _x32_meter_blob(_X32_M2)))),
+          expect_state={"buses": {str(n): {"meter_db": 0.0, "dyn_meter_db": -90.0} for n in range(1, 17)},
+                        "matrices": {str(n): {"meter_db": 20.0, "dyn_meter_db": 0.0} for n in range(1, 7)},
+                        "main": {"meter_left_db": -90.0, "meter_right_db": 0.0, "dyn_meter_db": 20.0},
+                        "mono": {"meter_db": 20.0, "dyn_meter_db": -90.0}})
+_X32_M3 = [1.0] * 6 + [10.0] * 8 + [0.0] * 8
+telemetry(X, "meters-returns", inbound_hex=hexs(osc("/meters/3", ("b", _x32_meter_blob(_X32_M3)))),
+          expect_state={"outputs": {"aux": {str(n): {"meter_db": 0.0} for n in range(1, 7)}},
+                        "aux": {str(n): {"meter_db": 20.0} for n in range(1, 9)},
+                        "fx_returns": {str(n): {"meter_db": -90.0} for n in range(1, 9)}})
