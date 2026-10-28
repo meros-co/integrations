@@ -894,15 +894,25 @@ telemetry:
   websocket:
     path: /query
     scheme: { setting: scheme }
+    # With security enabled each message carries the session's bearer token
+    # (WebSocket API, Authentication), and the keep-alive refreshes it.
     send:
-      - '{"subscribe":"scene"}'
-      - '{"subscribe":"timeline"}'
-      - '{"subscribe":"group"}'
-      - '{"subscribe":"beacon"}'
-      - '{"subscribe":"remote_device"}'
-      - '{"subscribe":"lua"}'
-      - '{"subscribe":"content_target"}'
-      - '{}'
+      - { unless_set: username, message: '{"subscribe":"scene"}' }
+      - { when_set: username, message: '{"subscribe":"scene","token":{session.id:json}}' }
+      - { unless_set: username, message: '{"subscribe":"timeline"}' }
+      - { when_set: username, message: '{"subscribe":"timeline","token":{session.id:json}}' }
+      - { unless_set: username, message: '{"subscribe":"group"}' }
+      - { when_set: username, message: '{"subscribe":"group","token":{session.id:json}}' }
+      - { unless_set: username, message: '{"subscribe":"beacon"}' }
+      - { when_set: username, message: '{"subscribe":"beacon","token":{session.id:json}}' }
+      - { unless_set: username, message: '{"subscribe":"remote_device"}' }
+      - { when_set: username, message: '{"subscribe":"remote_device","token":{session.id:json}}' }
+      - { unless_set: username, message: '{"subscribe":"lua"}' }
+      - { when_set: username, message: '{"subscribe":"lua","token":{session.id:json}}' }
+      - { unless_set: username, message: '{"subscribe":"content_target"}' }
+      - { when_set: username, message: '{"subscribe":"content_target","token":{session.id:json}}' }
+      - { unless_set: username, message: '{}' }
+      - { when_set: username, message: '{"token":{session.id:json}}' }
     every_ms: 10000
   poll:
     - every_ms: 2000
@@ -1143,9 +1153,9 @@ quirks:
       and the session logs in again when a request is refused with 401. That the cookie comes
       with a redirect (or a 200) and that an expired token is answered 401 are inferred. Wrong
       credentials are answered with a redirect to the referring page, which the session reads as
-      a login without a session, not as a refusal. The WebSocket wants the token inside each
-      message, which the spec format cannot add, so with security enabled the broadcasts do not
-      come and state is kept by polling only.
+      a login without a session, not as a refusal. With security enabled each WebSocket
+      message carries the session's token as its token attribute (a message waits for the next
+      round, every 10 s, until the session is held), and the keep-alive refreshes it.
   - models: [all]
     severity: warning
     text: >

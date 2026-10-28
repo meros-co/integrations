@@ -3427,11 +3427,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## pharos-designer — Pharos Designer controllers (HTTP and WebSocket API)
 
-- [ ] With security enabled, check that POST /authenticate?original_url=/ answers with a token cookie (status 302 or 200), that an expired token is answered 401, and what wrong credentials produce. ([specs/pharos-designer.yaml:1138](specs/pharos-designer.yaml#L1138))
-- [ ] Check whether resending the subscriptions every 10 s with the {} keep-alive duplicates broadcasts, and that the timeline broadcast is labeled "timeline". ([specs/pharos-designer.yaml:1149](specs/pharos-designer.yaml#L1149))
+- [ ] With security enabled, check that POST /authenticate?original_url=/ answers with a token cookie (status 302 or 200), that an expired token is answered 401, and what wrong credentials produce. ([specs/pharos-designer.yaml:1148](specs/pharos-designer.yaml#L1148))
+- [ ] Check whether resending the subscriptions every 10 s with the {} keep-alive duplicates broadcasts, and that the timeline broadcast is labeled "timeline". ([specs/pharos-designer.yaml:1148](specs/pharos-designer.yaml#L1148))
 - [ ] Check that sending fade 0, delay 0, path Default and conditions true when not asked for behaves as leaving them out, and the endpoint the Ping API really uses. ([specs/pharos-designer.yaml:1159](specs/pharos-designer.yaml#L1159))
-- [ ] On an LPC or TPC, check whether subscribing to content_target is refused harmlessly. ([specs/pharos-designer.yaml:1171](specs/pharos-designer.yaml#L1171))
-- [ ] Check the HTTPS certificate controllers present, and the status codes of the POST/PUT/DELETE endpoints (200, 202 or 204). ([specs/pharos-designer.yaml:1176](specs/pharos-designer.yaml#L1176))
+- [ ] On an LPC or TPC, check whether subscribing to content_target is refused harmlessly. ([specs/pharos-designer.yaml:1181](specs/pharos-designer.yaml#L1181))
+- [ ] Check the HTTPS certificate controllers present, and the status codes of the POST/PUT/DELETE endpoints (200, 202 or 204). ([specs/pharos-designer.yaml:1169](specs/pharos-designer.yaml#L1169))
+- [ ] With security enabled, check that the WebSocket takes the session cookie's token as each message's token attribute, that the 10-second keep-alive carrying it keeps the session, and what the all-zero binary answer of a timed-out session leads to. ([specs/pharos-designer.yaml:901](specs/pharos-designer.yaml#L901))
 
 ## philips-sicp — Philips professional displays (SICP)
 

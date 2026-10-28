@@ -241,3 +241,11 @@ ph_ws("ws-remote-device", {"data": {"remote_devices": [
     {"name": "EDN 20 1", "name_with_type": "EDN 20 1", "num": 1, "online": False, "serial": [], "type": "EDN 20"}]}},
     {"remote_devices": {"1": {"name": "EDN 20 1", "type": "EDN 20", "online": False}}})
 ph_ws("ws-lua", {"broadcast": "lua", "data": {"slider_level": "56"}}, {"lua": {"slider_level": "56"}})
+
+# The WebSocket's subscriptions on opening, without security (no token
+# attribute; WebSocket API, Authentication and Keep Alive).
+telemetry(PH, "ws-connect", inbound_ws='{"broadcast":"beacon","data":{"on":true}}',
+          expect_connect_ws=['{"subscribe":"scene"}', '{"subscribe":"timeline"}', '{"subscribe":"group"}',
+                             '{"subscribe":"beacon"}', '{"subscribe":"remote_device"}', '{"subscribe":"lua"}',
+                             '{"subscribe":"content_target"}', '{}'],
+          expect_state={"beacon": True})
