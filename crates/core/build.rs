@@ -317,6 +317,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-shure",
         &[
             "shure-ani",
+            "shure-chargers",
             "shure-imx-room",
             "shure-mxa",
             "shure-mxn5",

@@ -3390,6 +3390,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check LED_BRIGHTNESS's range on current firmware (0-2 documented). ([specs/shure-ani.yaml:577](specs/shure-ani.yaml#L577))
 - [ ] Capture SAMPLE with metering on, on each model, and confirm the values' order (ANI4IN's document labels its four values output 1-4; ANI22's inputs 1-2 then outputs 1-2; ANIUSB-MATRIX's ten channels) and whether the four-value form ends with two spaces before >. ([specs/shure-ani.yaml:775](specs/shure-ani.yaml#L775))
 
+## shure-chargers — Shure networked battery chargers
+
+- [ ] Check whether SBC250, SBC450 and SBC850 report changes unasked (their bulletin does not say), and how they answer GET 0 ALL. ([specs/shure-chargers.yaml:542](specs/shure-chargers.yaml#L542))
+- [ ] Confirm that each charger accepts a TCP connection on 2202 (the documents say it is the server, the user guides the client). ([specs/shure-chargers.yaml:623](specs/shure-chargers.yaml#L623))
+- [ ] Record BATT_MODULE_TYPE on an SBC220 and an SBC240, primary and secondary units. ([specs/shure-chargers.yaml:629](specs/shure-chargers.yaml#L629))
+- [ ] Record the SBC250/SBC450/SBC850 DEVICE_ID and MODEL replies (with or without braces). ([specs/shure-chargers.yaml:328](specs/shure-chargers.yaml#L328))
+- [ ] Check that SET NET_SETTINGS is answered with nothing (no asynchronous report is documented) and accepts unpadded addresses. ([specs/shure-chargers.yaml:367](specs/shure-chargers.yaml#L367))
+
 ## shure-imx-room — Shure IntelliMix Room
 
 - [ ] Check that GET 00 ALL is answered by IntelliMix Room and that its answers end. ([specs/shure-imx-room.yaml:398](specs/shure-imx-room.yaml#L398))
