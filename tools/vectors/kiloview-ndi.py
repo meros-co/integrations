@@ -423,3 +423,10 @@ _t("network-v3", "/api/network/get.json",
      "gw": "", "dynamic": "n", "dns": ""}],
    {"network": {"eth0": {"state": "down", "ip": "10.1.1.20", "mask": "255.255.0.0", "mac": "68:3A:7F:8C:A7:97",
                          "gateway": "", "dhcp": False, "dns": ""}}}, model="n5")
+
+# With a password, the session signs in first, as the authorize command
+# does (the engine's session tests cover the session ID and token headers).
+V.append({"spec": "kiloview-ndi", "command": "get_mode", "input": {}, "file": "get_mode-login",
+          "settings": {"username": "api", "password": "p@ss word"},
+          "expect_request": {"method": "POST", "target": "/api/v1/user/authorize",
+                             "body": '{"username":"api","password":"p@ss word"}', "content_type": "application/json"}})

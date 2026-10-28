@@ -47,29 +47,35 @@ transport:
   port: 80
   scheme: http
   # The document says every request after the login needs its token and
-  # the user name, not how. The token setting is sent both ways other
-  # Kiloview web APIs take it: as it is in Authorization, and in a cookie
-  # with the user name.
-  auth: header
-  auth_header: Authorization
+  # the user name, not how. The session logs in with the username and
+  # password settings and sends the token both ways other Kiloview web APIs
+  # take it: as it is in Authorization, and in a cookie with the user name;
+  # it logs in again on a bad or expired session (Appendix 4: 1005, 1009,
+  # 1127) or a 401.
   headers:
-    Cookie: "user={settings.username}; token={settings.token}"
+    Cookie: "user={settings.username}; token={session.id}"
   timeout_ms: 5000
+  session:
+    when_set: password
+    login: { method: POST, path: /api/tools/login.json, content_type: application/json,
+             body: '{"username":{settings.username:json},"password":{settings.password:json}}' }
+    capture: { json: $.token, header: Authorization }
+    relogin: { status: [401], json: { "$.result": "^error$", "$.msg": "^(1005|1009|1127)$" } }
 
 settings:
-  token:
-    type: string
-    secret: true
-    max_length: 512
-    default: ""
-    label: Login token
-    description: "The token the login command returns, sent with every request; run login and store its result here with update_settings."
   username:
     type: string
     max_length: 64
     default: admin
     label: User name
-    description: "The user the token belongs to, sent with the token; the server's default administrator is admin."
+    description: "The user the core logs in as, sent with its token; the server's default administrator is admin."
+  password:
+    type: string
+    secret: true
+    max_length: 128
+    default: Kiloview001
+    label: Password
+    description: "That user's password, Kiloview001 for the default administrator; while it is empty nothing logs in."
 
 ports:
   - { port: 80, protocol: http, role: control, note: "the web management port, chosen at installation (80 by default)" }
@@ -123,11 +129,11 @@ models:
 
 commands:
   login:
-    summary: Log in and return the token for the token setting (POST /api/tools/login.json)
+    summary: Log in as a user and return its token, beside the session the core keeps (POST /api/tools/login.json)
     params:
       username: { type: string, required: true, max_length: 64, label: User name, description: "The user to log in as; the default administrator is admin." }
       password: { type: string, required: true, secret: true, max_length: 128, label: Password, description: "That user's password; the default administrator's is Kiloview001." }
-    send: { method: POST, path: /api/tools/login.json, content_type: application/json, body: '{"username":{username:json},"password":{password:json}}' }
+    send: { method: POST, path: /api/tools/login.json, content_type: application/json, session: false, body: '{"username":{username:json},"password":{password:json}}' }
     expect: { status: 200, json_path: "$.token" }
     returns: value
   get_own_menu:
@@ -397,13 +403,14 @@ quirks:
     text: >
       Authentication: the document says every request after the login
       needs its token, and the user name, but not how they are sent. The
-      token setting is sent as it is in Authorization and in the cookie
-      user=<user>; token=<token>, the two ways other Kiloview web APIs take
-      a login token; run login and store its result in the token setting
-      with update_settings. A refused token answered with 401 or 403 stops
-      all requests until the settings change; the document lists its own
-      error codes for a bad or expired session (1005, 1009, 1127), which
-      fail the command.
+      core logs in with the username and password settings, keeps the
+      token the answer holds, and sends it as it is in Authorization and in
+      the cookie user=<user>; token=<token>, the two ways other Kiloview web
+      APIs take a login token. A request answered with one of the
+      document's codes for a bad or expired session (1005, 1009, 1127), or
+      with HTTP 401, has the core log in again and send it once more. The
+      document does not say how a wrong password is answered: a login
+      answer without a token fails what waits for it.
   - models: [all]
     severity: warning
     text: >

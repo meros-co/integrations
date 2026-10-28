@@ -49,23 +49,43 @@ transport:
   # The web console is served over HTTPS (Data Manual 2.3); no certificate
   # is documented, so it is not checked.
   accept_invalid_certs: true
-  # Every request carries the bearer token (1.2 onward: "Bearer" + space +
-  # token), sent while the token setting is set.
-  auth: bearer
   timeout_ms: 5000
   # Every request carries the language header (cn or en).
   headers:
     language: "{settings.language}"
   # 2.1 lists no header for system/info: it needs no token.
   probe: { method: GET, path: /api/cube/v2/system/info }
+  # Every request but login and system/info carries "Authorization: Bearer
+  # <token>". The session logs in with the username and password settings
+  # (a token valid 5 minutes by default) and again when a request is
+  # refused with 401 or 403; a login answered with an error is the refusal
+  # of the credential.
+  session:
+    when_set: password
+    login:
+      method: POST
+      path: /api/cube/v2/user/login
+      content_type: application/x-www-form-urlencoded
+      headers: { screen: "false" }
+      body: "grant_type=&username={settings.username:url}&password={settings.password:url}&scope=&client_id=&client_secret="
+    capture: { json: $.access_token, header: Authorization, scheme: Bearer }
+    relogin: { status: [401, 403] }
+    refused: { json: { "$.result": "^error$" } }
 
 settings:
-  token:
+  username:
+    type: string
+    default: admin
+    max_length: 64
+    label: User name
+    description: "The CUBE X1 user the core logs in as; the web console's default is admin."
+  password:
     type: string
     secret: true
-    default: ""
-    label: Access token
-    description: "The bearer token sent with every request: run get_long_term_token (or login) and store its result here with update_settings; empty sends none."
+    default: "admin"
+    max_length: 128
+    label: Password
+    description: "That user's password; while it is empty nothing logs in and requests go without a token."
   language:
     type: enum
     values: [en, cn]
@@ -158,25 +178,26 @@ models:
 commands:
   # ── 1 User management ────────────────────────────────────────────────
   login:
-    summary: Log in with a user name and password and return a bearer token valid for 5 minutes by default
+    summary: Log in as a user and return a bearer token valid for 5 minutes by default, beside the session the core keeps
     params:
       username: { type: string, required: true, max_length: 64, label: User name, description: "The CUBE X1 user to log in as; the web console's default is admin." }
       password: { type: string, required: true, secret: true, max_length: 128, label: Password, description: "That user's password; the default admin password is admin." }
     send:
       method: POST
       path: /api/cube/v2/user/login
+      session: false
       content_type: application/x-www-form-urlencoded
       headers: { screen: "false" }
       body: "grant_type=&username={username:url}&password={password:url}&scope=&client_id=&client_secret="
     expect: { status: 200, json_path: "$.access_token" }
     returns: value
   logout:
-    summary: Log out the user the token belongs to
+    summary: Log out the core's session; the next request logs in again
     send: { method: POST, path: /api/cube/v2/user/logout }
     expect: &ok { status: 200, json_equals: { "$.result": "ok" } }
     returns: ack
   renew_token:
-    summary: Return a new bearer token for the current one's user, valid for 5 minutes by default
+    summary: Return a new bearer token for the session's user, valid for 5 minutes by default
     send: { method: GET, path: /api/cube/v2/user/token/get }
     expect: &token { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.msg.access_token" }
     returns: value
@@ -672,18 +693,18 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      Authentication: every request but system/info carries "Authorization:
-      Bearer <token>". The login answers its token in the JSON body (and
-      the event websocket takes it in its URL), which the core cannot
-      capture into a session, so the token is a setting. Run
-      get_long_term_token once (a token that does not expire, or
-      get_timed_token for one valid the minutes given) and store the result
-      in the token setting with update_settings. login and renew_token
-      return tokens valid for only 5 minutes by default, after which the
-      server refuses them and the device reports unauthorized until a new
-      token is set; a consumer using them must renew the token (renew_token,
-      then update_settings) before it expires. A refused token (401 or 403)
-      stops all requests until the settings change.
+      Authentication: every request but system/info and login carries
+      "Authorization: Bearer <token>". The core logs in with the username
+      and password settings (user/login, a token valid 5 minutes by
+      default), keeps the token the answer holds (access_token), and logs
+      in again when a request is answered 401 or 403, sending it once more;
+      that an expired token is answered so is inferred. A login answered
+      with an error ({"result": "error", ...}, such as 10002 for a user that
+      does not exist) is the terminal refusal of the credential.
+      get_long_term_token, get_timed_token and renew_token return further
+      tokens for other clients; logout ends the core's own session, so the
+      next request logs in again. The event websocket takes a token in its
+      URL, but the document gives no message of it, so it is not used.
   - models: [all]
     severity: critical
     text: >

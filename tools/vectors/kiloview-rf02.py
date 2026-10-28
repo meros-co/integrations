@@ -25,7 +25,11 @@ _kr("login", {"username": "admin", "password": "admin"}, "POST", "/api/v1/login"
     http_reply=_kr_data({"expire": "2124-12-09T11:43:48Z", "token": "eyJ.rf02.tok",
                          "user": {"nickname": "nickname", "userId": 3, "username": "qss"}}, "Login successful"),
     expect_result={"ok": {"kind": "value", "value": "eyJ.rf02.tok"}})
-_kr("get_self", {}, "GET", "/api/v1/getinfo", settings={"token": "eyJ.rf02.tok"})
+# With a password, the session logs in first (the engine's session tests
+# cover the bearer token).
+V.append({"spec": "kiloview-rf02", "command": "get_self", "input": {}, "settings": {"password": "admin"},
+          "expect_request": {"method": "POST", "target": "/api/v1/login",
+                             "body": '{"userName":"admin","passWord":"admin"}', "content_type": "application/json"}})
 _kr("get_user", {"user": 9}, "GET", "/api/v1/sys-user/9")
 _kr("add_user", {"username": "lenovo", "nickname": "lenovo", "password": "Admin123"}, "POST", "/api/v1/sys-user",
     '{"username":"lenovo","nickName":"lenovo","password":"Admin123"}', http_reply=_KR_EMPTY, expect_result=_KR_ACK)
@@ -322,3 +326,9 @@ _kr_reread("reread-devices", "/api/v1/klnk/rename", {"serial_number": "1"},
 _kr_reread("reread-move", "/api/v1/directory/move/batch", {"targetId": 2}, ["/api/v1/klnk/gateway/output-devices"])
 _kr_reread("reread-aggregation", "/api/v1/sw/aggr/set", None, ["/api/v1/sw/aggr/dump"])
 _kr_reread("reread-notifications", "/api/v1/noti/close", {"msg_id": 1}, ["/api/v1/noti/summary", "/api/v1/noti/list"])
+
+# Every other vector leaves the password empty, so each command's own
+# request is the one compared.
+for _kr_v in V:
+    if _kr_v["spec"] == "kiloview-rf02" and _kr_v.get("command") != "get_self":
+        _kr_v.setdefault("settings", {}).setdefault("password", "")

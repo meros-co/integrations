@@ -45,30 +45,37 @@ transport:
   type: http
   port: 80
   scheme: http
-  # The document does not say how the login's token is sent back. The token
-  # setting is sent both ways other Kiloview web APIs take it: as it is in
-  # Authorization (auth: header) and in a cookie with the user name.
-  auth: header
-  auth_header: Authorization
+  # The document does not say how the login's token is sent back. The
+  # session logs in with the username and password settings and sends the
+  # token both ways other Kiloview web APIs take it: as it is in
+  # Authorization and in a cookie with the user name; a request answered
+  # Token.Error logs in again.
   headers:
-    Cookie: "user={settings.username}; token={settings.token}"
+    Cookie: "user={settings.username}; token={session.id}"
   timeout_ms: 4000
   probe: { method: GET, path: /api/r1/config/general/get.json }
+  session:
+    when_set: password
+    login: { method: POST, path: /api/r1/users/login.json, content_type: application/json,
+             body: '{"username":{settings.username:json},"password":{settings.password:json}}' }
+    capture: { json: $.data.token, header: Authorization }
+    relogin: { json: { "$.result": "^error$", "$.msg": "^Token\\.Error$" } }
+    refused: { json: { "$.result": "^error$", "$.msg": "(?i)password" } }
 
 settings:
-  token:
-    type: string
-    secret: true
-    max_length: 512
-    default: ""
-    label: Login token
-    description: "The token the login command returns (users/login.json), sent with every request; leave empty while the recorder takes requests without a login."
   username:
     type: string
     max_length: 64
     default: admin
     label: User name
-    description: "The user the token belongs to, sent with the token in the cookie; the recorder's default user is admin."
+    description: "The user the core logs in as, sent with its token in the cookie; the recorder's default user is admin."
+  password:
+    type: string
+    secret: true
+    max_length: 128
+    default: ""
+    label: Password
+    description: "That user's password; leave it empty while the recorder takes requests without a login, and nothing logs in."
   project_id:
     type: int
     min: 1
@@ -150,13 +157,13 @@ maps:
 commands:
   # ── Users (2.1-2.3) ───────────────────────────────────────────────────────
   login:
-    summary: Log in and return the token for the token setting (POST users/login.json)
+    summary: Log in as a user and return its token, beside the session the core keeps (POST users/login.json)
     params:
       username: { type: string, max_length: 64, required: true, label: User name,
         description: "The recorder's user name, admin by default." }
       password: { type: string, max_length: 128, required: true, secret: true, label: Password,
         description: "That user's password." }
-    send: { method: POST, path: /api/r1/users/login.json, body: '{"username":{username:json},"password":{password:json}}', content_type: application/json }
+    send: { method: POST, path: /api/r1/users/login.json, session: false, body: '{"username":{username:json},"password":{password:json}}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.token" }
     returns: value
 
@@ -619,14 +626,14 @@ quirks:
     text: >
       The document has the login (users/login.json) answer with a token and other requests answer
       "Token.Error" when it is missing or wrong, but does not say how the token is sent back. This
-      spec sends the token setting both ways other Kiloview web APIs take one: as it is in the
+      core logs in with the username and password settings, keeps the token the answer holds
+      (data.token), and sends it both ways other Kiloview web APIs take one: as it is in the
       Authorization header, and in a cookie with the user name (user=<username>; token=<token>).
-      A consumer runs the login command and puts the token it returns in the token setting with
-      update_settings; while the setting is empty, no Authorization header is sent and the cookie
-      carries an empty token. A refused token is answered
-      with HTTP 200 and result "error", so it fails only that command and does not stop the
-      device; the document gives no token lifetime, so a consumer logs in again when commands
-      start failing with Token.Error.
+      While the password is empty nothing logs in and neither is sent. A refused token is
+      answered with HTTP 200, result "error" and msg Token.Error: the core logs in again and sends
+      that request once more. A login answered with an error naming the password ("Username or
+      password is incorrect") is the terminal refusal of the credential. The document gives no
+      token lifetime.
   - models: [all]
     severity: info
     text: >
