@@ -47,6 +47,13 @@ transport:
   scheme: ws
   timeout_ms: 3000
   reply: expected
+  # The session keep-alive: the camera keeps the connection only while its
+  # rcp_session messages are echoed back, their data as it came, opened for
+  # commands only too.
+  acknowledge:
+    json_match: { "$.type": "^rcp_session$", "$.status": "^open$" }
+    json: { data: "$.data" }
+    send: '{"type":"rcp_session","data":{data}}'
 
 on_connect:
   - '{"type":"rcp_config","strings_decoded":1,"json_minified":1,"include_cacheable_flags":0,"encoding_type":"legacy","client":{"name":"meros-integrations","version":"1"}}'
@@ -344,11 +351,6 @@ telemetry:
     - json_match: { "$.type": "^rcp_cur_cdl$" }
       json: { all: "$" }
       state: { cdl: "{all}" }
-    # The session keep-alive: the camera's rcp_session data is echoed back.
-    - json_match: { "$.type": "^rcp_session$", "$.status": "^open$" }
-      json: { data: "$.data" }
-      then_send:
-        - '{"type":"rcp_session","data":{data}}'
 
 state:
   parameters.*.value: { type: int, description: "Value of the RCP2 parameter with this id, in its own units (RECORD_STATE, ISO, SENSOR_FRAME_RATE in thousandths of a fps...)" }
@@ -375,8 +377,8 @@ quirks:
     text: >
       Sets are not acknowledged; their read-back is the rcp_cur_int or rcp_cur_str the camera
       pushes for a subscribed parameter, kept in parameters.<id>. The camera keeps the connection
-      only while its rcp_session messages are echoed back, which telemetry does; a device opened
-      for commands only sends no echo, and the camera may drop it.
+      only while its rcp_session messages are echoed back; the core echoes each at once, also
+      when the camera is opened for commands only.
   - models: [all]
     severity: info
     text: >
