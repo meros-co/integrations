@@ -165,3 +165,37 @@ text(G, "clear_all", {}, "ClearAll\r\n")
 # SaveShow; and the raw entry point.
 text(G, "save_show", {}, "SaveShow\r\n")
 text(G, "command", {"line": "Blackout"}, "Blackout\r\n")
+
+# MSC via Ethernet (MIDI Show Control page): the ma-msc-ethernet extension
+# decodes each message to one line, as its Rust tests show for the manual's
+# examples; these are those lines and the state the rules make of them.
+telemetry(G, "msc-go-exec-dot-page", inbound="MSC GO device=1 format=01 cue=37.200 list=5.1\r\n",
+          expect_state={"msc": {"last": "MSC GO device=1 format=01 cue=37.200 list=5.1"},
+                        "pages": {"1": {"executors": {"5": {"cue": "37.200", "status": "running"}}}}})
+telemetry(G, "msc-go-exec-page", inbound="MSC GO device=1 format=02 cue=37.200 list=5 path=1\r\n",
+          expect_state={"msc": {"last": "MSC GO device=1 format=02 cue=37.200 list=5 path=1"},
+                        "pages": {"1": {"executors": {"5": {"cue": "37.200", "status": "running"}}}}})
+telemetry(G, "msc-timed-go", inbound="MSC TIMED_GO device=127 format=7F fade=20.00 cue=75.000 list=3.2\r\n",
+          expect_state={"msc": {"last": "MSC TIMED_GO device=127 format=7F fade=20.00 cue=75.000 list=3.2"},
+                        "pages": {"2": {"executors": {"3": {"cue": "75.000", "status": "running", "fade": 20.0}}}}})
+telemetry(G, "msc-stop", inbound="MSC STOP device=127 format=7F cue=0.000 list=5.1\r\n",
+          state_before={"pages": {"1": {"executors": {"5": {"cue": "37.200", "status": "running"}}}}},
+          expect_state={"msc": {"last": "MSC STOP device=127 format=7F cue=0.000 list=5.1"},
+                        "pages": {"1": {"executors": {"5": {"cue": "37.200", "status": "paused"}}}}})
+telemetry(G, "msc-resume", inbound="MSC RESUME device=127 format=7F cue=0.000 list=5 path=1\r\n",
+          expect_state={"msc": {"last": "MSC RESUME device=127 format=7F cue=0.000 list=5 path=1"},
+                        "pages": {"1": {"executors": {"5": {"status": "running"}}}}})
+telemetry(G, "msc-off", inbound="MSC GO_OFF device=127 format=7F cue=0.000 list=9.5\r\n",
+          expect_state={"msc": {"last": "MSC GO_OFF device=127 format=7F cue=0.000 list=9.5"},
+                        "pages": {"5": {"executors": {"9": {"status": "off"}}}}})
+telemetry(G, "msc-go-selected", inbound="MSC GO device=127 format=7F cue=35.000\r\n",
+          expect_state={"msc": {"last": "MSC GO device=127 format=7F cue=35.000"},
+                        "selected": {"cue": "35.000", "status": "running"}})
+telemetry(G, "msc-stop-selected", inbound="MSC STOP device=127 format=7F\r\n",
+          expect_state={"msc": {"last": "MSC STOP device=127 format=7F"}, "selected": {"status": "paused"}})
+# 45 % is sent as 39 4C (coarse 57, fine 76): 7372 / 163.84.
+telemetry(G, "msc-set", inbound="MSC SET device=127 format=7F fader=3 page=2 value=7372\r\n",
+          expect_state={"msc": {"last": "MSC SET device=127 format=7F fader=3 page=2 value=7372"},
+                        "pages": {"2": {"executors": {"3": {"fader": 44.9951171875}}}}})
+telemetry(G, "msc-fire", inbound="MSC FIRE device=127 format=7F macro=64\r\n",
+          expect_state={"msc": {"last": "MSC FIRE device=127 format=7F macro=64"}, "macros": {"last_fired": 64}})
