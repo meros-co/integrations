@@ -51,7 +51,7 @@ _mg_post("login", {"username": "admin", "password": "wrong"}, "/api/users/login"
          '{"username":"admin","password":"wrong"}',
          http_reply={"status": 200, "body": '{"result":"error","msg":"302"}'},
          expect_result={"error": {"error": "device_error"}}, file="login-refused")
-V.append({"spec": _MG_, "command": "logout", "input": {}, "settings": {"token": "3515d2e8d3615fc68c84f00b361c5d8c"},
+V.append({"spec": _MG_, "command": "logout", "input": {},
           "expect_request": {"method": "POST", "target": "/api/users/logout"},
           "http_reply": {"status": 200, "body": '{"result":"ok","data":{}}'}, "expect_result": {"ok": {"kind": "ack"}}})
 _mg_get("list_users", {}, "/api/users/list")
@@ -906,3 +906,18 @@ for _mg_name, _mg_path, _mg_sends, _mg_request in [
 _mg_t("readback-not-on-error", "/api/layout/select", {"result": "error", "msg": "105"}, {}, expect_then_send=[])
 # Downloads saved to the host file named (never written by a vector).
 V.append({"spec": "kiloview-mg300", "command": "export_config", "input": {"to": {"file": "source_config.zip"}}, "expect_request": {"method": "GET", "target": "/api/sys/config/export", "body": "{\"modules\":[\"source\"],\"name\":\"source_config\"}", "content_type": "application/json"}})
+
+
+# The session: with the password setting set (admin by default), a command's
+# first request is the login (section 3.1), and its token goes in the app
+# header from then on (the engine's session tests cover the header and the
+# login again on code 2). The other vectors leave the password empty, as for
+# a gateway with authentication off, so each command's own request is the
+# one compared.
+V.append({"spec": _MG_, "command": "list_users", "input": {}, "file": "list_users-login",
+          "settings": {"username": "admin", "password": "admin"},
+          "expect_request": {"method": "POST", "target": "/api/users/login",
+                             "body": '{"username":"admin","password":"admin"}', "content_type": "application/json"}})
+for _mg_v in V:
+    if _mg_v["spec"] == _MG_ and _mg_v.get("file") != "list_users-login":
+        _mg_v.setdefault("settings", {}).setdefault("password", "")

@@ -60,18 +60,26 @@ transport:
   scheme: { setting: scheme }
   https_port: 443
   accept_invalid_certs: true
-  auth: header
-  auth_header: Authorization
   timeout_ms: 5000
   probe: { method: GET, path: /api/systemctrl/system/getHostname }
+  # API authentication (1.1.1): the session logs in with the username and
+  # password settings and sends the login's token in Authorization, as it
+  # is, logging in again when a request is answered 401.
+  session:
+    when_set: password
+    login: { method: POST, path: /api/systemctrl/user/login, content_type: application/json,
+             body: '{"username":{settings.username:json},"password":{settings.password:json}}' }
+    capture: { json: $.data.token, header: Authorization }
+    relogin: { status: [401] }
 
 settings:
   scheme: { type: enum, values: [http, https], default: http,
             label: Connection,
             description: "Reach the web API over HTTP (port 80) or HTTPS (port 443), as switched on under the device's HTTP and HTTPS settings." }
-  token: { type: string, secret: true, default: "", max_length: 4096,
-           label: API token,
-           description: "The token the device's login issues (run the login command and pass its result here with update_settings), sent as it is in the Authorization header; leave empty while API authentication is off, which sends none." }
+  username: { type: string, default: admin, max_length: 64, label: User name,
+              description: "The user the core logs in as once API authentication is on; admin by default." }
+  password: { type: string, secret: true, default: "", max_length: 128, label: Password,
+              description: "That user's password; leave it empty while API authentication is off, and nothing logs in." }
 
 ports:
   - { port: 80, protocol: http, role: control, when: "scheme http" }
@@ -101,13 +109,13 @@ maps:
 commands:
   # ── 1.1 Users and authentication ───────────────────────────────────────
   login:
-    summary: Log in with a user name and password and return the token the device issues (pass it as the token setting with update_settings); 1.1.1
+    summary: Log in as a user and return the token the device issues, beside the session the core keeps; 1.1.1
     params:
       username: { type: string, required: true, max_length: 64,
                   label: User name, description: "The device user to log in as, such as admin." }
       password: { type: string, required: true, secret: true, max_length: 128,
                   label: Password, description: "That user's password." }
-    send: { method: POST, path: /api/systemctrl/user/login, body: '{"username":{username:json},"password":{password:json}}', content_type: application/json }
+    send: { method: POST, path: /api/systemctrl/user/login, session: false, body: '{"username":{username:json},"password":{password:json}}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.token" }
     returns: value
 
@@ -1690,14 +1698,13 @@ quirks:
     text: >
       Authentication. The API takes an optional token: with API authentication on
       (set_api_authentication), each request carries the token the login issues, as it
-      is, in the Authorization header (no Bearer word). The login answers the token in
-      its JSON body, which the spec format cannot capture as a session, so the token is
-      the token setting: run the login command (as the first request, or on a second
-      instance opened for commands only, since a request refused for a missing token
-      stops the device until its settings change), then pass the result with
-      update_settings. The document's example token is a JWT whose expiry lies a
-      century ahead; it states no lifetime or refresh. With authentication off, leave
-      the setting empty.
+      is, in the Authorization header (no Bearer word). With the password setting set,
+      the core logs in with the username and password settings, keeps the token the
+      answer holds (data.token) and sends it on every later request; a request answered
+      401 has it log in again and send the request once more (that a refused token is
+      answered 401 is inferred). The document's example token is a JWT whose expiry lies
+      a century ahead; it states no lifetime or refresh. With authentication off, leave
+      the password empty.
   - models: [all]
     severity: warning
     text: >

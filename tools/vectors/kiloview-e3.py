@@ -468,9 +468,12 @@ _ke3("set_onvif", {"enabled": True, "admin_name": "Admin", "device_name": "E3", 
 _ke3("get_ndi_bridge", {}, "GET", "/api/bridge/get")
 _ke3("set_ndi_bridge", {"enabled": True, "address": "192.168.35.70", "source_name": "E3"}, "POST", "/api/bridge/set",
      {"enable": True, "recv": "Public", "address": "192.168.35.70", "port": "5990", "secure": "", "id": "E3"})
-# With API authentication on: the token setting goes as the Authorization header.
-_ke3("get_hostname", {}, "GET", "/api/systemctrl/system/getHostname", settings={"token": "eyJ0eXAiOi.abc"},
-     file="get_hostname-token")
+# With API authentication on: the session logs in first, its token then sent
+# as the Authorization header (the engine's session tests cover the header).
+V.append({"spec": "kiloview-e3", "command": "get_hostname", "input": {}, "file": "get_hostname-token",
+          "settings": {"password": "admin"},
+          "expect_request": {"method": "POST", "target": "/api/systemctrl/users/login",
+                             "body": '{"username":"admin","password":"admin"}', "content_type": "application/json"}})
 
 
 # ── Telemetry: the document's example replies ────────────────────────────

@@ -29,9 +29,12 @@ OK = {"status": 200, "body": '{"result":"ok"}'}
 _post("login", {"password": "admin"}, "/api/users/login", '{"username":"admin","password":"admin"}',
       http_reply={"status": 200, "body": '{"result":"ok","data":{"username":"admin","token":"3515d2e8d3615fc68c84f00b361c5d8c"}}'},
       expect_result={"ok": {"kind": "value", "value": "3515d2e8d3615fc68c84f00b361c5d8c"}})
-V.append({"spec": KD, "command": "logout", "input": {}, "settings": {"token": "abc123"},
-          "expect_request": {"method": "POST", "target": "/api/users/logout", "body": '{"token":"abc123"}'},
-          "http_reply": OK, "expect_result": {"ok": {"kind": "ack"}}})
+# logout sends the session's token: its first request is the login, with the
+# password setting at its default (the engine's session tests cover the
+# token in the body and the app header).
+V.append({"spec": KD, "command": "logout", "input": {}, "settings": {"password": "admin"},
+          "expect_request": {"method": "POST", "target": "/api/users/login",
+                             "body": '{"username":"admin","password":"admin"}', "content_type": "application/json"}})
 _get("list_users", {}, "/api/users/list")
 _post("add_user", {"username": "op", "password": "pw1", "alias": "Operator"}, "/api/users/add",
       '{"username":"op","password":"pw1","alias":"Operator","role":"user","phone":"","descript":""}')
@@ -543,3 +546,9 @@ for name, path, sends, request in [
 ]:
     _t(name, path, OKB, {}, request=request, expect_then_send=sends)
 _t("readback-not-on-error", "/api/layout/select", {"result": "error", "msg": "104"}, {}, expect_then_send=[])
+
+# Every other vector leaves the password empty, as for a decoder whose
+# login is not used, so each command's own request is the one compared.
+for _kd_v in V:
+    if _kd_v["spec"] == KD and _kd_v.get("command") != "logout":
+        _kd_v.setdefault("settings", {}).setdefault("password", "")

@@ -38,6 +38,11 @@ expect_request: { method: GET, target: "/cgi-bin/ptzctrl.cgi?ptzcmd&home" }   # 
 # A binary body (SPEC.md §4, Binary request bodies) is `body_hex` in place of
 # `body`; `content_type`, when given, must be the request's Content-Type:
 # { method: POST, target: /v0/showfile, body_hex: "504b0304", content_type: application/octet-stream }
+# `headers`, when given, are headers the request must carry with these values
+# (names in any case), for credentials computed per request (SPEC.md §2). The
+# runner's wall clock reads the Unix epoch and its random bytes count up from
+# 0 for each command, so a signature, a salt or a nonce can be stated:
+# { method: GET, target: /api/live_events, headers: { X-Auth-Expires: "30", X-Auth-Key: "..." } }
 # A command sending several messages lists them: expect_wire: [ …, … ]
 # On a transport whose device answers, each goes after the reply to the one
 # before: give a device_reply answering them, and the messages it lets go are

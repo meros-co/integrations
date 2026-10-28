@@ -60,9 +60,8 @@ V.append({"spec": TDK, "command": "refresh_access_token", "input": {"refresh_tok
           "expect_result": {"ok": {"kind": "value", "value": {
               "expires_in": 3600, "token_type": "Bearer", "refresh_token": "bNLzvBOEqwDNYApV9jduhjlVXIoOp9kB",
               "access_token": "rYDVtxfHdH7Igk5qdMEWMJZAJpg1Gjvy"}}}})
-# With a token set, it goes as Authorization: Bearer (the headers are not
-# part of the vector; the request is the same).
-_get("get_api_root", {}, "/api/v1", settings={"token": "rYDVtxfHdH7Igk5qdMEWMJZAJpg1Gjvy"},
+# GET /api/v1 needs no token.
+_get("get_api_root", {}, "/api/v1",
      http_reply={"status": 200, "body": '{"endpoints":["decoders","encoders","inputs","network","settings","streams","system"]}'},
      expect_result={"ok": {"kind": "value", "value": ["decoders", "encoders", "inputs", "network", "settings",
                                                        "streams", "system"]}})
@@ -699,3 +698,13 @@ _t("settings-import", "/api/v1/settings/sync/import", '{"status":"ok","message":
 V.append({"spec": "teradek-prism", "command": "save_encoder_snapshot", "input": {"encoder": 0, "to": {"file": "enc.jpg"}}, "expect_request": {"method": "GET", "target": "/api/v1/encoders/0/snapshot"}})
 _post("save_decoder_snapshot", {"decoder": 0, "width": 1280, "height": 720, "quality": 90, "to": {"file": "dec.jpg"}},
       "/api/v1/decoders/0/snapshot", '{"settings":{"width":1280,"height":720,"quality":90}}')
+
+
+# With the admin password set, the session signs in first with the password
+# grant (the engine's session tests cover the bearer token and the sign-in
+# again on 401).
+V.append({"spec": TDK, "command": "get_api_root", "input": {}, "file": "get_api_root-login",
+          "settings": {"password": "p@ss word"},
+          "expect_request": {"method": "POST", "target": "/oauth/token",
+                             "body": "grant_type=password&password=p%40ss%20word",
+                             "content_type": "application/x-www-form-urlencoded"}})

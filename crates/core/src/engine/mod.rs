@@ -9,6 +9,7 @@
 //! as the answer to a later command. Liveness probes queue like commands for the
 //! same reason.
 
+mod cookies;
 mod expect;
 pub(crate) use expect::json_path;
 pub(crate) mod framing;
@@ -16,8 +17,10 @@ mod oauth;
 mod osc;
 mod pacing;
 mod pages;
+mod sign;
 mod telemetry;
 pub(crate) mod template;
+mod zeromq;
 
 use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::net::{IpAddr, SocketAddr};
@@ -349,6 +352,13 @@ struct SessionSpec {
     /// `login_status`: statuses besides 2xx a login answer holding the
     /// session may have (JVC answers its login 302 with the cookie).
     login_status: Vec<u16>,
+    /// `renew`: any answer carrying a session replaces the one held (Pharos
+    /// answers each authenticated request with a new token).
+    renew: bool,
+    /// `capture.values`: more strings of a JSON login answer, by name, for
+    /// `{session.<name>}` (a Kiloview NDI encoder's session ID beside its
+    /// token).
+    values: Vec<(String, String)>,
 }
 
 /// What of the login's answer is the session.
@@ -364,9 +374,11 @@ enum Capture {
     /// `{"proclaimAuthToken": "..."}`, sent back as `ProclaimAuthToken`.
     /// With a `scheme`, the header's value is the scheme, a space and the
     /// string: an access token sent back as `Authorization: Bearer <token>`.
+    /// Without a header, the string is sent only where a template names
+    /// `{session.id}` (Kiloview's `app` header, a JSON object holding it).
     Json {
         path: String,
-        header: String,
+        header: Option<String>,
         scheme: Option<String>,
     },
 }
@@ -384,7 +396,11 @@ impl SessionSpec {
                 (Some(Value::String(name)), None, None) if name == "*" => Capture::Cookie(None),
                 (Some(Value::String(name)), None, None) => Capture::Cookie(Some(name.clone())),
                 (None, Some(Value::String(h)), None) => Capture::Header(h.clone()),
-                (None, Some(Value::String(h)), Some(Value::String(path))) => {
+                (None, h @ (None | Some(Value::String(_))), Some(Value::String(path))) => {
+                    let h = h.and_then(Value::as_str).map(str::to_string);
+                    if h.is_none() && c.get("scheme").is_some() {
+                        return Err("transport.session.capture.scheme needs a header".into());
+                    }
                     let scheme = match c.get("scheme") {
                         None => None,
                         Some(Value::String(s))
@@ -401,7 +417,7 @@ impl SessionSpec {
                     };
                     Capture::Json {
                         path: path.clone(),
-                        header: h.clone(),
+                        header: h,
                         scheme,
                     }
                 }
@@ -445,12 +461,41 @@ impl SessionSpec {
         };
         Ok(SessionSpec {
             login,
-            capture,
+            capture: capture.clone(),
             relogin_status: statuses("relogin"),
             relogin_json: json("relogin")?,
             refused_status: statuses("refused"),
             refused_json: json("refused")?,
             when_set: str_field(v, "when_set").map(str::to_string),
+            values: {
+                let mut out = Vec::new();
+                let given = v.get("capture").and_then(|c| c.get("values"));
+                if given.is_some() && !matches!(capture, Capture::Json { .. }) {
+                    return Err("transport.session.capture.values goes with json".into());
+                }
+                for (name, path) in given.and_then(Value::as_object).into_iter().flatten() {
+                    let valid = name != "id"
+                        && !name.is_empty()
+                        && name
+                            .bytes()
+                            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_');
+                    let path = path.as_str().filter(|p| p.starts_with('$'));
+                    match (valid, path) {
+                        (true, Some(p)) => out.push((name.clone(), p.to_string())),
+                        _ => {
+                            return Err(format!(
+                                "transport.session.capture.values.{name} is a JSON path, named in snake_case (not id)"
+                            ))
+                        }
+                    }
+                }
+                out
+            },
+            renew: match v.get("renew") {
+                None => false,
+                Some(Value::Bool(b)) => *b,
+                Some(_) => return Err("transport.session.renew is true or false".into()),
+            },
             login_status: v
                 .get("login_status")
                 .and_then(Value::as_array)
@@ -491,6 +536,25 @@ impl SessionSpec {
         }
     }
 
+    /// What `{session.id}` and `{session.<name>}` render: the session alone,
+    /// or with `capture.values` an object of it (`id`) and those strings of
+    /// the answer (a name the answer does not hold is left out).
+    fn template_value(&self, token: &(String, String), response: &HttpResponse) -> Value {
+        let id = Value::String(self.value_of(token));
+        if self.values.is_empty() {
+            return id;
+        }
+        let doc = serde_json::from_slice::<Value>(&response.body).unwrap_or(Value::Null);
+        let mut out = Map::new();
+        out.insert("id".into(), id);
+        for (name, path) in &self.values {
+            if let Some(Value::String(v)) = expect::json_path(&doc, path) {
+                out.insert(name.clone(), Value::String(v.clone()));
+            }
+        }
+        Value::Object(out)
+    }
+
     /// The session in a login's answer, as the header to send it in.
     fn captured(&self, response: &HttpResponse) -> Option<(String, String)> {
         match &self.capture {
@@ -524,7 +588,8 @@ impl SessionSpec {
                             Some(s) => format!("{s} {token}"),
                             None => token.clone(),
                         };
-                        Some((header.clone(), value))
+                        // No header: sent only where `{session.id}` is named.
+                        Some((header.clone().unwrap_or_default(), value))
                     }
                     _ => None,
                 }
@@ -615,6 +680,10 @@ struct Push {
     /// offered under, as that GET's reply would be (a Blackmagic camera's
     /// property pushes, in the format its REST GET returns).
     as_reply: Option<AsReply>,
+    /// `token`: a request over the transport answered with a token, fetched
+    /// before each opening, and the JSON path to it in the answer; the
+    /// messages name it `{push.token}` (CamStreamer's ws_authorization.cgi).
+    token: Option<(Value, String)>,
 }
 
 /// `as_reply` (`telemetry.sse`, `telemetry.websocket`): each message is also
@@ -720,6 +789,11 @@ enum HttpAuth {
     /// The `access_token` setting as Bearer, refreshed with the
     /// `refresh_token` setting (`transport.oauth`).
     OAuth2,
+    /// A WS-Security UsernameToken with a password digest in each SOAP
+    /// envelope, from the `username` and `password` settings (ONVIF).
+    Wsse,
+    /// AWS Signature Version 4 over each request (`transport.aws`).
+    AwsSigV4,
 }
 
 impl Transport {
@@ -965,6 +1039,19 @@ pub(crate) struct SpecEngine {
     maps: Maps,
     /// `transport.session`: the login and what of its answer is the session.
     session: Option<SessionSpec>,
+    /// The push websocket's messages wait for a session to name
+    /// (`{session.id}`): sent once the login answers.
+    push_waits_session: bool,
+    /// `telemetry.websocket.token`: the request fetching it, in flight, and
+    /// the token for the websocket's messages (`{push.token}`). A secret.
+    push_token_request: Option<RequestId>,
+    push_token: Option<String>,
+    /// `transport.sign`: values worked out for each request.
+    sign: Option<sign::Sign>,
+    /// `transport.aws`: what `auth: aws-sigv4` signs for.
+    aws: Option<sign::Aws>,
+    /// `transport.cookies`: the cookies the device sets, sent back.
+    jar: Option<cookies::Jar>,
     /// The session held: the header it is sent in and its value. A secret,
     /// never logged, offered to the rules or kept in state.
     session_token: Option<(String, String)>,
@@ -988,6 +1075,8 @@ pub(crate) struct SpecEngine {
     /// feedback arrives on, beside a transport of another kind (CasparCG's
     /// OSC beside its AMCP line protocol).
     osc_listen: Option<u16>,
+    /// `telemetry.zeromq`: a ZeroMQ bus beside the transport.
+    zmq: Option<zeromq::Zmq>,
     /// `OpenRequest::monitor`. Without it nothing in `telemetry` is sent or
     /// opened: no subscription, poll or push websocket. Replies and anything
     /// the device sends unasked still go to the rules.
@@ -1103,7 +1192,7 @@ fn auth_headers(auth: HttpAuth, header: &str, settings: &Params) -> Vec<(String,
                 vec![("Authorization".to_string(), format!("Bearer {token}"))]
             }
         }
-        HttpAuth::None | HttpAuth::Digest => Vec::new(),
+        HttpAuth::None | HttpAuth::Digest | HttpAuth::Wsse | HttpAuth::AwsSigV4 => Vec::new(),
     }
 }
 
@@ -1768,6 +1857,8 @@ impl SpecEngine {
                     "bearer" => HttpAuth::Bearer,
                     "header" => HttpAuth::Header,
                     "oauth2" => HttpAuth::OAuth2,
+                    "wsse" => HttpAuth::Wsse,
+                    "aws-sigv4" => HttpAuth::AwsSigV4,
                     other => return Err(format!("http auth '{other}' is not implemented")),
                 };
                 if auth == HttpAuth::Header && auth_header.is_empty() {
@@ -1842,6 +1933,29 @@ impl SpecEngine {
             }
             Some(s) => Some(SessionSpec::parse(s, &ctx.model)?),
         };
+        // Credentials computed for each request (SPEC.md §2).
+        let signer = match t.get("sign") {
+            None => None,
+            Some(_) if kind != "http" => {
+                return Err("transport.sign is for the http transport".into())
+            }
+            Some(s) => Some(sign::Sign::parse(s)?),
+        };
+        let aws = match &transport {
+            Transport::Http {
+                auth: HttpAuth::AwsSigV4,
+                ..
+            } => Some(sign::Aws::parse(t.get("aws"))?),
+            _ => None,
+        };
+        let jar = match t.get("cookies") {
+            None | Some(Value::Bool(false)) => None,
+            Some(Value::Bool(true)) if kind == "http" => Some(cookies::Jar::default()),
+            Some(Value::Bool(true)) => {
+                return Err("transport.cookies is for the http transport".into())
+            }
+            Some(_) => return Err("transport.cookies is true or false".into()),
+        };
         let rules = rules_for_model(spec.telemetry.as_ref(), &ctx.model);
         let telemetry = telemetry::Telemetry::shared(
             rules.as_ref().or(spec.telemetry.as_ref()),
@@ -1879,7 +1993,16 @@ impl SpecEngine {
             }
             Some(o) => listen_port(o.get("listen_port"), &ctx.settings)?,
         };
-        let push = match spec.telemetry.as_ref().and_then(|t| t.get("websocket")) {
+        let zmq = match spec.telemetry.as_ref().and_then(|t| t.get("zeromq")) {
+            None => None,
+            Some(z) => Some(zeromq::Zmq::new(zeromq::parse(z, &ctx.settings)?)),
+        };
+        // A list of websockets, each for some models: the first for this one.
+        let websocket = match spec.telemetry.as_ref().and_then(|t| t.get("websocket")) {
+            Some(Value::Array(blocks)) => blocks.iter().find(|b| for_model(b, &ctx.model)),
+            other => other,
+        };
+        let push = match websocket {
             None => None,
             Some(w) => {
                 // A port, or `{setting: name}` naming the operator's (an
@@ -2041,6 +2164,26 @@ impl SpecEngine {
                     url,
                     idle,
                     as_reply: as_reply_of(w.get("as_reply"), "telemetry.websocket")?,
+                    token: match w.get("token") {
+                        None => None,
+                        Some(t) if kind == "http" => {
+                            let request = t
+                                .get("request")
+                                .filter(|r| r.is_object())
+                                .cloned()
+                                .ok_or("telemetry.websocket.token.request is a request")?;
+                            let path = str_field(t, "json")
+                                .filter(|p| p.starts_with('$'))
+                                .ok_or("telemetry.websocket.token.json is a JSON path")?;
+                            Some((request, path.to_string()))
+                        }
+                        Some(_) => {
+                            return Err(
+                                "telemetry.websocket.token is fetched over an http transport"
+                                    .into(),
+                            )
+                        }
+                    },
                 })
             }
         };
@@ -2188,6 +2331,12 @@ impl SpecEngine {
             session,
             session_token: None,
             session_value: None,
+            push_waits_session: false,
+            push_token_request: None,
+            push_token: None,
+            sign: signer,
+            aws,
+            jar,
             push,
             push_backoff: RECONNECT_MIN,
             events,
@@ -2195,6 +2344,7 @@ impl SpecEngine {
             events_reply,
             events_backoff: RECONNECT_MIN,
             osc_listen,
+            zmq,
             pacer,
             outbox: VecDeque::new(),
             pace_pass: false,
@@ -2385,7 +2535,10 @@ impl SpecEngine {
         // The session held (`transport.session`), on every request
         // but one sent without it.
         if let Some((name, value)) = &self.session_token {
-            if item.get("session") != Some(&Value::Bool(false)) && route == Route::Main {
+            if !name.is_empty()
+                && item.get("session") != Some(&Value::Bool(false))
+                && route == Route::Main
+            {
                 headers.push((name.clone(), value.clone()));
             }
         }
@@ -2621,25 +2774,30 @@ impl SpecEngine {
     /// The session held, as the header it is sent in: for a native
     /// extension's own requests to the device (AJA's event connection).
     pub(crate) fn session_header(&self) -> Option<(String, String)> {
-        self.session_token.clone()
+        self.session_token
+            .clone()
+            .filter(|(name, _)| !name.is_empty())
     }
 
-    fn needs_session(&self, job: &Job) -> bool {
+    /// Whether the session is in use now: there is one, and its `when_set`
+    /// setting, if it names one, is set.
+    fn session_on(&self) -> bool {
         let Some(session) = &self.session else {
             return false;
         };
-        if job.login {
-            return false;
+        match &session.when_set {
+            None => true,
+            Some(setting) => self.settings.get(setting).is_some_and(|v| {
+                !v.is_null() && v.as_str() != Some("") && v.as_bool() != Some(false)
+            }),
         }
+    }
+
+    fn needs_session(&self, job: &Job) -> bool {
         // `when_set`: no login while the operator has not turned it on,
         // decided from the settings current now, as update_settings changes.
-        if let Some(setting) = &session.when_set {
-            let set = self.settings.get(setting).is_some_and(|v| {
-                !v.is_null() && v.as_str() != Some("") && v.as_bool() != Some(false)
-            });
-            if !set {
-                return false;
-            }
+        if job.login || !self.session_on() {
+            return false;
         }
         let items = match (&job.id, &job.item) {
             (None, None) => return false,
@@ -2693,6 +2851,10 @@ impl SpecEngine {
             let Some(job) = self.queue.pop_front() else {
                 return;
             };
+            // A login queued for the push websocket, the session since held.
+            if job.login && self.session_token.is_some() {
+                continue;
+            }
             // No session yet: the login goes first.
             if self.session_token.is_none() && self.needs_session(&job) {
                 let login = self.session.as_ref().map(|s| s.login.clone());
@@ -2914,7 +3076,8 @@ impl SpecEngine {
                 self.last_sent = cx.now();
                 cx.ws_send(SOCKET, text)
             }
-            Outgoing::Http(request, _) => {
+            Outgoing::Http(mut request, _) => {
+                self.finish_request(cx, &mut request);
                 let id = self.next_request;
                 self.next_request += 1;
                 cx.http(id, request);
@@ -2933,7 +3096,8 @@ impl SpecEngine {
     }
 
     /// Send an HTTP request whose reply goes to the telemetry rules.
-    fn send_http(&mut self, cx: &mut Cx, request: HttpRequest) -> RequestId {
+    fn send_http(&mut self, cx: &mut Cx, mut request: HttpRequest) -> RequestId {
+        self.finish_request(cx, &mut request);
         let id = self.next_request;
         self.next_request += 1;
         let target = request.url.splitn(4, '/').nth(3).unwrap_or("");
@@ -2944,6 +3108,60 @@ impl SpecEngine {
         self.request_paths.insert(id, (format!("/{target}"), body));
         cx.http(id, request);
         id
+    }
+
+    /// What a request to the device's own server (or an endpoint taking
+    /// its credential) gets as it goes: the cookies kept
+    /// (`transport.cookies`), the values `transport.sign` works out, and a
+    /// WS-Security token or an AWS signature, all from the clock now.
+    fn finish_request(&self, cx: &mut Cx, request: &mut HttpRequest) {
+        let Transport::Http { base, auth, .. } = &self.transport else {
+            return;
+        };
+        let at = |b: &str| {
+            request
+                .url
+                .strip_prefix(b)
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with(['/', '?']))
+        };
+        let credentialed = self
+            .endpoints
+            .values()
+            .any(|e| e.credentialed && at(&e.base));
+        if !at(base) && !credentialed {
+            return;
+        }
+        if let Some(cookie) = self.jar.as_ref().and_then(cookies::Jar::header) {
+            match request
+                .headers
+                .iter_mut()
+                .find(|(n, _)| n.eq_ignore_ascii_case("cookie"))
+            {
+                Some((_, v)) => {
+                    v.push_str("; ");
+                    v.push_str(&cookie);
+                }
+                None => request.headers.push(("Cookie".into(), cookie)),
+            }
+        }
+        let unix = cx.unix_millis();
+        if let Some(sign) = &self.sign {
+            if let Err(e) = sign.apply(request, &self.settings, &self.spec.settings, unix) {
+                cx.log(
+                    Level::Warning,
+                    format!("request credentials not computed: {e}"),
+                );
+            }
+        }
+        match auth {
+            HttpAuth::Wsse => sign::wsse(request, &self.settings, unix),
+            HttpAuth::AwsSigV4 => {
+                if let Some(aws) = &self.aws {
+                    aws.sign(request, &self.settings, unix);
+                }
+            }
+            _ => {}
+        }
     }
 
     // ── OAuth ────────────────────────────────────────────────────────────
@@ -3450,9 +3668,14 @@ impl SpecEngine {
                 .then(|| session.captured(&response))
                 .flatten();
                 if let Some(token) = captured {
-                    self.session_value = Some(Value::String(session.value_of(&token)));
+                    self.session_value = Some(session.template_value(&token, &response));
                     self.session_token = Some(token);
                     self.heard(cx);
+                    // Push messages naming the session waited for it.
+                    if std::mem::take(&mut self.push_waits_session) {
+                        let prefix = self.push_prefix();
+                        self.send_push_items(cx, &prefix);
+                    }
                     self.pump(cx);
                     return;
                 }
@@ -4125,7 +4348,96 @@ impl SpecEngine {
         }
     }
 
+    /// Open the push websocket, first fetching its token when it takes one
+    /// (`telemetry.websocket.token`).
     fn open_push(&mut self, cx: &mut Cx) {
+        if !self.monitor || self.refused.is_some() {
+            return;
+        }
+        let Some((item, _)) = self.push.as_ref().and_then(|p| p.token.clone()) else {
+            self.open_push_socket(cx);
+            return;
+        };
+        if self.push_token_request.is_some() {
+            return;
+        }
+        let (no_params, no_specs) = (Params::new(), BTreeMap::new());
+        let built = self.build(&item, &self.values(&no_params, &no_specs));
+        match built {
+            Ok(Outgoing::Http(mut request, _)) => {
+                self.finish_request(cx, &mut request);
+                let id = self.next_request;
+                self.next_request += 1;
+                self.push_token_request = Some(id);
+                cx.http(id, request);
+            }
+            Ok(_) => cx.log(Level::Warning, "push websocket token: not an HTTP request"),
+            Err(e) => cx.log(
+                Level::Warning,
+                format!("push websocket token not asked for: {e}"),
+            ),
+        }
+    }
+
+    /// The answer to the push websocket's token request: the token, and
+    /// the websocket opened; or a refusal, or another try later. The answer
+    /// is never offered to the rules.
+    fn push_token_answered(&mut self, cx: &mut Cx, result: Result<HttpResponse, String>) {
+        self.push_token_request = None;
+        let path = match self.push.as_ref().and_then(|p| p.token.as_ref()) {
+            Some((_, path)) => path.clone(),
+            None => return,
+        };
+        let token = match &result {
+            Ok(r) if (200..300).contains(&r.status) => serde_json::from_slice::<Value>(&r.body)
+                .ok()
+                .and_then(|doc| match expect::json_path(&doc, &path) {
+                    Some(Value::String(t)) if !t.is_empty() => Some(t.clone()),
+                    _ => None,
+                }),
+            _ => None,
+        };
+        if let Some(token) = token {
+            self.push_token = Some(token);
+            self.open_push_socket(cx);
+            return;
+        }
+        if let (
+            Ok(r),
+            Transport::Http {
+                auth,
+                refusal,
+                refusal_body,
+                ..
+            },
+        ) = (&result, &self.transport)
+        {
+            if *auth != HttpAuth::None
+                && refused_by_status(refusal, refusal_body, r.status, &r.body)
+            {
+                self.refuse(
+                    cx,
+                    format!(
+                        "the device refused the credential on its websocket token request (HTTP {})",
+                        r.status
+                    ),
+                );
+                return;
+            }
+        }
+        let reason = match &result {
+            Ok(r) => format!("HTTP {}, no token in the answer", r.status),
+            Err(_) => "the request failed".to_string(),
+        };
+        cx.log(
+            Level::Info,
+            format!("push websocket token not obtained ({reason}); trying again"),
+        );
+        cx.set_timer(PUSH_RECONNECT, self.push_backoff);
+        self.push_backoff = (self.push_backoff * 2).min(RECONNECT_MAX);
+    }
+
+    fn open_push_socket(&mut self, cx: &mut Cx) {
         if !self.monitor {
             return;
         }
@@ -4325,15 +4637,81 @@ impl SpecEngine {
         if let Some(every) = self.push.as_ref().and_then(|p| p.every) {
             cx.set_timer(PUSH_RENEW, every);
         }
-        let empty = Params::new();
-        let empty_specs = BTreeMap::new();
-        let values = self.values(&empty, &empty_specs);
-        for item in items {
-            match item.as_str().map(|t| render(t, &values, no_escape)) {
-                Some(Ok(text)) => cx.ws_send(PUSH, format!("{prefix}{text}")),
-                Some(Err(e)) => cx.log(Level::Warning, format!("websocket message not sent: {e}")),
-                None => cx.log(Level::Warning, "a websocket message must be a string"),
+        // `{push.token}`: the token fetched for this opening, a string.
+        let mut empty = Params::new();
+        let mut empty_specs = BTreeMap::new();
+        if let Some(token) = &self.push_token {
+            empty.insert("push.token".into(), Value::String(token.clone()));
+            empty_specs.insert(
+                "push.token".to_string(),
+                serde_json::from_value::<ParamSpec>(serde_json::json!({"type": "string"}))
+                    .expect("a string parameter"),
+            );
+        }
+        let session_on = self.session_on();
+        let mut waits = false;
+        let mut sent = Vec::new();
+        {
+            let values = self.values(&empty, &empty_specs);
+            for item in items {
+                // A message naming the session goes only while the session
+                // is in use, once one is held; one marked `session: false`
+                // only while it is not (Pharos wants its token in each
+                // message when security is on, and none when it is off).
+                let template = match &item {
+                    Value::String(t) => Some(t.as_str()),
+                    Value::Object(o) => o.get("message").and_then(Value::as_str),
+                    _ => None,
+                };
+                let Some(template) = template else {
+                    cx.log(Level::Warning, "a websocket message must be a string");
+                    continue;
+                };
+                if item.get("session") == Some(&Value::Bool(false)) {
+                    if session_on {
+                        continue;
+                    }
+                } else if template.contains("{session.id") {
+                    if !session_on {
+                        continue;
+                    }
+                    if self.session_value.is_none() {
+                        waits = true;
+                        continue;
+                    }
+                }
+                match render(template, &values, no_escape) {
+                    Ok(text) => sent.push(format!("{prefix}{text}")),
+                    Err(e) => cx.log(Level::Warning, format!("websocket message not sent: {e}")),
+                }
             }
+        }
+        // No session yet: log in now, and send them all once it answers.
+        if !waits {
+            for text in sent {
+                cx.ws_send(PUSH, text);
+            }
+        } else {
+            self.push_waits_session = true;
+            let queued = self.queue.iter().any(|j| j.login)
+                || self.current.as_ref().is_some_and(|f| f.job.login);
+            if !queued {
+                let login = self.session.as_ref().map(|s| s.login.clone());
+                self.queue.push_back(Job {
+                    login: true,
+                    ..Job::internal(login, true)
+                });
+                self.pump(cx);
+            }
+        }
+    }
+
+    /// What precedes each push message: `42` and the namespace over
+    /// Socket.IO, nothing otherwise.
+    fn push_prefix(&self) -> String {
+        match self.push.as_ref().and_then(|p| p.socketio.as_ref()) {
+            Some(sio) => format!("42{}", sio.namespace),
+            None => String::new(),
         }
     }
 
@@ -4567,6 +4945,7 @@ impl Module for SpecEngine {
         cx.connection(Connection::Connecting);
         self.connect(cx);
         self.open_osc_listen(cx);
+        self.open_zmq(cx);
         self.open_push(cx);
         self.open_events(cx);
         self.validate_token(cx);
@@ -4598,7 +4977,11 @@ impl Module for SpecEngine {
         self.pump(cx);
     }
 
-    fn tcp(&mut self, cx: &mut Cx, _socket: Key, input: TcpInput) {
+    fn tcp(&mut self, cx: &mut Cx, socket: Key, input: TcpInput) {
+        if socket == zeromq::ZMQ_SUB || socket == zeromq::ZMQ_PUB {
+            self.zmq_input(cx, socket, input);
+            return;
+        }
         match input {
             TcpInput::Connected => self.opened(cx),
             TcpInput::Data(mut bytes) => {
@@ -4705,6 +5088,12 @@ impl Module for SpecEngine {
         id: RequestId,
         mut result: Result<HttpResponse, String>,
     ) {
+        if self.push_token_request == Some(id) {
+            if self.refused.is_none() {
+                self.push_token_answered(cx, result);
+            }
+            return;
+        }
         if self
             .oauth
             .as_ref()
@@ -4731,6 +5120,30 @@ impl Module for SpecEngine {
             self.current.as_ref().and_then(|f| f.awaiting.as_ref()),
             Some(Await::Http(r)) if *r == id
         );
+        // The cookies the device's own server sets (`transport.cookies`),
+        // and with `session.renew` a fresh session in any answer.
+        if ours
+            && self
+                .current
+                .as_ref()
+                .is_some_and(|f| f.route == Route::Main)
+        {
+            if let (Some(jar), Ok(response)) = (self.jar.as_mut(), &result) {
+                jar.take(response, cx.unix_millis());
+            }
+            let login = self.current.as_ref().is_some_and(|f| f.job.login);
+            if let (Some(session), Ok(response), false) = (&self.session, &result, login) {
+                if session.renew
+                    && self.session_token.is_some()
+                    && (200..300).contains(&response.status)
+                {
+                    if let Some(token) = session.captured(response) {
+                        self.session_value = Some(session.template_value(&token, response));
+                        self.session_token = Some(token);
+                    }
+                }
+            }
+        }
         // The login's answer holds the session: never offered to the rules.
         if ours && self.current.as_ref().is_some_and(|f| f.job.login) {
             self.request_paths.remove(&id);
@@ -4872,6 +5285,11 @@ impl Module for SpecEngine {
     }
 
     fn timer(&mut self, cx: &mut Cx, key: Key) {
+        match key {
+            zeromq::ZMQ_SUB_RETRY | zeromq::ZMQ_PUB_RETRY => return self.zmq_retry(cx, key),
+            zeromq::ZMQ_RENEW => return self.zmq_publish(cx),
+            _ => {}
+        }
         if self.refused.is_some() {
             return;
         }
@@ -5002,6 +5420,7 @@ impl Module for SpecEngine {
         if self.osc_listen.is_some() {
             cx.udp_close(OSC_LISTEN);
         }
+        self.close_zmq(cx);
     }
 
     fn sse(&mut self, cx: &mut Cx, stream: Key, input: SseInput) {
@@ -5045,11 +5464,20 @@ impl Module for SpecEngine {
             self.osc_listen = fresh.osc_listen;
             self.open_osc_listen(cx);
         }
+        // Other ZeroMQ ports, topics or messages: the bus is opened again.
+        if self.zmq.as_ref().map(|z| &z.spec) != fresh.zmq.as_ref().map(|z| &z.spec) {
+            self.close_zmq(cx);
+            self.zmq = fresh.zmq;
+            self.open_zmq(cx);
+        }
         // A session was opened with the old credential: the next request
         // logs in with the new one.
         self.session = fresh.session;
         self.session_token = None;
         self.session_value = None;
+        self.push_waits_session = false;
+        self.sign = fresh.sign;
+        self.aws = fresh.aws;
         if let (Some(push), Some(new)) = (self.push.as_mut(), fresh.push) {
             push.request = new.request;
             push.credentialed = new.credentialed;
@@ -5144,6 +5572,8 @@ fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack.windows(needle.len()).position(|w| w == needle)
 }
 
+#[cfg(test)]
+mod auth_tests;
 #[cfg(test)]
 mod pacing_tests;
 #[cfg(test)]
@@ -5852,9 +6282,18 @@ mod tests {
             "any"
         )
         .is_err());
-        // A JSON path needs the header to send it in.
-        assert!(SessionSpec::parse(
+        // Without a header, the string goes only where `{session.id}` is
+        // named (SPEC.md §2, Sessions); a scheme needs a header.
+        let alone = SessionSpec::parse(
             &json!({"login": {"method": "POST", "path": "/"}, "capture": {"json": "$.t"}}),
+            "any",
+        )
+        .unwrap();
+        let sent = alone.captured(&answer(r#"{"t":"x1"}"#)).unwrap();
+        assert_eq!(sent, (String::new(), "x1".to_string()));
+        assert_eq!(alone.value_of(&sent), "x1");
+        assert!(SessionSpec::parse(
+            &json!({"login": {"method": "POST", "path": "/"}, "capture": {"json": "$.t", "scheme": "Bearer"}}),
             "any"
         )
         .is_err());

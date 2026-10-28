@@ -36,10 +36,10 @@ V.append({"spec": KC, "command": "login", "file": "login.error", "input": {"user
                              "body": "grant_type=&username=nobody&password=x%26y&scope=&client_id=&client_secret="},
           "http_reply": {"status": 200, "body": '{"result":"error","error":{"code":"10002","info":"Username does not exist"}}'},
           "expect_result": {"error": {"error": "device_error"}}})
-V.append({"spec": KC, "command": "logout", "input": {}, "settings": {"token": "eyJ.abc.def"},
+V.append({"spec": KC, "command": "logout", "input": {},
           "expect_request": {"method": "POST", "target": _KCP + "/user/logout"},
           "http_reply": _KC_OK, "expect_result": _KC_ACK})
-_kc_get("renew_token", {}, "/user/token/get", settings={"token": "eyJ.abc.def"},
+_kc_get("renew_token", {}, "/user/token/get",
         http_reply=_kc_msg({"access_token": "eyJ.new.tok", "token_type": "bearer"}),
         expect_result={"ok": {"kind": "value", "value": "eyJ.new.tok"}})
 _kc_post("get_long_term_token", {"username": "username", "password": "password"}, "/user/token/permanent",
@@ -432,3 +432,16 @@ _kc_reread("reread-route-error", "/panel/output/input", {"id": 3, "output_id": 1
            body='{"result":"error","error":{"code":"10010","info":"Output is locked"}}')
 # Downloads saved to the host file named (never written by a vector).
 V.append({"spec": "kiloview-ndi-core", "command": "download_logs", "input": {"to": {"file": "logs.tar.gz"}}, "expect_request": {"method": "GET", "target": "/api/cube/v2/log/download"}})
+
+
+# The session: with a password, a command's first request is the login (a
+# form, as the login command sends it). Every other vector leaves the
+# password empty, so each command's own request is the one compared.
+V.append({"spec": KC, "command": "logout", "input": {}, "file": "logout-login",
+          "settings": {"username": "admin", "password": "admin"},
+          "expect_request": {"method": "POST", "target": "/api/cube/v2/user/login",
+                             "body": "grant_type=&username=admin&password=admin&scope=&client_id=&client_secret=",
+                             "content_type": "application/x-www-form-urlencoded"}})
+for _kc_v in V:
+    if _kc_v["spec"] == KC and _kc_v.get("file") != "logout-login":
+        _kc_v.setdefault("settings", {}).setdefault("password", "")

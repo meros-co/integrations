@@ -814,3 +814,11 @@ _kp3_tel("no-readback-on-read", "/api/record/v1/get_recording_status", {"result"
          {"recording": {"active": False}}, expect_then_send=[])
 # Downloads saved to the host file named (never written by a vector).
 V.append({"spec": "kiloview-p3", "command": "export_logs", "input": {"time": "old", "to": {"file": "logs.tgz"}}, "expect_request": {"method": "GET", "target": "/api/systemctrl/system_log/export/old"}})
+
+
+# With API authentication on: the session logs in first (the engine's
+# session tests cover the token in the Authorization header).
+V.append({"spec": "kiloview-p3", "command": "get_hostname", "input": {}, "file": "get_hostname-login",
+          "settings": {"password": "admin"},
+          "expect_request": {"method": "POST", "target": "/api/systemctrl/user/login",
+                             "body": '{"username":"admin","password":"admin"}', "content_type": "application/json"}})

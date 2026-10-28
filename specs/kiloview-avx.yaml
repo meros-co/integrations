@@ -32,23 +32,34 @@ transport:
   type: http
   port: 80
   scheme: http
-  # 1.1.1: the login issues a token "for interface authentication"; the
-  # document does not say how a request carries it. It is sent as
-  # "Authorization: Bearer <token>" while the token setting is set, as
-  # Kiloview's other HTTP APIs take theirs (see the quirks).
-  auth: bearer
   timeout_ms: 5000
-  # No probe: the document names no request that needs no token, and a
-  # refused probe would stop every request (the login among them) until the
-  # settings change.
+  # No probe: the document names no request that needs no token.
+  # 1.1.1: the login issues a token "for interface authentication"; the
+  # document does not say how a request carries it. The session logs in with
+  # the username and password settings and sends it as "Authorization:
+  # Bearer <token>", as Kiloview's other HTTP APIs take theirs, logging in
+  # again when a request is answered 401 (see the quirks).
+  session:
+    when_set: password
+    login: { method: POST, path: /v1/user/login, content_type: application/json,
+             body: '{"username":{settings.username:json},"password":{settings.password:json}}' }
+    capture: { json: $.data.token, header: Authorization, scheme: Bearer }
+    relogin: { status: [401] }
 
 settings:
-  token:
+  username:
+    type: string
+    default: admin
+    max_length: 64
+    label: User name
+    description: "The user the core logs in as; admin in the document's example."
+  password:
     type: string
     secret: true
     default: ""
-    label: Access token
-    description: "The token sent as a bearer token with every request: run login and store its result here with update_settings; empty sends none."
+    max_length: 128
+    label: Password
+    description: "That user's password; while it is empty nothing logs in, and requests go without a token."
 
 ports:
   - { port: 80, protocol: http, role: control, note: "the web server's HTTP port; the document gives no port, so the web console's default HTTP port is assumed" }
@@ -280,11 +291,11 @@ models:
 commands:
   # ── 1 User authentication ────────────────────────────────────────────
   login:
-    summary: Log in with a user name and password and return the token for the token setting (1.1.1)
+    summary: Log in as a user and return its token, beside the session the core keeps (1.1.1)
     params:
       username: { type: string, required: true, label: User name, description: "The user to log in as; admin on a new device in the document's example." }
       password: { type: string, required: true, secret: true, label: Password, description: "That user's password." }
-    send: { method: POST, path: /v1/user/login, content_type: application/json, body: '{"username":{username:json},"password":{password:json}}' }
+    send: { method: POST, path: /v1/user/login, content_type: application/json, session: false, body: '{"username":{username:json},"password":{password:json}}' }
     expect: { status: 200, code_path: "$.code", code_range: [200, 200], json_path: "$.data.token" }
     returns: value
   add_user:
@@ -1969,19 +1980,18 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      Authentication: login (1.1.1) answers a token in its JSON body
-      (data.token), which the core cannot capture into a session, so the
-      token is a setting: run login and store the result in the token
-      setting with update_settings. The document does not say how a request
-      carries the token; it is sent as "Authorization: Bearer <token>", as
-      Kiloview's other HTTP APIs take theirs. The document's example token
-      is a JWT valid for about an hour (its exp is 3660 seconds after its
-      nbf), after which the device presumably refuses it; a consumer logs in
-      again and sets the new token before then. A refused token (HTTP 401 or
-      403) stops all requests until the settings change, so open the device
-      for commands only (or with a valid token set) to log in. The
-      document's introduction mentions logout and session validation, but
-      it documents no such request.
+      Authentication: the core logs in with the username and password
+      settings (1.1.1), keeps the token the answer holds (data.token) and
+      sends it on every later request. The document does not say how a
+      request carries the token; it is sent as "Authorization: Bearer
+      <token>", as Kiloview's other HTTP APIs take theirs. The document's
+      example token is a JWT valid for about an hour (its exp is 3660
+      seconds after its nbf); a request answered HTTP 401 (taken to be an
+      expired or refused token) has the core log in again and send it once
+      more. A wrong password is answered with a code other than 200 and no
+      token, which fails what waits for the login. The document's
+      introduction mentions logout and session validation, but it
+      documents no such request.
   - models: [all]
     severity: critical
     text: >

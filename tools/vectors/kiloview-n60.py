@@ -608,3 +608,10 @@ for name, path, body, sends in [
 # A refused change is not read again.
 _tel("readback-refused", "/api/codec/preset/add", '{"result":"error","msg":"Invalid position"}', {},
      expect_then_send=[])
+
+# With a password, the session logs in first (the engine's session tests
+# cover the token in Authorization and in the Cookie and App headers).
+V.append({"spec": "kiloview-n60", "command": "check_session", "input": {}, "file": "check_session-login",
+          "settings": {"password": "Admin123"},
+          "expect_request": {"method": "POST", "target": "/api/systemctrl/users/login",
+                             "body": '{"username":"admin","password":"Admin123"}', "content_type": "application/json"}})

@@ -165,6 +165,11 @@ def save_checks(command: dict, params: dict, where: str, transport_type) -> list
     return errors
 
 
+# The names `transport.session.capture.values` declares in the spec being
+# checked, each a `{session.<name>}` (set by cross_field_checks).
+SESSION_VALUES: set[str] = set()
+
+
 def check_template(
     context: str,
     text: str,
@@ -182,9 +187,10 @@ def check_template(
         name, raw_directives = match.group(1), match.group(2)
         directives = [d for d in raw_directives.split(":") if d]
 
-        if name == "session.id":
-            # The session held (`transport.session`), a string; whether the
-            # spec has one is session_checks'.
+        if name == "session.id" or name[len("session."):] in SESSION_VALUES and name.startswith("session."):
+            # The session held (`transport.session`), a string, or a string
+            # its capture's `values` names; whether the spec has one is
+            # session_checks'.
             decl = {"type": "string"}
             always_present = True
         elif name.startswith("settings."):
@@ -369,6 +375,10 @@ EXTENSION_COMMANDS = {
 
 def cross_field_checks(doc: dict, path: str) -> list[str]:
     """Rules the schema cannot express on its own."""
+    # `{session.<name>}`: the names the session's capture gives values.
+    SESSION_VALUES.clear()
+    capture = ((doc.get("transport") or {}).get("session") or {}).get("capture") or {}
+    SESSION_VALUES.update((capture.get("values") or {}).keys())
     errors: list[str] = []
     commands: dict = doc.get("commands") or {}
     settings: dict = doc.get("settings") or {}
@@ -506,14 +516,23 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                                      f"commands.{name}.expect")
 
     transport = doc.get("transport") or {}
-    websocket = (doc.get("telemetry") or {}).get("websocket")
+    # `telemetry.websocket`: one block, or a list of blocks each for its models.
+    ws_value = (doc.get("telemetry") or {}).get("websocket")
+    ws_blocks = ws_value if isinstance(ws_value, list) else [ws_value] if ws_value else []
+    model_ids = {m.get("id") for m in doc.get("models") or []}
+    for i, block in enumerate(ws_blocks if isinstance(ws_value, list) else []):
+        for m in block.get("models") or []:
+            if m not in model_ids:
+                errors.append(f"telemetry.websocket[{i}].models names unknown model '{m}'")
+    if not isinstance(ws_value, list) and ws_value and "models" in ws_value:
+        errors.append("telemetry.websocket.models is for a list of websockets")
     schemes = [("transport", transport.get("scheme"),
                 {"ws", "wss"} if transport_type == "ws"
                 else {"tcp", "tls"} if transport_type == "line-tcp" else {"http", "https"})]
-    if websocket:
+    for websocket in ws_blocks:
         schemes.append(("telemetry.websocket", websocket.get("scheme"), {"ws", "wss"}))
-    for where_, block in (("telemetry.websocket", websocket or {}),
-                          ("telemetry.sse", (doc.get("telemetry") or {}).get("sse") or {})):
+    for where_, block in [("telemetry.websocket", b) for b in ws_blocks] + [
+            ("telemetry.sse", (doc.get("telemetry") or {}).get("sse") or {})]:
         reply = block.get("as_reply")
         if reply is None:
             continue
@@ -539,12 +558,12 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
     # accept_invalid_certs only means something over TLS.
     for where_, obj, default in [
             ("transport", transport, "ws" if transport_type == "ws"
-             else "tcp" if transport_type == "line-tcp" else "http"),
-            ("telemetry.websocket", websocket or {}, "ws")]:
+             else "tcp" if transport_type == "line-tcp" else "http")] + [
+            ("telemetry.websocket", b, "ws") for b in ws_blocks]:
         scheme = obj.get("scheme", default)
         if obj.get("accept_invalid_certs") is True and scheme in ("ws", "http", "tcp"):
             errors.append(f"{where_}.accept_invalid_certs needs a TLS scheme (wss, https, tls or a setting)")
-    if websocket:
+    for websocket in ws_blocks:
         url = websocket.get("url")
         if url is not None:
             errors += check_template("text", url, {}, settings, "telemetry.websocket.url")
@@ -563,9 +582,28 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                 errors.append(f"telemetry.websocket.port names unknown setting '{port.get('setting')}'")
             elif decl.get("type") != "int":
                 errors.append("telemetry.websocket.port's setting must be an int")
+        # `token`: fetched over the transport before each opening, for
+        # `{push.token}` in the messages.
+        token = websocket.get("token")
+        message_params = {}
+        if token is not None:
+            if transport_type != "http":
+                errors.append("telemetry.websocket.token is fetched over an http transport")
+            if not str(token.get("json", "")).startswith("$"):
+                errors.append("telemetry.websocket.token.json is a JSON path")
+            for context, text in template_strings(token.get("request") or {}):
+                errors += check_template(context, text, {}, settings, "telemetry.websocket.token.request")
+            message_params = {"push.token": {"type": "string", "required": True}}
         for i, text in enumerate(websocket.get("send", []) if isinstance(websocket.get("send"), list)
                                  else [websocket.get("send")] if websocket.get("send") else []):
-            errors += check_template("text", text, {}, settings, f"telemetry.websocket.send[{i}]")
+            # {message, session: false}: sent only while the session is not in use.
+            if isinstance(text, dict):
+                if "{session.id" in text.get("message", ""):
+                    errors.append(f"telemetry.websocket.send[{i}]: a message sent without the session cannot name it")
+                if not (transport.get("session") or {}):
+                    errors.append(f"telemetry.websocket.send[{i}]: session: false needs transport.session")
+                text = text.get("message", "")
+            errors += check_template("text", text, message_params, settings, f"telemetry.websocket.send[{i}]")
     auth = transport.get("auth")
     methods = set() if isinstance(auth, dict) else {auth}
     if isinstance(auth, dict):
@@ -576,8 +614,8 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         if decl is None:
             errors.append(f"transport.auth names unknown setting '{auth.get('setting')}'")
             methods = set()
-        elif decl.get("type") != "enum" or set(decl.get("values", [])) - {"none", "basic", "digest", "bearer", "header", "oauth2"}:
-            errors.append("transport.auth's setting must be an enum of none, basic, digest, bearer, header and oauth2")
+        elif decl.get("type") != "enum" or set(decl.get("values", [])) - {"none", "basic", "digest", "bearer", "header", "oauth2", "wsse", "aws-sigv4"}:
+            errors.append("transport.auth's setting must be an enum of none, basic, digest, bearer, header, oauth2, wsse and aws-sigv4")
             methods = set()
         else:
             methods = set(decl.get("values", []))
@@ -612,6 +650,20 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                 re.compile(pattern)
             except re.error as e:
                 errors.append(f"telemetry.updates[{i}].arg_match.{index} does not compile: {e}")
+    zmq = (doc.get("telemetry") or {}).get("zeromq")
+    if zmq is not None:
+        if doc.get("implementation") == "native":
+            errors.append("telemetry.zeromq is for spec-driven devices")
+        for role in ("subscribe", "publish"):
+            port = (zmq.get(role) or {}).get("port")
+            if isinstance(port, dict) and port.get("setting") not in settings:
+                errors.append(f"telemetry.zeromq.{role}.port names unknown setting '{port.get('setting')}'")
+        for i, topic in enumerate((zmq.get("subscribe") or {}).get("topics") or []):
+            errors += check_template("text", topic, {}, settings, f"telemetry.zeromq.subscribe.topics[{i}]")
+        for i, message in enumerate((zmq.get("publish") or {}).get("send") or []):
+            for j, frame in enumerate(message if isinstance(message, list) else []):
+                errors += check_template("text", frame, {}, settings,
+                                         f"telemetry.zeromq.publish.send[{i}][{j}]")
     sse_ = (doc.get("telemetry") or {}).get("sse") or {}
     if "body" in sse_:
         errors += check_template("text", sse_["body"], {}, settings, "telemetry.sse.body")
@@ -663,12 +715,14 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         errors += check_template("text", text, {}, settings, f"transport.headers.{name}")
     if ("header" in methods) != bool(transport.get("auth_header")):
         errors.append("auth: header and auth_header go together")
-    sio = (websocket or {}).get("socketio")
-    if isinstance(sio, dict) and sio.get("auth"):
-        errors += check_template("text", sio["auth"], {}, settings, "telemetry.websocket.socketio.auth")
-    for method in sorted(methods & {"basic", "digest"}):
+    for websocket in ws_blocks:
+        sio = websocket.get("socketio")
+        if isinstance(sio, dict) and sio.get("auth"):
+            errors += check_template("text", sio["auth"], {}, settings, "telemetry.websocket.socketio.auth")
+    for method in sorted(methods & {"basic", "digest", "wsse"}):
         if not {"username", "password"} <= settings.keys():
             errors.append(f"auth: {method} needs 'username' and 'password' settings")
+    errors += request_credential_checks(doc, methods)
     # OAuth 2: the consumer's tokens as settings, refreshed by the core.
     if "oauth2" in methods:
         if not isinstance(transport.get("oauth"), dict):
@@ -730,6 +784,81 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
     errors += per_model_checks(doc, model_ids)
     errors += session_checks(doc)
     errors += endpoint_checks(doc)
+    return errors
+
+
+def request_credential_checks(doc: dict, methods: set) -> list[str]:
+    """Credentials computed for each request (SPEC.md §2): `transport.sign`,
+    `auth: aws-sigv4` with `transport.aws`, and `transport.cookies`."""
+    errors: list[str] = []
+    transport = doc.get("transport") or {}
+    settings = doc.get("settings") or {}
+    is_http = transport.get("type") == "http"
+    if "cookies" in transport and not is_http:
+        errors.append("transport.cookies is for the http transport")
+    sign = transport.get("sign")
+    if sign is not None:
+        if not is_http:
+            errors.append("transport.sign is for the http transport")
+        if "when_set" in sign and sign["when_set"] not in settings:
+            errors.append(f"transport.sign.when_set names unknown setting '{sign['when_set']}'")
+        names = {n: {"type": "string", "required": True}
+                 for n in ("request.method", "request.path", "request.query", "request.body")}
+        for name, expr in (sign.get("values") or {}).items():
+            where = f"transport.sign.values.{name}"
+            kinds = [k for k in ("unix_time", "random", "text", "md5", "sha1", "sha256", "hmac_sha256") if k in expr]
+            if len(kinds) != 1:
+                errors.append(f"{where}: one of unix_time, random, text, md5, sha1, sha256 or hmac_sha256")
+            for key in ("text", "md5", "sha1", "sha256", "hmac_sha256", "key"):
+                if key in expr:
+                    if "{session.id" in expr[key]:
+                        errors.append(f"{where}: the session is not a sign value")
+                    errors += check_template("text", expr[key], names, settings, f"{where}.{key}")
+            if ("key" in expr) != ("hmac_sha256" in expr):
+                errors.append(f"{where}: key goes with hmac_sha256")
+            if "remove" in expr:
+                if "text" not in expr:
+                    errors.append(f"{where}: remove goes with text")
+                try:
+                    re.compile(expr["remove"])
+                except re.error as e:
+                    errors.append(f"{where}.remove does not compile: {e}")
+            if "encoding" in expr and not set(kinds) & {"md5", "sha1", "sha256", "hmac_sha256"}:
+                errors.append(f"{where}: encoding is a digest's")
+            random = expr.get("random")
+            if isinstance(random, dict) and random.get("max", 0) < random.get("min", 0):
+                errors.append(f"{where}: random max is below min")
+            names[name] = {"type": "string", "required": True}
+        for key in ("headers", "query"):
+            for name, text in (sign.get(key) or {}).items():
+                errors += check_template("text", text, names, settings, f"transport.sign.{key}.{name}")
+        for name in sign.get("headers") or {}:
+            if name.lower() in ("authorization", "content-type", "host"):
+                errors.append(f"transport.sign.headers: '{name}' is set by the core")
+        if not (sign.get("headers") or sign.get("query")):
+            errors.append("transport.sign sends nothing: give headers or query")
+    if "aws-sigv4" in methods:
+        aws = transport.get("aws")
+        if not isinstance(aws, dict):
+            errors.append("auth: aws-sigv4 needs transport.aws with service and region")
+        else:
+            region = aws.get("region")
+            if isinstance(region, dict):
+                decl = settings.get(region.get("setting"))
+                if decl is None or decl.get("type") != "string":
+                    errors.append(f"transport.aws.region names '{region.get('setting')}', which is not a string setting")
+        for name, secret in (("access_key_id", False), ("secret_access_key", True), ("session_token", True)):
+            decl = settings.get(name)
+            if decl is None:
+                errors.append(f"auth: aws-sigv4 needs a '{name}' setting")
+            elif decl.get("type") != "string":
+                errors.append(f"auth: aws-sigv4's '{name}' setting is a string")
+            elif secret and decl.get("secret") is not True:
+                errors.append(f"auth: aws-sigv4's '{name}' setting is secret: true")
+        if (settings.get("session_token") or {}).get("required"):
+            errors.append("auth: aws-sigv4's 'session_token' is not required: long-term keys have none")
+    elif "aws" in transport:
+        errors.append("transport.aws is for auth: aws-sigv4")
     return errors
 
 
@@ -863,8 +992,15 @@ def session_checks(doc: dict) -> list[str]:
                     re.compile(pattern)
                 except re.error as e:
                     errors.append(f"transport.session.{key}.json: {e}")
-    if session is None and "{session.id" in json.dumps({k: doc.get(k) for k in ("commands", "telemetry", "on_connect")}):
+    named = json.dumps({k: doc.get(k) for k in ("commands", "telemetry", "on_connect")}
+                       | {"headers": transport.get("headers")})
+    if session is None and "{session.id" in named:
         errors.append("{session.id} names the session, which needs transport.session")
+    capture = (session or {}).get("capture") or {}
+    if "json" in capture and "header" not in capture and "{session.id" not in named:
+        errors.append("transport.session.capture without a header sends the session only where {session.id} is named, and nothing names it")
+    if "renew" in (session or {}) and not isinstance(session["renew"], bool):
+        errors.append("transport.session.renew is true or false")
     # `scheme: tls` on line-tcp, and `tls_port` (SPEC.md §2, TLS).
     if "scheme" in transport and transport.get("type") not in ("http", "ws", "line-tcp"):
         errors.append(f"transport.scheme is not for {transport.get('type')}")
@@ -921,7 +1057,7 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
     # A native extension that offers JSON messages of its own (the NMOS Query
     # API's subscriptions) feeds json_match rules too.
     has_json = (transport_type in ("ws", "line-tcp", "line-serial", "line-udp")
-                or "websocket" in telemetry or "sse" in telemetry
+                or "websocket" in telemetry or "sse" in telemetry or "zeromq" in telemetry
                 or doc.get("extension") in ("nmos-query-websocket",))
     if "sse" in telemetry and transport_type != "http":
         errors.append("telemetry.sse needs an http transport")
@@ -1137,6 +1273,17 @@ def port_checks(doc: dict) -> list[str]:
             errors.append(f"ports: no core-listener udp entry for telemetry.osc.listen_port {osc_listen}")
         if ("websocket" in tel or "sse" in tel) and not any(e["role"] == "push" for e in ports):
             errors.append("ports: the push channel has no push entry")
+        # The ZeroMQ bus: a tcp push entry for each socket, at its port or
+        # naming its setting.
+        for role, block in ((tel.get("zeromq") or {}).items()):
+            port = (block or {}).get("port") if isinstance(block, dict) else None
+            if port is None:
+                continue
+            setting = port.get("setting") if isinstance(port, dict) else None
+            if not any(e["role"] == "push" and e["protocol"] == "tcp"
+                       and (e.get("setting") == setting if setting else e["port"] == port)
+                       for e in ports):
+                errors.append(f"ports: no tcp push entry for telemetry.zeromq.{role}'s port")
     return errors
 
 

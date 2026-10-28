@@ -72,11 +72,33 @@ transport:
   timeout_ms: 10000
   # The system status: small, and served while the service runs.
   probe: { method: GET, path: /api/system_status.json }
+  # User authentication (configure --config-auth): each request carries
+  # X-Auth-User, X-Auth-Expires (30 seconds ahead) and X-Auth-Key,
+  # md5(api_key + md5(url + user + api_key + expires)), the url being the
+  # request's path without the /api prefix (and any version after it) and
+  # without the query.
+  sign:
+    when_set: api_key
+    values:
+      expires: { unix_time: 30 }
+      url: { text: "{request.path}", remove: "^/api(?:/v[0-9][^/]*)?" }
+      inner: { md5: "{url}{settings.username}{settings.api_key}{expires}" }
+      key: { md5: "{settings.api_key}{inner}" }
+    headers:
+      X-Auth-User: "{settings.username}"
+      X-Auth-Expires: "{expires}"
+      X-Auth-Key: "{key}"
 
 settings:
   scheme: { type: enum, values: [https, http], default: https,
             label: Connection,
             description: "https, as the API guide documents the REST interface, or http where the encoder's web server serves it unencrypted." }
+  username: { type: string, default: "", max_length: 128,
+              label: User name,
+              description: "The encoder user whose API key is set, sent as X-Auth-User when user authentication is on." }
+  api_key: { type: string, secret: true, default: "", max_length: 256,
+             label: API key,
+             description: "That user's API key (Settings > User Profile, Reset API Key); leave it empty while user authentication is off, and no X-Auth headers are sent." }
 
 ports:
   - { port: 443, protocol: https, role: control, when: "scheme https", note: "the encoder's web server, REST interface under /api" }
@@ -88,8 +110,8 @@ models:
     supports: [list_live_events, list_live_events_filtered, get_live_event, get_live_event_clean, get_live_event_status, create_live_event, create_live_event_from_profile, update_live_event, update_live_event_restart, update_live_event_restart_at_input, update_live_event_restart_at_input_label, delete_live_event, get_live_event_priority, set_live_event_priority, start_live_event, stop_live_event, cancel_live_event, archive_live_event, reset_live_event, mute_audio, unmute_audio, reset_video_buffer_stats, start_live_event_at_input, start_live_event_at_input_label, set_audio_gain, rollover_output, pause_output, unpause_output, stop_output, start_output, pause_output_group, pause_output_group_by_name, unpause_output_group, unpause_output_group_by_name, stop_output_group, stop_output_group_by_name, start_output_group, start_output_group_by_name, send_stream_metadata, send_amf_metadata, update_timing, insert_avail, insert_avail_at, return_from_avail, cancel_avail, get_stream_time, insert_time_signal, insert_time_signal_at, image_inserter, motion_image_inserter, activate_input, activate_input_by_label, activate_input_at, prepare_input, prepare_input_custom, set_playlist, list_live_event_inputs, get_live_event_input, add_live_event_input, update_live_event_input, delete_live_event_input, update_live_event_input_by_label, delete_live_event_input_by_label, list_live_event_outputs, insert_timed_metadata, insert_private_metadata, insert_bulk_metadata, set_avail_image, set_avail_image_custom, set_blackout_image, list_cut_lists, get_cut_list, list_live_event_profiles, get_live_event_profile, create_live_event_profile, update_live_event_profile, delete_live_event_profile, list_schedules, get_schedule, create_schedule, update_schedule, delete_schedule, list_presets, get_preset, create_preset, update_preset, delete_preset, list_preset_categories, get_preset_category, create_preset_category, update_preset_category, delete_preset_category, list_mpts, get_mpts, create_mpts, update_mpts, delete_mpts, start_mpts, stop_mpts, get_mpts_statuses, get_mpts_status, get_mpts_stats, list_mpts_members, get_mpts_member, add_mpts_member, update_mpts_member, remove_mpts_member, get_settings, get_settings_cluster, get_network_settings, get_mount_points_settings, get_firewall_settings, get_snmp_settings, get_authentication_settings, get_advanced_settings, update_advanced_settings, stop_service, start_service, list_alerts, list_all_alerts, list_messages, list_messages_filtered, list_devices, get_device, rename_device, preview_device, get_system_status, list_routers, get_router, create_router, update_router, delete_router, list_router_inputs, get_router_input, create_router_input, update_router_input, delete_router_input, list_router_outputs, get_router_output, create_router_output, update_router_output, delete_router_output]
     verification: none
     notes: >
-      An encoder with user authentication turned on cannot be reached:
-      its per-request key depends on the time (see quirks).
+      An encoder with user authentication turned on is reached with the
+      username and api_key settings (see quirks).
 
 commands:
   list_live_events:
@@ -1307,12 +1329,17 @@ quirks:
     severity: warning
     text: >
       User authentication (off unless turned on with configure
-      --config-auth) is not supported: each request must carry an
-      X-Auth-Key computed from the request's path and a Unix time about 30
-      seconds ahead (md5(api_key + md5(path + user + api_key + expires))),
-      which the spec format cannot express, so an encoder with it on answers
-      every request 401 and every command fails. Encoders with it off take
-      every command.
+      --config-auth): with the api_key setting set, each request carries
+      X-Auth-User (the username setting), X-Auth-Expires (the Unix time 30
+      seconds ahead, as AWS recommends) and X-Auth-Key, md5(api_key +
+      md5(url + user + api_key + expires)), worked out as the request goes.
+      The url is the request's path without its query and without /api (and
+      an API version after it, which this spec's paths do not use); AWS's
+      hashing page says "minus any query parameters and without any API
+      version prefix", and reading /api as that prefix is inferred. The
+      encoder's clock must be within the 30 seconds of the host's (both on
+      NTP), or every request is answered 401. With the api_key empty no X-Auth
+      header is sent, as an encoder with authentication off expects.
 
   - models: [all]
     severity: info

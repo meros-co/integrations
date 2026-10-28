@@ -104,3 +104,10 @@ telemetry(OL, "theme-name", inbound_http={"path": "/api/v2/controller/theme", "b
 telemetry(OL, "system", inbound_http={"path": "/api/v2/core/system", "body": json.dumps(
     {"login_required": True, "websocket_port": 4317, "api_version": 2, "api_revision": 4})},
     expect_state={"system": {"login_required": True, "websocket_port": 4317, "api_version": 2, "api_revision": 4}})
+
+# With a password, the session logs in first (the engine's session tests
+# cover the token in Authorization).
+V.append({"spec": "openlp", "command": "list_plugins", "input": {}, "file": "list_plugins-login",
+          "settings": {"password": "secret"},
+          "expect_request": {"method": "POST", "target": "/api/v2/core/login",
+                             "body": '{"username":"openlp","password":"secret"}', "content_type": "application/json"}})

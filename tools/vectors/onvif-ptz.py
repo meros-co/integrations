@@ -254,3 +254,29 @@ _ov_tel("current-imaging-preset", "timg",
         '<timg:GetCurrentPresetResponse><timg:Preset token="Preset_2" type="Outdoor"><tt:Name>Outdoor</tt:Name>'
         "</timg:Preset></timg:GetCurrentPresetResponse>",
         {"imaging_preset": "Preset_2"})
+
+# auth wsse (OASIS Username Token Profile 1.0, ONVIF Core 5.9.1): the
+# envelope gets a header with a UsernameToken. The vector runner's clock reads
+# the Unix epoch and its random bytes count from 0, so the nonce is bytes 0 to
+# 15 and the digest is worked out here independently.
+import base64 as _ov_b64
+import hashlib as _ov_hashlib
+
+_OV_NONCE = bytes(range(16))
+_OV_CREATED = "1970-01-01T00:00:00Z"
+_OV_DIGEST = _ov_b64.b64encode(_ov_hashlib.sha1(_OV_NONCE + _OV_CREATED.encode() + b"pa<ss").digest()).decode()
+_OV_SECURITY = (
+    '<s:Header><wsse:Security s:mustUnderstand="1" '
+    'xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd" '
+    'xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">'
+    '<wsse:UsernameToken><wsse:Username>admin</wsse:Username>'
+    '<wsse:Password Type="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0'
+    f'#PasswordDigest">{_OV_DIGEST}</wsse:Password>'
+    '<wsse:Nonce EncodingType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0'
+    f'#Base64Binary">{_ov_b64.b64encode(_OV_NONCE).decode()}</wsse:Nonce>'
+    f'<wsu:Created>{_OV_CREATED}</wsu:Created></wsse:UsernameToken></wsse:Security></s:Header>')
+V.append({"spec": OV, "command": "get_device_information", "input": {}, "file": "get_device_information-wsse",
+          "settings": {**OV_SET, "auth": "wsse", "username": "admin", "password": "pa<ss"},
+          "expect_request": {"method": "POST", "target": OV_PATH["tds"], "content_type": SOAP,
+                             "body": _ov_env("tds", "<tds:GetDeviceInformation/>").replace(
+                                 "<s:Body>", _OV_SECURITY + "<s:Body>")}})

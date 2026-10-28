@@ -62,14 +62,14 @@ settings:
     default: admin
     max_length: 64
     label: User name
-    description: "The user the token belongs to, sent with it in the app header; admin by default."
-  token:
+    description: "The account the core logs in as, sent with its token in the app header; admin by default."
+  password:
     type: string
     secret: true
-    default: ""
-    max_length: 256
-    label: Token
-    description: "The token the login command returns for that user; every request carries it in the app header (with an empty token until it is set, which only the login accepts)."
+    default: admin
+    max_length: 64
+    label: Password
+    description: "That account's password, admin until it is changed; while it is empty nothing logs in, and only the login is accepted."
 
 ports:
   - { port: 80, protocol: http, role: control, when: "scheme http" }
@@ -84,11 +84,19 @@ transport:
   auth: none
   timeout_ms: 5000
   # Sections 2-3: every request carries the header app, a JSON object with
-  # the user name and the login's token (empty until the token setting is
-  # filled; only the login works then).
+  # the user name and the login's token. The session logs in with the
+  # username and password settings, and again when a request is answered
+  # with code 2 (authentication error, section 4).
   headers:
-    app: '{"username":{settings.username:json},"token":{settings.token:json}}'
+    app: '{"username":{settings.username:json},"token":{session.id:json}}'
   probe: { method: GET, path: /api/info/get }
+  session:
+    when_set: password
+    login: { method: POST, path: /api/users/login, content_type: application/json,
+             body: '{"username":{settings.username:json},"password":{settings.password:json}}' }
+    capture: { json: $.data.token }
+    relogin: { json: { "$.result": "^error$", "$.msg": "^2$" } }
+    refused: { json: { "$.result": "^error$", "$.msg": "^(300|301|302)$" } }
 
 maps:
   dhcp: { "true": "y", "false": "n" }
@@ -235,17 +243,17 @@ models:
 commands:
   # --- Users (section 6) ---
   login:
-    summary: "Log in and return the token for the token setting (POST /api/users/login)"
+    summary: "Log in as an account and return its token, beside the session the core keeps (POST /api/users/login)"
     params:
       username: { type: string, default: admin, max_length: 64, label: User name, description: "The account to log in as; admin by default." }
       password: { type: string, secret: true, required: true, max_length: 64, label: Password, description: "That account's password; admin until it is changed." }
-    send: { method: POST, path: /api/users/login, content_type: application/json,
+    send: { method: POST, path: /api/users/login, content_type: application/json, session: false,
             body: '{"username":{username:json},"password":{password:json}}' }
     expect: { status: 200, json_path: "$.data.token" }
     returns: value
   logout:
-    summary: "End the token setting's login (POST /api/users/logout)"
-    send: { method: POST, path: /api/users/logout, content_type: application/json, body: '{"token":{settings.token:json}}' }
+    summary: "End the core's session; the next request logs in again (POST /api/users/logout)"
+    send: { method: POST, path: /api/users/logout, content_type: application/json, body: '{"token":{session.id:json}}' }
     expect: &ok { status: 200, json_equals: { "$.result": "ok" } }
     returns: ack
   list_users:
@@ -2028,16 +2036,16 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      Authentication: the login (POST /api/users/login with username and
-      password, admin / admin until changed) answers the token in its JSON
-      body, and every other request must carry the header app holding the
-      JSON object {"username": ..., "token": ...}. The core cannot take a
-      token from a login's body, so the consumer runs the login command,
-      puts the token it returns into the token setting with update_settings
-      (and username if not admin), and the core then sends the header on
-      every request. The document says a token can expire without giving its
-      lifetime or how an expired token is answered; the consumer logs in
-      again when commands start failing with an authentication error.
+      Authentication: the core logs in with the username and password
+      settings (POST /api/users/login; admin / admin until changed), keeps
+      the token the answer holds, and sends the header app holding the JSON
+      object {"username": ..., "token": ...} on every other request. The
+      document says a token can expire without giving its lifetime or how
+      an expired token is answered; a request answered with code 2
+      (authentication error) has the core log in again and send it once
+      more. A login answered with code 300, 301 or 302 is the terminal
+      refusal of the credential. logout ends the core's own session, so the
+      next request logs in again.
   - models: [all]
     severity: info
     text: >

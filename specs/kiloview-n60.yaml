@@ -75,17 +75,22 @@ transport:
   scheme: { setting: scheme }
   # The web server's certificate is the device's own.
   accept_invalid_certs: true
-  # Requests carry the login token once the consumer has put it in the token
-  # setting (see quirks). Without one, Authorization is left out and the
-  # Cookie and App headers carry an empty token, as the Companion module
-  # sends them with its authentication off.
-  auth: header
-  auth_header: Authorization
+  # Requests carry the login token once the session has logged in with the
+  # username and password settings (see quirks): as Authorization, and in
+  # the Cookie and App headers. Without a password nothing logs in and the
+  # three are left out.
   headers:
-    Cookie: "language=en; user={settings.username}; token={settings.token}"
-    App: '{"user":{settings.username:json},"token":{settings.token:json},"language":"en"}'
+    Cookie: "language=en; user={settings.username}; token={session.id}"
+    App: '{"user":{settings.username:json},"token":{session.id:json},"language":"en"}'
   timeout_ms: 5000
   probe: { method: GET, path: /api/codec/mode/get }
+  session:
+    when_set: password
+    login: { method: POST, path: /api/systemctrl/users/login, content_type: application/json,
+             body: '{"username":{settings.username:json},"password":{settings.password:json}}' }
+    capture: { json: $.data.token, header: Authorization }
+    relogin: { status: [401, 403] }
+    refused: { json: { "$.result": "^error$" } }
 
 settings:
   scheme:
@@ -100,15 +105,14 @@ settings:
     max_length: 64
     pattern: '^[^;,\s"\\]+$'
     label: User name
-    description: "The user whose login token is in the token setting, sent beside it in the Cookie and App headers."
-  token:
+    description: "The user the core logs in as, sent beside its token in the Cookie and App headers."
+  password:
     type: string
     secret: true
     default: ""
     max_length: 128
-    pattern: '^[^;,\s"\\]*$'
-    label: Login token
-    description: "The token the login command returns for the user name above, sent as the Authorization header and in the Cookie and App headers; empty sends no Authorization header and an empty token in the others."
+    label: Password
+    description: "That user's password; while it is empty nothing logs in, and requests carry no token."
 
 ports:
   - { port: 80, protocol: http, role: control, note: "the web interface's port, changeable with set_web_protocols", when: "scheme http" }
@@ -160,16 +164,16 @@ maps:
 commands:
   # ── 1.1 Users and login ────────────────────────────────────────────────
   login:
-    summary: "Log in and return the token to put in the token setting; the document's web login then builds a cookie of user, alias and token from it (POST /api/systemctrl/users/login)"
+    summary: "Log in as a user and return its token, beside the session the core keeps; the document's web login then builds a cookie of user, alias and token from it (POST /api/systemctrl/users/login)"
     params:
       username: { type: string, required: true, max_length: 64, label: User name, description: "The user to log in as, such as admin." }
       password: { type: string, required: true, secret: true, max_length: 128, label: Password, description: "The user's password." }
-    send: { method: POST, path: /api/systemctrl/users/login, content_type: application/json,
+    send: { method: POST, path: /api/systemctrl/users/login, content_type: application/json, session: false,
             body: '{"username":{username:json},"password":{password:json}}' }
     expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.token" }
     returns: value
   check_session:
-    summary: "Check that the configured token is a valid login session (GET /api/systemctrl/users/session)"
+    summary: "Check that the session's token is still valid (GET /api/systemctrl/users/session)"
     send: { method: GET, path: /api/systemctrl/users/session }
     expect: &ok { status: 200, json_equals: { "$.result": "ok" } }
     returns: ack
@@ -1785,19 +1789,19 @@ quirks:
       builds from the user name, alias and token, checked by the session
       endpoint (1.1.2); the Companion module sends the same token as the
       Authorization header, as it is, beside an App header of user, token and
-      language. The core cannot take a token from a login's body, so the
-      consumer runs the login command (user name and password as parameters)
-      and puts the token it returns in the token setting with
-      update_settings; every request then carries it as Authorization, in a
-      Cookie of language, user and token, and in the App header, and
-      check_session tells whether it is still valid. With the token empty no
-      Authorization header is sent, and the Cookie and App headers carry an
-      empty token, as the Companion module sends them with its authentication
-      off. Neither document says which endpoints need a token, how
-      long it lasts, whether a reboot ends it, or how the device refuses a
-      missing or stale one (the Companion module logs in again when a reply
-      holds result error or code 401); an HTTP 401 or 403 is taken as the
-      terminal refusal, after which a new token is needed.
+      language. With the password setting set, the core logs in with the
+      username and password settings, keeps the token the answer holds
+      (data.token), and sends it on every later request as Authorization, in
+      a Cookie of language, user and token, and in the App header;
+      check_session tells whether it is still valid. With the password empty
+      nothing logs in and the three headers are left out (the Companion
+      module sends Cookie and App with an empty token instead). Neither
+      document says which endpoints need a token, how long it lasts,
+      whether a reboot ends it, or how the device refuses a missing or
+      stale one (the Companion module logs in again when a reply holds
+      result error or code 401); an HTTP 401 or 403 has the core log in
+      again and send the request once more. A login answered with result
+      error is the terminal refusal of the credential.
 
   - models: [all]
     severity: info

@@ -1091,3 +1091,13 @@ _ka_reread("reread-serial", "/v1/test/set_serial_number", {"serial_number": "S"}
            body='{"code":200,"message":"ok","data":{"code":1,"message":"string"}}')
 # Downloads saved to the host file named (never written by a vector).
 V.append({"spec": "kiloview-avx", "command": "download_alarm_export", "input": {"file_path": "alarm_export_1.xlsx", "to": {"file": "alarms.xlsx"}}, "expect_request": {"method": "POST", "target": "/v1/alarm/file/download", "body": "{\"file_path\":\"alarm_export_1.xlsx\"}", "content_type": "application/json"}})
+
+
+# The session: with a password, a command's first request is the login, its
+# token then sent as a bearer token (the engine's session tests cover the
+# header and the login again on 401). The other vectors leave the password
+# empty, so each command's own request is the one compared.
+V.append({"spec": _KA, "command": "get_users", "input": {}, "file": "get_users-login",
+          "settings": {"password": "admin"},
+          "expect_request": {"method": "POST", "target": "/v1/user/login",
+                             "body": '{"username":"admin","password":"admin"}', "content_type": "application/json"}})

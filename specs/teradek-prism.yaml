@@ -70,10 +70,17 @@ transport:
   # The device serves HTTPS with its own certificate (the SDK's
   # rejectUnauthorized: false).
   accept_invalid_certs: true
-  auth: bearer
-  # A 401 fails only the request it answers: the token setting is renewed by
-  # the get_access_token and refresh_access_token commands, which must stay
-  # usable when the token has expired (see quirks).
+  # The session signs in with the password grant (POST /oauth/token) and
+  # sends the access token as Authorization Bearer; a request answered 401
+  # (the token, valid one hour, expired) signs in again. A sign-in refused
+  # (400 or 401, invalid_grant) is the refusal of the password.
+  session:
+    when_set: password
+    login: { method: POST, path: /oauth/token, content_type: application/x-www-form-urlencoded,
+             body: "grant_type=password&password={settings.password:url}" }
+    capture: { json: $.access_token, header: Authorization, scheme: Bearer }
+    relogin: { status: [401] }
+    refused: { status: [400, 401] }
   refusal_status: []
   # The device answers 504 itself when a write is not confirmed in time.
   timeout_ms: 10000
@@ -86,12 +93,13 @@ transport:
     oauth: { port: 443, auth: none }
 
 settings:
-  token:
+  password:
     type: string
     secret: true
-    max_length: 4096
-    label: Access token
-    description: "The OAuth access token sent as Authorization Bearer, from get_access_token or refresh_access_token; it lasts one hour, so the consumer renews it and passes the new one with update_settings."
+    default: ""
+    max_length: 256
+    label: Admin password
+    description: "The device's admin password, as set in its web UI, with which the core signs in to its own token endpoint; while it is empty nothing signs in and only GET /api/v1 answers."
 
 ports:
   - { port: 443, protocol: https, role: control, note: "the REST API under /api/v1 and the token endpoint /oauth/token" }
@@ -162,7 +170,7 @@ models:
 commands:
   # ── Authentication (Authentication) ───────────────────────────────────
   get_access_token:
-    summary: "Sign in with the device admin password (OAuth 2.0 password grant, POST /oauth/token); returns the token answer {access_token, refresh_token, expires_in, token_type}, whose access_token goes into the token setting"
+    summary: "Sign in with the device admin password (OAuth 2.0 password grant, POST /oauth/token); returns the token answer {access_token, refresh_token, expires_in, token_type}, for another client: the core keeps its own session"
     params:
       password: { type: string, required: true, secret: true, max_length: 256,
                   label: Admin password,
@@ -172,7 +180,7 @@ commands:
     expect: { status: 200, json_path: "$" }
     returns: value
   refresh_access_token:
-    summary: "Get a new access token with the refresh token (OAuth 2.0 refresh grant, POST /oauth/token); returns the token answer, whose access_token goes into the token setting"
+    summary: "Get a new access token with a refresh token (OAuth 2.0 refresh grant, POST /oauth/token); returns the token answer, for another client"
     params:
       refresh_token: { type: string, required: true, secret: true, max_length: 4096,
                        label: Refresh token,
@@ -2034,20 +2042,19 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      Authentication is OAuth 2.0 against the device's own /oauth/token, which the
-      core's oauth2 support cannot reach (it refreshes only, against a fixed
-      token_url). The spec sends the token setting as Authorization Bearer and
-      offers the grants as commands: get_access_token (the password grant) and
-      refresh_access_token (the refresh grant) each return the token answer, and
-      the consumer passes its access_token with update_settings. An access token
-      lasts one hour and a refresh token one week; changing the device password
-      invalidates them all. The token commands go to the token endpoint without
-      the bearer token, as Teradek's SDK sends them, and are not paced (they have
-      their own limit of 30 per 60 seconds). A 401 is not a terminal refusal here,
-      so an expired token never blocks the token commands: requests answered 401
-      fail on their own (commands with HTTP 401, polls logged) until a new token
-      is set. GET /api/v1 needs no token, so the device is reported connected
-      without one.
+      Authentication is OAuth 2.0 against the device's own /oauth/token. The core
+      signs in there with the password grant and the password setting, keeps the
+      access token the answer holds, and sends it as Authorization Bearer; an
+      access token lasts one hour, and a request answered 401 has the core sign in
+      again and send it once more (the refresh token is not used: the password
+      setting signs in anew). A sign-in answered 400 or 401 (invalid_grant: a
+      wrong password, or one changed on the device) is the terminal refusal of
+      the credential. get_access_token and refresh_access_token offer the grants
+      to other clients; they go to the token endpoint without the bearer token, as
+      Teradek's SDK sends them, and are not paced (they have their own limit of 30
+      per 60 seconds), while the session's own sign-in is paced with the API's
+      requests. A 401 to any other request is not a terminal refusal. GET /api/v1
+      needs no token, so the device is reported connected without one.
   - models: [all]
     severity: info
     text: >

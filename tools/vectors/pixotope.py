@@ -73,3 +73,27 @@ V.append({"spec": PX, "command": "play_sequences", "input": {"sequences": ["/Gam
 V.append({"spec": PX, "command": "is_ready", "input": {}, "settings": {"machine": "RenderMachine1"}, "file": "is_ready-machine",
           "expect_request": {"method": "POST", "target": _PX_T, "body":
               '{"Topic":{"Type":"Call","Target":"RenderMachine1-Engine","Method":"IsReady"},"Message":{"Params":{}}}'}})
+
+# The Data Hub (ZeroMQ): broadcast Updates and Logs, as two frames, the topic
+# and the message, compact JSON as the "How to control a Pixotope service"
+# example sends them. On connecting, the read of State the Store answers.
+_PX_GET = ['{"Type":"Get","Target":"Store","RespondTo":"ExternalControl","Name":"State"}', '{}']
+telemetry(PX, "update-number", expect_connect_zmq=[_PX_GET],
+          inbound_zmq=['{"Type":"Update","Target":"BROADCAST","Source":"Store","Name":"State.General.FrameRate"}',
+                       '{"Value":50}'],
+          expect_state={"services": {"Store": {"values": {"State.General.FrameRate": "50"}}}})
+telemetry(PX, "update-text",
+          inbound_zmq=['{"Type":"Update","Target":"BROADCAST","Source":"Store","Name":"State.General.CompositingColorSpace"}',
+                       '{"Value":"Video"}'],
+          expect_state={"services": {"Store": {"values": {"State.General.CompositingColorSpace": "Video"}}}})
+telemetry(PX, "update-object-to-client",
+          inbound_zmq=['{"Type":"Update","Target":"ExternalControl","Source":"RenderMachine1-Engine","Name":"State"}',
+                       '{"Value":{"Level":"Levels/TestMap0"}}'],
+          expect_state={"services": {"RenderMachine1-Engine": {"values": {"State": '{"Level":"Levels/TestMap0"}'}}}})
+telemetry(PX, "log-with-code",
+          inbound_zmq=['{"Type":"Log","Target":"BROADCAST","Source":"RenderMachine1-VideoIO"}',
+                       '{"Message":"Input signal lost","Code":"NO_SIGNAL"}'],
+          expect_state={"services": {"RenderMachine1-VideoIO": {"log": {"message": "Input signal lost", "code": "NO_SIGNAL"}}}})
+telemetry(PX, "log-without-code",
+          inbound_zmq=['{"Type":"Log","Target":"BROADCAST","Source":"Store"}', '{"Message":"Show saved"}'],
+          expect_state={"services": {"Store": {"log": {"message": "Show saved", "code": ""}}}})
