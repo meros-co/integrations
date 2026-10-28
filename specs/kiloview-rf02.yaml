@@ -1,0 +1,1210 @@
+spec: 1
+id: kiloview-rf02
+name: Kiloview RF02 Cradle chassis management platform
+vendor: Kiloview
+category: other
+
+source:
+  - title: Kiloview-RF02-WebAPI (2025-06-27), Kiloview-RF02-WebAPI-20250627_EN.pdf
+    author: Kiloview
+    url: https://enstatic.kiloview.com/wp-content/uploads/2026/04/Kiloview-RF02-WebAPI-20250627_EN.pdf
+    note: >
+      Manufacturer document, linked from https://www.kiloview.com/en/docs/cradle-series-rf02/api/
+      (checked 2026-10-27; the Download Center lists nothing newer). The
+      source of every request, field and reply here: the base URL
+      http://IP:8000 and bearer (JWT) authentication; Login; user
+      (personal information, users, password, modules, roles); Directory
+      Service (directories, their permissions, the devices, encoders,
+      decoders, gateways and bonding services under them, gateway channel
+      deletion, batch moves); Network Configuration; System Settings;
+      System Maintenance (maintenance plan, factory reset, restart, RF02
+      firmware upload); Card Firmware Management; Cardboard Business
+      Management (front-screen network setting, board network, names,
+      restarts, resets, upgrades, debugging, version, logs, operating
+      modes, external devices and their configuration, licenses, gateway
+      output devices, bonding traffic); OPS (Prometheus metrics);
+      Switcher (switch module reset, port aggregation); Dashboard
+      (statistics, message notifications). Machine-translated from Chinese
+      in places; field tables are read together with the examples.
+
+transport:
+  type: http
+  port: 8000
+  scheme: http
+  # "HTTP Authentication, scheme: bearer": the login's JWT in
+  # Authorization: Bearer <token>, sent while the token setting is set.
+  auth: bearer
+  timeout_ms: 5000
+  # The front-screen (LCD) requests need no JWT (reset-lcd's note); this
+  # one only reads, so it checks that the platform answers without a token.
+  probe: { method: GET, path: /api/v1/netmgr/lcd-checkConf }
+
+settings:
+  token:
+    type: string
+    secret: true
+    default: ""
+    label: Access token
+    description: "The JWT sent as a bearer token with every request: run login and store its result here with update_settings; empty sends none."
+
+ports:
+  - { port: 8000, protocol: http, role: control, note: "the management platform's Web API (base URL http://IP:8000)" }
+
+models:
+  - id: rf02
+    name: Kiloview RF02 Cradle chassis
+    supports:
+      - login
+      - get_self
+      - get_user
+      - add_user
+      - set_user_nickname
+      - get_users
+      - delete_user
+      - delete_users
+      - set_user_password
+      - get_modules
+      - get_roles
+      - delete_role
+      - delete_roles
+      - set_role
+      - rename_role
+      - set_role_modules
+      - create_directory
+      - rename_directory
+      - delete_directory
+      - move_to_directory
+      - move_batch
+      - set_directory_permissions
+      - check_directory_permission
+      - get_directory_permissions
+      - clear_directory_permissions
+      - get_directory_tree
+      - get_directory_devices
+      - get_directory_encoders
+      - get_directory_decoders
+      - get_directory_gateways
+      - get_directory_bonding
+      - delete_gateway_channel
+      - delete_gateway_channels
+      - get_network
+      - set_network
+      - set_network_dhcp
+      - get_system
+      - set_system
+      - get_maintenance
+      - set_maintenance
+      - factory_reset
+      - reboot
+      - get_firmware_types
+      - get_firmware_list
+      - get_firmware_by_model
+      - upload_firmware_chunk
+      - check_main_control_firmware
+      - delete_firmware
+      - set_firmware_description
+      - get_lcd_addresses
+      - get_lcd_config
+      - set_lcd_address
+      - lcd_factory_reset
+      - set_card_network
+      - set_card_network_dhcp
+      - rename_card
+      - reboot_cards
+      - reset_cards
+      - upgrade_cards
+      - debug_forwarding_ports
+      - debug_forwarding
+      - get_system_version
+      - get_logs
+      - export_logs
+      - set_card_mode
+      - get_device_config_map
+      - get_device_config
+      - set_device_config
+      - add_device
+      - get_device_license
+      - get_gateway_output_devices
+      - delete_devices
+      - get_bonding_traffic
+      - get_metrics
+      - reset_switch
+      - get_aggregation_ports
+      - get_aggregation
+      - set_aggregation
+      - get_dashboard
+      - get_dashboard_of
+      - get_notification_summary
+      - get_notifications
+      - get_notifications_of
+      - mark_notification_read
+      - clear_notifications
+    verification: none
+    notes: >
+      The RF02 Cradle rack chassis' main control board: a management
+      platform (port 8000) for the module boards in its slots (FN50, FN60,
+      FMG400 and others) and for external Kiloview devices (N60, P3), with
+      a built-in switch module, users, roles, directories, firmware
+      distribution and a dashboard. The RF02-LC has no published API
+      document.
+
+commands:
+  # ── Login and users ──────────────────────────────────────────────────
+  login:
+    summary: Log in and return the JWT for the token setting (POST /api/v1/login); the token is data.token
+    params:
+      username: { type: string, required: true, max_length: 64, label: User name, description: "The platform user to log in as; admin by default." }
+      password: { type: string, required: true, secret: true, max_length: 128, label: Password, description: "That user's password; admin by default." }
+    send: { method: POST, path: /api/v1/login, content_type: application/json, body: '{"userName":{username:json},"passWord":{password:json}}' }
+    expect: { status: 200, json_path: "$.data.token" }
+    returns: value
+  get_self:
+    summary: Return the logged-in user's name, roles and the modules it may use (GET /api/v1/getinfo)
+    send: { method: GET, path: /api/v1/getinfo }
+    expect: &data { status: 200, json_path: "$.data" }
+    returns: value
+  get_user:
+    summary: Return one user (GET /api/v1/sys-user/{id})
+    params:
+      user: &user_id { type: int, min: 0, required: true, label: User ID, description: "The user's id, as users.<id> in state lists it." }
+    send: { method: GET, path: "/api/v1/sys-user/{user}" }
+    expect: { status: 200 }
+    returns: text
+  add_user:
+    summary: Add a user, who gets the ordinary user role (POST /api/v1/sys-user)
+    params:
+      username: { type: string, required: true, max_length: 64, label: User name, description: "The new user's login name." }
+      nickname: { type: string, required: true, max_length: 64, label: Nickname, description: "The new user's display name." }
+      password: { type: string, required: true, secret: true, max_length: 128, label: Password, description: "The new user's password." }
+    send: { method: POST, path: /api/v1/sys-user, content_type: application/json, body: '{"username":{username:json},"nickName":{nickname:json},"password":{password:json}}' }
+    expect: &ok { status: 200 }
+    returns: ack
+  set_user_nickname:
+    summary: Change a user's nickname and remark (PUT /api/v1/sys-user)
+    params:
+      user: *user_id
+      nickname: { type: string, required: true, max_length: 64, label: Nickname, description: "The user's display name." }
+      remark: { type: string, default: "", max_length: 256, label: Remark, description: "A note on the user; empty for none." }
+    send: { method: PUT, path: /api/v1/sys-user, content_type: application/json, body: '{"userId":{user},"nickName":{nickname:json},"remark":{remark:json}}' }
+    expect: *ok
+    returns: ack
+  get_users:
+    summary: Return one page of the users (GET /api/v1/sys-user)
+    params:
+      page: &page { type: int, min: 1, default: 1, label: Page, description: "The page to return, numbered from 1." }
+      page_size: &page_size { type: int, min: 1, default: 10, label: Page size, description: "Entries per page; 10 by default." }
+    send: { method: GET, path: /api/v1/sys-user, query: { pageIndex: "{page}", pageSize: "{page_size}" } }
+    expect: *data
+    returns: value
+  delete_user:
+    summary: Delete a user (DELETE /api/v1/sys-user/delUsers)
+    params:
+      user: *user_id
+    send: { method: DELETE, path: /api/v1/sys-user/delUsers, content_type: application/json, body: '{"ids":[{user}]}' }
+    expect: *ok
+    returns: ack
+  delete_users:
+    summary: "Delete several users; ids is the API's list of user ids (DELETE /api/v1/sys-user/delUsers)"
+    params:
+      ids: { type: json, required: true, label: User IDs, description: "A list of user ids, as users.<id> in state lists them." }
+    send: { method: DELETE, path: /api/v1/sys-user/delUsers, content_type: application/json, body: '{"ids":{ids}}' }
+    expect: *ok
+    returns: ack
+  set_user_password:
+    summary: Set a user's password, one's own or, as an administrator, another's (PUT /api/v1/user/pwd/reset)
+    params:
+      user: *user_id
+      password: { type: string, required: true, secret: true, max_length: 128, label: New password, description: "The user's new password." }
+    send: { method: PUT, path: /api/v1/user/pwd/reset, content_type: application/json, body: '{"userId":{user},"password":{password:json}}' }
+    expect: *ok
+    returns: ack
+  get_modules:
+    summary: Return one page of the system modules a role can be given (GET /api/v1/sys-module)
+    params:
+      page: *page
+      page_size: *page_size
+    send: { method: GET, path: /api/v1/sys-module, query: { page: "{page}", pageSize: "{page_size}" } }
+    expect: *data
+    returns: value
+  get_roles:
+    summary: Return one page of the roles with their modules and users (GET /api/v1/role)
+    params:
+      page: *page
+      page_size: *page_size
+    send: { method: GET, path: /api/v1/role, query: { pageIndex: "{page}", pageSize: "{page_size}" } }
+    expect: *data
+    returns: value
+  delete_role:
+    summary: Delete a role (DELETE /api/v1/role)
+    params:
+      role: &role_id { type: int, min: 0, required: true, label: Role ID, description: "The role's id, as roles.<id> in state lists it." }
+    send: { method: DELETE, path: /api/v1/role, content_type: application/json, body: '{"ids":[{role}]}' }
+    expect: *ok
+    returns: ack
+  delete_roles:
+    summary: "Delete several roles; ids is the API's list of role ids (DELETE /api/v1/role)"
+    params:
+      ids: { type: json, required: true, label: Role IDs, description: "A list of role ids, as roles.<id> in state lists them." }
+    send: { method: DELETE, path: /api/v1/role, content_type: application/json, body: '{"ids":{ids}}' }
+    expect: *ok
+    returns: ack
+  set_role:
+    summary: "Set a role's name, remark and users; users is the API's userIds list (POST /api/v1/role/{id})"
+    params:
+      role: *role_id
+      name: { type: string, required: true, max_length: 64, label: Name, description: "The role's name." }
+      remark: { type: string, default: "", max_length: 256, label: Remark, description: "A note on the role; empty for none." }
+      users: { type: json, required: true, label: Users, description: "The ids of every user who has the role, as a list such as [4, 9]." }
+    send: { method: POST, path: "/api/v1/role/{role}", content_type: application/json, body: '{"roleId":{role},"roleName":{name:json},"remark":{remark:json},"userIds":{users}}' }
+    expect: *ok
+    returns: ack
+  rename_role:
+    summary: Rename a role (POST /api/v1/role/rename)
+    params:
+      role: *role_id
+      name: { type: string, required: true, max_length: 64, label: Name, description: "The role's new name." }
+    send: { method: POST, path: /api/v1/role/rename, content_type: application/json, body: '{"roleId":{role},"roleName":{name:json}}' }
+    expect: *ok
+    returns: ack
+  set_role_modules:
+    summary: "Set the modules a role may use; modules is the API's list of module names (POST /api/v1/role/update)"
+    params:
+      role: *role_id
+      modules: { type: json, required: true, label: Modules, description: "The module names as a list, from devMgr (device management), devView (device view), firmwareUpload, firmwareDispatch, usrMgr (user management) and streamMgr (stream management)." }
+    send: { method: POST, path: /api/v1/role/update, content_type: application/json, body: '{"roleId":{role},"modules":{modules}}' }
+    expect: *ok
+    returns: ack
+
+  # ── Directory service ────────────────────────────────────────────────
+  create_directory:
+    summary: Create a directory under another (POST /api/v1/directory)
+    params:
+      name: { type: string, required: true, max_length: 128, label: Name, description: "The new directory's name." }
+      parent: &directory { type: int, min: 0, required: true, label: Parent directory, description: "The id of the directory it is created in." }
+    send: { method: POST, path: /api/v1/directory, content_type: application/json, body: '{"dirName":{name:json},"parentId":{parent}}' }
+    expect: *ok
+    returns: ack
+  rename_directory:
+    summary: Rename a directory (PUT /api/v1/directory/{id})
+    params:
+      directory: &dir_id { type: int, min: 0, required: true, label: Directory, description: "The directory's id." }
+      name: { type: string, required: true, max_length: 128, label: Name, description: "The directory's new name." }
+    send: { method: PUT, path: "/api/v1/directory/{directory}", content_type: application/json, body: '{"dirName":{name:json}}' }
+    expect: *ok
+    returns: ack
+  delete_directory:
+    summary: Delete a directory (DELETE /api/v1/directory/{id})
+    params:
+      directory: *dir_id
+    send: { method: DELETE, path: "/api/v1/directory/{directory}", content_type: application/json, body: '{}' }
+    expect: *ok
+    returns: ack
+  move_to_directory:
+    summary: Move a directory or a device into a target directory (PUT /api/v1/directory/{id}/position)
+    params:
+      directory: { type: int, min: 0, required: true, label: Directory, description: "The directory id the request is addressed to, as the path's id." }
+      item: { type: string, required: true, max_length: 64, label: Item, description: "The id of the directory, or the serial number of the device, that is moved (dirId)." }
+      target: { type: int, min: 0, required: true, label: Target directory, description: "The id of the directory it is moved into." }
+      type: { type: enum, values: [device, directory], default: device, label: Type, description: "Whether a device or a directory is moved." }
+    send: { method: PUT, path: "/api/v1/directory/{directory}/position", content_type: application/json, body: '{"dirId":{item:json},"targetId":{target},"type":{type:json}}' }
+    expect: *ok
+    returns: ack
+  move_batch:
+    summary: "Move several directories or devices into a target directory; ids is the API's list of directory ids or device serial numbers (POST /api/v1/directory/move/batch)"
+    params:
+      target: { type: int, min: 0, required: true, label: Target directory, description: "The id of the directory they are moved into." }
+      ids: { type: json, required: true, label: Items, description: "The directory ids or device serial numbers moved, as a list of strings such as [\"4\"]." }
+    send: { method: POST, path: /api/v1/directory/move/batch, content_type: application/json, body: '{"targetId":{target},"ids":{ids}}' }
+    expect: *ok
+    returns: ack
+  set_directory_permissions:
+    summary: "Set the roles' permissions on a directory; permissions is the API's list of {roleId, permission} with read or write (POST /api/v1/directory/permission)"
+    params:
+      directory: *dir_id
+      permissions: { type: json, required: true, label: Permissions, description: "A list of objects each with roleId (a role's id) and permission, read (view only) or write (read and write)." }
+    send: { method: POST, path: /api/v1/directory/permission, content_type: application/json, body: '{"directoryId":"{directory}","permissions":{permissions}}' }
+    expect: *ok
+    returns: ack
+  check_directory_permission:
+    summary: Check whether a role has a permission on a directory, a debugging request (POST /api/v1/directory/check)
+    params:
+      role: *role_id
+      directory: *dir_id
+      permission: { type: enum, values: [read, write], default: read, label: Permission, description: "The permission checked: read or write." }
+    send: { method: POST, path: /api/v1/directory/check, content_type: application/json, body: '{"roleId":{role},"directoryId":{directory},"permission":{permission:json}}' }
+    expect: { status: 200 }
+    returns: text
+  get_directory_permissions:
+    summary: Return the roles' permissions on a directory (GET /api/v1/directory/permission/)
+    params:
+      directory: *dir_id
+    send: { method: GET, path: /api/v1/directory/permission/, query: { directoryId: "{directory}" } }
+    expect: { status: 200 }
+    returns: text
+  clear_directory_permissions:
+    summary: Delete every directory permission, a debugging request (DELETE /api/v1/directory/deleteAllPermission)
+    send: { method: DELETE, path: /api/v1/directory/deleteAllPermission }
+    expect: *ok
+    returns: ack
+  get_directory_tree:
+    summary: Return the directory tree (GET /api/v1/directory/tree)
+    send: { method: GET, path: /api/v1/directory/tree }
+    expect: { status: 200 }
+    returns: text
+  get_directory_devices:
+    summary: Return the devices under a directory with the online and total counts (GET /api/v1/directory/{id}/devices)
+    params:
+      directory: *dir_id
+    send: { method: GET, path: "/api/v1/directory/{directory}/devices" }
+    expect: *data
+    returns: value
+  get_directory_encoders:
+    summary: Return the encoding services under a directory, or of a device by serial number (GET /api/v1/directory/{id}/encode)
+    params:
+      directory: &dir_or_serial { type: string, required: true, max_length: 64, pattern: '^[A-Za-z0-9_-]+$', label: Directory or device, description: "A directory id, or a device's serial number for that device's services." }
+    send: { method: GET, path: "/api/v1/directory/{directory}/encode" }
+    expect: { status: 200 }
+    returns: text
+  get_directory_decoders:
+    summary: Return the decoding services under a directory, or of a device by serial number (GET /api/v1/directory/{id}/decode)
+    params:
+      directory: *dir_or_serial
+    send: { method: GET, path: "/api/v1/directory/{directory}/decode" }
+    expect: { status: 200 }
+    returns: text
+  get_directory_gateways:
+    summary: Return the gateway services under a directory, or of a device by serial number (GET /api/v1/directory/{id}/mgw)
+    params:
+      directory: *dir_or_serial
+    send: { method: GET, path: "/api/v1/directory/{directory}/mgw" }
+    expect: { status: 200 }
+    returns: text
+  get_directory_bonding:
+    summary: Return the bonding services under a directory, or of a device by serial number (GET /api/v1/directory/{id}/bonding)
+    params:
+      directory: *dir_or_serial
+    send: { method: GET, path: "/api/v1/directory/{directory}/bonding" }
+    expect: { status: 200 }
+    returns: text
+  delete_gateway_channel:
+    summary: Delete an output channel of a gateway (POST /api/v1/klnk/gateway/channels/del)
+    params:
+      serial_number: &serial { type: string, required: true, max_length: 64, label: Serial number, description: "The device's serial number." }
+      channel: { type: string, required: true, max_length: 32, label: Channel, description: "The gateway output channel's id (channelid), such as 2." }
+    send: { method: POST, path: /api/v1/klnk/gateway/channels/del, content_type: application/json, body: '[{"channelid":{channel:json},"serial_number":{serial_number:json}}]' }
+    expect: *ok
+    returns: ack
+  delete_gateway_channels:
+    summary: "Delete several gateway output channels; channels is the API's list of {channelid, serial_number} (POST /api/v1/klnk/gateway/channels/del)"
+    params:
+      channels: { type: json, required: true, label: Channels, description: "A list of objects each with channelid (the channel's id) and serial_number (its gateway's serial number)." }
+    send: { method: POST, path: /api/v1/klnk/gateway/channels/del, content_type: application/json, body: '{channels}' }
+    expect: *ok
+    returns: ack
+
+  # ── Network configuration ────────────────────────────────────────────
+  get_network:
+    summary: Return the main control board's network interfaces (GET /api/v1/netmgr)
+    send: { method: GET, path: /api/v1/netmgr }
+    expect: *data
+    returns: value
+  set_network:
+    summary: Set a network interface of the main control board to a static address (POST /api/v1/netmgr)
+    params:
+      interface: &ifname { type: string, required: true, max_length: 32, label: Interface, description: "The interface's name, as network.interfaces.<name> in state lists it, such as enp1s0." }
+      ip: { type: string, required: true, max_length: 64, label: IP address, description: "The interface's IPv4 address, in dotted decimal." }
+      netmask: { type: string, required: true, max_length: 64, label: Subnet mask, description: "The subnet mask, in dotted decimal." }
+      gateway: { type: string, default: "", max_length: 64, label: Gateway, description: "The default gateway; empty for none." }
+      dns: { type: string, default: "", max_length: 256, label: DNS, description: "DNS servers, several separated by semicolons." }
+      mac: &mac { type: string, required: true, max_length: 32, label: MAC address, description: "The interface's MAC address, as get_network reports it." }
+    send: { method: POST, path: /api/v1/netmgr, content_type: application/json, body: '{"ifname":{interface:json},"ip":{ip:json},"netmask":{netmask:json},"gw":{gateway:json},"dns":{dns:json},"method":"static","mac":{mac:json}}' }
+    expect: *ok
+    returns: ack
+  set_network_dhcp:
+    summary: Set a network interface of the main control board to DHCP (POST /api/v1/netmgr)
+    params:
+      interface: *ifname
+      mac: *mac
+    send: { method: POST, path: /api/v1/netmgr, content_type: application/json, body: '{"ifname":{interface:json},"ip":"","netmask":"","gw":"","dns":"","method":"dhcp","mac":{mac:json}}' }
+    expect: *ok
+    returns: ack
+
+  # ── System settings and maintenance ──────────────────────────────────
+  get_system:
+    summary: Return the system name and time settings (GET /api/v1/systemctrl/get)
+    send: { method: GET, path: /api/v1/systemctrl/get }
+    expect: *data
+    returns: value
+  set_system:
+    summary: Set the system name and time (POST /api/v1/systemctrl/baseConf)
+    params:
+      name: { type: string, required: true, max_length: 64, label: Name, description: "The chassis' device name." }
+      time_type: { type: enum, values: [ntp, manual], default: ntp, label: Time source, description: "ntp to take the time from the NTP servers, manual to set it from time." }
+      ntp: { type: string, default: "", max_length: 256, label: NTP servers, description: "NTP server names separated by spaces, such as ntp1.aliyun.com ntp2.aliyun.com." }
+      timezone: { type: string, required: true, max_length: 64, label: Time zone, description: "An IANA time zone name, such as Asia/Shanghai." }
+      time: { type: string, required: true, max_length: 32, label: Time, description: "The local date and time as YYYY-MM-DD hh:mm:ss, used when the time is set by hand." }
+      offset: { type: int, min: -12, max: 14, required: true, label: UTC offset, description: "The time zone's offset from UTC in hours, such as 8." }
+    send: { method: POST, path: /api/v1/systemctrl/baseConf, content_type: application/json, body: '{"name":{name:json},"timetype":{time_type:json},"ntp":{ntp:json},"timezone":{timezone:json},"time":{time:json},"offset":{offset}}' }
+    expect: *ok
+    returns: ack
+  get_maintenance:
+    summary: Return the scheduled maintenance plan (GET /api/v1/systemctrl/system_maintenance)
+    send: { method: GET, path: /api/v1/systemctrl/system_maintenance }
+    expect: { status: 200 }
+    returns: text
+  set_maintenance:
+    summary: "Set the scheduled maintenance plan; days, months and weeks are the API's integer lists (POST /api/v1/systemctrl/system_maintenance)"
+    params:
+      enable: { type: int, min: 0, required: true, label: Enable, description: "The plan's enable value as the API takes it (the document's example sends 2)." }
+      policy: { type: string, required: true, max_length: 16, pattern: '^[a-z]+$', label: Policy, description: "How often the plan runs, such as day." }
+      day: { type: int, min: 0, required: true, label: Day, description: "The interval or day the policy uses (the example sends 1 with policy day)." }
+      days: { type: json, required: true, label: Days, description: "The days of the month the plan runs, as a list of integers (empty for none)." }
+      months: { type: json, required: true, label: Months, description: "The months the plan runs, as a list of integers (empty for none)." }
+      weeks: { type: json, required: true, label: Weekdays, description: "The days of the week the plan runs, as a list of integers (empty for none)." }
+      start: { type: string, required: true, max_length: 40, label: Start, description: "When the plan first runs, as an ISO 8601 time such as 2024-12-13T16:15:00.000Z." }
+    send: { method: POST, path: /api/v1/systemctrl/system_maintenance, content_type: application/json, body: '{"enable":{enable},"day":{day},"days":{days},"months":{months},"policy":{policy:json},"start_date":{start:json},"weeks":{weeks}}' }
+    expect: *ok
+    returns: ack
+  factory_reset:
+    summary: Reset the platform to its factory settings (POST /api/v1/systemctrl/reset)
+    send: { method: POST, path: /api/v1/systemctrl/reset }
+    expect: *ok
+    returns: ack
+  reboot:
+    summary: Restart the main control board (POST /api/v1/systemctrl/reboot)
+    send: { method: POST, path: /api/v1/systemctrl/reboot }
+    expect: *ok
+    returns: ack
+  get_system_version:
+    summary: Return the system firmware version information (GET /api/v1/systemctrl/sys_ver)
+    send: { method: GET, path: /api/v1/systemctrl/sys_ver }
+    expect: { status: 200 }
+    returns: text
+  get_logs:
+    summary: Return the system log for a date range (GET /api/v1/systemctrl/sysLog)
+    params:
+      date: &log_date { type: string, required: true, max_length: 64, label: Dates, description: "The start and end dates of the logs, as the platform takes them; logs up to now when the end is in the future." }
+    send: { method: GET, path: /api/v1/systemctrl/sysLog, query: { date: "{date}" } }
+    expect: { status: 200 }
+    returns: text
+  export_logs:
+    summary: Return the exported system log for a date range (GET /api/v1/systemctrl/expLog)
+    params:
+      date: *log_date
+    send: { method: GET, path: /api/v1/systemctrl/expLog, query: { date: "{date}" } }
+    expect: { status: 200 }
+    returns: text
+
+  # ── Card firmware management ─────────────────────────────────────────
+  get_firmware_types:
+    summary: Return one page of the device types firmware has been uploaded for (GET /api/v1/firmware/type)
+    params:
+      page: *page
+      page_size: *page_size
+    send: { method: GET, path: /api/v1/firmware/type, query: { page: "{page}", page_size: "{page_size}" } }
+    expect: { status: 200 }
+    returns: text
+  get_firmware_list:
+    summary: Return the uploaded firmware versions of a device type (GET /api/v1/firmware/list)
+    params:
+      device_type: { type: string, required: true, max_length: 64, label: Device type, description: "The device type id, as get_firmware_types lists it." }
+    send: { method: GET, path: /api/v1/firmware/list, query: { devicetypeid: "{device_type}" } }
+    expect: *data
+    returns: value
+  get_firmware_by_model:
+    summary: Return the uploaded firmware versions of a model (GET /api/v1/firmware/model)
+    params:
+      model: { type: string, required: true, max_length: 64, label: Model, description: "The model name, such as P3." }
+    send: { method: GET, path: /api/v1/firmware/model, query: { model: "{model}" } }
+    expect: { status: 200 }
+    returns: text
+  upload_firmware_chunk:
+    summary: Upload one chunk of a board firmware package, multipart form data (POST /api/v1/firmware/upload/chunk)
+    params:
+      identifier: { type: string, required: true, max_length: 128, pattern: '^[A-Za-z0-9_.-]+$', label: Upload identifier, description: "A name the caller chooses for this upload, the same for every chunk." }
+      number: { type: int, min: 0, required: true, label: Chunk number, description: "The chunk's sequence number." }
+      file_type: { type: string, default: bin, max_length: 16, pattern: '^[A-Za-z0-9]+$', label: File type, description: "The package's extension, bin for a firmware package." }
+      file: { type: binary, required: true, label: Chunk, description: "This chunk's bytes, a consecutive part of the firmware package." }
+    send:
+      method: POST
+      path: /api/v1/firmware/upload/chunk
+      multipart:
+        - { name: identifier, value: "{identifier}" }
+        - { name: number, value: "{number}" }
+        - { name: file_type, value: "{file_type}" }
+        - { name: file, binary: file, filename: "{identifier}.{number}", content_type: application/octet-stream }
+    expect: *ok
+    returns: ack
+  check_main_control_firmware:
+    summary: Return whether a main control board firmware is present (GET /api/v1/firmware/maincontrol/exists)
+    send: { method: GET, path: /api/v1/firmware/maincontrol/exists }
+    expect: { status: 200 }
+    returns: text
+  delete_firmware:
+    summary: "Delete uploaded firmware versions and their files; ids is the API's list of firmware ids (DELETE /api/v1/firmware)"
+    params:
+      ids: { type: json, required: true, label: Firmware IDs, description: "A list of firmware ids, as get_firmware_list returns them." }
+    send: { method: DELETE, path: /api/v1/firmware, content_type: application/json, body: '{"ids":{ids}}' }
+    expect: *ok
+    returns: ack
+  set_firmware_description:
+    summary: Change an uploaded firmware version's description (PUT /api/v1/firmware)
+    params:
+      firmware: { type: int, min: 0, required: true, label: Firmware ID, description: "The firmware's id, as get_firmware_list returns it." }
+      description: { type: string, required: true, max_length: 2048, label: Description, description: "The firmware version's new description." }
+    send: { method: PUT, path: /api/v1/firmware, content_type: application/json, body: '{"id":{firmware},"description":{description:json}}' }
+    expect: *ok
+    returns: ack
+
+  # ── Front screen (LCD) ───────────────────────────────────────────────
+  get_lcd_addresses:
+    summary: Return the default addresses the front screen offers for quick setting (GET /api/v1/netmgr/lcd-quick)
+    send: { method: GET, path: /api/v1/netmgr/lcd-quick }
+    expect: *data
+    returns: value
+  get_lcd_config:
+    summary: Return the network setting the front screen shows (GET /api/v1/netmgr/lcd-checkConf)
+    send: { method: GET, path: /api/v1/netmgr/lcd-checkConf }
+    expect: *data
+    returns: value
+  set_lcd_address:
+    summary: Quickly set an interface's address, as the front screen does (POST /api/v1/netmgr/setIP)
+    params:
+      interface: *ifname
+      method: { type: enum, values: [static, dhcp], default: static, label: Method, description: "static for the address given, dhcp to take one from DHCP." }
+      ip: { type: string, required: true, max_length: 64, label: IP address, description: "The interface's IPv4 address, in dotted decimal." }
+      netmask: { type: string, required: true, max_length: 64, label: Subnet mask, description: "The subnet mask, in dotted decimal." }
+      gateway: { type: string, default: "", max_length: 64, label: Gateway, description: "The default gateway; empty for none." }
+      dns: { type: string, default: "", max_length: 256, label: DNS, description: "DNS servers, several separated by semicolons." }
+      mac: *mac
+    send: { method: POST, path: /api/v1/netmgr/setIP, content_type: application/json, body: '{"ifname":{interface:json},"ip":{ip:json},"netmask":{netmask:json},"gw":{gateway:json},"dns":{dns:json},"method":{method:json},"mac":{mac:json}}' }
+    expect: *ok
+    returns: ack
+  lcd_factory_reset:
+    summary: Reset the platform to its factory settings as the front screen does, with its fixed password (POST /api/v1/systemctrl/reset-lcd)
+    params:
+      password: { type: string, default: kiloview, secret: true, max_length: 64, label: Password, description: "The front screen's reset password; the document gives kiloview." }
+    send: { method: POST, path: /api/v1/systemctrl/reset-lcd, content_type: application/json, body: '{"password":{password:json}}' }
+    expect: *ok
+    returns: ack
+
+  # ── Boards and external devices ──────────────────────────────────────
+  set_card_network:
+    summary: "Give boards static addresses, from a start address up by a step; serial_numbers is the API's list (POST /api/v1/klnk/network)"
+    params:
+      serial_numbers: &serials { type: json, required: true, label: Serial numbers, description: "The boards' serial numbers, as a list of strings such as [\"000000108\"]." }
+      start_ip: { type: string, required: true, max_length: 64, label: Start address, description: "The first board's IPv4 address, in dotted decimal." }
+      increment: { type: int, min: 1, default: 1, label: Step, description: "How much the address rises from one board to the next." }
+      netmask: { type: string, required: true, max_length: 64, label: Subnet mask, description: "The subnet mask, in dotted decimal." }
+      gateway: { type: string, default: "", max_length: 64, label: Gateway, description: "The default gateway, in dotted decimal; empty for none." }
+      dns: { type: string, default: "", max_length: 256, label: DNS, description: "DNS servers, several separated by semicolons." }
+    send: { method: POST, path: /api/v1/klnk/network, content_type: application/json, body: '{"serial_numbers":{serial_numbers},"network":{"mode":"static","start_ip":{start_ip:json},"ip_increment":{increment},"netmask":{netmask:json},"gateway":{gateway:json},"dns":{dns:json}}}' }
+    expect: *ok
+    returns: ack
+  set_card_network_dhcp:
+    summary: "Set boards to take their addresses from DHCP; serial_numbers is the API's list (POST /api/v1/klnk/network)"
+    params:
+      serial_numbers: *serials
+    send: { method: POST, path: /api/v1/klnk/network, content_type: application/json, body: '{"serial_numbers":{serial_numbers},"network":{"mode":"dhcp","start_ip":"","ip_increment":1,"netmask":"","gateway":"","dns":""}}' }
+    expect: *ok
+    returns: ack
+  rename_card:
+    summary: Set a board's or device's friendly name (POST /api/v1/klnk/rename)
+    params:
+      serial_number: *serial
+      name: { type: string, required: true, max_length: 128, label: Friendly name, description: "The name shown for the device." }
+    send: { method: POST, path: /api/v1/klnk/rename, content_type: application/json, body: '{"serial_number":{serial_number:json},"friendly_name":{name:json}}' }
+    expect: *ok
+    returns: ack
+  reboot_cards:
+    summary: "Restart boards or devices; serial_numbers is the API's list (POST /api/v1/klnk/reboot)"
+    params:
+      serial_numbers: *serials
+    send: { method: POST, path: /api/v1/klnk/reboot, content_type: application/json, body: '{"serial_numbers":{serial_numbers}}' }
+    expect: *ok
+    returns: ack
+  reset_cards:
+    summary: "Reset boards or devices to factory settings; serial_numbers is the API's list (POST /api/v1/klnk/reset)"
+    params:
+      serial_numbers: *serials
+    send: { method: POST, path: /api/v1/klnk/reset, content_type: application/json, body: '{"serial_numbers":{serial_numbers}}' }
+    expect: *ok
+    returns: ack
+  upgrade_cards:
+    summary: "Send an uploaded firmware version to boards or devices to install; serial_numbers is the API's list (POST /api/v1/klnk/upgrade)"
+    params:
+      version: { type: int, min: 0, required: true, label: Firmware ID, description: "The uploaded firmware's id (version_id), as get_firmware_list returns it." }
+      serial_numbers: *serials
+    send: { method: POST, path: /api/v1/klnk/upgrade, content_type: application/json, body: '{"version_id":{version},"serial_numbers":{serial_numbers}}' }
+    expect: *ok
+    returns: ack
+  debug_forwarding_ports:
+    summary: "Return the KiloLink forwarding ports of boards, a debugging tool; serial_numbers is the API's list (POST /api/v1/klnk/ports)"
+    params:
+      serial_numbers: *serials
+    send: { method: POST, path: /api/v1/klnk/ports, content_type: application/json, body: '{"serial_numbers":{serial_numbers}}' }
+    expect: { status: 200 }
+    returns: text
+  debug_forwarding:
+    summary: "Return forwarding information of boards' channels, a debugging tool; list is the API's list of {serial_number, channel} (POST /api/v1/klnk/forward)"
+    params:
+      list: { type: json, required: true, label: Channels, description: "A list of objects each with serial_number (a board's serial number) and channel (a channel, or empty for all)." }
+    send: { method: POST, path: /api/v1/klnk/forward, content_type: application/json, body: '{"list":{list}}' }
+    expect: { status: 200 }
+    returns: text
+  set_card_mode:
+    summary: Switch a board's operating mode (FN50, FN60, FMG400); FN50 and FN60 restart (POST /api/v1/klnk/changemode)
+    params:
+      serial_number: *serial
+      mode: { type: string, required: true, max_length: 32, pattern: '^[A-Za-z0-9_-]+$', label: Mode, description: "The operating mode, such as encode, as the board offers it." }
+    send: { method: POST, path: /api/v1/klnk/changemode, content_type: application/json, body: '{"serial_number":{serial_number:json},"mode":{mode:json}}' }
+    expect: *ok
+    returns: ack
+  get_device_config_map:
+    summary: Return an external device's configuration mapping table for an encoding channel (GET /api/v1/klnk/getDeviceConfigMap)
+    params:
+      serial_number: *serial
+      channel: &enc_channel { type: string, required: true, max_length: 32, label: Channel, description: "The encoding service channel's id." }
+    send: { method: GET, path: /api/v1/klnk/getDeviceConfigMap, query: { serial_number: "{serial_number}", id: "{channel}" } }
+    expect: { status: 200 }
+    returns: text
+  get_device_config:
+    summary: Return an external device's current configuration for an encoding channel (GET /api/v1/klnk/getDeviceConfig)
+    params:
+      serial_number: *serial
+      channel: *enc_channel
+    send: { method: GET, path: /api/v1/klnk/getDeviceConfig, query: { serial_number: "{serial_number}", id: "{channel}" } }
+    expect: { status: 200 }
+    returns: text
+  set_device_config:
+    summary: "Configure an external encoder's channel; config is the API's config object of video {signal, codec, resolution, bitrate, framerate_mode, framerate} and audio {signal} (POST /api/v1/klnk/setDeviceConfig)"
+    params:
+      serial_number: *serial
+      channel: *enc_channel
+      config: { type: json, required: true, label: Configuration, description: "An object with video (signal, codec, resolution, bitrate, framerate_mode and framerate, all strings, framerate given when the mode is custom) and audio (signal), as get_device_config_map offers them." }
+    send: { method: POST, path: /api/v1/klnk/setDeviceConfig, content_type: application/json, body: '{"serial_number":{serial_number:json},"id":{channel:json},"config":{config}}' }
+    expect: *ok
+    returns: ack
+  add_device:
+    summary: Add an external device by serial number and authorization code (POST /api/v1/klnk/addDevice)
+    params:
+      name: { type: string, required: true, max_length: 128, label: Friendly name, description: "The name shown for the device." }
+      serial_number: *serial
+      license: { type: string, required: true, max_length: 128, label: Authorization code, description: "The device's authorization code (license), as get_device_license reports it." }
+      note: { type: string, default: "", max_length: 256, label: Note, description: "A note on the device; empty for none." }
+    send: { method: POST, path: /api/v1/klnk/addDevice, content_type: application/json, body: '{"name":{name:json},"serialnumber":{serial_number:json},"license":{license:json},"note":{note:json},"serial_number":{serial_number:json}}' }
+    expect: *ok
+    returns: ack
+  get_device_license:
+    summary: Return a device's authorization code (GET /api/v1/klnk/getDeviceLicense)
+    params:
+      serial_number: *serial
+    send: { method: GET, path: /api/v1/klnk/getDeviceLicense, query: { serial_number: "{serial_number}" } }
+    expect: *data
+    returns: value
+  get_gateway_output_devices:
+    summary: Return the boards and devices with their status, network, CPU, memory and temperature (GET /api/v1/klnk/gateway/output-devices)
+    send: { method: GET, path: /api/v1/klnk/gateway/output-devices }
+    expect: *data
+    returns: value
+  delete_devices:
+    summary: "Delete offline boards or external devices; serial_numbers is the API's list (POST /api/v1/klnk/delDevice)"
+    params:
+      serial_numbers: *serials
+    send: { method: POST, path: /api/v1/klnk/delDevice, content_type: application/json, body: '{"serial_numbers":{serial_numbers}}' }
+    expect: *ok
+    returns: ack
+  get_bonding_traffic:
+    summary: Return a bonding (P series) device's aggregated link traffic (GET /api/v1/klnk/getBondingTraffic)
+    params:
+      serial_number: *serial
+    send: { method: GET, path: /api/v1/klnk/getBondingTraffic, query: { serial_number: "{serial_number}" } }
+    expect: { status: 200 }
+    returns: text
+
+  # ── OPS, switch module, dashboard ────────────────────────────────────
+  get_metrics:
+    summary: Return the platform's metrics in Prometheus' text format (GET /api/v1/metrics)
+    send: { method: GET, path: /api/v1/metrics }
+    expect: { status: 200 }
+    returns: text
+  reset_switch:
+    summary: Reset the built-in switch module (POST /api/v1/klnk/rstSwitchBoard)
+    send: { method: POST, path: /api/v1/klnk/rstSwitchBoard }
+    expect: *ok
+    returns: ack
+  get_aggregation_ports:
+    summary: Return the switch ports that can be aggregated (GET /api/v1/sw/aggr/ports)
+    send: { method: GET, path: /api/v1/sw/aggr/ports }
+    expect: *data
+    returns: value
+  get_aggregation:
+    summary: Return the switch's port aggregation (GET /api/v1/sw/aggr/dump)
+    send: { method: GET, path: /api/v1/sw/aggr/dump }
+    expect: *data
+    returns: value
+  set_aggregation:
+    summary: "Set one or more port aggregation groups; groups is the API's list of {aggre-id, name, type, enable, members} (POST /api/v1/sw/aggr/set)"
+    params:
+      groups: { type: json, required: true, label: Groups, description: "A list of objects each with aggre-id (the group's id), name, type (static or lacp), enable (1 on, 0 off) and members (the switch port numbers)." }
+    send: { method: POST, path: /api/v1/sw/aggr/set, content_type: application/json, body: '{groups}' }
+    expect: *ok
+    returns: ack
+  get_dashboard:
+    summary: Return the dashboard statistics of every board and device (GET /api/v1/dashboard/data)
+    send: { method: GET, path: /api/v1/dashboard/data }
+    expect: *data
+    returns: value
+  get_dashboard_of:
+    summary: Return the dashboard statistics of one kind (GET /api/v1/dashboard/data)
+    params:
+      type: { type: string, required: true, max_length: 32, pattern: '^[A-Za-z_]+$', label: Kind, description: "The statistics wanted, overview, card boards or external devices, as the platform names them." }
+    send: { method: GET, path: /api/v1/dashboard/data, query: { type: "{type}" } }
+    expect: *data
+    returns: value
+  get_notification_summary:
+    summary: Return the counts of warning, error, information and unread messages (GET /api/v1/noti/summary)
+    send: { method: GET, path: /api/v1/noti/summary }
+    expect: *data
+    returns: value
+  get_notifications:
+    summary: Return every message notification (GET /api/v1/noti/list)
+    send: { method: GET, path: /api/v1/noti/list }
+    expect: *data
+    returns: value
+  get_notifications_of:
+    summary: Return the message notifications of one type (GET /api/v1/noti/list)
+    params:
+      type: &alert_type { type: enum, values: [warning, error, info], required: true, label: Type, description: "warning (system alarms), error (system errors) or info (system notifications)." }
+    send: { method: GET, path: /api/v1/noti/list, query: { msg_type: "{type}" } }
+    expect: *data
+    returns: value
+  mark_notification_read:
+    summary: Close a message notification, marking it read (POST /api/v1/noti/close)
+    params:
+      message: { type: int, min: 0, required: true, label: Message ID, description: "The message's id, as notifications.<id> in state lists it." }
+    send: { method: POST, path: /api/v1/noti/close, content_type: application/json, body: '{"msg_id":{message}}' }
+    expect: *ok
+    returns: ack
+  clear_notifications:
+    summary: Delete every message notification of one type (POST /api/v1/noti/del)
+    params:
+      type: *alert_type
+    send: { method: POST, path: /api/v1/noti/del, content_type: application/json, body: '{"alert_type":{type:json}}' }
+    expect: *ok
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Authentication: every request carries "Authorization: Bearer <JWT>".
+      The login answers its JWT in the JSON body (data.token), which the
+      core cannot capture into a bearer session, so the token is a setting:
+      run login and store its result in the token setting with
+      update_settings. The document's example token expires a century after
+      it is issued (data.expire). A refused token (401 or 403) stops all
+      requests until the settings change. The probe reads the front-screen
+      network setting, which the document's LCD requests take without a
+      JWT, so an empty token does not make the platform unauthorized before
+      login has run.
+  - models: [all]
+    severity: critical
+    text: >
+      factory_reset, lcd_factory_reset and reset_cards erase settings;
+      reboot restarts the main control board, reboot_cards and set_card_mode
+      on an FN50 or FN60 restart boards; upgrade_cards installs firmware;
+      set_network, set_network_dhcp, set_lcd_address and set_card_network
+      can move the platform or its boards off the network the core reaches;
+      reset_switch resets the built-in switch, cutting every board's link;
+      set_aggregation changes the switch's port aggregation;
+      clear_directory_permissions deletes every directory permission (a
+      debugging request); delete_* and clear_notifications cannot be
+      undone. None asks for confirmation.
+  - models: [all]
+    severity: info
+    text: >
+      Replies carry {requestId, code, msg, data}, code 200 for success; the
+      document shows a refused request (a device that already exists)
+      answered with HTTP 500 and code 500, status "error". Many replies are
+      shown only as {} in the document (writes, the directory tree, the
+      directory's services, maintenance, versions, logs, firmware types,
+      device configuration, bonding traffic), so their shape is unknown:
+      those commands return the reply's text and are not read into state.
+      Writes succeed on HTTP 200.
+  - models: [all]
+    severity: info
+    text: >
+      State is polled: the dashboard, notification counts and the boards
+      and devices (gateway output devices) every 5 seconds; users, roles,
+      the logged-in user, network interfaces, system settings, the
+      front-screen setting, port aggregation and the notification list
+      every 30 seconds. Users and roles are read as one page of up to 1000
+      entries, since the format cannot follow pages. Every write the
+      platform accepts has what it changed read again.
+  - models: [all]
+    severity: info
+    text: >
+      API limits and gaps: the RF02's own firmware upload
+      (/api/v1/firmware/rf02/upload) and firmware download
+      (/api/v1/firmware/download/{id}) document no request body or reply,
+      so they are not offered; the chunked board firmware upload is sent as
+      the document's example body (identifier, number, file_type, file),
+      while its code comments name chunkNumber, totalChunks and filename,
+      and no request joins the chunks. The directory permission request's
+      table (roleKeys, directoryId, action) disagrees with its example
+      (directoryId, permissions of roleId and permission); the example is
+      followed. GET requests documented with a body (firmware types, list
+      and model, device configuration) take those values as query
+      parameters here.
+
+state:
+  # getinfo
+  self.user_id: { type: int, description: "The logged-in user's id" }
+  self.username: { type: string, description: "The logged-in user's login name" }
+  self.name: { type: string, description: "The logged-in user's nickname" }
+  self.roles: { type: string, description: "The logged-in user's role keys, as JSON text" }
+  self.modules: { type: string, description: "The modules the logged-in user may use, as JSON text" }
+  # sys-user
+  users.*.username: { type: string, description: "The user's login name" }
+  users.*.nickname: { type: string, description: "The user's nickname" }
+  users.*.status: { type: string, description: "The user's status code as the platform reports it; 2 means enabled" }
+  users.*.roles: { type: string, description: "The user's role ids, as JSON text" }
+  users.*.created: { type: string, description: "When the user was created, ISO 8601" }
+  users.*.updated: { type: string, description: "When the user was last changed, ISO 8601" }
+  # role
+  roles.*.name: { type: string, description: "The role's name" }
+  roles.*.key: { type: string, description: "The role's key, such as admin" }
+  roles.*.remark: { type: string, description: "The role's remark" }
+  roles.*.modules: { type: string, description: "The modules the role may use, as JSON text" }
+  roles.*.users: { type: string, description: "The ids of the users with the role, as JSON text" }
+  # netmgr
+  network.interfaces.*.ip: { type: string, description: "The interface's IPv4 address, empty when it has none, keyed by interface name" }
+  network.interfaces.*.netmask: { type: string, description: "Its subnet mask" }
+  network.interfaces.*.gateway: { type: string, description: "Its gateway" }
+  network.interfaces.*.dns: { type: string, description: "Its DNS servers, separated by semicolons" }
+  network.interfaces.*.method: { type: string, description: "How it is addressed: dhcp, static or manual" }
+  network.interfaces.*.mac: { type: string, description: "Its MAC address" }
+  # lcd-checkConf
+  lcd.interface: { type: string, description: "The interface the front screen's network setting is for" }
+  lcd.ip: { type: string, description: "The front screen's address setting" }
+  lcd.netmask: { type: string, description: "The front screen's subnet mask setting" }
+  lcd.gateway: { type: string, description: "The front screen's gateway setting" }
+  lcd.dns: { type: string, description: "The front screen's DNS setting" }
+  lcd.method: { type: string, description: "The front screen's addressing method" }
+  # systemctrl/get
+  system.name: { type: string, description: "The chassis' device name" }
+  system.time_type: { type: string, description: "Where the time comes from: ntp or manual" }
+  system.ntp: { type: string, description: "The NTP servers, separated by spaces" }
+  system.timezone: { type: string, description: "The time zone (IANA name)" }
+  system.time: { type: string, description: "The platform's local time when read" }
+  system.offset: { type: int, unit: h, description: "The time zone's offset from UTC" }
+  # gateway/output-devices
+  devices.*.id: { type: string, description: "A board or device, keyed by serial number: its id on the platform" }
+  devices.*.slot: { type: int, description: "Its slot in the chassis" }
+  devices.*.model: { type: string, description: "Its model" }
+  devices.*.name: { type: string, description: "Its friendly name" }
+  devices.*.device_model: { type: string, description: "Its device model (devicemodel)" }
+  devices.*.firmware: { type: string, description: "Its firmware version" }
+  devices.*.update_available: { type: bool, description: "Whether a newer firmware is offered (versiontips)" }
+  devices.*.status: { type: int, description: "Its status code as the platform reports it" }
+  devices.*.cpu: { type: float, unit: "%", description: "CPU use" }
+  devices.*.memory: { type: int, unit: "%", description: "Memory use" }
+  devices.*.uptime: { type: float, unit: s, description: "Time since it started" }
+  devices.*.temperature: { type: int, unit: degC, description: "Its temperature" }
+  devices.*.disk: { type: int, unit: "%", description: "Disk use" }
+  devices.*.directory: { type: int, description: "The directory it is in" }
+  devices.*.device_type: { type: string, description: "Its device type" }
+  devices.*.network.*.ip: { type: string, description: "A network interface, keyed by name: its address" }
+  devices.*.network.*.netmask: { type: string, description: "Its subnet mask" }
+  devices.*.network.*.gateway: { type: string, description: "Its gateway" }
+  devices.*.network.*.tx_speed: { type: float, description: "Transmit speed as reported" }
+  devices.*.network.*.rx_speed: { type: float, description: "Receive speed as reported" }
+  devices.*.network.*.tx_packets: { type: int, description: "Packets sent" }
+  devices.*.network.*.rx_packets: { type: int, description: "Packets received" }
+  devices.*.network.*.tx_errors: { type: int, description: "Send errors" }
+  devices.*.network.*.rx_errors: { type: int, description: "Receive errors" }
+  # dashboard/data
+  dashboard.total_count: { type: int, description: "Number of boards and devices" }
+  dashboard.updated: { type: string, description: "When the statistics were last computed" }
+  dashboard.models.*.units: { type: int, description: "Units of a model, keyed by model name" }
+  dashboard.models.*.offline: { type: int, description: "Units of that model offline" }
+  dashboard.models.*.external: { type: bool, description: "Whether the model is an external device rather than a board" }
+  dashboard.services.*.total_devices: { type: int, description: "A kind of service (encoding, decoding, mgw, bonding): devices running it" }
+  dashboard.services.*.online_devices: { type: int, description: "Of those, online" }
+  dashboard.services.*.offline_devices: { type: int, description: "Of those, offline" }
+  dashboard.services.*.total_channels: { type: int, description: "Channels of that service" }
+  dashboard.services.*.error_devices: { type: int, description: "Devices of that service in error" }
+  # noti/summary and noti/list
+  notifications_summary.warnings: { type: int, description: "Number of warning messages" }
+  notifications_summary.errors: { type: int, description: "Number of error messages" }
+  notifications_summary.info: { type: int, description: "Number of information messages" }
+  notifications_summary.unread: { type: int, description: "Number of unread messages" }
+  notifications.*.device: { type: string, description: "A message, keyed by id: the device it is about" }
+  notifications.*.type: { type: string, description: "warning, error or info" }
+  notifications.*.content: { type: string, description: "The message's text" }
+  notifications.*.read: { type: bool, description: "Whether it has been read (closed)" }
+  notifications.*.time: { type: string, description: "When it was raised, ISO 8601" }
+  # sw/aggr/dump
+  aggregation.id: { type: int, description: "The aggregation group's id (aggre-id)" }
+  aggregation.name: { type: string, description: "The aggregation group's name" }
+  aggregation.type: { type: string, description: "static or lacp" }
+  aggregation.enabled: { type: bool, description: "Whether the group is on" }
+  aggregation.configured: { type: string, description: "The switch ports configured in the group, as JSON text" }
+  aggregation.aggregated: { type: string, description: "The switch ports aggregated now, as JSON text" }
+
+telemetry:
+  poll:
+    - every_ms: 5000
+      send:
+        - { method: GET, path: /api/v1/dashboard/data }
+        - { method: GET, path: /api/v1/noti/summary }
+        - { method: GET, path: /api/v1/klnk/gateway/output-devices }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /api/v1/getinfo }
+        - { method: GET, path: /api/v1/sys-user, query: { pageIndex: "1", pageSize: "1000" } }
+        - { method: GET, path: /api/v1/role, query: { pageIndex: "1", pageSize: "1000" } }
+        - { method: GET, path: /api/v1/netmgr }
+        - { method: GET, path: /api/v1/netmgr/lcd-checkConf }
+        - { method: GET, path: /api/v1/systemctrl/get }
+        - { method: GET, path: /api/v1/sw/aggr/dump }
+        - { method: GET, path: /api/v1/noti/list }
+  updates:
+    - path: "^/api/v1/getinfo$"
+      json_match: { "$.code": "^200$" }
+      json: { id: "$.data.userId", username: "$.data.userName", name: "$.data.name", roles: "$.data.roles", modules: "$.data.modules" }
+      state:
+        self.user_id: "{id}"
+        self.username: "{username}"
+        self.name: "{name}"
+        self.roles: "{roles}"
+        self.modules: "{modules}"
+    - path: "^/api/v1/sys-user\\?pageIndex=1&pageSize=1000$"
+      json_match: { "$.code": "^200$" }
+      json_each: "$.data.list"
+      json: &user_fields { id: "$.userId", username: "$.username", nickname: "$.nickName", status: "$.status", roles: "$.roleIds", created: "$.createdAt", updated: "$.updatedAt" }
+      replace: users
+      state: &user_state
+        "users.{id}.username": "{username}"
+        "users.{id}.nickname": "{nickname}"
+        "users.{id}.status": "{status}"
+        "users.{id}.roles": "{roles}"
+        "users.{id}.created": "{created}"
+        "users.{id}.updated": "{updated}"
+    # Another page (get_users) adds what it lists.
+    - path: "^/api/v1/sys-user\\?pageIndex=\\d+&pageSize=\\d+$"
+      json_match: { "$.code": "^200$" }
+      json_each: "$.data.list"
+      json: *user_fields
+      state: *user_state
+    - path: "^/api/v1/role\\?pageIndex=1&pageSize=1000$"
+      json_match: { "$.code": "^200$" }
+      json_each: "$.data.list"
+      json: &role_fields { id: "$.roleId", name: "$.roleName", key: "$.roleKey", remark: "$.remark", modules: "$.modules", users: "$.user_ids" }
+      replace: roles
+      state: &role_state
+        "roles.{id}.name": "{name}"
+        "roles.{id}.key": "{key}"
+        "roles.{id}.remark": "{remark}"
+        "roles.{id}.modules": "{modules}"
+        "roles.{id}.users": "{users}"
+    - path: "^/api/v1/role\\?pageIndex=\\d+&pageSize=\\d+$"
+      json_match: { "$.code": "^200$" }
+      json_each: "$.data.list"
+      json: *role_fields
+      state: *role_state
+    - path: "^/api/v1/netmgr$"
+      json_match: { "$.code": "^200$" }
+      json_each: "$.data"
+      json: { ifname: "$.ifname", ip: "$.ip", netmask: "$.netmask", gw: "$.gw", dns: "$.dns", method: "$.method", mac: "$.mac" }
+      replace: network.interfaces
+      state:
+        "network.interfaces.{ifname:key}.ip": "{ip}"
+        "network.interfaces.{ifname:key}.netmask": "{netmask}"
+        "network.interfaces.{ifname:key}.gateway": "{gw}"
+        "network.interfaces.{ifname:key}.dns": "{dns}"
+        "network.interfaces.{ifname:key}.method": "{method}"
+        "network.interfaces.{ifname:key}.mac": "{mac}"
+    - path: "^/api/v1/netmgr/lcd-checkConf$"
+      json_match: { "$.code": "^200$" }
+      json: { ifname: "$.data.ifname", ip: "$.data.ip", netmask: "$.data.netmask", gw: "$.data.gw", dns: "$.data.dns", method: "$.data.method" }
+      state:
+        lcd.interface: "{ifname}"
+        lcd.ip: "{ip}"
+        lcd.netmask: "{netmask}"
+        lcd.gateway: "{gw}"
+        lcd.dns: "{dns}"
+        lcd.method: "{method}"
+    # The reply's field is "Timezone" in the document's table and example.
+    - path: "^/api/v1/systemctrl/get$"
+      json_match: { "$.code": "^200$" }
+      json: { name: "$.data.name", timetype: "$.data.timetype", ntp: "$.data.ntp", tz: "$.data.Timezone", time: "$.data.time", offset: "$.data.offset" }
+      state:
+        system.name: "{name}"
+        system.time_type: "{timetype}"
+        system.ntp: "{ntp}"
+        system.timezone: "{tz}"
+        system.time: "{time}"
+        system.offset: "{offset}"
+    - path: "^/api/v1/klnk/gateway/output-devices$"
+      json_match: { "$.code": "^200$" }
+      json_each: "$.data"
+      json:
+        serial: "$.serialnumber"
+        id: "$.id"
+        slot: "$.slotid"
+        model: "$.model"
+        name: "$.name"
+        devicemodel: "$.devicemodel"
+        firmware: "$.firmware"
+        tips: "$.versiontips"
+        status: "$.status"
+        cpu: "$.cpu"
+        memory: "$.memory"
+        uptime: "$.uptime"
+        temp: "$.temp"
+        disk: "$.disk"
+        dir: "$.directoryId"
+        type: "$.devicetype"
+      replace: devices
+      state:
+        "devices.{serial:key}.id": "{id}"
+        "devices.{serial:key}.slot": "{slot}"
+        "devices.{serial:key}.model": "{model}"
+        "devices.{serial:key}.name": "{name}"
+        "devices.{serial:key}.device_model": "{devicemodel}"
+        "devices.{serial:key}.firmware": "{firmware}"
+        "devices.{serial:key}.update_available": "{tips}"
+        "devices.{serial:key}.status": "{status}"
+        "devices.{serial:key}.cpu": "{cpu}"
+        "devices.{serial:key}.memory": "{memory}"
+        "devices.{serial:key}.uptime": "{uptime}"
+        "devices.{serial:key}.temperature": "{temp}"
+        "devices.{serial:key}.disk": "{disk}"
+        "devices.{serial:key}.directory": "{dir}"
+        "devices.{serial:key}.device_type": "{type}"
+    - path: "^/api/v1/klnk/gateway/output-devices$"
+      json_match: { "$.code": "^200$" }
+      json_each: "$.data[*].network"
+      json:
+        serial: "$^.serialnumber"
+        if: "$.if"
+        ip: "$.ip"
+        mask: "$.mask"
+        gw: "$.gw"
+        tx_speed: "$.tx.speed"
+        tx_pkt: "$.tx.pkt"
+        tx_err: "$.tx.error"
+        rx_speed: "$.rx.speed"
+        rx_pkt: "$.rx.pkt"
+        rx_err: "$.rx.error"
+      state:
+        "devices.{serial:key}.network.{if:key}.ip": "{ip}"
+        "devices.{serial:key}.network.{if:key}.netmask": "{mask}"
+        "devices.{serial:key}.network.{if:key}.gateway": "{gw}"
+        "devices.{serial:key}.network.{if:key}.tx_speed": "{tx_speed}"
+        "devices.{serial:key}.network.{if:key}.rx_speed": "{rx_speed}"
+        "devices.{serial:key}.network.{if:key}.tx_packets": "{tx_pkt}"
+        "devices.{serial:key}.network.{if:key}.rx_packets": "{rx_pkt}"
+        "devices.{serial:key}.network.{if:key}.tx_errors": "{tx_err}"
+        "devices.{serial:key}.network.{if:key}.rx_errors": "{rx_err}"
+    - path: "^/api/v1/dashboard/data$"
+      json_match: { "$.code": "^200$" }
+      json: { total: "$.data.total_count", updated: "$.data.update_time" }
+      state:
+        dashboard.total_count: "{total}"
+        dashboard.updated: "{updated}"
+    - path: "^/api/v1/dashboard/data$"
+      json_match: { "$.code": "^200$" }
+      json_each: "$.data.model_stats.*"
+      json: { units: "$.units", offline: "$.offline", external: "$.external_device" }
+      replace: dashboard.models
+      state:
+        "dashboard.models.{key:key}.units": "{units}"
+        "dashboard.models.{key:key}.offline": "{offline}"
+        "dashboard.models.{key:key}.external": "{external}"
+    - path: "^/api/v1/dashboard/data$"
+      json_match: { "$.code": "^200$" }
+      json_each: "$.data.*"
+      each_match: { "$.total_devices": "^\\d+$" }
+      json: { total: "$.total_devices", online: "$.online_devices", offline: "$.offline_devices", channels: "$.total_channels", errors: "$.error_devices" }
+      state:
+        "dashboard.services.{key}.total_devices": "{total}"
+        "dashboard.services.{key}.online_devices": "{online}"
+        "dashboard.services.{key}.offline_devices": "{offline}"
+        "dashboard.services.{key}.total_channels": "{channels}"
+        "dashboard.services.{key}.error_devices": "{errors}"
+    - path: "^/api/v1/noti/summary$"
+      json_match: { "$.code": "^200$" }
+      json: { w: "$.data.warning_count", e: "$.data.error_count", i: "$.data.info_count", u: "$.data.unread_count" }
+      state:
+        notifications_summary.warnings: "{w}"
+        notifications_summary.errors: "{e}"
+        notifications_summary.info: "{i}"
+        notifications_summary.unread: "{u}"
+    # The unfiltered list replaces the messages; a filtered one adds to them.
+    - path: "^/api/v1/noti/list$"
+      json_match: { "$.code": "^200$" }
+      json_each: "$.data"
+      json: &noti_fields { id: "$.id", device: "$.device_id", type: "$.type", content: "$.content", read: "$.is_read", time: "$.timestamp" }
+      replace: notifications
+      state: &noti_state
+        "notifications.{id}.device": "{device}"
+        "notifications.{id}.type": "{type}"
+        "notifications.{id}.content": "{content}"
+        "notifications.{id}.read": "{read}"
+        "notifications.{id}.time": "{time}"
+    - path: "^/api/v1/noti/list\\?"
+      json_match: { "$.code": "^200$" }
+      json_each: "$.data"
+      json: *noti_fields
+      state: *noti_state
+    - path: "^/api/v1/sw/aggr/dump$"
+      json_match: { "$.code": "^200$" }
+      json: { id: "$.data.aggre-id", name: "$.data.name", type: "$.data.type", enable: "$.data.enable", configured: "$.data.configured", aggregated: "$.data.aggregated" }
+      state:
+        aggregation.id: "{id}"
+        aggregation.name: "{name}"
+        aggregation.type: "{type}"
+        aggregation.enabled: { value: "{enable}", map: { "1": true, "0": false } }
+        aggregation.configured: "{configured}"
+        aggregation.aggregated: "{aggregated}"
+
+    # ── Read-backs: what a write changed is read again once it is
+    # answered ───────────────────────────────────────────────────────────
+    - path: "^/api/v1/(sys-user|sys-user/delUsers|user/pwd/reset)$"
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/sys-user, query: { pageIndex: "1", pageSize: "1000" } }
+        - { method: GET, path: /api/v1/role, query: { pageIndex: "1", pageSize: "1000" } }
+    - path: "^/api/v1/role(/rename|/update|/\\d+)?$"
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/role, query: { pageIndex: "1", pageSize: "1000" } }
+        - { method: GET, path: /api/v1/getinfo }
+    - path: "^/api/v1/netmgr(/setIP)?$"
+      request_match: { "$.ifname": "." }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/netmgr }
+        - { method: GET, path: /api/v1/netmgr/lcd-checkConf }
+    - path: "^/api/v1/systemctrl/baseConf$"
+      json: {}
+      then_send: [{ method: GET, path: /api/v1/systemctrl/get }]
+    - path: "^/api/v1/klnk/(rename|addDevice|delDevice|changemode|network|upgrade|gateway/channels/del)$"
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/klnk/gateway/output-devices }
+        - { method: GET, path: /api/v1/dashboard/data }
+    - path: "^/api/v1/directory/(move/batch|\\d+/position)$"
+      json: {}
+      then_send: [{ method: GET, path: /api/v1/klnk/gateway/output-devices }]
+    - path: "^/api/v1/sw/aggr/set$"
+      json: {}
+      then_send: [{ method: GET, path: /api/v1/sw/aggr/dump }]
+    - path: "^/api/v1/noti/(close|del)$"
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/noti/summary }
+        - { method: GET, path: /api/v1/noti/list }

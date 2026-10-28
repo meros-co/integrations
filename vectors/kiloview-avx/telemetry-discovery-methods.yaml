@@ -1,0 +1,33 @@
+spec: kiloview-avx
+telemetry: discovery-methods
+inbound_http:
+  path: /v1/input/discovery/all
+  body: '{"code":200,"message":"ok","data":{"manuals":[{"dis_id":3,"dis_g_name":"public","dis_d_ip":"192.168.40.23"}],"auto_servers":[{"dis_id":1,"dis_method":"auto","dis_g_name":"public","dis_d_ip":"","dis_s_ip":""},{"dis_id":4,"dis_method":"server","dis_g_name":"public","dis_d_ip":"","dis_s_ip":"192.43.56.2"}]}}'
+expect_state:
+  discovery:
+    '3':
+      method: manual
+      group: public
+      device_ip: 192.168.40.23
+    '1':
+      method: auto
+      group: public
+      device_ip: ''
+      server_ip: ''
+    '4':
+      method: server
+      group: public
+      device_ip: ''
+      server_ip: 192.43.56.2
+state_before:
+  discovery:
+    '8':
+      method: auto
+      group: gone
+expect_then_send:
+- method: GET
+  target: /v1/input/manual/discovery
+- method: GET
+  target: /v1/input/auto/discovery?dis_g_name=public
+- method: GET
+  target: /v1/input/server/discovery?dis_g_name=public&dis_s_ip=192.43.56.2

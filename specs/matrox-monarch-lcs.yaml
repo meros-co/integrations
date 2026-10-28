@@ -1,0 +1,624 @@
+spec: 1
+id: matrox-monarch-lcs
+name: Matrox Monarch LCS lecture capture appliance
+vendor: Matrox
+category: recorder
+
+source:
+  - title: Matrox Monarch LCS Dev Tools Reference Guide, v1.1.13 (January 10, 2019, Y11386-301-01113)
+    author: Matrox Electronic Systems Ltd.
+    url: https://ftp.matrox.com/pub/video/doc/Matrox%20Monarch%20LCS%20Dev%20Tools%20Reference%20guide_v1.1.13.pdf
+    note: >
+      Manufacturer-documented, the source of every command and state rule
+      here. Chapter 1, Using the Monarch LCS Control API (p.2-15): commands
+      sent as GET /Monarch/syncconnect/sdk.aspx?command=<command> with the
+      unit's username and password (both admin by default), HTTPS also
+      supported; arguments follow the command name, separated by commas.
+      GetStatus (ENC1:<mode>,<state>,ENC2:<mode>,<state>,FILETRANSFER:<state>,
+      NAME:<name>; mode RTSP, RTMP, RECORD or NONE; state ON, OFF, READY or
+      DISABLED), GetInputStatus, Start/StopBothEncoders,
+      Set/GetStreamingVideoDataRate, Set/GetRTSP, Set/GetRTMP,
+      SetBothRtmpPaths, Set/GetRecordFileName, Set/GetVideoInput,
+      Set/GetAudioInput, SetTransferLocation, StartTransfer,
+      StartTransferAll, StopTransfer, SetOperatingMode, SetDynamicOutput,
+      AskForReboot; every command answers RETRY while another is executing.
+      Chapter 2, the XML configuration file, and chapter 3, the Windows
+      command line utility, are not part of the HTTP API.
+  - title: Matrox Monarch LCS User Guide (April 9, 2021, Y11387-300-01119)
+    author: Matrox Electronic Systems Ltd.
+    url: https://ftp.matrox.com/pub/video/doc/Matrox%20Monarch%20LCS%20User%20Guide_v1.1.19.pdf
+    note: >
+      Installing the Monarch SSL certificate (p.21): HTTPS uses a
+      certificate the unit issues itself, downloaded from the Command Center.
+  - title: companion-module-matrox-monarch (Bitfocus Companion module, MIT)
+    author: Bitfocus and contributors
+    url: https://github.com/bitfocus/companion-module-matrox-monarch
+    note: >
+      Corroboration only: sends the commands with an HTTP Basic credential
+      on port 80, reads the reply as plain text and SetDynamicOutput's value
+      after a comma.
+
+transport:
+  type: http
+  port: 80
+  https_port: 443
+  scheme: { setting: scheme }
+  # The unit's HTTPS certificate is one it issues itself (User Guide,
+  # "Installing the Monarch SSL certificate").
+  accept_invalid_certs: true
+  auth: basic
+  refusal_status: [401]
+  timeout_ms: 10000
+  probe: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStatus" }
+
+settings:
+  username: { type: string, default: admin, label: Username, description: "The Command Center user; admin by default, as the Dev Tools guide says." }
+  password: { type: string, secret: true, default: admin, label: Password, description: "That user's password; admin by default." }
+  scheme:
+    type: enum
+    values: [http, https]
+    default: http
+    label: Scheme
+    description: "http on port 80, or https on port 443 with the unit's own certificate, which is not checked."
+
+ports:
+  - { port: 80, protocol: http, role: control, setting: scheme, when: "scheme http" }
+  - { port: 443, protocol: https, role: control, setting: scheme, when: "scheme https" }
+
+maps:
+  true_false: { "true": "TRUE", "false": "FALSE" }
+
+models:
+  - id: monarch-lcs
+    name: Matrox Monarch LCS
+    supports:
+      - get_status
+      - get_input_status
+      - start_both_encoders
+      - stop_both_encoders
+      - set_streaming_video_data_rate
+      - get_streaming_video_data_rate
+      - set_rtsp
+      - get_rtsp
+      - set_rtmp
+      - set_rtmp_with_credentials
+      - get_rtmp
+      - set_both_rtmp_paths
+      - set_both_rtmp_paths_with_credentials
+      - set_record_file_name
+      - get_record_file_name
+      - set_video_input
+      - get_video_input
+      - set_audio_input
+      - get_audio_input
+      - set_transfer_location
+      - set_transfer_location_with_credentials
+      - start_transfer
+      - start_transfer_all
+      - stop_transfer
+      - set_operating_mode
+      - set_operating_mode_with_composition
+      - set_dynamic_output
+      - reboot
+    verification: none
+    notes: >
+      Two inputs (A: SDI or HDMI, B: HDMI) and two encoders, in the
+      Single-isolated, Dual-isolated, Picture-in-picture, Side-by-side or
+      Full-screen switch operating mode; recordings can be transferred to a
+      network share.
+
+commands:
+  get_status:
+    summary: Read each encoder's mode and state, the file transfer state and the device name (GetStatus); returns the reply text
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStatus" }
+    expect: { status: 200, matches: "^\\s*(ENC1:[\\s\\S]*\\S)\\s*$" }
+    returns: value
+
+  get_input_status:
+    summary: >
+      Read the inputs' connectors, resolutions and frame rates
+      (GetInputStatus), such as "SDI A: 1920x1080i, 29.97 fps;HDMI B:
+      1920x1080p, 60 fps"; "No video input" for an input without a signal,
+      and only the input in use in Single-isolated mode
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetInputStatus" }
+    expect: { status: 200, matches: "^\\s*([\\s\\S]*(?:fps|No video input)[\\s\\S]*?)\\s*$" }
+    returns: value
+
+  start_both_encoders:
+    summary: Start both encoders at once, each in the mode set for it (StartBothEncoders)
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=StartBothEncoders" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  stop_both_encoders:
+    summary: Stop both encoders at once (StopBothEncoders)
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=StopBothEncoders" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  set_streaming_video_data_rate:
+    summary: >
+      Change a streaming encoder's average video bit rate without stopping
+      it (SetStreamingVideoDataRate); the minimum becomes 90% and the
+      maximum 110% of it. The encoder must be streaming
+    params:
+      encoder: { type: int, min: 1, max: 2, required: true, label: Encoder, description: "Encoder 1 or 2, as the Command Center numbers them." }
+      kbps: { type: int, min: 50, max: 20000, required: true, label: Average bit rate, description: "Average video bit rate in kilobits per second." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetStreamingVideoDataRate,{encoder},{kbps}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  get_streaming_video_data_rate:
+    summary: Read a streaming encoder's average video bit rate in kb/s (GetStreamingVideoDataRate); the encoder must be streaming
+    params:
+      encoder: { type: int, min: 1, max: 2, required: true, label: Encoder, description: "Encoder 1 or 2, as the Command Center numbers them." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStreamingVideoDataRate,{encoder}" }
+    expect: { status: 200, matches: "^\\s*BITRATE:\\s*(\\d+)\\s*$" }
+    returns: value
+
+  set_rtsp:
+    summary: >
+      Set an encoder's RTSP path and port (SetRTSP); refused unless the unit
+      is idle, neither streaming nor recording
+    params:
+      encoder: { type: int, min: 1, max: 2, required: true, label: Encoder, description: "Encoder 1 or 2, as the Command Center numbers them." }
+      name: { type: string, required: true, max_length: 255, pattern: "^[A-Za-z0-9.:=/]+$", label: Stream path, description: "The path RTSP clients connect to; letters, digits and . : = / only, as the guide allows." }
+      port: { type: enum, values: ["554", "8554"], default: "554", label: RTSP port, description: "The RTSP server's port, 554 or 8554." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetRTSP,{encoder},{name},{port}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  get_rtsp:
+    summary: >
+      Read an encoder's RTSP settings, the URL, the name and the port
+      (GetRTSP), whether or not it is set to RTSP; returns the reply text
+    params:
+      encoder: { type: int, min: 1, max: 2, required: true, label: Encoder, description: "Encoder 1 or 2, as the Command Center numbers them." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRTSP,{encoder}" }
+    expect: { status: 200, matches: "^\\s*([^\\s,][^,]*,[\\s\\S]*\\S)\\s*$" }
+    returns: value
+
+  set_rtmp:
+    summary: >
+      Set an encoder's RTMP server URL and stream name, with no credential
+      (SetRTMP); refused unless the unit is idle, neither streaming nor
+      recording
+    params:
+      encoder: { type: int, min: 1, max: 2, required: true, label: Encoder, description: "Encoder 1 or 2, as the Command Center numbers them." }
+      url: { type: string, required: true, max_length: 1024, pattern: "^[A-Za-z0-9.:=/]+$", label: Server URL, description: "The RTMP server URL, such as rtmp://192.168.66.200/live; letters, digits and . : = / only, as the guide allows." }
+      stream: { type: string, required: true, max_length: 1024, pattern: "^[^,]+$", label: Stream name, description: "The stream name or key the server gives; no commas, which separate the command's arguments." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetRTMP,{encoder},{url},{stream:url}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  set_rtmp_with_credentials:
+    summary: >
+      Set an encoder's RTMP server URL, stream name, username and password
+      (SetRTMP); refused unless the unit is idle, neither streaming nor
+      recording
+    params:
+      encoder: { type: int, min: 1, max: 2, required: true, label: Encoder, description: "Encoder 1 or 2, as the Command Center numbers them." }
+      url: { type: string, required: true, max_length: 1024, pattern: "^[A-Za-z0-9.:=/]+$", label: Server URL, description: "The RTMP server URL, such as rtmp://192.168.66.200/live; letters, digits and . : = / only, as the guide allows." }
+      stream: { type: string, required: true, max_length: 1024, pattern: "^[^,]+$", label: Stream name, description: "The stream name or key the server gives; no commas, which separate the command's arguments." }
+      username: { type: string, required: true, max_length: 255, pattern: "^[^,]+$", label: RTMP username, description: "The user the RTMP server asks for; no commas." }
+      password: { type: string, required: true, secret: true, max_length: 255, pattern: "^[^,]+$", label: RTMP password, description: "That user's password; no commas." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetRTMP,{encoder},{url},{stream:url},{username:url},{password:url}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  get_rtmp:
+    summary: >
+      Read an encoder's RTMP server URL and stream name (GetRTMP), whether
+      or not it is set to RTMP; returns the reply text
+    params:
+      encoder: { type: int, min: 1, max: 2, required: true, label: Encoder, description: "Encoder 1 or 2, as the Command Center numbers them." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRTMP,{encoder}" }
+    expect: { status: 200, matches: "^\\s*([^\\s,][^,]*,[\\s\\S]*\\S)\\s*$" }
+    returns: value
+
+  set_both_rtmp_paths:
+    summary: >
+      Set both encoders' RTMP server URLs and stream names in one command,
+      with no credentials (SetBothRtmpPaths); refused unless the unit is
+      idle, neither streaming nor recording
+    params:
+      url1: { type: string, required: true, max_length: 1024, pattern: "^rtmps?://[A-Za-z0-9.:=/]+$", label: Encoder 1 server URL, description: "Encoder 1's RTMP server URL, starting rtmp:// or rtmps://; letters, digits and . : = / only, as the guide allows." }
+      stream1: { type: string, required: true, max_length: 1024, pattern: "^[^,]+$", label: Encoder 1 stream name, description: "Encoder 1's stream name or key; no commas, and never holding rtmp:// or rtmps://." }
+      url2: { type: string, required: true, max_length: 1024, pattern: "^rtmps?://[A-Za-z0-9.:=/]+$", label: Encoder 2 server URL, description: "Encoder 2's RTMP server URL, starting rtmp:// or rtmps://; letters, digits and . : = / only, as the guide allows." }
+      stream2: { type: string, required: true, max_length: 1024, pattern: "^[^,]+$", label: Encoder 2 stream name, description: "Encoder 2's stream name or key; no commas, and never holding rtmp:// or rtmps://." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetBothRtmpPaths,{url1},{stream1:url},{url2},{stream2:url}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  set_both_rtmp_paths_with_credentials:
+    summary: >
+      Set both encoders' RTMP server URLs, stream names, usernames and
+      passwords in one command (SetBothRtmpPaths); refused unless the unit
+      is idle, neither streaming nor recording
+    params:
+      url1: { type: string, required: true, max_length: 1024, pattern: "^rtmps?://[A-Za-z0-9.:=/]+$", label: Encoder 1 server URL, description: "Encoder 1's RTMP server URL, starting rtmp:// or rtmps://; letters, digits and . : = / only, as the guide allows." }
+      stream1: { type: string, required: true, max_length: 1024, pattern: "^[^,]+$", label: Encoder 1 stream name, description: "Encoder 1's stream name or key; no commas, and never holding rtmp:// or rtmps://." }
+      username1: { type: string, required: true, max_length: 255, pattern: "^[^,]+$", label: Encoder 1 username, description: "The user encoder 1's RTMP server asks for; no commas." }
+      password1: { type: string, required: true, secret: true, max_length: 255, pattern: "^[^,]+$", label: Encoder 1 password, description: "That user's password; no commas." }
+      url2: { type: string, required: true, max_length: 1024, pattern: "^rtmps?://[A-Za-z0-9.:=/]+$", label: Encoder 2 server URL, description: "Encoder 2's RTMP server URL, starting rtmp:// or rtmps://; letters, digits and . : = / only, as the guide allows." }
+      stream2: { type: string, required: true, max_length: 1024, pattern: "^[^,]+$", label: Encoder 2 stream name, description: "Encoder 2's stream name or key; no commas, and never holding rtmp:// or rtmps://." }
+      username2: { type: string, required: true, max_length: 255, pattern: "^[^,]+$", label: Encoder 2 username, description: "The user encoder 2's RTMP server asks for; no commas." }
+      password2: { type: string, required: true, secret: true, max_length: 255, pattern: "^[^,]+$", label: Encoder 2 password, description: "That user's password; no commas." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetBothRtmpPaths,{url1},{stream1:url},{username1:url},{password1:url},{url2},{stream2:url},{username2:url},{password2:url}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  set_record_file_name:
+    summary: >
+      Set the name, or path and name, an encoder records to
+      (SetRecordFileName); refused while the unit streams or records
+    params:
+      encoder: { type: int, min: 1, max: 2, required: true, label: Encoder, description: "Encoder 1 or 2, as the Command Center numbers them." }
+      filename: { type: string, required: true, max_length: 1024, pattern: "^[A-Za-z0-9/.:-]+$", label: File name, description: "Letters, digits, - and /, plus . and : when recording to a network drive, as the guide allows; every folder named must exist." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetRecordFileName,{encoder},{filename}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  get_record_file_name:
+    summary: Read the name, or path and name, an encoder records to (GetRecordFileName)
+    params:
+      encoder: { type: int, min: 1, max: 2, required: true, label: Encoder, description: "Encoder 1 or 2, as the Command Center numbers them." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRecordFileName,{encoder}" }
+    expect: { status: 200, matches: "^\\s*RECORD FILENAME:\\s*(.*?)\\s*$" }
+    returns: value
+
+  set_video_input:
+    summary: >
+      Choose the video input (SetVideoInput): input A's SDI or HDMI
+      connector, or input B's HDMI in Single-isolated mode only; refused
+      while the unit streams or records
+    params:
+      input: { type: enum, values: [INPUT_A_SDI, INPUT_A_HDMI, INPUT_B_HDMI], required: true, label: Video input, description: "Input A on its SDI or HDMI connector, or input B (HDMI), which only Single-isolated mode takes." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetVideoInput,{input}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  get_video_input:
+    summary: Read the video input or inputs in use (GetVideoInput), returned as the unit words it after VIDEO INPUT
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetVideoInput" }
+    expect: { status: 200, matches: "^\\s*VIDEO INPUT:\\s*(\\S[\\s\\S]*?)\\s*$" }
+    returns: value
+
+  set_audio_input:
+    summary: >
+      Choose the audio input (SetAudioInput): analog, or the digital audio
+      of input A (its SDI or HDMI connector, as selected) or input B;
+      refused while the unit streams or records
+    params:
+      input: { type: enum, values: [INPUT_ANALOG, INPUT_A, INPUT_B], required: true, label: Audio input, description: "Analog audio, or the digital audio embedded in input A or input B." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetAudioInput,{input}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  get_audio_input:
+    summary: Read the audio input in use (GetAudioInput), such as INPUT_ANALOG or INPUT_A_SDI, as the unit words it after AUDIO INPUT
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetAudioInput" }
+    expect: { status: 200, matches: "^\\s*AUDIO INPUT:\\s*(\\S[\\s\\S]*?)\\.?\\s*$" }
+    returns: value
+
+  set_transfer_location:
+    summary: >
+      Set the File Transfer feature's source media and the network share it
+      copies recordings to, with no credential (SetTransferLocation);
+      SUCCESS when the share can be mounted and written
+    params:
+      source: { type: enum, values: [USB1, USB2, SDCARD], required: true, label: Source, description: "The media holding the recordings to transfer." }
+      destination: { type: string, required: true, max_length: 1024, pattern: "^[A-Za-z0-9_./\\\\:]+$", label: Destination, description: "The network share that receives the files, such as 192.168.12.34/recordings; letters, digits, _ / \\ : and dots." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetTransferLocation,{source},{destination:url}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  set_transfer_location_with_credentials:
+    summary: >
+      Set the File Transfer feature's source media and the network share it
+      copies recordings to, with the share's domain, username and password
+      (SetTransferLocation); SUCCESS when the share can be mounted and
+      written
+    params:
+      source: { type: enum, values: [USB1, USB2, SDCARD], required: true, label: Source, description: "The media holding the recordings to transfer." }
+      destination: { type: string, required: true, max_length: 1024, pattern: "^[A-Za-z0-9_./\\\\:]+$", label: Destination, description: "The network share that receives the files, such as 192.168.12.34/recordings; letters, digits, _ / \\ : and dots." }
+      domain: { type: string, default: WORKGROUP, max_length: 255, pattern: "^[A-Za-z0-9_/\\\\:]+$", label: Domain, description: "The network domain hosting the share; WORKGROUP is Windows' default." }
+      username: { type: string, required: true, max_length: 255, pattern: "^[A-Za-z0-9_/\\\\:]+$", label: Share username, description: "The user the share asks for; letters, digits, _ / \\ and : only." }
+      password: { type: string, required: true, secret: true, max_length: 255, pattern: "^[^,]+$", label: Share password, description: "That user's password; no commas." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetTransferLocation,{source},{destination:url},{domain:url},{username:url},{password:url}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  start_transfer:
+    summary: Start copying the recordings not yet transferred to the network share (StartTransfer); set_transfer_location first
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=StartTransfer" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  start_transfer_all:
+    summary: Start copying every recording to the network share (StartTransferAll); set_transfer_location first
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=StartTransferAll" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  stop_transfer:
+    summary: Stop the file transfer in progress (StopTransfer)
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=StopTransfer" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  set_operating_mode:
+    summary: >
+      Set the operating mode with its video input, audio input and outputs
+      (SetOperatingMode), the composition left at its default
+    params:
+      mode: { type: enum, values: [SINGLEISOLATED, DUALISOLATED, PICTUREINPICTURE, SIDEBYSIDE, FULLSCREENSWITCH], required: true, label: Operating mode, description: "Single-isolated, Dual-isolated, Picture-in-picture, Side-by-side or Full-screen switch." }
+      video_input: { type: enum, values: [INPUT_A_HDMI, INPUT_A_SDI, INPUT_B_HDMI], required: true, label: Video input, description: "Input A on its HDMI or SDI connector, or input B, which only Single-isolated mode takes." }
+      audio_input: { type: enum, values: [INPUT_ANALOG, INPUT_A, INPUT_B], required: true, label: Audio input, description: "Analog audio, or the digital audio of input A (its selected connector) or input B." }
+      sdi_output: { type: enum, values: [INPUT_A, INPUT_B], required: true, label: SDI output, description: "The input routed to the SDI output; in Single-isolated mode it mirrors the input." }
+      hdmi_output: { type: enum, values: [INPUT_A, INPUT_B, COMPOSITION], required: true, label: HDMI output, description: "The input routed to the HDMI output, or the composition of both." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetOperatingMode,{mode},{video_input},{audio_input},{sdi_output},{hdmi_output}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  set_operating_mode_with_composition:
+    summary: >
+      Set the operating mode with its video input, audio input, outputs,
+      composition and picture-in-picture cropping (SetOperatingMode), for
+      Picture-in-picture and Side-by-side modes
+    params:
+      mode: { type: enum, values: [PICTUREINPICTURE, SIDEBYSIDE], required: true, label: Operating mode, description: "Picture-in-picture or Side-by-side, the modes that take a composition." }
+      video_input: { type: enum, values: [INPUT_A_HDMI, INPUT_A_SDI], required: true, label: Video input, description: "Input A on its HDMI or SDI connector." }
+      audio_input: { type: enum, values: [INPUT_ANALOG, INPUT_A, INPUT_B], required: true, label: Audio input, description: "Analog audio, or the digital audio of input A (its selected connector) or input B." }
+      sdi_output: { type: enum, values: [INPUT_A, INPUT_B], required: true, label: SDI output, description: "The input routed to the SDI output." }
+      hdmi_output: { type: enum, values: [INPUT_A, INPUT_B, COMPOSITION], required: true, label: HDMI output, description: "The input routed to the HDMI output, or the composition of both." }
+      composition: { type: enum, values: [PIP_TL, PIP_TR, PIP_BL, PIP_BR, SBS_AB, SBS_BA, SBS_ACB, SBS_BAC], required: true, label: Composition, description: "PIP_ places the inset top or bottom, left or right (Picture-in-picture only); SBS_ puts A or B on the left, C marking the cropped one (Side-by-side only)." }
+      crop: { type: bool, default: false, label: Crop picture-in-picture, description: "True crops the picture-in-picture video where the composition places it." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetOperatingMode,{mode},{video_input},{audio_input},{sdi_output},{hdmi_output},{composition},{crop:map.true_false}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  set_dynamic_output:
+    summary: >
+      Switch what the output shows (SetDynamicOutput): input A or B in
+      Dual-isolated and Full-screen switch modes, the inset shown or hidden
+      in Picture-in-picture mode; SUCCESS without effect in Single-isolated
+      and Side-by-side modes
+    params:
+      output: { type: enum, values: [SHOW_A, SHOW_B, HIDE_A], required: true, label: Output, description: "SHOW_A or SHOW_B in Dual-isolated and Full-screen switch modes; SHOW_A or HIDE_A in Picture-in-picture mode." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetDynamicOutput,{output}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  reboot:
+    summary: Reboot the unit (AskForReboot), interrupting any stream, recording or transfer
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=AskForReboot" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+telemetry:
+  # The unit pushes nothing. GetStatus is read every 2 seconds, the inputs
+  # and the streaming bit rates every 10, and the settings every 30. Every
+  # command's reply goes through these rules too, and a change that
+  # succeeded reads back what it changed.
+  poll:
+    - every_ms: 2000
+      send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStatus" }
+    - every_ms: 10000
+      send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetInputStatus" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStreamingVideoDataRate,1" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStreamingVideoDataRate,2" }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetVideoInput" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetAudioInput" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRTSP,1" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRTSP,2" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRTMP,1" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRTMP,2" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRecordFileName,1" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRecordFileName,2" }
+  updates:
+    # Status.
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetStatus$"
+      match: "^\\s*ENC1:\\s*([A-Z]+)\\s*,\\s*([A-Z]+)\\s*,\\s*ENC2:\\s*([A-Z]+)\\s*,\\s*([A-Z]+)\\s*,\\s*FILETRANSFER:\\s*([A-Z]+)\\s*,\\s*NAME:\\s*(.*?)\\s*$"
+      state:
+        encoders.1.mode: "{1}"
+        encoders.1.state: "{2}"
+        encoders.1.active: { value: "{2}", map: { "ON": true, "OFF": false, "READY": false, "DISABLED": false } }
+        encoders.2.mode: "{3}"
+        encoders.2.state: "{4}"
+        encoders.2.active: { value: "{4}", map: { "ON": true, "OFF": false, "READY": false, "DISABLED": false } }
+        file_transfer.state: "{5}"
+        file_transfer.on: { value: "{5}", map: { "ON": true, "OFF": false } }
+        device.name: "{6}"
+
+    # Inputs: what one reply says replaces the last.
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetInputStatus$"
+      match: "(?:fps|No video input)"
+      replace: [input, inputs]
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetInputStatus$"
+      match: "^\\s*([\\s\\S]*(?:fps|No video input)[\\s\\S]*?)\\s*$"
+      state: { input.status: "{1}" }
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetInputStatus$"
+      match: "(?:^|;)\\s*(SDI|HDMI) A\\s*:\\s*(\\d+)\\s*x\\s*(\\d+)\\s*([ip])\\s*,\\s*([0-9]+(?:\\.[0-9]+)?)\\s*fps"
+      state:
+        inputs.a.connector: "{1}"
+        inputs.a.width: "{2}"
+        inputs.a.height: "{3}"
+        inputs.a.scan: { value: "{4}", map: { i: interlaced, p: progressive } }
+        inputs.a.frame_rate: "{5}"
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetInputStatus$"
+      match: "(?:^|;)\\s*(HDMI) B\\s*:\\s*(\\d+)\\s*x\\s*(\\d+)\\s*([ip])\\s*,\\s*([0-9]+(?:\\.[0-9]+)?)\\s*fps"
+      state:
+        inputs.b.connector: "{1}"
+        inputs.b.width: "{2}"
+        inputs.b.height: "{3}"
+        inputs.b.scan: { value: "{4}", map: { i: interlaced, p: progressive } }
+        inputs.b.frame_rate: "{5}"
+
+    # Streaming bit rate (answered only while the encoder streams).
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetStreamingVideoDataRate,([12])$"
+      match: "^\\s*BITRATE:\\s*(\\d+)\\s*$"
+      state: { "encoders.{1}.bitrate_kbps": "{2}" }
+
+    # Settings.
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetRTSP,([12])$"
+      match: "^\\s*([^\\s,][^,]*?)\\s*,\\s*([^,]*?)\\s*,\\s*(\\d+)\\s*$"
+      state:
+        "encoders.{1}.rtsp.url": "{2}"
+        "encoders.{1}.rtsp.name": "{3}"
+        "encoders.{1}.rtsp.port": "{4}"
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetRTMP,([12])$"
+      match: "^\\s*([^\\s,][^,]*?)\\s*,\\s*(.*?)\\s*$"
+      state:
+        "encoders.{1}.rtmp.url": "{2}"
+        "encoders.{1}.rtmp.stream_name": "{3}"
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetRecordFileName,([12])$"
+      match: "^\\s*RECORD FILENAME:\\s*(.*?)\\s*$"
+      state: { "encoders.{1}.record_file_name": "{2}" }
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetVideoInput$"
+      match: "^\\s*VIDEO INPUT:\\s*(\\S[\\s\\S]*?)\\s*$"
+      state: { video_input: "{1}" }
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetAudioInput$"
+      match: "^\\s*AUDIO INPUT:\\s*(\\S[\\s\\S]*?)\\.?\\s*$"
+      state: { audio_input: "{1}" }
+
+    # Read-backs after a change the unit accepted.
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=(?:(?:Start|Stop)BothEncoders|StartTransfer|StartTransferAll|StopTransfer)$"
+      match: "^\\s*SUCCESS\\s*$"
+      then_send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStatus" }
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=SetStreamingVideoDataRate,([12]),"
+      match: "^\\s*SUCCESS\\s*$"
+      then_send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStreamingVideoDataRate,{1}" }
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=SetRTSP,([12]),"
+      match: "^\\s*SUCCESS\\s*$"
+      then_send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRTSP,{1}" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStatus" }
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=SetRTMP,([12]),"
+      match: "^\\s*SUCCESS\\s*$"
+      then_send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRTMP,{1}" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStatus" }
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=SetBothRtmpPaths,"
+      match: "^\\s*SUCCESS\\s*$"
+      then_send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRTMP,1" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRTMP,2" }
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=SetRecordFileName,([12]),"
+      match: "^\\s*SUCCESS\\s*$"
+      then_send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRecordFileName,{1}" }
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=(?:SetVideoInput|SetOperatingMode),"
+      match: "^\\s*SUCCESS\\s*$"
+      then_send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetVideoInput" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetAudioInput" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetInputStatus" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStatus" }
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=SetAudioInput,"
+      match: "^\\s*SUCCESS\\s*$"
+      then_send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetAudioInput" }
+
+state:
+  device.name: { type: string, description: "The device name set in the Command Center, from GetStatus" }
+  encoders.*.mode: { type: string, description: "The encoder's mode, keyed 1 or 2: RTSP, RTMP, RECORD or NONE" }
+  encoders.*.state: { type: string, description: "The encoder's state: ON (streaming, an RTSP client connected, or recording), OFF, READY or DISABLED" }
+  encoders.*.active: { type: bool, description: "True when the encoder's state is ON" }
+  encoders.*.bitrate_kbps: { type: int, unit: kbit/s, description: "The streaming encoder's average video bit rate, read while it streams; the last value read stays while it does not" }
+  encoders.*.rtsp.url: { type: string, description: "The RTSP URL GetRTSP gives, whether or not the encoder is set to RTSP" }
+  encoders.*.rtsp.name: { type: string, description: "The RTSP stream name GetRTSP gives" }
+  encoders.*.rtsp.port: { type: int, description: "The RTSP port, 554 or 8554" }
+  encoders.*.rtmp.url: { type: string, description: "The RTMP server URL GetRTMP gives, whether or not the encoder is set to RTMP" }
+  encoders.*.rtmp.stream_name: { type: string, description: "The RTMP stream name GetRTMP gives" }
+  encoders.*.record_file_name: { type: string, description: "The name, or path and name, the encoder records to" }
+  file_transfer.state: { type: string, description: "The FILETRANSFER state GetStatus gives: ON or OFF" }
+  file_transfer.on: { type: bool, description: "True when the FILETRANSFER state is ON" }
+  video_input: { type: string, description: "GetVideoInput's text after VIDEO INPUT: INPUT_A_SDI, INPUT_A_HDMI or INPUT_B_HDMI in Single-isolated mode, input A's connector and INPUT_B_HDMI in the others" }
+  audio_input: { type: string, description: "GetAudioInput's text after AUDIO INPUT: INPUT_ANALOG, INPUT_A_SDI, INPUT_A_HDMI or INPUT_B_HDMI" }
+  input.status: { type: string, description: "GetInputStatus's text as the unit gives it, such as \"SDI A: 1920x1080i, 29.97 fps;HDMI B: 1920x1080p, 60 fps\"" }
+  inputs.*.connector: { type: string, description: "The connector carrying a signal on input a or b: SDI or HDMI; absent while the unit reports no signal there or does not report the input" }
+  inputs.*.width: { type: int, unit: px, description: "The input's frame width" }
+  inputs.*.height: { type: int, unit: px, description: "The input's frame height" }
+  inputs.*.scan: { type: string, description: "interlaced or progressive, from the i or p after the resolution" }
+  inputs.*.frame_rate: { type: float, unit: fps, description: "The input's frame rate" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      reboot (AskForReboot) restarts the unit at once, interrupting any
+      stream, recording or file transfer. set_operating_mode and
+      set_operating_mode_with_composition change the inputs, outputs and
+      layout live; set_dynamic_output switches what the outputs show.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The unit runs one command at a time: a command arriving while another
+      executes (from this or another client, such as the Command Center)
+      answers RETRY and does nothing, and the command fails here with the
+      reply. Send it again. Changes answered FAILED or RETRY also fail
+      here; SUCCESS is the only success.
+
+  - models: [all]
+    severity: warning
+    text: >
+      set_rtsp, set_rtmp, set_rtmp_with_credentials, set_both_rtmp_paths,
+      set_record_file_name, set_video_input and set_audio_input are refused
+      (FAILED) while the unit streams or records: stop the encoders first.
+      set_streaming_video_data_rate and get_streaming_video_data_rate work
+      only on an encoder that is streaming, so encoders.<n>.bitrate_kbps is
+      the last rate read while it streamed. The API has no command to read
+      the operating mode, its composition, the dynamic output or the
+      transfer location back, nor to start or stop one encoder alone; an
+      encoder's mode and encoding settings, the transfer window, automatic
+      transfer, the scheduler and Kaltura are set in the Command Center
+      only.
+
+  - models: [all]
+    severity: info
+    text: >
+      Arguments follow the command name, separated by commas, so no argument
+      may hold a comma. The RTMP and RTSP URLs, the file name and the
+      enumerated values are sent as they are and limited to the characters
+      the guide allows; stream names, usernames, passwords, the transfer
+      destination and domain are percent-encoded, which the unit is taken
+      to decode. SetBothRtmpPaths without credentials is sent as the two
+      URL and stream name pairs, which the unit tells apart by their
+      rtmp:// or rtmps:// prefix. The guide writes SetRTMP's arguments with
+      a space after each comma and without the command name; this spec
+      sends SetRTMP,<encoder>,<url>,<stream> with no spaces. Username and
+      password are sent together or not at all, and the transfer
+      location's domain goes with them. The guide's first SetOperatingMode
+      example names a mode DUALINPUT that its list of modes does not have;
+      this spec offers the listed modes only.
+
+  - models: [all]
+    severity: info
+    text: >
+      Replies are plain text. The shapes of GetRTSP ("URL, name, port") and
+      GetRTMP ("Url name, stream name") are read as comma-separated fields,
+      and GetInputStatus's text is read into each input's connector, size,
+      scan and frame rate from the guide's one example; input.status keeps
+      the whole text, which is the only record of an input reported without
+      a signal. What FILETRANSFER ON means (a transfer running, or the
+      feature enabled) is not stated. The guide documents the credential as
+      the userinfo of the URL; it is sent as HTTP Basic (a Digest challenge
+      is answered too). HTTPS is "also supported" with the unit's own
+      certificate, taken to be on port 443.
+
+  - models: [all]
+    severity: info
+    text: >
+      Outside the HTTP API: the XML configuration file (imported in the
+      Command Center, from a USB key at a factory reset, or fetched by the
+      unit from a "call home" URL it is given), which carries the encoding,
+      recording, streaming, file transfer, Kaltura and scheduler settings,
+      and the Windows MonarchLCSUtils program for updating and rebooting.

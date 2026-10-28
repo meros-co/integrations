@@ -1,0 +1,579 @@
+spec: 1
+id: kiloview-kilolink-server
+name: Kiloview KiloLink Server Pro
+vendor: Kiloview
+category: other
+
+source:
+  - title: KiloLink Server Pro API (EN, 2025.6), KiloLink-Server-Pro-API-en（2025.6）.docx
+    author: Kiloview
+    url: https://enstatic.kiloview.com/wp-content/uploads/2026/10/KiloLink-Server-Pro-API-en%EF%BC%882025.6%EF%BC%89.docx
+    note: >
+      Manufacturer document, linked from https://www.kiloview.com/en/docs/kilolink-server-free/api/
+      (KiloLink Server Pro API, checked 2026-10-27). The source of every
+      request and field here: KilolinkServer API (Login; navigation bar
+      permissions; the node tree; adding, deleting, modifying, renaming and
+      moving users, devices, groups and organizations; device access
+      control; firmware list, types and descriptions; the device list;
+      own password and nickname; batch delete, reboot, reset, upgrade and
+      upgrade cancel; device stream control; device modes and types;
+      random keys), Appendix 1 (the tree), Appendix 2 (node attributes)
+      and Appendix 4 (error codes). It gives no port, no request body
+      format and not how the login token is sent back. Its first part,
+      the KiloLink Server Pro Client API (/kilolink/kilolink/Get.json,
+      Set.json, NetworkInterface.json), is served by the devices that
+      connect to the server, names no device, and is not part of this spec.
+  - title: KiloLink Server Pro User Manual V1.5 (draft, 2024-08-06)
+    author: Kiloview
+    url: https://enstatic.kiloview.com/wp-content/uploads/2025/08/Kilolink_Server_Pro_User_Manual-V1.5-draft-240806.pdf
+    note: >
+      Manufacturer document, linked from https://www.kiloview.com/en/docs/kilolink-server-free/user-manual/.
+      Used for what the server is (Docker-deployed software managing
+      KiloLink bonding encoders and their streams), its web access on TCP
+      80 by default (2.6, chosen at installation, with 50000-50001 for the
+      devices' KiloLink connections), the default administrator admin /
+      Kiloview001, and that device permissions, moves and upgrades need
+      the admin user.
+  - title: Kiloview CUBE R1 spec in this repository (specs/kiloview-cube-r1.yaml)
+    author: meros-co/integrations
+    url: https://github.com/meros-co/integrations/blob/main/specs/kiloview-cube-r1.yaml
+    note: >
+      Another Kiloview web API whose document also leaves the token's
+      return path unsaid; this spec sends the token the same two ways (see
+      quirks).
+
+transport:
+  type: http
+  port: 80
+  scheme: http
+  # The document says every request after the login needs its token and
+  # the user name, not how. The token setting is sent both ways other
+  # Kiloview web APIs take it: as it is in Authorization, and in a cookie
+  # with the user name.
+  auth: header
+  auth_header: Authorization
+  headers:
+    Cookie: "user={settings.username}; token={settings.token}"
+  timeout_ms: 5000
+
+settings:
+  token:
+    type: string
+    secret: true
+    max_length: 512
+    default: ""
+    label: Login token
+    description: "The token the login command returns, sent with every request; run login and store its result here with update_settings."
+  username:
+    type: string
+    max_length: 64
+    default: admin
+    label: User name
+    description: "The user the token belongs to, sent with the token; the server's default administrator is admin."
+
+ports:
+  - { port: 80, protocol: http, role: control, note: "the web management port, chosen at installation (80 by default)" }
+
+models:
+  - id: kilolink-server-pro
+    name: Kiloview KiloLink Server Pro
+    supports:
+      - login
+      - get_own_menu
+      - get_group_menus
+      - set_group_menu
+      - get_tree
+      - get_tree_under
+      - add_node
+      - add_device
+      - add_group
+      - add_organization
+      - delete_node
+      - delete_nodes
+      - modify_node
+      - rename_node
+      - move_node
+      - move_devices
+      - set_device_access
+      - get_firmware_list
+      - find_firmware
+      - get_firmware_types
+      - set_firmware_description
+      - get_devices
+      - get_devices_under
+      - change_own_password
+      - change_own_nickname
+      - reboot_devices
+      - reset_devices
+      - upgrade_devices
+      - cancel_upgrade
+      - set_stream
+      - set_all_streams
+      - get_device_modes
+      - get_device_types
+      - create_random_key
+      - create_device_key
+    verification: none
+    notes: >
+      Server software (deployed with Docker) that KiloLink bonding encoders
+      connect to: it receives their bonded streams and manages the devices,
+      users, groups and organizations (an LDAP directory under
+      cn=admin,dc=kiloview,dc=com), firmware distribution and streams.
+
+commands:
+  login:
+    summary: Log in and return the token for the token setting (POST /api/tools/login.json)
+    params:
+      username: { type: string, required: true, max_length: 64, label: User name, description: "The user to log in as; the default administrator is admin." }
+      password: { type: string, required: true, secret: true, max_length: 128, label: Password, description: "That user's password; the default administrator's is Kiloview001." }
+    send: { method: POST, path: /api/tools/login.json, content_type: application/json, body: '{"username":{username:json},"password":{password:json}}' }
+    expect: { status: 200, json_path: "$.token" }
+    returns: value
+  get_own_menu:
+    summary: Return which parts of the navigation bar the logged-in user sees (GET /api/tools/getSelfMenu.json)
+    send: { method: GET, path: /api/tools/getSelfMenu.json }
+    expect: &json { status: 200, json_path: "$" }
+    returns: value
+  get_group_menus:
+    summary: Return each user group's navigation bar permissions (GET /api/tools/getRdControl.json)
+    send: { method: GET, path: /api/tools/getRdControl.json }
+    expect: *json
+    returns: value
+  set_group_menu:
+    summary: Set a user group's navigation bar permissions, all four at once (POST /api/tools/setRdControl.json)
+    params:
+      group: { type: string, required: true, max_length: 512, label: Group DN, description: "The user group's distinguished name, such as cn=kiloview,ou=KVGroups,cn=admin,dc=kiloview,dc=com." }
+      device_control: { type: bool, required: true, label: Device management, description: "Whether the group may manage devices." }
+      user_control: { type: bool, required: true, label: User management, description: "Whether the group may manage users." }
+      upload_control: { type: bool, required: true, label: Firmware upload, description: "Whether the group may upload firmware." }
+      send_control: { type: bool, required: true, label: Firmware distribution, description: "Whether the group may send firmware to devices." }
+    send: { method: POST, path: /api/tools/setRdControl.json, content_type: application/json, body: '{"deviceControl":{device_control},"userControl":{user_control},"uploadControl":{upload_control},"sendControl":{send_control},"dn":{group:json}}' }
+    expect: &ok { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+  get_tree:
+    summary: Return the whole node tree (organizations, groups, users, devices) from the root (POST /api/tools/searchFix.json)
+    send: { method: POST, path: /api/tools/searchFix.json, content_type: application/json, body: '{}' }
+    expect: &data { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+  get_tree_under:
+    summary: Return the node tree under a node (POST /api/tools/searchFix.json)
+    params:
+      dn: &dn { type: string, required: true, max_length: 512, label: Node DN, description: "The node's distinguished name, such as cn=device1,ou=KVDevices,cn=admin,dc=kiloview,dc=com." }
+    send: { method: POST, path: /api/tools/searchFix.json, content_type: application/json, body: '{"dn":{dn:json}}' }
+    expect: *data
+    returns: value
+  add_node:
+    summary: "Add a user, device, group or organization under a node; cfg is the API's attributes object (Appendix 2) (POST /api/tools/add.json)"
+    params:
+      parent: &parent { type: string, required: true, max_length: 512, label: Parent DN, description: "The distinguished name of the node it is added under, such as ou=KVDevices,cn=admin,dc=kiloview,dc=com." }
+      type: &node_type { type: enum, values: [user, device, group, organization], required: true, label: Type, description: "What the node is: user, device, group or organization (a folder)." }
+      cfg: { type: json, required: true, label: Attributes, description: "The node's attributes as Appendix 2 lists them: a device's cn, ipHostNumber, serialNumber, description (its authorization key) and o; a group's cn and uniqueMember; an organization's ou; a user's uid, cn, sn, uidNumber, gidNumber, homeDirectory and userPassword." }
+    send: { method: POST, path: /api/tools/add.json, content_type: application/json, body: '{"dn":{parent:json},"cfg":{cfg},"type":{type:json}}' }
+    expect: *ok
+    returns: ack
+  add_device:
+    summary: Add a device under a node by serial number and authorization key (POST /api/tools/add.json)
+    params:
+      parent: { type: string, default: "ou=KVDevices,cn=admin,dc=kiloview,dc=com", max_length: 512, label: Parent DN, description: "The distinguished name of the folder it is added to; the devices folder by default." }
+      name: { type: string, required: true, max_length: 128, label: Name, description: "The device's name (cn), changed later only by rename_node." }
+      serial_number: { type: string, required: true, max_length: 64, label: Serial number, description: "The device's serial number." }
+      key: { type: string, required: true, max_length: 128, label: Authorization key, description: "The device's authorization key (description), as create_device_key can make one." }
+      ip: { type: string, default: "192.168.0.1", max_length: 64, label: IP address, description: "The device's IP address, which the directory requires; 192.168.0.1 by default." }
+      remark: { type: string, default: "", max_length: 256, label: Remark, description: "A note on the device (o); empty for none." }
+    send: { method: POST, path: /api/tools/add.json, content_type: application/json, body: '{"dn":{parent:json},"cfg":{"cn":{name:json},"ipHostNumber":{ip:json},"serialNumber":{serial_number:json},"description":{key:json},"o":{remark:json}},"type":"device"}' }
+    expect: *ok
+    returns: ack
+  add_group:
+    summary: "Add a user group; members is the API's uniqueMember list of user DNs (POST /api/tools/add.json)"
+    params:
+      parent: { type: string, default: "ou=KVGroups,cn=admin,dc=kiloview,dc=com", max_length: 512, label: Parent DN, description: "The distinguished name of the folder it is added to; the groups folder by default." }
+      name: { type: string, required: true, max_length: 128, label: Name, description: "The group's name (cn), changed later only by rename_node." }
+      members: { type: json, required: true, label: Members, description: "The distinguished names of the users in the group, as a list of strings." }
+    send: { method: POST, path: /api/tools/add.json, content_type: application/json, body: '{"dn":{parent:json},"cfg":{"cn":{name:json},"uniqueMember":{members}},"type":"group"}' }
+    expect: *ok
+    returns: ack
+  add_organization:
+    summary: Add an organization (a folder) under a node (POST /api/tools/add.json)
+    params:
+      parent: *parent
+      name: { type: string, required: true, max_length: 128, label: Name, description: "The folder's name (ou), changed later only by rename_node." }
+    send: { method: POST, path: /api/tools/add.json, content_type: application/json, body: '{"dn":{parent:json},"cfg":{"ou":{name:json}},"type":"organization"}' }
+    expect: *ok
+    returns: ack
+  delete_node:
+    summary: Delete a user, device, group or organization (POST /api/tools/delete.json)
+    params:
+      dn: *dn
+    send: { method: POST, path: /api/tools/delete.json, content_type: application/json, body: '{"dn":{dn:json}}' }
+    expect: *ok
+    returns: ack
+  delete_nodes:
+    summary: "Delete several nodes; list is the API's list of DNs (POST /api/tools/deleteMany.json)"
+    params:
+      list: &dn_list { type: json, required: true, label: Node DNs, description: "The nodes' distinguished names, as a list of strings." }
+    send: { method: POST, path: /api/tools/deleteMany.json, content_type: application/json, body: '{"list":{list}}' }
+    expect: *ok
+    returns: ack
+  modify_node:
+    summary: "Replace a node's attributes; cfg is the API's attributes object with every property (POST /api/tools/modify.json)"
+    params:
+      dn: *dn
+      type: *node_type
+      cfg: { type: json, required: true, label: Attributes, description: "Every attribute of the node as Appendix 2 lists them, changed ones included; the name (cn, ou or uid) changes only by rename_node." }
+    send: { method: POST, path: /api/tools/modify.json, content_type: application/json, body: '{"dn":{dn:json},"cfg":{cfg},"type":{type:json}}' }
+    expect: *ok
+    returns: ack
+  rename_node:
+    summary: Rename a device node (POST /api/tools/rename.json)
+    params:
+      dn: *dn
+      name: { type: string, required: true, max_length: 128, label: New name, description: "The node's new name." }
+    send: { method: POST, path: /api/tools/rename.json, content_type: application/json, body: '{"dn":{dn:json},"new":{name:json}}' }
+    expect: *ok
+    returns: ack
+  move_node:
+    summary: Move a device node under another node (POST /api/tools/rename.json)
+    params:
+      dn: *dn
+      parent: { type: string, required: true, max_length: 512, label: New parent DN, description: "The distinguished name of the node it is moved under." }
+    send: { method: POST, path: /api/tools/rename.json, content_type: application/json, body: '{"dn":{dn:json},"parent":{parent:json}}' }
+    expect: *ok
+    returns: ack
+  move_devices:
+    summary: "Move several devices under another node; dns is the API's list of device DNs (POST /api/tools/move.json)"
+    params:
+      dns: { type: json, required: true, label: Device DNs, description: "The devices' distinguished names, as a list of strings." }
+      parent: { type: string, required: true, max_length: 512, label: New parent DN, description: "The distinguished name of the node they are moved under." }
+    send: { method: POST, path: /api/tools/move.json, content_type: application/json, body: '{"dns":{dns},"parent":{parent:json}}' }
+    expect: *ok
+    returns: ack
+  set_device_access:
+    summary: "Set a node's access control list; aci is the API's OpenLDAPaci list (POST /api/tools/aciSet.json)"
+    params:
+      dn: *dn
+      aci: { type: json, required: true, label: Access control list, description: "The OpenLDAP ACI entries, as a list, as the node tree reports them." }
+    send: { method: POST, path: /api/tools/aciSet.json, content_type: application/json, body: '{"dn":{dn:json},"OpenLDAPaci":{aci}}' }
+    expect: *ok
+    returns: ack
+  get_firmware_list:
+    summary: Return the uploaded firmware, grouped by device type (POST /api/tools/getFirmwareList.json)
+    send: { method: POST, path: /api/tools/getFirmwareList.json, content_type: application/json, body: '{}' }
+    expect: *data
+    returns: value
+  find_firmware:
+    summary: Return one page of the uploaded firmware matching a search (POST /api/tools/getFirmwareList.json)
+    params:
+      search: { type: string, required: true, max_length: 128, label: Search, description: "Text the firmware list is filtered by." }
+      page: { type: int, min: 1, default: 1, label: Page, description: "The page to return, numbered from 1." }
+      limit: { type: int, min: 1, default: 20, label: Page size, description: "Entries per page." }
+    send: { method: POST, path: /api/tools/getFirmwareList.json, content_type: application/json, body: '{"search":{search:json},"page":{page},"limit":{limit}}' }
+    expect: *data
+    returns: value
+  get_firmware_types:
+    summary: Return the device types firmware has been uploaded for (POST /api/tools/getFirmwareTypes.json)
+    send: { method: POST, path: /api/tools/getFirmwareTypes.json, content_type: application/json, body: '{}' }
+    expect: *data
+    returns: value
+  set_firmware_description:
+    summary: Change an uploaded firmware's description (POST /api/tools/modifyFirmware.json)
+    params:
+      type: &fw_type { type: string, required: true, max_length: 64, label: Device type, description: "The device type the firmware is for, such as E1." }
+      version: &fw_version { type: string, required: true, max_length: 64, label: Version, description: "The firmware version, such as 4.7.2515." }
+      description: { type: string, required: true, max_length: 256, label: Description, description: "The firmware's new description." }
+    send: { method: POST, path: /api/tools/modifyFirmware.json, content_type: application/json, body: '{"desc":{description:json},"type":{type:json},"version":{version:json}}' }
+    expect: *ok
+    returns: ack
+  get_devices:
+    summary: Return every device with the total, online and offline counts (POST /api/tools/getDeviceList.json)
+    send: { method: POST, path: /api/tools/getDeviceList.json, content_type: application/json, body: '{}' }
+    expect: *data
+    returns: value
+  get_devices_under:
+    summary: Return the devices under a node, of a type and mode, with their counts (POST /api/tools/getDeviceList.json)
+    params:
+      dn: *dn
+      device_type: { type: string, default: all, max_length: 64, label: Device type, description: "The device type to list, as get_device_types returns them; all for every type." }
+      device_mode: { type: string, required: true, max_length: 32, label: Device mode, description: "The device mode to list, as get_device_modes returns them, such as encoder." }
+    send: { method: POST, path: /api/tools/getDeviceList.json, content_type: application/json, body: '{"dn":{dn:json},"device_type":{device_type:json},"device_mode":{device_mode:json}}' }
+    expect: *data
+    returns: value
+  change_own_password:
+    summary: Change the logged-in user's password (POST /api/tools/changeSelfPassword.json)
+    params:
+      password: { type: string, required: true, secret: true, max_length: 128, label: New password, description: "The new password, with upper and lower case letters and digits." }
+    send: { method: POST, path: /api/tools/changeSelfPassword.json, content_type: application/json, body: '{"new":{password:json}}' }
+    expect: *ok
+    returns: ack
+  change_own_nickname:
+    summary: Change the logged-in user's nickname (POST /api/tools/changeSelfInfo.json)
+    params:
+      nickname: { type: string, required: true, max_length: 128, label: Nickname, description: "The new nickname." }
+    send: { method: POST, path: /api/tools/changeSelfInfo.json, content_type: application/json, body: '{"cfg":{"cn":{nickname:json}}}' }
+    expect: *ok
+    returns: ack
+  reboot_devices:
+    summary: "Restart devices; list is the API's list of device DNs (POST /api/tools/rebootDevices.json)"
+    params:
+      list: *dn_list
+    send: { method: POST, path: /api/tools/rebootDevices.json, content_type: application/json, body: '{"list":{list}}' }
+    expect: *ok
+    returns: ack
+  reset_devices:
+    summary: "Reset devices to factory settings; list is the API's list of device DNs (POST /api/tools/resetDevices.json)"
+    params:
+      list: *dn_list
+    send: { method: POST, path: /api/tools/resetDevices.json, content_type: application/json, body: '{"list":{list}}' }
+    expect: *ok
+    returns: ack
+  upgrade_devices:
+    summary: "Upgrade devices to an uploaded firmware; list is the API's list of device DNs (POST /api/tools/upgradeDevices.json)"
+    params:
+      list: *dn_list
+      type: *fw_type
+      version: *fw_version
+    send: { method: POST, path: /api/tools/upgradeDevices.json, content_type: application/json, body: '{"list":{list},"type":{type:json},"version":{version:json}}' }
+    expect: *ok
+    returns: ack
+  cancel_upgrade:
+    summary: "Cancel devices' upgrades; list is the API's list of device DNs (POST /api/tools/closeUpgrade.json)"
+    params:
+      list: *dn_list
+    send: { method: POST, path: /api/tools/closeUpgrade.json, content_type: application/json, body: '{"list":{list}}' }
+    expect: *ok
+    returns: ack
+  set_stream:
+    summary: Start or stop one stream of a device (POST /api/tools/controlDeviceStream.json)
+    params:
+      dn: *dn
+      key: { type: string, required: true, max_length: 128, label: Stream key, description: "The stream's key." }
+      stream: { type: string, required: true, max_length: 64, label: Stream ID, description: "The stream's id." }
+      enabled: { type: bool, required: true, label: Started, description: "On to start the stream; off to stop it." }
+    send: { method: POST, path: /api/tools/controlDeviceStream.json, content_type: application/json, body: '{"dn":{dn:json},"key":{key:json},"stream":{stream:json},"enabled":{enabled},"all":false}' }
+    expect: *ok
+    returns: ack
+  set_all_streams:
+    summary: Start or stop every stream of a device (POST /api/tools/controlDeviceStream.json)
+    params:
+      dn: *dn
+      enabled: { type: bool, required: true, label: Started, description: "On to start every stream; off to stop them." }
+    send: { method: POST, path: /api/tools/controlDeviceStream.json, content_type: application/json, body: '{"dn":{dn:json},"enabled":{enabled},"all":true}' }
+    expect: *ok
+    returns: ack
+  get_device_modes:
+    summary: Return the device modes (encoder, decoder, IO) (POST /api/tools/getDeviceModes.json)
+    send: { method: POST, path: /api/tools/getDeviceModes.json, content_type: application/json, body: '{}' }
+    expect: *data
+    returns: value
+  get_device_types:
+    summary: Return the device types the server knows (POST /api/tools/getDeviceTypes.json)
+    send: { method: POST, path: /api/tools/getDeviceTypes.json, content_type: application/json, body: '{}' }
+    expect: *data
+    returns: value
+  create_random_key:
+    summary: Return a new random authorization key (POST /api/tools/createRandomKey.json)
+    send: { method: POST, path: /api/tools/createRandomKey.json, content_type: application/json, body: '{}' }
+    expect: *data
+    returns: value
+  create_device_key:
+    summary: Return a new random authorization key for a device's serial number (POST /api/tools/createRandomKey.json)
+    params:
+      serial_number: { type: string, required: true, max_length: 64, label: Serial number, description: "The device's serial number." }
+    send: { method: POST, path: /api/tools/createRandomKey.json, content_type: application/json, body: '{"serialNumber":{serial_number:json}}' }
+    expect: *data
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Authentication: the document says every request after the login
+      needs its token, and the user name, but not how they are sent. The
+      token setting is sent as it is in Authorization and in the cookie
+      user=<user>; token=<token>, the two ways other Kiloview web APIs take
+      a login token; run login and store its result in the token setting
+      with update_settings. A refused token answered with 401 or 403 stops
+      all requests until the settings change; the document lists its own
+      error codes for a bad or expired session (1005, 1009, 1127), which
+      fail the command.
+  - models: [all]
+    severity: warning
+    text: >
+      The document gives each request's parameters but not their format:
+      bodies are sent as JSON (content type application/json), GET
+      requests carry none. Replies are {result: "ok" | "error", msg, data};
+      the login's reply is shown as a token field only. Errors carry an
+      Appendix 4 code (999, 1001-1128).
+  - models: [all]
+    severity: critical
+    text: >
+      delete_node, delete_nodes, reset_devices and the upgrade commands
+      cannot be undone; reboot_devices restarts devices and their streams;
+      set_stream and set_all_streams start or stop live streams;
+      modify_node replaces every attribute of a node (all properties must
+      be given); set_device_access replaces a node's access list. Device
+      permissions, moves and upgrades need the admin user (user manual).
+      None asks for confirmation.
+  - models: [all]
+    severity: info
+    text: >
+      State is polled every 10 seconds (the device counts and the tree of
+      organizations, groups, users and devices) and every 60 seconds (the
+      firmware list and types, the navigation bar permissions). The device
+      list's entries are a structure the document does not describe, so
+      only its counts are kept; the tree's first level under each
+      organization is kept (Appendix 1), deeper levels only through
+      get_tree_under. Every write the server accepts has the tree, the
+      device counts, the firmware or the permissions read again.
+  - models: [all]
+    severity: info
+    text: >
+      API limits: firmware upload (/api/tools/uploadFirmware.json) gives
+      only a desc URL parameter and no body format, so it is not offered
+      (use the web console); the server's own settings (ports, streaming
+      services, logs) are not in the API.
+
+state:
+  menu.device_control: { type: bool, description: "Whether the logged-in user sees device management" }
+  menu.user_control: { type: bool, description: "Whether the logged-in user sees user management" }
+  menu.upload_control: { type: bool, description: "Whether the logged-in user sees firmware upload" }
+  menu.send_control: { type: bool, description: "Whether the logged-in user sees firmware distribution" }
+  group_menus.*.device_control: { type: bool, description: "A user group, keyed by name: whether it may manage devices" }
+  group_menus.*.user_control: { type: bool, description: "Whether it may manage users" }
+  group_menus.*.upload_control: { type: bool, description: "Whether it may upload firmware" }
+  group_menus.*.send_control: { type: bool, description: "Whether it may send firmware to devices" }
+  devices.total: { type: int, description: "Number of devices in the directory" }
+  devices.online: { type: int, description: "Devices online" }
+  devices.offline: { type: int, description: "Devices offline" }
+  firmware_types: { type: string, description: "The device types with uploaded firmware, as JSON text" }
+  firmware.*.*.version: { type: string, description: "An uploaded firmware, keyed by device type then place (from 0): its version" }
+  firmware.*.*.description: { type: string, description: "Its description" }
+  firmware.*.*.uploaded: { type: int, unit: s, description: "When it was uploaded, in Unix seconds" }
+  tree.*.name: { type: string, description: "A node one level under an organization, keyed by distinguished name: its name (cn, or ou for a folder)" }
+  tree.*.type: { type: string, description: "user, device, group or organization" }
+  tree.*.parent: { type: string, description: "The distinguished name of the organization it is in" }
+  tree.*.description: { type: string, description: "A device's authorization key, or a group's description" }
+  tree.*.ip: { type: string, description: "A device's IP address (ipHostNumber)" }
+  tree.*.serial_number: { type: string, description: "A device's serial number" }
+  tree.*.remark: { type: string, description: "A device's remark, or a group's creation stamp (o)" }
+  tree.*.uid: { type: string, description: "A user's login id" }
+  tree.*.members: { type: string, description: "A group's members' distinguished names, as JSON text" }
+  organizations.*.dn: { type: string, description: "A top-level organization, keyed by its relative name such as ou=KVDevices: its distinguished name" }
+
+telemetry:
+  poll:
+    - every_ms: 10000
+      send:
+        - { method: POST, path: /api/tools/getDeviceList.json, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/tools/searchFix.json, content_type: application/json, body: '{}' }
+    - every_ms: 60000
+      send:
+        - { method: GET, path: /api/tools/getSelfMenu.json }
+        - { method: GET, path: /api/tools/getRdControl.json }
+        - { method: POST, path: /api/tools/getFirmwareList.json, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/tools/getFirmwareTypes.json, content_type: application/json, body: '{}' }
+  updates:
+    - path: "^/api/tools/getSelfMenu.json$"
+      json_match: { "$.deviceControl": "^(true|false)$" }
+      json: { d: "$.deviceControl", u: "$.userControl", up: "$.uploadControl", s: "$.sendControl" }
+      state:
+        menu.device_control: "{d}"
+        menu.user_control: "{u}"
+        menu.upload_control: "{up}"
+        menu.send_control: "{s}"
+    - path: "^/api/tools/getRdControl.json$"
+      json_each: "$.*"
+      each_match: { "$.deviceControl": "^(true|false)$" }
+      json: { d: "$.deviceControl", u: "$.userControl", up: "$.uploadControl", s: "$.sendControl" }
+      replace: group_menus
+      state:
+        "group_menus.{key:key}.device_control": "{d}"
+        "group_menus.{key:key}.user_control": "{u}"
+        "group_menus.{key:key}.upload_control": "{up}"
+        "group_menus.{key:key}.send_control": "{s}"
+    - path: "^/api/tools/getDeviceList.json$"
+      request_match: { "$": "^\\{\\}$" }
+      json_match: { "$.result": "^ok$" }
+      json: { total: "$.data.total", online: "$.data.online", offline: "$.data.offline" }
+      state:
+        devices.total: "{total}"
+        devices.online: "{online}"
+        devices.offline: "{offline}"
+    - path: "^/api/tools/getFirmwareTypes.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { types: "$.data" }
+      state: { firmware_types: "{types}" }
+    - path: "^/api/tools/getFirmwareList.json$"
+      request_match: { "$": "^\\{\\}$" }
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data[*].children"
+      json: { type: "$^.type", version: "$.version", desc: "$.desc", time: "$.uploadTime" }
+      replace: firmware
+      state:
+        "firmware.{type:key}.{index}.version": "{version}"
+        "firmware.{type:key}.{index}.description": "{desc}"
+        "firmware.{type:key}.{index}.uploaded": "{time}"
+    # The whole tree (no dn): the organizations, and the nodes in each.
+    - path: "^/api/tools/searchFix.json$"
+      request_match: { "$": "^\\{\\}$" }
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.*"
+      json: { dn: "$.dn" }
+      replace: [organizations, tree]
+      state: { "organizations.{key:key}.dn": "{dn}" }
+    - path: "^/api/tools/searchFix.json$"
+      request_match: { "$": "^\\{\\}$" }
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.*.children"
+      json:
+        dn: "$.dn"
+        type: "$.type"
+        cn: "$.cn"
+        ou: "$.ou"
+        parent: "$.parentDN"
+        description: "$.description"
+        ip: "$.ipHostNumber"
+        serial: "$.serialNumber"
+        o: "$.o"
+        uid: "$.uid"
+        members: "$.uniqueMember"
+      state:
+        "tree.{dn:key}.name": "{cn}"
+        "tree.{dn:key}.type": "{type}"
+        "tree.{dn:key}.parent": "{parent}"
+        "tree.{dn:key}.description": "{description}"
+        "tree.{dn:key}.ip": "{ip}"
+        "tree.{dn:key}.serial_number": "{serial}"
+        "tree.{dn:key}.remark": "{o}"
+        "tree.{dn:key}.uid": "{uid}"
+        "tree.{dn:key}.members": "{members}"
+    - path: "^/api/tools/searchFix.json$"
+      request_match: { "$": "^\\{\\}$" }
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.*.children"
+      each_match: { "$.type": "^organization$" }
+      json: { dn: "$.dn", ou: "$.ou" }
+      state: { "tree.{dn:key}.name": "{ou}" }
+
+    # ── Read-backs ─────────────────────────────────────────────────────
+    - path: "^/api/tools/(add|delete|deleteMany|modify|rename|move|aciSet|changeSelfInfo)\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: POST, path: /api/tools/searchFix.json, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/tools/getDeviceList.json, content_type: application/json, body: '{}' }
+    - path: "^/api/tools/(modifyFirmware|upgradeDevices|closeUpgrade)\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: POST, path: /api/tools/getFirmwareList.json, content_type: application/json, body: '{}' }
+        - { method: POST, path: /api/tools/getDeviceList.json, content_type: application/json, body: '{}' }
+    - path: "^/api/tools/(rebootDevices|resetDevices|controlDeviceStream)\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: POST, path: /api/tools/getDeviceList.json, content_type: application/json, body: '{}' }]
+    - path: "^/api/tools/setRdControl\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/tools/getRdControl.json }
+        - { method: GET, path: /api/tools/getSelfMenu.json }

@@ -876,8 +876,11 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
 
     # JSON messages arrive on a websocket, an event stream, or as the lines of
     # a line transport; HTTP replies are matched with `path`.
+    # A native extension that offers JSON messages of its own (the NMOS Query
+    # API's subscriptions) feeds json_match rules too.
     has_json = (transport_type in ("ws", "line-tcp", "line-serial", "line-udp")
-                or "websocket" in telemetry or "sse" in telemetry)
+                or "websocket" in telemetry or "sse" in telemetry
+                or doc.get("extension") in ("nmos-query-websocket",))
     if "sse" in telemetry and transport_type != "http":
         errors.append("telemetry.sse needs an http transport")
     declared = [key.split(".") for key in (doc.get("state") or {})]

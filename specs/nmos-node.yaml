@@ -1,0 +1,1246 @@
+spec: 1
+id: nmos-node
+name: AMWA NMOS Node (IS-04 Node API, IS-05 Connection API, IS-08 Channel Mapping, IS-07 Events)
+vendor: AMWA (NMOS specifications; any NMOS Node)
+category: router
+
+source:
+  - title: AMWA IS-04 NMOS Discovery and Registration Specification v1.3.3
+    author: Advanced Media Workflow Association (AMWA)
+    url: https://specs.amwa.tv/is-04/v1.3.3/
+    note: >
+      Apache 2.0 specification, the source of every Node API request and resource
+      field here: APIs/NodeAPI.raml (/self, /devices, /sources, /flows, /senders,
+      /receivers, their single resources and the deprecated
+      /receivers/{receiverId}/target PUT), the resource schemas (resource_core,
+      node, device, source, flow, sender, receiver), docs/APIs.md (trailing
+      slashes, error codes), docs/Discovery - Peer to Peer Operation.md (the
+      _nmos-node._tcp advertisement and its api_proto and api_ver TXT records).
+      Repository https://github.com/AMWA-TV/is-04 at tag v1.3.3.
+  - title: AMWA IS-05 NMOS Device Connection Management Specification v1.1.2 (and v1.2.0)
+    author: Advanced Media Workflow Association (AMWA)
+    url: https://specs.amwa.tv/is-05/v1.1.2/
+    note: >
+      Apache 2.0 specification: APIs/ConnectionAPI.raml (single senders and
+      receivers with their constraints, staged, active, transportfile and
+      transporttype resources, the bulk endpoints), the stage, activation and
+      transport parameter schemas and the examples (a PATCH with an SDP
+      transport file, immediate and scheduled activations, the resource list
+      of ids with trailing slashes). v1.2.0 adds transport types only and keeps
+      the same resources (CHANGELOG). Repository https://github.com/AMWA-TV/is-05.
+  - title: AMWA IS-08 NMOS Audio Channel Mapping Specification v1.0.1
+    author: Advanced Media Workflow Association (AMWA)
+    url: https://specs.amwa.tv/is-08/v1.0.1/
+    note: >
+      Apache 2.0 specification: APIs/ChannelMappingAPI.raml (/inputs, /outputs,
+      /map/active, /map/activations, /io) and the examples (the /io answer, the
+      active map keyed by output and channel index, an activation request).
+      Repository https://github.com/AMWA-TV/is-08.
+  - title: AMWA IS-07 NMOS Event and Tally Specification v1.0.1
+    author: Advanced Media Workflow Association (AMWA)
+    url: https://specs.amwa.tv/is-07/v1.0.1/
+    note: >
+      Apache 2.0 specification: APIs/EventsAPI.raml (/sources, /sources/{id}/type,
+      /sources/{id}/state) and the state and type examples. Repository
+      https://github.com/AMWA-TV/is-07.
+
+transport:
+  type: http
+  port: null
+  scheme: { setting: scheme }
+  accept_invalid_certs: true
+  # IS-10 authorization, where a Node uses it: the token goes as a bearer
+  # token on every request while it is set.
+  auth: bearer
+  # IS-10: 401 is a token refused; 403 a scope missing or a request refused
+  # (deleting a non-persistent subscription), which fails that request only.
+  refusal_status: [401]
+  timeout_ms: 5000
+  probe: { method: GET, path: /x-nmos/node }
+  endpoints:
+    connection: { port: { setting: connection_port } }
+    channelmapping: { port: { setting: channelmapping_port } }
+    events: { port: { setting: events_port } }
+settings:
+  scheme:
+    type: enum
+    values: [http, https]
+    default: http
+    label: Protocol
+    description: "http, or https for a Node whose APIs are served over TLS (BCP-003-01); the Node's api_proto TXT record says which."
+  token:
+    type: string
+    secret: true
+    default: ""
+    label: Access token
+    description: "An IS-10 bearer token for a Node that requires authorization, sent with every request; empty sends none."
+  node_version:
+    type: enum
+    values: [v1.3, v1.2, v1.1, v1.0]
+    default: v1.3
+    label: Node API version
+    description: "The Node API version to use, one the Node lists in its api_ver TXT record or at /x-nmos/node."
+  connection_version:
+    type: enum
+    values: [v1.1, v1.0, v1.2]
+    default: v1.1
+    label: Connection API version
+    description: "The IS-05 Connection API version to use, as the Device's sr-ctrl control type names it."
+  connection_port:
+    type: int
+    min: 1
+    max: 65535
+    label: Connection API port
+    description: "The port of the Node's IS-05 Connection API, from the href of its Devices' urn:x-nmos:control:sr-ctrl control; empty uses the Node API's port."
+  channelmapping_port:
+    type: int
+    min: 1
+    max: 65535
+    label: Channel Mapping API port
+    description: "The port of the Node's IS-08 Channel Mapping API, from its Devices' urn:x-nmos:control:cm-ctrl control; empty uses the Node API's port."
+  events_port:
+    type: int
+    min: 1
+    max: 65535
+    label: Events API port
+    description: "The port of the Node's IS-07 Events API, from its Devices' urn:x-nmos:control:events control; empty uses the Node API's port."
+
+ports:
+  - { port: null, protocol: http, role: control, note: "the Node API port has no standard number: it is given when the Node is opened, from its _nmos-node._tcp SRV record or its configuration" }
+  - { port: null, protocol: http, role: control, setting: connection_port, note: "IS-05 Connection API; the Node API's port when not set" }
+  - { port: null, protocol: http, role: control, setting: channelmapping_port, note: "IS-08 Channel Mapping API; the Node API's port when not set" }
+  - { port: null, protocol: http, role: control, setting: events_port, note: "IS-07 Events API; the Node API's port when not set" }
+  - { port: 5353, protocol: udp, role: discovery, note: "mDNS / DNS-SD: _nmos-node._tcp" }
+models:
+  - id: node
+    name: Any AMWA NMOS Node (IS-04 v1.0 to v1.3, with IS-05, IS-08 and IS-07 where it has them)
+    supports:
+      - get_self
+      - get_devices
+      - get_device
+      - get_sources
+      - get_source
+      - get_flows
+      - get_flow
+      - get_senders
+      - get_sender
+      - get_receivers
+      - get_receiver
+      - set_receiver_target
+      - clear_receiver_target
+      - get_connection_senders
+      - get_sender_constraints
+      - get_sender_staged
+      - get_sender_active
+      - get_sender_transporttype
+      - get_connection_receivers
+      - get_receiver_constraints
+      - get_receiver_staged
+      - get_receiver_active
+      - get_receiver_transporttype
+      - get_sender_transport_file
+      - connect_receiver
+      - connect_receiver_with_params
+      - disconnect_receiver
+      - set_receiver_enabled
+      - set_sender_enabled
+      - set_sender_receiver
+      - stage_receiver
+      - stage_sender
+      - bulk_stage_senders
+      - bulk_stage_receivers
+      - get_channelmapping_io
+      - get_active_map
+      - get_map_activations
+      - route_channel
+      - unroute_channel
+      - activate_map
+      - cancel_map_activation
+      - get_event_sources
+      - get_event_state
+      - get_event_type
+    verification: none
+    notes: >
+      Any Node, from any vendor: a camera, gateway, encoder, decoder,
+      multiviewer or software. The APIs it has are listed in its Devices' controls
+      (state devices.*.controls); a request to an API it lacks fails.
+commands:
+  get_self:
+    summary: "Read the Node resource (GET /self)"
+    send: { method: GET, path: "/x-nmos/node/{settings.node_version}/self" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # NodeAPI.raml /self
+
+  get_devices:
+    summary: "List the Node's devices (GET /devices)"
+    send: { method: GET, path: "/x-nmos/node/{settings.node_version}/devices" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # NodeAPI.raml /devices
+
+  get_device:
+    summary: "Read one Device (GET /devices/{id})"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Device id,
+        description: "The Device's id, a UUID." }
+    send: { method: GET, path: "/x-nmos/node/{settings.node_version}/devices/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # NodeAPI.raml /devices/{id}
+
+  get_sources:
+    summary: "List the Node's sources (GET /sources)"
+    send: { method: GET, path: "/x-nmos/node/{settings.node_version}/sources" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # NodeAPI.raml /sources
+
+  get_source:
+    summary: "Read one Source (GET /sources/{id})"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Source id,
+        description: "The Source's id, a UUID." }
+    send: { method: GET, path: "/x-nmos/node/{settings.node_version}/sources/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # NodeAPI.raml /sources/{id}
+
+  get_flows:
+    summary: "List the Node's flows (GET /flows)"
+    send: { method: GET, path: "/x-nmos/node/{settings.node_version}/flows" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # NodeAPI.raml /flows
+
+  get_flow:
+    summary: "Read one Flow (GET /flows/{id})"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Flow id,
+        description: "The Flow's id, a UUID." }
+    send: { method: GET, path: "/x-nmos/node/{settings.node_version}/flows/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # NodeAPI.raml /flows/{id}
+
+  get_senders:
+    summary: "List the Node's senders (GET /senders)"
+    send: { method: GET, path: "/x-nmos/node/{settings.node_version}/senders" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # NodeAPI.raml /senders
+
+  get_sender:
+    summary: "Read one Sender (GET /senders/{id})"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Sender id,
+        description: "The Sender's id, a UUID." }
+    send: { method: GET, path: "/x-nmos/node/{settings.node_version}/senders/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # NodeAPI.raml /senders/{id}
+
+  get_receivers:
+    summary: "List the Node's receivers (GET /receivers)"
+    send: { method: GET, path: "/x-nmos/node/{settings.node_version}/receivers" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # NodeAPI.raml /receivers
+
+  get_receiver:
+    summary: "Read one Receiver (GET /receivers/{id})"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Receiver id,
+        description: "The Receiver's id, a UUID." }
+    send: { method: GET, path: "/x-nmos/node/{settings.node_version}/receivers/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # NodeAPI.raml /receivers/{id}
+
+  set_receiver_target:
+    summary: "Subscribe a Receiver to a Sender through the Node API (PUT /receivers/{id}/target, deprecated in favor of IS-05)"
+    params:
+      receiver_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Receiver id,
+        description: "The Receiver to subscribe, a UUID." }
+      sender:
+        type: json
+        required: true
+        label: Sender
+        description: "The Sender resource to subscribe to, as the Query or Node API gives it (the IS-04 sender schema)."
+    send:
+      - { method: PUT, path: "/x-nmos/node/{settings.node_version}/receivers/{receiver_id}/target", content_type: application/json, body: "{sender}" }
+      - { method: GET, path: "/x-nmos/node/{settings.node_version}/receivers" }
+    expect: { status: [200, 202] }
+    returns: ack
+    # NodeAPI.raml /receivers/{receiverId}/target: 202 with the Sender, 501 where not implemented
+
+  clear_receiver_target:
+    summary: "Unsubscribe a Receiver through the Node API (PUT an empty object to /receivers/{id}/target, deprecated)"
+    params:
+      receiver_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Receiver id,
+        description: "The Receiver to unsubscribe, a UUID." }
+    send:
+      - { method: PUT, path: "/x-nmos/node/{settings.node_version}/receivers/{receiver_id}/target", content_type: application/json, body: "{}" }
+      - { method: GET, path: "/x-nmos/node/{settings.node_version}/receivers" }
+    expect: { status: [200, 202] }
+    returns: ack
+    # NodeAPI.raml: an empty object unsubscribes
+
+  get_connection_senders:
+    summary: "List the senders the Connection API controls (GET /single/senders)"
+    send: { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/senders" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # ConnectionAPI.raml /single/senders
+
+  get_sender_constraints:
+    summary: "Read a Sender's constraints parameters (GET /single/senders/{id}/constraints)"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Sender id,
+        description: "The Sender's id, a UUID." }
+    send: { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/senders/{id}/constraints" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # ConnectionAPI.raml /single/senders/{id}/constraints
+
+  get_sender_staged:
+    summary: "Read a Sender's staged parameters (GET /single/senders/{id}/staged)"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Sender id,
+        description: "The Sender's id, a UUID." }
+    send: { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/senders/{id}/staged" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # ConnectionAPI.raml /single/senders/{id}/staged
+
+  get_sender_active:
+    summary: "Read a Sender's active parameters (GET /single/senders/{id}/active)"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Sender id,
+        description: "The Sender's id, a UUID." }
+    send: { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/senders/{id}/active" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # ConnectionAPI.raml /single/senders/{id}/active
+
+  get_sender_transporttype:
+    summary: "Read a Sender's transporttype parameters (GET /single/senders/{id}/transporttype)"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Sender id,
+        description: "The Sender's id, a UUID." }
+    send: { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/senders/{id}/transporttype" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # ConnectionAPI.raml /single/senders/{id}/transporttype
+
+  get_connection_receivers:
+    summary: "List the receivers the Connection API controls (GET /single/receivers)"
+    send: { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/receivers" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # ConnectionAPI.raml /single/receivers
+
+  get_receiver_constraints:
+    summary: "Read a Receiver's constraints parameters (GET /single/receivers/{id}/constraints)"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Receiver id,
+        description: "The Receiver's id, a UUID." }
+    send: { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/receivers/{id}/constraints" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # ConnectionAPI.raml /single/receivers/{id}/constraints
+
+  get_receiver_staged:
+    summary: "Read a Receiver's staged parameters (GET /single/receivers/{id}/staged)"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Receiver id,
+        description: "The Receiver's id, a UUID." }
+    send: { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/receivers/{id}/staged" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # ConnectionAPI.raml /single/receivers/{id}/staged
+
+  get_receiver_active:
+    summary: "Read a Receiver's active parameters (GET /single/receivers/{id}/active)"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Receiver id,
+        description: "The Receiver's id, a UUID." }
+    send: { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/receivers/{id}/active" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # ConnectionAPI.raml /single/receivers/{id}/active
+
+  get_receiver_transporttype:
+    summary: "Read a Receiver's transporttype parameters (GET /single/receivers/{id}/transporttype)"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Receiver id,
+        description: "The Receiver's id, a UUID." }
+    send: { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/receivers/{id}/transporttype" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # ConnectionAPI.raml /single/receivers/{id}/transporttype
+
+  get_sender_transport_file:
+    summary: "Read a Sender's transport file, its SDP (GET /single/senders/{id}/transportfile)"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Sender id,
+        description: "The Sender's id, a UUID." }
+    send: { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/senders/{id}/transportfile" }
+    expect: { status: 200 }
+    returns: text
+    # ConnectionAPI.raml /single/senders/{id}/transportfile
+
+  connect_receiver:
+    summary: "Connect a Receiver to a Sender with the Sender's SDP, at once (PATCH staged, activate_immediate)"
+    params:
+      receiver_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Receiver id,
+        description: "The Receiver to change, a UUID." }
+      sender_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Sender id,
+        description: "The Sender to receive, a UUID." }
+      sdp: { type: string, required: true, multiline: true,
+        label: SDP,
+        description: "The Sender's transport file (SDP), as its transportfile resource or manifest_href gives it." }
+    send:
+      - { endpoint: connection, method: PATCH, path: "/x-nmos/connection/{settings.connection_version}/single/receivers/{receiver_id}/staged",
+          content_type: application/json, body: '{"sender_id":{sender_id:json},"master_enable":true,"activation":{"mode":"activate_immediate"},"transport_file":{"data":{sdp:json},"type":"application/sdp"}}' }
+      - { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/receivers/{receiver_id}/active" }
+    expect: { status: [200, 202] }
+    returns: ack
+    # receiver-patch-transportfile.json, activation-schema.json
+
+  connect_receiver_with_params:
+    summary: "Connect a Receiver to a Sender with explicit transport parameters, at once"
+    params:
+      receiver_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Receiver id,
+        description: "The Receiver to change, a UUID." }
+      sender_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Sender id,
+        description: "The Sender to receive, a UUID." }
+      transport_params: { type: json, required: true,
+        label: Transport parameters,
+        description: "The transport parameters in the shape of the IS-05 receiver_transport_params schema: an array of one object per leg, two for SMPTE 2022-7." }
+    send:
+      - { endpoint: connection, method: PATCH, path: "/x-nmos/connection/{settings.connection_version}/single/receivers/{receiver_id}/staged",
+          content_type: application/json, body: '{"sender_id":{sender_id:json},"master_enable":true,"activation":{"mode":"activate_immediate"},"transport_params":{transport_params}}' }
+      - { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/receivers/{receiver_id}/active" }
+    expect: { status: [200, 202] }
+    returns: ack
+    # receiver-patch.json, receiver-stage-schema.json
+
+  disconnect_receiver:
+    summary: "Disconnect a Receiver at once: no Sender, master enable off"
+    params:
+      receiver_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Receiver id,
+        description: "The Receiver to change, a UUID." }
+    send:
+      - { endpoint: connection, method: PATCH, path: "/x-nmos/connection/{settings.connection_version}/single/receivers/{receiver_id}/staged",
+          content_type: application/json, body: '{"sender_id":null,"master_enable":false,"activation":{"mode":"activate_immediate"}}' }
+      - { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/receivers/{receiver_id}/active" }
+    expect: { status: [200, 202] }
+    returns: ack
+    # receiver-stage-schema.json: sender_id null
+
+  set_receiver_enabled:
+    summary: "Turn a Receiver's master enable on or off, at once"
+    params:
+      receiver_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Receiver id,
+        description: "The Receiver to change, a UUID." }
+      enabled: { type: bool, required: true, label: Enabled, description: "On makes the Receiver receive, off stops it." }
+    send:
+      - { endpoint: connection, method: PATCH, path: "/x-nmos/connection/{settings.connection_version}/single/receivers/{receiver_id}/staged",
+          content_type: application/json, body: '{"master_enable":{enabled},"activation":{"mode":"activate_immediate"}}' }
+      - { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/receivers/{receiver_id}/active" }
+    expect: { status: [200, 202] }
+    returns: ack
+    # receiver-stage-schema.json: master_enable
+
+  set_sender_enabled:
+    summary: "Turn a Sender's master enable on or off, at once"
+    params:
+      sender_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Sender id,
+        description: "The Sender to change, a UUID." }
+      enabled: { type: bool, required: true, label: Enabled, description: "On makes the Sender send, off stops it." }
+    send:
+      - { endpoint: connection, method: PATCH, path: "/x-nmos/connection/{settings.connection_version}/single/senders/{sender_id}/staged",
+          content_type: application/json, body: '{"master_enable":{enabled},"activation":{"mode":"activate_immediate"}}' }
+      - { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/senders/{sender_id}/active" }
+    expect: { status: [200, 202] }
+    returns: ack
+    # sender-stage-schema.json: master_enable
+
+  set_sender_receiver:
+    summary: "Point a unicast Sender at a Receiver, at once"
+    params:
+      sender_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Sender id,
+        description: "The Sender to change, a UUID." }
+      receiver_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Receiver id,
+        description: "The Receiver the Sender sends to, a UUID." }
+    send:
+      - { endpoint: connection, method: PATCH, path: "/x-nmos/connection/{settings.connection_version}/single/senders/{sender_id}/staged",
+          content_type: application/json, body: '{"receiver_id":{receiver_id:json},"activation":{"mode":"activate_immediate"}}' }
+      - { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/senders/{sender_id}/active" }
+    expect: { status: [200, 202] }
+    returns: ack
+    # sender-stage-schema.json: receiver_id
+
+  stage_receiver:
+    summary: "Stage a Receiver's parameters and activation as the IS-05 receiver-stage-schema gives them (scheduled activations, cancelling one)"
+    params:
+      receiver_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Receiver id,
+        description: "The Receiver to change, a UUID." }
+      staged: { type: json, required: true,
+        label: Staged parameters,
+        description: "The PATCH body in the shape of the IS-05 receiver-stage-schema: sender_id, master_enable, activation (immediate, scheduled absolute or relative, or a null mode to cancel), transport_file and transport_params." }
+    send:
+      - { endpoint: connection, method: PATCH, path: "/x-nmos/connection/{settings.connection_version}/single/receivers/{receiver_id}/staged",
+          content_type: application/json, body: '{staged}' }
+      - { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/receivers/{receiver_id}/active" }
+    expect: { status: [200, 202] }
+    returns: ack
+    # receiver-stage-schema.json, receiver-patch-absolute.json, receiver-patch-relative.json
+
+  stage_sender:
+    summary: "Stage a Sender's parameters and activation as the IS-05 sender-stage-schema gives them"
+    params:
+      sender_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Sender id,
+        description: "The Sender to change, a UUID." }
+      staged: { type: json, required: true,
+        label: Staged parameters,
+        description: "The PATCH body in the shape of the IS-05 sender-stage-schema: receiver_id, master_enable, activation (immediate, scheduled absolute or relative, or a null mode to cancel) and transport_params." }
+    send:
+      - { endpoint: connection, method: PATCH, path: "/x-nmos/connection/{settings.connection_version}/single/senders/{sender_id}/staged",
+          content_type: application/json, body: '{staged}' }
+      - { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/senders/{sender_id}/active" }
+    expect: { status: [200, 202] }
+    returns: ack
+    # sender-stage-schema.json
+
+  bulk_stage_senders:
+    summary: "Stage several senders at once (POST /bulk/senders), each with its own parameters and activation"
+    params:
+      items:
+        type: json
+        required: true
+        label: Items
+        description: "The POST body in the shape of the IS-05 bulk-sender-post-schema: an array of id and params, params as for one sender."
+    send: { endpoint: connection, method: POST, path: "/x-nmos/connection/{settings.connection_version}/bulk/senders", content_type: application/json, body: "{items}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # ConnectionAPI.raml /bulk/senders: one result per item
+
+  bulk_stage_receivers:
+    summary: "Stage several receivers at once (POST /bulk/receivers), each with its own parameters and activation"
+    params:
+      items:
+        type: json
+        required: true
+        label: Items
+        description: "The POST body in the shape of the IS-05 bulk-receiver-post-schema: an array of id and params, params as for one receiver."
+    send: { endpoint: connection, method: POST, path: "/x-nmos/connection/{settings.connection_version}/bulk/receivers", content_type: application/json, body: "{items}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # ConnectionAPI.raml /bulk/receivers: one result per item
+
+  get_channelmapping_io:
+    summary: "Read every input and output with their properties, channels and capabilities (GET /io)"
+    send: { endpoint: channelmapping, method: GET, path: "/x-nmos/channelmapping/v1.0/io" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # ChannelMappingAPI.raml /io
+
+  get_active_map:
+    summary: "Read the active channel map (GET /map/active)"
+    send: { endpoint: channelmapping, method: GET, path: "/x-nmos/channelmapping/v1.0/map/active" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # ChannelMappingAPI.raml /map/active
+
+  get_map_activations:
+    summary: "List the scheduled channel map activations (GET /map/activations)"
+    send: { endpoint: channelmapping, method: GET, path: "/x-nmos/channelmapping/v1.0/map/activations" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # ChannelMappingAPI.raml /map/activations
+
+  route_channel:
+    summary: "Route an input channel to an output channel, at once"
+    params:
+      output: { type: string, required: true, max_length: 256, pattern: "^[^\\x00-\\x1f\"/]+$",
+        label: Output, description: "The output's id, as /io lists it." }
+      channel: { type: int, min: 0, max: 65535, required: true,
+        label: Output channel, description: "The output channel, numbered from 0." }
+      input: { type: string, required: true, max_length: 256, pattern: "^[^\\x00-\\x1f\"/]+$",
+        label: Input, description: "The input's id, as /io lists it." }
+      input_channel: { type: int, min: 0, max: 65535, required: true,
+        label: Input channel, description: "The input channel, numbered from 0." }
+    send:
+      - { endpoint: channelmapping, method: POST, path: "/x-nmos/channelmapping/v1.0/map/activations", content_type: application/json,
+          body: '{"activation":{"mode":"activate_immediate"},"action":{{output:json}:{"{channel}":{"input":{input:json},"channel_index":{input_channel}}}}}' }
+      - { endpoint: channelmapping, method: GET, path: "/x-nmos/channelmapping/v1.0/map/active" }
+    expect: { status: [200, 202] }
+    returns: ack
+    # map-activations-post-request-schema.json, map-activations-post.json
+
+  unroute_channel:
+    summary: "Leave an output channel unrouted, at once"
+    params:
+      output: { type: string, required: true, max_length: 256, pattern: "^[^\\x00-\\x1f\"/]+$",
+        label: Output, description: "The output's id, as /io lists it." }
+      channel: { type: int, min: 0, max: 65535, required: true,
+        label: Output channel, description: "The output channel, numbered from 0." }
+    send:
+      - { endpoint: channelmapping, method: POST, path: "/x-nmos/channelmapping/v1.0/map/activations", content_type: application/json,
+          body: '{"activation":{"mode":"activate_immediate"},"action":{{output:json}:{"{channel}":{"input":null,"channel_index":null}}}}' }
+      - { endpoint: channelmapping, method: GET, path: "/x-nmos/channelmapping/v1.0/map/active" }
+    expect: { status: [200, 202] }
+    returns: ack
+    # map-entries-schema.json: input and channel_index null for an unrouted channel
+
+  activate_map:
+    summary: "Change several channels, at once or scheduled, with an activation request as the IS-08 schema gives it"
+    params:
+      activation:
+        type: json
+        required: true
+        label: Activation
+        description: "The POST body in the shape of the IS-08 map-activations-post-request-schema: activation (mode and requested_time) and action (outputs, channels and their inputs)."
+    send:
+      - { endpoint: channelmapping, method: POST, path: "/x-nmos/channelmapping/v1.0/map/activations", content_type: application/json, body: "{activation}" }
+      - { endpoint: channelmapping, method: GET, path: "/x-nmos/channelmapping/v1.0/map/activations" }
+    expect: { status: [200, 202] }
+    returns: ack
+    # ChannelMappingAPI.raml /map/activations POST
+
+  cancel_map_activation:
+    summary: "Cancel a scheduled channel map activation (DELETE /map/activations/{id})"
+    params:
+      id: { type: string, required: true, max_length: 64, pattern: "^[A-Za-z0-9_-]+$",
+        label: Activation id, description: "The scheduled activation's id, as /map/activations lists it." }
+    send:
+      - { endpoint: channelmapping, method: DELETE, path: "/x-nmos/channelmapping/v1.0/map/activations/{id}" }
+      - { endpoint: channelmapping, method: GET, path: "/x-nmos/channelmapping/v1.0/map/activations" }
+    expect: { status: [200, 204] }
+    returns: ack
+    # ChannelMappingAPI.raml /map/activations/{activationId} DELETE
+
+  get_event_sources:
+    summary: "List the event sources (GET /sources)"
+    send: { endpoint: events, method: GET, path: "/x-nmos/events/v1.0/sources" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # EventsAPI.raml /sources
+
+  get_event_state:
+    summary: "Read an event source's current state (GET /sources/{id}/state)"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Event source id,
+        description: "The event source's id (its IS-04 Source id), a UUID." }
+    send: { endpoint: events, method: GET, path: "/x-nmos/events/v1.0/sources/{id}/state" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # EventsAPI.raml /sources/{id}/state
+
+  get_event_type:
+    summary: "Read an event source's type (GET /sources/{id}/type)"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Event source id,
+        description: "The event source's id (its IS-04 Source id), a UUID." }
+    send: { endpoint: events, method: GET, path: "/x-nmos/events/v1.0/sources/{id}/type" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # EventsAPI.raml /sources/{id}/type
+telemetry:
+  # Nothing is pushed: the Node API, Connection API, Channel Mapping API and
+  # Events API are read in turn. Each list read has each item's state read
+  # after it (then_send), as a controller does.
+  poll:
+    - every_ms: 2000
+      send:
+        - { endpoint: events, method: GET, path: "/x-nmos/events/v1.0/sources" }
+    - every_ms: 5000
+      send:
+        - { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/receivers" }
+        - { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/senders" }
+        - { endpoint: channelmapping, method: GET, path: "/x-nmos/channelmapping/v1.0/map/active" }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: "/x-nmos/node/{settings.node_version}/self" }
+        - { method: GET, path: "/x-nmos/node/{settings.node_version}/devices" }
+        - { method: GET, path: "/x-nmos/node/{settings.node_version}/sources" }
+        - { method: GET, path: "/x-nmos/node/{settings.node_version}/flows" }
+        - { method: GET, path: "/x-nmos/node/{settings.node_version}/senders" }
+        - { method: GET, path: "/x-nmos/node/{settings.node_version}/receivers" }
+        - { endpoint: channelmapping, method: GET, path: "/x-nmos/channelmapping/v1.0/io" }
+        - { endpoint: channelmapping, method: GET, path: "/x-nmos/channelmapping/v1.0/map/activations/" }
+  updates:
+    - path: "^/x-nmos/node/v1[.][0-9]+/self$"
+      replace: "nodes"
+      json: { rid: "$.id", label: "$.label", description: "$.description", version: "$.version", tags: "$.tags", resource: "$", hostname: "$.hostname", href: "$.href", api_versions: "$.api.versions", api_endpoints: "$.api.endpoints", caps: "$.caps", services: "$.services", clocks: "$.clocks", interfaces: "$.interfaces" }
+      state:
+        "nodes.{rid:key}.label": "{label}"
+        "nodes.{rid:key}.description": "{description}"
+        "nodes.{rid:key}.version": "{version}"
+        "nodes.{rid:key}.tags": "{tags}"
+        "nodes.{rid:key}.resource": "{resource}"
+        "nodes.{rid:key}.hostname": "{hostname}"
+        "nodes.{rid:key}.href": "{href}"
+        "nodes.{rid:key}.api_versions": "{api_versions}"
+        "nodes.{rid:key}.api_endpoints": "{api_endpoints}"
+        "nodes.{rid:key}.caps": "{caps}"
+        "nodes.{rid:key}.services": "{services}"
+        "nodes.{rid:key}.clocks": "{clocks}"
+        "nodes.{rid:key}.interfaces": "{interfaces}"
+    - path: "^/x-nmos/node/v1[.][0-9]+/devices$"
+      json_each: "$"
+      replace: "devices"
+      json: { rid: "$.id", label: "$.label", description: "$.description", version: "$.version", tags: "$.tags", resource: "$", type: "$.type", node_id: "$.node_id", controls: "$.controls" }
+      state:
+        "devices.{rid:key}.label": "{label}"
+        "devices.{rid:key}.description": "{description}"
+        "devices.{rid:key}.version": "{version}"
+        "devices.{rid:key}.tags": "{tags}"
+        "devices.{rid:key}.resource": "{resource}"
+        "devices.{rid:key}.type": "{type}"
+        "devices.{rid:key}.node_id": "{node_id}"
+        "devices.{rid:key}.controls": "{controls}"
+    - path: "^/x-nmos/node/v1[.][0-9]+/devices/[0-9a-f-]+$"
+      json: { rid: "$.id", label: "$.label", description: "$.description", version: "$.version", tags: "$.tags", resource: "$", type: "$.type", node_id: "$.node_id", controls: "$.controls" }
+      state:
+        "devices.{rid:key}.label": "{label}"
+        "devices.{rid:key}.description": "{description}"
+        "devices.{rid:key}.version": "{version}"
+        "devices.{rid:key}.tags": "{tags}"
+        "devices.{rid:key}.resource": "{resource}"
+        "devices.{rid:key}.type": "{type}"
+        "devices.{rid:key}.node_id": "{node_id}"
+        "devices.{rid:key}.controls": "{controls}"
+    - path: "^/x-nmos/node/v1[.][0-9]+/sources$"
+      json_each: "$"
+      replace: "sources"
+      json: { rid: "$.id", label: "$.label", description: "$.description", version: "$.version", tags: "$.tags", resource: "$", format: "$.format", device_id: "$.device_id", clock_name: "$.clock_name", grain_rate: "$.grain_rate", caps: "$.caps", parents: "$.parents", channels: "$.channels" }
+      state:
+        "sources.{rid:key}.label": "{label}"
+        "sources.{rid:key}.description": "{description}"
+        "sources.{rid:key}.version": "{version}"
+        "sources.{rid:key}.tags": "{tags}"
+        "sources.{rid:key}.resource": "{resource}"
+        "sources.{rid:key}.format": "{format}"
+        "sources.{rid:key}.device_id": "{device_id}"
+        "sources.{rid:key}.clock_name": "{clock_name}"
+        "sources.{rid:key}.grain_rate": "{grain_rate}"
+        "sources.{rid:key}.caps": "{caps}"
+        "sources.{rid:key}.parents": "{parents}"
+        "sources.{rid:key}.channels": "{channels}"
+    - path: "^/x-nmos/node/v1[.][0-9]+/sources$"
+      json_each: "$"
+      each_match: { "$.clock_name": "^null$" }
+      json: { rid: "$.id" }
+      state: { "sources.{rid:key}.clock_name": "" }
+    - path: "^/x-nmos/node/v1[.][0-9]+/sources/[0-9a-f-]+$"
+      json: { rid: "$.id", label: "$.label", description: "$.description", version: "$.version", tags: "$.tags", resource: "$", format: "$.format", device_id: "$.device_id", clock_name: "$.clock_name", grain_rate: "$.grain_rate", caps: "$.caps", parents: "$.parents", channels: "$.channels" }
+      state:
+        "sources.{rid:key}.label": "{label}"
+        "sources.{rid:key}.description": "{description}"
+        "sources.{rid:key}.version": "{version}"
+        "sources.{rid:key}.tags": "{tags}"
+        "sources.{rid:key}.resource": "{resource}"
+        "sources.{rid:key}.format": "{format}"
+        "sources.{rid:key}.device_id": "{device_id}"
+        "sources.{rid:key}.clock_name": "{clock_name}"
+        "sources.{rid:key}.grain_rate": "{grain_rate}"
+        "sources.{rid:key}.caps": "{caps}"
+        "sources.{rid:key}.parents": "{parents}"
+        "sources.{rid:key}.channels": "{channels}"
+    - path: "^/x-nmos/node/v1[.][0-9]+/sources/[0-9a-f-]+$"
+      json_match: { "$.clock_name": "^null$" }
+      json: { rid: "$.id" }
+      state: { "sources.{rid:key}.clock_name": "" }
+    - path: "^/x-nmos/node/v1[.][0-9]+/flows$"
+      json_each: "$"
+      replace: "flows"
+      json: { rid: "$.id", label: "$.label", description: "$.description", version: "$.version", tags: "$.tags", resource: "$", format: "$.format", source_id: "$.source_id", device_id: "$.device_id", media_type: "$.media_type", grain_rate: "$.grain_rate", frame_width: "$.frame_width", frame_height: "$.frame_height", interlace_mode: "$.interlace_mode", colorspace: "$.colorspace", transfer_characteristic: "$.transfer_characteristic", sample_rate: "$.sample_rate", bit_depth: "$.bit_depth", parents: "$.parents" }
+      state:
+        "flows.{rid:key}.label": "{label}"
+        "flows.{rid:key}.description": "{description}"
+        "flows.{rid:key}.version": "{version}"
+        "flows.{rid:key}.tags": "{tags}"
+        "flows.{rid:key}.resource": "{resource}"
+        "flows.{rid:key}.format": "{format}"
+        "flows.{rid:key}.source_id": "{source_id}"
+        "flows.{rid:key}.device_id": "{device_id}"
+        "flows.{rid:key}.media_type": "{media_type}"
+        "flows.{rid:key}.grain_rate": "{grain_rate}"
+        "flows.{rid:key}.frame_width": "{frame_width}"
+        "flows.{rid:key}.frame_height": "{frame_height}"
+        "flows.{rid:key}.interlace_mode": "{interlace_mode}"
+        "flows.{rid:key}.colorspace": "{colorspace}"
+        "flows.{rid:key}.transfer_characteristic": "{transfer_characteristic}"
+        "flows.{rid:key}.sample_rate": "{sample_rate}"
+        "flows.{rid:key}.bit_depth": "{bit_depth}"
+        "flows.{rid:key}.parents": "{parents}"
+    - path: "^/x-nmos/node/v1[.][0-9]+/flows/[0-9a-f-]+$"
+      json: { rid: "$.id", label: "$.label", description: "$.description", version: "$.version", tags: "$.tags", resource: "$", format: "$.format", source_id: "$.source_id", device_id: "$.device_id", media_type: "$.media_type", grain_rate: "$.grain_rate", frame_width: "$.frame_width", frame_height: "$.frame_height", interlace_mode: "$.interlace_mode", colorspace: "$.colorspace", transfer_characteristic: "$.transfer_characteristic", sample_rate: "$.sample_rate", bit_depth: "$.bit_depth", parents: "$.parents" }
+      state:
+        "flows.{rid:key}.label": "{label}"
+        "flows.{rid:key}.description": "{description}"
+        "flows.{rid:key}.version": "{version}"
+        "flows.{rid:key}.tags": "{tags}"
+        "flows.{rid:key}.resource": "{resource}"
+        "flows.{rid:key}.format": "{format}"
+        "flows.{rid:key}.source_id": "{source_id}"
+        "flows.{rid:key}.device_id": "{device_id}"
+        "flows.{rid:key}.media_type": "{media_type}"
+        "flows.{rid:key}.grain_rate": "{grain_rate}"
+        "flows.{rid:key}.frame_width": "{frame_width}"
+        "flows.{rid:key}.frame_height": "{frame_height}"
+        "flows.{rid:key}.interlace_mode": "{interlace_mode}"
+        "flows.{rid:key}.colorspace": "{colorspace}"
+        "flows.{rid:key}.transfer_characteristic": "{transfer_characteristic}"
+        "flows.{rid:key}.sample_rate": "{sample_rate}"
+        "flows.{rid:key}.bit_depth": "{bit_depth}"
+        "flows.{rid:key}.parents": "{parents}"
+    - path: "^/x-nmos/node/v1[.][0-9]+/senders$"
+      json_each: "$"
+      replace: "senders"
+      json: { rid: "$.id", label: "$.label", description: "$.description", version: "$.version", tags: "$.tags", resource: "$", flow_id: "$.flow_id", transport: "$.transport", device_id: "$.device_id", manifest_href: "$.manifest_href", interface_bindings: "$.interface_bindings", subscription_receiver_id: "$.subscription.receiver_id", subscription_active: "$.subscription.active", caps: "$.caps" }
+      state:
+        "senders.{rid:key}.label": "{label}"
+        "senders.{rid:key}.description": "{description}"
+        "senders.{rid:key}.version": "{version}"
+        "senders.{rid:key}.tags": "{tags}"
+        "senders.{rid:key}.resource": "{resource}"
+        "senders.{rid:key}.flow_id": "{flow_id}"
+        "senders.{rid:key}.transport": "{transport}"
+        "senders.{rid:key}.device_id": "{device_id}"
+        "senders.{rid:key}.manifest_href": "{manifest_href}"
+        "senders.{rid:key}.interface_bindings": "{interface_bindings}"
+        "senders.{rid:key}.subscription.receiver_id": "{subscription_receiver_id}"
+        "senders.{rid:key}.subscription.active": "{subscription_active}"
+        "senders.{rid:key}.caps": "{caps}"
+    - path: "^/x-nmos/node/v1[.][0-9]+/senders$"
+      json_each: "$"
+      each_match: { "$.flow_id": "^null$" }
+      json: { rid: "$.id" }
+      state: { "senders.{rid:key}.flow_id": "" }
+    - path: "^/x-nmos/node/v1[.][0-9]+/senders$"
+      json_each: "$"
+      each_match: { "$.manifest_href": "^null$" }
+      json: { rid: "$.id" }
+      state: { "senders.{rid:key}.manifest_href": "" }
+    - path: "^/x-nmos/node/v1[.][0-9]+/senders$"
+      json_each: "$"
+      each_match: { "$.subscription.receiver_id": "^null$" }
+      json: { rid: "$.id" }
+      state: { "senders.{rid:key}.subscription.receiver_id": "" }
+    - path: "^/x-nmos/node/v1[.][0-9]+/senders/[0-9a-f-]+$"
+      json: { rid: "$.id", label: "$.label", description: "$.description", version: "$.version", tags: "$.tags", resource: "$", flow_id: "$.flow_id", transport: "$.transport", device_id: "$.device_id", manifest_href: "$.manifest_href", interface_bindings: "$.interface_bindings", subscription_receiver_id: "$.subscription.receiver_id", subscription_active: "$.subscription.active", caps: "$.caps" }
+      state:
+        "senders.{rid:key}.label": "{label}"
+        "senders.{rid:key}.description": "{description}"
+        "senders.{rid:key}.version": "{version}"
+        "senders.{rid:key}.tags": "{tags}"
+        "senders.{rid:key}.resource": "{resource}"
+        "senders.{rid:key}.flow_id": "{flow_id}"
+        "senders.{rid:key}.transport": "{transport}"
+        "senders.{rid:key}.device_id": "{device_id}"
+        "senders.{rid:key}.manifest_href": "{manifest_href}"
+        "senders.{rid:key}.interface_bindings": "{interface_bindings}"
+        "senders.{rid:key}.subscription.receiver_id": "{subscription_receiver_id}"
+        "senders.{rid:key}.subscription.active": "{subscription_active}"
+        "senders.{rid:key}.caps": "{caps}"
+    - path: "^/x-nmos/node/v1[.][0-9]+/senders/[0-9a-f-]+$"
+      json_match: { "$.flow_id": "^null$" }
+      json: { rid: "$.id" }
+      state: { "senders.{rid:key}.flow_id": "" }
+    - path: "^/x-nmos/node/v1[.][0-9]+/senders/[0-9a-f-]+$"
+      json_match: { "$.manifest_href": "^null$" }
+      json: { rid: "$.id" }
+      state: { "senders.{rid:key}.manifest_href": "" }
+    - path: "^/x-nmos/node/v1[.][0-9]+/senders/[0-9a-f-]+$"
+      json_match: { "$.subscription.receiver_id": "^null$" }
+      json: { rid: "$.id" }
+      state: { "senders.{rid:key}.subscription.receiver_id": "" }
+    - path: "^/x-nmos/node/v1[.][0-9]+/receivers$"
+      json_each: "$"
+      replace: "receivers"
+      json: { rid: "$.id", label: "$.label", description: "$.description", version: "$.version", tags: "$.tags", resource: "$", format: "$.format", transport: "$.transport", device_id: "$.device_id", interface_bindings: "$.interface_bindings", subscription_sender_id: "$.subscription.sender_id", subscription_active: "$.subscription.active", caps: "$.caps" }
+      state:
+        "receivers.{rid:key}.label": "{label}"
+        "receivers.{rid:key}.description": "{description}"
+        "receivers.{rid:key}.version": "{version}"
+        "receivers.{rid:key}.tags": "{tags}"
+        "receivers.{rid:key}.resource": "{resource}"
+        "receivers.{rid:key}.format": "{format}"
+        "receivers.{rid:key}.transport": "{transport}"
+        "receivers.{rid:key}.device_id": "{device_id}"
+        "receivers.{rid:key}.interface_bindings": "{interface_bindings}"
+        "receivers.{rid:key}.subscription.sender_id": "{subscription_sender_id}"
+        "receivers.{rid:key}.subscription.active": "{subscription_active}"
+        "receivers.{rid:key}.caps": "{caps}"
+    - path: "^/x-nmos/node/v1[.][0-9]+/receivers$"
+      json_each: "$"
+      each_match: { "$.subscription.sender_id": "^null$" }
+      json: { rid: "$.id" }
+      state: { "receivers.{rid:key}.subscription.sender_id": "" }
+    - path: "^/x-nmos/node/v1[.][0-9]+/receivers/[0-9a-f-]+$"
+      json: { rid: "$.id", label: "$.label", description: "$.description", version: "$.version", tags: "$.tags", resource: "$", format: "$.format", transport: "$.transport", device_id: "$.device_id", interface_bindings: "$.interface_bindings", subscription_sender_id: "$.subscription.sender_id", subscription_active: "$.subscription.active", caps: "$.caps" }
+      state:
+        "receivers.{rid:key}.label": "{label}"
+        "receivers.{rid:key}.description": "{description}"
+        "receivers.{rid:key}.version": "{version}"
+        "receivers.{rid:key}.tags": "{tags}"
+        "receivers.{rid:key}.resource": "{resource}"
+        "receivers.{rid:key}.format": "{format}"
+        "receivers.{rid:key}.transport": "{transport}"
+        "receivers.{rid:key}.device_id": "{device_id}"
+        "receivers.{rid:key}.interface_bindings": "{interface_bindings}"
+        "receivers.{rid:key}.subscription.sender_id": "{subscription_sender_id}"
+        "receivers.{rid:key}.subscription.active": "{subscription_active}"
+        "receivers.{rid:key}.caps": "{caps}"
+    - path: "^/x-nmos/node/v1[.][0-9]+/receivers/[0-9a-f-]+$"
+      json_match: { "$.subscription.sender_id": "^null$" }
+      json: { rid: "$.id" }
+      state: { "receivers.{rid:key}.subscription.sender_id": "" }
+    # Each Sender's transport file, read from the Connection API.
+    - path: "^/x-nmos/node/v1[.][0-9]+/senders$"
+      json_each: "$"
+      json: { rid: "$.id" }
+      then_send:
+        - { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/senders/{rid}/transportfile" }
+    - path: "^/x-nmos/connection/v1[.][0-9]+/single/(senders|receivers)$"
+      json_each: "$"
+      each_match: { "$": "^([0-9a-f-]+)/?$" }
+      json: {}
+      then_send:
+        - { endpoint: connection, method: GET, path: "/x-nmos/connection/{settings.connection_version}/single/{1}/{2}/active" }
+    - path: "^/x-nmos/connection/v1[.][0-9]+/single/senders/([0-9a-f-]+)/(active|staged)$"
+      json: { peer: "$.receiver_id", enable: "$.master_enable", mode: "$.activation.mode", requested: "$.activation.requested_time", time: "$.activation.activation_time", params: "$.transport_params" }
+      state:
+        "connection.senders.{1}.{2}.receiver_id": "{peer}"
+        "connection.senders.{1}.{2}.master_enable": "{enable}"
+        "connection.senders.{1}.{2}.activation_mode": "{mode}"
+        "connection.senders.{1}.{2}.requested_time": "{requested}"
+        "connection.senders.{1}.{2}.activation_time": "{time}"
+        "connection.senders.{1}.{2}.transport_params": "{params}"
+    - path: "^/x-nmos/connection/v1[.][0-9]+/single/senders/([0-9a-f-]+)/(active|staged)$"
+      json_match: { "$.receiver_id": "^null$" }
+      json: {}
+      state: { "connection.senders.{1}.{2}.receiver_id": "" }
+    - path: "^/x-nmos/connection/v1[.][0-9]+/single/senders/([0-9a-f-]+)/(active|staged)$"
+      json_match: { "$.activation.mode": "^null$" }
+      json: {}
+      state: { "connection.senders.{1}.{2}.activation_mode": "" }
+    - path: "^/x-nmos/connection/v1[.][0-9]+/single/senders/([0-9a-f-]+)/(active|staged)$"
+      json_match: { "$.activation.requested_time": "^null$" }
+      json: {}
+      state: { "connection.senders.{1}.{2}.requested_time": "" }
+    - path: "^/x-nmos/connection/v1[.][0-9]+/single/senders/([0-9a-f-]+)/(active|staged)$"
+      json_match: { "$.activation.activation_time": "^null$" }
+      json: {}
+      state: { "connection.senders.{1}.{2}.activation_time": "" }
+    - path: "^/x-nmos/connection/v1[.][0-9]+/single/receivers/([0-9a-f-]+)/(active|staged)$"
+      json: { peer: "$.sender_id", enable: "$.master_enable", mode: "$.activation.mode", requested: "$.activation.requested_time", time: "$.activation.activation_time", params: "$.transport_params", file: "$.transport_file.data", file_type: "$.transport_file.type" }
+      state:
+        "connection.receivers.{1}.{2}.sender_id": "{peer}"
+        "connection.receivers.{1}.{2}.master_enable": "{enable}"
+        "connection.receivers.{1}.{2}.activation_mode": "{mode}"
+        "connection.receivers.{1}.{2}.requested_time": "{requested}"
+        "connection.receivers.{1}.{2}.activation_time": "{time}"
+        "connection.receivers.{1}.{2}.transport_params": "{params}"
+        "connection.receivers.{1}.{2}.transport_file": "{file}"
+        "connection.receivers.{1}.{2}.transport_file_type": "{file_type}"
+    - path: "^/x-nmos/connection/v1[.][0-9]+/single/receivers/([0-9a-f-]+)/(active|staged)$"
+      json_match: { "$.sender_id": "^null$" }
+      json: {}
+      state: { "connection.receivers.{1}.{2}.sender_id": "" }
+    - path: "^/x-nmos/connection/v1[.][0-9]+/single/receivers/([0-9a-f-]+)/(active|staged)$"
+      json_match: { "$.activation.mode": "^null$" }
+      json: {}
+      state: { "connection.receivers.{1}.{2}.activation_mode": "" }
+    - path: "^/x-nmos/connection/v1[.][0-9]+/single/receivers/([0-9a-f-]+)/(active|staged)$"
+      json_match: { "$.activation.requested_time": "^null$" }
+      json: {}
+      state: { "connection.receivers.{1}.{2}.requested_time": "" }
+    - path: "^/x-nmos/connection/v1[.][0-9]+/single/receivers/([0-9a-f-]+)/(active|staged)$"
+      json_match: { "$.activation.activation_time": "^null$" }
+      json: {}
+      state: { "connection.receivers.{1}.{2}.activation_time": "" }
+    - path: "^/x-nmos/connection/v1[.][0-9]+/single/receivers/([0-9a-f-]+)/(active|staged)$"
+      json_match: { "$.transport_file.data": "^null$" }
+      json: {}
+      state: { "connection.receivers.{1}.{2}.transport_file": "" }
+    - path: "^/x-nmos/connection/v1[.][0-9]+/single/receivers/([0-9a-f-]+)/(active|staged)$"
+      json_match: { "$.transport_file.type": "^null$" }
+      json: {}
+      state: { "connection.receivers.{1}.{2}.transport_file_type": "" }
+    - path: "^/x-nmos/connection/v1[.][0-9]+/single/senders/([0-9a-f-]+)/transportfile$"
+      match: "(?s)^(v=.*)$"
+      state: { "connection.senders.{1}.transport_file": "{2}" }
+    - path: "^/x-nmos/channelmapping/v1[.]0/io$"
+      json_each: "$.inputs.*"
+      replace: channelmapping.inputs
+      json: { name: "$.properties.name", description: "$.properties.description", parent_id: "$.parent.id", parent_type: "$.parent.type", channels: "$.channels", caps: "$.caps" }
+      state:
+        "channelmapping.inputs.{key:key}.name": "{name}"
+        "channelmapping.inputs.{key:key}.description": "{description}"
+        "channelmapping.inputs.{key:key}.parent_id": "{parent_id}"
+        "channelmapping.inputs.{key:key}.parent_type": "{parent_type}"
+        "channelmapping.inputs.{key:key}.channels": "{channels}"
+        "channelmapping.inputs.{key:key}.caps": "{caps}"
+    - path: "^/x-nmos/channelmapping/v1[.]0/io$"
+      json_each: "$.inputs.*"
+      each_match: { "$.parent.id": "^null$" }
+      json: {}
+      state: { "channelmapping.inputs.{key:key}.parent_id": "", "channelmapping.inputs.{key:key}.parent_type": "" }
+    - path: "^/x-nmos/channelmapping/v1[.]0/io$"
+      json_each: "$.outputs.*"
+      replace: channelmapping.outputs
+      json: { name: "$.properties.name", description: "$.properties.description", source_id: "$.source_id", channels: "$.channels", routable: "$.caps.routable_inputs", caps: "$.caps" }
+      state:
+        "channelmapping.outputs.{key:key}.name": "{name}"
+        "channelmapping.outputs.{key:key}.description": "{description}"
+        "channelmapping.outputs.{key:key}.source_id": "{source_id}"
+        "channelmapping.outputs.{key:key}.channels": "{channels}"
+        "channelmapping.outputs.{key:key}.routable_inputs": "{routable}"
+        "channelmapping.outputs.{key:key}.caps": "{caps}"
+    - path: "^/x-nmos/channelmapping/v1[.]0/io$"
+      json_each: "$.outputs.*"
+      each_match: { "$.source_id": "^null$" }
+      json: {}
+      state: { "channelmapping.outputs.{key:key}.source_id": "" }
+    - path: "^/x-nmos/channelmapping/v1[.]0/io$"
+      json_each: "$.outputs.*"
+      each_match: { "$.caps.routable_inputs": "^null$" }
+      json: {}
+      state: { "channelmapping.outputs.{key:key}.routable_inputs": "any" }
+    - path: "^/x-nmos/channelmapping/v1[.]0/map/active$"
+      json_each: "$.map.*.*"
+      replace: channelmapping.map
+      json: { input: "$.input", channel: "$.channel_index" }
+      state:
+        "channelmapping.map.{^key:key}.{key:key}.input": "{input}"
+        "channelmapping.map.{^key:key}.{key:key}.input_channel": "{channel}"
+    - path: "^/x-nmos/channelmapping/v1[.]0/map/active$"
+      json_each: "$.map.*.*"
+      each_match: { "$.input": "^null$" }
+      json: {}
+      state:
+        "channelmapping.map.{^key:key}.{key:key}.input": ""
+        "channelmapping.map.{^key:key}.{key:key}.input_channel": "-1"
+    - path: "^/x-nmos/channelmapping/v1[.]0/map/activations/$"
+      json: { body: "$" }
+      state: { channelmapping.activations: "{body}" }
+    - path: "^/x-nmos/events/v1[.]0/sources$"
+      json_each: "$"
+      each_match: { "$": "^([0-9a-f-]+)/?$" }
+      json: {}
+      then_send:
+        - { endpoint: events, method: GET, path: "/x-nmos/events/v1.0/sources/{1}/state" }
+    - path: "^/x-nmos/events/v1[.]0/sources/([0-9a-f-]+)/state$"
+      json: { event_type: "$.event_type", value: "$.payload.value", scale: "$.payload.scale", payload: "$.payload", time: "$.timing.creation_timestamp" }
+      state:
+        "events.{1}.event_type": "{event_type}"
+        "events.{1}.value": "{value}"
+        "events.{1}.scale": "{scale}"
+        "events.{1}.payload": "{payload}"
+        "events.{1}.creation_timestamp": "{time}"
+    - path: "^/x-nmos/events/v1[.]0/sources/([0-9a-f-]+)/type$"
+      json: { body: "$" }
+      state: { "events.{1}.type": "{body}" }
+state:
+  nodes.*.label: { type: string, description: "Node: its label, free text" }
+  nodes.*.description: { type: string, description: "Node: its description, free text" }
+  nodes.*.version: { type: string, description: "Node: its version, the TAI time of its last change as <seconds>:<nanoseconds>" }
+  nodes.*.tags: { type: string, description: "Node: its tags, as JSON text (an object of string arrays)" }
+  nodes.*.resource: { type: string, description: "Node: the whole resource as the API gives it, as JSON text" }
+  nodes.*.hostname: { type: string, description: "Node: the Node's host name" }
+  nodes.*.href: { type: string, description: "Node: the Node's HTTP access URL (deprecated in v1.1 in favor of api.endpoints)" }
+  nodes.*.api_versions: { type: string, description: "Node: the Node API versions the Node supports, as JSON text" }
+  nodes.*.api_endpoints: { type: string, description: "Node: the Node API's endpoints (host, port, protocol, authorization), as JSON text" }
+  nodes.*.caps: { type: string, description: "Node: the Node's capabilities, as JSON text" }
+  nodes.*.services: { type: string, description: "Node: the Node's services (href, type, authorization), as JSON text" }
+  nodes.*.clocks: { type: string, description: "Node: the Node's clocks (internal or PTP, with their parameters), as JSON text" }
+  nodes.*.interfaces: { type: string, description: "Node: the Node's network interfaces (name, chassis_id, port_id, attached network device), as JSON text" }
+  devices.*.label: { type: string, description: "Device: its label, free text" }
+  devices.*.description: { type: string, description: "Device: its description, free text" }
+  devices.*.version: { type: string, description: "Device: its version, the TAI time of its last change as <seconds>:<nanoseconds>" }
+  devices.*.tags: { type: string, description: "Device: its tags, as JSON text (an object of string arrays)" }
+  devices.*.resource: { type: string, description: "Device: the whole resource as the API gives it, as JSON text" }
+  devices.*.type: { type: string, description: "Device: the Device's type, a URN such as urn:x-nmos:device:pipeline" }
+  devices.*.node_id: { type: string, description: "Device: the id of the Node the Device belongs to" }
+  devices.*.controls: { type: string, description: "Device: the Device's control endpoints (href, type such as urn:x-nmos:control:sr-ctrl/v1.1, authorization), as JSON text" }
+  sources.*.label: { type: string, description: "Source: its label, free text" }
+  sources.*.description: { type: string, description: "Source: its description, free text" }
+  sources.*.version: { type: string, description: "Source: its version, the TAI time of its last change as <seconds>:<nanoseconds>" }
+  sources.*.tags: { type: string, description: "Source: its tags, as JSON text (an object of string arrays)" }
+  sources.*.resource: { type: string, description: "Source: the whole resource as the API gives it, as JSON text" }
+  sources.*.format: { type: string, description: "Source: the Source's format, a URN such as urn:x-nmos:format:video" }
+  sources.*.device_id: { type: string, description: "Source: the id of the Device the Source belongs to" }
+  sources.*.clock_name: { type: string, description: "Source: the name of the Node clock the Source is timed by, empty when none" }
+  sources.*.grain_rate: { type: string, description: "Source: the Source's maximum grain rate as JSON text ({numerator, denominator})" }
+  sources.*.caps: { type: string, description: "Source: the Source's capabilities, as JSON text" }
+  sources.*.parents: { type: string, description: "Source: the ids of the Sources this one derives from, as JSON text" }
+  sources.*.channels: { type: string, description: "Source: an audio Source's channels (label, symbol), as JSON text" }
+  flows.*.label: { type: string, description: "Flow: its label, free text" }
+  flows.*.description: { type: string, description: "Flow: its description, free text" }
+  flows.*.version: { type: string, description: "Flow: its version, the TAI time of its last change as <seconds>:<nanoseconds>" }
+  flows.*.tags: { type: string, description: "Flow: its tags, as JSON text (an object of string arrays)" }
+  flows.*.resource: { type: string, description: "Flow: the whole resource as the API gives it, as JSON text" }
+  flows.*.format: { type: string, description: "Flow: the Flow's format, a URN such as urn:x-nmos:format:audio" }
+  flows.*.source_id: { type: string, description: "Flow: the id of the Source the Flow is from" }
+  flows.*.device_id: { type: string, description: "Flow: the id of the Device the Flow belongs to" }
+  flows.*.media_type: { type: string, description: "Flow: the Flow's media type, such as video/raw or audio/L24" }
+  flows.*.grain_rate: { type: string, description: "Flow: the Flow's grain rate as JSON text ({numerator, denominator})" }
+  flows.*.frame_width: { type: int, description: "Flow: a video Flow's width in pixels" }
+  flows.*.frame_height: { type: int, description: "Flow: a video Flow's height in lines" }
+  flows.*.interlace_mode: { type: string, description: "Flow: a video Flow's interlace mode: progressive, interlaced_tff, interlaced_bff or interlaced_psf" }
+  flows.*.colorspace: { type: string, description: "Flow: a video Flow's colorspace, such as BT709 or BT2020" }
+  flows.*.transfer_characteristic: { type: string, description: "Flow: a video Flow's transfer characteristic: SDR, HLG or PQ" }
+  flows.*.sample_rate: { type: string, description: "Flow: an audio Flow's sample rate as JSON text ({numerator, denominator})" }
+  flows.*.bit_depth: { type: int, description: "Flow: an audio Flow's bit depth" }
+  flows.*.parents: { type: string, description: "Flow: the ids of the Flows this one derives from, as JSON text" }
+  senders.*.label: { type: string, description: "Sender: its label, free text" }
+  senders.*.description: { type: string, description: "Sender: its description, free text" }
+  senders.*.version: { type: string, description: "Sender: its version, the TAI time of its last change as <seconds>:<nanoseconds>" }
+  senders.*.tags: { type: string, description: "Sender: its tags, as JSON text (an object of string arrays)" }
+  senders.*.resource: { type: string, description: "Sender: the whole resource as the API gives it, as JSON text" }
+  senders.*.flow_id: { type: string, description: "Sender: the id of the Flow the Sender sends, empty when none" }
+  senders.*.transport: { type: string, description: "Sender: the Sender's transport, a URN such as urn:x-nmos:transport:rtp.mcast" }
+  senders.*.device_id: { type: string, description: "Sender: the id of the Device the Sender belongs to" }
+  senders.*.manifest_href: { type: string, description: "Sender: the URL of the Sender's transport file (SDP), empty when none" }
+  senders.*.interface_bindings: { type: string, description: "Sender: the Node interfaces the Sender sends on, as JSON text" }
+  senders.*.subscription.receiver_id: { type: string, description: "Sender: the Receiver the Sender sends to (unicast), empty when none" }
+  senders.*.subscription.active: { type: bool, description: "Sender: the Sender is active (sending)" }
+  senders.*.caps: { type: string, description: "Sender: the Sender's capabilities, as JSON text" }
+  receivers.*.label: { type: string, description: "Receiver: its label, free text" }
+  receivers.*.description: { type: string, description: "Receiver: its description, free text" }
+  receivers.*.version: { type: string, description: "Receiver: its version, the TAI time of its last change as <seconds>:<nanoseconds>" }
+  receivers.*.tags: { type: string, description: "Receiver: its tags, as JSON text (an object of string arrays)" }
+  receivers.*.resource: { type: string, description: "Receiver: the whole resource as the API gives it, as JSON text" }
+  receivers.*.format: { type: string, description: "Receiver: the Receiver's format, a URN such as urn:x-nmos:format:video" }
+  receivers.*.transport: { type: string, description: "Receiver: the Receiver's transport, a URN such as urn:x-nmos:transport:rtp" }
+  receivers.*.device_id: { type: string, description: "Receiver: the id of the Device the Receiver belongs to" }
+  receivers.*.interface_bindings: { type: string, description: "Receiver: the Node interfaces the Receiver listens on, as JSON text" }
+  receivers.*.subscription.sender_id: { type: string, description: "Receiver: the Sender the Receiver is subscribed to, empty when none (or a non-NMOS sender)" }
+  receivers.*.subscription.active: { type: bool, description: "Receiver: the Receiver is active (receiving)" }
+  receivers.*.caps: { type: string, description: "Receiver: the Receiver's capabilities (media types, constraint sets), as JSON text" }
+  connection.senders.*.active.receiver_id: { type: string, description: "IS-05, Sender active (in effect): the Receiver a unicast Sender sends to, empty when none" }
+  connection.senders.*.active.master_enable: { type: bool, description: "IS-05, Sender active (in effect): master enable" }
+  connection.senders.*.active.activation_mode: { type: string, description: "IS-05, Sender active (in effect): activation mode, activate_immediate, activate_scheduled_absolute or activate_scheduled_relative, empty when none" }
+  connection.senders.*.active.requested_time: { type: string, description: "IS-05, Sender active (in effect): requested activation time as <seconds>:<nanoseconds> (TAI, or relative), empty when none" }
+  connection.senders.*.active.activation_time: { type: string, description: "IS-05, Sender active (in effect): TAI time of the activation as <seconds>:<nanoseconds>, empty when none" }
+  connection.senders.*.active.transport_params: { type: string, description: "IS-05, Sender active (in effect): transport parameters, one object per leg, as JSON text" }
+  connection.senders.*.staged.receiver_id: { type: string, description: "IS-05, Sender staged (to take effect at the next activation): the Receiver a unicast Sender sends to, empty when none" }
+  connection.senders.*.staged.master_enable: { type: bool, description: "IS-05, Sender staged (to take effect at the next activation): master enable" }
+  connection.senders.*.staged.activation_mode: { type: string, description: "IS-05, Sender staged (to take effect at the next activation): activation mode, activate_immediate, activate_scheduled_absolute or activate_scheduled_relative, empty when none" }
+  connection.senders.*.staged.requested_time: { type: string, description: "IS-05, Sender staged (to take effect at the next activation): requested activation time as <seconds>:<nanoseconds> (TAI, or relative), empty when none" }
+  connection.senders.*.staged.activation_time: { type: string, description: "IS-05, Sender staged (to take effect at the next activation): TAI time of the activation as <seconds>:<nanoseconds>, empty when none" }
+  connection.senders.*.staged.transport_params: { type: string, description: "IS-05, Sender staged (to take effect at the next activation): transport parameters, one object per leg, as JSON text" }
+  connection.receivers.*.active.sender_id: { type: string, description: "IS-05, Receiver active (in effect): the Sender the Receiver receives, empty when none" }
+  connection.receivers.*.active.master_enable: { type: bool, description: "IS-05, Receiver active (in effect): master enable" }
+  connection.receivers.*.active.activation_mode: { type: string, description: "IS-05, Receiver active (in effect): activation mode, activate_immediate, activate_scheduled_absolute or activate_scheduled_relative, empty when none" }
+  connection.receivers.*.active.requested_time: { type: string, description: "IS-05, Receiver active (in effect): requested activation time as <seconds>:<nanoseconds> (TAI, or relative), empty when none" }
+  connection.receivers.*.active.activation_time: { type: string, description: "IS-05, Receiver active (in effect): TAI time of the activation as <seconds>:<nanoseconds>, empty when none" }
+  connection.receivers.*.active.transport_params: { type: string, description: "IS-05, Receiver active (in effect): transport parameters, one object per leg, as JSON text" }
+  connection.receivers.*.active.transport_file: { type: string, description: "IS-05, Receiver active (in effect): the transport file (SDP) given to it, empty when none" }
+  connection.receivers.*.active.transport_file_type: { type: string, description: "IS-05, Receiver active (in effect): the transport file's media type, such as application/sdp, empty when none" }
+  connection.receivers.*.staged.sender_id: { type: string, description: "IS-05, Receiver staged (to take effect at the next activation): the Sender the Receiver receives, empty when none" }
+  connection.receivers.*.staged.master_enable: { type: bool, description: "IS-05, Receiver staged (to take effect at the next activation): master enable" }
+  connection.receivers.*.staged.activation_mode: { type: string, description: "IS-05, Receiver staged (to take effect at the next activation): activation mode, activate_immediate, activate_scheduled_absolute or activate_scheduled_relative, empty when none" }
+  connection.receivers.*.staged.requested_time: { type: string, description: "IS-05, Receiver staged (to take effect at the next activation): requested activation time as <seconds>:<nanoseconds> (TAI, or relative), empty when none" }
+  connection.receivers.*.staged.activation_time: { type: string, description: "IS-05, Receiver staged (to take effect at the next activation): TAI time of the activation as <seconds>:<nanoseconds>, empty when none" }
+  connection.receivers.*.staged.transport_params: { type: string, description: "IS-05, Receiver staged (to take effect at the next activation): transport parameters, one object per leg, as JSON text" }
+  connection.receivers.*.staged.transport_file: { type: string, description: "IS-05, Receiver staged (to take effect at the next activation): the transport file (SDP) given to it, empty when none" }
+  connection.receivers.*.staged.transport_file_type: { type: string, description: "IS-05, Receiver staged (to take effect at the next activation): the transport file's media type, such as application/sdp, empty when none" }
+  connection.senders.*.transport_file: { type: string, description: "IS-05: the Sender's transport file (SDP) as its transportfile resource gives it" }
+  channelmapping.inputs.*.name: { type: string, description: "IS-08 input: its name" }
+  channelmapping.inputs.*.description: { type: string, description: "IS-08 input: its description" }
+  channelmapping.inputs.*.parent_id: { type: string, description: "IS-08 input: the id of the IS-04 Source or Receiver it comes from, empty when none" }
+  channelmapping.inputs.*.parent_type: { type: string, description: "IS-08 input: source or receiver, empty when none" }
+  channelmapping.inputs.*.channels: { type: string, description: "IS-08 input: its channels (label), in order from 0, as JSON text" }
+  channelmapping.inputs.*.caps: { type: string, description: "IS-08 input: its capabilities (reordering, block_size), as JSON text" }
+  channelmapping.outputs.*.name: { type: string, description: "IS-08 output: its name" }
+  channelmapping.outputs.*.description: { type: string, description: "IS-08 output: its description" }
+  channelmapping.outputs.*.source_id: { type: string, description: "IS-08 output: the id of the IS-04 Source it feeds, empty when none" }
+  channelmapping.outputs.*.channels: { type: string, description: "IS-08 output: its channels (label), in order from 0, as JSON text" }
+  channelmapping.outputs.*.routable_inputs: { type: string, description: "IS-08 output: the inputs it can take, as JSON text, or any" }
+  channelmapping.outputs.*.caps: { type: string, description: "IS-08 output: its capabilities, as JSON text" }
+  channelmapping.map.*.*.input: { type: string, description: "IS-08 active map, keyed by output and output channel (from 0): the input routed there, empty when unrouted" }
+  channelmapping.map.*.*.input_channel: { type: int, description: "IS-08 active map: the input channel routed there (from 0), -1 when unrouted" }
+  channelmapping.activations: { type: string, description: "IS-08: the scheduled activations, keyed by activation id, as JSON text" }
+  events.*.event_type: { type: string, description: "IS-07 event source, keyed by its id: the event type, such as boolean or number/temperature/C" }
+  events.*.value: { type: string, description: "IS-07 event source: its current value as text (true or false, a number, or a string)" }
+  events.*.scale: { type: int, description: "IS-07 event source: the scale a number value is divided by, for a number event" }
+  events.*.payload: { type: string, description: "IS-07 event source: the whole payload, as JSON text" }
+  events.*.creation_timestamp: { type: string, description: "IS-07 event source: when the state was created, TAI <seconds>:<nanoseconds>" }
+  events.*.type: { type: string, description: "IS-07 event source: its type definition (enumerations, ranges), as JSON text, read with get_event_type" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      A Node has no standard port: open it with the Node API's port from its
+      _nmos-node._tcp advertisement (mDNS discovery reports it) or its
+      configuration. Its Connection, Channel Mapping and Events APIs may be on the
+      same port or others: the href of each Device control (state
+      devices.*.controls) gives them, and connection_port, channelmapping_port
+      and events_port take them. A Node lacking one of these APIs fails its
+      requests, which are then logged at each poll.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Connecting a Receiver over RTP needs the Sender's transport file (SDP):
+      connect_receiver takes it, as the Sender's own Node serves it
+      (connection.senders.*.transport_file there, or its manifest_href). A
+      Sender on another Node is read by opening that Node too, or from the
+      registry (nmos-registry). Changes take effect at once (activate_immediate);
+      stage_receiver and stage_sender schedule them.
+
+  - models: [all]
+    severity: info
+    text: >
+      Nothing is pushed by the Node API: the resources are read every 30 seconds,
+      the IS-05 active parameters every 5 seconds, the IS-08 map every 5 seconds
+      and the IS-07 event states every 2 seconds. An IS-07 Node's websocket or
+      MQTT event transport is not used. IS-05 parameters of a Sender or Receiver
+      that has gone stay in state until the Node is opened again, since the
+      Connection API's lists name ids only.
+
+  - models: [all]
+    severity: info
+    text: >
+      The Node API's /receivers/{id}/target is deprecated since IS-04 v1.2 and may
+      answer 501; set_receiver_target and clear_receiver_target are for Nodes
+      without IS-05. The IS-08 scheduled activations are read from
+      /map/activations/ (with the trailing slash every server accepts for GET),
+      so a POST's answer, which names only the new activation, does not replace
+      the list.

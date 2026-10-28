@@ -1,0 +1,428 @@
+spec: 1
+id: matrox-monarch-hd
+name: Matrox Monarch HD streaming and recording appliance
+vendor: Matrox
+category: recorder
+
+source:
+  - title: Matrox Monarch HD Dev Tools Reference Guide, v2.2.0 (August 17, 2017, Y11308-301-0220)
+    author: Matrox Electronic Systems Ltd.
+    url: https://ftp.matrox.com/pub/video/doc/Matrox%20Monarch%20HD%20Dev%20Tools%20Reference%20guide_v.2.2.0.pdf
+    note: >
+      Manufacturer-documented, the source of every command and state rule
+      here. Chapter 1, Using the Monarch HD Control API (p.2-10): commands
+      sent as GET /Monarch/syncconnect/sdk.aspx?command=<command> with the
+      unit's username and password (both admin by default), HTTPS also
+      supported; arguments follow the command name, separated by commas.
+      GetStatus (RECORD:<state>, STREAM:<mode>,<state>, NAME:<name>; state
+      ON, READY or DISABLED; mode RTSP, RTMP or DISABLED), Start/Stop
+      Streaming, Recording and StreamingAndRecording, GetInputStatus,
+      Set/GetStreamingVideoDataRate (50 to 20000 kb/s, Stream-only mode),
+      Set/GetRTSP (port 554 or 8554), Set/GetRTMP (username and password
+      optional), Set/GetRecordFileName, GetSerialNumber; every command
+      answers RETRY while another is executing. Chapter 2, the XML
+      configuration file, and chapter 3, the Windows command line utility,
+      are not part of the HTTP API.
+  - title: Matrox Monarch HD User Guide (February 2, 2021, Y11271-301-0240)
+    author: Matrox Electronic Systems Ltd.
+    url: https://ftp.matrox.com/pub/video/doc/Matrox%20Monarch%20HD%20User%20Guide_v2.4.0.pdf
+    note: >
+      Username and password, and Installing the Monarch SSL certificate
+      (p.20-21): HTTPS uses a certificate the unit issues itself, downloaded
+      from the Command Center.
+  - title: companion-module-matrox-monarch (Bitfocus Companion module, MIT)
+    author: Bitfocus and contributors
+    url: https://github.com/bitfocus/companion-module-matrox-monarch
+    note: >
+      Corroboration only: sends the commands with an HTTP Basic credential
+      on port 80 and reads the reply as plain text.
+
+transport:
+  type: http
+  port: 80
+  https_port: 443
+  scheme: { setting: scheme }
+  # The unit's HTTPS certificate is one it issues itself (User Guide,
+  # "Installing the Monarch SSL certificate").
+  accept_invalid_certs: true
+  auth: basic
+  refusal_status: [401]
+  timeout_ms: 10000
+  probe: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStatus" }
+
+settings:
+  username: { type: string, default: admin, label: Username, description: "The Command Center user; admin by default, as the Dev Tools guide says." }
+  password: { type: string, secret: true, default: admin, label: Password, description: "That user's password; admin by default." }
+  scheme:
+    type: enum
+    values: [http, https]
+    default: http
+    label: Scheme
+    description: "http on port 80, or https on port 443 with the unit's own certificate, which is not checked."
+
+ports:
+  - { port: 80, protocol: http, role: control, setting: scheme, when: "scheme http" }
+  - { port: 443, protocol: https, role: control, setting: scheme, when: "scheme https" }
+
+models:
+  - id: monarch-hd
+    name: Matrox Monarch HD
+    supports:
+      - get_status
+      - start_streaming
+      - start_recording
+      - start_streaming_and_recording
+      - stop_streaming
+      - stop_recording
+      - stop_streaming_and_recording
+      - get_input_status
+      - set_streaming_video_data_rate
+      - get_streaming_video_data_rate
+      - set_rtsp
+      - get_rtsp
+      - set_rtmp
+      - set_rtmp_with_credentials
+      - get_rtmp
+      - set_record_file_name
+      - get_record_file_name
+      - get_serial_number
+    verification: none
+    notes: >
+      HDMI input; encoder 1 records and encoder 2 streams (RTSP or RTMP), in
+      the Record-only, Stream-only or Stream-and-record operating mode set
+      in the Command Center.
+
+commands:
+  get_status:
+    summary: Read the record state, the stream mode and state, and the device name (GetStatus); returns the reply text
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStatus" }
+    expect: { status: 200, matches: "^\\s*(RECORD:[\\s\\S]*\\S)\\s*$" }
+    returns: value
+
+  start_streaming:
+    summary: >
+      Start streaming in RTMP mode (StartStreaming); in RTSP mode the stream
+      is always active and this answers SUCCESS without a change. FAILED in
+      Record-only mode
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=StartStreaming" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  start_recording:
+    summary: Start recording (StartRecording); FAILED in Stream-only mode
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=StartRecording" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  start_streaming_and_recording:
+    summary: >
+      Start the RTMP stream and the recording together
+      (StartStreamingAndRecording); Stream-and-record mode only, and not
+      advised in RTSP mode, where start_recording is the one to use
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=StartStreamingAndRecording" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  stop_streaming:
+    summary: Stop the RTMP stream (StopStreaming); FAILED in RTSP mode, whose stream cannot be stopped, and in Record-only mode
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=StopStreaming" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  stop_recording:
+    summary: Stop recording (StopRecording); FAILED in Stream-only mode
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=StopRecording" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  stop_streaming_and_recording:
+    summary: >
+      Stop the RTMP stream and the recording together
+      (StopStreamingAndRecording); Stream-and-record mode only, and not
+      advised in RTSP mode, where stop_recording is the one to use
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=StopStreamingAndRecording" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  get_input_status:
+    summary: >
+      Read the HDMI input's resolution and frame rate (GetInputStatus), such
+      as "HDMI: 1920x1080i, 29.97 fps", or "No video input"
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetInputStatus" }
+    expect: { status: 200, matches: "^\\s*([\\s\\S]*(?:fps|No video input)[\\s\\S]*?)\\s*$" }
+    returns: value
+
+  set_streaming_video_data_rate:
+    summary: >
+      Change the stream's average video bit rate without stopping it
+      (SetStreamingVideoDataRate); the minimum becomes 90% and the maximum
+      110% of it. Stream-only mode only
+    params:
+      kbps: { type: int, min: 50, max: 20000, required: true, label: Average bit rate, description: "Average video bit rate in kilobits per second." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetStreamingVideoDataRate,{kbps}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  get_streaming_video_data_rate:
+    summary: Read the stream's average video bit rate in kb/s (GetStreamingVideoDataRate); Stream-only mode only
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStreamingVideoDataRate" }
+    expect: { status: 200, matches: "^\\s*BITRATE:\\s*(\\d+)\\s*$" }
+    returns: value
+
+  set_rtsp:
+    summary: >
+      Set the RTSP path and port and switch streaming to RTSP (SetRTSP);
+      refused unless the unit is idle, neither streaming nor recording
+    params:
+      name: { type: string, required: true, max_length: 255, pattern: "^[A-Za-z0-9.:=/]+$", label: Stream path, description: "The path RTSP clients connect to; letters, digits and . : = / only, as the guide allows." }
+      port: { type: enum, values: ["554", "8554"], default: "554", label: RTSP port, description: "The RTSP server's port, 554 or 8554." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetRTSP,{name},{port}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  get_rtsp:
+    summary: >
+      Read the RTSP settings, the URL, the name and the port (GetRTSP),
+      whether or not streaming is set to RTSP; returns the reply text
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRTSP" }
+    expect: { status: 200, matches: "^\\s*([^\\s,][^,]*,[\\s\\S]*\\S)\\s*$" }
+    returns: value
+
+  set_rtmp:
+    summary: >
+      Set the RTMP server URL and stream name, with no credential, and
+      switch streaming to RTMP (SetRTMP); refused unless the unit is idle,
+      neither streaming nor recording
+    params:
+      url: { type: string, required: true, max_length: 1024, pattern: "^[A-Za-z0-9.:=/]+$", label: Server URL, description: "The RTMP server URL, such as rtmp://192.168.66.200/live; letters, digits and . : = / only, as the guide allows." }
+      stream: { type: string, required: true, max_length: 1024, pattern: "^[^,]+$", label: Stream name, description: "The stream name or key the server gives; no commas, which separate the command's arguments." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetRTMP,{url},{stream:url}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  set_rtmp_with_credentials:
+    summary: >
+      Set the RTMP server URL, stream name, username and password and switch
+      streaming to RTMP (SetRTMP); refused unless the unit is idle, neither
+      streaming nor recording
+    params:
+      url: { type: string, required: true, max_length: 1024, pattern: "^[A-Za-z0-9.:=/]+$", label: Server URL, description: "The RTMP server URL, such as rtmp://192.168.66.200/live; letters, digits and . : = / only, as the guide allows." }
+      stream: { type: string, required: true, max_length: 1024, pattern: "^[^,]+$", label: Stream name, description: "The stream name or key the server gives; no commas, which separate the command's arguments." }
+      username: { type: string, required: true, max_length: 255, pattern: "^[^,]+$", label: RTMP username, description: "The user the RTMP server asks for; no commas." }
+      password: { type: string, required: true, secret: true, max_length: 255, pattern: "^[^,]+$", label: RTMP password, description: "That user's password; no commas." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetRTMP,{url},{stream:url},{username:url},{password:url}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  get_rtmp:
+    summary: >
+      Read the RTMP server URL and stream name (GetRTMP), whether or not
+      streaming is set to RTMP; returns the reply text
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRTMP" }
+    expect: { status: 200, matches: "^\\s*([^\\s,][^,]*,[\\s\\S]*\\S)\\s*$" }
+    returns: value
+
+  set_record_file_name:
+    summary: >
+      Set the name, or path and name, recordings are saved to
+      (SetRecordFileName); refused while the unit streams or records
+    params:
+      filename: { type: string, required: true, max_length: 1024, pattern: "^[A-Za-z0-9/.:-]+$", label: File name, description: "Letters, digits, - and /, plus . and : when recording to a network drive, as the guide allows; every folder named must exist." }
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=SetRecordFileName,{filename}" }
+    expect: { status: 200, matches: "^\\s*SUCCESS\\s*$" }
+    returns: ack
+
+  get_record_file_name:
+    summary: Read the name, or path and name, recordings are saved to (GetRecordFileName)
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRecordFileName" }
+    expect: { status: 200, matches: "^\\s*RECORD FILENAME:\\s*(.*?)\\s*$" }
+    returns: value
+
+  get_serial_number:
+    summary: Read the unit's serial number (GetSerialNumber)
+    send: { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetSerialNumber" }
+    expect: { status: 200, matches: "^\\s*([A-Za-z0-9-]*[0-9][A-Za-z0-9-]*)\\s*$" }
+    returns: value
+
+telemetry:
+  # The unit pushes nothing. GetStatus is read every 2 seconds, the input
+  # and the streaming bit rate every 10, the settings every 30, and the
+  # serial number on connecting. Every command's reply goes through these
+  # rules too, and a change that succeeded reads back what it changed.
+  subscribe:
+    send:
+      - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetSerialNumber" }
+  poll:
+    - every_ms: 2000
+      send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStatus" }
+    - every_ms: 10000
+      send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetInputStatus" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStreamingVideoDataRate" }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRTSP" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRTMP" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRecordFileName" }
+  updates:
+    # Status.
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetStatus$"
+      match: "^\\s*RECORD:\\s*([A-Z]+)\\s*,\\s*STREAM:\\s*([A-Z]+)\\s*,\\s*([A-Z]+)\\s*,\\s*NAME:\\s*(.*?)\\s*$"
+      state:
+        record.state: "{1}"
+        record.active: { value: "{1}", map: { "ON": true, "READY": false, "DISABLED": false } }
+        stream.mode: "{2}"
+        stream.state: "{3}"
+        stream.active: { value: "{3}", map: { "ON": true, "READY": false, "DISABLED": false } }
+        device.name: "{4}"
+
+    # Input: what one reply says replaces the last.
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetInputStatus$"
+      match: "(?:fps|No video input)"
+      replace: input
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetInputStatus$"
+      match: "^\\s*([\\s\\S]*(?:fps|No video input)[\\s\\S]*?)\\s*$"
+      state: { input.status: "{1}" }
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetInputStatus$"
+      match: "^\\s*No video input\\s*$"
+      state: { input.present: "false" }
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetInputStatus$"
+      match: "^\\s*([A-Za-z]+(?: [A-Z])?)\\s*:\\s*(\\d+)\\s*x\\s*(\\d+)\\s*([ip])\\s*,\\s*([0-9]+(?:\\.[0-9]+)?)\\s*fps"
+      state:
+        input.present: "true"
+        input.connector: "{1}"
+        input.width: "{2}"
+        input.height: "{3}"
+        input.scan: { value: "{4}", map: { i: interlaced, p: progressive } }
+        input.frame_rate: "{5}"
+
+    # Streaming bit rate (answered in Stream-only mode).
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetStreamingVideoDataRate$"
+      match: "^\\s*BITRATE:\\s*(\\d+)\\s*$"
+      state: { stream.bitrate_kbps: "{1}" }
+
+    # Settings.
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetRTSP$"
+      match: "^\\s*([^\\s,][^,]*?)\\s*,\\s*([^,]*?)\\s*,\\s*(\\d+)\\s*$"
+      state:
+        stream.rtsp.url: "{1}"
+        stream.rtsp.name: "{2}"
+        stream.rtsp.port: "{3}"
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetRTMP$"
+      match: "^\\s*([^\\s,][^,]*?)\\s*,\\s*(.*?)\\s*$"
+      state:
+        stream.rtmp.url: "{1}"
+        stream.rtmp.stream_name: "{2}"
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetRecordFileName$"
+      match: "^\\s*RECORD FILENAME:\\s*(.*?)\\s*$"
+      state: { record.file_name: "{1}" }
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=GetSerialNumber$"
+      match: "^\\s*([A-Za-z0-9-]*[0-9][A-Za-z0-9-]*)\\s*$"
+      state: { device.serial_number: "{1}" }
+
+    # Read-backs after a change the unit accepted.
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=(?:Start|Stop)(?:Streaming|Recording|StreamingAndRecording)$"
+      match: "^\\s*SUCCESS\\s*$"
+      then_send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStatus" }
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=SetStreamingVideoDataRate,"
+      match: "^\\s*SUCCESS\\s*$"
+      then_send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStreamingVideoDataRate" }
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=SetRTSP,"
+      match: "^\\s*SUCCESS\\s*$"
+      then_send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRTSP" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStatus" }
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=SetRTMP,"
+      match: "^\\s*SUCCESS\\s*$"
+      then_send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRTMP" }
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetStatus" }
+    - path: "^/Monarch/syncconnect/sdk\\.aspx\\?command=SetRecordFileName,"
+      match: "^\\s*SUCCESS\\s*$"
+      then_send:
+        - { method: GET, path: /Monarch/syncconnect/sdk.aspx, raw_query: "command=GetRecordFileName" }
+
+state:
+  device.name: { type: string, description: "The device name set in the Command Center, from GetStatus" }
+  device.serial_number: { type: string, description: "The unit's serial number" }
+  record.state: { type: string, description: "The recording state: ON (recording), READY or DISABLED (Stream-only mode)" }
+  record.active: { type: bool, description: "True while recording" }
+  record.file_name: { type: string, description: "The name, or path and name, recordings are saved to" }
+  stream.mode: { type: string, description: "The streaming mode: RTSP, RTMP or DISABLED (Record-only mode)" }
+  stream.state: { type: string, description: "The streaming state: ON (streaming over RTMP, or an RTSP client connected), READY or DISABLED" }
+  stream.active: { type: bool, description: "True when the streaming state is ON" }
+  stream.bitrate_kbps: { type: int, unit: kbit/s, description: "The stream's average video bit rate, read in Stream-only mode; the last value read stays in other modes" }
+  stream.rtsp.url: { type: string, description: "The RTSP URL GetRTSP gives, whether or not streaming is set to RTSP" }
+  stream.rtsp.name: { type: string, description: "The RTSP stream name GetRTSP gives" }
+  stream.rtsp.port: { type: int, description: "The RTSP port, 554 or 8554" }
+  stream.rtmp.url: { type: string, description: "The RTMP server URL GetRTMP gives, whether or not streaming is set to RTMP" }
+  stream.rtmp.stream_name: { type: string, description: "The RTMP stream name GetRTMP gives" }
+  input.status: { type: string, description: "GetInputStatus's text as the unit gives it, such as \"HDMI: 1920x1080i, 29.97 fps\" or \"No video input\"" }
+  input.present: { type: bool, description: "False when the unit reports no video input" }
+  input.connector: { type: string, description: "The input connector as the unit names it, HDMI" }
+  input.width: { type: int, unit: px, description: "The input's frame width" }
+  input.height: { type: int, unit: px, description: "The input's frame height" }
+  input.scan: { type: string, description: "interlaced or progressive, from the i or p after the resolution" }
+  input.frame_rate: { type: float, unit: fps, description: "The input's frame rate" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The unit runs one command at a time: a command arriving while another
+      executes (from this or another client, such as the Command Center)
+      answers RETRY and does nothing, and the command fails here with the
+      reply. Send it again. Changes answered FAILED or RETRY also fail
+      here; SUCCESS is the only success.
+
+  - models: [all]
+    severity: warning
+    text: >
+      set_rtsp, set_rtmp, set_rtmp_with_credentials and set_record_file_name
+      are refused (FAILED) while the unit streams or records: stop it first.
+      set_rtsp and set_rtmp also switch the streaming mode. An RTSP stream
+      is always active and cannot be started or stopped; use start_recording
+      and stop_recording there. set_streaming_video_data_rate and
+      get_streaming_video_data_rate work only in Stream-only mode, so
+      stream.bitrate_kbps is the last rate read in it. The operating mode
+      (Record-only, Stream-only, Stream-and-record), the encoding settings,
+      the audio input and the recording media are set in the Command Center
+      only; the HTTP API has no command for them.
+
+  - models: [all]
+    severity: info
+    text: >
+      Arguments follow the command name, separated by commas, so no argument
+      may hold a comma. The RTMP and RTSP URLs and the file name are sent as
+      they are and limited to the characters the guide allows; the stream
+      name, username and password are percent-encoded, which the unit is
+      taken to decode. The guide writes SetRTMP's arguments with a space
+      after each comma and without the command name; this spec sends
+      SetRTMP,<url>,<stream> with no spaces, as every other command's format
+      is written. Username and password are sent together or not at all.
+
+  - models: [all]
+    severity: info
+    text: >
+      Replies are plain text. The shapes of GetRTSP ("URL, name, port") and
+      GetRTMP ("Url name, stream name") are read as comma-separated fields,
+      GetInputStatus's text is read into connector, size, scan and frame
+      rate from the guide's one example (input.status keeps the whole
+      text), and GetSerialNumber's bare reply is taken as the serial number
+      when it holds a digit, which RETRY and FAILED do not. The guide
+      documents the credential as the userinfo of the URL; it is sent as
+      HTTP Basic (a Digest challenge is answered too). HTTPS is "also
+      supported" with the unit's own certificate, taken to be on port 443.
+
+  - models: [all]
+    severity: info
+    text: >
+      Outside the HTTP API: the XML configuration file (imported in the
+      Command Center, from a USB key at a factory reset, or fetched by the
+      unit from a "call home" URL it is given), which carries the operating
+      mode, audio, encoding, recording and streaming settings and a
+      dynamic bit rate, and the Windows MonarchHDUtils program for updating
+      and rebooting.

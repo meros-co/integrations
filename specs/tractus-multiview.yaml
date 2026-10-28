@@ -1,0 +1,719 @@
+spec: 1
+id: tractus-multiview
+name: Tractus Multiview for NDI (HTTP API)
+vendor: Tractus Events
+category: display
+
+source:
+  - title: Tractus Multiview for NDI, HTTP API Details
+    author: Tractus Events (Northern HCI Solutions Inc.)
+    url: https://multiviewforndi.com/documentation/webapi/
+    note: >
+      Manufacturer documentation, the source of every request here: port 8901,
+      the Swagger reference on the host, /sources with forcereload, /viewers
+      and its fields (Name, ViewerIndex, NdiStatus, LayoutModeCode, Layout,
+      AudioChannels, AudioSampleRate, AudioPeakdBFS, AudioMonitorSourceName,
+      ProjectorSource, Outputs with NdiSource, Name, UseLowBandwidth, IsHDR and
+      VideoWatchdogTripped, FocusedViewportIndex), /receivers and its fields
+      (SourceName, SubscribedRenderers, PreviewTally, ProgramTally, IsHDR,
+      LowBandwidth, ReceiverWatchdogTimeout, SupportsPtz, SupportsKvm), /current
+      (Version, InstanceName, BuildType, DefaultInstances, NdiSenderType, Sources,
+      Viewers), viewer management, layouts, viewport sources, NDI output,
+      presets, audio monitoring (2024-04-04), projection (2023-12-21), captions
+      (2025-01-01), layout import and export, shutdown and focus (2025-02-27),
+      and the debug routes.
+  - title: Tractus Multiview for NDI, Default Multiview Layouts
+    author: Tractus Events
+    url: https://multiviewforndi.com/documentation/layouts/
+    note: The layout names and codes (2L8S, 2L18S, 2L8SV, 1L12SV, 1LC12S, 2L2M10S, 7L8S, 2X2, 3X3, 4X4, 5X5, 6X6, 8X8, 1X1).
+  - title: Tractus Tools for NDI, Caption/UMD and Expressions
+    author: Tractus Events
+    url: https://tractus.gitbook.io/tractus-tools-for-ndi/getting-started/caption-umd-and-expressions
+    note: Viewers and viewports are numbered from 0; caption properties and expressions.
+
+transport:
+  type: http
+  port: 8901
+  scheme: http
+  auth: none
+  timeout_ms: 5000
+  probe: { method: GET, path: /current }
+
+ports:
+  - { port: 8901, protocol: http, role: control, note: "the Multiview's HTTP API, on every interface" }
+
+models:
+  - id: multiview
+    name: Tractus Multiview for NDI
+    supports:
+      - get_sources
+      - refresh_sources
+      - get_viewers
+      - get_receivers
+      - get_current
+      - get_layouts
+      - create_viewer
+      - set_viewer_count
+      - shutdown_viewer
+      - rename_viewer
+      - set_layout
+      - set_output_source
+      - clear_output
+      - set_ndi_output
+      - save_viewer_preset
+      - load_viewer_preset
+      - save_output_preset
+      - load_output_preset
+      - listen_viewport
+      - listen_source
+      - stop_listening
+      - project_viewport
+      - project_source
+      - stop_projecting
+      - focus_viewport
+      - set_caption_text
+      - set_caption_background
+      - set_caption_position
+      - hide_caption
+      - show_caption
+      - remove_caption
+      - clear_captions
+      - update_caption
+      - export_layout
+      - import_layout
+      - apply_layout_template
+      - shutdown
+      - get_expressions
+      - get_launch_options
+      - get_diagnostics
+      - get_debug
+    verification: none
+    notes: >
+      Software for Windows, macOS and Linux that shows NDI sources in multiviewer
+      layouts on screens or as NDI outputs, one or more multiviewers (viewers) per
+      instance.
+
+commands:
+  get_sources:
+    summary: "List the NDI sources the multiview sees (GET /sources)"
+    send: { method: GET, path: "/sources" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  refresh_sources:
+    summary: "Refresh the NDI source list and return it (GET /sources?forcereload)"
+    send: { method: GET, path: "/sources", query: { forcereload: "true" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_viewers:
+    summary: "List the multiviewers with their layout, audio and viewports (GET /viewers)"
+    send: { method: GET, path: "/viewers" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_receivers:
+    summary: "List the NDI receivers with their tally and bandwidth (GET /receivers)"
+    send: { method: GET, path: "/receivers" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_current:
+    summary: "Read the application's state: version, instance, sources and viewers (GET /current)"
+    send: { method: GET, path: "/current" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_layouts:
+    summary: "List the layouts the multiview offers (GET /layouts)"
+    send: { method: GET, path: "/layouts" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_viewer:
+    summary: "Add a multiviewer (GET /viewers/create)"
+    send: 
+      - { method: GET, path: "/viewers/create" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  set_viewer_count:
+    summary: "Set how many multiviewers run (GET /viewers/set/{count})"
+    params:
+      count: { type: int, min: 0, max: 1024, required: true,
+        label: Viewers, description: "The number of multiviewers to run." }
+    send: 
+      - { method: GET, path: "/viewers/set/{count}" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  shutdown_viewer:
+    summary: "Shut a multiviewer down (GET /viewer/{viewer}/shutdown)"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+    send: 
+      - { method: GET, path: "/viewer/{viewer}/shutdown" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  rename_viewer:
+    summary: "Rename a multiviewer (GET /viewer/{viewer}/rename/{name})"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      name: { type: string, required: true, max_length: 128,
+        label: Name, description: "The multiviewer's new name." }
+    send: 
+      - { method: GET, path: "/viewer/{viewer}/rename/{name}" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  set_layout:
+    summary: "Change a multiviewer's layout (GET /viewer/{viewer}/layout/{layout})"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      layout: { type: string, required: true, max_length: 64, pattern: "^[A-Za-z0-9_-]+$",
+        label: Layout, description: "The layout's code: 2L8S (the default), 2L18S, 2L8SV, 1L12SV, 1LC12S, 2L2M10S, 7L8S, 2X2, 3X3, 4X4, 5X5, 6X6, 8X8 or 1X1 (solo), or another /layouts lists." }
+    send: 
+      - { method: GET, path: "/viewer/{viewer}/layout/{layout}" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  set_output_source:
+    summary: "Show an NDI source in a viewport (GET /viewer/{viewer}/output/{output}/sourcename/{source})"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      output: { type: int, min: 0, max: 1023, required: true,
+        label: Viewport, description: "The viewport (output) of the multiviewer, numbered from 0." }
+      source: { type: string, required: true, max_length: 256,
+        label: NDI source, description: "The NDI source's full name, such as STUDIO-PC (Camera 1)." }
+    send: 
+      - { method: GET, path: "/viewer/{viewer}/output/{output}/sourcename/{source}" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  clear_output:
+    summary: "Clear a viewport's source (GET /viewer/{viewer}/output/{output}/clear)"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      output: { type: int, min: 0, max: 1023, required: true,
+        label: Viewport, description: "The viewport (output) of the multiviewer, numbered from 0." }
+    send: 
+      - { method: GET, path: "/viewer/{viewer}/output/{output}/clear" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  set_ndi_output:
+    summary: "Turn a multiviewer's NDI output on or off (GET /viewer/{viewer}/ndi/{enabled})"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      enabled: { type: bool, required: true,
+        label: NDI output, description: "On sends the multiviewer as an NDI source, off stops it." }
+    send: 
+      - { method: GET, path: "/viewer/{viewer}/ndi/{enabled}" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  save_viewer_preset:
+    summary: "Save a multiviewer's configuration to a preset bank"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      bank: { type: string, required: true, max_length: 64, pattern: "^[A-Za-z0-9_-]+$",
+        label: Preset bank, description: "The preset bank, as the multiview's presets name it, such as 1." }
+    send: 
+      - { method: GET, path: "/viewer/{viewer}/savepreset/{bank}" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  load_viewer_preset:
+    summary: "Load a multiviewer's configuration from a preset bank"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      bank: { type: string, required: true, max_length: 64, pattern: "^[A-Za-z0-9_-]+$",
+        label: Preset bank, description: "The preset bank, as the multiview's presets name it, such as 1." }
+    send: 
+      - { method: GET, path: "/viewer/{viewer}/loadpreset/{bank}" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  save_output_preset:
+    summary: "Save a viewport's source to a preset bank"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      output: { type: int, min: 0, max: 1023, required: true,
+        label: Viewport, description: "The viewport (output) of the multiviewer, numbered from 0." }
+      bank: { type: string, required: true, max_length: 64, pattern: "^[A-Za-z0-9_-]+$",
+        label: Preset bank, description: "The preset bank, as the multiview's presets name it, such as 1." }
+    send: 
+      - { method: GET, path: "/viewer/{viewer}/output/{output}/savepreset/{bank}" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  load_output_preset:
+    summary: "Load a viewport's source from a preset bank"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      output: { type: int, min: 0, max: 1023, required: true,
+        label: Viewport, description: "The viewport (output) of the multiviewer, numbered from 0." }
+      bank: { type: string, required: true, max_length: 64, pattern: "^[A-Za-z0-9_-]+$",
+        label: Preset bank, description: "The preset bank, as the multiview's presets name it, such as 1." }
+    send: 
+      - { method: GET, path: "/viewer/{viewer}/output/{output}/loadpreset/{bank}" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  listen_viewport:
+    summary: "Monitor a viewport's audio (GET /viewer/{viewer}/listen/viewport/{viewport})"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      viewport: { type: int, min: 0, max: 1023, required: true,
+        label: Viewport, description: "The viewport of the multiviewer, numbered from 0." }
+    send: 
+      - { method: GET, path: "/viewer/{viewer}/listen/viewport/{viewport}" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  listen_source:
+    summary: "Monitor an NDI source's audio (GET /viewer/{viewer}/listen/source/{source})"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      source: { type: string, required: true, max_length: 256,
+        label: NDI source, description: "The NDI source's full name, such as STUDIO-PC (Camera 1)." }
+    send: 
+      - { method: GET, path: "/viewer/{viewer}/listen/source/{source}" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_listening:
+    summary: "Stop monitoring audio on a multiviewer"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+    send: 
+      - { method: GET, path: "/viewer/{viewer}/listen/stop" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  project_viewport:
+    summary: "Project a viewport full screen (GET /viewer/{viewer}/project/viewport/{viewport})"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      viewport: { type: int, min: 0, max: 1023, required: true,
+        label: Viewport, description: "The viewport of the multiviewer, numbered from 0." }
+    send: 
+      - { method: GET, path: "/viewer/{viewer}/project/viewport/{viewport}" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  project_source:
+    summary: "Project an NDI source full screen (GET /viewer/{viewer}/project/source/{source})"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      source: { type: string, required: true, max_length: 256,
+        label: NDI source, description: "The NDI source's full name, such as STUDIO-PC (Camera 1)." }
+    send: 
+      - { method: GET, path: "/viewer/{viewer}/project/source/{source}" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_projecting:
+    summary: "Stop projecting on a multiviewer"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+    send: 
+      - { method: GET, path: "/viewer/{viewer}/project/stop" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  focus_viewport:
+    summary: "Focus a viewport (GET /viewer/{viewer}/focus/{viewport})"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      viewport: { type: int, min: 0, max: 1023, required: true,
+        label: Viewport, description: "The viewport of the multiviewer, numbered from 0." }
+    send: 
+      - { method: GET, path: "/viewer/{viewer}/focus/{viewport}" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  set_caption_text:
+    summary: "Set a caption's text (GET /viewer/{viewer}/caption/update/{code}/{text})"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      code: { type: string, required: true, max_length: 128, pattern: "^[A-Za-z0-9_.-]+$",
+        label: Caption code, description: "The caption's code, its unique identifier on the multiviewer." }
+      text: { type: string, required: true, max_length: 1024,
+        label: Text, description: "The caption's new text, static or an expression such as $source.name$." }
+    send: { method: GET, path: "/viewer/{viewer}/caption/update/{code}/{text}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_caption_background:
+    summary: "Set a caption's background color (GET /viewer/{viewer}/caption/updatebg/{code}/{rgba})"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      code: { type: string, required: true, max_length: 128, pattern: "^[A-Za-z0-9_.-]+$",
+        label: Caption code, description: "The caption's code, its unique identifier on the multiviewer." }
+      rgba: { type: string, required: true, max_length: 32, pattern: "^[#A-Za-z0-9,.() ]+$",
+        label: Background, description: "The background color in RGBA, as the multiview writes it." }
+    send: { method: GET, path: "/viewer/{viewer}/caption/updatebg/{code}/{rgba}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_caption_position:
+    summary: "Move a caption (GET /viewer/{viewer}/caption/updatepos/{code}/{x}/{y})"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      code: { type: string, required: true, max_length: 128, pattern: "^[A-Za-z0-9_.-]+$",
+        label: Caption code, description: "The caption's code, its unique identifier on the multiviewer." }
+      x: { type: int, min: -100000, max: 100000, required: true, label: X, description: "Horizontal position on the canvas, in pixels from the left." }
+      y: { type: int, min: -100000, max: 100000, required: true, label: Y, description: "Vertical position on the canvas, in pixels from the top." }
+    send: { method: GET, path: "/viewer/{viewer}/caption/updatepos/{code}/{x}/{y}" }
+    expect: { status: 200 }
+    returns: ack
+
+  hide_caption:
+    summary: "Hide a caption"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      code: { type: string, required: true, max_length: 128, pattern: "^[A-Za-z0-9_.-]+$",
+        label: Caption code, description: "The caption's code, its unique identifier on the multiviewer." }
+    send: { method: GET, path: "/viewer/{viewer}/caption/hide/{code}" }
+    expect: { status: 200 }
+    returns: ack
+
+  show_caption:
+    summary: "Show a hidden caption"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      code: { type: string, required: true, max_length: 128, pattern: "^[A-Za-z0-9_.-]+$",
+        label: Caption code, description: "The caption's code, its unique identifier on the multiviewer." }
+    send: { method: GET, path: "/viewer/{viewer}/caption/show/{code}" }
+    expect: { status: 200 }
+    returns: ack
+
+  remove_caption:
+    summary: "Remove a caption (DELETE /viewer/{viewer}/caption/remove/{code})"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      code: { type: string, required: true, max_length: 128, pattern: "^[A-Za-z0-9_.-]+$",
+        label: Caption code, description: "The caption's code, its unique identifier on the multiviewer." }
+    send: { method: DELETE, path: "/viewer/{viewer}/caption/remove/{code}" }
+    expect: { status: 200 }
+    returns: ack
+
+  clear_captions:
+    summary: "Remove every caption of a multiviewer"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+    send: { method: GET, path: "/viewer/{viewer}/caption/clearall" }
+    expect: { status: 200 }
+    returns: ack
+
+  update_caption:
+    summary: "Add or update a caption with its full details (POST /viewer/{viewer}/caption/update), in the multiview's own caption format"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      caption:
+        type: json
+        required: true
+        label: Caption
+        description: "The caption's details as the multiview's Swagger reference (at /swagger/index.html on the host) gives its caption schema."
+    send: { method: POST, path: "/viewer/{viewer}/caption/update", content_type: application/json, body: "{caption}" }
+    expect: { status: 200 }
+    returns: ack
+
+  export_layout:
+    summary: "Export a multiviewer's layout (GET /viewer/{viewer}/exportlayout)"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+    send: { method: GET, path: "/viewer/{viewer}/exportlayout" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  import_layout:
+    summary: "Import a layout file into a multiviewer (POST /viewer/{viewer}/importlayout), as export_layout gives it"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      layout:
+        type: json
+        required: true
+        label: Layout file
+        description: "The layout as export_layout returns it, the multiview's own layout schema."
+    send:
+      - { method: POST, path: "/viewer/{viewer}/importlayout", content_type: application/json, body: "{layout}" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  apply_layout_template:
+    summary: "Change a multiviewer's layout to a template (POST /viewer/{viewer}/layout)"
+    params:
+      viewer: { type: int, min: 0, max: 1023, required: true,
+        label: Viewer, description: "The multiviewer, numbered from 0 as /viewers lists them." }
+      template:
+        type: json
+        required: true
+        label: Layout template
+        description: "The layout template, in the multiview's own layout schema (as /layouts lists them)."
+    send:
+      - { method: POST, path: "/viewer/{viewer}/layout", content_type: application/json, body: "{template}" }
+      - { method: GET, path: /viewers }
+    expect: { status: 200 }
+    returns: ack
+
+  shutdown:
+    summary: "Shut the whole Multiview application down (GET /shutdown)"
+    send: { method: GET, path: "/shutdown" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_expressions:
+    summary: "Read the caption expression engine's debug output (GET /expressions)"
+    send: { method: GET, path: "/expressions" }
+    expect: { status: 200 }
+    returns: text
+
+  get_launch_options:
+    summary: "Read the launch options in effect, as a text table (GET /debug/launchoptions)"
+    send: { method: GET, path: "/debug/launchoptions" }
+    expect: { status: 200 }
+    returns: text
+
+  get_diagnostics:
+    summary: "Read the receiver and viewer diagnostics, as text (GET /debug/diagnostics)"
+    send: { method: GET, path: "/debug/diagnostics" }
+    expect: { status: 200 }
+    returns: text
+
+  get_debug:
+    summary: "Read the performance figures, as text (GET /debug)"
+    send: { method: GET, path: "/debug" }
+    expect: { status: 200 }
+    returns: text
+
+telemetry:
+  # The API pushes nothing: the viewers and receivers (with their tally) are
+  # read every 2 seconds, the application, sources and layouts every 30.
+  poll:
+    - every_ms: 2000
+      send:
+        - { method: GET, path: /viewers }
+        - { method: GET, path: /receivers }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /current }
+        - { method: GET, path: /sources }
+        - { method: GET, path: /layouts }
+  updates:
+    - path: "^/viewers$"
+      json_each: "$"
+      each_match: { "$.ViewerIndex": "^[0-9]+$" }
+      replace: viewers
+      json: { vi: "$.ViewerIndex", name: "$.Name", ndi_output: "$.NdiStatus", layout: "$.LayoutModeCode", layout_data: "$.Layout", audio_channels: "$.AudioChannels", audio_sample_rate: "$.AudioSampleRate", audio_peak_dbfs: "$.AudioPeakdBFS", audio_monitor_source: "$.AudioMonitorSourceName", projector_source: "$.ProjectorSource.NdiSource", projector_hdr: "$.ProjectorSource.IsHDR", focused_viewport: "$.FocusedViewportIndex" }
+      state:
+        "viewers.{vi}.name": "{name}"
+        "viewers.{vi}.ndi_output": "{ndi_output}"
+        "viewers.{vi}.layout": "{layout}"
+        "viewers.{vi}.layout_data": "{layout_data}"
+        "viewers.{vi}.audio_channels": "{audio_channels}"
+        "viewers.{vi}.audio_sample_rate": "{audio_sample_rate}"
+        "viewers.{vi}.audio_peak_dbfs": "{audio_peak_dbfs}"
+        "viewers.{vi}.audio_monitor_source": "{audio_monitor_source}"
+        "viewers.{vi}.projector_source": "{projector_source}"
+        "viewers.{vi}.projector_hdr": "{projector_hdr}"
+        "viewers.{vi}.focused_viewport": "{focused_viewport}"
+    - path: "^/viewers$"
+      json_each: "$[*].Outputs"
+      json: { vi: "$^.ViewerIndex", source: "$.NdiSource", name: "$.Name", low_bandwidth: "$.UseLowBandwidth", hdr: "$.IsHDR", video_watchdog_tripped: "$.VideoWatchdogTripped" }
+      state:
+        "viewers.{vi}.outputs.{index}.source": "{source}"
+        "viewers.{vi}.outputs.{index}.name": "{name}"
+        "viewers.{vi}.outputs.{index}.low_bandwidth": "{low_bandwidth}"
+        "viewers.{vi}.outputs.{index}.hdr": "{hdr}"
+        "viewers.{vi}.outputs.{index}.video_watchdog_tripped": "{video_watchdog_tripped}"
+    - path: "^/receivers$"
+      json_each: "$"
+      each_match: { "$.SourceName": "." }
+      replace: receivers
+      json: { name: "$.SourceName", subscribed_renderers: "$.SubscribedRenderers", preview_tally: "$.PreviewTally", program_tally: "$.ProgramTally", hdr: "$.IsHDR", low_bandwidth: "$.LowBandwidth", watchdog_timeout: "$.ReceiverWatchdogTimeout", supports_ptz: "$.SupportsPtz", supports_kvm: "$.SupportsKvm" }
+      state:
+        "receivers.{name:key}.subscribed_renderers": "{subscribed_renderers}"
+        "receivers.{name:key}.preview_tally": "{preview_tally}"
+        "receivers.{name:key}.program_tally": "{program_tally}"
+        "receivers.{name:key}.hdr": "{hdr}"
+        "receivers.{name:key}.low_bandwidth": "{low_bandwidth}"
+        "receivers.{name:key}.watchdog_timeout": "{watchdog_timeout}"
+        "receivers.{name:key}.supports_ptz": "{supports_ptz}"
+        "receivers.{name:key}.supports_kvm": "{supports_kvm}"
+    - path: "^/current$"
+      json_match: { "$.Version": "." }
+      json: { version: "$.Version", instance_name: "$.InstanceName", build_type: "$.BuildType", default_instances: "$.DefaultInstances", ndi_sender_type: "$.NdiSenderType" }
+      state:
+        "app.version": "{version}"
+        "app.instance_name": "{instance_name}"
+        "app.build_type": "{build_type}"
+        "app.default_instances": "{default_instances}"
+        "app.ndi_sender_type": "{ndi_sender_type}"
+    - path: "^/viewers$"
+      json_each: "$"
+      each_match: { "$.viewerIndex": "^[0-9]+$" }
+      replace: viewers
+      json: { vi: "$.viewerIndex", name: "$.name", ndi_output: "$.ndiStatus", layout: "$.layoutModeCode", layout_data: "$.layout", audio_channels: "$.audioChannels", audio_sample_rate: "$.audioSampleRate", audio_peak_dbfs: "$.audioPeakdBFS", audio_monitor_source: "$.audioMonitorSourceName", projector_source: "$.projectorSource.ndiSource", projector_hdr: "$.projectorSource.isHDR", focused_viewport: "$.focusedViewportIndex" }
+      state:
+        "viewers.{vi}.name": "{name}"
+        "viewers.{vi}.ndi_output": "{ndi_output}"
+        "viewers.{vi}.layout": "{layout}"
+        "viewers.{vi}.layout_data": "{layout_data}"
+        "viewers.{vi}.audio_channels": "{audio_channels}"
+        "viewers.{vi}.audio_sample_rate": "{audio_sample_rate}"
+        "viewers.{vi}.audio_peak_dbfs": "{audio_peak_dbfs}"
+        "viewers.{vi}.audio_monitor_source": "{audio_monitor_source}"
+        "viewers.{vi}.projector_source": "{projector_source}"
+        "viewers.{vi}.projector_hdr": "{projector_hdr}"
+        "viewers.{vi}.focused_viewport": "{focused_viewport}"
+    - path: "^/viewers$"
+      json_each: "$[*].outputs"
+      json: { vi: "$^.viewerIndex", source: "$.ndiSource", name: "$.name", low_bandwidth: "$.useLowBandwidth", hdr: "$.isHDR", video_watchdog_tripped: "$.videoWatchdogTripped" }
+      state:
+        "viewers.{vi}.outputs.{index}.source": "{source}"
+        "viewers.{vi}.outputs.{index}.name": "{name}"
+        "viewers.{vi}.outputs.{index}.low_bandwidth": "{low_bandwidth}"
+        "viewers.{vi}.outputs.{index}.hdr": "{hdr}"
+        "viewers.{vi}.outputs.{index}.video_watchdog_tripped": "{video_watchdog_tripped}"
+    - path: "^/receivers$"
+      json_each: "$"
+      each_match: { "$.sourceName": "." }
+      replace: receivers
+      json: { name: "$.sourceName", subscribed_renderers: "$.subscribedRenderers", preview_tally: "$.previewTally", program_tally: "$.programTally", hdr: "$.isHDR", low_bandwidth: "$.lowBandwidth", watchdog_timeout: "$.receiverWatchdogTimeout", supports_ptz: "$.supportsPtz", supports_kvm: "$.supportsKvm" }
+      state:
+        "receivers.{name:key}.subscribed_renderers": "{subscribed_renderers}"
+        "receivers.{name:key}.preview_tally": "{preview_tally}"
+        "receivers.{name:key}.program_tally": "{program_tally}"
+        "receivers.{name:key}.hdr": "{hdr}"
+        "receivers.{name:key}.low_bandwidth": "{low_bandwidth}"
+        "receivers.{name:key}.watchdog_timeout": "{watchdog_timeout}"
+        "receivers.{name:key}.supports_ptz": "{supports_ptz}"
+        "receivers.{name:key}.supports_kvm": "{supports_kvm}"
+    - path: "^/current$"
+      json_match: { "$.version": "." }
+      json: { version: "$.version", instance_name: "$.instanceName", build_type: "$.buildType", default_instances: "$.defaultInstances", ndi_sender_type: "$.ndiSenderType" }
+      state:
+        "app.version": "{version}"
+        "app.instance_name": "{instance_name}"
+        "app.build_type": "{build_type}"
+        "app.default_instances": "{default_instances}"
+        "app.ndi_sender_type": "{ndi_sender_type}"
+    - path: "^/sources(\\?.*)?$"
+      json: { body: "$" }
+      state: { sources: "{body}" }
+    - path: "^/layouts$"
+      json: { body: "$" }
+      state: { layouts: "{body}" }
+state:
+  viewers.*.name: { type: string, description: "Multiviewer, keyed by its index from 0: the multiviewer's name" }
+  viewers.*.ndi_output: { type: bool, description: "Multiviewer, keyed by its index from 0: its NDI output is on (NdiStatus)" }
+  viewers.*.layout: { type: string, description: "Multiviewer, keyed by its index from 0: its layout's code (LayoutModeCode), such as 2L8S" }
+  viewers.*.layout_data: { type: string, description: "Multiviewer, keyed by its index from 0: its layout data, as JSON text" }
+  viewers.*.audio_channels: { type: int, description: "Multiviewer, keyed by its index from 0: channels of the audio it monitors" }
+  viewers.*.audio_sample_rate: { type: int, description: "Multiviewer, keyed by its index from 0: sample rate of the audio it monitors, in Hz" }
+  viewers.*.audio_peak_dbfs: { type: string, description: "Multiviewer, keyed by its index from 0: peak level of the monitored audio in dBFS, as JSON text (a number or one per channel)" }
+  viewers.*.audio_monitor_source: { type: string, description: "Multiviewer, keyed by its index from 0: the NDI source whose audio it monitors, empty when none" }
+  viewers.*.projector_source: { type: string, description: "Multiviewer, keyed by its index from 0: the NDI source it projects full screen, empty when none" }
+  viewers.*.projector_hdr: { type: bool, description: "Multiviewer, keyed by its index from 0: the projected source is HDR" }
+  viewers.*.focused_viewport: { type: int, description: "Multiviewer, keyed by its index from 0: the focused viewport, from 0" }
+  viewers.*.outputs.*.source: { type: string, description: "Viewport, keyed by multiviewer and viewport from 0: the NDI source shown in the viewport, empty when none" }
+  viewers.*.outputs.*.name: { type: string, description: "Viewport, keyed by multiviewer and viewport from 0: the viewport's name" }
+  viewers.*.outputs.*.low_bandwidth: { type: bool, description: "Viewport, keyed by multiviewer and viewport from 0: the viewport receives the low-bandwidth stream" }
+  viewers.*.outputs.*.hdr: { type: bool, description: "Viewport, keyed by multiviewer and viewport from 0: the source is HDR" }
+  viewers.*.outputs.*.video_watchdog_tripped: { type: bool, description: "Viewport, keyed by multiviewer and viewport from 0: no video has arrived within the watchdog time" }
+  receivers.*.subscribed_renderers: { type: int, description: "NDI receiver, keyed by source name: how many viewports show the source" }
+  receivers.*.preview_tally: { type: bool, description: "NDI receiver, keyed by source name: the source is on preview (NDI tally)" }
+  receivers.*.program_tally: { type: bool, description: "NDI receiver, keyed by source name: the source is on program (NDI tally)" }
+  receivers.*.hdr: { type: bool, description: "NDI receiver, keyed by source name: the source is HDR" }
+  receivers.*.low_bandwidth: { type: bool, description: "NDI receiver, keyed by source name: the low-bandwidth stream is received" }
+  receivers.*.watchdog_timeout: { type: string, description: "NDI receiver, keyed by source name: the receiver's watchdog timeout, as JSON text" }
+  receivers.*.supports_ptz: { type: bool, description: "NDI receiver, keyed by source name: the source takes PTZ control" }
+  receivers.*.supports_kvm: { type: bool, description: "NDI receiver, keyed by source name: the source takes KVM control" }
+  app.version: { type: string, description: "The application's version" }
+  app.instance_name: { type: string, description: "The instance's name" }
+  app.build_type: { type: string, description: "production, beta or dangerous" }
+  app.default_instances: { type: string, description: "The default multiview instances, as JSON text" }
+  app.ndi_sender_type: { type: string, description: "The NDI sender type requested, as JSON text" }
+  sources: { type: string, description: "The NDI sources the multiview sees, as JSON text, as /sources gives them" }
+  layouts: { type: string, description: "The layouts the multiview offers, as JSON text, as /layouts gives them" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The documentation names the response fields in PascalCase (ViewerIndex,
+      NdiSource) but shows no response; state reads them in PascalCase and in
+      camelCase, the form such a server often writes. The shapes of /sources,
+      /layouts and the caption and layout bodies are only in the Swagger reference
+      on the host (/swagger/index.html), so they are kept and sent whole as JSON.
+
+  - models: [all]
+    severity: info
+    text: >
+      Viewers (multiviewers) and viewports are numbered from 0, in the API and in
+      state. Commands that change a multiviewer read /viewers again after it, so
+      state follows at once; captions are not in /viewers and are not read back.
+
+  - models: [all]
+    severity: critical
+    text: >
+      shutdown ends the whole Multiview application and shutdown_viewer closes a
+      multiviewer: neither asks for confirmation, and nothing over the API starts
+      the application again.
+
+  - models: [all]
+    severity: info
+    text: >
+      The API takes no credential: anyone on the network who reaches port 8901
+      can control the multiview. The documentation says the Multiview listens on
+      every interface.

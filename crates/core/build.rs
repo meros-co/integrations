@@ -34,6 +34,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "allenheath-sq",
         ],
     ),
+    ("vendor-amwa", &["nmos-node", "nmos-registry"]),
     (
         "vendor-analogway",
         &[
@@ -75,6 +76,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-blackmagic",
         &[
             "blackmagic-atem",
+            "blackmagic-audio-monitor",
             "blackmagic-camera",
             "blackmagic-hyperdeck",
             "blackmagic-multiview",
@@ -177,6 +179,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-grassvalley", &["grassvalley-amp"]),
     ("vendor-greenhippo", &["greenhippo-hippotizer"]),
     ("vendor-h2r", &["h2r-graphics"]),
+    ("vendor-haivision", &["haivision-kb", "haivision-makito-x4"]),
     ("vendor-highend", &["highend-hog4"]),
     ("vendor-holographics", &["holographics"]),
     ("vendor-holyrics", &["holyrics"]),
@@ -193,13 +196,20 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     (
         "vendor-kiloview",
         &[
+            "kiloview-avx",
             "kiloview-cube-r1",
             "kiloview-cube-x1",
             "kiloview-decoder",
             "kiloview-e3",
+            "kiloview-kilolink-server",
+            "kiloview-mg300",
+            "kiloview-multiview",
+            "kiloview-multiview-server",
             "kiloview-n60",
             "kiloview-ndi",
+            "kiloview-ndi-core",
             "kiloview-p3",
+            "kiloview-rf02",
         ],
     ),
     ("vendor-kramer", &["kramer-p3000"]),
@@ -219,6 +229,14 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "magewell-proconvert",
             "magewell-ultra-encode",
             "magewell-ultra-stream",
+        ],
+    ),
+    (
+        "vendor-matrox",
+        &[
+            "matrox-monarch-hd",
+            "matrox-monarch-hdx",
+            "matrox-monarch-lcs",
         ],
     ),
     ("vendor-megapixel", &["megapixel-helios"]),
@@ -255,6 +273,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "panasonic-ptz-serial",
         ],
     ),
+    ("vendor-phabrix", &["phabrix-qx"]),
     ("vendor-pharos", &["pharos-designer"]),
     ("vendor-philips", &["philips-sicp"]),
     ("vendor-pixotope", &["pixotope"]),
@@ -371,6 +390,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ),
     ("vendor-teradek", &["teradek-prism"]),
     ("vendor-tinkerlist", &["cuez-automator"]),
+    (
+        "vendor-tractus",
+        &["tractus-fullview", "tractus-multiview", "tractus-router"],
+    ),
     ("vendor-tsl", &["tsl-umd-display", "tsl-umd-listener"]),
     (
         "vendor-turtleav",

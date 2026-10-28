@@ -1,0 +1,1365 @@
+spec: 1
+id: kiloview-multiview
+name: Kiloview Multiview Pro NDI multiviewer software
+vendor: Kiloview
+category: switcher
+
+source:
+  - title: Mulitiview Pro API 文档 (Multiview Pro API, Chinese), software and API version V_1.10, first issued 2023-02-10
+    author: Kiloview
+    url: https://cnstatic.kiloview.com/wp-content/uploads/2026/02/Mulitiview-Pro-API-cn-1.pdf
+    note: >
+      Manufacturer document on Kiloview's Chinese site (uploaded February
+      2026, the newest Multiview Pro API there, checked 2026-10-27); the
+      English API page https://www.kiloview.com/en/docs/multiview/api/
+      links only the older Multiview Server HTTP API 1.0 (spec
+      kiloview-multiview-server). Read in machine translation. The source
+      of every request, field and reply here: 2.1 URL rules (the /api/v2
+      paths, port 81, the app request header carrying the user name and
+      token); 2.2 replies; 3 login; 4 global configuration (general,
+      navigation, resolutions, frame rates); 5 programs (list, rename, add,
+      remove, on/off, switch, parameters, language); 6 source discovery
+      (discovery groups and their sources, add, modify, parameters, remove,
+      source web page, refresh); 6 windows (list, switch, add, parameters,
+      remove, encoder output types, screens, contents, screen output, NDI
+      output and its parameters, sources, toolbar, layout, pane sources,
+      pane settings, audio mix); 7 layouts (templates, list, add, rename,
+      edit, remove, save as); 8 NDI discovery (groups, manual addresses);
+      9 others (WebRTC SDP, PTZ, transitions, Take). Its section numbers
+      repeat (two 5.4 to 5.7 and two 6s); this spec cites them by title.
+  - title: Multiview Pro product and download pages
+    author: Kiloview
+    url: https://www.kiloview.com/en/support/download/multiview-pro/
+    note: >
+      Manufacturer page: Multiview Pro is software for Windows and macOS
+      that shows NDI sources in multiview windows on the host's screens and
+      sends windows out as NDI.
+
+transport:
+  type: http
+  port: 81
+  scheme: { setting: scheme }
+  # The general configuration's QR code example is https on port 81; no
+  # certificate is documented, so it is not checked.
+  accept_invalid_certs: true
+  timeout_ms: 5000
+  # 2.1: every request carries the header app, a JSON object with the
+  # user name and the token the login returns.
+  headers:
+    app: '{"username":{settings.username:json},"token":{settings.token:json}}'
+  probe: { method: GET, path: /api/v2/config/general.json }
+
+settings:
+  username:
+    type: string
+    max_length: 64
+    default: admin
+    label: User name
+    description: "The user the token belongs to, sent with it in the app header; the default user is admin."
+  token:
+    type: string
+    secret: true
+    max_length: 256
+    default: ""
+    label: Login token
+    description: "The token the login command returns, sent in the app header with every request; run login and store it here with update_settings."
+  scheme:
+    type: enum
+    values: [http, https]
+    default: http
+    label: Scheme
+    description: "http, or https where the web server is set to it; the certificate is not checked."
+
+ports:
+  - { port: 81, protocol: http, role: control, when: "scheme http", note: "the HTTP service's default port (2.1)" }
+  - { port: 81, protocol: https, role: control, when: "scheme https", note: "the same port over TLS, as the general configuration's QR code shows it" }
+
+models:
+  - id: multiview-pro
+    name: Kiloview Multiview Pro
+    supports:
+      - login
+      - get_general
+      - get_nav
+      - get_resolutions
+      - get_frame_rates
+      - set_language
+      - get_programs
+      - add_program
+      - rename_program
+      - remove_program
+      - set_program_on
+      - switch_program
+      - get_program
+      - set_program
+      - get_discovery_groups
+      - add_auto_discovery
+      - add_manual_discovery
+      - modify_auto_discovery
+      - modify_manual_discovery
+      - get_discovery
+      - remove_discovery
+      - open_source_webpage
+      - refresh_sources
+      - get_windows
+      - switch_window
+      - add_window
+      - set_window
+      - remove_window
+      - get_output_types
+      - get_screens
+      - get_window
+      - get_window_screen
+      - set_window_screen
+      - get_window_output
+      - set_window_output
+      - get_window_ndi
+      - set_window_ndi
+      - clear_window_sources
+      - get_toolbar
+      - set_toolbar
+      - set_toolbar_font
+      - set_toolbar_border
+      - set_toolbar_audio_gain
+      - set_window_layout
+      - reload_window_layout
+      - set_pane_source
+      - remove_pane_source
+      - get_pane
+      - set_pane
+      - set_pane_name
+      - set_pane_audio
+      - get_layout_templates
+      - get_layouts
+      - add_layout
+      - rename_layout
+      - modify_layout
+      - remove_layout
+      - save_layout_as
+      - get_ndi_groups
+      - get_manual_ips
+      - set_ndi_discovery
+      - get_window_sdp
+      - ptz
+      - ptz_zoom
+      - ptz_zoom_speed
+      - ptz_pan_tilt
+      - ptz_pan_tilt_speed
+      - ptz_store_preset
+      - ptz_recall_preset
+      - ptz_focus
+      - ptz_focus_speed
+      - ptz_auto_focus
+      - ptz_white_balance
+      - ptz_white_balance_manual
+      - ptz_exposure_auto
+      - ptz_exposure_manual
+      - ptz_is_supported
+      - get_transitions
+      - take
+      - tbar
+      - get_take
+      - set_take
+    verification: none
+    notes: >
+      Multiview software (Windows, macOS) organized in programs, each with
+      its own windows, one PVW and one PGM window among them; windows show
+      NDI sources in panes laid out by layouts, go to the host's screens
+      and can be sent out as NDI; a program takes PVW to PGM with a
+      transition.
+
+commands:
+  # ── 3 Login ──────────────────────────────────────────────────────────
+  login:
+    summary: Log in and return the token for the token setting (POST /api/v2/users/login.json); the token is data.token
+    params:
+      username: { type: string, required: true, max_length: 64, label: User name, description: "The user to log in as; admin by default." }
+      password: { type: string, required: true, secret: true, max_length: 128, label: Password, description: "That user's password." }
+    send: { method: POST, path: /api/v2/users/login.json, content_type: application/json, body: '{"username":{username:json},"password":{password:json}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.token" }
+    returns: value
+
+  # ── 4 Global configuration ───────────────────────────────────────────
+  get_general:
+    summary: Return the device name, version, websocket port, languages and QR code address (GET /api/v2/config/general.json)
+    send: { method: GET, path: /api/v2/config/general.json }
+    expect: &data { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+  get_nav:
+    summary: Return whether the navigation bar is shown (GET /api/v2/config/nav/nav)
+    send: { method: GET, path: /api/v2/config/nav/nav }
+    expect: *data
+    returns: value
+  get_resolutions:
+    summary: Return the resolutions a program or window can take (GET /api/v2/resolution/list.json)
+    send: { method: GET, path: /api/v2/resolution/list.json }
+    expect: *data
+    returns: value
+  get_frame_rates:
+    summary: Return the frame rates offered (GET /api/v2/frameRate/list.json)
+    send: { method: GET, path: /api/v2/frameRate/list.json }
+    expect: *data
+    returns: value
+  set_language:
+    summary: Switch the interface language (POST /api/v2/lang/modify.json)
+    params:
+      language: { type: enum, values: [zh, en], required: true, label: Language, description: "zh for Chinese, en for English." }
+    send: { method: POST, path: /api/v2/lang/modify.json, content_type: application/json, body: '{"lang":{language:json}}' }
+    expect: &ok { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  # ── 5 Programs ───────────────────────────────────────────────────────
+  get_programs:
+    summary: Return every program with its name and whether it is on (GET /api/v2/program/list.json)
+    send: { method: GET, path: /api/v2/program/list.json }
+    expect: *data
+    returns: value
+  add_program:
+    summary: Add a program with the resolution and frame rate of its PVW and PGM windows (POST /api/v2/program/add.json)
+    params:
+      name: &program_name { type: string, required: true, max_length: 64, label: Name, description: "The program's name, unique among programs; it is part of its windows' NDI channel names." }
+      width: &width { type: int, min: 1, required: true, label: Width, description: "The resolution's width in pixels, such as 1920." }
+      height: &height { type: int, min: 1, required: true, label: Height, description: "The resolution's height in pixels, such as 1080." }
+      resolution: &res_index { type: int, min: 0, required: true, label: Resolution, description: "The resolution's id in get_resolutions' list, such as 2 for 1920x1080." }
+      aspect: &aspect { type: float, min: 0, required: true, label: Aspect ratio, description: "The resolution's width divided by its height, such as 1.777." }
+      frame_rate: &frame_rate { type: int, min: 1, required: true, label: Frame rate, description: "Frames per second, from get_frame_rates' list such as 60." }
+    send: { method: POST, path: /api/v2/program/add.json, content_type: application/json, body: '{"name":{name:json},"resolution":{"width":{width},"height":{height},"index":{resolution},"aspect":{aspect:.3f}},"frameRate":{frame_rate}}' }
+    expect: *ok
+    returns: ack
+  rename_program:
+    summary: Rename a program (POST /api/v2/program/rername.json)
+    params:
+      program: &program { type: string, required: true, max_length: 32, label: Program, description: "The program's id (pro_id), as programs.<id> in state lists it." }
+      name: *program_name
+    send: { method: POST, path: /api/v2/program/rername.json, content_type: application/json, body: '{"pro_id":{program:json},"name":{name:json}}' }
+    expect: *ok
+    returns: ack
+  remove_program:
+    summary: Delete a program and every window in it (POST /api/v2/program/remove.json)
+    params:
+      program: *program
+    send: { method: POST, path: /api/v2/program/remove.json, content_type: application/json, body: '{"pro_id":{program:json}}' }
+    expect: *ok
+    returns: ack
+  set_program_on:
+    summary: Turn a program on or off, starting or stopping the rendering of all its windows (POST /api/v2/program/set_status.json)
+    params:
+      program: *program
+      enabled: { type: bool, required: true, label: "On", description: "On to render the program's windows; off to stop them." }
+    send: { method: POST, path: /api/v2/program/set_status.json, content_type: application/json, body: '{"pro_id":{program:json},"status":{enabled}}' }
+    expect: *ok
+    returns: ack
+  switch_program:
+    summary: Switch to another program (POST /api/v2/program/switch.json)
+    params:
+      program: *program
+    send: { method: POST, path: /api/v2/program/switch.json, content_type: application/json, body: '{"pro_id":{program:json}}' }
+    expect: *ok
+    returns: ack
+  get_program:
+    summary: Return a program's name, resolution and frame rate (GET /api/v2/program/get_param.json)
+    params:
+      program: *program
+    send: { method: GET, path: /api/v2/program/get_param.json, query: { pro_id: "{program}" } }
+    expect: *data
+    returns: value
+  set_program:
+    summary: Set a program's name, and the resolution and frame rate of its PVW and PGM windows (POST /api/v2/program/set_param.json)
+    params:
+      program: *program
+      name: *program_name
+      width: *width
+      height: *height
+      resolution: *res_index
+      aspect: *aspect
+      frame_rate: *frame_rate
+    send: { method: POST, path: /api/v2/program/set_param.json, content_type: application/json, body: '{"pro_id":{program:json},"name":{name:json},"resolution":{"width":{width},"height":{height},"index":{resolution},"aspect":{aspect:.3f}},"frameRate":{frame_rate}}' }
+    expect: *ok
+    returns: ack
+
+  # ── 6 Source discovery ───────────────────────────────────────────────
+  get_discovery_groups:
+    summary: Return every discovery group with the NDI sources it finds (GET /api/v2/source/list.json)
+    send: { method: GET, path: /api/v2/source/list.json }
+    expect: *data
+    returns: value
+  add_auto_discovery:
+    summary: "Add an automatic discovery group; groups is the API's list of NDI group names (POST /api/v2/source/add.json)"
+    params:
+      name: &disc_name { type: string, required: true, max_length: 64, label: Name, description: "The discovery group's name, unique among them." }
+      server_enabled: &server_enabled { type: bool, default: false, label: Discovery Server, description: "Whether sources are found through an NDI Discovery Server." }
+      server_ip: &server_ip { type: string, default: "", max_length: 64, label: Discovery Server address, description: "The NDI Discovery Server's address; empty when it is not used." }
+      groups: &ndi_groups { type: json, required: true, label: NDI groups, description: "The NDI group names searched, as a list such as [\"public\"]." }
+    send: { method: POST, path: /api/v2/source/add.json, content_type: application/json, body: '{"disc_name":{name:json},"disc_type":"Auto","discovery_enable":{server_enabled},"discovery_ip":{server_ip:json},"group":{groups}}' }
+    expect: *ok
+    returns: ack
+  add_manual_discovery:
+    summary: "Add a manual discovery group of addresses; groups and ips are the API's lists (POST /api/v2/source/add.json)"
+    params:
+      name: *disc_name
+      groups: *ndi_groups
+      ips: &ips { type: json, required: true, label: Addresses, description: "The IP addresses searched, outside the subnet too, as a list of strings." }
+    send: { method: POST, path: /api/v2/source/add.json, content_type: application/json, body: '{"disc_name":{name:json},"disc_type":"Manual","group":{groups},"ip":{ips}}' }
+    expect: *ok
+    returns: ack
+  modify_auto_discovery:
+    summary: "Change a discovery group into, or keep it as, an automatic one with these settings (POST /api/v2/source/modify.json)"
+    params:
+      discovery: &disc { type: string, required: true, max_length: 32, label: Discovery group, description: "The discovery group's id (disc_id), as discovery.<id> in state lists it." }
+      name: *disc_name
+      server_enabled: *server_enabled
+      server_ip: *server_ip
+      groups: *ndi_groups
+    send: { method: POST, path: /api/v2/source/modify.json, content_type: application/json, body: '{"disc_id":{discovery:json},"disc_name":{name:json},"disc_type":"Auto","discovery_enable":{server_enabled},"discovery_ip":{server_ip:json},"group":{groups}}' }
+    expect: *ok
+    returns: ack
+  modify_manual_discovery:
+    summary: "Change a discovery group into, or keep it as, a manual one with these addresses (POST /api/v2/source/modify.json)"
+    params:
+      discovery: *disc
+      name: *disc_name
+      groups: *ndi_groups
+      ips: *ips
+    send: { method: POST, path: /api/v2/source/modify.json, content_type: application/json, body: '{"disc_id":{discovery:json},"disc_name":{name:json},"disc_type":"Manual","group":{groups},"ip":{ips}}' }
+    expect: *ok
+    returns: ack
+  get_discovery:
+    summary: Return a discovery group's settings (GET /api/v2/source/get_param.json)
+    params:
+      discovery: *disc
+    send: { method: GET, path: /api/v2/source/get_param.json, query: { disc_id: "{discovery}" } }
+    expect: *data
+    returns: value
+  remove_discovery:
+    summary: Delete a discovery group (POST /api/v2/source/remove.json)
+    params:
+      discovery: *disc
+    send: { method: POST, path: /api/v2/source/remove.json, content_type: application/json, body: '{"disc_id":{discovery:json}}' }
+    expect: *ok
+    returns: ack
+  open_source_webpage:
+    summary: Have the host open an NDI source's web page in its default browser (POST /api/v2/webSite/set.json)
+    params:
+      url: { type: string, required: true, max_length: 512, label: URL, description: "The page's address, such as a source's web_url." }
+    send: { method: POST, path: /api/v2/webSite/set.json, content_type: application/json, body: '{"url":{url:json}}' }
+    expect: *ok
+    returns: ack
+  refresh_sources:
+    summary: Search for NDI sources again (POST /api/v2/source/refresh.json)
+    send: { method: POST, path: /api/v2/source/refresh.json, content_type: application/json, body: '{"refresh":true}' }
+    expect: *ok
+    returns: ack
+
+  # ── 6 Windows ────────────────────────────────────────────────────────
+  get_windows:
+    summary: Return a program's windows with their layout, resolution and frame rate (GET /api/v2/window/list.json)
+    params:
+      program: *program
+    send: { method: GET, path: /api/v2/window/list.json, query: { pro_id: "{program}" } }
+    expect: *data
+    returns: value
+  switch_window:
+    summary: Switch the WebRTC preview session to another window of the program (POST /api/v2/window/switch.json)
+    params:
+      program: *program
+      window: &window { type: string, required: true, max_length: 32, label: Window, description: "The window's id (win_id): a number, or pvw or pgm, as windows.<program>.<id> in state lists it." }
+      session: { type: string, required: true, max_length: 64, label: WebRTC session, description: "The WebRTC session id that get_window_sdp returned." }
+    send: { method: POST, path: /api/v2/window/switch.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"session_id":{session:json}}' }
+    expect: *ok
+    returns: ack
+  add_window:
+    summary: Add a window to a program (POST /api/v2/window/add.json)
+    params:
+      program: *program
+      window: *window
+      name: &win_name { type: string, required: true, max_length: 64, label: Name, description: "The window's name." }
+      width: *width
+      height: *height
+      resolution: *res_index
+      aspect: *aspect
+      frame_rate: *frame_rate
+      numbered: &numbered { type: bool, default: false, label: Numbering, description: "Whether the window's panes are numbered." }
+      number_min: &number_min { type: int, min: 0, default: 1, label: First number, description: "The lowest pane number." }
+      number_max: &number_max { type: int, min: 0, default: 16, label: Last number, description: "The highest pane number." }
+    send: { method: POST, path: /api/v2/window/add.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"name":{name:json},"resolution":{"width":{width},"height":{height},"index":{resolution},"aspect":{aspect:.3f}},"frameRate":{frame_rate},"number_used":{numbered},"number_range":{"min":{number_min},"max":{number_max}}}' }
+    expect: *ok
+    returns: ack
+  set_window:
+    summary: Set a window's name, resolution, frame rate and pane numbering (POST /api/v2/window/set_param.json)
+    params:
+      program: *program
+      window: *window
+      name: *win_name
+      width: *width
+      height: *height
+      resolution: *res_index
+      aspect: *aspect
+      frame_rate: *frame_rate
+      numbered: *numbered
+      number_min: *number_min
+      number_max: *number_max
+    send: { method: POST, path: /api/v2/window/set_param.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"name":{name:json},"resolution":{"width":{width},"height":{height},"index":{resolution},"aspect":{aspect:.3f}},"frameRate":{frame_rate},"number_used":{numbered},"number_range":{"min":{number_min},"max":{number_max}}}' }
+    expect: *ok
+    returns: ack
+  remove_window:
+    summary: Delete a window of a program (POST /api/v2/window/remove.json)
+    params:
+      program: *program
+      window: *window
+    send: { method: POST, path: /api/v2/window/remove.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json}}' }
+    expect: *ok
+    returns: ack
+  get_output_types:
+    summary: Return the encoder outputs a window can use, such as NDI (GET /api/v2/window/get_output_list.json)
+    send: { method: GET, path: /api/v2/window/get_output_list.json }
+    expect: *data
+    returns: value
+  get_screens:
+    summary: Return the screens connected to the host (GET /api/v2/window/get_screen_list.json)
+    send: { method: GET, path: /api/v2/window/get_screen_list.json }
+    expect: *data
+    returns: value
+  get_window:
+    summary: Return a window's layout and every pane's source, name, size, type and audio mix (GET /api/v2/window/get.json)
+    params:
+      program: *program
+      window: *window
+    send: { method: GET, path: /api/v2/window/get.json, query: { pro_id: "{program}", win_id: "{window}" } }
+    expect: *data
+    returns: value
+  get_window_screen:
+    summary: Return which screen a window is shown on, 0 or less for none (GET /api/v2/window/get_position.json)
+    params:
+      program: *program
+      window: *window
+    send: { method: GET, path: /api/v2/window/get_position.json, query: { pro_id: "{program}", win_id: "{window}" } }
+    expect: *data
+    returns: value
+  set_window_screen:
+    summary: Show a window on a screen of the host, or take it off the screens (POST /api/v2/window/set_position.json)
+    params:
+      program: *program
+      window: *window
+      screen: { type: int, required: true, label: Screen, description: "The screen's number in get_screens' list, from 1; 0 takes the window off the screens." }
+    send: { method: POST, path: /api/v2/window/set_position.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"select":{screen}}' }
+    expect: *ok
+    returns: ack
+  get_window_output:
+    summary: Return a window's encoder output, NDI or none (GET /api/v2/window/get_output_type.json)
+    params:
+      program: *program
+      window: *window
+    send: { method: GET, path: /api/v2/window/get_output_type.json, query: { pro_id: "{program}", win_id: "{window}" } }
+    expect: *data
+    returns: value
+  set_window_output:
+    summary: Send a window out as NDI, or stop its encoder output (POST /api/v2/window/set_output_type.json)
+    params:
+      program: *program
+      window: *window
+      ndi: { type: bool, required: true, label: NDI output, description: "On to send the window out as NDI; off to stop the encoder output." }
+    send: { method: POST, path: /api/v2/window/set_output_type.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"select":{ndi:map.ndi_output}}' }
+    expect: *ok
+    returns: ack
+  get_window_ndi:
+    summary: Return a window's NDI output settings (GET /api/v2/window/ndi/get_param.json)
+    params:
+      program: *program
+      window: *window
+    send: { method: GET, path: /api/v2/window/ndi/get_param.json, query: { pro_id: "{program}", win_id: "{window}" } }
+    expect: *data
+    returns: value
+  set_window_ndi:
+    summary: "Set a window's NDI output: transport, multicast, groups and Discovery Server (POST /api/v2/window/ndi/set_param.json)"
+    params:
+      program: *program
+      window: *window
+      connection: { type: enum, values: [Default, no_multi_tcp, multicast], default: Default, label: Transport, description: "Default, no_multi_tcp to turn multi-TCP off, or multicast." }
+      netprefix: { type: string, default: "", max_length: 64, label: Multicast address, description: "The multicast address prefix, for multicast; empty otherwise." }
+      netmask: { type: string, default: "", max_length: 64, label: Multicast mask, description: "The multicast subnet mask, for multicast; empty otherwise." }
+      ttl: { type: int, min: 0, max: 255, default: 1, label: TTL, description: "The multicast time to live." }
+      groups: *ndi_groups
+      server_enabled: *server_enabled
+      server_ip: *server_ip
+    send: { method: POST, path: /api/v2/window/ndi/set_param.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"connection_type":{connection:json},"netprefix":{netprefix:json},"netmask":{netmask:json},"ttl":{ttl},"group":{groups},"discovery_enable":{server_enabled},"discovery_ip":{server_ip:json}}' }
+    expect: *ok
+    returns: ack
+  clear_window_sources:
+    summary: Remove the sources of every pane of a window (POST /api/v2/window/delete_sources.json)
+    params:
+      program: *program
+      window: *window
+    send: { method: POST, path: /api/v2/window/delete_sources.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json}}' }
+    expect: *ok
+    returns: ack
+  get_toolbar:
+    summary: Return a window's overlays, font, border and audio gain (GET /api/v2/window/get_state_control.json)
+    params:
+      program: *program
+      window: *window
+    send: { method: GET, path: /api/v2/window/get_state_control.json, query: { pro_id: "{program}", win_id: "{window}" } }
+    expect: *data
+    returns: value
+  set_toolbar:
+    summary: Turn one of a window's overlays on or off for all its panes (POST /api/v2/window/set_state_control.json)
+    params:
+      program: *program
+      window: *window
+      item: { type: enum, values: [name_enable, safe_area, center_cross, vu_meter], required: true, label: Overlay, description: "name_enable (pane names), safe_area, center_cross or vu_meter (audio meters)." }
+      enabled: { type: bool, required: true, label: Shown, description: "On to show the overlay; off to hide it." }
+    send: { method: POST, path: /api/v2/window/set_state_control.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"type":{item:json},"config":{"enable":{enabled}}}' }
+    expect: *ok
+    returns: ack
+  set_toolbar_font:
+    summary: Set the font of a window's pane names (POST /api/v2/window/set_state_control.json)
+    params:
+      program: *program
+      window: *window
+      color: &color { type: string, required: true, max_length: 16, pattern: '^#[0-9A-Fa-f]{3,8}$', label: Color, description: "A CSS hex color, such as #fff." }
+      size: { type: int, min: 1, max: 200, required: true, label: Size, description: "The font size." }
+    send: { method: POST, path: /api/v2/window/set_state_control.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"type":"font","config":{"color":{color:json},"size":{size}}}' }
+    expect: *ok
+    returns: ack
+  set_toolbar_border:
+    summary: Show or hide a window's pane borders and set their color (POST /api/v2/window/set_state_control.json)
+    params:
+      program: *program
+      window: *window
+      enabled: { type: bool, required: true, label: Shown, description: "On to show the borders; off to hide them." }
+      color: *color
+    send: { method: POST, path: /api/v2/window/set_state_control.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"type":"border","config":{"enable":{enabled},"color":{color:json}}}' }
+    expect: *ok
+    returns: ack
+  set_toolbar_audio_gain:
+    summary: Set a window's audio gain (POST /api/v2/window/set_state_control.json)
+    params:
+      program: *program
+      window: *window
+      gain: { type: int, required: true, label: Audio gain, description: "The volume gain value, as the toolbar shows it." }
+    send: { method: POST, path: /api/v2/window/set_state_control.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"type":"audio_gain","config":{"value":{gain}}}' }
+    expect: *ok
+    returns: ack
+  set_window_layout:
+    summary: Give a window another layout (POST /api/v2/window/set_layout.json)
+    params:
+      program: *program
+      window: *window
+      layout: &layout { type: string, required: true, max_length: 32, label: Layout, description: "The layout's id (layout_id), as layouts.<program>.<id> in state lists it." }
+    send: { method: POST, path: /api/v2/window/set_layout.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"layout_id":{layout:json}}' }
+    expect: *ok
+    returns: ack
+  reload_window_layout:
+    summary: Reset a window's contents to its layout as saved (POST /api/v2/window/reload_layout.json)
+    params:
+      program: *program
+      window: *window
+      layout: *layout
+    send: { method: POST, path: /api/v2/window/reload_layout.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"layout_id":{layout:json}}' }
+    expect: *ok
+    returns: ack
+  set_pane_source:
+    summary: Put an NDI source in a pane, from another pane (POST /api/v2/window/set_source.json)
+    params:
+      from_program: { type: string, required: true, max_length: 32, label: From program, description: "The program the source comes from." }
+      from_window: { type: string, required: true, max_length: 32, label: From window, description: "The window the source comes from." }
+      from_pane: { type: int, min: 0, required: true, label: From pane, description: "The pane the source comes from." }
+      program: *program
+      window: *window
+      pane: &pane { type: int, min: 0, required: true, label: Pane, description: "The pane's id in the window, as panes.<program>.<window>.<id> in state lists it." }
+      source: { type: string, required: true, max_length: 256, label: Source, description: "The NDI source's name (stream_id), as discovery.<group>.sources lists it; empty when it is the from pane's source." }
+    send: { method: POST, path: /api/v2/window/set_source.json, content_type: application/json, body: '{"from":{"pro_id":{from_program:json},"win_id":{from_window:json},"pos_id":{from_pane}},"to":{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"stream_id":{source:json}}}' }
+    expect: *ok
+    returns: ack
+  remove_pane_source:
+    summary: Remove the source of a pane (POST /api/v2/window/remove_source.json)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+    send: { method: POST, path: /api/v2/window/remove_source.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane}}' }
+    expect: *ok
+    returns: ack
+  get_pane:
+    summary: Return a pane's name and overlays (POST /api/v2/window/get_single_layout.json)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+    send: { method: POST, path: /api/v2/window/get_single_layout.json, query: { pro_id: "{program}", win_id: "{window}", pos_id: "{pane}" } }
+    expect: *data
+    returns: value
+  set_pane:
+    summary: Turn one of a pane's overlays, or its audio, on or off (POST /api/v2/window/set_single_layout.json)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+      item: { type: enum, values: [name_enable, safe_area, center_cross, vu_meter, audio_enable], required: true, label: Item, description: "name_enable (the pane's name), safe_area, center_cross, vu_meter (audio meter) or audio_enable." }
+      enabled: { type: bool, required: true, label: "On", description: "On to show or enable it; off to hide or disable it." }
+    send: { method: POST, path: /api/v2/window/set_single_layout.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"type":{item:json},"config":{"enable":{enabled}}}' }
+    expect: *ok
+    returns: ack
+  set_pane_name:
+    summary: Set a pane's name (POST /api/v2/window/set_single_layout.json)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+      name: { type: string, required: true, max_length: 128, label: Name, description: "The pane's title shown on it." }
+    send: { method: POST, path: /api/v2/window/set_single_layout.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"type":"name","config":{"pattern_name":{name:json}}}' }
+    expect: *ok
+    returns: ack
+  set_pane_audio:
+    summary: Set a pane's audio in the mix output to always on, follow PGM, or off (POST /api/v2/window/set_audio_type.json)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+      mix: { type: enum, values: [always, follow, close], required: true, label: Audio mix, description: "always (locked in the mix), follow (in the mix while on PGM) or close (muted)." }
+    send: { method: POST, path: /api/v2/window/set_audio_type.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"mix_type":{mix:json}}' }
+    expect: *ok
+    returns: ack
+
+  # ── 7 Layouts ────────────────────────────────────────────────────────
+  get_layout_templates:
+    summary: Return the fixed layout templates (GET /api/v2/layout/template.json)
+    send: { method: GET, path: /api/v2/layout/template.json }
+    expect: *data
+    returns: value
+  get_layouts:
+    summary: Return a program's layouts and which are in use (GET /api/v2/layout/list.json)
+    params:
+      program: *program
+    send: { method: GET, path: /api/v2/layout/list.json, query: { pro_id: "{program}" } }
+    expect: *data
+    returns: value
+  add_layout:
+    summary: Add a layout to a program from a template (POST /api/v2/layout/add.json)
+    params:
+      program: *program
+      name: &layout_name { type: string, required: true, max_length: 64, label: Name, description: "The layout's name." }
+      template: { type: string, required: true, max_length: 32, label: Template, description: "The template's id (template_id), as layout_templates.<id> in state lists it." }
+    send: { method: POST, path: /api/v2/layout/add.json, content_type: application/json, body: '{"pro_id":{program:json},"name":{name:json},"template_id":{template:json}}' }
+    expect: *ok
+    returns: ack
+  rename_layout:
+    summary: Rename a layout (POST /api/v2/layout/rename.json)
+    params:
+      program: *program
+      layout: *layout
+      name: *layout_name
+    send: { method: POST, path: /api/v2/layout/rename.json, content_type: application/json, body: '{"pro_id":{program:json},"layout_id":{layout:json},"name":{name:json}}' }
+    expect: *ok
+    returns: ack
+  modify_layout:
+    summary: "Edit a layout's panes; panes is the API's position list of {x, y, width, height, type, number, id, z_index} (POST /api/v2/layout/modify.json)"
+    params:
+      program: *program
+      window: *window
+      layout: *layout
+      name: *layout_name
+      panes: { type: json, required: true, label: Panes, description: "Every pane as an object with x, y, width and height (percent of the window), type (empty, pvw or pgm), number, id and z_index (stacking order from 0)." }
+      count: { type: int, min: 1, required: true, label: Pane count, description: "The number of panes in the list (layout_count)." }
+    send: { method: POST, path: /api/v2/layout/modify.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"layout_id":{layout:json},"layout_count":{count},"name":{name:json},"position":{panes}}' }
+    expect: *ok
+    returns: ack
+  remove_layout:
+    summary: Delete a layout (POST /api/v2/layout/remove.json)
+    params:
+      program: *program
+      layout: *layout
+    send: { method: POST, path: /api/v2/layout/remove.json, content_type: application/json, body: '{"pro_id":{program:json},"layout_id":{layout:json}}' }
+    expect: *ok
+    returns: ack
+  save_layout_as:
+    summary: Save a layout under a new name (POST /api/v2/layout/resave.json)
+    params:
+      program: *program
+      layout: *layout
+      name: *layout_name
+    send: { method: POST, path: /api/v2/layout/resave.json, content_type: application/json, body: '{"pro_id":{program:json},"layout_id":{layout:json},"name":{name:json}}' }
+    expect: *ok
+    returns: ack
+
+  # ── 8 NDI discovery ──────────────────────────────────────────────────
+  get_ndi_groups:
+    summary: Return the NDI groups searched (GET /api/discovery/scan/groupChecked.json)
+    send: { method: GET, path: /api/discovery/scan/groupChecked.json }
+    expect: *data
+    returns: value
+  get_manual_ips:
+    summary: Return the addresses searched outside the subnet (GET /api/discovery/scan/getManualIps.json)
+    send: { method: GET, path: /api/discovery/scan/getManualIps.json }
+    expect: *data
+    returns: value
+  set_ndi_discovery:
+    summary: "Set the NDI groups and the addresses searched outside the subnet; groups and ips are the API's lists (POST /api/discovery/scan/addManualIp.json)"
+    params:
+      groups: *ndi_groups
+      ips: *ips
+    send: { method: POST, path: /api/discovery/scan/addManualIp.json, content_type: application/json, body: '{"group_name":{groups},"ip":{ips}}' }
+    expect: *ok
+    returns: ack
+
+  # ── 9 Others: WebRTC, PTZ, Take ──────────────────────────────────────
+  get_window_sdp:
+    summary: Return the WebRTC SDP offer and session id for previewing a window in a browser (GET /api/v2/webrtc/get_sdp.json)
+    params:
+      program: *program
+      window: *window
+      ip: { type: string, required: true, max_length: 64, label: Address, description: "The address the preview is for, as the document's example gives it." }
+    send: { method: GET, path: /api/v2/webrtc/get_sdp.json, query: { pro_id: "{program}", win_id: "{window}", ip: "{ip}" } }
+    expect: *data
+    returns: value
+  ptz:
+    summary: "Send a PTZ request to the camera in a pane; data is the API's data object for the type (POST /api/v2/ptz/set.json)"
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+      type: { type: enum, values: [ptz_zoom, ptz_zoom_speed, ptz_pan_tilt, ptz_pan_tilt_speed, ptz_store_preset, ptz_recall_preset, ptz_auto_focus, ptz_focus, ptz_focus_speed, ptz_white_balance_auto, ptz_white_balance_indoor, ptz_white_balance_outdoor, ptz_white_balance_oneshot, ptz_white_balance_manual, ptz_exposure_auto, ptz_exposure_manual, ptz_is_supported], required: true, label: Request, description: "The PTZ request, as the document lists them." }
+      data: { type: json, required: true, label: Data, description: "The request's values, as 9.2 names them: zoom_value, zoom_speed, pan_value, tilt_value, pan_speed, tilt_speed, preset_no, speed, focus_value, focus_speed, red, blue, exposure_level." }
+    send: { method: POST, path: /api/v2/ptz/set.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"type":{type:json},"data":{data}}' }
+    expect: *ok
+    returns: ack
+  ptz_zoom:
+    summary: Zoom the camera in a pane to a position (ptz_zoom)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+      zoom: { type: float, min: 0, max: 1, required: true, label: Zoom, description: "0.0 zoomed in to 1.0 zoomed out." }
+    send: { method: POST, path: /api/v2/ptz/set.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"type":"ptz_zoom","data":{"zoom_value":{zoom:.3f}}}' }
+    expect: *ok
+    returns: ack
+  ptz_zoom_speed:
+    summary: Zoom the camera in a pane at a speed, 0 to stop (ptz_zoom_speed)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+      speed: { type: float, min: -1, max: 1, required: true, label: Zoom speed, description: "-1.0 zooming out to +1.0 zooming in; 0 stops." }
+    send: { method: POST, path: /api/v2/ptz/set.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"type":"ptz_zoom_speed","data":{"zoom_speed":{speed:.3f}}}' }
+    expect: *ok
+    returns: ack
+  ptz_pan_tilt:
+    summary: Point the camera in a pane to a pan and tilt position (ptz_pan_tilt)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+      pan: { type: float, min: -1, max: 1, required: true, label: Pan, description: "-1.0 left, 0.0 centered, +1.0 right." }
+      tilt: { type: float, min: -1, max: 1, required: true, label: Tilt, description: "-1.0 bottom, 0.0 centered, +1.0 top." }
+    send: { method: POST, path: /api/v2/ptz/set.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"type":"ptz_pan_tilt","data":{"pan_value":{pan:.3f},"tilt_value":{tilt:.3f}}}' }
+    expect: *ok
+    returns: ack
+  ptz_pan_tilt_speed:
+    summary: Move the camera in a pane at a pan and tilt speed, 0 to stop (ptz_pan_tilt_speed)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+      pan_speed: { type: float, min: -1, max: 1, required: true, label: Pan speed, description: "-1.0 moving right, 0.0 stopped, +1.0 moving left." }
+      tilt_speed: { type: float, min: -1, max: 1, required: true, label: Tilt speed, description: "-1.0 moving down, 0.0 stopped, +1.0 moving up." }
+    send: { method: POST, path: /api/v2/ptz/set.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"type":"ptz_pan_tilt_speed","data":{"pan_speed":{pan_speed:.3f},"tilt_speed":{tilt_speed:.3f}}}' }
+    expect: *ok
+    returns: ack
+  ptz_store_preset:
+    summary: Store the camera's position in a preset (ptz_store_preset)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+      preset: &preset { type: int, min: 0, max: 99, required: true, label: Preset, description: "The preset number, 0 to 99." }
+    send: { method: POST, path: /api/v2/ptz/set.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"type":"ptz_store_preset","data":{"preset_no":{preset}}}' }
+    expect: *ok
+    returns: ack
+  ptz_recall_preset:
+    summary: Move the camera to a preset at a speed (ptz_recall_preset)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+      preset: *preset
+      speed: { type: float, min: 0, max: 1, default: 1, label: Speed, description: "0.0 as slow as possible to 1.0 as fast as possible." }
+    send: { method: POST, path: /api/v2/ptz/set.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"type":"ptz_recall_preset","data":{"preset_no":{preset},"speed":{speed:.3f}}}' }
+    expect: *ok
+    returns: ack
+  ptz_focus:
+    summary: Focus the camera in a pane to a position (ptz_focus)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+      focus: { type: float, min: 0, max: 1, required: true, label: Focus, description: "0.0 focused to infinity to 1.0 focused as close as possible." }
+    send: { method: POST, path: /api/v2/ptz/set.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"type":"ptz_focus","data":{"focus_value":{focus:.3f}}}' }
+    expect: *ok
+    returns: ack
+  ptz_focus_speed:
+    summary: Focus the camera in a pane at a speed, 0 to stop (ptz_focus_speed)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+      speed: { type: float, min: -1, max: 1, required: true, label: Focus speed, description: "-1.0 focusing outwards to +1.0 focusing inwards; 0 stops." }
+    send: { method: POST, path: /api/v2/ptz/set.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"type":"ptz_focus_speed","data":{"focus_speed":{speed:.3f}}}' }
+    expect: *ok
+    returns: ack
+  ptz_auto_focus:
+    summary: Turn on the camera's auto focus (ptz_auto_focus)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+    send: { method: POST, path: /api/v2/ptz/set.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"type":"ptz_auto_focus","data":{}}' }
+    expect: *ok
+    returns: ack
+  ptz_white_balance:
+    summary: Set the camera's white balance to auto, indoor, outdoor or one-shot (ptz_white_balance_*)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+      mode: { type: enum, values: [auto, indoor, outdoor, oneshot], required: true, label: White balance, description: "auto, indoor, outdoor, or oneshot to measure once." }
+    send: { method: POST, path: /api/v2/ptz/set.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"type":"ptz_white_balance_{mode}","data":{}}' }
+    expect: *ok
+    returns: ack
+  ptz_white_balance_manual:
+    summary: Set the camera's white balance by hand (ptz_white_balance_manual)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+      red: { type: float, min: 0, max: 1, required: true, label: Red, description: "0.0 not red to 1.0 very red." }
+      blue: { type: float, min: 0, max: 1, required: true, label: Blue, description: "0.0 not blue to 1.0 very blue." }
+    send: { method: POST, path: /api/v2/ptz/set.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"type":"ptz_white_balance_manual","data":{"red":{red:.3f},"blue":{blue:.3f}}}' }
+    expect: *ok
+    returns: ack
+  ptz_exposure_auto:
+    summary: Set the camera's exposure to automatic (ptz_exposure_auto)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+    send: { method: POST, path: /api/v2/ptz/set.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"type":"ptz_exposure_auto","data":{}}' }
+    expect: *ok
+    returns: ack
+  ptz_exposure_manual:
+    summary: Set the camera's exposure level by hand (ptz_exposure_manual)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+      level: { type: float, min: 0, max: 1, required: true, label: Exposure, description: "0.0 dark to 1.0 light." }
+    send: { method: POST, path: /api/v2/ptz/set.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"type":"ptz_exposure_manual","data":{"exposure_level":{level:.3f}}}' }
+    expect: *ok
+    returns: ack
+  ptz_is_supported:
+    summary: Check whether the source in a pane takes PTZ; ok when it does (ptz_is_supported)
+    params:
+      program: *program
+      window: *window
+      pane: *pane
+    send: { method: POST, path: /api/v2/ptz/set.json, content_type: application/json, body: '{"pro_id":{program:json},"win_id":{window:json},"pos_id":{pane},"type":"ptz_is_supported","data":{}}' }
+    expect: *ok
+    returns: ack
+  get_transitions:
+    summary: Return the Take transition effects (GET /api/v2/take/transition/list.json)
+    send: { method: GET, path: /api/v2/take/transition/list.json }
+    expect: *data
+    returns: value
+  take:
+    summary: Take a program's PVW to PGM with a transition (POST /api/v2/take/set.json, progress 1.0)
+    params:
+      program: *program
+      time: &take_time { type: int, min: 0, required: true, label: Duration, description: "The transition's duration in seconds; 0 cuts." }
+      transition: &transition { type: int, min: 1, default: 1, label: Transition, description: "The transition effect's id in get_transitions' list; 1 (fade) by default." }
+    send: { method: POST, path: /api/v2/take/set.json, content_type: application/json, body: '{"pro_id":{program:json},"time":{time},"progress":1.0,"select":{transition}}' }
+    expect: *ok
+    returns: ack
+  tbar:
+    summary: Move a program's T-bar, running the transition to that point (POST /api/v2/take/set.json)
+    params:
+      program: *program
+      progress: { type: float, min: 0, max: 1, required: true, label: T-bar, description: "The transition's progress, 0.0 to 1.0." }
+      transition: *transition
+    send: { method: POST, path: /api/v2/take/set.json, content_type: application/json, body: '{"pro_id":{program:json},"time":0,"progress":{progress:.3f},"select":{transition}}' }
+    expect: *ok
+    returns: ack
+  get_take:
+    summary: Return a program's Take duration and transition (POST /api/v2/take/get.json)
+    params:
+      program: *program
+    send: { method: POST, path: /api/v2/take/get.json, query: { pro_id: "{program}" } }
+    expect: *data
+    returns: value
+  set_take:
+    summary: Set a program's Take duration and transition without taking (POST /api/v2/take/set_params.json)
+    params:
+      program: *program
+      time: *take_time
+      transition: *transition
+    send: { method: POST, path: /api/v2/take/set_params.json, content_type: application/json, body: '{"pro_id":{program:json},"time":{time},"select":{transition}}' }
+    expect: *ok
+    returns: ack
+
+maps:
+  ndi_output: { "true": '"NDI"', "false": '""' }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Authentication: every request carries the header app, a JSON object
+      with the user name and the token (2.1). The login answers its token
+      in the JSON body (data.token), which the core cannot capture into a
+      session, so it is a setting: run login and store the token with
+      update_settings. A request with a missing or wrong token is answered
+      with {"result": "error"}, which fails the command; the document does
+      not say whether the token expires.
+  - models: [all]
+    severity: warning
+    text: >
+      The document's own spelling is followed where it gives only one:
+      program/rername.json for the program rename. Where it gives two, the
+      regular one is used: program/list.json (the document's heading reads
+      prrogram) and program/get_param.json (its example reads prgram). Its
+      URL rule names port 65532 while its text gives 81 as the default; 81
+      is used, and the port given when opening the device wins.
+  - models: [all]
+    severity: critical
+    text: >
+      take and tbar change PGM at once; set_pane_source, remove_pane_source,
+      clear_window_sources, set_window_layout and reload_window_layout
+      change what a window shows (and sends as NDI); set_program_on off
+      stops a program's rendering; remove_program deletes every window of
+      the program; remove_window, remove_layout and remove_discovery cannot
+      be undone; set_window_output off stops the window's NDI output. None
+      asks for confirmation.
+  - models: [all]
+    severity: info
+    text: >
+      State is polled every 3 seconds: the programs, then each program's
+      windows, layouts, parameters and Take settings, then each window's
+      panes, screen, encoder output, NDI settings and toolbar. The discovery
+      groups and their sources, the NDI discovery groups and addresses, the
+      templates, resolutions, frame rates, transitions, screens and the
+      general configuration are read every 30 seconds. A pane's own
+      overlays (get_pane) are read when a command changes them or asks
+      for them, not polled, since every pane of every window would be a
+      request. Every accepted change has what it changed read again.
+  - models: [all]
+    severity: info
+    text: >
+      API limits and gaps: the WebRTC preview (get_window_sdp,
+      switch_window) needs a browser-side peer the core does not provide;
+      the document gives no request for a source's preloading, users, or
+      the host's network; set_pane_source takes the source from another
+      pane (from) as the document's example does, and its stream_id is the
+      NDI source's name. The PTZ data fields follow 9.2's list (one value
+      per type); ptz_is_supported answers ok or error.
+
+state:
+  # config/general.json, config/nav/nav
+  general.device_name: { type: string, description: "The device name" }
+  general.version: { type: string, description: "The software version, such as V_1.10.0001" }
+  general.websocket_port: { type: int, description: "The software's websocket port" }
+  general.qrcode: { type: string, description: "The address the QR code points to" }
+  general.language_switch: { type: bool, description: "Whether the language switch is shown" }
+  general.logo_shown: { type: bool, description: "Whether the logo is shown" }
+  general.languages: { type: string, description: "The languages offered, as JSON text of {value, name, default}" }
+  general.nav_shown: { type: bool, description: "Whether the navigation bar is shown (main_nav.home)" }
+  # resolution/list, frameRate/list, take/transition/list, window/get_output_list, get_screen_list
+  resolutions.*.label: { type: string, description: "A resolution, keyed by id: its label" }
+  resolutions.*.width: { type: int, description: "Its width" }
+  resolutions.*.height: { type: int, description: "Its height" }
+  frame_rates: { type: string, description: "The frame rates offered, as JSON text" }
+  transitions.*: { type: string, description: "A Take transition effect's name, keyed by id" }
+  output_types.*: { type: string, description: "An encoder output's name (such as NDI), keyed by id" }
+  screens.*: { type: string, description: "A screen of the host, keyed by id: its label" }
+  # program/list, get_param
+  programs.*.name: { type: string, description: "A program, keyed by id: its name" }
+  programs.*.on: { type: bool, description: "Whether its windows are rendering" }
+  programs.*.width: { type: int, description: "Its PVW and PGM windows' resolution width" }
+  programs.*.height: { type: int, description: "Their resolution height" }
+  programs.*.resolution: { type: int, description: "Their resolution's id in the resolution list" }
+  programs.*.aspect: { type: float, description: "Their resolution's aspect ratio" }
+  programs.*.frame_rate: { type: float, description: "Their frame rate" }
+  programs.*.take_time: { type: int, unit: s, description: "The Take transition's duration" }
+  programs.*.take_transition: { type: int, description: "The Take transition effect's id" }
+  # window/list and the per-window reads
+  windows.*.*.name: { type: string, description: "A window, keyed by program then window id (a number, pvw or pgm): its name" }
+  windows.*.*.layout: { type: string, description: "The id of its layout" }
+  windows.*.*.modified: { type: bool, description: "Whether its layout has unsaved changes" }
+  windows.*.*.width: { type: int, description: "Its resolution width" }
+  windows.*.*.height: { type: int, description: "Its resolution height" }
+  windows.*.*.resolution: { type: int, description: "Its resolution's id" }
+  windows.*.*.aspect: { type: float, description: "Its resolution's aspect ratio" }
+  windows.*.*.frame_rate: { type: float, description: "Its frame rate" }
+  windows.*.*.layout_name: { type: string, description: "Its layout's name" }
+  windows.*.*.pane_count: { type: int, description: "Number of panes in its layout" }
+  windows.*.*.screen: { type: int, description: "The screen it is shown on, 0 or less for none" }
+  windows.*.*.ndi_output: { type: bool, description: "Whether it is sent out as NDI" }
+  windows.*.*.ndi.connection: { type: string, description: "NDI transport: Default, no_multi_tcp or multicast" }
+  windows.*.*.ndi.netprefix: { type: string, description: "Multicast address prefix" }
+  windows.*.*.ndi.netmask: { type: string, description: "Multicast mask" }
+  windows.*.*.ndi.ttl: { type: int, description: "Multicast TTL" }
+  windows.*.*.ndi.groups: { type: string, description: "The NDI groups it is sent in, as JSON text" }
+  windows.*.*.ndi.server_enabled: { type: bool, description: "Whether it registers with an NDI Discovery Server" }
+  windows.*.*.ndi.server_ip: { type: string, description: "That server's address" }
+  windows.*.*.toolbar.names: { type: bool, description: "Whether pane names are shown" }
+  windows.*.*.toolbar.safe_area: { type: bool, description: "Whether safe areas are shown" }
+  windows.*.*.toolbar.center_cross: { type: bool, description: "Whether center crosses are shown" }
+  windows.*.*.toolbar.vu_meter: { type: bool, description: "Whether audio meters are shown" }
+  windows.*.*.toolbar.font_color: { type: string, description: "Pane name font color" }
+  windows.*.*.toolbar.font_size: { type: int, description: "Pane name font size" }
+  windows.*.*.toolbar.border: { type: bool, description: "Whether pane borders are shown" }
+  windows.*.*.toolbar.border_color: { type: string, description: "Pane border color" }
+  windows.*.*.toolbar.audio_gain: { type: int, description: "Audio gain value" }
+  # window/get layout panes
+  panes.*.*.*.number: { type: int, description: "A pane, keyed by program, window, then pane id: its number" }
+  panes.*.*.*.x: { type: float, unit: "%", description: "Its left edge" }
+  panes.*.*.*.y: { type: float, unit: "%", description: "Its top edge" }
+  panes.*.*.*.z: { type: float, description: "Its stacking order, from 0" }
+  panes.*.*.*.width: { type: float, unit: "%", description: "Its width" }
+  panes.*.*.*.height: { type: float, unit: "%", description: "Its height" }
+  panes.*.*.*.type: { type: string, description: "Empty for an ordinary pane, pvw or pgm" }
+  panes.*.*.*.source_resolution: { type: string, description: "The source's resolution (aspectRatio)" }
+  panes.*.*.*.source_frame_rate: { type: float, description: "The source's frame rate" }
+  panes.*.*.*.source: { type: string, description: "The source's id (stream_id), empty for none" }
+  panes.*.*.*.source_name: { type: string, description: "The source's name" }
+  panes.*.*.*.name: { type: string, description: "The pane's name (pattern_name)" }
+  panes.*.*.*.audio_mix: { type: string, description: "always, follow or close" }
+  panes.*.*.*.on_pgm: { type: bool, description: "Whether its source is on the PGM window" }
+  panes.*.*.*.on_pvw: { type: bool, description: "Whether its source is on the PVW window" }
+  # window/get_single_layout
+  panes.*.*.*.safe_area: { type: bool, description: "Whether its safe area is shown (pane setting)" }
+  panes.*.*.*.vu_meter: { type: bool, description: "Whether its audio meter is shown" }
+  panes.*.*.*.center_cross: { type: bool, description: "Whether its center cross is shown" }
+  panes.*.*.*.name_shown: { type: bool, description: "Whether its name is shown" }
+  # layout/list, layout/template
+  layouts.*.*.name: { type: string, description: "A layout, keyed by program then layout id: its name" }
+  layouts.*.*.pane_count: { type: int, description: "Its number of panes" }
+  layouts.*.*.used: { type: bool, description: "Whether it is in use" }
+  layouts.*.*.panes: { type: string, description: "Its panes, as JSON text of {x, y, width, height, type, number, id, z_index}" }
+  layout_templates.*.name: { type: string, description: "A layout template, keyed by id: its name" }
+  layout_templates.*.pane_count: { type: int, description: "Its number of panes" }
+  layout_templates.*.panes: { type: string, description: "Its panes, as JSON text" }
+  # source/list, source/get_param
+  discovery.*.name: { type: string, description: "A discovery group, keyed by id: its name" }
+  discovery.*.sources.*.name: { type: string, description: "An NDI source it finds, keyed by source id: its name" }
+  discovery.*.sources.*.ip: { type: string, description: "Its address" }
+  discovery.*.sources.*.url: { type: string, description: "Its address and port" }
+  discovery.*.sources.*.web_url: { type: string, description: "Its web page address" }
+  discovery.*.type: { type: string, description: "Auto or Manual" }
+  discovery.*.server_enabled: { type: bool, description: "Whether it searches through an NDI Discovery Server" }
+  discovery.*.server_ip: { type: string, description: "That server's address" }
+  discovery.*.groups: { type: string, description: "The NDI groups searched, as JSON text" }
+  discovery.*.ips: { type: string, description: "The addresses searched (manual), as JSON text" }
+  # discovery/scan
+  ndi_discovery.groups: { type: string, description: "The NDI groups searched, as JSON text" }
+  ndi_discovery.manual_ips: { type: string, description: "The addresses searched outside the subnet, as JSON text" }
+
+telemetry:
+  poll:
+    - every_ms: 3000
+      send:
+        - { method: GET, path: /api/v2/program/list.json }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /api/v2/config/general.json }
+        - { method: GET, path: /api/v2/config/nav/nav }
+        - { method: GET, path: /api/v2/resolution/list.json }
+        - { method: GET, path: /api/v2/frameRate/list.json }
+        - { method: GET, path: /api/v2/take/transition/list.json }
+        - { method: GET, path: /api/v2/window/get_output_list.json }
+        - { method: GET, path: /api/v2/window/get_screen_list.json }
+        - { method: GET, path: /api/v2/layout/template.json }
+        - { method: GET, path: /api/v2/source/list.json }
+        - { method: GET, path: /api/discovery/scan/groupChecked.json }
+        - { method: GET, path: /api/discovery/scan/getManualIps.json }
+  updates:
+    - path: "^/api/v2/config/general\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { name: "$.data.deviceName", version: "$.data.version", ws: "$.data.websocketPort", qr: "$.data.qrcode", lang: "$.data.languageShow", logo: "$.data.logoImgShow", langs: "$.data.languageOptions" }
+      state:
+        general.device_name: "{name}"
+        general.version: "{version}"
+        general.websocket_port: "{ws}"
+        general.qrcode: "{qr}"
+        general.language_switch: "{lang}"
+        general.logo_shown: "{logo}"
+        general.languages: "{langs}"
+    - path: "^/api/v2/config/nav/nav$"
+      json_match: { "$.result": "^ok$" }
+      json: { home: "$.data.main_nav.home" }
+      state: { general.nav_shown: "{home}" }
+    # 4.3 lists value/label, 5.1 id/label; both are read.
+    - path: "^/api/v2/resolution/list\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      each_match: { "$.id": "^\\d+$" }
+      json: { id: "$.id", label: "$.label", width: "$.width", height: "$.height" }
+      replace: resolutions
+      state: &res_state
+        "resolutions.{id}.label": "{label}"
+        "resolutions.{id}.width": "{width}"
+        "resolutions.{id}.height": "{height}"
+    - path: "^/api/v2/resolution/list\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      each_match: { "$.value": "^\\d+$" }
+      json: { id: "$.value", label: "$.label", width: "$.width", height: "$.height" }
+      replace: resolutions
+      state: *res_state
+    - path: "^/api/v2/frameRate/list\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { rates: "$.data" }
+      state: { frame_rates: "{rates}" }
+    - path: "^/api/v2/take/transition/list\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", label: "$.label" }
+      replace: transitions
+      state: { "transitions.{id}": "{label}" }
+    - path: "^/api/v2/window/get_output_list\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", label: "$.label" }
+      replace: output_types
+      state: { "output_types.{id}": "{label}" }
+    - path: "^/api/v2/window/get_screen_list\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", label: "$.label" }
+      replace: screens
+      state: { "screens.{id}": "{label}" }
+
+    # ── Programs, then each program's windows, layouts, parameters, Take
+    - path: "^/api/v2/program/list\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.pro_id", name: "$.name", status: "$.status" }
+      replace: programs
+      state:
+        "programs.{id:key}.name": "{name}"
+        "programs.{id:key}.on": "{status}"
+      then_send:
+        - { method: GET, path: /api/v2/window/list.json, query: { pro_id: "{id}" } }
+        - { method: GET, path: /api/v2/layout/list.json, query: { pro_id: "{id}" } }
+        - { method: GET, path: /api/v2/program/get_param.json, query: { pro_id: "{id}" } }
+        - { method: POST, path: /api/v2/take/get.json, query: { pro_id: "{id}" } }
+    - path: "^/api/v2/program/get_param\\.json\\?pro_id=([^&]+)$"
+      json_match: { "$.result": "^ok$" }
+      json: { w: "$.data.resolution.width", h: "$.data.resolution.height", i: "$.data.resolution.index", a: "$.data.resolution.aspect", f: "$.data.frameRate" }
+      state:
+        "programs.{1:url_decode:key}.width": "{w}"
+        "programs.{1:url_decode:key}.height": "{h}"
+        "programs.{1:url_decode:key}.resolution": "{i}"
+        "programs.{1:url_decode:key}.aspect": "{a}"
+        "programs.{1:url_decode:key}.frame_rate": "{f}"
+    - path: "^/api/v2/take/get\\.json\\?pro_id=([^&]+)$"
+      json_match: { "$.result": "^ok$" }
+      json: { t: "$.data.time", s: "$.data.select" }
+      state:
+        "programs.{1:url_decode:key}.take_time": "{t}"
+        "programs.{1:url_decode:key}.take_transition": "{s}"
+    - path: "^/api/v2/window/list\\.json\\?pro_id=([^&]+)$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", name: "$.name", layout: "$.layout_id", modified: "$.modified", w: "$.resolution.width", h: "$.resolution.height", i: "$.resolution.index", a: "$.resolution.aspect", f: "$.frameRate" }
+      replace: "windows.{1:url_decode:key}"
+      state:
+        "windows.{1:url_decode:key}.{id:key}.name": "{name}"
+        "windows.{1:url_decode:key}.{id:key}.layout": "{layout}"
+        "windows.{1:url_decode:key}.{id:key}.modified": "{modified}"
+        "windows.{1:url_decode:key}.{id:key}.width": "{w}"
+        "windows.{1:url_decode:key}.{id:key}.height": "{h}"
+        "windows.{1:url_decode:key}.{id:key}.resolution": "{i}"
+        "windows.{1:url_decode:key}.{id:key}.aspect": "{a}"
+        "windows.{1:url_decode:key}.{id:key}.frame_rate": "{f}"
+      then_send:
+        - { method: GET, path: /api/v2/window/get.json, query: { pro_id: "{1:url_decode}", win_id: "{id}" } }
+        - { method: GET, path: /api/v2/window/get_position.json, query: { pro_id: "{1:url_decode}", win_id: "{id}" } }
+        - { method: GET, path: /api/v2/window/get_output_type.json, query: { pro_id: "{1:url_decode}", win_id: "{id}" } }
+        - { method: GET, path: /api/v2/window/ndi/get_param.json, query: { pro_id: "{1:url_decode}", win_id: "{id}" } }
+        - { method: GET, path: /api/v2/window/get_state_control.json, query: { pro_id: "{1:url_decode}", win_id: "{id}" } }
+    - path: "^/api/v2/window/get\\.json\\?pro_id=([^&]+)&win_id=([^&]+)$"
+      json_match: { "$.result": "^ok$" }
+      json: { name: "$.data.layout_name", count: "$.data.layout_count" }
+      state:
+        "windows.{1:url_decode:key}.{2:url_decode:key}.layout_name": "{name}"
+        "windows.{1:url_decode:key}.{2:url_decode:key}.pane_count": "{count}"
+    - path: "^/api/v2/window/get\\.json\\?pro_id=([^&]+)&win_id=([^&]+)$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.layout"
+      json: { id: "$.id", number: "$.number", x: "$.x", y: "$.y", z: "$.z_index", w: "$.width", h: "$.height", type: "$.type", ar: "$.aspectRatio", fr: "$.frameRate", sid: "$.stream_id", sname: "$.stream_name", pname: "$.pattern_name", mix: "$.audio_mix.mix_type", pgm: "$.audio_mix.pgm_enable", pvw: "$.audio_mix.pvw_enable" }
+      replace: "panes.{1:url_decode:key}.{2:url_decode:key}"
+      state:
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{id}.number": "{number}"
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{id}.x": "{x}"
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{id}.y": "{y}"
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{id}.z": "{z}"
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{id}.width": "{w}"
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{id}.height": "{h}"
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{id}.type": "{type}"
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{id}.source_resolution": "{ar}"
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{id}.source_frame_rate": "{fr}"
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{id}.source": "{sid}"
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{id}.source_name": "{sname}"
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{id}.name": "{pname}"
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{id}.audio_mix": "{mix}"
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{id}.on_pgm": "{pgm}"
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{id}.on_pvw": "{pvw}"
+    - path: "^/api/v2/window/get_position\\.json\\?pro_id=([^&]+)&win_id=([^&]+)$"
+      json_match: { "$.result": "^ok$" }
+      json: { s: "$.data.select" }
+      state: { "windows.{1:url_decode:key}.{2:url_decode:key}.screen": "{s}" }
+    - path: "^/api/v2/window/get_output_type\\.json\\?pro_id=([^&]+)&win_id=([^&]+)$"
+      json_match: { "$.result": "^ok$" }
+      json: { s: "$.data.select" }
+      state: { "windows.{1:url_decode:key}.{2:url_decode:key}.ndi_output": { value: "{s}", map: { "NDI": true, "": false } } }
+    - path: "^/api/v2/window/ndi/get_param\\.json\\?pro_id=([^&]+)&win_id=([^&]+)$"
+      json_match: { "$.result": "^ok$" }
+      json: { c: "$.data.connection_type", p: "$.data.netprefix", m: "$.data.netmask", t: "$.data.ttl", g: "$.data.group", e: "$.data.discovery_enable", d: "$.data.discovery_ip" }
+      state:
+        "windows.{1:url_decode:key}.{2:url_decode:key}.ndi.connection": "{c}"
+        "windows.{1:url_decode:key}.{2:url_decode:key}.ndi.netprefix": "{p}"
+        "windows.{1:url_decode:key}.{2:url_decode:key}.ndi.netmask": "{m}"
+        "windows.{1:url_decode:key}.{2:url_decode:key}.ndi.ttl": "{t}"
+        "windows.{1:url_decode:key}.{2:url_decode:key}.ndi.groups": "{g}"
+        "windows.{1:url_decode:key}.{2:url_decode:key}.ndi.server_enabled": "{e}"
+        "windows.{1:url_decode:key}.{2:url_decode:key}.ndi.server_ip": "{d}"
+    - path: "^/api/v2/window/get_state_control\\.json\\?pro_id=([^&]+)&win_id=([^&]+)$"
+      json_match: { "$.result": "^ok$" }
+      json: { n: "$.data.name_enable", s: "$.data.safe_area", c: "$.data.center_cross", v: "$.data.vu_meter", fc: "$.data.font.color", fs: "$.data.font.size", be: "$.data.border.enable", bc: "$.data.border.color", g: "$.data.audio_gain" }
+      state:
+        "windows.{1:url_decode:key}.{2:url_decode:key}.toolbar.names": "{n}"
+        "windows.{1:url_decode:key}.{2:url_decode:key}.toolbar.safe_area": "{s}"
+        "windows.{1:url_decode:key}.{2:url_decode:key}.toolbar.center_cross": "{c}"
+        "windows.{1:url_decode:key}.{2:url_decode:key}.toolbar.vu_meter": "{v}"
+        "windows.{1:url_decode:key}.{2:url_decode:key}.toolbar.font_color": "{fc}"
+        "windows.{1:url_decode:key}.{2:url_decode:key}.toolbar.font_size": "{fs}"
+        "windows.{1:url_decode:key}.{2:url_decode:key}.toolbar.border": "{be}"
+        "windows.{1:url_decode:key}.{2:url_decode:key}.toolbar.border_color": "{bc}"
+        "windows.{1:url_decode:key}.{2:url_decode:key}.toolbar.audio_gain": "{g}"
+    - path: "^/api/v2/window/get_single_layout\\.json\\?pro_id=([^&]+)&win_id=([^&]+)&pos_id=(\\d+)$"
+      json_match: { "$.result": "^ok$" }
+      json: { n: "$.data.pattern_name", s: "$.data.safe_area", v: "$.data.vu_meter", c: "$.data.center_cross", e: "$.data.name_enable" }
+      state:
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{3}.name": "{n}"
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{3}.safe_area": "{s}"
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{3}.vu_meter": "{v}"
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{3}.center_cross": "{c}"
+        "panes.{1:url_decode:key}.{2:url_decode:key}.{3}.name_shown": "{e}"
+
+    # ── Layouts ─────────────────────────────────────────────────────────
+    - path: "^/api/v2/layout/list\\.json\\?pro_id=([^&]+)$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.layout_id", name: "$.name", count: "$.layout_count", used: "$.used", pos: "$.position" }
+      replace: "layouts.{1:url_decode:key}"
+      state:
+        "layouts.{1:url_decode:key}.{id:key}.name": "{name}"
+        "layouts.{1:url_decode:key}.{id:key}.pane_count": "{count}"
+        "layouts.{1:url_decode:key}.{id:key}.used": "{used}"
+        "layouts.{1:url_decode:key}.{id:key}.panes": "{pos}"
+    - path: "^/api/v2/layout/template\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.template_id", name: "$.name", count: "$.template_count", pos: "$.position" }
+      replace: layout_templates
+      state:
+        "layout_templates.{id:key}.name": "{name}"
+        "layout_templates.{id:key}.pane_count": "{count}"
+        "layout_templates.{id:key}.panes": "{pos}"
+
+    # ── Source discovery ────────────────────────────────────────────────
+    - path: "^/api/v2/source/list\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.disc_id", name: "$.disc_name" }
+      replace: discovery
+      state: { "discovery.{id:key}.name": "{name}" }
+      then_send: [{ method: GET, path: /api/v2/source/get_param.json, query: { disc_id: "{id}" } }]
+    - path: "^/api/v2/source/list\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data[*].sources"
+      json: { disc: "$^.disc_id", id: "$.id", name: "$.name", ip: "$.ip", url: "$.url", web: "$.web_url" }
+      state:
+        "discovery.{disc:key}.sources.{id:key}.name": "{name}"
+        "discovery.{disc:key}.sources.{id:key}.ip": "{ip}"
+        "discovery.{disc:key}.sources.{id:key}.url": "{url}"
+        "discovery.{disc:key}.sources.{id:key}.web_url": "{web}"
+    - path: "^/api/v2/source/get_param\\.json\\?disc_id=([^&]+)$"
+      json_match: { "$.result": "^ok$" }
+      json: { t: "$.data.disc_type", e: "$.data.discovery_enable", s: "$.data.discovery_ip", g: "$.data.group", i: "$.data.ip" }
+      state:
+        "discovery.{1:url_decode:key}.type": "{t}"
+        "discovery.{1:url_decode:key}.server_enabled": "{e}"
+        "discovery.{1:url_decode:key}.server_ip": "{s}"
+        "discovery.{1:url_decode:key}.groups": "{g}"
+        "discovery.{1:url_decode:key}.ips": "{i}"
+    - path: "^/api/discovery/scan/groupChecked\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { g: "$.data" }
+      state: { ndi_discovery.groups: "{g}" }
+    - path: "^/api/discovery/scan/getManualIps\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { i: "$.data" }
+      state: { ndi_discovery.manual_ips: "{i}" }
+
+    # ── Read-backs ──────────────────────────────────────────────────────
+    - path: "^/api/v2/program/(add|rername|remove|set_status|switch|set_param)\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/v2/program/list.json }]
+    - path: "^/api/v2/source/(add|modify|remove|refresh)\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/v2/source/list.json }]
+    - path: "^/api/discovery/scan/addManualIp\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/discovery/scan/groupChecked.json }
+        - { method: GET, path: /api/discovery/scan/getManualIps.json }
+    # Window writes: the program's windows are read again (and with them
+    # each window's panes, screen, output, NDI settings and toolbar).
+    - path: "^/api/v2/window/(add|set_param|remove|set_position|set_output_type|ndi/set_param|delete_sources|set_state_control|set_layout|reload_layout|remove_source|set_audio_type)\\.json$"
+      request_match: { "$.pro_id": "^(.+)$" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v2/window/list.json, query: { pro_id: "{2}" } }
+        - { method: GET, path: /api/v2/layout/list.json, query: { pro_id: "{2}" } }
+    - path: "^/api/v2/window/set_source\\.json$"
+      request_match: { "$.to.pro_id": "^(.+)$" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/v2/window/list.json, query: { pro_id: "{1}" } }]
+    - path: "^/api/v2/window/set_single_layout\\.json$"
+      request_match: { "$.pro_id": "^(.+)$", "$.win_id": "^(.+)$", "$.pos_id": "^(\\d+)$" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: POST, path: /api/v2/window/get_single_layout.json, query: { pro_id: "{1}", win_id: "{2}", pos_id: "{3}" } }
+        - { method: GET, path: /api/v2/window/get.json, query: { pro_id: "{1}", win_id: "{2}" } }
+    - path: "^/api/v2/layout/(add|rename|modify|remove|resave)\\.json$"
+      request_match: { "$.pro_id": "^(.+)$" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v2/layout/list.json, query: { pro_id: "{2}" } }
+        - { method: GET, path: /api/v2/window/list.json, query: { pro_id: "{2}" } }
+    - path: "^/api/v2/take/(set|set_params)\\.json$"
+      request_match: { "$.pro_id": "^(.+)$" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: POST, path: /api/v2/take/get.json, query: { pro_id: "{2}" } }
+        - { method: GET, path: /api/v2/window/list.json, query: { pro_id: "{2}" } }
+    - path: "^/api/v2/lang/modify\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/v2/config/general.json }]
