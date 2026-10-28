@@ -2560,6 +2560,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which column feedback name Millumin V5 sends (launchedColumn in the Feedback section, columnLaunched in the Summary), and whether launching a column also reports the previous one stopped. ([specs/millumin.yaml:678](specs/millumin.yaml#L678))
 - [ ] Confirm /millumin/info carries the original address (layer:Name/opacity, light:Name/intensity) as its first argument and the message's values after it, for every property read from it (the legacy example shows only selection), and that a setup can send only this form. ([specs/millumin.yaml:764](specs/millumin.yaml#L764))
 
+## mixingstation — Mixing Station desktop (OSC API)
+
+- [ ] A get on /con/v/<path> or /con/n/<path> is answered on the same address with the value as its one argument (the documentation shows the get but not its answer). ([specs/mixingstation.yaml:57](specs/mixingstation.yaml#L57))
+- [ ] After /hi/v, every parameter change arrives as /con/v/<path> with the value in the parameter's own OSC type (f, i, T/F or s); the documentation does not show the update messages. ([specs/mixingstation.yaml:139](specs/mixingstation.yaml#L139))
+- [ ] /hi/v resent every 4 seconds keeps the subscription alive, and Mixing Station answers to the address and port the subscription came from. ([specs/mixingstation.yaml:137](specs/mixingstation.yaml#L137))
+- [ ] An on/off parameter takes T or F (OSC's true and false); the documentation lists bool as a data type without naming its type tag. ([specs/mixingstation.yaml:91](specs/mixingstation.yaml#L91))
+
 ## modulopi-kinetic — Modulo Pi Modulo Kinetic
 
 - [ ] Confirm the websocket path (/ is used) and whether wss uses a self-signed certificate when SSL is on. ([specs/modulopi-kinetic.yaml:45](specs/modulopi-kinetic.yaml#L45))
