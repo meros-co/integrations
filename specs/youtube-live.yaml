@@ -215,11 +215,12 @@ models:
     supports: [list_broadcasts, get_broadcast, start_testing, go_live, complete_broadcast,
                bind_stream, unbind_stream, insert_ad_break, insert_broadcast, update_broadcast,
                delete_broadcast, list_streams, get_stream, insert_stream, update_stream,
-               delete_stream, get_live_details, list_chat_messages, send_chat_message,
+               delete_stream, get_live_details, list_chat_messages, list_chat_messages_after, send_chat_message,
                delete_chat_message, ban_chat_user, ban_chat_user_temporarily, unban_chat_user,
                get_video, update_video, update_video_snippet, update_video_status, set_thumbnail,
                list_video_categories,
                list_chat_moderators, add_chat_moderator, remove_chat_moderator, list_super_chat_events,
+               list_super_chat_events_page,
                create_chat_poll, close_chat_poll]
     verification: none
     notes: >
@@ -229,7 +230,7 @@ models:
 commands:
   # ── Broadcasts ───────────────────────────────────────────────────────────
   list_broadcasts:
-    summary: The channel's broadcasts with a lifecycle status, newest first (liveBroadcasts.list with broadcastStatus; 1 quota unit)
+    summary: The channel's broadcasts with a lifecycle status, newest first, every page (liveBroadcasts.list with broadcastStatus; 1 quota unit a page)
     params:
       broadcast_status: { type: enum, values: [active, upcoming, completed, all], default: active,
                           label: Status,
@@ -239,10 +240,11 @@ commands:
                         description: "event for scheduled broadcasts, persistent for the channel's default broadcast, all for both." }
       max_results: { type: int, min: 0, max: 50, default: 25,
                      label: Broadcasts per page,
-                     description: "How many broadcasts to return, from 0 to 50." }
+                     description: "How many broadcasts each page YouTube is asked for holds, from 0 to 50; every page is read." }
     send: { method: GET, path: /youtube/v3/liveBroadcasts,
             query: { part: "id,snippet,contentDetails,status", broadcastStatus: "{broadcast_status}",
-                     broadcastType: "{broadcast_type}", maxResults: "{max_results}" } }
+                     broadcastType: "{broadcast_type}", maxResults: "{max_results}" },
+            pages: &pages { items: "$.items", cursor: "$.nextPageToken", query: pageToken } }
     expect: { status: 200, json_path: "$.items" }
     returns: value
 
@@ -363,13 +365,13 @@ commands:
 
   # ── Streams ──────────────────────────────────────────────────────────────
   list_streams:
-    summary: The channel's streams with their status and health (liveStreams.list mine; 1 quota unit)
+    summary: The channel's streams with their status and health, every page (liveStreams.list mine; 1 quota unit a page)
     params:
       max_results: { type: int, min: 0, max: 50, default: 25,
                      label: Streams per page,
-                     description: "How many streams to return, from 0 to 50." }
+                     description: "How many streams each page YouTube is asked for holds, from 0 to 50; every page is read." }
     send: { method: GET, path: /youtube/v3/liveStreams,
-            query: { part: "id,snippet,cdn,status", mine: "true", maxResults: "{max_results}" } }
+            query: { part: "id,snippet,cdn,status", mine: "true", maxResults: "{max_results}" }, pages: *pages }
     expect: { status: 200, json_path: "$.items" }
     returns: value
 
@@ -435,6 +437,20 @@ commands:
                       description: "The chat's id, a broadcast's snippet.liveChatId." }
     send: { method: GET, path: /youtube/v3/liveChat/messages,
             query: { liveChatId: "{live_chat_id}", part: "id,snippet,authorDetails" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_chat_messages_after:
+    summary: A live chat's messages since an earlier reply, with the next nextPageToken and pollingIntervalMillis (liveChatMessages.list with pageToken; 5 quota units)
+    params:
+      live_chat_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 256, required: true,
+                      label: Live chat ID,
+                      description: "The chat's id, a broadcast's snippet.liveChatId." }
+      page_token: { type: string, pattern: "^[A-Za-z0-9_=-]+$", max_length: 1024, required: true,
+                    label: Page token,
+                    description: "The nextPageToken of the previous reply for this chat." }
+    send: { method: GET, path: /youtube/v3/liveChat/messages,
+            query: { liveChatId: "{live_chat_id}", part: "id,snippet,authorDetails", pageToken: "{page_token}" } }
     expect: { status: 200, json_path: "$" }
     returns: value
 
@@ -513,7 +529,7 @@ commands:
                       label: Live chat ID,
                       description: "The chat's id, a broadcast's snippet.liveChatId." }
     send: { method: GET, path: /youtube/v3/liveChat/moderators,
-            query: { liveChatId: "{live_chat_id}", part: "id,snippet", maxResults: "50" } }
+            query: { liveChatId: "{live_chat_id}", part: "id,snippet", maxResults: "50" }, pages: *pages }
     expect: { status: 200, json_path: "$.items" }
     returns: value
 
@@ -579,6 +595,20 @@ commands:
                      description: "How many events to return, 1 to 50." }
     send: { method: GET, path: /youtube/v3/superChatEvents, query: { part: snippet, maxResults: "{max_results}" } }
     expect: { status: 200, json_path: "$.items" }
+    returns: value
+
+  list_super_chat_events_page:
+    summary: The next page of Super Chats and Super Stickers after an earlier reply, with its nextPageToken, kept in state (superChatEvents.list with pageToken; 1 quota unit)
+    params:
+      max_results: { type: int, min: 1, max: 50, default: 50,
+                     label: Events,
+                     description: "How many events to return, 1 to 50." }
+      page_token: { type: string, pattern: "^[A-Za-z0-9_=-]+$", max_length: 1024, required: true,
+                    label: Page token,
+                    description: "The nextPageToken of the previous reply." }
+    send: { method: GET, path: /youtube/v3/superChatEvents,
+            query: { part: snippet, maxResults: "{max_results}", pageToken: "{page_token}" } }
+    expect: { status: 200, json_path: "$" }
     returns: value
 
   # ── The broadcast's video ────────────────────────────────────────────────
@@ -748,8 +778,8 @@ quirks:
       interval (health_updated is its time). The broadcast's stream is
       streams.<broadcasts.<id>.bound_stream_id>. concurrent_viewers is only
       reported while live and when the channel shows the count, and is not
-      cleared when it stops being reported. Only the channel's first 50
-      streams are polled. YouTube reports nothing it pushes; webhooks are
+      cleared when it stops being reported. Every stream of the channel is
+      polled, 50 a page. YouTube reports nothing it pushes; webhooks are
       not offered for live streaming.
 
   - models: [all]
@@ -763,10 +793,11 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Live chat is read with list_chat_messages, which the consumer polls at
-      the reply's pollingIntervalMillis (5 units each), passing nothing back:
-      the format has no page-token chaining, so each call returns the chat
-      from the start. YouTube's streaming liveChatMessages.streamList is a
+      Live chat is read with list_chat_messages (the chat from the start)
+      and then list_chat_messages_after, passing the last reply's
+      nextPageToken, which the consumer polls at the reply's
+      pollingIntervalMillis (5 units each) for the messages since. YouTube's
+      streaming liveChatMessages.streamList is a
       server-streamed gRPC-style call the core does not speak. Chat is not
       polled into state.
 
@@ -888,7 +919,7 @@ telemetry:
       - { method: GET, path: /youtube/v3/liveBroadcasts,
           query: { part: "id,snippet,contentDetails,status", id: "{settings.broadcast_id}" } }
       - { method: GET, path: /youtube/v3/liveStreams,
-          query: { part: "id,snippet,cdn,status", mine: "true", maxResults: "50" } }
+          query: { part: "id,snippet,cdn,status", mine: "true", maxResults: "50" }, pages: *pages }
       - { method: GET, path: /youtube/v3/videos,
           query: { part: "snippet,status,liveStreamingDetails,statistics", id: "{settings.broadcast_id}" } }
   updates:
@@ -953,12 +984,12 @@ telemetry:
         streams.{id}.ingestion_type: "{ingestion}"
         streams.{id}.resolution: "{resolution}"
         streams.{id}.frame_rate: "{frame_rate}"
-    # The poll's list of the channel's streams (mine, 50 a page) is the whole
-    # list when its total fits on the page: it then also replaces the streams
-    # (the rule above writes them), so a deleted stream leaves the state. A
-    # lookup by id, a smaller page or a longer list adds and removes nothing.
+    # The poll's list of the channel's streams (mine, 50 a page, every page
+    # joined) is the whole list: it also replaces the streams (the rule above
+    # writes them), so a deleted stream leaves the state. A lookup by id adds
+    # and removes nothing.
     - path: '^/youtube/v3/liveStreams\?part=[^&]*&mine=true&maxResults=50$'
-      json_match: { "$.pageInfo.totalResults": '^(?:[0-9]|[1-4][0-9]|50)$', "$.items": '^\[' }
+      json_match: { "$.items": '^\[' }
       json: {}
       replace: streams
     - path: '^/youtube/v3/videos\?'
@@ -1008,7 +1039,7 @@ telemetry:
       json: *video
       state: *video_state
 
-    # Chat moderators: a list of 50 or fewer is the whole list.
+    # Chat moderators: every page joined is the whole list.
     - path: '^/youtube/v3/liveChat/moderators\?'
       json_each: "$.items"
       json: { id: "$.id", chat: "$.snippet.liveChatId", channel: "$.snippet.moderatorDetails.channelId",
@@ -1018,7 +1049,7 @@ telemetry:
         chat_moderators.{id}.channel_id: "{channel}"
         chat_moderators.{id}.display_name: "{name}"
     - path: '^/youtube/v3/liveChat/moderators\?liveChatId=[^&]+&part=[^&]*&maxResults=50$'
-      json_match: { "$.pageInfo.totalResults": '^(?:[0-9]|[1-4][0-9]|50)$', "$.items": '^\[' }
+      json_match: { "$.items": '^\[' }
       json: {}
       replace: chat_moderators
     - path: '^/youtube/v3/liveChat/moderators\?part=snippet$'

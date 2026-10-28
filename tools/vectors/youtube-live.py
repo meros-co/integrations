@@ -104,6 +104,9 @@ _yt("get_live_details", {"video_id": "abcDEF12345"}, "GET",
 # Live chat.
 _yt("list_chat_messages", {"live_chat_id": "Cg0KC2FiY0RFRjEyMzQ1"}, "GET",
     "/youtube/v3/liveChat/messages?liveChatId=Cg0KC2FiY0RFRjEyMzQ1&part=id%2Csnippet%2CauthorDetails")
+_yt("list_chat_messages_after", {"live_chat_id": "Cg0KC2FiY0RFRjEyMzQ1", "page_token": "GO7GxdXV3_8CIJ_p"}, "GET",
+    "/youtube/v3/liveChat/messages?liveChatId=Cg0KC2FiY0RFRjEyMzQ1&part=id%2Csnippet%2CauthorDetails"
+    "&pageToken=GO7GxdXV3_8CIJ_p")
 _yt("send_chat_message", {"live_chat_id": "Cg0KC2FiY0RFRjEyMzQ1", "text": 'Welcome, "everyone"!'}, "POST",
     "/youtube/v3/liveChat/messages?part=snippet",
     body='{"snippet":{"liveChatId":"Cg0KC2FiY0RFRjEyMzQ1","type":"textMessageEvent",'
@@ -292,6 +295,8 @@ _SC = {"kind": "youtube#superChatEvent", "etag": "s1", "id": "SC-1",
                    "commentText": "Great sermon!", "createdAt": "2026-10-04T16:30:00Z", "amountMicros": "5000000",
                    "currency": "USD", "displayString": "$5.00", "messageType": 2, "isSuperStickerEvent": False}}
 _yt("list_super_chat_events", {}, "GET", "/youtube/v3/superChatEvents?part=snippet&maxResults=50")
+_yt("list_super_chat_events_page", {"page_token": "CAoQAA"}, "GET",
+    "/youtube/v3/superChatEvents?part=snippet&maxResults=50&pageToken=CAoQAA")
 telemetry(YT, "super-chats", settings=_YTS, inbound_http={
     "path": "/youtube/v3/superChatEvents?part=snippet&maxResults=50",
     "body": json.dumps({"kind": "youtube#superChatEventListResponse",
