@@ -318,6 +318,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that replies to polled getters come back compact or spaced as the poll rules read them, with strings escaped as JSON. ([specs/avstumpfl-pixera.yaml:6802](specs/avstumpfl-pixera.yaml#L6802))
 - [ ] Confirm what utility_run_js_script answers for a script that throws, and whether it is subject to the allowlist. ([specs/avstumpfl-pixera.yaml:6743](specs/avstumpfl-pixera.yaml#L6743))
 
+## axia-lwrp — Axia Livewire devices
+
+- [ ] Confirm that the client that makes a change also receives its indication (the specification says changes go to every client). ([specs/axia-lwrp.yaml:62](specs/axia-lwrp.yaml#L62))
+- [ ] Check what LOGIN without a password does on a device with a password (assumed: read-only, no error) before the password is sent. ([specs/axia-lwrp.yaml:78](specs/axia-lwrp.yaml#L78))
+- [ ] Confirm INGN is in tenths of a dB (the specification's text says "10dB units" while its example is -100) and record each node's gain range. ([specs/axia-lwrp.yaml:221](specs/axia-lwrp.yaml#L221))
+- [ ] Check that NCHN can be set on SRC and DST, and the channel counts each device accepts. ([specs/axia-lwrp.yaml:235](specs/axia-lwrp.yaml#L235))
+- [ ] Confirm that CFG GPO with only a port number is answered with its CFG GPO indication. ([specs/axia-lwrp.yaml:364](specs/axia-lwrp.yaml#L364))
+- [ ] Record the IP indication's layout (assumed keyword and value pairs as in the command). ([specs/axia-lwrp.yaml:529](specs/axia-lwrp.yaml#L529))
+- [ ] Record the xNode mixer's gain range and the MIX indication sent after a change (assumed the mix's whole point list). ([specs/axia-lwrp.yaml:402](specs/axia-lwrp.yaml#L402))
+- [ ] Record a VER indication from current xNodes, the IP-Audio Driver and a GPIO node (quoting of DEVN and SYSV, tags beyond 2.0.2). ([specs/axia-lwrp.yaml:513](specs/axia-lwrp.yaml#L513))
+
 ## aximmetry — Aximmetry Composer
 
 - [ ] Record the default HTTP Control port (21463 is the documents' example) and the editions that offer HTTP Control. ([specs/aximmetry.yaml:31](specs/aximmetry.yaml#L31))
