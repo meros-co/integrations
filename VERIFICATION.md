@@ -981,15 +981,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## boxcast — BoxCast
 
 - [ ] Confirm the client credentials grant (HTTP Basic client id and secret to auth.boxcast.com/oauth2/token, grant_type client_credentials) answers an access token, how long it lasts in steady use, and that an expired or revoked token answers 401 (not 403). ([specs/boxcast.yaml:66](specs/boxcast.yaml#L66))
-- [ ] Confirm JSON request bodies are accepted for every POST and PUT, and record the status Create calls answer (the reference shows 200 with the resource; uploads 201). ([specs/boxcast.yaml:227](specs/boxcast.yaml#L227))
+- [ ] Confirm JSON request bodies are accepted for every POST and PUT, and record the status Create calls answer (the reference shows 200 with the resource; uploads 201). ([specs/boxcast.yaml:228](specs/boxcast.yaml#L228))
 - [ ] Confirm the poll's search q=timeframe:preroll timeframe:current answers both kinds (space as OR) and that list items carry timeframe, which the reference's summary examples leave out. ([specs/boxcast.yaml:205](specs/boxcast.yaml#L205))
-- [ ] Confirm s=name and l=100 are accepted on the BoxCaster, channel and RTMP source lists, and record whether those lists page (X-Pagination) beyond a default size. ([specs/boxcast.yaml:437](specs/boxcast.yaml#L437))
-- [ ] Confirm stops_at now in Update a Broadcast ends a live broadcast at once (the now keyword is documented for Schedule a Broadcast only), and likewise starts_at now. ([specs/boxcast.yaml:331](specs/boxcast.yaml#L331))
-- [ ] Confirm DELETE of a broadcast, highlight and RTMP source answers 200 with an empty body (the state rules rely on it). ([specs/boxcast.yaml:1092](specs/boxcast.yaml#L1092))
-- [ ] Record whether broadcast answers include audio_source and recording_id (Get Broadcast Detail names recording_id only in the download guide). ([specs/boxcast.yaml:1068](specs/boxcast.yaml#L1068))
-- [ ] Confirm the download preparation takes audio_only as JSON and answers 201, and the download_status values (processing:N). ([specs/boxcast.yaml:413](specs/boxcast.yaml#L413))
-- [ ] Confirm /account/viewer_analytics/{id} serves broadcasts and channels alike with since, until and include_viewer_timeseries as query parameters (the reference's examples join them with &). ([specs/boxcast.yaml:742](specs/boxcast.yaml#L742))
-- [ ] Confirm Update a Channel takes description (not documented) and whether channel lists include description. ([specs/boxcast.yaml:852](specs/boxcast.yaml#L852))
+- [ ] Confirm s=name and l=100 are accepted on the BoxCaster, channel and RTMP source lists, and record whether those lists page (X-Pagination) beyond a default size. ([specs/boxcast.yaml:438](specs/boxcast.yaml#L438))
+- [ ] Confirm stops_at now in Update a Broadcast ends a live broadcast at once (the now keyword is documented for Schedule a Broadcast only), and likewise starts_at now. ([specs/boxcast.yaml:332](specs/boxcast.yaml#L332))
+- [ ] Confirm DELETE of a broadcast, highlight and RTMP source answers 200 with an empty body (the state rules rely on it). ([specs/boxcast.yaml:1094](specs/boxcast.yaml#L1094))
+- [ ] Record whether broadcast answers include audio_source and recording_id (Get Broadcast Detail names recording_id only in the download guide). ([specs/boxcast.yaml:1070](specs/boxcast.yaml#L1070))
+- [ ] Confirm the download preparation takes audio_only as JSON and answers 201, and the download_status values (processing:N). ([specs/boxcast.yaml:414](specs/boxcast.yaml#L414))
+- [ ] Confirm /account/viewer_analytics/{id} serves broadcasts and channels alike with since, until and include_viewer_timeseries as query parameters (the reference's examples join them with &). ([specs/boxcast.yaml:743](specs/boxcast.yaml#L743))
+- [ ] Confirm Update a Channel takes description (not documented) and whether channel lists include description. ([specs/boxcast.yaml:854](specs/boxcast.yaml#L854))
 
 ## brightsign-dws — BrightSign players (Local DWS)
 

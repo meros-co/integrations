@@ -45,7 +45,7 @@ _bx("list_broadcasts", {"page": 2}, "GET", "/account/broadcasts?p=2&l=20&s=-star
 _bx("search_broadcasts", {"query": "football +timeframe:current", "sort": "name"}, "GET",
     "/account/broadcasts?q=football%20%2Btimeframe%3Acurrent&p=0&l=20&s=name")
 _bx("list_live_broadcasts", {}, "GET",
-    "/account/broadcasts?q=timeframe%3Apreroll%20timeframe%3Acurrent&s=starts_at&l=100")
+    "/account/broadcasts?q=timeframe%3Apreroll%20timeframe%3Acurrent&s=starts_at&l=100&p=0")
 _bx("list_upcoming_broadcasts", {}, "GET", "/account/broadcasts?q=timeframe%3Afuture&s=starts_at&l=50")
 _bx("get_broadcast", {"broadcast_id": _BXB}, "GET", "/account/broadcasts/" + _BXB)
 _bx("schedule_broadcast", {"name": "Celtics vs Knicks", "boxcaster_id": "n9c4ebf123456",
@@ -98,7 +98,7 @@ _bx("prepare_recording_download", {"recording_id": "rec123", "audio_only": True}
 _bx("get_recording", {"recording_id": "rec123"}, "GET", "/account/recordings/rec123")
 
 # Channels.
-_bx("list_channels", {}, "GET", "/account/channels?s=name&l=100")
+_bx("list_channels", {}, "GET", "/account/channels?s=name&l=100&p=0")
 _bx("search_channels", {"query": "name:*Basketball*"}, "GET", "/account/channels?q=name%3A%2ABasketball%2A&s=name")
 _bx("get_channel", {"channel_id": _BXB}, "GET", "/account/channels/" + _BXB)
 _bx("create_channel", {"name": "Basketball Channel", "description": ""}, "POST", "/account/channels",
@@ -119,7 +119,7 @@ _bx("list_channel_broadcasts", {"channel_id": _BXCH}, "GET", "/account/channels/
 
 # Highlights.
 _BXHL = "/account/broadcasts/" + _BXB + "/highlights"
-_bx("list_highlights", {"broadcast_id": _BXB}, "GET", _BXHL + "?l=100")
+_bx("list_highlights", {"broadcast_id": _BXB}, "GET", _BXHL + "?l=100&p=0")
 _bx("get_highlight", {"broadcast_id": _BXB, "highlight_id": _BXH}, "GET", _BXHL + "/" + _BXH)
 _bx("create_highlight", {"broadcast_id": _BXB, "name": "Tip-off", "description": "", "start_seconds": 120,
                          "stop_seconds": 140},
@@ -142,7 +142,7 @@ _bx("get_highlight_download", {"highlight_id": _BXH}, "GET", "/account/highlight
 # RTMP sources.
 _BXRTMP = {"id": _BXR, "name": "Wirecast", "description": "Production booth Wirecast computer",
            "server_url": "rtmps://rtmp.boxcast.com/live", "stream_key": "Qid9aksdhlk9eiSKNd"}
-_bx("list_rtmp_sources", {}, "GET", "/account/static_rtmps?s=name&l=100")
+_bx("list_rtmp_sources", {}, "GET", "/account/static_rtmps?s=name&l=100&p=0")
 _bx("get_rtmp_source", {"rtmp_source_id": _BXR}, "GET", "/account/static_rtmps/" + _BXR)
 _bx("get_rtmp_ingest", {"rtmp_source_id": _BXR}, "GET", "/account/static_rtmps/" + _BXR,
     http_reply={"status": 200, "body": json.dumps(_BXRTMP)},
@@ -225,7 +225,7 @@ _BXLIVESTATE = {"name": "Hockey Game vs St. Marks (Audio Only)", "channel_id": "
                 "poster": "https://assets.boxcast.com/latest/static/audio-only.png",
                 "total_active_viewer_count": 12, "total_minutes_viewed": 340.0, "total_view_count": 40}
 telemetry(BX, "on-air", settings=_BXS, inbound_http={
-    "path": "/account/broadcasts?q=timeframe%3Apreroll%20timeframe%3Acurrent&s=starts_at&l=100",
+    "path": "/account/broadcasts?q=timeframe%3Apreroll%20timeframe%3Acurrent&s=starts_at&l=100&p=0",
     "body": json.dumps([_BXLIVE])},
     # A broadcast that ended leaves the on-air list, not broadcasts.
     state_before={"on_air": {"old": {"name": "Earlier", "timeframe": "current"}}},
@@ -244,7 +244,7 @@ telemetry(BX, "broadcast-deleted", settings=_BXS,
           inbound_http={"path": "/account/broadcasts/" + _BXB, "body": ""},
           state_before={"broadcasts": {_BXB: {"name": "Celtics vs Knicks"}}, "on_air": {_BXB: {"name": "Celtics vs Knicks"}}},
           expect_state={"broadcasts": {}, "on_air": {}})
-telemetry(BX, "highlights", settings=_BXS, inbound_http={"path": _BXHL + "?l=100", "body": json.dumps([
+telemetry(BX, "highlights", settings=_BXS, inbound_http={"path": _BXHL + "?l=100&p=0", "body": json.dumps([
     {"id": _BXH, "name": "Tip-off Won By Knicks", "broadcast_id": _BXB, "description": "Way to start the game!",
      "duration": 20, "start_seconds": 120, "stop_seconds": 140}])},
     expect_state={"broadcasts": {_BXB: {"highlights": {_BXH: {
@@ -260,13 +260,13 @@ telemetry(BX, "highlight-download", settings=_BXS, inbound_http={"path": "/accou
      "download_url": "https://example.com/h.mp4"})},
     expect_state={"highlight_downloads": {_BXH: {"download_status": "ready", "download_url": "https://example.com/h.mp4",
                                                  "audio_download_status": "", "audio_download_url": ""}}})
-telemetry(BX, "channels", settings=_BXS, inbound_http={"path": "/account/channels?s=name&l=100", "body": json.dumps([
+telemetry(BX, "channels", settings=_BXS, inbound_http={"path": "/account/channels?s=name&l=100&p=0", "body": json.dumps([
     {"id": _BXB, "name": "Basketball Channel", "channel_id": "2016-basketball-season", "is_ticketed": True,
      "ticket_price": 24.95, "free_variant": ""}])},
     expect_state={"channels": {_BXB: {"name": "Basketball Channel", "channel_id": "2016-basketball-season",
                                       "is_ticketed": True, "ticket_price": 24.95, "free_variant": ""}}})
 telemetry(BX, "rtmp-sources", settings=_BXS,
-          inbound_http={"path": "/account/static_rtmps?s=name&l=100", "body": json.dumps([_BXRTMP])},
+          inbound_http={"path": "/account/static_rtmps?s=name&l=100&p=0", "body": json.dumps([_BXRTMP])},
           expect_state={"rtmp_sources": {_BXR: {"name": "Wirecast", "description": "Production booth Wirecast computer",
                                                 "server_url": "rtmps://rtmp.boxcast.com/live"}}})
 telemetry(BX, "uploads", settings=_BXS,

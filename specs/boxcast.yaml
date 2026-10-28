@@ -203,7 +203,8 @@ commands:
   list_live_broadcasts:
     summary: The broadcasts preparing to go live or live now (List Broadcasts, q timeframe:preroll timeframe:current)
     send: &live_poll { method: GET, path: /account/broadcasts,
-                       query: { q: "timeframe:preroll timeframe:current", s: starts_at, l: "100" } }
+                       query: { q: "timeframe:preroll timeframe:current", s: starts_at, l: "100", p: "0" },
+                       pages: &pages { items: "$", page: p, size: l, total: { header: X-Pagination, json: "$.total" } } }
     expect: { status: 200, json_path: "$" }
     returns: value
 
@@ -434,7 +435,7 @@ commands:
   # ── Channels ─────────────────────────────────────────────────────────────
   list_channels:
     summary: Every channel on the account with its ticketing (List Channels)
-    send: &channels_poll { method: GET, path: /account/channels, query: { s: name, l: "100" } }
+    send: &channels_poll { method: GET, path: /account/channels, query: { s: name, l: "100", p: "0" }, pages: *pages }
     expect: { status: 200, json_path: "$" }
     returns: value
 
@@ -524,7 +525,7 @@ commands:
     summary: A broadcast's highlights, kept in state (List Highlights)
     params:
       broadcast_id: *broadcast_id
-    send: { method: GET, path: "/account/broadcasts/{broadcast_id}/highlights", query: { l: "100" } }
+    send: { method: GET, path: "/account/broadcasts/{broadcast_id}/highlights", query: { l: "100", p: "0" }, pages: *pages }
     expect: { status: 200, json_path: "$" }
     returns: value
 
@@ -623,7 +624,7 @@ commands:
   # ── RTMP sources ─────────────────────────────────────────────────────────
   list_rtmp_sources:
     summary: The account's RTMP sources (encoders streaming into BoxCast); they include stream keys, so the value is never kept or logged (List RTMP Sources)
-    send: &rtmp_poll { method: GET, path: /account/static_rtmps, query: { s: name, l: "100" } }
+    send: &rtmp_poll { method: GET, path: /account/static_rtmps, query: { s: name, l: "100", p: "0" }, pages: *pages }
     expect: { status: 200, json_path: "$" }
     returns: value
 
@@ -801,9 +802,10 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      List polls ask for 100 channels and RTMP sources, which BoxCast
-      pages: an account with more keeps only the first 100 in state (the
-      commands page through the rest). Lists answer summary fields only:
+      The on-air, channel, RTMP source and highlight lists are read whole:
+      100 a page, each page asked for in turn (p) until the X-Pagination
+      total has arrived or a page is short, and joined. The upcoming list
+      is the next 50, and searches page with page. Lists answer summary fields only:
       a broadcast's description, channels and recording id come from
       get_broadcast. Unset times read 9999-12-31T23:59:59Z and unset text
       reads empty, never null.
@@ -1134,7 +1136,7 @@ telemetry:
         highlight_downloads.{1}.audio_download_url: "{audio_url}"
 
     # Channels: the poll's list is whole; one is read, made or changed.
-    - path: "^/account/channels\\?s=name&l=100$"
+    - path: "^/account/channels\\?s=name&l=100&p=0$"
       json_each: "$"
       replace: channels
       json: &channel { id: "$.id", name: "$.name", slug: "$.channel_id", description: "$.description",
@@ -1156,7 +1158,7 @@ telemetry:
       state: *channel_state
 
     # RTMP sources: the stream key is never kept.
-    - path: "^/account/static_rtmps\\?s=name&l=100$"
+    - path: "^/account/static_rtmps\\?s=name&l=100&p=0$"
       json_each: "$"
       replace: rtmp_sources
       json: &rtmp { id: "$.id", name: "$.name", description: "$.description", server: "$.server_url" }
