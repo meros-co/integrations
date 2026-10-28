@@ -450,3 +450,71 @@ fn no_token_is_asked_for_commands_only() {
         .all(|(_, url)| !url.contains("ws_authorization")));
     assert!(push_opened(&a).is_none());
 }
+
+const SESSION_PUSH_SPEC: &str = r##"
+spec: 1
+id: session-push-test
+name: Session push test
+vendor: Test
+category: lighting
+source: [{ title: test }]
+transport:
+  type: http
+  port: 80
+  timeout_ms: 1000
+  session:
+    when_set: username
+    login: { method: POST, path: /authenticate, body: "{settings.username}" }
+    capture: { cookie: token }
+settings:
+  username: { type: string, label: User, description: x }
+ports:
+  - { port: 80, protocol: http, role: control }
+  - { port: 80, protocol: ws, role: push }
+models: [{ id: m, name: M, supports: [], verification: none }]
+commands: {}
+state:
+  level: { type: int, description: x }
+telemetry:
+  websocket:
+    path: /query
+    send:
+      - { unless_set: username, message: '{"subscribe":"scene"}' }
+      - { when_set: username, message: '{"subscribe":"scene","token":{session.id:json}}' }
+    every_ms: 10000
+  poll: { every_ms: 2000, send: [{ method: GET, path: /api/scene }] }
+  updates: []
+"##;
+
+#[test]
+fn push_messages_follow_a_setting_and_wait_for_the_session() {
+    // No user: the message without a token.
+    let mut e = open_yaml(SESSION_PUSH_SPEC, json!({}), true);
+    at(0, |cx| e.start(cx));
+    let a = at(1, |cx| e.ws(cx, PUSH, WsInput::Opened));
+    assert_eq!(ws_sent(&a, PUSH), [r#"{"subscribe":"scene"}"#]);
+
+    // A user: the message waits for the session, then carries its token.
+    let mut e = open_yaml(SESSION_PUSH_SPEC, json!({"username": "op"}), true);
+    let a = at(0, |cx| e.start(cx));
+    let login = http_requests(&a);
+    assert!(login[0].1.ends_with("/authenticate"));
+    let a = at(1, |cx| e.ws(cx, PUSH, WsInput::Opened));
+    assert!(ws_sent(&a, PUSH).is_empty());
+    at(2, |cx| {
+        e.http_response(
+            cx,
+            login[0].0,
+            Ok(HttpResponse {
+                status: 200,
+                headers: vec![("set-cookie".into(), "token=abc; Path=/".into())],
+                body: Vec::new(),
+            }),
+        )
+    });
+    let a = at(10_001, |cx| e.timer(cx, PUSH_RENEW));
+    assert_eq!(
+        ws_sent(&a, PUSH),
+        [r#"{"subscribe":"scene","token":"abc"}"#]
+    );
+}

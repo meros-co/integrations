@@ -4417,8 +4417,33 @@ impl SpecEngine {
         // `{token}`: the token the websocket was opened with, if any.
         let (token, token_specs) = self.token_params();
         let values = self.values(&token, &token_specs);
+        let set = |name: &str| {
+            self.settings.get(name).is_some_and(|v| {
+                !v.is_null() && v.as_str() != Some("") && v.as_bool() != Some(false)
+            })
+        };
         for item in items {
-            match item.as_str().map(|t| render(t, &values, no_escape)) {
+            // `{message, when_set}` or `{message, unless_set}`: sent only
+            // while the setting is set, or is not (Pharos takes the session's
+            // token in each message only with security enabled).
+            let text = match &item {
+                Value::Object(o) => {
+                    let when = o.get("when_set").and_then(Value::as_str);
+                    let unless = o.get("unless_set").and_then(Value::as_str);
+                    if when.is_some_and(|w| !set(w)) || unless.is_some_and(set) {
+                        continue;
+                    }
+                    o.get("message").and_then(Value::as_str)
+                }
+                other => other.as_str(),
+            };
+            // A message naming the session waits for one: it goes at the
+            // next renewal once the session is held.
+            if text.is_some_and(|t| t.contains("{session.id")) && self.session_value.is_none() {
+                cx.log(Level::Debug, "websocket message held: no session yet");
+                continue;
+            }
+            match text.map(|t| render(t, &values, no_escape)) {
                 Some(Ok(text)) => cx.ws_send(PUSH, format!("{prefix}{text}")),
                 Some(Err(e)) => cx.log(Level::Warning, format!("websocket message not sent: {e}")),
                 None => cx.log(Level::Warning, "a websocket message must be a string"),

@@ -2556,6 +2556,19 @@ model is named once.
 that long, for a service that sends keepalives, where silence means a dead
 connection.
 
+A `send` item may be an object, `{message, when_set}` or `{message,
+unless_set}`, sent only while the setting named is set, or is not. A message
+may name the session held (`{session.id}`, §2, Sessions); while there is none
+yet it is not sent, and goes at the next `every_ms` round. A Pharos controller
+with security enabled wants its session's token in each message:
+
+```yaml
+    send:
+      - { unless_set: username, message: '{"subscribe":"scene"}' }
+      - { when_set: username, message: '{"subscribe":"scene","token":{session.id:json}}' }
+    every_ms: 10000
+```
+
 `every_ms` sends the `send` items again at that interval while the websocket
 is open: a keepalive a device requires of a client (mimoLive closes a socket
 that sends nothing for 15 seconds), or a request a device answers with its

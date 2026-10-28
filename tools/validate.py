@@ -557,8 +557,16 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                         errors.append("telemetry.websocket.token.match needs a group holding the token")
                 except re.error as e:
                     errors.append(f"telemetry.websocket.token.match: {e}")
-        for i, text in enumerate(websocket.get("send", []) if isinstance(websocket.get("send"), list)
+        for i, item in enumerate(websocket.get("send", []) if isinstance(websocket.get("send"), list)
                                  else [websocket.get("send")] if websocket.get("send") else []):
+            # An object: its message, sent while a setting is set (or not).
+            text = item.get("message", "") if isinstance(item, dict) else item
+            if isinstance(item, dict):
+                for key in ("when_set", "unless_set"):
+                    if key in item and item[key] not in settings:
+                        errors.append(f"telemetry.websocket.send[{i}].{key}: unknown setting '{item[key]}'")
+            if "{session.id" in text and not transport.get("session"):
+                errors.append(f"telemetry.websocket.send[{i}]: {{session.id}} needs transport.session")
             errors += check_template("text", text, token_param, settings, f"telemetry.websocket.send[{i}]")
     auth = transport.get("auth")
     methods = set() if isinstance(auth, dict) else {auth}
