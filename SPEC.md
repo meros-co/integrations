@@ -830,7 +830,10 @@ host name the device was opened with, so TLS checks the certificate against
 it), on the endpoint's port and scheme. `scheme` defaults to the transport's,
 and `accept_invalid_certs` is the transport's. `port` is a number or an
 integer setting; the port given when opening the device changes only the
-transport's own port, never an endpoint's. With `auth: inherit` (the default)
+transport's own port, never an endpoint's. A port setting left empty (one
+with no default, not given) means the transport's own port, for a device
+that may serve the second API on the same server or on another (an NMOS
+Node's Connection API). With `auth: inherit` (the default)
 the transport's credential (`auth`, its Digest answer, an OAuth token and its
 refresh) and `headers` go with each request, and a refusal of them is the
 terminal refusal above, as on the transport's port: it is the same credential.

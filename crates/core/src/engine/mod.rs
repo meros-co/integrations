@@ -226,6 +226,7 @@ fn endpoints_of(
     scheme: &str,
     accept_invalid_certs: bool,
     http: bool,
+    main_port: u16,
 ) -> Result<BTreeMap<String, Endpoint>, String> {
     let Some(map) = t.get("endpoints") else {
         return Ok(BTreeMap::new());
@@ -249,7 +250,12 @@ fn endpoints_of(
                 let setting = o.get("setting").and_then(Value::as_str).ok_or(format!(
                     "transport.endpoints.{name}.port is a port or {{setting: name}}"
                 ))?;
-                settings.get(setting).and_then(Value::as_u64)
+                // A setting left empty means the transport's own port: a
+                // device that may serve the second API on the same server.
+                match settings.get(setting) {
+                    None | Some(Value::Null) => Some(u64::from(main_port)),
+                    Some(v) => v.as_u64(),
+                }
             }
             Some(v) => v.as_u64(),
             None => return Err(format!("transport.endpoints.{name} has no port")),
@@ -1747,9 +1753,10 @@ impl SpecEngine {
                     scheme,
                     *accept_invalid_certs,
                     true,
+                    port,
                 )?
             }
-            _ => endpoints_of(&t, &ctx.settings, &url_host(&ctx), "http", false, false)?,
+            _ => endpoints_of(&t, &ctx.settings, &url_host(&ctx), "http", false, false, port)?,
         };
         let keepalive = keepalive_of(&t, &transport)?;
         // A list of probes, each for some models: the first for this one.
@@ -8268,6 +8275,35 @@ state:
         e.http_response(&mut cx, rid, answer("{}", None));
         let (_, request) = requests(&cx.take()).remove(0);
         assert!(header(&request, "Authorization").is_some());
+    }
+
+    #[test]
+    fn an_endpoint_whose_port_setting_is_empty_uses_the_transports_port() {
+        // The same device, with no default for the endpoint's port.
+        let yaml = ENDPOINTS.replace(
+            "media_port: { type: int, min: 1, max: 65535, default: 9996 }",
+            "media_port: { type: int, min: 1, max: 65535 }",
+        );
+        let spec: DeviceSpec = crate::yaml::from_str(&yaml).unwrap();
+        let settings = crate::catalog::validate(&spec.settings, &Map::new()).unwrap();
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: Some(19997),
+                model: "m".into(),
+                channels: None,
+                settings,
+                monitor: false,
+            },
+        )
+        .unwrap();
+        endpoints_connected(&mut e);
+        let mut cx = Cx::new(2);
+        e.command(&mut cx, 1, "list", &Params::new());
+        let (_, request) = requests(&cx.take()).remove(0);
+        assert_eq!(request.url, "http://127.0.0.1:19997/list?path=cam1");
     }
 
     #[test]
