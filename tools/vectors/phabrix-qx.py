@@ -21,7 +21,7 @@ def _qx(command, input, method, target, body=None, **extra):
 _qx("browse", {"path": "v1"}, "GET", "/api/v1",
     http_reply={"status": 200, "body": '{"analyser":{},"generator":{}}'},
     expect_result={"ok": {"kind": "value", "value": {"analyser": {}, "generator": {}}}})
-_qx("get_analyser_status", {}, "GET", "/api/v1/analyser/status")
+_qx("get_analyzer_status", {}, "GET", "/api/v1/analyser/status")
 _qx("get_crc_summary", {}, "GET", "/api/v1/analyser/crcSummary")
 _qx("get_generator_status", {}, "GET", "/api/v1/generator/status")
 _qx("get_generator_standards", {}, "GET", "/api/v1/generator/standards")
@@ -58,7 +58,7 @@ for suffix, base in (("", "/api/v1/ipReceive"), ("_2110", "/api/v1/2110/receive"
     _qx("request_multicast" + suffix, {"address": "230.0.0.15"}, "PUT", base + "/multicastRequests",
         '{"action":"request","destinationIpAddress":"230.0.0.15"}')
     _qx("get_media_streams" + suffix, {}, "GET", base + "/mediaStreams")
-    _qx("analyse_media_stream" + suffix, _STREAM, "PUT", base + "/mediaStreams", _STREAM_BODY)
+    _qx("analyze_media_stream" + suffix, _STREAM, "PUT", base + "/mediaStreams", _STREAM_BODY)
     _qx("get_requested_media_streams" + suffix, {}, "GET", base + "/requestedMediaStreams")
     _qx("clear_media_streams" + suffix, {}, "PUT", base + "/mediaStreams", '{"action":"clearList"}')
 
@@ -70,8 +70,8 @@ def _tel(name, path, body, expect_state):
 
 
 _A = {"standard": "1920x1080p60"}
-_tel("analyser-status", "/api/v1/analyser/status", _A, {"analyser": {"status": '{"standard":"1920x1080p60"}'}})
-_tel("crc-summary", "/api/v1/analyser/crcSummary", {"errors": 0}, {"analyser": {"crc_summary": '{"errors":0}'}})
+_tel("analyser-status", "/api/v1/analyser/status", _A, {"analyzer": {"status": '{"standard":"1920x1080p60"}'}})
+_tel("crc-summary", "/api/v1/analyser/crcSummary", {"errors": 0}, {"analyzer": {"crc_summary": '{"errors":0}'}})
 _tel("generator-status", "/api/v1/generator/status", _A, {"generator": {"status": '{"standard":"1920x1080p60"}'}})
 _tel("generator-audio", "/api/v1/generator/audio", {"mode": "Fixed Tone"},
      {"generator": {"audio": '{"mode":"Fixed Tone"}'}})
