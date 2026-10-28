@@ -1452,7 +1452,7 @@ state:
   cloud.platforms.*.registration: { type: string, description: "Cloud slot: registration accepted, refused, waiting or deleted" }
   cloud.platforms.*.connection: { type: string, description: "Cloud slot: online, offline or initial" }
 
-  # get-media-files (the first 100 files of each storage).
+  # get-media-files (every file of each storage, 100 a page).
   media.*.path:             { type: string, description: "Folder of the recordings (usb or sd) on the device" }
   media.*.thumbnail_dir:    { type: string, description: "Thumbnail subfolder, under that folder" }
   media.*.files.*.thumbnail: { type: string, description: "The recording's thumbnail name (a .jpg)" }
@@ -1483,8 +1483,9 @@ telemetry:
         - { models: [ultra-stream-hdmi], method: GET, path: /usapi, query: { method: get-edid-config } }
         - { models: [ultra-stream-hdmi], method: GET, path: /usapi, query: { method: get-loop-through-edid } }
         - { endpoint: cloud, method: GET, path: /cloud-api, query: { method: cloud-status, version: "1" } }
-        - { method: GET, path: /usapi, query: { method: get-media-files, disk-type: "0", start: "0", count: "100" } }
-        - { method: GET, path: /usapi, query: { method: get-media-files, disk-type: "1", start: "0", count: "100" } }
+        - { method: GET, path: /usapi, query: { method: get-media-files, disk-type: "0", start: "0", count: "100" },
+            pages: &files_pages { items: "$.media-files", offset: start, size: count } }
+        - { method: GET, path: /usapi, query: { method: get-media-files, disk-type: "1", start: "0", count: "100" }, pages: *files_pages }
   updates:
     # The status mask, from get-status and ping (Device Status Mask).
     - path: "^/usapi\\?method=(get-status|ping)$"
@@ -2266,7 +2267,7 @@ telemetry:
       json_match: { "$.result": "^0$" }
       json: {}
       then_send:
-        - { method: GET, path: /usapi, query: { method: get-media-files, disk-type: "{1}", start: "0", count: "100" } }
+        - { method: GET, path: /usapi, query: { method: get-media-files, disk-type: "{1}", start: "0", count: "100" }, pages: *files_pages }
         - { method: GET, path: /usapi, query: { method: get-status } }
 
 quirks:
@@ -2360,8 +2361,8 @@ quirks:
       document only their result, so get_signal_info and get_upload_status
       return the reply unread; get-status's send-file object gives the
       upload progress. The recording list kept in state is each storage's
-      first 100 files; get_media_files reads further pages, which are added
-      to it. The document's examples of the JSON bodies of del-media-files,
+      whole list, read 100 files at a time (start on by each page) until a
+      page holds fewer; get_media_files reads one page. The document's examples of the JSON bodies of del-media-files,
       send-file-add and send-file-del leave the keys unquoted; the core
       sends standard JSON.
 
