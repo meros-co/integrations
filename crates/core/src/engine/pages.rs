@@ -330,6 +330,11 @@ impl Paging {
         on_page: u64,
     ) -> Option<String> {
         let p = self.pages.clone();
+        // A page with no items is the end, whatever links it gives (an NMOS
+        // registry's oldest page still links to an earlier one).
+        if on_page == 0 {
+            return None;
+        }
         if let Some(more) = &p.more {
             text(more.read(response, body))?;
         }
@@ -363,16 +368,10 @@ impl Paging {
                 with_query(&self.url, query, &text(source.read(response, body))?)
             }
             Next::Page(query) => {
-                if on_page == 0 {
-                    return None;
-                }
                 let n: i64 = query_value(&self.url, query)?.parse().ok()?;
                 with_query(&self.url, query, &(n + 1).to_string())
             }
             Next::Offset(query) => {
-                if on_page == 0 {
-                    return None;
-                }
                 let n: u64 = query_value(&self.url, query).map_or(Some(0), |v| v.parse().ok())?;
                 with_query(&self.url, query, &(n + on_page).to_string())
             }

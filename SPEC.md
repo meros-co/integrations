@@ -1772,8 +1772,9 @@ named by one of:
 | `offset` | The query parameter counting items skipped: on by each page's items, from the first request's value (0 when it has none) |
 
 The list ends when the next page's link or cursor is absent, null, `false`
-or empty; when a `page` or `offset` page holds no items; when a page names
-one already read; or at the first of these, each optional:
+or empty; when a page holds no items (an NMOS registry links its oldest
+page to an earlier, empty one); when a page names one already read; or at
+the first of these, each optional:
 
 - `more`: go on only while this value is present and not false, null or
   empty (`$.has_more`, or the next link where the cursor is elsewhere).
