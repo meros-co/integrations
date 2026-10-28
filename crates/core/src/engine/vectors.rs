@@ -60,6 +60,9 @@ enum Wire {
         /// The request's Content-Type; compared only when the vector gives
         /// one.
         content_type: Option<String>,
+        /// Headers by lowercase name: all the request's, or in a vector those
+        /// it must carry (computed credentials, SPEC.md §2).
+        headers: Vec<(String, String)>,
     },
 }
 
@@ -76,6 +79,7 @@ impl PartialEq for Wire {
                     target,
                     body,
                     content_type,
+                    headers,
                 },
                 Wire::Http {
                     method: m,
@@ -83,6 +87,7 @@ impl PartialEq for Wire {
                     target: t,
                     body: b,
                     content_type: c,
+                    headers: h,
                 },
             ) => {
                 method == m
@@ -90,6 +95,7 @@ impl PartialEq for Wire {
                     && target == t
                     && body == b
                     && (c.is_none() || content_type == c)
+                    && h.iter().all(|want| headers.contains(want))
             }
             _ => false,
         }
@@ -158,6 +164,11 @@ fn wire(actions: &[Action]) -> Vec<Wire> {
                         .iter()
                         .find(|(k, _)| k.eq_ignore_ascii_case("content-type"))
                         .map(|(_, v)| v.clone()),
+                    headers: request
+                        .headers
+                        .iter()
+                        .map(|(k, v)| (k.to_ascii_lowercase(), v.clone()))
+                        .collect(),
                 })
             }
             _ => None,
@@ -219,6 +230,15 @@ fn expected_wire(v: &Value, main_port: u16) -> Option<Vec<Wire>> {
                         .get("content_type")
                         .and_then(Value::as_str)
                         .map(String::from),
+                    headers: r
+                        .get("headers")
+                        .and_then(Value::as_object)
+                        .into_iter()
+                        .flatten()
+                        .map(|(k, v)| {
+                            (k.to_ascii_lowercase(), v.as_str().unwrap_or("").to_string())
+                        })
+                        .collect(),
                 })
                 .collect(),
         );
@@ -532,6 +552,9 @@ fn answer_internal(engine: &mut SpecEngine, cx: &mut Cx, success: &[u8]) {
 }
 
 fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
+    // Random values a request carries (a salt, a nonce) are drawn from a
+    // counter from 0, so a vector can state them.
+    super::sign::fix_random(Some(0));
     let text = std::fs::read_to_string(path).unwrap();
     let v: Value = crate::yaml::from_str(&text).map_err(|e| format!("parse: {e}"))?;
     if [
@@ -821,6 +844,8 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     }
     cx.take();
 
+    // The command's own random values start from the counter's 0 too.
+    super::sign::fix_random(Some(0));
     let mut cx = Cx::new(2);
     engine.command(&mut cx, 1, command, &params);
     let actions = cx.take();

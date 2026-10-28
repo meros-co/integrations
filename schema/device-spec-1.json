@@ -876,7 +876,7 @@
               "description": "Over wss, accept a certificate that does not chain to a trusted root, such as a device's self-signed one. The connection is encrypted; the device is not authenticated. Defaults to the http transport's accept_invalid_certs."
             },
             "send": {
-              "description": "Text messages (templates over settings) sent each time the websocket opens: the subscriptions.",
+              "description": "Text messages (templates over settings) sent each time the websocket opens: the subscriptions. One naming {session.id} goes only while the session is in use, once it is held; {message, session: false} only while it is not.",
               "oneOf": [
                 {
                   "type": "string"
@@ -884,7 +884,27 @@
                 {
                   "type": "array",
                   "items": {
-                    "type": "string"
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "message"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "message": {
+                            "type": "string"
+                          },
+                          "session": {
+                            "const": false,
+                            "description": "Sent only while the session is not in use."
+                          }
+                        }
+                      }
+                    ]
                   }
                 }
               ]
@@ -1992,7 +2012,7 @@
               }
             },
             "auth": {
-              "description": "The credential sent: a method, or {setting: name} naming an enum setting whose values are methods, for a service taking more than one kind of credential.",
+              "description": "The credential sent: a method, or {setting: name} naming an enum setting whose values are methods, for a service taking more than one kind of credential. wsse puts a WS-Security UsernameToken with a password digest in each SOAP envelope; aws-sigv4 signs each request with AWS Signature Version 4 (transport.aws).",
               "oneOf": [
                 {
                   "enum": [
@@ -2002,7 +2022,9 @@
                     "bearer",
                     "header",
                     "query-token",
-                    "oauth2"
+                    "oauth2",
+                    "wsse",
+                    "aws-sigv4"
                   ]
                 },
                 {
@@ -2149,7 +2171,7 @@
                   ]
                 },
                 "capture": {
-                  "description": "What of the login's answer is the session: {cookie: name} the named Set-Cookie, or every one with \"*\" (the default), sent back as Cookie; {header: name} a response header, sent back in a header of that name; {json: path, header: name, scheme} a string at that JSON path of the answer's body, sent back in the header named, after the scheme and a space when one is given.",
+                  "description": "What of the login's answer is the session: {cookie: name} the named Set-Cookie, or every one with \"*\" (the default), sent back as Cookie; {header: name} a response header, sent back in a header of that name; {json: path, header: name, scheme} a string at that JSON path of the answer's body, sent back in the header named, after the scheme and a space when one is given; {json: path} alone sends the string only where a template names {session.id} (a header of transport.headers, a body, a push websocket message).",
                   "oneOf": [
                     {
                       "type": "object",
@@ -2181,8 +2203,7 @@
                       "type": "object",
                       "additionalProperties": false,
                       "required": [
-                        "json",
-                        "header"
+                        "json"
                       ],
                       "properties": {
                         "json": {
@@ -2197,10 +2218,27 @@
                           "type": "string",
                           "pattern": "^[A-Za-z0-9._-]+$",
                           "description": "Sent before the string and a space: Bearer sends Authorization: Bearer <token>."
+                        },
+                        "values": {
+                          "type": "object",
+                          "description": "More strings of the login's answer, each named here by a JSON path and sent where a template names {session.<name>} (a session ID beside a token).",
+                          "propertyNames": {
+                            "pattern": "^[a-z0-9_]+$",
+                            "not": { "const": "id" }
+                          },
+                          "additionalProperties": {
+                            "type": "string",
+                            "pattern": "^\\$"
+                          }
                         }
                       }
                     }
                   ]
+                },
+                "renew": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Any answer to a request carrying the session that holds a new one replaces the session held: a device that issues a fresh token with each authenticated answer."
                 },
                 "login_status": {
                   "type": "array",
@@ -2219,6 +2257,135 @@
             },
             "pacing": {
               "$ref": "#/$defs/pacing"
+            },
+            "cookies": {
+              "type": "boolean",
+              "default": false,
+              "description": "Keep the cookies the device sets on any answer and send them back on every later request to it, as a browser does (an Axis camera's PTZ control queue). Removed when set empty or expired; never logged or offered to the rules."
+            },
+            "sign": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Values worked out for each request, in order, and sent as headers or query parameters: a key computed from the request, the time and a secret (SPEC.md §2, Computed request credentials).",
+              "properties": {
+                "when_set": {
+                  "type": "string",
+                  "description": "A setting: the values are sent only while it is set."
+                },
+                "values": {
+                  "type": "object",
+                  "propertyNames": {
+                    "pattern": "^[a-z0-9_]+$"
+                  },
+                  "additionalProperties": {
+                    "type": "object",
+                    "minProperties": 1,
+                    "additionalProperties": false,
+                    "description": "One of unix_time (seconds added to the Unix time), random ({min, max}), text (a template, with remove a regex whose first match is taken out), md5, sha1 or sha256 (a template's digest), hmac_sha256 (a template, keyed by key); a digest is written in hex or base64 (encoding).",
+                    "properties": {
+                      "unix_time": {
+                        "type": "integer"
+                      },
+                      "random": {
+                        "type": "object",
+                        "required": [
+                          "max"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "min": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "max": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        }
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "remove": {
+                        "type": "string"
+                      },
+                      "md5": {
+                        "type": "string"
+                      },
+                      "sha1": {
+                        "type": "string"
+                      },
+                      "sha256": {
+                        "type": "string"
+                      },
+                      "hmac_sha256": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "encoding": {
+                        "enum": [
+                          "hex",
+                          "base64"
+                        ],
+                        "default": "hex"
+                      }
+                    }
+                  }
+                },
+                "headers": {
+                  "type": "object",
+                  "propertyNames": {
+                    "pattern": "^[A-Za-z0-9-]+$"
+                  },
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "query": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "aws": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "service",
+                "region"
+              ],
+              "description": "With auth: aws-sigv4, what each request is signed for, with the access_key_id, secret_access_key and session_token settings.",
+              "properties": {
+                "service": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9-]+$",
+                  "description": "The service's signing name, such as medialive."
+                },
+                "region": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[a-z0-9-]+$"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "setting"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "setting": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
             }
           },
           "required": [
