@@ -2386,7 +2386,8 @@ commands:
     summary: "Sources added by hand, or NDI sources discovered, with their ids and the source selected (GET /api/source/list?type=static or dynamic)"
     params:
       list: { type: enum, values: [static, discovered], default: static, label: List, description: "Sources added by hand (static), or NDI sources found by discovery." }
-    send: { models: [ip-to-usb], method: GET, path: /api/source/list, query: { type: "{list:map.usb_source_list}" } }
+    send: { models: [ip-to-usb], method: GET, path: /api/source/list, query: { type: "{list:map.usb_source_list}", page: "1" },
+            pages: &usb_pages { items: "$.data", page: page, total: "$.total" } }
     expect: *value
     returns: value
   add_usb_ndi_source:
@@ -3007,8 +3008,8 @@ telemetry:
         - { models: [ip-to-usb], method: GET, path: /api/ndi/config/get }
         - { models: [ip-to-usb], method: POST, path: /api/resource/image/get, content_type: application/json,
             body: '{"id":"no_signal_1","type":"simple"}' }
-        - { models: [ip-to-usb], method: GET, path: /api/source/list, query: { type: static } }
-        - { models: [ip-to-usb], method: GET, path: /api/source/list, query: { type: dynamic } }
+        - { models: [ip-to-usb], method: GET, path: /api/source/list, query: { type: static, page: "1" }, pages: *usb_pages }
+        - { models: [ip-to-usb], method: GET, path: /api/source/list, query: { type: dynamic, page: "1" }, pages: *usb_pages }
       every_ms: 30000
   updates:
     # Encoder API section 5.1, Decoder API V1.3 section 5.1.
@@ -4437,7 +4438,7 @@ telemetry:
         video.no_signal_images.{1}.path: "{path}"
         video.no_signal_images.{1}.default: "{default}"
     # IP to USB API section 7.1: each list whole, keyed by source id.
-    - path: "^/api/source/list\\?type=static$"
+    - path: "^/api/source/list\\?type=static&page=1$"
       json_match: { "$.status": "^0$" }
       json_each: "$.data"
       json: { id: "$.id", name: "$.config.name", protocol: "$.config.protocol", type: "$.config.type", buffer: "$.config.data.buffer_ms" }
@@ -4448,7 +4449,7 @@ telemetry:
         sources.{id}.source_type: "{type}"
         sources.{id}.buffer_ms: "{buffer}"
         sources.{id}.kind: static
-    - path: "^/api/source/list\\?type=static$"
+    - path: "^/api/source/list\\?type=static&page=1$"
       json_match: { "$.status": "^0$" }
       json_each: "$.data"
       each_match: { "$.config.type": "^url$" }
@@ -4466,7 +4467,7 @@ telemetry:
         sources.{id}.ptz.header: "{header}"
         sources.{id}.ptz.invert_pan: "{pan}"
         sources.{id}.ptz.invert_tilt: "{tilt}"
-    - path: "^/api/source/list\\?type=static$"
+    - path: "^/api/source/list\\?type=static&page=1$"
       json_match: { "$.status": "^0$" }
       json_each: "$.data"
       each_match: { "$.config.type": "^(ndi|d_ndi)$" }
@@ -4478,7 +4479,7 @@ telemetry:
         sources.{id}.low_bandwidth: "{low}"
         sources.{id}.transport: "{transport}"
         sources.{id}.pts_mode: "{pts}"
-    - path: "^/api/source/list\\?type=dynamic$"
+    - path: "^/api/source/list\\?type=dynamic&page=1$"
       json_match: { "$.status": "^0$" }
       json_each: "$.data"
       json: { id: "$.id", name: "$.config.data.name", url: "$.config.data.url" }
@@ -4486,7 +4487,7 @@ telemetry:
       state:
         ndi.discovered.{id}.name: "{name}"
         ndi.discovered.{id}.address: "{url}"
-    - path: "^/api/source/list\\?type=(static|dynamic)$"
+    - path: "^/api/source/list\\?type=(static|dynamic)&page=1$"
       json_match: { "$.status": "^0$" }
       json: { selected: "$.selected" }
       state: { source.selected_id: "{selected}" }
@@ -4693,7 +4694,7 @@ telemetry:
       path: "^/api/source/(add|update|delete|select)$"
       json_match: { "$.status": "^0$" }
       json: {}
-      then_send: [{ method: GET, path: /api/source/list, query: { type: static } }, { method: GET, path: /api/source/list, query: { type: dynamic } }]
+      then_send: [{ method: GET, path: /api/source/list, query: { type: static, page: "1" }, pages: *usb_pages }, { method: GET, path: /api/source/list, query: { type: dynamic, page: "1" }, pages: *usb_pages }]
 
 quirks:
   - models: [all]
@@ -4840,9 +4841,10 @@ quirks:
   - models: [ip-to-usb]
     severity: info
     text: >
-      The source list is read one page at a time and the document gives no
-      default page size; the core reads the first page of each list
-      (static and discovered). select_source with id 0 deselects every source.
+      The source lists (static and discovered) are read whole: page 1 and
+      each next page in turn, at the device's own page size (the document
+      gives no default), until total sources have arrived or a page is
+      empty. select_source with id 0 deselects every source.
       A new device name may take effect only after a restart
       (device.reboot_required). After an upload the core reads back the
       no-signal image no_signal_1, the only id the document names. The USB

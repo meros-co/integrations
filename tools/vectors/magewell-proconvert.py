@@ -848,7 +848,7 @@ _usb("set_usb_ndi_discovery", {"enabled": True, "servers": "192.168.66.1,192.168
      '{"data":{"enable":true,"discovery_server":"192.168.66.1,192.168.66.2","groups":"public"}}')
 _usb("get_no_signal_image", {}, "POST", "/api/resource/image/get", '{"id":"no_signal_1","type":"simple"}')
 _usb("delete_no_signal_image", {"id": "no_signal_1"}, "POST", "/api/resource/image/delete", '{"id":"no_signal_1"}')
-_usb("get_usb_sources", {"list": "discovered"}, "GET", "/api/source/list?type=dynamic")
+_usb("get_usb_sources", {"list": "discovered"}, "GET", "/api/source/list?type=dynamic&page=1")
 _usb("add_usb_ndi_source", {"name": "name1", "ndi_name": "ULTRA ENCODE (C315230423002-2)", "url": "100.100.33.21:5000",
                             "transport": "tcp"}, "POST", "/api/source/add",
      '{"name":"name1","protocol":"ndi","type":"ndi","data":{"name":"ULTRA ENCODE (C315230423002-2)",'
@@ -1190,7 +1190,7 @@ _mwm("ndi-discovery-usb", "ip-to-usb", "/api/ndi/config/get", {"status": 0, "cod
 _mwm("no-signal-image", "ip-to-usb", "/api/resource/image/get", {"status": 0, "code": "Success", "data": {
     "id": "no_signal_1", "type": "simple", "path": "/static/img/no_signal.png", "is_default": True}},
     {"video": {"no_signal_images": {"no_signal_1": {"path": "/static/img/no_signal.png", "default": True}}}})
-_mwm("sources-usb", "ip-to-usb", "/api/source/list?type=static", {
+_mwm("sources-usb", "ip-to-usb", "/api/source/list?type=static&page=1", {
     "status": 0, "code": "Success", "page": 1, "page_size": 25, "total": 2, "selected": 1, "data": [
         {"id": 1, "config": {"name": "name1", "protocol": "ndi", "type": "ndi", "data": {
             "name": "ULTRA ENCODE (C315230423002-2)", "url": "100.100.33.21:5000", "low_bw": False, "transport": "tcp",
@@ -1208,7 +1208,7 @@ _mwm("sources-usb", "ip-to-usb", "/api/source/list?type=static", {
                        "ptz": {"protocol": "VISCA over UDP", "address": "192.168.1.1", "port": 3000, "camera": 1,
                                "header": True, "invert_pan": False, "invert_tilt": False}}}},
     state_before={"sources": {"7": {"name": "Gone"}}})
-_mwm("discovered-usb", "ip-to-usb", "/api/source/list?type=dynamic", {
+_mwm("discovered-usb", "ip-to-usb", "/api/source/list?type=dynamic&page=1", {
     "status": 0, "code": "Success", "selected": 0, "data": [
         {"id": 5, "config": {"name": "CAM (1)", "protocol": "ndi", "type": "d_ndi",
                              "data": {"name": "CAM (1)", "url": "10.0.0.5:5961"}}}]},
@@ -1251,7 +1251,7 @@ for _name, _model, _path, _sends in [
     ("reread-video-config-usb", "ip-to-usb", "/api/video/config/update", [("GET", "/api/video/config/get")]),
     ("reread-ndi-usb", "ip-to-usb", "/api/ndi/config/update", [("GET", "/api/ndi/config/get")]),
     ("reread-sources-usb", "ip-to-usb", "/api/source/select",
-     [("GET", "/api/source/list?type=static"), ("GET", "/api/source/list?type=dynamic")]),
+     [("GET", "/api/source/list?type=static&page=1"), ("GET", "/api/source/list?type=dynamic&page=1")]),
 ]:
     _mwm(_name, _model, _path, '{"status":0}', {},
          expect_then_send=[{"method": m, "target": t} for m, t in _sends])

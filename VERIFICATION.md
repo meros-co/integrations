@@ -2799,6 +2799,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the method that sets the USB audio channel count (uac-num-channels), which the AES67 document names /system/uac-format without describing it. ([spec](specs/magewell-proconvert.yaml#L4830))
 - [ ] Record whether the Audio DX serves auto-reboot (POST /api/system/auto-reboot) and the certificate methods, whose document pages are empty. ([spec](specs/magewell-proconvert.yaml#L4836))
 - [ ] Confirm the 2-second reads on the audio models (summary, PTP or Dante state, matrix meters) and the 30-second settings reads (about 20 requests on the AES67) do not disturb the audio. ([spec](specs/magewell-proconvert.yaml#L2950))
+- [ ] Confirm the IP-to-USB source list numbers its pages from 1 and answers page with the device's default page_size, so asking for page 1 and each next page until total sources have arrived reads the whole list. ([specs/magewell-proconvert.yaml:2390](specs/magewell-proconvert.yaml#L2390))
 
 ## magewell-ultra-encode — Magewell Ultra Encode
 
