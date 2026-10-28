@@ -416,6 +416,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-visualproductions", &["visualproductions-cuecore"]),
     ("vendor-vizrt", &["vizrt-trio"]),
     ("vendor-workpro", &["workpro-lightshark"]),
+    ("vendor-wowza", &["wowza-streaming-engine"]),
     ("vendor-wyrestorm", &["wyrestorm-matrix"]),
     (
         "vendor-yamaha",

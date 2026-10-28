@@ -4287,6 +4287,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that a release-only message (0.0) triggers keys, playbacks and executors as the manual's hexadecimal table shows. ([specs/workpro-lightshark.yaml:279](specs/workpro-lightshark.yaml#L279))
 - [ ] Check /LS/Color against /LS/Colour, /LS/Fx, the /LS/ExecutorLine form, and the Companion-only addresses (Tap, FxTap, TAP/PB, ChaseValue/PB, Level/Sm*, Reset/Sm*). ([specs/workpro-lightshark.yaml:286](specs/workpro-lightshark.yaml#L286))
 
+## wowza-streaming-engine — Wowza Streaming Engine
+
+- [ ] Confirm every GET answers JSON with Accept: application/json (the API answers XML otherwise), and that writes take JSON bodies. ([specs/wowza-streaming-engine.yaml:63](specs/wowza-streaming-engine.yaml#L63))
+- [ ] Confirm the default digest authentication is answered, that basic and none work when Server.xml sets them, and that a wrong credential answers 401. ([specs/wowza-streaming-engine.yaml:59](specs/wowza-streaming-engine.yaml#L59))
+- [ ] Confirm an update body holding only some fields leaves the others as they were, for the configuration commands (update_app, update_transcoder, update_push_publish_map_entry and the like). ([specs/wowza-streaming-engine.yaml:3405](specs/wowza-streaming-engine.yaml#L3405))
+- [ ] Confirm GET .../instances lists every instance with incomingStreams, recorders and streamGroups in the shapes the reference gives (its OutgoingStreamConfig shows placeholder fields only). ([specs/wowza-streaming-engine.yaml:3692](specs/wowza-streaming-engine.yaml#L3692))
+- [ ] Confirm start_recording's body (recorderName, instanceName, defaultRecorder true) starts a recording with the application's recorder defaults. ([specs/wowza-streaming-engine.yaml:3363](specs/wowza-streaming-engine.yaml#L3363))
+- [ ] Confirm write operations answer {"success": true, ...}, which the stream target and recorder re-reads rely on. ([specs/wowza-streaming-engine.yaml:3789](specs/wowza-streaming-engine.yaml#L3789))
+- [ ] Confirm per-stream monitoring (incomingstreams/{stream}/monitoring/current) answers for live streams, including names with spaces, and what it answers for a stream not publishing. ([specs/wowza-streaming-engine.yaml:3761](specs/wowza-streaming-engine.yaml#L3761))
+- [ ] Record the stream recorder's currentDuration unit (ms assumed) and recordingStartTime format, and the sessionStatus values of stream targets. ([specs/wowza-streaming-engine.yaml:3539](specs/wowza-streaming-engine.yaml#L3539))
+- [ ] Confirm the media caster type is rtp-record (the reference lists it with a leading space). ([specs/wowza-streaming-engine.yaml:3420](specs/wowza-streaming-engine.yaml#L3420))
+- [ ] Record the action names the DVR store and media cache store actions take, which the reference leaves open. ([specs/wowza-streaming-engine.yaml:1273](specs/wowza-streaming-engine.yaml#L1273))
+- [ ] Confirm startupstreams answers its list under Streams (capitalized, as the reference gives it). ([specs/wowza-streaming-engine.yaml:3802](specs/wowza-streaming-engine.yaml#L3802))
+
 ## wyrestorm-matrix — WyreStorm matrix switchers
 
 - [ ] Confirm SET CEC_PWR takes a space before the port on H2A and MXV matrices (the syntax line has none, the example one). ([specs/wyrestorm-matrix.yaml:497](specs/wyrestorm-matrix.yaml#L497))
