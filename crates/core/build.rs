@@ -265,6 +265,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "panasonic-ptz-serial",
         ],
     ),
+    ("vendor-phabrix", &["phabrix-qx"]),
     ("vendor-pharos", &["pharos-designer"]),
     ("vendor-philips", &["philips-sicp"]),
     ("vendor-pixotope", &["pixotope"]),

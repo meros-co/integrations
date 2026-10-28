@@ -1,0 +1,463 @@
+spec: 1
+id: phabrix-qx
+name: PHABRIX Qx IP / SDI rasterizer, analyzer and generator (REST API)
+vendor: PHABRIX
+category: other
+
+source:
+  - title: PHABRIX Qx IP | SDI User Manual, Software Release 4.8, Manual Revision 22a (January 2023)
+    author: PHABRIX Ltd (a Leader company)
+    url: https://www.leader.co.jp/uploads/2023/02/qx_e_4_8.pdf
+    note: >
+      Manufacturer document, the source of every request here. Chapter 16, "Using
+      the REST API for Remote Access" (p.16-2 to 16-5): turning the API on in the Qx
+      Network & Automation instrument, port 8080, the base resource /api, the GET,
+      PUT, DELETE and POST methods, and the documented requests: analyzer and
+      generator status, the generator's standards tree and generating a standard
+      with an optional pathological overlay, the audio generator and its
+      QuickConfig payload, eye and jitter readings, the event logs and their
+      REST API logging switch, the CRC summary, and in the IP 2022-6 and IP 2110
+      boot modes the multicast requests, the media stream list, choosing a stream
+      for analysis and clearing the list. Table 3-1 (p.3-3 to 3-4): the REST API
+      option, GET to navigate the menus and PUT to change the unit. Table 6-3
+      (p.6-9): pathological patterns and the 0-16384 pairs range; Tables 6-5 and 6-6
+      (p.6-10 to 6-11): audio generator tones, musical pitches, -144 to 0 dBFS
+      amplitudes and the audio macros. The chapter ends "Contact PHABRIX for full
+      details of all available REST API requests": the full reference is supplied
+      by PHABRIX on request and is not used here.
+
+transport:
+  type: http
+  port: 8080
+  scheme: http
+  auth: none
+  timeout_ms: 5000
+  probe: { method: GET, path: /api }
+
+ports:
+  - { port: 8080, protocol: http, role: control, note: "the REST API port the Qx Network & Automation instrument shows once REST API is enabled (p.16-2)" }
+
+models:
+  - id: qx
+    name: PHABRIX Qx (12G-SDI / 25GbE IP rasterizer, analyzer and generator)
+    supports:
+      [browse, get_analyser_status, get_crc_summary, get_generator_status,
+       get_generator_standards, get_generator_standards_under, generate_standard, generate_standard_pathological,
+       get_generator_audio, set_generator_audio_quick, set_generator_audio,
+       get_eye_status, get_jitter_status, get_event_logs, set_event_log_config,
+       get_multicast_requests, request_multicast, get_media_streams,
+       analyse_media_stream, get_requested_media_streams, clear_media_streams,
+       get_multicast_requests_2110, request_multicast_2110, get_media_streams_2110,
+       analyse_media_stream_2110, get_requested_media_streams_2110,
+       clear_media_streams_2110]
+    verification: none
+    notes: >
+      One chassis that boots in SDI, IP 2022-6 or IP 2110 mode (p.16-3 to 16-5);
+      the IP requests answer only in their boot mode, and generation, eye and
+      jitter need their options (PHQXO-GEN, PHQX01E-3G).
+
+commands:
+  browse:
+    summary: Read any resource of the API tree under /api and return its JSON, to navigate the menus
+    params:
+      path: { type: string, required: true, max_length: 1024, pattern: "^[^/].*$",
+        label: Path,
+        description: "The resource below /api, segments separated by /, such as v1 or v1/generator/standards; each segment is percent-encoded as sent." }
+    send: { method: GET, path: "/api/{path:path}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # p.3-4: GET retrieves information and navigates the submenus
+
+  get_analyser_status:
+    summary: Report the standard the analyzer is currently analyzing
+    send: { method: GET, path: /api/v1/analyser/status }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # p.16-3
+
+  get_crc_summary:
+    summary: Report the current CRC analysis status
+    send: { method: GET, path: /api/v1/analyser/crcSummary }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # p.16-4
+
+  get_generator_status:
+    summary: Report the standard currently generated
+    send: { method: GET, path: /api/v1/generator/status }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # p.16-3
+
+  get_generator_standards:
+    summary: List the resolutions at the top of the generator's standards tree
+    send: { method: GET, path: /api/v1/generator/standards }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # p.16-3
+
+  get_generator_standards_under:
+    summary: List the next level of the standards tree (color format, gamut and level, test pattern) under the levels chosen
+    params:
+      path: { type: string, required: true, max_length: 512,
+        label: Tree path,
+        description: "The levels already chosen, separated by /, such as 1920x1080p60/YCbCr:422:10." }
+    send: { method: GET, path: "/api/v1/generator/standards/{path:path}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # p.16-3: "Select the required URL from the tree structure and use GET again to drill-down"
+
+  generate_standard:
+    summary: Generate a standard and test pattern chosen from the standards tree
+    params:
+      resolution: { type: string, required: true, max_length: 64,
+        label: Resolution and rate,
+        description: "The first level of the standards tree, such as 1920x1080p60." }
+      color_format: { type: string, required: true, max_length: 64,
+        label: Color format,
+        description: "The second level: color format, sampling and bit depth, such as YCbCr:422:10." }
+      level: { type: string, required: true, max_length: 64,
+        label: Level and gamut,
+        description: "The third level: SDI level and SDR or HDR format, such as 3G_A_Rec.709." }
+      pattern: { type: string, required: true, max_length: 128,
+        label: Test pattern,
+        description: "The test pattern, the last level, such as 100% Bars." }
+    send: { method: PUT, path: "/api/v1/generator/standards/{resolution}/{color_format}/{level}/{pattern}",
+            content_type: application/json, body: '{"action":"start"}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+    # p.16-3; the {"action":"start"} body is inferred from the pathological example, see quirks
+
+  generate_standard_pathological:
+    summary: Generate a standard and test pattern with a pathological signal overlaid
+    params:
+      resolution: { type: string, required: true, max_length: 64,
+        label: Resolution and rate,
+        description: "The first level of the standards tree, such as 1920x1080p60." }
+      color_format: { type: string, required: true, max_length: 64,
+        label: Color format,
+        description: "The second level: color format, sampling and bit depth, such as YCbCr:422:10." }
+      level: { type: string, required: true, max_length: 64,
+        label: Level and gamut,
+        description: "The third level: SDI level and SDR or HDR format, such as 3G_A_Rec.709." }
+      pattern: { type: string, required: true, max_length: 128,
+        label: Test pattern,
+        description: "The test pattern, the last level, such as 100% Bars." }
+      type: { type: string, required: true, max_length: 64,
+        label: Pathological pattern,
+        description: "The pathological pattern to overlay as the API names it, such as CheckField (the generator also offers Eq, PLL, Clock and CheckField + Clock)." }
+      pairs: { type: int, min: 0, max: 16384, required: true,
+        label: Pairs,
+        description: "Pathological pairs to insert per line, 0 to 16384, limited by the format's line length." }
+    send: { method: PUT, path: "/api/v1/generator/standards/{resolution}/{color_format}/{level}/{pattern}",
+            content_type: application/json,
+            body: '{"action":"start","pathological":{"type":{type:json},"pairs":{pairs}}}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+    # p.16-3: {"action":"start","pathological":{"type":"CheckField","pairs":100}}; Table 6-3
+
+  get_generator_audio:
+    summary: Report the audio the generator currently generates
+    send: { method: GET, path: /api/v1/generator/audio }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # p.16-3
+
+  set_generator_audio_quick:
+    summary: Set the generated audio with a QuickConfig macro applied across every group
+    params:
+      mode: { type: string, required: true, max_length: 64,
+        label: Mode,
+        description: "The macro, as the audio generator names it, such as Fixed Tone or Musical Pitch." }
+      gain_type: { type: string, required: true, max_length: 64,
+        label: Gain type,
+        description: "How the level is set, such as Fixed Levels or Ramp Levels." }
+      gain: { type: int, min: -144, max: 0, required: true,
+        label: Gain,
+        description: "Amplitude in dBFS, -144 to 0." }
+      pitch: { type: string, required: true, max_length: 16,
+        label: Pitch,
+        description: "The tone as a musical pitch, such as E 3, from C 3 to C7." }
+    send: { method: PUT, path: /api/v1/generator/audio, content_type: application/json,
+            body: '{"mode":{mode:json},"quickConfig":{"gainType":{gain_type:json},"gain":{gain},"pitch":{pitch:json}}}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+    # p.16-3: {"mode":"Fixed Tone","quickConfig":{"gainType":"Fixed Levels","gain":-10,"pitch":"E 3"}}
+
+  set_generator_audio:
+    summary: Set the generated audio channel by channel with a Custom config payload in the shape get_generator_audio returns
+    params:
+      config: { type: json, required: true,
+        label: Audio configuration,
+        description: "The Custom config payload: the structure get_generator_audio returns, with the channels' tones and levels changed." }
+    send: { method: PUT, path: /api/v1/generator/audio, content_type: application/json, body: "{config}" }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+    # p.16-3: "For Custom config raw payload structure, refer to the GET request output structure"
+
+  get_eye_status:
+    summary: Report the instantaneous eye readings
+    send: { method: GET, path: /api/v1/eye/status }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # p.16-3
+
+  get_jitter_status:
+    summary: Report the instantaneous jitter readings
+    send: { method: GET, path: /api/v1/jitter/status }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # p.16-3
+
+  get_event_logs:
+    summary: Retrieve the event logs
+    send: { method: GET, path: /api/v1/eventlog/logs }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # p.16-4
+
+  set_event_log_config:
+    summary: Turn logging of an event source on or off, such as REST API requests (restApi)
+    params:
+      item: { type: string, required: true, max_length: 64, pattern: "^[A-Za-z0-9_]+$",
+        label: Event source,
+        description: "The event log configuration item, such as restApi for REST API event logging." }
+      enabled: { type: bool, required: true,
+        label: Enabled,
+        description: "On enables logging of the item's events, off disables it." }
+    send: { method: PUT, path: "/api/v1/eventlog/config/{item}", content_type: application/json,
+            body: '{"action":"{enabled:map.enable_action}"}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+    # p.16-4: {"action":"enable"} on /eventlog/config/restApi; "disable" is inferred
+
+  get_multicast_requests:
+    summary: Report the active multicast request (IP 2022-6 boot mode)
+    send: { method: GET, path: /api/v1/ipReceive/multicastRequests }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # p.16-4
+
+  request_multicast:
+    summary: Join a multicast group (IP 2022-6 boot mode)
+    params:
+      address: &multicast { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$",
+        label: Multicast address,
+        description: "The destination IPv4 multicast address to join, such as 230.0.0.15." }
+    send: { method: PUT, path: /api/v1/ipReceive/multicastRequests, content_type: application/json,
+            body: '{"action":"request","destinationIpAddress":{address:json}}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+    # p.16-4
+
+  get_media_streams:
+    summary: List the IP media streams currently available (IP 2022-6 boot mode)
+    send: { method: GET, path: /api/v1/ipReceive/mediaStreams }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # p.16-4
+
+  analyse_media_stream:
+    summary: Choose the IP media stream to analyze (IP 2022-6 boot mode)
+    params: &stream_params
+      destination_address: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$",
+        label: Destination address,
+        description: "The stream's destination IPv4 address, such as 230.0.0.15." }
+      destination_port: { type: int, min: 0, max: 65535, required: true,
+        label: Destination port,
+        description: "The stream's destination UDP port." }
+      source_address: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$",
+        label: Source address,
+        description: "The stream's source IPv4 address." }
+      source_port: { type: int, min: 0, max: 65535, required: true,
+        label: Source port,
+        description: "The stream's source UDP port." }
+      match_ssrc: { type: bool, default: true,
+        label: Match SSRC,
+        description: "On selects the stream with this RTP SSRC only." }
+      ssrc: { type: int, min: 0, max: 4294967295, default: 0,
+        label: SSRC,
+        description: "The RTP synchronization source identifier of the stream." }
+    send: { method: PUT, path: /api/v1/ipReceive/mediaStreams, content_type: application/json,
+            body: '{"action":"analyseStream","destinationIpAddress":{destination_address:json},"destinationUdpPort":{destination_port},"matchSsrc":{match_ssrc},"sourceIpAddress":{source_address:json},"sourceUdpPort":{source_port},"ssrc":{ssrc}}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+    # p.16-4
+
+  get_requested_media_streams:
+    summary: Report the IP media stream being analyzed (IP 2022-6 boot mode)
+    send: { method: GET, path: /api/v1/ipReceive/requestedMediaStreams }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # p.16-4
+
+  clear_media_streams:
+    summary: Clear the list of IP media streams (IP 2022-6 boot mode)
+    send: { method: PUT, path: /api/v1/ipReceive/mediaStreams, content_type: application/json,
+            body: '{"action":"clearList"}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+    # p.16-4
+
+  get_multicast_requests_2110:
+    summary: Report the active multicast request (IP 2110 boot mode)
+    send: { method: GET, path: /api/v1/2110/receive/multicastRequests }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # p.16-4
+
+  request_multicast_2110:
+    summary: Join a multicast group (IP 2110 boot mode)
+    params:
+      address: *multicast
+    send: { method: PUT, path: /api/v1/2110/receive/multicastRequests, content_type: application/json,
+            body: '{"action":"request","destinationIpAddress":{address:json}}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+    # p.16-4 to 16-5
+
+  get_media_streams_2110:
+    summary: List the IP media streams currently available (IP 2110 boot mode)
+    send: { method: GET, path: /api/v1/2110/receive/mediaStreams }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # p.16-5
+
+  analyse_media_stream_2110:
+    summary: Choose the IP media stream to analyze (IP 2110 boot mode)
+    params: *stream_params
+    send: { method: PUT, path: /api/v1/2110/receive/mediaStreams, content_type: application/json,
+            body: '{"action":"analyseStream","destinationIpAddress":{destination_address:json},"destinationUdpPort":{destination_port},"matchSsrc":{match_ssrc},"sourceIpAddress":{source_address:json},"sourceUdpPort":{source_port},"ssrc":{ssrc}}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+    # p.16-5
+
+  get_requested_media_streams_2110:
+    summary: Report the IP media stream being analyzed (IP 2110 boot mode)
+    send: { method: GET, path: /api/v1/2110/receive/requestedMediaStreams }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # p.16-5
+
+  clear_media_streams_2110:
+    summary: Clear the list of IP media streams (IP 2110 boot mode)
+    send: { method: PUT, path: /api/v1/2110/receive/mediaStreams, content_type: application/json,
+            body: '{"action":"clearList"}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+    # p.16-5
+
+maps:
+  enable_action: { "true": enable, "false": disable }
+
+telemetry:
+  # The API pushes nothing. The analyzer, CRC and generator status are polled;
+  # every other reading is kept from the reply to its command, so a consumer
+  # reads eye, jitter, logs and the IP lists when it needs them (their
+  # requests answer only in their boot mode and with their options).
+  poll:
+    - every_ms: 2000
+      send:
+        - { method: GET, path: /api/v1/analyser/status }
+        - { method: GET, path: /api/v1/analyser/crcSummary }
+    - every_ms: 10000
+      send:
+        - { method: GET, path: /api/v1/generator/status }
+        - { method: GET, path: /api/v1/generator/audio }
+  updates:
+    - path: "^/api/v1/analyser/status$"
+      json: { body: "$" }
+      state: { analyser.status: "{body}" }
+    - path: "^/api/v1/analyser/crcSummary$"
+      json: { body: "$" }
+      state: { analyser.crc_summary: "{body}" }
+    - path: "^/api/v1/generator/status$"
+      json: { body: "$" }
+      state: { generator.status: "{body}" }
+    - path: "^/api/v1/generator/audio$"
+      json: { body: "$" }
+      state: { generator.audio: "{body}" }
+    - path: "^/api/v1/eye/status$"
+      json: { body: "$" }
+      state: { eye.status: "{body}" }
+    - path: "^/api/v1/jitter/status$"
+      json: { body: "$" }
+      state: { jitter.status: "{body}" }
+    - path: "^/api/v1/eventlog/logs$"
+      json: { body: "$" }
+      state: { eventlog.logs: "{body}" }
+    - path: "^/api/v1/ipReceive/multicastRequests$"
+      json: { body: "$" }
+      state: { ip_2022_6.multicast_requests: "{body}" }
+    - path: "^/api/v1/ipReceive/mediaStreams$"
+      json: { body: "$" }
+      state: { ip_2022_6.media_streams: "{body}" }
+    - path: "^/api/v1/ipReceive/requestedMediaStreams$"
+      json: { body: "$" }
+      state: { ip_2022_6.requested_media_streams: "{body}" }
+    - path: "^/api/v1/2110/receive/multicastRequests$"
+      json: { body: "$" }
+      state: { ip_2110.multicast_requests: "{body}" }
+    - path: "^/api/v1/2110/receive/mediaStreams$"
+      json: { body: "$" }
+      state: { ip_2110.media_streams: "{body}" }
+    - path: "^/api/v1/2110/receive/requestedMediaStreams$"
+      json: { body: "$" }
+      state: { ip_2110.requested_media_streams: "{body}" }
+
+state:
+  analyser.status:          { type: string, description: "The analyzer's status as JSON text, as GET /api/v1/analyser/status returns it: the standard being analyzed" }
+  analyser.crc_summary:     { type: string, description: "The CRC analysis status as JSON text, as GET /api/v1/analyser/crcSummary returns it" }
+  generator.status:         { type: string, description: "The generator's status as JSON text, as GET /api/v1/generator/status returns it: the standard being generated" }
+  generator.audio:          { type: string, description: "The generated audio as JSON text, as GET /api/v1/generator/audio returns it (the shape set_generator_audio takes)" }
+  eye.status:               { type: string, description: "The last eye readings read, as JSON text (read with get_eye_status)" }
+  jitter.status:            { type: string, description: "The last jitter readings read, as JSON text (read with get_jitter_status)" }
+  eventlog.logs:            { type: string, description: "The event logs last read, as JSON text (read with get_event_logs)" }
+  ip_2022_6.multicast_requests:      { type: string, description: "The active multicast request in IP 2022-6 boot mode, as JSON text (read with get_multicast_requests)" }
+  ip_2022_6.media_streams:           { type: string, description: "The IP media streams available in IP 2022-6 boot mode, as JSON text (read with get_media_streams)" }
+  ip_2022_6.requested_media_streams: { type: string, description: "The IP media stream analyzed in IP 2022-6 boot mode, as JSON text (read with get_requested_media_streams)" }
+  ip_2110.multicast_requests:        { type: string, description: "The active multicast request in IP 2110 boot mode, as JSON text (read with get_multicast_requests_2110)" }
+  ip_2110.media_streams:             { type: string, description: "The IP media streams available in IP 2110 boot mode, as JSON text (read with get_media_streams_2110)" }
+  ip_2110.requested_media_streams:   { type: string, description: "The IP media stream analyzed in IP 2110 boot mode, as JSON text (read with get_requested_media_streams_2110)" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The public manual documents only a set of example requests and says to
+      contact PHABRIX for the full REST API reference (p.16-3, p.16-5). Only those
+      requests are here, with browse to read any other resource of the tree. The
+      manual shows no reply bodies, so every reading is kept whole in state as JSON
+      text rather than field by field.
+
+  - models: [all]
+    severity: info
+    text: >
+      The REST API is off by default: enable it in the Qx Network & Automation
+      instrument, which then shows port 8080 (p.16-2). It takes no credential.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Generating a standard is a PUT to its place in the standards tree; the manual
+      shows a payload only with a pathological overlay, whose action is start
+      (p.16-3). generate_standard sends {"action":"start"} alone. Changing the
+      generated standard or audio changes the unit's outputs at once.
+
+  - models: [all]
+    severity: info
+    text: >
+      Each boot mode answers its own requests: the 2022-6 requests under
+      /api/v1/ipReceive and the 2110 requests under /api/v1/2110/receive (p.16-4 to
+      16-5). Eye and jitter readings and generation need their options. These are
+      read on request and not polled, so a unit in another mode or without an option
+      is not asked for them every few seconds.
+
+  - models: [all]
+    severity: info
+    text: >
+      Values of the audio QuickConfig (mode, gain type, pitch) and the pathological
+      type are free text in the unit's own words: the manual gives Fixed Tone,
+      Fixed Levels, E 3 and CheckField as examples, and the audio generator and
+      pathological menus list the others (Tables 6-3, 6-6). set_event_log_config
+      sends disable for off, which the manual does not show.

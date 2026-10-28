@@ -3129,6 +3129,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the older section-per-command lists against a projector where their titles and bytes disagree (GMFI2 printed GMFI1, QJB as QJK, QFI as QEI, and value conflicts such as SHIFT -327 and -127). ([specs/panasonic-projector.yaml:16353](specs/panasonic-projector.yaml#L16353))
 - [ ] Confirm QPW codes other than 000 and 001 that some series may return (warm-up, cooling). ([specs/panasonic-projector.yaml:9094](specs/panasonic-projector.yaml#L9094))
 
+## phabrix-qx — PHABRIX Qx (REST API)
+
+- [ ] Check that GET /api answers once REST API is enabled, as the liveness probe relies on it. ([specs/phabrix-qx.yaml:35](specs/phabrix-qx.yaml#L35))
+- [ ] Check that generating a standard takes {"action":"start"} alone, and what a PUT without a body does. ([specs/phabrix-qx.yaml:110](specs/phabrix-qx.yaml#L110))
+- [ ] Record the reply bodies of the status, CRC, generator, audio, eye, jitter, event log and IP list requests, so state can be kept field by field. ([specs/phabrix-qx.yaml:358](specs/phabrix-qx.yaml#L358))
+- [ ] Record the QuickConfig mode, gain type and pitch names the unit takes besides the manual's example, and the pathological type names besides CheckField. ([specs/phabrix-qx.yaml:166](specs/phabrix-qx.yaml#L166))
+- [ ] Check that {"action":"disable"} turns off an event log source, and which sources besides restApi exist. ([specs/phabrix-qx.yaml:219](specs/phabrix-qx.yaml#L219))
+- [ ] Check the statuses the unit answers PUT requests with (200, 201 or 204 taken as success) and a request outside its boot mode. ([specs/phabrix-qx.yaml:260](specs/phabrix-qx.yaml#L260))
+- [ ] Check that browse reaches the tree with percent-encoded segments as the manual's examples show (YCbCr%3A422%3A10, 100%25%20Bars). ([specs/phabrix-qx.yaml:60](specs/phabrix-qx.yaml#L60))
+
 ## pharos-designer — Pharos Designer controllers (HTTP and WebSocket API)
 
 - [ ] With security enabled, check that POST /authenticate?original_url=/ answers with a token cookie (status 302 or 200), that an expired token is answered 401, and what wrong credentials produce. ([specs/pharos-designer.yaml:1138](specs/pharos-designer.yaml#L1138))
