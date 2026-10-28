@@ -359,7 +359,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "softron-multicam-logger",
         ],
     ),
-    ("vendor-softvelum", &["nimble-streamer"]),
+    ("vendor-softvelum", &["nimble-streamer", "wmspanel"]),
     (
         "vendor-sony",
         &[

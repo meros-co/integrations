@@ -4311,6 +4311,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the dynamic element's input1 to input4 and value1 to value4 children. ([specs/vmix.yaml:5196](specs/vmix.yaml#L5196))
 - [ ] Confirm the video call attributes (callPassword, callConnected, callVideoSource, callAudioSource) and the VideoCallAudioSourceX and VideoCallSourceOutputN activators. ([specs/vmix.yaml:5141](specs/vmix.yaml#L5141))
 
+## wmspanel — WMSPanel
+
+- [ ] Confirm wrong credentials and a calling host missing from the API whitelist both answer 403, and record the body. ([specs/wmspanel.yaml:2477](specs/wmspanel.yaml#L2477))
+- [ ] Confirm create and update calls take the request data fields as a JSON body with Content-Type application/json, for every resource (the reference shows it for some). ([specs/wmspanel.yaml:2491](specs/wmspanel.yaml#L2491))
+- [ ] Confirm the single get calls' answer shapes: stream (an object) for a live stream, rule (an array in the reference's example) for a re-publish rule. ([specs/wmspanel.yaml:2611](specs/wmspanel.yaml#L2611))
+- [ ] Confirm the action calls (pause, resume, restart, start, stop, clone) answer {"status": "Ok"}, and record how soon the lists show the change. ([specs/wmspanel.yaml:2683](specs/wmspanel.yaml#L2683))
+- [ ] Record how WMSPanel counts the probe and poll calls against the 15,000-call daily limit, and what it answers once the limit is reached. ([specs/wmspanel.yaml:2465](specs/wmspanel.yaml#L2465))
+- [ ] Confirm list_servers lists every server kind, and that the server answer's status is online, offline or pending. ([specs/wmspanel.yaml:2519](specs/wmspanel.yaml#L2519))
+
 ## workpro-lightshark — Work Pro LightShark LS-1 / LS-Core (OSC)
 
 - [ ] Check the default OSC input and output ports (8000 and 9000 per Companion) and where the console sends its output. ([specs/workpro-lightshark.yaml:265](specs/workpro-lightshark.yaml#L265))
