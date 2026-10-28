@@ -3213,6 +3213,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record whether the multi-window report (FD) starts with the window number. ([specs/philips-sicp.yaml:792](specs/philips-sicp.yaml#L792))
 - [ ] Confirm the operating hours report is a big-endian 16-bit count of hours. ([specs/philips-sicp.yaml:724](specs/philips-sicp.yaml#L724))
 
+## pigpio — Raspberry Pi GPIO (pigpio daemon)
+
+- [ ] Check against pigpiod (version 79) on a Raspberry Pi 4 that NOIB on a second connection answers the handle and then streams reports for the GPIO NB names on the first, as the C interface describes for socket notifications. ([specs/pigpio.yaml:7](specs/pigpio.yaml#L7))
+
 ## pikvm — PiKVM
 
 - [ ] Check the PiKVM Switch commands' answers (the reference shows FIXME for each) and that status 200 means the switch acted. ([specs/pikvm.yaml:694](specs/pikvm.yaml#L694))

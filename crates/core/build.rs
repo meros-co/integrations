@@ -282,6 +282,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-phabrix", &["phabrix-qx"]),
     ("vendor-pharos", &["pharos-designer"]),
     ("vendor-philips", &["philips-sicp"]),
+    ("vendor-pigpio", &["pigpio"]),
     ("vendor-pikvm", &["pikvm"]),
     ("vendor-pixotope", &["pixotope"]),
     ("vendor-pjlink", &["pjlink"]),

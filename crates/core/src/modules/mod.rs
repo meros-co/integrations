@@ -151,6 +151,8 @@ mod panasonic_projector_commands;
 mod pandorasbox_commands;
 #[cfg(feature = "philips-sicp")]
 mod philips_sicp;
+#[cfg(feature = "pigpio")]
+mod pigpio;
 #[cfg(feature = "pjlink")]
 mod pjlink;
 #[cfg(feature = "posistagenet")]
@@ -334,6 +336,8 @@ pub(crate) fn construct(
         "integ-jnior" => Ok(Box::new(jnior::Jnior::new(context)?)),
         #[cfg(feature = "kissbox-io")]
         "kissbox-io" => Ok(Box::new(kissbox::KissBox::new(context)?)),
+        #[cfg(feature = "pigpio")]
+        "pigpio" => Ok(Box::new(pigpio::Pigpio::new(context)?)),
         #[cfg(feature = "ptp")]
         "ptp" => Ok(Box::new(ptp::Ptp::new(context)?)),
         #[cfg(feature = "osc-listener")]
