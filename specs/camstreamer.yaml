@@ -91,6 +91,8 @@ settings:
 ports:
   - { port: 80, protocol: http, role: control, when: "scheme http", note: "the camera's web server" }
   - { port: 443, protocol: https, role: control, when: "scheme https", note: "the camera's web server over TLS" }
+  - { port: 80, protocol: ws, role: push, when: "scheme http", note: "the app's websocket of events on the camera's web server (CamStreamer, CamOverlay, CamSwitcher)" }
+  - { port: 443, protocol: wss, role: push, when: "scheme https", note: "the app's websocket of events over TLS" }
 
 maps:
   master_audio: { source: NONE, silence: SILENCE }
@@ -527,15 +529,19 @@ quirks:
     severity: info
     text: >
       Each app answers only once it is installed and licensed on the camera
-      (an unlicensed app refuses its API). The apps' own websockets of
-      events (stream states, overlay starts and stops, CamSwitcher's
-      switches) need a token fetched over HTTP (ws_authorization.cgi, valid
-      30 seconds) as their first message, which the spec format cannot
-      chain, so state is polled: CamStreamer streams and their status, and
-      CamOverlay services, every 10 seconds; CamSwitcher playlists and
+      (an unlicensed app refuses its API). CamStreamer, CamOverlay and
+      CamSwitcher push their events on a websocket of their own, opened
+      with a token asked for over HTTP (ws_authorization.cgi, valid 30
+      seconds or until the first connection) before each opening and sent
+      as its first message: stream states, platform API results and I/O
+      port changes, overlay service starts and stops, and CamSwitcher's
+      switches (the playlist and item it plays as video and as audio) and
+      input availability, each kept in state as it happens. What the
+      events do not carry is polled: CamStreamer streams and their status,
+      and CamOverlay services, every 10 seconds; CamSwitcher playlists and
       master audio, and the NDI settings, every 30 seconds; CamScripter
-      packages every minute. CamSwitcher's playing item is reported only on
-      its websocket, so it is not in state.
+      packages every minute. CamScripter and the NDI HX Plugin have no
+      websocket of events.
 
   - models: [app-6, app-4]
     severity: info
@@ -584,6 +590,19 @@ quirks:
       live; set_services replaces every overlay.
 
 state:
+  streams.*.automation_state: { type: int, description: "A stream, keyed by its ID: its automation state as the StreamState event gives it" }
+  stream_status.*.last_api_call: { type: string, description: "A stream, keyed by its ID: the last platform API call that succeeded (CS_API_SUCCESS), such as startBroadcast" }
+  stream_status.*.last_api_message: { type: string, description: "That call's message, such as Broadcast started." }
+  io_ports.*.value: { type: int, description: "A camera I/O port, keyed by its number, as the PortChanged event gives its value" }
+  services.*.running: { type: bool, description: "An overlay service, keyed by id: it is started (ServiceStart) or stopped (ServiceStop)" }
+  switcher.default_playlist: { type: string, description: "CamSwitcher's default playlist, as SwitcherStart names it" }
+  switcher.video.playlist: { type: string, description: "The playlist CamSwitcher plays as video now (StreamSwitchVideo)" }
+  switcher.video.stream: { type: string, description: "The stream or clip of that playlist it plays now" }
+  switcher.video.index: { type: int, description: "The place of that item in the playlist, from 0" }
+  switcher.audio.playlist: { type: string, description: "The playlist CamSwitcher plays as audio now (StreamSwitchAudio)" }
+  switcher.audio.stream: { type: string, description: "The stream or clip of that playlist it plays now" }
+  switcher.audio.index: { type: int, description: "The place of that item in the playlist, from 0" }
+  stream_available.*.available: { type: bool, description: "A CamSwitcher input stream, keyed by its name: it is available (StreamAvailable)" }
   streams.*.title:          { type: string, description: "A CamStreamer stream, keyed by its ID: its title" }
   streams.*.platform:       { type: string, description: "Its platform, such as rtmp, youtube or srt" }
   streams.*.enabled:        { type: bool, description: "It is enabled (started)" }
@@ -616,6 +635,44 @@ state:
   ndi.audio_enabled:        { type: bool, description: "It carries audio" }
 
 telemetry:
+  # Each app's websocket of events, opened with a token from its
+  # ws_authorization.cgi (valid 30 seconds or until the first connection),
+  # sent as the first message. After it the app sends its initial state,
+  # each event wrapped as {"type": "init", "data": <event>}, then each
+  # event as it happens.
+  websocket:
+    - models: [app-6]
+      path: /local/camstreamer/events
+      scheme: { setting: scheme }
+      subprotocol: events
+      token:
+        request: { method: GET, path: /local/camstreamer/api/ws_authorization.cgi }
+        match: '"data"\s*:\s*"([^"]+)"'
+      send: ['{"authorization":{token:json}}']
+    - models: [app-4]
+      path: /local/camstreamer/events
+      scheme: { setting: scheme }
+      subprotocol: events
+      token:
+        request: { method: GET, path: /local/camstreamer/api/ws_authorization.cgi }
+        match: '"message"\s*:\s*"([^"]+)"'
+      send: ['{"authorization":{token:json}}']
+    - models: [camoverlay]
+      path: /local/camoverlay/service/ws
+      scheme: { setting: scheme }
+      subprotocol: events
+      token:
+        request: { method: GET, path: /local/camoverlay/api/ws_authorization.cgi }
+        match: '"message"\s*:\s*"([^"]+)"'
+      send: ['{"authorization":{token:json}}']
+    - models: [camswitcher]
+      path: /local/camswitcher/events
+      scheme: { setting: scheme }
+      subprotocol: events
+      token:
+        request: { method: GET, path: /local/camswitcher/api/ws_authorization.cgi }
+        match: '"data"\s*:\s*"([^"]+)"'
+      send: ['{"authorization":{token:json}}']
   poll:
     - every_ms: 10000
       send:
@@ -726,3 +783,51 @@ telemetry:
         ndi.fps: "{fps}"
         ndi.gop: "{gop}"
         ndi.audio_enabled: "{audio}"
+
+    # The apps' websocket events, as they happen and wrapped in init.
+    - json_match: { "$.type": "^StreamState$" }
+      json: &stream_state { id: "$.streamID", enabled: "$.enabled", active: "$.active", automation: "$.automationState", streaming: "$.isStreaming" }
+      state: &stream_state_state
+        "streams.{id:key}.enabled": { value: "{enabled}", map: { "1": true, "0": false, "true": true, "false": false } }
+        "streams.{id:key}.active": { value: "{active}", map: { "1": true, "0": false, "true": true, "false": false } }
+        "streams.{id:key}.automation_state": "{automation}"
+        "stream_status.{id:key}.streaming": { value: "{streaming}", map: { "1": true, "0": false, "true": true, "false": false } }
+    - json_match: { "$.type": "^init$", "$.data.type": "^StreamState$" }
+      json: { id: "$.data.streamID", enabled: "$.data.enabled", active: "$.data.active", automation: "$.data.automationState", streaming: "$.data.isStreaming" }
+      state: *stream_state_state
+    - json_match: { "$.type": "^CS_API_SUCCESS$" }
+      json: { id: "$.streamID", call: "$.apiCall", message: "$.message" }
+      state:
+        "stream_status.{id:key}.last_api_call": "{call}"
+        "stream_status.{id:key}.last_api_message": "{message}"
+    - json_match: { "$.type": "^PortChanged$", "$.port": "^(\\d+)$" }
+      json: { value: "$.value" }
+      state: { "io_ports.{1}.value": "{value}" }
+    - json_match: { "$.type": "^init$", "$.data.type": "^PortChanged$", "$.data.port": "^(\\d+)$" }
+      json: { value: "$.data.value" }
+      state: { "io_ports.{1}.value": "{value}" }
+    - json_match: { "$.type": "^Service(Start|Stop)$", "$.serviceId": "^(\\d+)$" }
+      state: { "services.{2}.running": { value: "{1}", map: { Start: true, Stop: false } } }
+    - json_match: { "$.type": "^init$", "$.data.type": "^Service(Start|Stop)$", "$.data.serviceId": "^(\\d+)$" }
+      state: { "services.{2}.running": { value: "{1}", map: { Start: true, Stop: false } } }
+    - json_match: { "$.type": "^SwitcherStart$" }
+      json: { playlist: "$.default_playlist_id" }
+      state: { switcher.default_playlist: "{playlist}" }
+    - json_match: { "$.type": "^init$", "$.data.type": "^SwitcherStart$" }
+      json: { playlist: "$.data.default_playlist_id" }
+      state: { switcher.default_playlist: "{playlist}" }
+    - json_match: { "$.type": "^StreamSwitch(Video|Audio)$" }
+      json: { playlist: "$.playlist_name", stream: "$.stream_name", index: "$.playlist_active_stream" }
+      state: &switch_state
+        "switcher.{1:lower}.playlist": "{playlist}"
+        "switcher.{1:lower}.stream": "{stream}"
+        "switcher.{1:lower}.index": "{index}"
+    - json_match: { "$.type": "^init$", "$.data.type": "^StreamSwitch(Video|Audio)$" }
+      json: { playlist: "$.data.playlist_name", stream: "$.data.stream_name", index: "$.data.playlist_active_stream" }
+      state: *switch_state
+    - json_match: { "$.type": "^StreamAvailable$" }
+      json: { name: "$.stream_name", available: "$.state" }
+      state: &available_state { "stream_available.{name:key}.available": "{available}" }
+    - json_match: { "$.type": "^init$", "$.data.type": "^StreamAvailable$" }
+      json: { name: "$.data.stream_name", available: "$.data.state" }
+      state: *available_state
