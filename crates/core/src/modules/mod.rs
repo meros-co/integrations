@@ -141,6 +141,10 @@ mod nec_display;
 mod nec_projector;
 #[cfg(feature = "nec-projector")]
 mod nec_projector_models;
+#[cfg(feature = "nmos-node")]
+mod nmos_events;
+#[cfg(feature = "nmos-node")]
+mod nmos_mqtt;
 #[cfg(feature = "nmos-registry")]
 mod nmos_query;
 #[cfg(feature = "novastar-central-control")]
@@ -336,6 +340,10 @@ pub(crate) fn construct(
             Some("resolume-push") => Ok(Box::new(resolume_push::ResolumePush::new(
                 engine, spec, &context,
             ))),
+            #[cfg(feature = "nmos-node")]
+            Some("nmos-event-transports") => {
+                Ok(Box::new(nmos_events::NmosEvents::new(engine, &context)))
+            }
             #[cfg(feature = "nmos-registry")]
             Some("nmos-query-websocket") => {
                 Ok(Box::new(nmos_query::NmosQuery::new(engine, &context)))

@@ -917,7 +917,7 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
     # API's subscriptions) feeds json_match rules too.
     has_json = (transport_type in ("ws", "line-tcp", "line-serial", "line-udp")
                 or "websocket" in telemetry or "sse" in telemetry
-                or doc.get("extension") in ("nmos-query-websocket",))
+                or doc.get("extension") in ("nmos-query-websocket", "nmos-event-transports"))
     if "sse" in telemetry and transport_type != "http":
         errors.append("telemetry.sse needs an http transport")
     declared = [key.split(".") for key in (doc.get("state") or {})]

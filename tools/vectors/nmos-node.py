@@ -277,3 +277,27 @@ _tel("event-state", f"{EV}/sources/{_E}/state",
      {"events": {_E: {"event_type": "number/temperature/C", "value": "201", "scale": 10,
                       "payload": '{"value":201,"scale":10}', "creation_timestamp": "1532504241:104000200"}}})
 _tel("event-type", f"{EV}/sources/{_E}/type", {"type": "boolean"}, {"events": {_E: {"type": '{"type":"boolean"}'}}})
+
+# IS-07 messages on an event Sender's websocket or MQTT broker, as the
+# nmos-event-transports extension offers them (IS-07 v1.0.1, Message types).
+def nn_ws(name, message, expect_state, **extra):
+    telemetry(NN, name, inbound_ws=json.dumps(message, separators=(",", ":")), expect_state=expect_state, **extra)
+
+
+nn_ws("is07-state", {"identity": {"source_id": "6cbd0441-7882-44cd-9557-842243a0d618", "flow_id": "ff455cf3-fb17-448b-8f4c-e6c0e294f5ed"},
+                     "event_type": "boolean", "timing": {"creation_timestamp": "1531680501:280709600"},
+                     "payload": {"value": True}, "message_type": "state"},
+      {"events": {"6cbd0441-7882-44cd-9557-842243a0d618": {
+          "event_type": "boolean", "value": "true", "payload": "{\"value\":true}",
+          "creation_timestamp": "1531680501:280709600", "announced": "none"}}})
+nn_ws("is07-number-state", {"identity": {"source_id": "s2"}, "event_type": "number/temperature/C",
+                            "timing": {"creation_timestamp": "1:0"}, "payload": {"value": 215, "scale": 10},
+                            "message_type": "state"},
+      {"events": {"s2": {"event_type": "number/temperature/C", "value": "215", "scale": 10,
+                         "payload": "{\"value\":215,\"scale\":10}", "creation_timestamp": "1:0", "announced": "none"}}})
+nn_ws("is07-reboot", {"identity": {"source_id": "s2", "flow_id": "f"}, "timing": {"creation_timestamp": "1:0"},
+                      "message_type": "reboot"},
+      {"events": {"s2": {"announced": "reboot"}}})
+nn_ws("is07-connection-status", {"message_type": "connection_status", "active": False,
+                                 "sender_id": "772116e0-b4ba-43b1-9ffc-70287c17cb9e"},
+      {"event_senders": {"772116e0-b4ba-43b1-9ffc-70287c17cb9e": {"broker_connected": False}}})
