@@ -4197,6 +4197,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm Update Channel Stream Schedule takes its vacation fields as query parameters, not a body, and answers 204. ([specs/twitch.yaml:1073](specs/twitch.yaml#L1073))
 - [ ] Confirm Delete Videos answers 200 with the deleted ids, and what it answers for a video that is not the channel's. ([specs/twitch.yaml:1160](specs/twitch.yaml#L1160))
 
+## unifi-network — UniFi Network (Network API)
+
+- [ ] Check the API on a self-hosted UniFi OS Server and a Cloud Key: port, path prefix and certificate. ([specs/unifi-network.yaml:43](specs/unifi-network.yaml#L43))
+- [ ] Check power_cycle_port's off time and that it refuses ports without PoE. ([specs/unifi-network.yaml:1395](specs/unifi-network.yaml#L1395))
+- [ ] Check the filter syntax and its percent-encoding as sent in the query (name.eq('x')). ([specs/unifi-network.yaml:257](specs/unifi-network.yaml#L257))
+- [ ] Check the polled lists with offset=0&limit=200 on a large site, and the load of reading each device's details and statistics every 15 s. ([specs/unifi-network.yaml:1409](specs/unifi-network.yaml#L1409))
+
 ## ups-mib — UPS over SNMP (UPS-MIB, RFC 1628)
 
 - [ ] Walk an Eaton Network-M2 or Network-M3 card and a CyberPower RMCARD and check which UPS-MIB groups each fills. ([specs/ups-mib.yaml:39](specs/ups-mib.yaml#L39))
