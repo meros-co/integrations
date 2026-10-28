@@ -151,13 +151,14 @@ commands:
     returns: value
 
   list_pages:
-    summary: The Pages the user manages, each with id, name, category, the user's tasks and the Page access token, a secret returned here only; the answer's paging.cursors.after pages on (GET /me/accounts)
+    summary: Every Page the user manages, each with id, name, category, the user's tasks and the Page access token, a secret returned here only; every page of results is read and joined (GET /me/accounts)
     params:
       limit: { type: int, min: 1, max: 100, default: 25,
                label: Pages,
-               description: "How many Pages to return in this page of results." }
+               description: "How many Pages each page of results Facebook is asked for holds; every page is read." }
     send: { method: GET, path: "/{settings.api_version}/me/accounts",
-            query: { fields: "id,name,category,tasks,access_token", limit: "{limit}" } }
+            query: { fields: "id,name,category,tasks,access_token", limit: "{limit}" },
+            pages: &pages { items: "$.data", cursor: "$.paging.cursors.after", query: after, more: "$.paging.next" } }
     expect: { status: 200, json_path: "$" }
     returns: value
 
@@ -176,13 +177,13 @@ commands:
     returns: value
 
   list_page_names:
-    summary: The Pages the user manages, with id, name, category and the user's tasks but no tokens, for a picker followed by get_page_token (GET /me/accounts)
+    summary: Every Page the user manages, with id, name, category and the user's tasks but no tokens, for a picker followed by get_page_token; every page of results is read and joined (GET /me/accounts)
     params:
       limit: { type: int, min: 1, max: 100, default: 25,
                label: Pages,
-               description: "How many Pages to return in this page of results." }
+               description: "How many Pages each page of results Facebook is asked for holds; every page is read." }
     send: { method: GET, path: "/{settings.api_version}/me/accounts",
-            query: { fields: "id,name,category,tasks", limit: "{limit}" } }
+            query: { fields: "id,name,category,tasks", limit: "{limit}" }, pages: *pages }
     expect: { status: 200, json_path: "$" }
     returns: value
 
@@ -280,9 +281,10 @@ quirks:
     severity: info
     text: >
       Pages come 25 to an answer by default (limit, at most 100), as data
-      with paging; when the answer has paging.next there are more, and
-      list_pages_after (or list_page_names_after) with
-      paging.cursors.after gives the next ones. Each Page carries the
+      with paging; when the answer has paging.next there are more.
+      list_pages and list_page_names read every page (paging.cursors.after
+      while paging.next is there) and return them all; list_pages_after
+      and list_page_names_after read one page after a cursor. Each Page carries the
       user's tasks on it (such as CREATE_CONTENT, MODERATE, ANALYZE,
       ADVERTISE, MANAGE); going live is expected to need CREATE_CONTENT.
 
