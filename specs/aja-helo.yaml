@@ -145,6 +145,7 @@ models:
       - set_filename_prefix
       - get_filename_prefix
       - enter_data_lan_mode
+      - download_clip
       - enter_record_stream_mode
       - get_media_state
       - enable_authentication
@@ -182,6 +183,7 @@ models:
       - set_filename_prefix
       - get_filename_prefix
       - enter_data_lan_mode
+      - download_clip
       - enter_record_stream_mode
       - get_media_state
       - enable_authentication
@@ -434,6 +436,20 @@ commands:
       query: { action: set, paramid: eParamID_MediaState, value: "1" }
     expect: { status: 200 }
     returns: ack
+
+  download_clip:
+    summary: >
+      Download a recorded clip (.mov) from the current media to a host file,
+      streamed, in Data-LAN mode (GET /media0/<file>); returns the file saved
+      and its size
+    params:
+      clip: { type: string, required: true, max_length: 255, pattern: "^[^/]+$", label: Clip,
+              description: "File name of the clip on the current media, with its .mov extension." }
+      to: { type: save, required: true, label: Save to,
+            description: "The host file the clip is written to; replaced once the whole clip has arrived." }
+    send: { method: GET, path: "/media0/{clip}", save: to }
+    expect: { status: 200 }
+    returns: file
 
   enter_record_stream_mode:
     summary: >
@@ -848,10 +864,11 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Clip download (GET /media0/<file name>, video/quicktime, with the unit
-      in Data-LAN mode) carries a whole video file to the host, which this
-      format cannot express; a transfer in progress is aborted by
-      enter_record_stream_mode. Preset export and import are file transfers
+      download_clip (GET /media0/<file name>, video/quicktime, with the unit
+      in Data-LAN mode) streams a whole clip to a host file; a transfer in
+      progress is aborted by enter_record_stream_mode. AJA documents no
+      clip listing: the clip's name is the one the unit recorded it under
+      (eParamID_FilenamePrefix). Preset export and import are file transfers
       AJA does not document.
 
   - models: [helo-plus]

@@ -103,6 +103,10 @@ http(H, "get_filename_prefix", {}, "GET", _HGET + "eParamID_FilenamePrefix",
 
 # Media state (chapter 3).
 http(H, "enter_data_lan_mode", {}, "GET", _HSET + "eParamID_MediaState&value=1")
+# A clip saved to the host file named (never written by a vector).
+http(H, "download_clip", {"clip": "clip_0001.mov", "to": {"file": "clip_0001.mov"}}, "GET", "/media0/clip_0001.mov",
+     http_reply={"status": 200, "body": ""},
+     expect_result={"ok": {"kind": "value", "value": {"file": "clip_0001.mov", "size": None, "content_type": None}}})
 http(H, "enter_record_stream_mode", {}, "GET", _HSET + "eParamID_MediaState&value=0")
 http(H, "get_media_state", {}, "GET", _HGET + "eParamID_MediaState",
      http_reply={"status": 200, "body": _hreply("eParamID_MediaState", "1", "Data-LAN")},
