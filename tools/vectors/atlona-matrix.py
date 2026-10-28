@@ -289,3 +289,34 @@ telemetry(AT, "output-name", model="at-hdr-h2h-44ma", inbound="OutNameSet3 SonyX
           expect_state={"outputs": {"3": {"name": "SonyXBR7"}}})
 telemetry(AT, "preset-name", model="at-hdr-h2h-44ma", inbound="PreNameGet 4 HuddleRm2\r\n",
           expect_state={"presets": {"4": {"name": "HuddleRm2"}}})
+
+# AT-OME-ST31 (examples VOUTMute 2 off, RS232zone1[command], InputStatus 010)
+AT_ST31 = {"model": "at-ome-st31"}
+AT_SR21 = {"model": "at-ome-sr21"}
+at("set_output_mute", {"output": 2, "muted": False}, "VOUTMute 2 off", device_reply="VOUTMute 2 off\r\n",
+   expect_result=AT_OK, file="set_output_mute-st31", **AT_ST31)
+at_v("get_output_mute", {"output": 1}, "VOUTMute 1 sta", "VOUTMute 1 on", "on", file="get_output_mute-st31", **AT_ST31)
+at("send_zone_serial", {"zone": 1, "command": "command"}, "RS232zone1[command]", file="send_zone_serial-st31", **AT_ST31)
+at("set_host_name", {"name": "AT-OME-ST31_Huddle1"}, "SHostName AT-OME-ST31_Huddle1", file="set_host_name-st31", **AT_ST31)
+at_t("output-mute-st31", "VOUTMute 2 off", {"outputs": {"2": {"audio_muted": False}}}, **AT_ST31)
+
+# AT-OME-SR21 (examples VOUT -50, HDMIAUD on, RelayAct2 open, USBHostRoute local)
+at("set_volume", {"level": -50}, "VOUT -50", device_reply="VOUT -50\r\n", expect_result=AT_OK, **AT_SR21)
+at("increase_volume", {}, "VOUT +", device_reply="VOUT -29\r\n", expect_result=AT_OK, **AT_SR21)
+at("decrease_volume", {}, "VOUT -", device_reply="VOUT -51\r\n", expect_result=AT_OK, **AT_SR21)
+at_v("get_volume", {}, "VOUT sta", "VOUT -30", "-30", **AT_SR21)
+at("set_hdmi_audio", {"enabled": True}, "HDMIAUD on", device_reply="HDMIAUD on\r\n", expect_result=AT_OK, **AT_SR21)
+at_v("get_hdmi_audio", {}, "HDMIAUD sta", "HDMIAUD on", "on", **AT_SR21)
+at("set_relay", {"relay": 2, "closed": False}, "RelayAct2 open", device_reply="RelayAct2 open\r\n",
+   expect_result=AT_OK, **AT_SR21)
+at_v("get_relay", {"relay": 1}, "RelayAct1 sta", "RelayAct1 close", "close", **AT_SR21)
+at("set_usb_host_route", {"host": "local"}, "USBHostRoute local", device_reply="USBHostRoute local\r\n",
+   expect_result=AT_OK, file="set_usb_host_route-sr21", **AT_SR21)
+at_v("get_usb_host_route", {}, "USBHostRoute sta", "USBHostRoute remote", "remote", file="get_usb_host_route-sr21", **AT_SR21)
+at("set_output_mute", {"output": 1, "muted": True}, "VOUTMute1 on", file="set_output_mute-sr21", **AT_SR21)
+at("send_display_serial", {"command": "VOL23"}, "RS232zone[VOL23]", file="send_display_serial-sr21", **AT_SR21)
+at_t("volume-sr21", "VOUT -30", {"volume": -30}, **AT_SR21)
+at_t("hdmi-audio-sr21", "HDMIAUD on", {"hdmi_audio": True}, **AT_SR21)
+at_t("relay-sr21", "RelayAct1 close", {"relays": {"1": {"closed": True}}}, **AT_SR21)
+at_t("usb-host-route-sr21", "USBHostRoute local", {"usb": {"host_route": "local"}}, **AT_SR21)
+at_t("input-status-sr21", "InputStatus2 1", {"inputs": {"2": {"signal": True}}}, **AT_SR21)

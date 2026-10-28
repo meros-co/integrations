@@ -125,6 +125,33 @@ source:
       PWSTA, RepCmdTime, RepeatCmd, RHostName, RS232zone, SHostName, Status,
       Type, Unlock, Version, VOUTMute (1 HDMI, 2 HDBaseT), xY$, xYAVxZ
       (inputs 1 USB-C, 2-3 HDMI, output always 1, both outputs follow) p.4-14.
+  - title: "AT-OME-ST31 Application Programming Interface, firmware 1.0.05 (version 2, May 2019)"
+    author: Atlona Inc.
+    url: https://atlona.com/pdf/AT-OME-ST31_API.pdf
+    note: >
+      Manufacturer document (Internet Archive copy, 20250215205845). RS-232
+      or Telnet 23, 500 ms between commands, CR after each command and CR LF
+      after each answer p.3; Blink, CommaWait, DispBtn (on, off, tog, sta),
+      InputStatus (InputStatus 010), IP802.1x, IPCFG, IPDHCP, IPStatic, Lock,
+      Mreset, PWOFF, PWON, PWSTA, RepCmdTime, RepeatCmd, RHostName,
+      RS232zoneX[Y] (zone 1 only), SHostName, Status (x2AVx1,x2AVx2), Type,
+      Unlock, Version, VOUTMute with a space (VOUTMute 2 off; 1 HDMI, 2
+      HDBaseT), xY$, xYAVxZ (inputs 1 USB-C, 2-3 HDMI, output always 1)
+      p.3-13. It gives no RS-232 line settings.
+  - title: "AT-OME-SR21 Application Programming Interface (version 3, January 2021)"
+    author: Atlona Inc.
+    url: https://atlona.com/pdf/AT-OME-SR21_API.pdf
+    note: >
+      Manufacturer document (Internet Archive copy, 20240303123037). RS-232,
+      Telnet 23, SSH 22 or TCP (9000 MCU, 9001 HDBaseT input, 9002 local
+      RS-232 port 1), 500 ms between commands p.2; RS-232 port 1 drives the
+      display (9600 8N1), port 2 controls the unit (115200 8N1) p.3; Blink,
+      CommaWait, DispBtn (on, off, vol+, vol-, mute), HDMIAUD, InputStatus
+      (InputStatus 01, InputStatus2 1), IPCFG, IPDHCP, IPStatic, Lock, LRAUD,
+      Mreset, Reboot, RelayActX (relays 1-2: open, close, sta),
+      RS232zone[X], Status (x3Vx1), Type, Unlock, USBHostLogic,
+      USBHostRoute (local, remote), Version, VOUT (-80 to 0, +, -, sta),
+      VOUTMute (1-2), x?AVx1 (inputs 1-2) p.4-11.
   - title: "AT-OME-MH21 Application Programming Interface, version 1.0 (September 2020)"
     author: Atlona Inc.
     url: https://atlona.com/pdf/AT-OME-MH21_API.pdf
@@ -191,16 +218,18 @@ transport:
   pacing:
     min_interval_ms: 0
     by_model:
-      - { models: [at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21, at-hdr-h2h-44ma], min_interval_ms: 500 }
+      - { models: [at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-st31, at-ome-sr21, at-ome-mh21, at-hdr-h2h-44ma], min_interval_ms: 500 }
   # The same API on each unit's RS-232 control port (every document: "Commands
   # can be sent using RS-232, Telnet ..."). Line defaults: MS42, PS62 and SW32
-  # 115200 8N1, ST31A and MH21 9600 8N1 (their p.2-3). The PRO3 and H2H
-  # documents give the CSpara example 115200,8,0,1 but no factory default.
+  # 115200 8N1, ST31A and MH21 9600 8N1 (their p.2-3), SR21 port 2 115200
+  # 8N1 (p.3). The ST31's document gives none; 9600 like the ST31A is
+  # inferred. The PRO3 and H2H documents give the CSpara example
+  # 115200,8,0,1 but no factory default.
   serial:
     baud_rate:
       default: 115200
       values: [2400, 4800, 9600, 19200, 38400, 57600, 115200]
-      by_model: [{ models: [at-ome-st31a, at-ome-mh21], default: 9600 }]
+      by_model: [{ models: [at-ome-st31a, at-ome-st31, at-ome-mh21], default: 9600 }]
     data_bits: { default: 8, values: [7, 8] }
     parity: { default: none, values: [none, odd, even] }
     stop_bits: { default: 1, values: [1, 2] }
@@ -229,10 +258,11 @@ maps:
   onoff: { "true": "on", "false": "off" }
   lock_word: { "true": "Lock", "false": "Unlock" }
   ir_word: { "true": "IRON", "false": "IROFF" }
+  relay_word: { "true": "close", "false": "open" }
   parity_digit: { none: "0", odd: "1", even: "2" }
 
 ports:
-  - { port: 23, protocol: tcp, role: control, when: "link tcp", note: "Telnet, changeable with IPPort; the Omega MS42, PS62 and MH21 also answer the same API, without a login, on TCP 9000" }
+  - { port: 23, protocol: tcp, role: control, when: "link tcp", note: "Telnet, changeable with IPPort; the Omega MS42, PS62, SR21 and MH21 also answer the same API, without a login, on TCP 9000" }
   - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The unit's RS-232 control port, a 3- or 4-pole captive screw connector (PRO3: the master RS-232 port)" }
 
 models:
@@ -408,6 +438,38 @@ models:
       Inputs 1 USB-C, 2 HDMI 1, 3 HDMI 2 to output 1; the HDMI and HDBaseT
       outputs carry the same source, and Status reports both (x2AVx1,x2AVx2).
       Output video and mutes take 1 HDMI and 2 HDBaseT.
+  - id: at-ome-st31
+    name: Atlona AT-OME-ST31 (Omega 3-input switcher with HDBaseT and HDMI outputs)
+    supports:
+      [route, get_routing, set_output_video, get_output_video, set_output_mute, get_output_mute,
+       get_input_signals, power_on, power_off, get_power, set_blink, get_blink,
+       set_comma_wait, get_comma_wait, set_display_button, get_display_button, set_front_panel_lock,
+       set_8021x, get_8021x, set_dhcp, get_dhcp, set_static_ip, get_network,
+       set_repeat, get_repeat, set_repeat_count, get_repeat_count, send_zone_serial,
+       set_host_name, get_host_name, factory_reset, get_model, get_firmware]
+    verification: none
+    notes: >
+      The ST31A's predecessor: inputs 1 USB-C, 2 HDMI 1, 3 HDMI 2 to output
+      1, with the HDMI and HDBaseT outputs carrying the same source. Output
+      video and mutes take 1 HDMI and 2 HDBaseT; VOUTMute takes a space
+      before the output. Display serial is RS-232 zone 1 (send_zone_serial).
+      It has no LRAUD or OutHdmi5vKeep.
+  - id: at-ome-sr21
+    name: Atlona AT-OME-SR21 (Omega scaler for HDBaseT and HDMI with USB)
+    supports:
+      [route, get_routing, set_output_mute, get_output_mute, get_input_signals, get_input_signal,
+       set_volume, increase_volume, decrease_volume, get_volume, set_hdmi_audio, get_hdmi_audio,
+       set_analog_audio, get_analog_audio, set_blink, get_blink, set_comma_wait, get_comma_wait,
+       set_display_button_sw32, set_front_panel_lock, set_dhcp, get_dhcp, set_static_ip, get_network,
+       set_relay, get_relay, send_display_serial, set_usb_host_logic, get_usb_host_logic,
+       set_usb_host_route, get_usb_host_route, reboot, factory_reset, get_model, get_firmware]
+    verification: none
+    notes: >
+      Inputs 1-2 (HDBaseT and HDMI) to output 1. VOUT sets the analog audio
+      level, -80 to 0; VOUTMute takes channels 1-2. Relays 1-2. The USB host
+      is local (the unit's USB port) or remote (over HDBaseT). The display
+      button takes on, off, vol+, vol- and mute (no tog, no sta). It has no
+      power commands.
   - id: at-ome-mh21
     name: Atlona AT-OME-MH21 (Omega 2-input switcher for HDMI and USB-C with USB hub)
     supports:
@@ -529,15 +591,19 @@ commands:
       output: &zone { type: int, min: 1, max: 16, required: true, label: Zone,
                       description: "The audio output (zone) from 1, as the model's document numbers it (PS62: 1 HDBaseT, 2 HDMI, 3-4 analog)." }
       muted:  { type: bool, required: true, label: Muted, description: "On mutes the output's audio; off unmutes it." }
-    send: "VOUTMute{output} {muted:map.onoff}"
-    expect: { reply_contains: "VOUTMute{output} ", not_contains: "Command FAILED" }
+    send:
+      - { models: [at-ome-st31], message: "VOUTMute {output} {muted:map.onoff}" }
+      - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-sr21], message: "VOUTMute{output} {muted:map.onoff}" }
+    expect: { reply_contains: "VOUTMute", not_contains: "Command FAILED" }
     returns: ack
 
   get_output_mute:
     summary: Read whether an output's or zone's audio is muted (VOUTMuteN sta)
     params: { output: *zone }
-    send: "VOUTMute{output} sta"
-    expect: { reply_contains: "VOUTMute{output} ", matches: ' (on|off)$' }
+    send:
+      - { models: [at-ome-st31], message: "VOUTMute {output} sta" }
+      - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-sr21], message: "VOUTMute{output} sta" }
+    expect: { reply_contains: "VOUTMute", matches: ' (on|off)$' }
     returns: value
 
   set_audio_mute:
@@ -583,6 +649,46 @@ commands:
     params: { output: *zone }
     send: "VOUT{output} sta"
     expect: { reply_contains: "VOUT{output} ", matches: ' (-?\d+)$' }
+    returns: value
+
+  set_volume:
+    summary: Set the analog audio level in dB (VOUT level), the AT-OME-SR21's single control
+    params:
+      level: { type: int, min: -80, max: 0, required: true, label: Level, description: "Analog audio level in dB, -80 to 0." }
+    send: "VOUT {level}"
+    expect: { reply_contains: "VOUT ", not_contains: "Command FAILED" }
+    returns: ack
+
+  increase_volume:
+    summary: Raise the analog audio level 1 dB (VOUT +), the AT-OME-SR21's single control
+    send: "VOUT +"
+    expect: { reply_contains: "VOUT ", not_contains: "Command FAILED" }
+    returns: ack
+
+  decrease_volume:
+    summary: Lower the analog audio level 1 dB (VOUT -), the AT-OME-SR21's single control
+    send: "VOUT -"
+    expect: { reply_contains: "VOUT ", not_contains: "Command FAILED" }
+    returns: ack
+
+  get_volume:
+    summary: Read the analog audio level in dB (VOUT sta), the AT-OME-SR21's single control
+    send: "VOUT sta"
+    expect: { reply_contains: "VOUT ", matches: '^VOUT (-?\d+)$' }
+    returns: value
+
+  set_hdmi_audio:
+    summary: Turn the HDMI output's audio on or off (HDMIAUD on|off)
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On sends audio on the HDMI output; off removes it." }
+    send: "HDMIAUD {enabled:map.onoff}"
+    expect: { reply_contains: "HDMIAUD ", not_contains: "Command FAILED" }
+    returns: ack
+
+  get_hdmi_audio:
+    summary: Read whether the HDMI output carries audio (HDMIAUD sta)
+    send: "HDMIAUD sta"
+    expect: { reply_contains: "HDMIAUD ", matches: ' (on|off)$' }
     returns: value
 
   set_mirror:
@@ -793,6 +899,22 @@ commands:
     returns: value
 
   # ── Power and front panel ────────────────────────────────────────────────
+  set_relay:
+    summary: Open or close a relay (RelayActN open|close)
+    params:
+      relay: &relay { type: int, min: 1, max: 2, required: true, label: Relay, description: "The relay port, 1 or 2." }
+      closed: { type: bool, required: true, label: Closed, description: "On closes the relay; off opens it." }
+    send: "RelayAct{relay} {closed:map.relay_word}"
+    expect: { reply_contains: "RelayAct{relay} ", not_contains: "Command FAILED" }
+    returns: ack
+
+  get_relay:
+    summary: Read whether a relay is open or closed (RelayActN sta)
+    params: { relay: *relay }
+    send: "RelayAct{relay} sta"
+    expect: { reply_contains: "RelayAct{relay} ", matches: ' (open|close)$' }
+    returns: value
+
   power_on:
     summary: Power the unit on from standby (PWON)
     send: "PWON"
@@ -1342,7 +1464,7 @@ commands:
               description: "Letters, digits, - and _ without spaces: up to 40 characters on PRO3 matrices, 15 on the AT-OME-MH21." }
     send:
       - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m], message: "set_host_name {name}" }
-      - { models: [at-ome-st31a, at-ome-mh21], message: "SHostName {name}" }
+      - { models: [at-ome-st31a, at-ome-st31, at-ome-mh21], message: "SHostName {name}" }
     expect: { reply_contains: "ost", not_contains: "Command FAILED" }
     returns: ack
 
@@ -1350,7 +1472,7 @@ commands:
     summary: Read the unit's host name (show_host_name; RHostName on Omega)
     send:
       - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m], message: "show_host_name" }
-      - { models: [at-ome-st31a, at-ome-mh21], message: "RHostName" }
+      - { models: [at-ome-st31a, at-ome-st31, at-ome-mh21], message: "RHostName" }
     expect: { matches: '^(?:RHostName )?(\S+)$' }
     returns: value
 
@@ -1369,7 +1491,7 @@ commands:
   get_firmware:
     summary: Read the firmware version (Version; VersionMCU on the H2H)
     send:
-      - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "Version" }
+      - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-st31, at-ome-sr21, at-ome-mh21], message: "Version" }
       - { models: [at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma], message: "VersionMCU" }
     expect: { matches: '^(?:Firmware )?(\d[\w.]*)$' }
     returns: value
@@ -1462,10 +1584,10 @@ commands:
   set_usb_host_route:
     summary: Choose the USB host (USBHostRoute port; UsbHostRoute on the MH21)
     params:
-      host: { type: enum, values: [C, "1", "2", "3"], required: true, label: USB host,
-              description: "MS42: C (USB-C), 1 or 2 (USB host ports), 3 (the remote host over HDBaseT); MH21: 1 (USB-C) or 2 (USB host)." }
+      host: { type: enum, values: [C, "1", "2", "3", local, remote], required: true, label: USB host,
+              description: "MS42: C (USB-C), 1 or 2 (USB host ports), 3 (the remote host over HDBaseT); MH21: 1 (USB-C) or 2 (USB host); SR21: local (the unit's USB port) or remote (over HDBaseT)." }
     send:
-      - { models: [at-ome-ms42], message: "USBHostRoute {host}" }
+      - { models: [at-ome-ms42, at-ome-sr21], message: "USBHostRoute {host}" }
       - { models: [at-ome-mh21], message: "UsbHostRoute {host}" }
     expect: { reply_contains: "HostRoute ", not_contains: "Command FAILED" }
     returns: ack
@@ -1473,7 +1595,7 @@ commands:
   get_usb_host_route:
     summary: Read the USB host (USBHostRoute sta)
     send:
-      - { models: [at-ome-ms42], message: "USBHostRoute sta" }
+      - { models: [at-ome-ms42, at-ome-sr21], message: "USBHostRoute sta" }
       - { models: [at-ome-mh21], message: "UsbHostRoute sta" }
     expect: { reply_contains: "HostRoute ", matches: 'HostRoute (\S+)$' }
     returns: value
@@ -1560,6 +1682,9 @@ state:
   front_panel_locked:        { type: bool, description: "Whether the front-panel buttons are locked; known from Lock and Unlock answers only" }
   ir_enabled:                { type: bool, description: "Whether the front-panel IR receiver is enabled (IRON, IROFF, IRSTA)" }
   display_button:            { type: string, description: "DISPLAY button state: on, off, tog, mute, vol+ or vol- (DispBtn)" }
+  volume:                    { type: int, unit: dB, description: "Analog audio level (VOUT; AT-OME-SR21)" }
+  hdmi_audio:                { type: bool, description: "Whether the HDMI output carries audio (HDMIAUD)" }
+  relays.*.closed:           { type: bool, description: "Whether the relay is closed, keyed by relay (RelayAct)" }
   analog_audio:              { type: bool, description: "Whether the analog audio output is enabled (LRAUD)" }
   hdmi_5v_keep:              { type: bool, description: "Whether the HDMI output holds +5V high always (OutHdmi5vKeep)" }
   comma_wait:                { type: bool, description: "Whether a comma in stored display commands waits 5 s (CommaWait)" }
@@ -1610,6 +1735,9 @@ telemetry:
       send:
         - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "Status" }
         - { models: [at-ome-mh21], message: "Statusx1" }
+        - { models: [at-ome-st31, at-ome-sr21], message: "Status" }
+        - { models: [at-ome-st31], message: "PWSTA" }
+        - { models: [at-ome-st31, at-ome-sr21], message: "InputStatus" }
         - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "PWSTA" }
         - { models: [at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "InputStatus" }
         - { models: [at-ome-mh21], message: "InputStatus1" }
@@ -1739,6 +1867,31 @@ telemetry:
         - { models: [at-ome-ms42], message: "UsbVbusControl sta" }
         - { models: [at-ome-mh21], message: "UsbHostRoute sta" }
         - { models: [at-ome-mh21], message: "UsbMode sta" }
+        # The ST31 and SR21.
+        - { models: [at-ome-st31, at-ome-sr21], message: "Type" }
+        - { models: [at-ome-st31, at-ome-sr21], message: "Version" }
+        - { models: [at-ome-st31, at-ome-sr21], message: "IPCFG" }
+        - { models: [at-ome-st31, at-ome-sr21], message: "Blink sta" }
+        - { models: [at-ome-st31, at-ome-sr21], message: "IPDHCP sta" }
+        - { models: [at-ome-st31, at-ome-sr21], message: "CommaWait sta" }
+        - { models: [at-ome-st31], message: "x1$ sta" }
+        - { models: [at-ome-st31], message: "x2$ sta" }
+        - { models: [at-ome-st31], message: "VOUTMute 1 sta" }
+        - { models: [at-ome-st31], message: "VOUTMute 2 sta" }
+        - { models: [at-ome-st31], message: "DispBtn sta" }
+        - { models: [at-ome-st31], message: "IP802.1x sta" }
+        - { models: [at-ome-st31], message: "RepeatCmd sta" }
+        - { models: [at-ome-st31], message: "RepCmdTime sta" }
+        - { models: [at-ome-st31], message: "RHostName" }
+        - { models: [at-ome-sr21], message: "VOUTMute1 sta" }
+        - { models: [at-ome-sr21], message: "VOUTMute2 sta" }
+        - { models: [at-ome-sr21], message: "VOUT sta" }
+        - { models: [at-ome-sr21], message: "HDMIAUD sta" }
+        - { models: [at-ome-sr21], message: "LRAUD sta" }
+        - { models: [at-ome-sr21], message: "RelayAct1 sta" }
+        - { models: [at-ome-sr21], message: "RelayAct2 sta" }
+        - { models: [at-ome-sr21], message: "USBHostLogic sta" }
+        - { models: [at-ome-sr21], message: "USBHostRoute sta" }
         - { models: [at-ome-mh21], message: "UsbCSS sta" }
         - { models: [at-ome-mh21], message: "InputBroadcast sta" }
         - { models: [at-ome-mh21], message: "AutoPwr sta" }
@@ -1777,13 +1930,19 @@ telemetry:
       state: { power: { value: "{1}", map: { "N": true, "FF": false } } }
     - match: '^x(\d+)\$ (on|off)$'
       state: { "outputs.{1}.video_enabled": { value: "{2}", map: { "on": true, "off": false } } }
-    - match: '^VOUTMute(\d+) (on|off)$'
+    - match: '^VOUTMute ?(\d+) (on|off)$'
       state: { "outputs.{1}.audio_muted": { value: "{2}", map: { "on": true, "off": false } } }
     - models: [at-ome-mh21]
       match: '^VOUTMute (on|off)$'
       state: { "outputs.1.audio_muted": { value: "{1}", map: { "on": true, "off": false } } }
     - match: '^VOUT(\d+) (-?\d+)$'
       state: { "outputs.{1}.volume": "{2}" }
+    - match: '^VOUT (-?\d+)$'
+      state: { volume: "{1}" }
+    - match: '^HDMIAUD (on|off)$'
+      state: { hdmi_audio: { value: "{1}", map: { "on": true, "off": false } } }
+    - match: '^RelayAct(\d) (open|close)$'
+      state: { "relays.{1}.closed": { value: "{2}", map: { "close": true, "open": false } } }
     - match: '^MirrorHdmi(\d+) Out(\d+)$'
       state: { "outputs.{1}.mirror_of": "{2}" }
     - match: '^UnMirror(\d+)$'
@@ -1911,7 +2070,7 @@ telemetry:
       state: { host_name: "{1}" }
     - match: '^USBHostLogic (follow usb|follow video|manual)$'
       state: { usb.host_logic: "{1}" }
-    - match: '^(?:USB|Usb)HostRoute (C|[1-3])$'
+    - match: '^(?:USB|Usb)HostRoute (C|[1-3]|local|remote)$'
       state: { usb.host_route: "{1}" }
     - match: '^UsbVbusControl (on|off)$'
       state: { usb.vbus: { value: "{1}", map: { "on": true, "off": false } } }
@@ -1978,12 +2137,21 @@ quirks:
       answered "SetCmd on CRLF [PWON]", and IRSetCmd's syntax as "IRSetCmd
       X[Y]" with the example "IRSetCmd off poweroff"; neither says where
       the command text goes. Set them in the web GUI.
-  - models: [at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21]
+  - models: [at-ome-st31, at-ome-sr21]
+    severity: info
+    text: >
+      Inferred: the ST31's RS-232 line (9600 8N1, as the ST31A; its document
+      gives none) and that the SR21's HDMIAUD, RelayAct, USBHostRoute and
+      VOUT answers look like their examples. The SR21's Status example reads
+      x3Vx1 for a unit with inputs 1-2, taken as a document error; the route
+      is read from whatever input the answer names. The SR21 has no sta for
+      DispBtn, so its display button state is not read.
+  - models: [at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-st31, at-ome-sr21, at-ome-mh21]
     severity: info
     text: >
       Atlona asks for 500 ms between commands on Omega switchers, which the
       core keeps (transport pacing), so a full settings poll takes a while.
-      The MS42, PS62 and MH21 also take this API without a login on TCP
+      The MS42, PS62, SR21 and MH21 also take this API without a login on TCP
       9000 ("MCU, similar to Telnet"); open the device with that port to use
       it. Ports 9001-9004 pass data straight to the RS-232 ports of the unit
       and its HDBaseT endpoints and are not this API.
