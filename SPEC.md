@@ -1697,7 +1697,8 @@ hash, which a file holds only if it was made to. A vector for such a command
 gives the body as `body_hex`, and may give `content_type`, in
 `expect_request`. `tools/validate.py` checks that
 a binary parameter is required, named only by `body.binary` or a part's
-`binary`, and used only over HTTP.
+`binary`, and used only over HTTP: the transport's, or an endpoint's (§2,
+Endpoints) beside a transport of another kind.
 
 ### Saving a response to a file
 

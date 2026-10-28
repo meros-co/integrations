@@ -116,8 +116,11 @@ def binary_checks(send, params: dict, where: str, transport_type) -> list[str]:
             for name in item["headers"]:
                 if name.lower() in ("authorization", "content-type", "host"):
                     errors.append(f"{where}: header {name} is set by the core, not by the spec")
-    if refs and transport_type != "http":
-        errors.append(f"{where}: binary bodies are for the http transport")
+    # Over HTTP: the transport's, or an endpoint beside another transport.
+    for item in send if isinstance(send, list) else [send]:
+        if isinstance(item, dict) and binary_refs(item) and transport_type != "http" and "endpoint" not in item:
+            errors.append(f"{where}: binary bodies are for the http transport or an endpoint")
+            break
     for name in refs:
         decl = params.get(name)
         if decl is None or decl.get("type") != "binary":

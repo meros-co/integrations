@@ -36,7 +36,9 @@ class Binary(unittest.TestCase):
                 "multipart": [{"name": "f", "binary": "file", "filename": "{name}"}]}
         self.assertEqual(validate.binary_checks(form, self.PARAMS, "c", "http"), [])
         self.assertEqual(validate.binary_checks(send, self.PARAMS, "c", "line-tcp"),
-                         ["c: binary bodies are for the http transport"])
+                         ["c: binary bodies are for the http transport or an endpoint"])
+        # An HTTP endpoint beside a line transport takes them too.
+        self.assertEqual(validate.binary_checks(dict(send, endpoint="files"), self.PARAMS, "c", "line-tcp"), [])
 
     def test_a_binary_parameter_is_never_templated_and_always_given(self):
         errors = validate.check_template("http-body", "{file}", self.PARAMS, {}, "c")
