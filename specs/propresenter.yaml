@@ -247,12 +247,12 @@ commands:
     expect: { status: 204 }
     returns: ack
   audio_playlist_get:
-    summary: "Requests a list of all the audio items in the specified audio playlist."
+    summary: "Requests a list of all the audio items in the specified audio playlist. Every item is read, 100 a request."
     params:
       playlist_id: { type: string, max_length: 256, required: true,
                      label: Audio playlist,
                      description: "The audio playlist, by UUID, name or index, or a path of them for a playlist within folders." }
-    send: { method: GET, path: "/v1/audio/playlist/{playlist_id}" }
+    send: { method: GET, path: "/v1/audio/playlist/{playlist_id}", pages: { items: "$.items", offset: start } }
     expect: { status: 200, json_path: "$" }
     returns: value
   audio_playlist_focus:
@@ -692,12 +692,12 @@ commands:
     expect: { status: 204 }
     returns: ack
   media_playlist_get:
-    summary: "Requests a list of all the media items in the specified media playlist."
+    summary: "Requests a list of all the media items in the specified media playlist. Every item is read, 100 a request."
     params:
       playlist_id: { type: string, max_length: 256, required: true,
                      label: Media playlist,
                      description: "The media playlist, by UUID, name or index, or a path of them for a playlist within folders." }
-    send: { method: GET, path: "/v1/media/playlist/{playlist_id}" }
+    send: { method: GET, path: "/v1/media/playlist/{playlist_id}", pages: { items: "$.items", offset: start } }
     expect: { status: 200, json_path: "$" }
     returns: value
   media_playlist_focus:
@@ -2215,17 +2215,17 @@ telemetry:
       json_each: "$"
       each_match: { "$.type": "^playlist$", "$.id.uuid": "^([^/]+)$" }
       json: {}
-      then_send: [{ method: GET, path: "/v1/{1}/playlist/{2}" }]
+      then_send: [{ method: GET, path: "/v1/{1}/playlist/{2}", pages: { items: "$.items", offset: start } }]
     - path: "^/v1/(media|audio)/playlists$"
       json_each: "$[*].children"
       each_match: { "$.type": "^playlist$", "$.id.uuid": "^([^/]+)$" }
       json: {}
-      then_send: [{ method: GET, path: "/v1/{1}/playlist/{2}" }]
+      then_send: [{ method: GET, path: "/v1/{1}/playlist/{2}", pages: { items: "$.items", offset: start } }]
     - path: "^/v1/(media|audio)/playlists$"
       json_each: "$[*].children[*].children"
       each_match: { "$.type": "^playlist$", "$.id.uuid": "^([^/]+)$" }
       json: {}
-      then_send: [{ method: GET, path: "/v1/{1}/playlist/{2}" }]
+      then_send: [{ method: GET, path: "/v1/{1}/playlist/{2}", pages: { items: "$.items", offset: start } }]
     # A playlist's items, from that read or playlist_get, by position. The
     # active and focused playlist replies hold no id and items, so they are
     # not taken for one.
@@ -2255,8 +2255,8 @@ telemetry:
         "playlist_items.{1:key}.{index}.presentation_uuid": "{presentation}"
         "playlist_items.{1:key}.{index}.arrangement": "{arrangement}"
         "playlist_items.{1:key}.{index}.target_uuid": "{target}"
-    # A media or audio playlist's items: the first 100, which is all one
-    # request returns.
+    # A media or audio playlist's items: every one, read 100 a request (start)
+    # and joined.
     - path: "^/v1/(media|audio)/playlist/[^/]+$"
       json_match: { "$.id.uuid": "^(.+)$", "$.items": "^\\[" }
       replace: "{1}_playlist_items.{2:key}"
@@ -2537,12 +2537,12 @@ state:
   playlist_items.*.*.presentation_uuid: { type: string, description: "UUID of the presentation a presentation item refers to" }
   playlist_items.*.*.arrangement: { type: string, description: "Arrangement selected for a presentation item" }
   playlist_items.*.*.target_uuid: { type: string, description: "UUID of the presentation, media or audio the item stands for" }
-  media_playlist_items.*.*.uuid: { type: string, description: "UUID of a media item, keyed by the media playlist's UUID and the item's position from 0 (the first 100)" }
+  media_playlist_items.*.*.uuid: { type: string, description: "UUID of a media item, keyed by the media playlist's UUID and the item's position from 0" }
   media_playlist_items.*.*.name: { type: string, description: "Name of the media item" }
   media_playlist_items.*.*.type: { type: string, description: "audio, video or image" }
   media_playlist_items.*.*.artist: { type: string, description: "Artist of the media" }
   media_playlist_items.*.*.duration: { type: int, unit: s, description: "Length of the media" }
-  audio_playlist_items.*.*.uuid: { type: string, description: "UUID of an audio item, keyed by the audio playlist's UUID and the item's position from 0 (the first 100)" }
+  audio_playlist_items.*.*.uuid: { type: string, description: "UUID of an audio item, keyed by the audio playlist's UUID and the item's position from 0" }
   audio_playlist_items.*.*.name: { type: string, description: "Name of the audio item" }
   audio_playlist_items.*.*.type: { type: string, description: "audio, video or image" }
   audio_playlist_items.*.*.artist: { type: string, description: "Artist of the audio" }
@@ -2609,8 +2609,8 @@ quirks:
       under their group, keyed by the group's position and the slide's within
       it, both from 0, as the API numbers a slide within its group only. A
       slide's image is not kept. A media or audio playlist request returns at most 100
-      items, and only the first 100 are kept; the rest need media_playlist_get
-      or audio_playlist_get with start. A playlist deleted in ProPresenter
+      items from its start index, so every playlist is read 100 at a time until a
+      request returns none, and kept whole. A playlist deleted in ProPresenter
       keeps its last items in playlist_items until the device is opened
       again. Auto-advance can
       only be cancelled (transport_layer_auto_advance_delete); the API has no

@@ -169,8 +169,13 @@ for path, ops in sorted(spec["paths"].items()):
         if name in commands:
             name = f"{name}_{method}"
         params = {}
+        paged = False
         for prm in resolve(shared) + op.get("parameters", []):
             if prm["in"] == "query":
+                # A list given 100 items a request from an optional start
+                # index: read whole, every page joined (SPEC.md §4, Paged lists).
+                if prm["name"] == "start" and not prm.get("required"):
+                    paged = True
                 if prm["name"] in SKIP_QUERY or not prm.get("required"):
                     continue
             if prm["in"] not in ("path", "query"):
@@ -227,6 +232,8 @@ for path, ops in sorted(spec["paths"].items()):
         returns_value = status == 200 and "application/json" in content
         query = {k: f"{{{k}}}" for k, p in params.items() if p.get("in") == "query"}
         summary = op.get("summary", "").strip()
+        if paged:
+            summary += " Every item is read, 100 a request."
         if body == "{body}":
             summary += " The body is JSON in the shape the API document gives for this operation."
         commands[name] = {
@@ -238,6 +245,7 @@ for path, ops in sorted(spec["paths"].items()):
             "body": body,
             "status": status,
             "returns": "value" if returns_value else "ack",
+            "paged": paged,
         }
         if optional_body:
             # The body is optional (a message's tokens): a second command
@@ -273,6 +281,8 @@ for name, c in commands.items():
     if c["body"]:
         send.append(f"body: {yq(c['body'])}")
         send.append("content_type: application/json")
+    if c.get("paged"):
+        send.append('pages: { items: "$.items", offset: start }')
     lines.append(f"    send: {{ {', '.join(send)} }}")
     if c["returns"] == "value":
         lines.append(f"    expect: {{ status: {c['status']}, json_path: \"$\" }}")
@@ -801,17 +811,17 @@ TAIL = r'''telemetry:
       json_each: "$"
       each_match: { "$.type": "^playlist$", "$.id.uuid": "^([^/]+)$" }
       json: {}
-      then_send: [{ method: GET, path: "/v1/{1}/playlist/{2}" }]
+      then_send: [{ method: GET, path: "/v1/{1}/playlist/{2}", pages: { items: "$.items", offset: start } }]
     - path: "^/v1/(media|audio)/playlists$"
       json_each: "$[*].children"
       each_match: { "$.type": "^playlist$", "$.id.uuid": "^([^/]+)$" }
       json: {}
-      then_send: [{ method: GET, path: "/v1/{1}/playlist/{2}" }]
+      then_send: [{ method: GET, path: "/v1/{1}/playlist/{2}", pages: { items: "$.items", offset: start } }]
     - path: "^/v1/(media|audio)/playlists$"
       json_each: "$[*].children[*].children"
       each_match: { "$.type": "^playlist$", "$.id.uuid": "^([^/]+)$" }
       json: {}
-      then_send: [{ method: GET, path: "/v1/{1}/playlist/{2}" }]
+      then_send: [{ method: GET, path: "/v1/{1}/playlist/{2}", pages: { items: "$.items", offset: start } }]
     # A playlist's items, from that read or playlist_get, by position. The
     # active and focused playlist replies hold no id and items, so they are
     # not taken for one.
@@ -841,8 +851,8 @@ TAIL = r'''telemetry:
         "playlist_items.{1:key}.{index}.presentation_uuid": "{presentation}"
         "playlist_items.{1:key}.{index}.arrangement": "{arrangement}"
         "playlist_items.{1:key}.{index}.target_uuid": "{target}"
-    # A media or audio playlist's items: the first 100, which is all one
-    # request returns.
+    # A media or audio playlist's items: every one, read 100 a request (start)
+    # and joined.
     - path: "^/v1/(media|audio)/playlist/[^/]+$"
       json_match: { "$.id.uuid": "^(.+)$", "$.items": "^\\[" }
       replace: "{1}_playlist_items.{2:key}"
@@ -1123,12 +1133,12 @@ state:
   playlist_items.*.*.presentation_uuid: { type: string, description: "UUID of the presentation a presentation item refers to" }
   playlist_items.*.*.arrangement: { type: string, description: "Arrangement selected for a presentation item" }
   playlist_items.*.*.target_uuid: { type: string, description: "UUID of the presentation, media or audio the item stands for" }
-  media_playlist_items.*.*.uuid: { type: string, description: "UUID of a media item, keyed by the media playlist's UUID and the item's position from 0 (the first 100)" }
+  media_playlist_items.*.*.uuid: { type: string, description: "UUID of a media item, keyed by the media playlist's UUID and the item's position from 0" }
   media_playlist_items.*.*.name: { type: string, description: "Name of the media item" }
   media_playlist_items.*.*.type: { type: string, description: "audio, video or image" }
   media_playlist_items.*.*.artist: { type: string, description: "Artist of the media" }
   media_playlist_items.*.*.duration: { type: int, unit: s, description: "Length of the media" }
-  audio_playlist_items.*.*.uuid: { type: string, description: "UUID of an audio item, keyed by the audio playlist's UUID and the item's position from 0 (the first 100)" }
+  audio_playlist_items.*.*.uuid: { type: string, description: "UUID of an audio item, keyed by the audio playlist's UUID and the item's position from 0" }
   audio_playlist_items.*.*.name: { type: string, description: "Name of the audio item" }
   audio_playlist_items.*.*.type: { type: string, description: "audio, video or image" }
   audio_playlist_items.*.*.artist: { type: string, description: "Artist of the audio" }
@@ -1195,8 +1205,8 @@ quirks:
       under their group, keyed by the group's position and the slide's within
       it, both from 0, as the API numbers a slide within its group only. A
       slide's image is not kept. A media or audio playlist request returns at most 100
-      items, and only the first 100 are kept; the rest need media_playlist_get
-      or audio_playlist_get with start. A playlist deleted in ProPresenter
+      items from its start index, so every playlist is read 100 at a time until a
+      request returns none, and kept whole. A playlist deleted in ProPresenter
       keeps its last items in playlist_items until the device is opened
       again. Auto-advance can
       only be cancelled (transport_layer_auto_advance_delete); the API has no
