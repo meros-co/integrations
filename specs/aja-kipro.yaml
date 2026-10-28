@@ -124,6 +124,7 @@ models:
       - set_use_custom_clip_take
       - record_named
       - enter_data_lan_mode
+      - download_clip
       - enter_record_play_mode
       - get_media_state
       - get_clips
@@ -180,6 +181,7 @@ models:
       - set_use_custom_clip_take
       - record_named
       - enter_data_lan_mode
+      - download_clip
       - enter_record_play_mode
       - get_media_state
       - get_clips
@@ -223,6 +225,7 @@ models:
       - set_use_custom_clip_take
       - record_named
       - enter_data_lan_mode
+      - download_clip
       - enter_record_play_mode
       - get_media_state
       - get_clips
@@ -261,6 +264,7 @@ models:
       - record_at_system_time
       - go_to_idle
       - enter_data_lan_mode
+      - download_clip
       - enter_record_play_mode
       - get_media_state
       - get_storage_path
@@ -308,6 +312,7 @@ models:
       - record_at_system_time
       - go_to_idle
       - enter_data_lan_mode
+      - download_clip
       - enter_record_play_mode
       - get_media_state
       - get_storage_path
@@ -356,6 +361,8 @@ models:
       - set_playback_speed
       - play_at_speed
       - enter_data_lan_mode
+      - download_clip
+      - upload_clip
       - enter_record_play_mode
       - get_media_state
       - get_storage_path
@@ -398,6 +405,8 @@ models:
       - set_playback_speed
       - play_at_speed
       - enter_data_lan_mode
+      - download_clip
+      - upload_clip
       - enter_record_play_mode
       - get_media_state
       - get_storage_path
@@ -447,6 +456,8 @@ models:
       - set_playback_speed
       - play_at_speed
       - enter_data_lan_mode
+      - download_clip
+      - upload_clip
       - enter_record_play_mode
       - get_media_state
       - get_storage_path
@@ -880,6 +891,42 @@ commands:
       method: POST
       path: /clips
       query: { action: delete, clipname: "{clip}" }
+    expect: { status: 200 }
+    returns: ack
+
+  download_clip:
+    summary: >
+      Download a clip of the AJA folder of the current media to a host file,
+      streamed, in Data - LAN mode (GET /media/<file>); returns the file
+      saved and its size
+    params:
+      clip: { type: string, required: true, max_length: 255, pattern: "^[^/]+$", label: Clip,
+              description: "File name of the clip, with its extension, as get_clips lists it." }
+      to: { type: save, required: true, label: Save to,
+            description: "The host file the clip is written to; replaced once the whole clip has arrived." }
+    send: { method: GET, path: "/media/{clip}", save: to }
+    expect: { status: 200 }
+    returns: file
+
+  upload_clip:
+    summary: >
+      Upload a clip from the host to the AJA folder of the current media,
+      streamed, in Data - LAN mode (PUT /media with X-File-Name and
+      X-File-Size)
+    params:
+      file: { type: binary, required: true, label: Clip file,
+              description: "The clip's bytes, as a host file (or base64 for a small one)." }
+      name: { type: string, required: true, max_length: 255, pattern: "^[^/]+$", label: File name,
+              description: "The clip's file name on the media, with its extension." }
+      size: { type: int, min: 0, required: true, label: File size,
+              description: "The clip's length in bytes, the file's own size, sent as X-File-Size." }
+    timeout_ms: 60000
+    send:
+      method: PUT
+      path: /media
+      body: { binary: file }
+      content_type: video/quicktime
+      headers: { X-File-Name: "{name}", X-File-Size: "{size}", X-File-Type: video/quicktime }
     expect: { status: 200 }
     returns: ack
 
@@ -1535,10 +1582,12 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Clip download (GET /media/<file>) and upload (PUT /media with
-      X-File-Name and X-File-Size headers, Ultra models) need Data - LAN mode
-      and carry whole video files, and the Ultra Plus and 12G confidence
-      monitor is a WebSocket stream (ws://<unit>/stream); neither is a command
-      this format carries. Protobuf alarm parameters such as
+      Clip download (download_clip, GET /media/<file>) and upload
+      (upload_clip, PUT /media with X-File-Name and X-File-Size headers,
+      Ultra models) need Data - LAN mode (enter_data_lan_mode); both stream
+      the file to or from the host, with no size limit. upload_clip's size
+      must be the file's own length. The Ultra Plus and 12G confidence
+      monitor is a WebSocket stream (ws://<unit>/stream), which is not a
+      command this format carries. Protobuf alarm parameters such as
       eParamID_Dropped_Frames_Alarm read through get_parameter as base64 that
       the format cannot decode.

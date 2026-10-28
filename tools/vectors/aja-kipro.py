@@ -93,6 +93,15 @@ http(A, "get_clips", {}, "GET", "/clips",
      expect_result={"ok": {"kind": "value", "value":
                            '[ { clipname: "Clip1ATK2.MOV", framecount: "474", framerate: "29.97" } ];'}})
 http(A, "delete_clip", {"clip": "Clip1ATK43.mov"}, "POST", "/clips?action=delete&clipname=Clip1ATK43.mov")
+# Clip transfer in Data - LAN mode: the download is saved to the host file
+# named (never written by a vector), the upload streamed from one.
+http(A, "download_clip", {"clip": "Clip 1.mov", "to": {"file": "Clip1.mov"}}, "GET", "/media/Clip%201.mov",
+     http_reply={"status": 200, "body": ""},
+     expect_result={"ok": {"kind": "value", "value": {"file": "Clip1.mov", "size": None, "content_type": None}}})
+V.append({"spec": A, "command": "upload_clip", "model": "kipro-ultra",
+          "input": {"file": "QUJD", "name": "Clip2.mov", "size": 3},
+          "expect_request": {"method": "PUT", "target": "/media", "body": "ABC",
+                             "content_type": "video/quicktime"}})
 http(A, "select_next_slot", {}, "POST", "/options?transport_command=next_slot")
 http(A, "select_playlist", {"playlist": "Show Reel", "updated": 1472148607}, "GET",
      _CFG + "eParamID_CurrentPlaylist&value=Show%20Reel")
