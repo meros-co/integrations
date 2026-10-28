@@ -18,7 +18,7 @@ category: other
 source: [{ title: test }]
 transport: { type: http, port: 80, timeout_ms: 2000, probe: { method: GET, path: /info } }
 ports: [{ port: 80, protocol: http, role: control }]
-models: [{ id: m, name: M, supports: [list, download, slow, upload, fetch_file], verification: none }]
+models: [{ id: m, name: M, supports: [list, download, slow, upload, fetch_file, export], verification: none }]
 commands:
   list:
     send:
@@ -41,6 +41,14 @@ commands:
     send: { method: GET, path: /log, save: to }
     expect: { status: 200 }
     returns: ack
+  export:
+    params:
+      to: { type: save, required: true }
+    send:
+      - { method: GET, path: /export/start }
+      - { method: GET, path: /export/file.bin, save: to }
+    expect: { status: 200 }
+    returns: file
   slow:
     timeout_ms: 600000
     send: { method: POST, path: /firmware/apply }
@@ -368,4 +376,48 @@ fn a_streamed_upload_is_timed_by_its_progress() {
         Err(format!("{} 2000 ms", crate::http::STALLED)),
     );
     assert_eq!(completed(&cx.take()), vec![(1, Err(CommandError::Timeout))]);
+}
+
+#[test]
+fn a_file_fetched_after_an_earlier_message_is_the_commands_result() {
+    let to = std::env::temp_dir().join(format!("meros-export-{}.bin", std::process::id()));
+    let mut e = connected();
+    let mut cx = Cx::new(2);
+    let params = json!({"to": {"file": to.to_str().unwrap()}});
+    e.command(&mut cx, 1, "export", params.as_object().unwrap());
+    let (id, first, saved) = requests(&cx.take()).remove(0);
+    assert_eq!(
+        (first.url.as_str(), saved),
+        ("http://127.0.0.1:80/export/start", None)
+    );
+    // The export's acknowledgement lets the file's request go.
+    let mut cx = Cx::new(3);
+    e.http_response(&mut cx, id, ok("<result>0</result>"));
+    let a = cx.take();
+    assert!(completed(&a).is_empty());
+    let (id, second, saved) = requests(&a).remove(0);
+    assert_eq!(second.url, "http://127.0.0.1:80/export/file.bin");
+    assert_eq!(saved.as_deref(), Some(to.as_path()));
+    std::fs::write(&to, b"abc").unwrap();
+    let mut cx = Cx::new(4);
+    e.http_response(
+        &mut cx,
+        id,
+        Ok(HttpResponse {
+            status: 200,
+            headers: vec![],
+            body: Vec::new(),
+        }),
+    );
+    let done = completed(&cx.take());
+    let _ = std::fs::remove_file(&to);
+    assert_eq!(
+        done,
+        vec![(
+            1,
+            Ok(Outcome::Value {
+                value: json!({"file": to.to_str().unwrap(), "size": 3, "content_type": null})
+            })
+        )]
+    );
 }

@@ -3311,6 +3311,9 @@ impl SpecEngine {
         ) && matches!(reply, Reply::Text(_));
         // `returns: file`: the saved file, once `expect` has passed.
         let saved = flight.saved.take();
+        // A message before the last (an export started before the file is
+        // fetched) is checked as an acknowledgement.
+        let last = flight.messages.is_empty();
         let returns = if flight.returns == "file" {
             "ack"
         } else {
@@ -3318,6 +3321,7 @@ impl SpecEngine {
         };
         let result = expect::evaluate(&flight.expect, returns, &self.spec.codes, &reply, headed);
         let result = match (result, flight.returns.as_str(), saved) {
+            (Ok(outcome), "file", _) if !last => Ok(outcome),
             (Ok(_), "file", Some((path, content_type))) => {
                 let size = std::fs::metadata(&path).map(|m| m.len()).ok();
                 Ok(Outcome::Value {
