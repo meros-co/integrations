@@ -246,6 +246,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-megapixel", &["megapixel-helios"]),
     ("vendor-meros", &["meros-camera"]),
     ("vendor-meta", &["facebook-account", "facebook-live"]),
+    ("vendor-middleatlantic", &["middle-atlantic-racklink"]),
     (
         "vendor-modulopi",
         &["modulopi-kinetic", "modulopi-player", "modulopi-spydog"],

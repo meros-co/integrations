@@ -2803,6 +2803,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that settings.exposure.iso is null (absent from state) in automatic exposure, and which settings fields the camera writes as null in other modes. ([specs/meros-camera.yaml:596](specs/meros-camera.yaml#L596))
 - [ ] On a phone with talkback on, confirm that get_talkback_url's address takes a director's WebRTC offer, and that new_talkback_address cuts off a director on the old one. ([specs/meros-camera.yaml:536](specs/meros-camera.yaml#L536))
 
+## middle-atlantic-racklink — Middle Atlantic RackLink power (control protocol)
+
+- [ ] Check the status change registration: its length byte (the document says 6 while listing six data bytes), which bit is "bit 1", and that the unit then pushes outlet, contact, sequence, EPO and reading changes. ([specs/middle-atlantic-racklink.yaml:268](specs/middle-atlantic-racklink.yaml#L268))
+- [ ] Check the sequencing response's subcommand (the document shows 0x01 where a response would be 0x10) and its states. ([specs/middle-atlantic-racklink.yaml:127](specs/middle-atlantic-racklink.yaml#L127))
+- [ ] Check the current energy management state response (0x60): occupancy first and a letter per outlet (INFOCOMM 4:2012) or 16 letters (I-00472). ([specs/middle-atlantic-racklink.yaml:168](specs/middle-atlantic-racklink.yaml#L168))
+- [ ] Check the temperature's unit in sensor readings and thresholds (the log gives Fahrenheit). ([specs/middle-atlantic-racklink.yaml:282](specs/middle-atlantic-racklink.yaml#L282))
+- [ ] Check how often the unit pings and that answering each ping keeps the connection, on Select, Premium and Premium+. ([specs/middle-atlantic-racklink.yaml:9](specs/middle-atlantic-racklink.yaml#L9))
+- [ ] Check RS-232 on a Premium: the same messages at 9600 8N1, and whether it needs the login. ([specs/middle-atlantic-racklink.yaml:53](specs/middle-atlantic-racklink.yaml#L53))
+
 ## midi-show-control — MIDI Show Control (MSC) device
 
 - [ ] Against an MSC lighting console (ETC Eos, grandMA, Chamsys), confirm GO, STOP, RESUME, TIMED_GO, SET and FIRE act as described for its device ID and command format, and whether it answers all_types and the all-call ID 127. ([specs/midi-show-control.yaml:318](specs/midi-show-control.yaml#L318))

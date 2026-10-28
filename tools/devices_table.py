@@ -65,6 +65,7 @@ NATIVE = {
     "http-snapshot": "HTTP JPEG snapshots",
     "grassvalley-amp": "AMP as hexadecimal text over TCP 3811, or binary on an RS-422 port",
     "meros-camera": "HTTP 8790 (JSON, NDJSON event stream, binary preview)",
+    "middle-atlantic-racklink": "RackLink binary protocol over TCP 60000 or RS-232",
     "midi-show-control": "MSC SysEx over RTP-MIDI (UDP 5004/5005) or a MIDI port of the host",
     "nec-display": "External Control binary messages over TCP 7142, or an RS-232C port",
     "nec-projector": "NEC binary commands over TCP 7142 or a serial port",

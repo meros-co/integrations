@@ -1,0 +1,282 @@
+spec: 1
+id: middle-atlantic-racklink
+name: Middle Atlantic RackLink power (control protocol)
+vendor: Middle Atlantic (Legrand AV)
+category: other
+implementation: native
+reason: >
+  A binary protocol: each message framed by 0xFE and 0xFF with a length, a 7-bit checksum and escaping of the
+  framing bytes; a login before anything else; pings from the unit that must be answered, or it drops the
+  controller after three; responses and unasked status changes told apart by subcommand; and log reads answered
+  with one message per entry.
+
+source:
+  - title: "RackLink Control System Communication Protocol Manual, I-00472 Rev G"
+    author: Middle Atlantic Products
+    url: "https://res.cloudinary.com/avd/image/upload/v1598618818/Resources/Middle%20Atlantic/Power/Firmware/I-00472-Series-Protocol.pdf"
+    note: >
+      Transports: TCP 60000 (Select, Premium, Premium+) and RS-232 9600 8N1 (Premium); enabling the protocol
+      (Select and Premium: unlocked at the first web login, user "user"; Premium+: Network Services > Control
+      Protocol, any admin account with the protocol enabled). Message structure, checksum and escaping (pp.4-7),
+      NACK codes (p.7-8), ping (p.8), login (p.9), outlets and dry contacts 0x20/0x30 with cycle times 0-3600 s
+      (p.10-11), names 0x21/0x31 (p.12-13), counts 0x22/0x32 (C, N, X per outlet, p.13-14), sequencing 0x36 with
+      0-999 s (p.14-15), and on Premium and Premium+ the energy management state 0x23, EPO 0x37, log alerts 0x40,
+      status change registration 0x41, sensors 0x50-0x61, thresholds 0x70-0x77, the log 0x80-0x82 and product
+      information 0x90-0x95 (pp.15-29).
+  - title: "RackLink Control Protocol: Support for INFOCOMM 4:2012 Audiovisual Systems Energy Management Standard"
+    author: Middle Atlantic Products
+    url: "https://res.cloudinary.com/avd/image/upload/v1598617481/Resources/Middle%20Atlantic/Power/Specifications/RackLink-INFOCOMM-Standard.pdf"
+    note: >
+      The 78-byte log entries with occupancy and outlet energy management states, the energy management state
+      0x23, the current energy management state 0x60 (occupancy first, then a letter per outlet) and the
+      occupancy state 0x61, which can be set.
+
+settings:
+  username: { type: string, max_length: 64, default: user, pattern: '^[^|]*$', label: User name,
+              description: "The login: user on Select and Premium, or a Premium+ account with admin rights and the control protocol enabled." }
+  password: { type: string, secret: true, max_length: 64, default: "", label: Password,
+              description: "That account's password, as set at the unit's first web login." }
+  poll_interval_ms: { type: int, min: 500, max: 3600000, default: 5000, label: Read interval,
+                      description: "Milliseconds between reads of outlet and contact states and, on Premium models, the sensors." }
+  link: { type: enum, values: [tcp, serial], default: tcp, label: Link,
+          description: "tcp reaches the unit on the network; serial uses an RS-232 port of the host wired to a Premium unit's RS-232 port." }
+  serial_port: { type: string, max_length: 256, label: Serial port,
+                 description: "With link serial, the host's serial port wired to the unit: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
+  baud_rate: { type: enum, values: ["9600"], default: "9600", label: Baud rate, description: "With link serial, 9600 bit/s, as the document gives." }
+  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "With link serial, 8 data bits." }
+  parity: { type: enum, values: [none], default: none, label: Parity, description: "With link serial, no parity." }
+  stop_bits: { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "With link serial, one stop bit." }
+  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "With link serial, no flow control; the document names none." }
+
+ports:
+  - { port: 60000, protocol: tcp, role: control, when: "link tcp", note: "the control protocol, once enabled on the unit" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RackLink Premium's RS-232 port" }
+
+models:
+  - id: racklink-select
+    name: Middle Atlantic RackLink Select (RLNK-...-S and Select series PDUs)
+    supports: &basic [set_outlet, get_outlet, set_outlet_name, get_outlet_name, get_outlet_count, set_contact, get_contact,
+                      set_contact_name, get_contact_name, get_contact_count, sequence_outlets, refresh]
+    verification: none
+    notes: The basic commands only; a Select pushes no status changes, so states are polled.
+  - id: racklink-premium
+    name: Middle Atlantic RackLink Premium (RLNK-P...)
+    supports: &advanced [set_outlet, get_outlet, set_outlet_name, get_outlet_name, get_outlet_count, set_contact, get_contact,
+                         set_contact_name, get_contact_name, get_contact_count, sequence_outlets, refresh, set_energy_state,
+                         get_energy_state, emergency_power_off, set_log_alerts, get_log_alerts, set_status_registration,
+                         get_status_registration, get_sensor, set_occupancy, get_threshold, set_threshold, read_log,
+                         get_log_count, clear_log, get_product_info]
+    verification: none
+    notes: Basic and advanced commands, on TCP 60000 or the RS-232 port.
+  - id: racklink-premium-plus
+    name: Middle Atlantic RackLink Premium+ (RLM-..., RLNK-P...-PL)
+    supports: *advanced
+    verification: none
+    notes: Basic and advanced commands on TCP 60000; the protocol is turned on in the unit's network services.
+
+commands:
+  set_outlet:
+    summary: Turn an outlet on or off, or cycle it (off, then on after cycle_s seconds); the unit answers with the outlet's state
+    params:
+      outlet: &outlet { type: int, min: 1, max: 16, required: true, label: Outlet, description: "The outlet, numbered from 1 as on the unit." }
+      action: &switch_action { type: enum, values: ["on", "off", cycle], required: true, label: Action,
+                               description: "on and off switch it; cycle turns it off and on again after cycle_s seconds." }
+      cycle_s: &cycle { type: int, min: 0, max: 3600, default: 0, label: Cycle time,
+                        description: "For cycle, the seconds it stays off, 0 to 3600; ignored by on and off." }
+    returns: ack
+  get_outlet:
+    summary: Read an outlet's state and saved cycle time, as {state, cycle_time}
+    params: { outlet: *outlet }
+    returns: value
+  set_outlet_name:
+    summary: Name an outlet; the unit answers with the name
+    params:
+      outlet: *outlet
+      name: &name { type: string, max_length: 32, required: true, label: Name, description: "The new name." }
+    returns: ack
+  get_outlet_name:
+    summary: Read an outlet's name
+    params: { outlet: *outlet }
+    returns: value
+  get_outlet_count:
+    summary: Read which outlets the unit has, one of controllable, not_controllable or absent for each of 16
+    returns: value
+  set_contact:
+    summary: Switch a dry contact on or off, or cycle it
+    params:
+      contact: &contact { type: int, min: 1, max: 8, required: true, label: Contact, description: "The dry contact, numbered from 1." }
+      action: *switch_action
+      cycle_s: *cycle
+    returns: ack
+  get_contact:
+    summary: Read a dry contact's state and saved cycle time
+    params: { contact: *contact }
+    returns: value
+  set_contact_name:
+    summary: Name a dry contact
+    params: { contact: *contact, name: *name }
+    returns: ack
+  get_contact_name:
+    summary: Read a dry contact's name
+    params: { contact: *contact }
+    returns: value
+  get_contact_count:
+    summary: Read which dry contacts the unit has, one of controllable, not_controllable or absent for each of 8
+    returns: value
+  sequence_outlets:
+    summary: Sequence every outlet up (on in order) or down (off in order)
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: Direction, description: "up turns the outlets on in order, down off in reverse." }
+      delay_s: { type: int, min: 0, max: 999, default: 0, label: Delay,
+                 description: "Seconds between outlets, 0 to 999; a Premium+ uses its configured delays and is sent 0." }
+    returns: ack
+  set_energy_state:
+    summary: Set an outlet device's energy management state (INFOCOMM 4:2012)
+    params:
+      outlet: *outlet
+      state: { type: enum, values: [disconnected, standby, "on", "off"], required: true, label: State,
+               description: "The connected device's energy management state as the control system knows it." }
+    returns: ack
+  get_energy_state:
+    summary: Read an outlet device's energy management state
+    params: { outlet: *outlet }
+    returns: value
+  emergency_power_off:
+    summary: Start emergency power off, or recover from it
+    params:
+      active: { type: bool, required: true, label: Active, description: "True initiates EPO, false recovers from it." }
+    returns: ack
+  set_log_alerts:
+    summary: Choose which events the unit logs, as two bytes of flags
+    params:
+      flags: { type: int, min: 0, max: 65535, required: true, label: Flags,
+               description: "High byte: 1 normal, 2 over voltage, 4 under voltage, 8 over temperature, 16 under temperature, 32 surge fault; low byte: 1 auto ping timeout, 2 RS-232 ping timeout, 4 over current, 8 under current, 16 EPO." }
+    returns: ack
+  get_log_alerts:
+    summary: Read which events the unit logs, as the flags set_log_alerts takes
+    returns: value
+  set_status_registration:
+    summary: Choose which changes the unit pushes, as its six bytes of flags (the module registers for every change on connecting)
+    params:
+      flags: { type: string, max_length: 32, pattern: '^[0-9A-Fa-f :]+$', required: true, label: Flags,
+               description: "Six bytes in hex, such as 01 0f 5b 01 7f 0f: outlets; contacts, inputs, sequencing and EPO; thresholds; minimum temperature; readings; power factor, thermal load, log count and surge state." }
+    returns: ack
+  get_status_registration:
+    summary: Read which changes the unit pushes, as six bytes in hex
+    returns: value
+  get_sensor:
+    summary: Read one of the unit's readings
+    params:
+      sensor: { type: enum, values: [energy, peak_voltage, rms_voltage, peak_load, rms_load, temperature, wattage, power_factor, thermal_load, surge_protection, energy_management, occupancy],
+                required: true, label: Sensor, description: "The reading: kilowatt-hours, volts, amps, temperature, watts, power factor, BTU, surge protection, outlets' energy states or occupancy." }
+    returns: value
+  set_occupancy:
+    summary: Tell the unit whether the room is occupied (INFOCOMM 4:2012)
+    params:
+      occupied: { type: bool, required: true, label: Occupied, description: "True for occupied, false for unoccupied." }
+    returns: ack
+  get_threshold:
+    summary: Read one of the alarm thresholds
+    params:
+      threshold: &threshold { type: enum, values: [low_voltage, high_voltage, max_load, min_load, max_temperature, min_temperature], required: true, label: Threshold,
+                              description: "Voltages in whole volts, loads in amps to a tenth, temperatures in whole degrees." }
+    returns: value
+  set_threshold:
+    summary: Set one of the alarm thresholds
+    params:
+      threshold: *threshold
+      value: { type: float, min: 0, max: 999, required: true, label: Value,
+               description: "Up to three whole digits for voltages and temperatures, two digits and a tenth for loads." }
+    returns: ack
+  read_log:
+    summary: "Read log entries, as {entries: [{entry, type, data}]}; data is the entry's text (date, temperature, watts, power factor, volts, amps, thermal load, occupancy and outlet states)"
+    params:
+      start: { type: int, min: 1, max: 2000, required: true, label: First entry, description: "The first entry to read, from 1." }
+      count: { type: int, min: 1, max: 99, required: true, label: Count, description: "How many entries to read, 1 to 99." }
+    returns: value
+  get_log_count:
+    summary: Read how many entries the log holds
+    returns: value
+  clear_log:
+    summary: Clear the log
+    returns: ack
+  get_product_info:
+    summary: Read the part number, amp rating, whether it has surge protection, its IP address or its MAC address
+    params:
+      item: { type: enum, values: [part_number, amp_rating, surge, ip_address, mac_address], required: true, label: Item, description: "What to read." }
+    returns: value
+  refresh:
+    summary: Read the outlets, contacts and, on Premium models, the readings, thresholds and product information again
+    returns: ack
+
+state:
+  outlets.*.state: { type: string, description: "The outlet's state: on, off or not_controllable" }
+  outlets.*.cycle_time: { type: int, unit: s, description: "The outlet's saved cycle time" }
+  outlets.*.name: { type: string, description: "The outlet's name" }
+  outlets.*.controllable: { type: bool, description: "Whether the outlet can be switched (C) or not (N); an absent outlet leaves state" }
+  outlets.*.energy_state: { type: string, description: "The outlet device's energy management state: disconnected, standby, on, off or unknown (Premium models)" }
+  contacts.*.state: { type: string, description: "The dry contact's state: on, off or not_controllable" }
+  contacts.*.cycle_time: { type: int, unit: s, description: "The dry contact's saved cycle time" }
+  contacts.*.name: { type: string, description: "The dry contact's name" }
+  contacts.*.controllable: { type: bool, description: "Whether the contact can be switched; an absent contact leaves state" }
+  sequence.state: { type: string, description: "The last sequence's state: not_sequencing, sequencing_up, up_complete, sequencing_down or down_complete" }
+  sequence.delay: { type: int, unit: s, description: "The sequence's delay between outlets" }
+  emergency_power_off: { type: bool, description: "Whether the unit is in emergency power off mode" }
+  log_alerts: { type: int, description: "The events the unit logs, as set_log_alerts' flags" }
+  status_registration: { type: string, description: "The changes the unit pushes, six bytes in hex" }
+  log.count: { type: int, description: "Entries in the log" }
+  sensors.energy: { type: float, unit: kWh, description: "Energy used" }
+  sensors.peak_voltage: { type: int, unit: V, description: "Peak voltage" }
+  sensors.rms_voltage: { type: int, unit: V, description: "RMS voltage" }
+  sensors.peak_load: { type: float, unit: A, description: "Peak load" }
+  sensors.rms_load: { type: float, unit: A, description: "RMS load" }
+  sensors.temperature: { type: int, description: "Temperature, in the unit's degrees (its log gives Fahrenheit)" }
+  sensors.wattage: { type: int, unit: W, description: "Power" }
+  sensors.power_factor: { type: float, description: "Power factor" }
+  sensors.thermal_load: { type: float, unit: BTU, description: "Thermal load" }
+  sensors.surge_protection: { type: string, description: "Surge protection: not_applicable, protected or compromised" }
+  sensors.occupancy: { type: string, description: "Occupancy: occupied or unoccupied" }
+  thresholds.low_voltage: { type: float, unit: V, description: "Low voltage alarm threshold" }
+  thresholds.high_voltage: { type: float, unit: V, description: "High voltage alarm threshold" }
+  thresholds.max_load: { type: float, unit: A, description: "Maximum load alarm threshold" }
+  thresholds.min_load: { type: float, unit: A, description: "Minimum load alarm threshold" }
+  thresholds.max_temperature: { type: float, description: "Maximum temperature alarm threshold" }
+  thresholds.min_temperature: { type: float, description: "Minimum temperature alarm threshold" }
+  product.part_number: { type: string, description: "The part number" }
+  product.amp_rating: { type: int, unit: A, description: "The product's amp rating" }
+  product.surge: { type: bool, description: "Whether the product has surge protection" }
+  product.ip_address: { type: string, description: "The unit's current IP address" }
+  product.mac_address: { type: string, description: "The unit's MAC address" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      set_outlet off or cycle, set_contact, sequence_outlets down and emergency_power_off cut power at once;
+      during EPO the unit refuses commands (NACK 0x11, access denied) until it is recovered. clear_log erases the
+      log for good.
+  - models: [all]
+    severity: info
+    text: >
+      The protocol is off until enabled: on Select and Premium by the first web login, which sets the password of
+      the user account this integration logs in with; on Premium+ in Device Settings > Network Services > Control
+      Protocol, with an admin account that has the protocol enabled. A rejected login is final until the settings
+      change; a NACK 0x08 (invalid credentials) later logs in again.
+  - models: [racklink-premium, racklink-premium-plus]
+    severity: warning
+    text: >
+      On connecting the module registers for every status change the document names (six bytes 01 0f 5b 01 7f 0f,
+      bit 1 being the lowest), so outlet, contact, sequence, EPO, threshold and reading changes are pushed. The
+      document's register command gives its length as 6 while listing six data bytes after the subcommand; the
+      module sends the length its envelope has (9). Readings are read again every poll as well.
+  - models: [racklink-select]
+    severity: info
+    text: >
+      A Select has only the basic commands and pushes no changes, so outlet and contact states are read every
+      poll_interval_ms. The advanced commands are not offered for it.
+  - models: [all]
+    severity: info
+    text: >
+      Thresholds and readings are ASCII numbers with fixed digits (voltages ###, loads ##.#, temperatures ###),
+      which set_threshold writes zero-padded. The document lists a set subcommand for every reading but describes
+      setting only occupancy, which is the only one offered; the temperature's unit is not stated.

@@ -159,6 +159,8 @@ mod posistagenet;
 mod powernet_traps;
 #[cfg(feature = "qsys")]
 mod qsys;
+#[cfg(feature = "middle-atlantic-racklink")]
+mod racklink;
 #[cfg(feature = "resolume")]
 mod resolume_push;
 #[cfg(any(feature = "generic-midi", feature = "midi-show-control"))]
@@ -491,6 +493,8 @@ pub(crate) fn construct(
             &ups_mib_profile::PROFILE,
             context,
         )?)),
+        #[cfg(feature = "middle-atlantic-racklink")]
+        "middle-atlantic-racklink" => Ok(Box::new(racklink::RackLink::new(context)?)),
         #[cfg(feature = "generic-http")]
         "generic-http" => Ok(Box::new(generic_http::GenericHttp::new(context)?)),
         #[cfg(feature = "generic-websocket")]
