@@ -361,7 +361,13 @@ enum Capture {
     /// A string in the answer's JSON body, at this JSON path, sent back in
     /// the header named: Logos Proclaim answers its login with
     /// `{"proclaimAuthToken": "..."}`, sent back as `ProclaimAuthToken`.
-    Json { path: String, header: String },
+    /// With a `scheme`, the header's value is the scheme, a space and the
+    /// string: an access token sent back as `Authorization: Bearer <token>`.
+    Json {
+        path: String,
+        header: String,
+        scheme: Option<String>,
+    },
 }
 
 impl SessionSpec {
@@ -377,13 +383,30 @@ impl SessionSpec {
                 (Some(Value::String(name)), None, None) if name == "*" => Capture::Cookie(None),
                 (Some(Value::String(name)), None, None) => Capture::Cookie(Some(name.clone())),
                 (None, Some(Value::String(h)), None) => Capture::Header(h.clone()),
-                (None, Some(Value::String(h)), Some(Value::String(path))) => Capture::Json {
-                    path: path.clone(),
-                    header: h.clone(),
-                },
+                (None, Some(Value::String(h)), Some(Value::String(path))) => {
+                    let scheme = match c.get("scheme") {
+                        None => None,
+                        Some(Value::String(s))
+                            if !s.is_empty()
+                                && s.bytes().all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b)) =>
+                        {
+                            Some(s.clone())
+                        }
+                        Some(_) => {
+                            return Err(
+                                "transport.session.capture.scheme is a word such as Bearer".into()
+                            )
+                        }
+                    };
+                    Capture::Json {
+                        path: path.clone(),
+                        header: h.clone(),
+                        scheme,
+                    }
+                }
                 _ => {
                     return Err(
-                        "transport.session.capture is {cookie: name}, {header: name} or {json: path, header: name}"
+                        "transport.session.capture is {cookie: name}, {header: name} or {json: path, header: name, scheme}"
                             .into(),
                     )
                 }
@@ -455,6 +478,14 @@ impl SessionSpec {
                 .split_once('=')
                 .map_or(sent.as_str(), |(_, v)| v)
                 .to_string(),
+            Capture::Json {
+                scheme: Some(scheme),
+                ..
+            } => sent
+                .strip_prefix(scheme.as_str())
+                .and_then(|v| v.strip_prefix(' '))
+                .unwrap_or(sent)
+                .to_string(),
             _ => sent.clone(),
         }
     }
@@ -480,11 +511,19 @@ impl SessionSpec {
                 .next()
                 .filter(|v| !v.is_empty())
                 .map(|v| (h.clone(), v.to_string())),
-            Capture::Json { path, header } => {
+            Capture::Json {
+                path,
+                header,
+                scheme,
+            } => {
                 let doc = serde_json::from_slice::<Value>(&response.body).ok()?;
                 match expect::json_path(&doc, path) {
                     Some(Value::String(token)) if !token.is_empty() => {
-                        Some((header.clone(), token.clone()))
+                        let value = match scheme {
+                            Some(s) => format!("{s} {token}"),
+                            None => token.clone(),
+                        };
+                        Some((header.clone(), value))
                     }
                     _ => None,
                 }
@@ -5577,6 +5616,30 @@ mod tests {
             None
         );
         assert_eq!(session.captured(&answer("denied")), None);
+        // With a scheme, as an access token: Authorization: Bearer <token>,
+        // and {session.id} the token alone.
+        let bearer = SessionSpec::parse(
+            &json!({
+                "login": {"method": "POST", "path": "/api/nodes/self/access"},
+                "capture": {"json": "$.accessToken", "header": "Authorization", "scheme": "Bearer"},
+            }),
+            "any",
+        )
+        .unwrap();
+        let sent = bearer
+            .captured(&answer(r#"{"accessToken":"eyJ.a.b"}"#))
+            .unwrap();
+        assert_eq!(
+            sent,
+            ("Authorization".to_string(), "Bearer eyJ.a.b".to_string())
+        );
+        assert_eq!(bearer.value_of(&sent), "eyJ.a.b");
+        assert!(SessionSpec::parse(
+            &json!({"login": {"method": "POST", "path": "/"},
+                    "capture": {"json": "$.t", "header": "Authorization", "scheme": "Bearer x"}}),
+            "any"
+        )
+        .is_err());
         // A JSON path needs the header to send it in.
         assert!(SessionSpec::parse(
             &json!({"login": {"method": "POST", "path": "/"}, "capture": {"json": "$.t"}}),

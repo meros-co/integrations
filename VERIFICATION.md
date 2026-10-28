@@ -55,6 +55,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the value ranges Live accepts for tempo, song and scene signatures, clip transposition and detune, groove amount (the Live Object Model says 0 to 1), and what Live does with a value outside them. ([specs/ableton-live.yaml:3097](specs/ableton-live.yaml#L3097))
 - [ ] Confirm /live/startup is sent when Live loads another Set, so the rule registering everything again runs then. ([specs/ableton-live.yaml:3112](specs/ableton-live.yaml#L3112))
 
+## adder-aim — Adder AdderLink Infinity Manager (AIM API)
+
+- [ ] Check what the AIM answers a request with an ended or unknown token: the integration logs in again only when the error's message names the login, the token or the session, since appendix K documents no code for it. ([specs/adder-aim.yaml:314](specs/adder-aim.yaml#L314))
+- [ ] Check on AIM 5.10 that get_devices for receivers lists a current connection with an empty con_end_time, as the example shows, so receivers.<id>.connected is right, and that pages past 1000 devices come as total_devices says. ([specs/adder-aim.yaml:309](specs/adder-aim.yaml#L309))
+
+## adder-xdip — Adder XDIP receivers
+
+- [ ] Check that a switch with an expired token (after a day) is answered 401, which logs in again, and that a receiver without an Access password answers the access login with 401. ([specs/adder-xdip.yaml:49](specs/adder-xdip.yaml#L49))
+
 ## aes70 — AES70 / OCA devices
 
 - [ ] Check the device's OCP.1 port (AES70 assigns none) and which transports it accepts: TCP, UDP, WebSocket (and its path), or only secure OCP.1. ([specs/aes70.yaml:401](specs/aes70.yaml#L401))
@@ -1805,6 +1814,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Run the MTC generator into a DAW or lighting console chasing MTC, over a MIDI port and over RTP-MIDI, at 24, 25, 30df and 30: confirm it locks at the time located, reads drop-frame across a minute (00:00:59:28 to 00:01:00:02), and stays within a frame of the core's clock for an hour. ([specs/generic-midi.yaml:457](specs/generic-midi.yaml#L457))
 - [ ] Against an MMC device (a DAW or recorder), confirm READ answers for selected_time_code and motion_control_tally decode as kept, including short time code updates. ([specs/generic-midi.yaml:475](specs/generic-midi.yaml#L475))
 
+## generic-modbus — Generic Modbus TCP server
+
+- [ ] Check the word_order setting against devices that document 32-bit floats and integers in either register order (a power meter, a PLC), and that 0-based addressing matches devices that document 1-based 4xxxx and 3xxxx registers. ([specs/generic-modbus.yaml:220](specs/generic-modbus.yaml#L220))
+- [ ] Check that servers answer a liveness read of a register they lack with an exception rather than silence, and that common Modbus TCP to RTU gateways answer for the unit IDs behind them without stalling the single outstanding request. ([specs/generic-modbus.yaml:245](specs/generic-modbus.yaml#L245))
+
+## generic-mqtt — Generic MQTT broker client
+
+- [ ] Connect to Mosquitto, EMQX and HiveMQ with versions 3.1.1 and 5 over tcp, tls and wss, and confirm CONNACK, SUBACK and version 5 properties (server keep alive, assigned client id, maximum QoS) are read as described, and that their WebSocket endpoints accept the mqtt subprotocol at the paths they document. ([specs/generic-mqtt.yaml:42](specs/generic-mqtt.yaml#L42))
+- [ ] With clean_start false and a session expiry, confirm a broker delivers the messages queued while the client was away after reconnecting, and that dropping unacknowledged QoS 1 and 2 publishes (not resent with DUP) is acceptable to it. ([specs/generic-mqtt.yaml:153](specs/generic-mqtt.yaml#L153))
+
 ## generic-ping — Network presence (ping) and Wake-on-LAN
 
 - [ ] Check that network adapters with a SecureOn password take it as 4 or 6 bytes right after the sixteen MAC repetitions (from practice, not AMD's paper). ([specs/generic-ping.yaml:66](specs/generic-ping.yaml#L66))
@@ -1961,6 +1980,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the argument types Mitti accepts: values are sent as OSC strings ("75", "-3.5", "0.50") as the Companion module does; check whether floats or ints are what the OSC Query server advertises, and the types Mitti's feedback carries. ([specs/imimot-mitti.yaml:647](specs/imimot-mitti.yaml#L647))
 - [ ] Check whether cue-level feedback keys a cue by its number or its ID, and the value range of the documented /mitti/<cue>/opacity. ([specs/imimot-mitti.yaml:654](specs/imimot-mitti.yaml#L654))
 - [ ] Confirm the UDP string form of the no-value commands, and that OSC control is ignored while Mitti follows MTC or LTC. ([specs/imimot-mitti.yaml:664](specs/imimot-mitti.yaml#L664))
+
+## integ-jnior — INTEG JNIOR automation controllers
+
+- [ ] Check the WebSocket transport's path: the manual describes the interface on the web server's port but not the path the WebUI connects to; / is assumed. ([specs/integ-jnior.yaml:44](specs/integ-jnior.yaml#L44))
+- [ ] Confirm every response the integration waits for (Registry, File, Console, Enumerate and Read Devices, Clock) echoes the request's Meta, as the manual says of responses in general; a response without it would time out the command. ([specs/integ-jnior.yaml:7](specs/integ-jnior.yaml#L7))
+- [ ] Check on a unit with JMPServer/Login disabled that a Monitor or Authenticated message arrives without a challenge, which the integration takes as logged in. ([specs/integ-jnior.yaml:254](specs/integ-jnior.yaml#L254))
 
 ## ioversal-vertex — ioversal VERTEX
 
@@ -2167,16 +2192,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## kiloview-kilolink-server — Kiloview KiloLink Server Pro
 
 - [ ] Find out how the server takes the login token back (the document only says every request needs it and the user name). Check whether the token sent as it is in Authorization, or the cookie user=<user>; token=<token>, is accepted. ([specs/kiloview-kilolink-server.yaml:53](specs/kiloview-kilolink-server.yaml#L53))
-- [ ] Confirm that the login answers the token at $.token, and how a refused or expired token is answered (401/403, or Appendix 4 codes 1005, 1009, 1127 with HTTP 200). ([specs/kiloview-kilolink-server.yaml:124](specs/kiloview-kilolink-server.yaml#L124))
-- [ ] Confirm that request parameters go as a JSON body (the document gives no format), and that the requests with no parameters accept an empty JSON object. ([specs/kiloview-kilolink-server.yaml:155](specs/kiloview-kilolink-server.yaml#L155))
+- [ ] Confirm that the login answers the token at $.token, and how a refused or expired token is answered (401/403, or Appendix 4 codes 1005, 1009, 1127 with HTTP 200). ([specs/kiloview-kilolink-server.yaml:125](specs/kiloview-kilolink-server.yaml#L125))
+- [ ] Confirm that request parameters go as a JSON body (the document gives no format), and that the requests with no parameters accept an empty JSON object. ([specs/kiloview-kilolink-server.yaml:156](specs/kiloview-kilolink-server.yaml#L156))
 - [ ] Confirm that the web API is on port 80 by default, the installer's web port (user manual 2.6), and that it has no HTTPS. ([specs/kiloview-kilolink-server.yaml:47](specs/kiloview-kilolink-server.yaml#L47))
-- [ ] Record the device list's entries (the document says only "complex structure"), so devices can go into state. ([specs/kiloview-kilolink-server.yaml:291](specs/kiloview-kilolink-server.yaml#L291))
-- [ ] Check that the tree's first level under each organization is read as Appendix 1 shows it, and how deeper levels appear. ([specs/kiloview-kilolink-server.yaml:451](specs/kiloview-kilolink-server.yaml#L451))
-- [ ] Find out what OpenLDAPaci entries set_device_access takes (Appendix 3 is cut off). ([specs/kiloview-kilolink-server.yaml:250](specs/kiloview-kilolink-server.yaml#L250))
-- [ ] Check that rename_node and move_node also work for users, groups and folders, not only devices. ([specs/kiloview-kilolink-server.yaml:226](specs/kiloview-kilolink-server.yaml#L226))
-- [ ] Find out where a stream's key and id come from for set_stream (not in any documented reply). ([specs/kiloview-kilolink-server.yaml:344](specs/kiloview-kilolink-server.yaml#L344))
-- [ ] Check that modify_node replaces every attribute and needs all of them. ([specs/kiloview-kilolink-server.yaml:217](specs/kiloview-kilolink-server.yaml#L217))
-- [ ] Check what create_device_key does with the serial number. ([specs/kiloview-kilolink-server.yaml:377](specs/kiloview-kilolink-server.yaml#L377))
+- [ ] Record the device list's entries (the document says only "complex structure"), so devices can go into state. ([specs/kiloview-kilolink-server.yaml:292](specs/kiloview-kilolink-server.yaml#L292))
+- [ ] Check that the tree's first level under each organization is read as Appendix 1 shows it, and how deeper levels appear. ([specs/kiloview-kilolink-server.yaml:460](specs/kiloview-kilolink-server.yaml#L460))
+- [ ] Find out what OpenLDAPaci entries set_device_access takes (Appendix 3 is cut off). ([specs/kiloview-kilolink-server.yaml:251](specs/kiloview-kilolink-server.yaml#L251))
+- [ ] Check that rename_node and move_node also work for users, groups and folders, not only devices. ([specs/kiloview-kilolink-server.yaml:227](specs/kiloview-kilolink-server.yaml#L227))
+- [ ] Find out where a stream's key and id come from for set_stream (not in any documented reply). ([specs/kiloview-kilolink-server.yaml:353](specs/kiloview-kilolink-server.yaml#L353))
+- [ ] Check that modify_node replaces every attribute and needs all of them. ([specs/kiloview-kilolink-server.yaml:218](specs/kiloview-kilolink-server.yaml#L218))
+- [ ] Check what create_device_key does with the serial number. ([specs/kiloview-kilolink-server.yaml:386](specs/kiloview-kilolink-server.yaml#L386))
 
 ## kiloview-mg300 — Kiloview MG300 V2
 
@@ -2202,9 +2227,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether window mute's pos_id counts from 0 (the example) or from 1. ([specs/kiloview-mg300.yaml:1382](specs/kiloview-mg300.yaml#L1382))
 - [ ] Check that gateway adds are accepted without stream_id, and the defaults conn_intv 3 and conn_timeout 10. ([specs/kiloview-mg300.yaml:1405](specs/kiloview-mg300.yaml#L1405))
 - [ ] Check the gateway RTSP defaults taken from the list example. ([specs/kiloview-mg300.yaml:1420](specs/kiloview-mg300.yaml#L1420))
-- [ ] Check the gateway RTP/TS defaults and the numbering of load_type. ([specs/kiloview-mg300.yaml:1440](specs/kiloview-mg300.yaml#L1440))
+- [ ] Find the gateway RTP/TS field values the web console uses by default (the document gives none, so TTL, PIDs, PCR period, TS id, tables version and PTS/PCR delay are required) and the numbering of load_type. ([specs/kiloview-mg300.yaml:1440](specs/kiloview-mg300.yaml#L1440))
 - [ ] Find the gateway SRT encryption values other than "0", and whether the address may be empty for Listener. ([specs/kiloview-mg300.yaml:1481](specs/kiloview-mg300.yaml#L1481))
-- [ ] Find the gateway HLS mode values other than server, and check the segment defaults. ([specs/kiloview-mg300.yaml:1502](specs/kiloview-mg300.yaml#L1502))
+- [ ] Find the gateway HLS mode values other than server, and the segment length and count the web console uses by default (the document gives none, so both are required). ([specs/kiloview-mg300.yaml:1502](specs/kiloview-mg300.yaml#L1502))
 - [ ] Find the gateway NDI HX connection values other than multicast. ([specs/kiloview-mg300.yaml:1515](specs/kiloview-mg300.yaml#L1515))
 - [ ] Check the gateway list's field names per protocol (address or dest_url), and SRT encryption read as "0"/"1". ([specs/kiloview-mg300.yaml:2260](specs/kiloview-mg300.yaml#L2260))
 - [ ] Find out what sys/reset does. ([specs/kiloview-mg300.yaml:1848](specs/kiloview-mg300.yaml#L1848))
@@ -2234,6 +2259,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that take/set.json performs the Take (progress 1.0) rather than only storing the settings, and that a T-bar move sends time 0 with the T-bar's value. ([specs/kiloview-multiview.yaml:871](specs/kiloview-multiview.yaml#L871))
 - [ ] Check that take/get.json takes pro_id in the query of a POST. ([specs/kiloview-multiview.yaml:889](specs/kiloview-multiview.yaml#L889))
 - [ ] Check what get_window_sdp's ip is (described as the video source's address) and that switch_window's session id is the one get_window_sdp returns. ([specs/kiloview-multiview.yaml:705](specs/kiloview-multiview.yaml#L705))
+- [ ] Check that pane and layout coordinates (x, y, width, height) are percentages of the window (the examples run from 0 to 100). ([specs/kiloview-multiview.yaml:1026](specs/kiloview-multiview.yaml#L1026))
+- [ ] Find out what a pane's audio mix follow follows (6.24 names always, follow and close only). ([specs/kiloview-multiview.yaml:618](specs/kiloview-multiview.yaml#L618))
+- [ ] Check whether any read reports a pane's audio_enable (get_single_layout's reply has none). ([specs/kiloview-multiview.yaml:597](specs/kiloview-multiview.yaml#L597))
 
 ## kiloview-multiview-server — Kiloview Multiview Server (NDI Multiview, API 1.0)
 
@@ -2249,6 +2277,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that set_grid_audio's volume on means unmuted, off muted. ([specs/kiloview-multiview-server.yaml:273](specs/kiloview-multiview-server.yaml#L273))
 - [ ] Check that close_window and the other requests accept window ids as the examples type them (string in some, number in others). ([specs/kiloview-multiview-server.yaml:173](specs/kiloview-multiview-server.yaml#L173))
 - [ ] Check what get_window_sdp's stream_id is. ([specs/kiloview-multiview-server.yaml:458](specs/kiloview-multiview-server.yaml#L458))
+- [ ] Check that layout grids' x, y, width and height are percentages of the window (the examples run from 0 to 100). ([specs/kiloview-multiview-server.yaml:126](specs/kiloview-multiview-server.yaml#L126))
+- [ ] Check that set_toolbar's type takes soundColumn, securityBox, centerline and nameEnable, the names 6.4's reply uses (6.5 says only "item name"). ([specs/kiloview-multiview-server.yaml:240](specs/kiloview-multiview-server.yaml#L240))
+- [ ] Check whether any read reports set_take's syncVolume (8.3's reply has none). ([specs/kiloview-multiview-server.yaml:365](specs/kiloview-multiview-server.yaml#L365))
 
 ## kiloview-n60 — Kiloview N60 / N50
 
@@ -2314,11 +2345,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that get_long_term_token (user/token/permanent) works without an Authorization header, and that the token never expires. ([specs/kiloview-ndi-core.yaml:194](specs/kiloview-ndi-core.yaml#L194))
 - [ ] Confirm that get_timed_token's minutes sets the token's lifetime. ([specs/kiloview-ndi-core.yaml:206](specs/kiloview-ndi-core.yaml#L206))
 - [ ] Check how login answers a wrong user name or password: HTTP 200 with the error envelope, or 401. ([specs/kiloview-ndi-core.yaml:171](specs/kiloview-ndi-core.yaml#L171))
-- [ ] Confirm that errors come with HTTP 200 and {"result": "error", ...}, and list the codes. ([specs/kiloview-ndi-core.yaml:862](specs/kiloview-ndi-core.yaml#L862))
+- [ ] Confirm that errors come with HTTP 200 and {"result": "error", ...}, and list the codes. ([specs/kiloview-ndi-core.yaml:865](specs/kiloview-ndi-core.yaml#L865))
 - [ ] Confirm that system/info answers without a token, since the probe relies on it. ([specs/kiloview-ndi-core.yaml:53](specs/kiloview-ndi-core.yaml#L53))
 - [ ] Check that the language header en is accepted on every request. ([specs/kiloview-ndi-core.yaml:50](specs/kiloview-ndi-core.yaml#L50))
 - [ ] Check that NDI CORE (software) answers on port 80, or on which port, and whether it or the MAX serves HTTPS. ([specs/kiloview-ndi-core.yaml:69](specs/kiloview-ndi-core.yaml#L69))
-- [ ] Record the event websocket's messages (ws://<host>/api_event/cube/ws/info?token=...) so they can replace polling. ([specs/kiloview-ndi-core.yaml:870](specs/kiloview-ndi-core.yaml#L870))
+- [ ] Record the event websocket's messages (ws://<host>/api_event/cube/ws/info?token=...) so they can replace polling. ([specs/kiloview-ndi-core.yaml:873](specs/kiloview-ndi-core.yaml#L873))
 - [ ] Check that add_input with dis_method 0 and dis_g_name *manual* (the example) adds a usable source. ([specs/kiloview-ndi-core.yaml:343](specs/kiloview-ndi-core.yaml#L343))
 - [ ] Check that modify_input refuses conn_type 1 in this version. ([specs/kiloview-ndi-core.yaml:383](specs/kiloview-ndi-core.yaml#L383))
 - [ ] Check whether manage_panel_inputs and manage_panel_outputs remove entries left out of their lists. ([specs/kiloview-ndi-core.yaml:660](specs/kiloview-ndi-core.yaml#L660))
@@ -2331,11 +2362,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that restart_service restarts only the service, not the hardware. ([specs/kiloview-ndi-core.yaml:331](specs/kiloview-ndi-core.yaml#L331))
 - [ ] Check that log/operate/download answers the log as plain text. ([specs/kiloview-ndi-core.yaml:317](specs/kiloview-ndi-core.yaml#L317))
 - [ ] Check what update_authorization answers for a wrong code. ([specs/kiloview-ndi-core.yaml:808](specs/kiloview-ndi-core.yaml#L808))
-- [ ] Confirm that system_running_time is in seconds. ([specs/kiloview-ndi-core.yaml:910](specs/kiloview-ndi-core.yaml#L910))
-- [ ] Find the unit and period of bytes_sent and bytes_recv. ([specs/kiloview-ndi-core.yaml:924](specs/kiloview-ndi-core.yaml#L924))
-- [ ] Find the unit of v_b and a_b. ([specs/kiloview-ndi-core.yaml:969](specs/kiloview-ndi-core.yaml#L969))
-- [ ] Find the unit of cr_progress. ([specs/kiloview-ndi-core.yaml:1044](specs/kiloview-ndi-core.yaml#L1044))
-- [ ] Confirm the user roles: 0 built-in admin, 1 administrator, 2 ordinary user. ([specs/kiloview-ndi-core.yaml:948](specs/kiloview-ndi-core.yaml#L948))
+- [ ] Confirm that system_running_time is in seconds. ([specs/kiloview-ndi-core.yaml:913](specs/kiloview-ndi-core.yaml#L913))
+- [ ] Find the unit and period of bytes_sent and bytes_recv. ([specs/kiloview-ndi-core.yaml:927](specs/kiloview-ndi-core.yaml#L927))
+- [ ] Find the unit of v_b and a_b. ([specs/kiloview-ndi-core.yaml:972](specs/kiloview-ndi-core.yaml#L972))
+- [ ] Find the unit of cr_progress. ([specs/kiloview-ndi-core.yaml:1047](specs/kiloview-ndi-core.yaml#L1047))
+- [ ] Confirm the user roles: 0 built-in admin, 1 administrator, 2 ordinary user. ([specs/kiloview-ndi-core.yaml:951](specs/kiloview-ndi-core.yaml#L951))
 
 ## kiloview-p3 — Kiloview P3 / P3 Mini
 
@@ -2375,10 +2406,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Find out the operating modes set_card_mode takes besides encode. ([specs/kiloview-rf02.yaml:655](specs/kiloview-rf02.yaml#L655))
 - [ ] Find out the dashboard type values. ([specs/kiloview-rf02.yaml:758](specs/kiloview-rf02.yaml#L758))
 - [ ] Check that lcd_factory_reset's password is kiloview. ([specs/kiloview-rf02.yaml:583](specs/kiloview-rf02.yaml#L583))
-- [ ] Check that the users and roles lists accept pageSize 1000. ([specs/kiloview-rf02.yaml:966](specs/kiloview-rf02.yaml#L966))
+- [ ] Check that the users and roles lists accept pageSize 1000. ([specs/kiloview-rf02.yaml:970](specs/kiloview-rf02.yaml#L970))
 - [ ] Find out the user status codes besides 2 (enabled), and the gateway device status codes. ([specs/kiloview-rf02.yaml:871](specs/kiloview-rf02.yaml#L871))
 - [ ] Find the units of the gateway device CPU, memory, uptime and disk values. ([specs/kiloview-rf02.yaml:912](specs/kiloview-rf02.yaml#L912))
 - [ ] Check that delete_gateway_channel's single-entry list body is accepted. ([specs/kiloview-rf02.yaml:389](specs/kiloview-rf02.yaml#L389))
+
+## kissbox-io — KissBox IO3CC and IO8CC I/O card frames
+
+- [ ] Check where a frame on the UDP firmware sends its answers to reads: to the destination port set in the Editor as a broadcast (as the core expects, listening on feedback_port), or back to the sender's port. ([specs/kissbox-io.yaml:109](specs/kissbox-io.yaml#L109))
+- [ ] Check that input change notifications use the all channel status (A1h) or single channel status (A3h) layout, which the protocol document does not state for notifications. ([specs/kissbox-io.yaml:7](specs/kissbox-io.yaml#L7))
 
 ## kramer-p3000 — Kramer Protocol 3000
 
@@ -3229,6 +3265,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record whether the multi-window report (FD) starts with the window number. ([specs/philips-sicp.yaml:792](specs/philips-sicp.yaml#L792))
 - [ ] Confirm the operating hours report is a big-endian 16-bit count of hours. ([specs/philips-sicp.yaml:724](specs/philips-sicp.yaml#L724))
 
+## pigpio — Raspberry Pi GPIO (pigpio daemon)
+
+- [ ] Check against pigpiod (version 79) on a Raspberry Pi 4 that NOIB on a second connection answers the handle and then streams reports for the GPIO NB names on the first, as the C interface describes for socket notifications. ([specs/pigpio.yaml:7](specs/pigpio.yaml#L7))
+
+## pikvm — PiKVM
+
+- [ ] Check the PiKVM Switch commands' answers (the reference shows FIXME for each) and that status 200 means the switch acted. ([specs/pikvm.yaml:694](specs/pikvm.yaml#L694))
+- [ ] Check on current KVMD that the websocket events still carry whole states as the reference's examples show (hid_state with outputs and jiggler, msd_state with storage.images by name), and that ocr_right and ocr_bottom are the region's bounds rather than its width and height. ([specs/pikvm.yaml:681](specs/pikvm.yaml#L681))
+- [ ] Confirm the GPIO switch route is /api/gpio/switch (the reference's heading says /gpio/switch, its example /api/gpio/switch). ([specs/pikvm.yaml:342](specs/pikvm.yaml#L342))
+
 ## pixotope — Pixotope
 
 - [ ] Record the Gateway's HTTP answer bodies (to a Set, a Get, a Call, and a Call that times out), so replies can be read into state. ([specs/pixotope.yaml:321](specs/pixotope.yaml#L321))
@@ -3312,6 +3358,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that playlist_get by UUID answers id and items for a playlist inside folders, as the document gives it. ([specs/propresenter.yaml:2232](specs/propresenter.yaml#L2232))
 - [ ] Check the media and audio playlist replies: the document gives media's items as an object with array fields and audio's reply as an array of playlists; an object with id and an items array is assumed for both. ([specs/propresenter.yaml:2260](specs/propresenter.yaml#L2260))
 - [ ] Open POST /v1/status/updates with Accept application/json and confirm each update arrives as {"url", "data"} followed by a blank line (not as server-sent events), that url carries /v1 as the document's example does, and that data is what each endpoint's own GET returns; and record whether the stream ends when ProPresenter changes presentations. ([specs/propresenter.yaml:1756](specs/propresenter.yaml#L1756))
+
+## ptp — PTP version 2 (IEEE 1588) network monitor
+
+- [ ] On a SMPTE ST 2059-2 or AES67 network with a real grandmaster (and a boundary clock), confirm the Announce dataset, the best master and the clock accuracy and time source texts match what the grandmaster's own interface shows. ([specs/ptp.yaml:87](specs/ptp.yaml#L87))
+- [ ] Confirm the Delay_Req (1) and Delay_Resp (9) message types and the slave role they show, taken from a BSD-licensed decoder rather than IEEE 1588's own text, against a real end-to-end network. ([specs/ptp.yaml:107](specs/ptp.yaml#L107))
+- [ ] Check host_offset_ms on a host disciplined by PTP (it should stay within a millisecond or so) and on one that is not, and that sharing ports 319 and 320 with a PTP daemon on the same host works on Windows, Linux and macOS. ([specs/ptp.yaml:158](specs/ptp.yaml#L158))
 
 ## ptzoptics — PTZOptics
 

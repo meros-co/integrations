@@ -6,6 +6,8 @@
 //! A module shared by several integrations (one protocol, several product
 //! lines) is compiled when any of them is.
 
+#[cfg(feature = "adder-aim")]
+mod adder_aim;
 #[cfg(any(feature = "aes70", feature = "focusrite-rednet", feature = "dbaudio"))]
 mod aes70;
 #[cfg(any(feature = "aja-helo", feature = "aja-kipro", feature = "aja-kumo"))]
@@ -109,6 +111,10 @@ mod http_listener;
 mod http_snapshot;
 #[cfg(feature = "blackmagic-hyperdeck")]
 mod hyperdeck_ftp;
+#[cfg(feature = "integ-jnior")]
+mod jnior;
+#[cfg(feature = "kissbox-io")]
+mod kissbox;
 #[cfg(feature = "labgruppen-lake")]
 mod lake_dlm;
 #[cfg(feature = "meros-camera")]
@@ -119,6 +125,10 @@ mod meros_camera_wire;
 mod midi_link;
 #[cfg(feature = "midi-show-control")]
 mod midi_show_control;
+#[cfg(feature = "generic-modbus")]
+mod modbus;
+#[cfg(feature = "generic-mqtt")]
+mod mqtt;
 #[cfg(feature = "nec-display")]
 mod nec_display;
 #[cfg(feature = "nec-projector")]
@@ -151,12 +161,16 @@ mod panasonic_projector_commands;
 mod pandorasbox_commands;
 #[cfg(feature = "philips-sicp")]
 mod philips_sicp;
+#[cfg(feature = "pigpio")]
+mod pigpio;
 #[cfg(feature = "pjlink")]
 mod pjlink;
 #[cfg(feature = "posistagenet")]
 mod posistagenet;
 #[cfg(any(feature = "apc-rack-pdu", feature = "apc-ups"))]
 mod powernet_traps;
+#[cfg(feature = "ptp")]
+mod ptp;
 #[cfg(feature = "qsys")]
 mod qsys;
 #[cfg(feature = "middle-atlantic-racklink")]
@@ -363,6 +377,16 @@ pub(crate) fn construct(
         "sacn" => Ok(Box::new(sacn::Sacn::new(context)?)),
         #[cfg(feature = "posistagenet")]
         "posistagenet" => Ok(Box::new(posistagenet::Psn::new(context)?)),
+        #[cfg(feature = "adder-aim")]
+        "adder-aim" => Ok(Box::new(adder_aim::AdderAim::new(context)?)),
+        #[cfg(feature = "integ-jnior")]
+        "integ-jnior" => Ok(Box::new(jnior::Jnior::new(context)?)),
+        #[cfg(feature = "kissbox-io")]
+        "kissbox-io" => Ok(Box::new(kissbox::KissBox::new(context)?)),
+        #[cfg(feature = "pigpio")]
+        "pigpio" => Ok(Box::new(pigpio::Pigpio::new(context)?)),
+        #[cfg(feature = "ptp")]
+        "ptp" => Ok(Box::new(ptp::Ptp::new(context)?)),
         #[cfg(feature = "osc-listener")]
         "osc-listener" => Ok(Box::new(osc_listener::OscListener::new(context)?)),
         #[cfg(feature = "tsl-umd-display")]
@@ -462,6 +486,10 @@ pub(crate) fn construct(
         "grassvalley-amp" => Ok(Box::new(vtr::Vtr::new(vtr::Dialect::Amp, context)?)),
         #[cfg(feature = "vdcp")]
         "vdcp" => Ok(Box::new(vdcp::Vdcp::new(context)?)),
+        #[cfg(feature = "generic-modbus")]
+        "generic-modbus" => Ok(Box::new(modbus::Modbus::new(context)?)),
+        #[cfg(feature = "generic-mqtt")]
+        "generic-mqtt" => Ok(Box::new(mqtt::Mqtt::new(context)?)),
         #[cfg(feature = "generic-osc")]
         "generic-osc" => Ok(Box::new(generic_osc::GenericOsc::new(context)?)),
         #[cfg(feature = "generic-tcp-udp")]
@@ -624,10 +652,17 @@ mod tests {
                     // These send nothing until asked (a request, a watched
                     // stream), so there is nothing to compare on starting.
                     // An sACN source sends nothing before it holds a
-                    // universe, nor a PSN server before it has a tracker.
+                    // universe, nor a PSN server before it has a tracker;
+                    // a PTP monitor only listens.
                     if used.is_none()
-                        && ["generic-http", "http-snapshot", "posistagenet", "sacn"]
-                            .contains(&spec.id.as_str())
+                        && [
+                            "generic-http",
+                            "http-snapshot",
+                            "posistagenet",
+                            "ptp",
+                            "sacn",
+                        ]
+                        .contains(&spec.id.as_str())
                     {
                         continue;
                     }

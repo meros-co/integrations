@@ -11,7 +11,7 @@ source:
     note: >
       Manufacturer-documented, public, in Chinese; linked as the API of the
       MG300 V2 from https://www.kiloview.com/en/docs/rmg300-v2-video-media-gateway/api/
-      (checked 2026-10-27). Machine-translated; field tables, whose columns
+      (checked 2026-10-27). Read in the Chinese original; field tables, whose columns
       are misaligned in the PDF, are read together with the examples. Used:
       section 1 (paths under /api, the result/data/msg reply, methods not
       enforced), 1.1-1.2 (the token from the login reply, sent in the app
@@ -1351,23 +1351,23 @@ commands:
     expect: *val
     returns: value
   set_encoder:
-    summary: "Set an output's main-stream encoding (POST /api/output/encode/set)"
+    summary: "Set an output's main-stream encoding; every field is sent, so one not given takes its default here, not its current value (POST /api/output/encode/set)"
     params:
       output: *output
       codec: { type: enum, values: [H264, H265], default: H264, label: Codec, description: "H.264 or H.265." }
-      grey: { type: bool, default: false, label: Grayscale, description: "On encodes in grayscale, off in color." }
+      grayscale: { type: bool, default: false, label: Grayscale, description: "On encodes in grayscale, off in color." }
       profile: { type: enum, values: [high, main, baseline], default: high, label: Profile, description: "The encoding profile." }
       width: { type: int, min: 1, default: 1, label: Width, description: "The encoded width in pixels, or 1 to follow the output resolution." }
       height: { type: int, min: 1, default: 1, label: Height, description: "The encoded height in pixels, or 1 to follow the output resolution." }
       mode: { type: enum, values: [CBR, VBR], default: VBR, label: Bitrate mode, description: "Constant or variable bitrate." }
-      gop: { type: int, min: 1, default: 60, label: GOP, description: "Frames between key frames: 1, 30, 60, 90, 120, 150, 180 or another." }
+      gop: { type: int, min: 1, default: 60, label: GOP, description: "Frames between key frames; the document lists 1, 30, 60, 90, 120, 150 and 180." }
       fps: { type: string, default: auto, pattern: "^(auto|half|[0-9]+(\\.[0-9]+)?)$", label: Frame rate, description: "auto, half, or a fixed frame rate such as 30." }
       bitrate: { type: int, min: 32, max: 50000, default: 6000, label: Bitrate, description: "The bitrate in kbit/s, 32 to 50000." }
       max_bitrate: { type: int, min: 32, default: 20000, label: Maximum bitrate, description: "The highest bitrate in kbit/s, used in VBR." }
       reference_frames: { type: int, min: 0, default: 0, label: Reference frames, description: "0 for a single reference frame, more for several." }
       deinterlace: { type: enum, values: [default, line_doubling], default: default, label: Deinterlacing, description: "default weaves the fields, line_doubling doubles lines per field." }
     send: { method: POST, path: /api/output/encode/set, content_type: application/json,
-            body: '{"output_id":{output},"main":{"codec":"{codec}","grey":{grey},"profile":{profile:map.encode_profile},"pic_width":{width},"pic_height":{height},"mode":"{mode}","gop":{gop},"fps":"{fps}","bitrate":{bitrate},"max_bitrate":{max_bitrate},"code_frame":{reference_frames},"deinterlace_mode":"{deinterlace}"}}' }
+            body: '{"output_id":{output},"main":{"codec":"{codec}","grey":{grayscale},"profile":{profile:map.encode_profile},"pic_width":{width},"pic_height":{height},"mode":"{mode}","gop":{gop},"fps":"{fps}","bitrate":{bitrate},"max_bitrate":{max_bitrate},"code_frame":{reference_frames},"deinterlace_mode":"{deinterlace}"}}' }
     expect: *ok
     returns: ack
   set_vu_meter:
@@ -1445,14 +1445,14 @@ commands:
       address: &gw_dest { type: string, required: true, max_length: 255, label: Destination address, description: "The address to send to, unicast or multicast." }
       port: &gw_dest_port { type: int, min: 1, max: 65535, required: true, label: Destination port, description: "The port to send to." }
       load_type: { type: int, min: 0, required: true, label: Payload type, description: "The RTP payload type as the gateway numbers it." }
-      ttl: &gw_ttl { type: int, min: 1, max: 255, default: 64, label: TTL, description: "The packets' time to live." }
+      ttl: &gw_ttl { type: int, min: 1, max: 255, required: true, label: TTL, description: "The packets' time to live; the document gives no default." }
       service_name: &gw_ts_service { type: string, default: "", max_length: 128, label: TS service name, description: "The MPEG-TS service name." }
       service_provider: &gw_ts_provider { type: string, default: "", max_length: 128, label: TS service provider, description: "The MPEG-TS service provider name." }
-      pcr_period: &gw_ts_pcr { type: int, min: 1, max: 100, default: 40, label: PCR period, description: "The PCR period in milliseconds, 1 to 100." }
-      transport_stream_id: &gw_ts_id { type: int, min: 1, max: 65535, default: 1, label: Transport stream ID, description: "The MPEG-TS transport stream id, 1 to 65535." }
-      start_pid: &gw_ts_pid { type: int, min: 32, max: 3840, default: 256, label: Start PID, description: "The first elementary stream PID, 32 to 3840." }
-      pmt_start_pid: &gw_ts_pmt { type: int, min: 16, max: 7936, default: 4096, label: PMT start PID, description: "The first PMT PID, 16 to 7936." }
-      tables_version: &gw_ts_ver { type: int, min: 0, max: 31, default: 0, label: Tables version, description: "The MPEG-TS tables version, 0 to 31." }
+      pcr_period: &gw_ts_pcr { type: int, min: 1, max: 100, required: true, label: PCR period, description: "The PCR period in milliseconds, 1 to 100." }
+      transport_stream_id: &gw_ts_id { type: int, min: 1, max: 65535, required: true, label: Transport stream ID, description: "The MPEG-TS transport stream id, 1 to 65535." }
+      start_pid: &gw_ts_pid { type: int, min: 32, max: 3840, required: true, label: Start PID, description: "The first elementary stream PID, 32 to 3840." }
+      pmt_start_pid: &gw_ts_pmt { type: int, min: 16, max: 7936, required: true, label: PMT start PID, description: "The first PMT PID, 16 to 7936." }
+      tables_version: &gw_ts_ver { type: int, min: 0, max: 31, required: true, label: Tables version, description: "The MPEG-TS tables version, 0 to 31." }
     send: { method: POST, path: /api/gate/stream/add, content_type: application/json,
             body: '{"name":{name:json},"protocol":"rtp","is_enable":{enabled},"address":{address:json},"port":{port},"load_type":{load_type},"ttl":{ttl},"ts_service_name":{service_name:json},"ts_service_provider":{service_provider:json},"ts_pcr_period":{pcr_period},"ts_transport_stream_id":{transport_stream_id},"ts_start_pid":{start_pid},"ts_pmt_start_pid":{pmt_start_pid},"ts_tables_version":{tables_version}}' }
     expect: *ok
@@ -1466,7 +1466,7 @@ commands:
       port: *gw_dest_port
       bind_port: &gw_bind { type: int, min: 0, max: 65535, default: 0, label: Local port, description: "The local port to send from, 0 for any." }
       ttl: *gw_ttl
-      pts_pcr_delay: &gw_pts { type: int, min: 0, default: 0, label: PTS/PCR delay, description: "The PTS to PCR delay in milliseconds." }
+      pts_pcr_delay: &gw_pts { type: int, min: 0, required: true, label: PTS/PCR delay, description: "The PTS to PCR delay in milliseconds." }
       service_name: *gw_ts_service
       service_provider: *gw_ts_provider
       pcr_period: *gw_ts_pcr
@@ -1506,8 +1506,8 @@ commands:
       enabled: *gw_enabled
       mode: &gw_hls_mode { type: string, default: server, max_length: 32, label: Mode, description: "The HLS mode; the document names server, which serves the playlist from the gateway." }
       session: &gw_hls_session { type: string, required: true, max_length: 128, label: Session, description: "The HLS session id, needed in server mode; a duplicate is refused (615)." }
-      segment_time: &gw_hls_seg { type: int, min: 1, default: 2, label: Segment length, description: "Segment length in seconds." }
-      max_segments: &gw_hls_max { type: int, min: 1, default: 5, label: Segments kept, description: "The number of segments the playlist keeps." }
+      segment_time: &gw_hls_seg { type: int, min: 1, required: true, label: Segment length, description: "Segment length in seconds." }
+      max_segments: &gw_hls_max { type: int, min: 1, required: true, label: Segments kept, description: "The number of segments the playlist keeps." }
     send: { method: POST, path: /api/gate/stream/add, content_type: application/json,
             body: '{"name":{name:json},"protocol":"hls","is_enable":{enabled},"mode":{mode:json},"session":{session:json},"segment_time":{segment_time},"max_segments":{max_segments}}' }
     expect: *ok
@@ -2109,7 +2109,7 @@ state:
   outputs.*.encoder.width:                { type: int, description: "Main stream width, pixels; 1 when it follows the output resolution" }
   outputs.*.encoder.height:               { type: int, description: "Main stream height, pixels; 1 when it follows the output resolution" }
   outputs.*.encoder.follows_resolution:   { type: bool, description: "The main stream's size follows the output resolution" }
-  outputs.*.encoder.grey:                 { type: bool, description: "The main stream is encoded in grayscale" }
+  outputs.*.encoder.grayscale:            { type: bool, description: "The main stream is encoded in grayscale" }
   outputs.*.encoder.fps:                  { type: string, description: "Main stream frame rate: auto, half, or a number" }
   outputs.*.encoder.mode:                 { type: string, description: "Main stream bitrate mode: CBR or VBR" }
   outputs.*.encoder.bitrate:              { type: int, description: "Main stream bitrate, kbit/s" }
@@ -2612,7 +2612,7 @@ telemetry:
         "outputs.{1}.encoder.width": "{w}"
         "outputs.{1}.encoder.height": "{h}"
         "outputs.{1}.encoder.follows_resolution": "{def}"
-        "outputs.{1}.encoder.grey": "{grey}"
+        "outputs.{1}.encoder.grayscale": "{grey}"
         "outputs.{1}.encoder.fps": "{fps}"
         "outputs.{1}.encoder.mode": "{mode}"
         "outputs.{1}.encoder.bitrate": "{rate}"

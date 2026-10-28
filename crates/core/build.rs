@@ -18,6 +18,7 @@ use std::{collections::BTreeSet, env, fs, path::PathBuf};
 const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-7thsense", &["7thsense-delta"]),
     ("vendor-ableton", &["ableton-live"]),
+    ("vendor-adder", &["adder-aim", "adder-xdip"]),
     ("vendor-aes70", &["aes70"]),
     ("vendor-aimedia", &["aimedia-icap"]),
     (
@@ -166,6 +167,8 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &[
             "generic-http",
             "generic-midi",
+            "generic-modbus",
+            "generic-mqtt",
             "generic-osc",
             "generic-ping",
             "generic-snmp",
@@ -186,9 +189,11 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-highend", &["highend-hog4"]),
     ("vendor-holographics", &["holographics"]),
     ("vendor-holyrics", &["holyrics"]),
+    ("vendor-ieee", &["ptp"]),
     ("vendor-imagine", &["vdcp"]),
     ("vendor-imimot", &["imimot-mitti"]),
     ("vendor-inoage", &["madrix"]),
+    ("vendor-integ", &["integ-jnior"]),
     ("vendor-ioversal", &["ioversal-vertex"]),
     (
         "vendor-irisdown",
@@ -215,6 +220,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "kiloview-rf02",
         ],
     ),
+    ("vendor-kissbox", &["kissbox-io"]),
     ("vendor-kramer", &["kramer-p3000"]),
     (
         "vendor-labgruppen",
@@ -282,6 +288,8 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-phabrix", &["phabrix-qx"]),
     ("vendor-pharos", &["pharos-designer"]),
     ("vendor-philips", &["philips-sicp"]),
+    ("vendor-pigpio", &["pigpio"]),
+    ("vendor-pikvm", &["pikvm"]),
     ("vendor-pixotope", &["pixotope"]),
     ("vendor-pjlink", &["pjlink"]),
     ("vendor-planningcenter", &["planningcenter-services"]),

@@ -190,10 +190,11 @@ def _km_tel(name, path, data, expect_state, request=None, **extra):
 
 _km_tel("general", "/api/v2/config/general.json", {
     "deviceName": "NDI Multiview", "languageShow": True, "websocketPort": 12345, "qrcode": "https://192.168.40.215:81/",
-    "loginImgUrl": "./img/logo.png", "logoImgShow": True,
+    "loginImgUrl": "./img/logo.png", "logoImgShow": True, "logoImgUrl": "./img/logo.png",
     "languageOptions": [{"value": "en", "name": "English"}], "version": "V_1.10.0001"},
     {"general": {"device_name": "NDI Multiview", "version": "V_1.10.0001", "websocket_port": 12345,
                  "qrcode": "https://192.168.40.215:81/", "language_switch": True, "logo_shown": True,
+                 "logo_url": "./img/logo.png", "login_logo_url": "./img/logo.png",
                  "languages": '[{"value":"en","name":"English"}]'}})
 _km_tel("nav", "/api/v2/config/nav/nav", {"main_nav": {"home": True}}, {"general": {"nav_shown": True}})
 _km_tel("resolutions", "/api/v2/resolution/list.json", [{"id": 1, "label": "1280x720", "width": 1280, "height": 720}],

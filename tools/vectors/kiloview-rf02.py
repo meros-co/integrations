@@ -123,7 +123,7 @@ _kr("set_firmware_description", {"firmware": 2, "description": "description"}, "
 _kr_body, _kr_ctype = _ke3_form([("identifier", b"fw1", None), ("number", b"0", None), ("file_type", b"bin", None),
                                  ("file", bytes([0, 1, 2]), "fw1.0")])
 V.append({"spec": KR, "command": "upload_firmware_chunk",
-          "input": {"identifier": "fw1", "number": 0, "file": "AAEC"},
+          "input": {"identifier": "fw1", "number": 0, "file_type": "bin", "file": "AAEC"},
           "expect_request": {"method": "POST", "target": "/api/v1/firmware/upload/chunk",
                              "body_hex": _kr_body.hex(), "content_type": _kr_ctype}})
 
@@ -258,7 +258,7 @@ _kr_tel("devices", "/api/v1/klnk/gateway/output-devices", [
         "firmware": "1.00.0042", "update_available": False, "status": 1, "cpu": 12.5, "memory": 40, "uptime": 3600.0,
         "temperature": 55, "disk": 10, "directory": 2, "device_type": "mgw",
         "network": {"eth0": {"ip": "192.168.35.191", "netmask": "255.255.255.0", "gateway": "192.168.35.254",
-                             "tx_speed": 1.5, "rx_speed": 2.5, "tx_packets": 100, "rx_packets": 200,
+                             "model": "", "tx_speed": 1.5, "rx_speed": 2.5, "tx_packets": 100, "rx_packets": 200,
                              "tx_errors": 0, "rx_errors": 1}}}}},
     state_before={"devices": {"000000108": {"name": "removed"}}})
 _kr_tel("dashboard", "/api/v1/dashboard/data", {
@@ -274,9 +274,11 @@ _kr_tel("dashboard", "/api/v1/dashboard/data", {
                    "models": {"FMG400": {"units": 3, "offline": 0, "external": False},
                               "N60": {"units": 1, "offline": 0, "external": True}},
                    "services": {"encoding": {"total_devices": 10, "online_devices": 10, "offline_devices": 0,
-                                             "total_channels": 15, "error_devices": 0},
+                                             "total_channels": 15, "error_devices": 0,
+                                             "updated": "0001-01-01T00:00:00Z"},
                                 "bonding": {"total_devices": 1, "online_devices": 1, "offline_devices": 0,
-                                            "total_channels": 1, "error_devices": 0}}}})
+                                            "total_channels": 1, "error_devices": 0,
+                                            "updated": "0001-01-01T00:00:00Z"}}}})
 _kr_tel("notification-summary", "/api/v1/noti/summary",
         {"warning_count": 80, "error_count": 0, "info_count": 27, "unread_count": 107},
         {"notifications_summary": {"warnings": 80, "errors": 0, "info": 27, "unread": 107}})
@@ -294,6 +296,9 @@ _kr_tel("aggregation", "/api/v1/sw/aggr/dump", {"aggre-id": 0, "aggregated": [],
                                                 "name": "147", "type": "lacp", "enable": 1},
         {"aggregation": {"id": 0, "name": "147", "type": "lacp", "enabled": True, "configured": "[22,23,24]",
                          "aggregated": "[]"}})
+_kr_tel("aggregation-ports", "/api/v1/sw/aggr/ports", [{"port": 22, "name": "port22", "type": "ge"}],
+        {"aggregation_ports": {"22": {"name": "port22", "type": "ge"}}},
+        state_before={"aggregation_ports": {"9": {"name": "gone"}}})
 
 
 def _kr_reread(name, path, request, then):

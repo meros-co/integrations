@@ -96,7 +96,7 @@ _kms_tel("general", "/api/config/general/get.json", {
     "deviceName": "NDI Multiview", "languageShow": True, "languageOptions": [{"value": "en", "name": "English"}],
     "logoShow": False, "logoUrl": "", "qrcode": "http://192.168.2.150:8080/index.html"},
     {"general": {"device_name": "NDI Multiview", "language_switch": True, "languages": '[{"value":"en","name":"English"}]',
-                 "logo_shown": False, "qrcode": "http://192.168.2.150:8080/index.html"}})
+                 "logo_shown": False, "logo_url": "", "qrcode": "http://192.168.2.150:8080/index.html"}})
 _kms_tel("nav", "/api/config/nav/nav.json", {"main_nav": {"home": True}}, {"general": {"nav_shown": True}})
 _KMS_P = [{"x": 0, "y": 0, "width": 100, "height": 100}]
 _kms_tel("layouts", "/api/output/icon.json", [{"id": 0, "number": 1, "name": "PIP", "use_output": 1, "position": _KMS_P}],

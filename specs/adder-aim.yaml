@@ -1,0 +1,322 @@
+spec: 1
+id: adder-aim
+name: Adder AdderLink Infinity Manager (A.I.M.) API
+vendor: Adder Technology
+category: router
+implementation: native
+reason: >
+  The AIM API answers in XML, and its session token comes in the login's XML answer and goes back as a query
+  parameter on every request; a token the AIM no longer accepts is reported in the XML body, not the status, and
+  needs a new login and the request sent again; lists come in pages. The spec format captures sessions only from
+  cookies, headers or JSON.
+
+source:
+  - title: "A.I.M. (AdderLink Infinity Manager) User Guide, MAN-000016 v6.2, Appendix K: AIM API (API version 14)"
+    author: Adder Technology
+    url: https://files.onetimepim.com/acc-65/media/pdf/man-000016_v6-2.pdf
+    note: >
+      Adder's user guide for AIM software up to 5.10, as distributed by Adder's product information service. Appendix
+      K: best practices (log in once and keep the token, which is a stored session until the admin timeout; do not
+      keep HTTP connections open; poll devices, channels, presets and C-USB every 5 to 10 s; tokens bound to the
+      client's address), the connection procedure (log in again on a login error), the API changelog (v1 to v14) and
+      the methods with their inputs and XML outputs: login and logout (error 2 for a wrong user name or password; no
+      credentials for the anonymous API user), logout_device, get_devices (rx or tx, show_all, page and
+      results_per_page; d_id, names, addresses, firmware, d_status, and for receivers the last connection: con_c_id,
+      con_exclusive, con_control, start and end times, user, c_name), disk_usage, get_channels, get_presets,
+      connect_channel (modes v, s, e, p), connect_preset (force), disconnect_channel (rx_id list, force),
+      disconnect_preset (no id ends every connection), create_preset (pairs channel-receiver, allowed modes),
+      delete_preset, create_channel (sources, heads, group), delete_channel, update_device (desc and loc, _ clears),
+      promote, get_all_c_usb, delete_c_usb, update_c_usb, connect_c_usb, disconnect_c_usb, reboot_devices,
+      replace_device, get_servers (role, status, interfaces) and identify_device. Appendix M: the database schema's
+      on-line status values (d_status). The admin settings API - Login Required and API - Anonymous user (Settings).
+  - title: "ALIF: API (Adder Support Wiki)"
+    author: Adder Technology
+    url: https://support.adder.com/tiki/tiki-index.php?page=ALIF%3A+API
+    note: "Points to the AIM API; the online version of Appendix K is the AIM's own page at http://<ip address>/api/."
+
+settings:
+  scheme: { type: enum, values: [http, https], default: http, label: Scheme,
+            description: "http reaches the AIM's web server on 80, https on 443 with its certificate accepted as the next setting says." }
+  accept_invalid_certs: { type: bool, default: true, label: Accept the AIM's certificate,
+                          description: "With https, accept the AIM's self-signed certificate; the link is encrypted but the server not authenticated." }
+  username: { type: string, max_length: 64, default: "", label: User name,
+              description: "An AIM user; empty logs in as the anonymous API user, which the AIM may refuse (Settings, API - Login Required). Changes need an admin user." }
+  password: { type: string, secret: true, max_length: 128, default: "", label: Password, description: "The user's password." }
+  api_version: { type: int, min: 1, max: 14, default: 14, label: API version,
+                 description: "The API version requests ask for: 14 for AIM 5.10 and later; an older AIM may need its own (12 for 5.8, 9 for 5.2, 5 for 4.3)." }
+  poll_interval_ms: { type: int, min: 500, max: 3600000, default: 5000, label: Poll interval,
+                      description: "Milliseconds between reads of the receivers, transmitters, channels, presets and C-USB extenders; Adder recommends 5 to 10 s." }
+  timeout_ms: { type: int, min: 1, max: 600000, default: 10000, label: Timeout, description: "Milliseconds to wait for each answer." }
+
+ports:
+  - { port: 80, protocol: http, role: control, when: "scheme http" }
+  - { port: 443, protocol: https, role: control, when: "scheme https" }
+
+models:
+  - id: aim
+    name: AdderLink Infinity Manager (AIM server or virtual AIM, primary)
+    supports: [connect_channel, disconnect_receiver, disconnect_all_receivers, connect_preset, disconnect_preset,
+               disconnect_everything, create_preset, delete_preset, create_channel, delete_channel, update_device,
+               reboot_devices, identify_device, replace_device, logout_receiver, promote, rename_c_usb, delete_c_usb,
+               connect_c_usb, disconnect_c_usb, refresh]
+    verification: none
+
+commands:
+  connect_channel:
+    summary: Connect a receiver to a channel in a connection mode (connect_channel); answered with true, or the AIM's error
+    params:
+      receiver: { type: int, min: 1, max: 2147483647, required: true, label: Receiver, description: "The receiver's device id (d_id)." }
+      channel: { type: int, min: 1, max: 2147483647, required: true, label: Channel, description: "The channel's id (c_id)." }
+      mode: { type: enum, values: [shared, video_only, exclusive, private], default: shared, label: Mode, description: "shared (control with others), video_only (view only), exclusive (control, others view) or private (no one else)." }
+    returns: value
+  disconnect_receiver:
+    summary: End the connections of one or more receivers (disconnect_channel)
+    params:
+      receivers: { type: string, pattern: '^[0-9]+(,[0-9]+)*$', max_length: 4096, required: true, label: Receivers, description: "Receiver device ids separated by commas, such as 1,2,3." }
+      force: { type: bool, default: false, label: Force, description: "Also end connections made by other users, and those of offline receivers." }
+    returns: value
+  disconnect_all_receivers:
+    summary: End every connection the user made (disconnect_channel without receivers), or every connection with force
+    params:
+      force: { type: bool, default: false, label: Force, description: "End every connected receiver's connection, whoever made it." }
+    returns: value
+  connect_preset:
+    summary: Connect every channel and receiver pair of a preset (connect_preset)
+    params:
+      preset: { type: int, min: 1, max: 2147483647, required: true, label: Preset, description: "The preset's id (cp_id)." }
+      mode: { type: enum, values: [shared, video_only, exclusive, private], default: shared, label: Mode, description: "The connection mode for every pair." }
+      force: { type: bool, default: false, label: Force, description: "Connect the pairs that can be connected even when others fail." }
+    returns: value
+  disconnect_preset:
+    summary: End a preset's connections (disconnect_preset)
+    params:
+      preset: { type: int, min: 1, max: 2147483647, required: true, label: Preset, description: "The preset's id." }
+      force: { type: bool, default: false, label: Force, description: "Ignore errors with some of the preset's pairs." }
+    returns: value
+  disconnect_everything:
+    summary: End every connection in the whole AIM network (disconnect_preset without an id)
+    params:
+      force: { type: bool, default: false, label: Force, description: "Ignore errors with some connections." }
+    returns: value
+  create_preset:
+    summary: "Create a preset (admin); answered with {id}"
+    params:
+      name: { type: string, max_length: 128, required: true, label: Name, description: "The preset's display name." }
+      pairs: { type: string, pattern: '^[0-9]+-[0-9]+(,[0-9]+-[0-9]+)*$', max_length: 8192, required: true, label: Pairs, description: "Channel and receiver id pairs, each channel-receiver, separated by commas: 1-1,1-2,2-3." }
+      allow_video_only: { type: bool, default: false, label: Allow video only, description: "Permit video-only connections; with no mode allowed, the global setting applies." }
+      allow_shared: { type: bool, default: false, label: Allow shared, description: "Permit shared connections." }
+      allow_exclusive: { type: bool, default: false, label: Allow exclusive, description: "Permit exclusive connections." }
+      allow_private: { type: bool, default: false, label: Allow private, description: "Permit private connections." }
+    returns: value
+  delete_preset:
+    summary: Delete a preset (admin)
+    params:
+      preset: { type: int, min: 1, max: 2147483647, required: true, label: Preset, description: "The preset's id." }
+    returns: value
+  create_channel:
+    summary: "Create a channel from source devices (admin); at least one source; answered with {id}"
+    params:
+      name: { type: string, max_length: 128, required: true, label: Name, description: "The channel's display name." }
+      description: { type: string, max_length: 256, default: "", label: Description, description: "Its description; empty for none." }
+      location: { type: string, max_length: 256, default: "", label: Location, description: "Its location; empty for none." }
+      group: { type: string, max_length: 128, default: "", label: Channel group, description: "A channel group to add it to; empty for none." }
+      video1: { type: int, min: 0, max: 2147483647, default: 0, label: Video 1 source, description: "The transmitter id of video source 1; 0 for none." }
+      video1_head: { type: int, min: 1, max: 2, default: 1, label: Video 1 head, description: "Which video head of that transmitter." }
+      video2: { type: int, min: 0, max: 2147483647, default: 0, label: Video 2 source, description: "The transmitter id of video source 2; 0 for none." }
+      video2_head: { type: int, min: 1, max: 2, default: 1, label: Video 2 head, description: "Which video head of that transmitter." }
+      audio: { type: int, min: 0, max: 2147483647, default: 0, label: Audio source, description: "The transmitter id of the audio source; 0 for none." }
+      usb: { type: int, min: 0, max: 2147483647, default: 0, label: USB source, description: "The transmitter id of the USB source; 0 for none." }
+      serial: { type: int, min: 0, max: 2147483647, default: 0, label: Serial source, description: "The transmitter id of the serial source; 0 for none." }
+      allow_video_only: { type: bool, default: false, label: Allow video only, description: "Permit video-only connections; with no mode allowed, the global setting applies." }
+      allow_shared: { type: bool, default: false, label: Allow shared, description: "Permit shared connections." }
+      allow_exclusive: { type: bool, default: false, label: Allow exclusive, description: "Permit exclusive connections." }
+      allow_private: { type: bool, default: false, label: Allow private, description: "Permit private connections." }
+    returns: value
+  delete_channel:
+    summary: Delete a channel (admin)
+    params:
+      channel: { type: int, min: 1, max: 2147483647, required: true, label: Channel, description: "The channel's id." }
+    returns: value
+  update_device:
+    summary: Change a device's description and location (admin; update_device)
+    params:
+      device: { type: int, min: 1, max: 2147483647, required: true, label: Device, description: "The device's id." }
+      description: { type: string, max_length: 256, default: "", label: Description, description: "The new description; empty leaves it." }
+      location: { type: string, max_length: 256, default: "", label: Location, description: "The new location; empty leaves it." }
+      clear_description: { type: bool, default: false, label: Clear description, description: "Remove the description." }
+      clear_location: { type: bool, default: false, label: Clear location, description: "Remove the location." }
+    returns: value
+  reboot_devices:
+    summary: Reboot devices (reboot_devices); their connections drop while they restart
+    params:
+      devices: { type: string, pattern: '^[0-9]+(,[0-9]+)*$', max_length: 4096, required: true, label: Devices, description: "Device ids separated by commas, such as 101,1701." }
+    returns: value
+  identify_device:
+    summary: Make a device identify itself (identify_device)
+    params:
+      device: { type: int, min: 1, max: 2147483647, required: true, label: Device, description: "The device's id." }
+    returns: value
+  replace_device:
+    summary: Replace a device with an unconfigured one, which takes its configuration (replace_device)
+    params:
+      device: { type: int, min: 1, max: 2147483647, required: true, label: Device, description: "The id of the device being replaced." }
+      replacement: { type: int, min: 1, max: 2147483647, required: true, label: Replacement, description: "The id of the unconfigured device replacing it." }
+    returns: value
+  logout_receiver:
+    summary: Log the user out of a receiver's OSD (logout_device)
+    params:
+      receiver: { type: int, min: 1, max: 2147483647, required: true, label: Receiver, description: "The receiver's id." }
+    returns: value
+  promote:
+    summary: Promote a backup AIM acting as primary to primary (admin; only an active backup answers)
+    returns: value
+  rename_c_usb:
+    summary: Rename a C-USB LAN extender (update_c_usb)
+    params:
+      mac: { type: string, pattern: '^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$', required: true, label: MAC address, description: "The extender's MAC address." }
+      name: { type: string, max_length: 128, required: true, label: Name, description: "Its new display name." }
+    returns: value
+  delete_c_usb:
+    summary: Delete a C-USB LAN extender (delete_c_usb)
+    params:
+      mac: { type: string, pattern: '^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$', required: true, label: MAC address, description: "The extender's MAC address." }
+    returns: value
+  connect_c_usb:
+    summary: Connect a C-USB LAN receiver to a transmitter (connect_c_usb); both must be disconnected first
+    params:
+      receiver: { type: string, pattern: '^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$', required: true, label: Receiver, description: "The receiving extender's MAC address." }
+      transmitter: { type: string, pattern: '^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$', required: true, label: Transmitter, description: "The transmitting extender's MAC address." }
+    returns: value
+  disconnect_c_usb:
+    summary: Disconnect a C-USB LAN receiver (disconnect_c_usb)
+    params:
+      mac: { type: string, pattern: '^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$', required: true, label: MAC address, description: "The receiving extender's MAC address." }
+    returns: value
+  refresh:
+    summary: Read every list, the servers and the disk usage now
+    returns: ack
+
+state:
+  api.version: { type: string, description: "The API version the AIM answered the login with" }
+  receivers.*.name: { type: string, description: "A receiver, keyed by its device id: its name" }
+  receivers.*.description: { type: string, description: "Its description" }
+  receivers.*.location: { type: string, description: "Its location" }
+  receivers.*.status: { type: string, description: "offline, online, rebooting, factory_resetting, firmware_upgrading, online_unconfigured, running_backup_firmware, id_no_longer_online, rdp_device or unknown" }
+  receivers.*.online: { type: bool, description: "Whether it is online" }
+  receivers.*.ip_address: { type: string, description: "Interface 1's IP address" }
+  receivers.*.ip_address2: { type: string, description: "Interface 2's IP address" }
+  receivers.*.mac_address: { type: string, description: "Interface 1's MAC address" }
+  receivers.*.mac_address2: { type: string, description: "Interface 2's MAC address" }
+  receivers.*.serial_number: { type: string, description: "Its serial number, when reported" }
+  receivers.*.firmware: { type: string, description: "Its firmware version" }
+  receivers.*.backup_firmware: { type: string, description: "Its backup firmware version" }
+  receivers.*.version: { type: int, description: "Its hardware family (d_version: 1 ALIF1000, 2 ALIF2000 family, 3 ALIF2100 family, 4 ALIF4000, 8 ALIF3000R, 0 an RDP server)" }
+  receivers.*.variant: { type: string, description: "Its variant letter (d_variant)" }
+  receivers.*.configured: { type: bool, description: "Whether it is configured" }
+  receivers.*.valid_firmware: { type: bool, description: "Whether its firmware is valid" }
+  receivers.*.date_added: { type: string, description: "When it joined the AIM network" }
+  receivers.*.connected: { type: bool, description: "Whether it is connected to a channel now (its last connection has no end time)" }
+  receivers.*.channel: { type: string, description: "The channel id it is connected to; empty when none" }
+  receivers.*.channel_name: { type: string, description: "That channel's name; empty when none" }
+  receivers.*.mode: { type: string, description: "The connection's mode: video_only, shared, exclusive, private, none or unknown" }
+  receivers.*.user: { type: string, description: "The user who made its last connection" }
+  receivers.*.connection_start: { type: string, description: "When its last connection started" }
+  receivers.*.connection_end: { type: string, description: "When its last connection ended; empty while it lasts" }
+  transmitters.*.name: { type: string, description: "A transmitter, keyed by its device id: its name" }
+  transmitters.*.description: { type: string, description: "Its description" }
+  transmitters.*.location: { type: string, description: "Its location" }
+  transmitters.*.status: { type: string, description: "As a receiver's status" }
+  transmitters.*.online: { type: bool, description: "Whether it is online" }
+  transmitters.*.ip_address: { type: string, description: "Interface 1's IP address" }
+  transmitters.*.ip_address2: { type: string, description: "Interface 2's IP address" }
+  transmitters.*.mac_address: { type: string, description: "Interface 1's MAC address" }
+  transmitters.*.mac_address2: { type: string, description: "Interface 2's MAC address" }
+  transmitters.*.serial_number: { type: string, description: "Its serial number" }
+  transmitters.*.firmware: { type: string, description: "Its firmware version" }
+  transmitters.*.backup_firmware: { type: string, description: "Its backup firmware version" }
+  transmitters.*.version: { type: int, description: "Its hardware family (d_version)" }
+  transmitters.*.variant: { type: string, description: "Its variant letter" }
+  transmitters.*.configured: { type: bool, description: "Whether it is configured" }
+  transmitters.*.valid_firmware: { type: bool, description: "Whether its firmware is valid" }
+  transmitters.*.date_added: { type: string, description: "When it joined the AIM network" }
+  transmitters.*.channel_count: { type: int, description: "How many channels use it" }
+  channels.*.name: { type: string, description: "A channel available to the user, keyed by its id: its name" }
+  channels.*.description: { type: string, description: "Its description" }
+  channels.*.location: { type: string, description: "Its location" }
+  channels.*.type: { type: string, description: "Its type, such as ALIF" }
+  channels.*.transmitter: { type: string, description: "Its transmitter's device id" }
+  channels.*.online: { type: bool, description: "Whether its devices are online" }
+  channels.*.favourite: { type: bool, description: "Whether it is the user's favorite" }
+  channels.*.video1: { type: string, description: "Video source 1's device id" }
+  channels.*.video1_head: { type: string, description: "Its head" }
+  channels.*.video2: { type: string, description: "Video source 2's device id" }
+  channels.*.video2_head: { type: string, description: "Its head" }
+  channels.*.audio: { type: string, description: "The audio source's device id" }
+  channels.*.usb: { type: string, description: "The USB source's device id" }
+  channels.*.serial: { type: string, description: "The serial source's device id" }
+  channels.*.sensitive: { type: bool, description: "Whether it is marked sensitive" }
+  channels.*.view: { type: string, description: "Whether a video-only connection is possible: enabled, disabled (in use by someone else) or hidden (never)" }
+  channels.*.shared: { type: string, description: "The same for a shared connection" }
+  channels.*.control: { type: string, description: "The same for an exclusive connection" }
+  channels.*.exclusive: { type: string, description: "The same for a private connection" }
+  presets.*.name: { type: string, description: "A preset available to the user, keyed by its id: its name" }
+  presets.*.description: { type: string, description: "Its description" }
+  presets.*.pairs: { type: int, description: "Its channel and receiver pairs" }
+  presets.*.problem_pairs: { type: int, description: "Pairs that are misconfigured (a receiver offline or undefined)" }
+  presets.*.active: { type: string, description: "Whether its pairs are connected: full, partial or none" }
+  presets.*.connected_receivers: { type: int, description: "Its receivers already connected" }
+  presets.*.view: { type: string, description: "Whether a video-only connection is possible: enabled, disabled or hidden" }
+  presets.*.shared: { type: string, description: "The same for shared" }
+  presets.*.control: { type: string, description: "The same for exclusive" }
+  presets.*.exclusive: { type: string, description: "The same for private" }
+  c_usb.*.type: { type: string, description: "A C-USB LAN extender, keyed by its MAC address: rx or tx" }
+  c_usb.*.name: { type: string, description: "Its name" }
+  c_usb.*.online: { type: bool, description: "Whether it is online" }
+  c_usb.*.ip_address: { type: string, description: "Its IP address" }
+  c_usb.*.connected_to: { type: string, description: "The MAC address of the extender it is connected to; empty when none" }
+  servers.*.name: { type: string, description: "An AIM server, keyed by its place in the list: its name" }
+  servers.*.role: { type: string, description: "primary, backup, solo or unconfigured" }
+  servers.*.status: { type: string, description: "active, standby, failed or quiescent" }
+  servers.*.ip_address: { type: string, description: "Its IP address" }
+  servers.*.mac_address: { type: string, description: "Its MAC address" }
+  servers.*.eth1: { type: int, description: "Its second interface: 0 off, 1 DHCP, 2 static, 3 bonded" }
+  servers.*.ip_address2: { type: string, description: "The second interface's IP address" }
+  servers.*.mac_address2: { type: string, description: "The second interface's MAC address" }
+  servers.*.description: { type: string, description: "Its description" }
+  servers.*.location: { type: string, description: "Its location" }
+  disk.main_used_percent: { type: float, unit: "%", description: "How full the main disk partition is" }
+  disk.backup_used_percent: { type: float, unit: "%", description: "How full the backup partition is" }
+  disk.db_size: { type: float, description: "The database's size, as the AIM reports it" }
+  disk.db_event_log_size: { type: float, description: "The event log's size" }
+  disk.db_connection_log_size: { type: float, description: "The connection log's size" }
+  disk.backups_size: { type: float, description: "The backup files' size" }
+  disk.archives_size: { type: float, description: "The archived logs' size" }
+  disk.firmware_size: { type: float, description: "The firmware files' size" }
+  disk.debug_size: { type: float, description: "The debug log's size" }
+  disk.aim_upgrades_size: { type: float, description: "The AIM upgrade files' size" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      disconnect_everything ends every KVM connection in the AIM network, and reboot_devices, replace_device and promote
+      interrupt the users of the devices concerned; none can be undone while users are working.
+  - models: [all]
+    severity: info
+    text: >
+      The API pushes nothing: the lists are polled (5 s by default, as Adder recommends 5 to 10 s), and read again after
+      each command. Channels and presets are those the user may use; receivers are all of them (show_all). A receiver's
+      connection is taken from its last connection record: connected while that has no end time.
+  - models: [all]
+    severity: info
+    text: >
+      The integration logs in once and keeps its token, which the AIM holds as a session until its admin timeout, and
+      logs out on closing. Tokens are bound to the client's address. The API documents no error code for an ended
+      token; an error whose message names the login, the token or the session logs in again once and repeats the
+      request. Error 2 at login (a wrong user name or password) makes the device unauthorized.
+  - models: [all]
+    severity: info
+    text: >
+      Methods that change the AIM need an admin user; others answer with the AIM's error. The API works on the primary
+      AIM only (promote excepted). Opening for commands only logs in and reads nothing; a get_servers after 30 s of
+      silence stays as the liveness check.

@@ -737,7 +737,12 @@ from its answer: with `capture: { cookie: name }` the named cookie of its
 value, sent back in a header of the same name; with `capture: { json: path,
 header: name }` the string at that JSON path of the answer's body, sent back
 in the header named (Logos Proclaim answers its login with
-`{"proclaimAuthToken": "..."}` and takes it back as `ProclaimAuthToken`). An
+`{"proclaimAuthToken": "..."}` and takes it back as `ProclaimAuthToken`).
+With `scheme`, the header carries the scheme, a space and the string: an
+Adder XDIP receiver answers its access login with `{"accessToken": "..."}`
+and takes it back as `Authorization: Bearer ...` (`capture: { json:
+$.accessToken, header: Authorization, scheme: Bearer }`); `{session.id}` is
+still the string alone. An
 answer without it, or with it empty, holds no session. Every later request
 carries it, except the probe and a request marked `session: false` (Magewell's ping),
 which need none and never log in. Requests go one at a time, so nothing is

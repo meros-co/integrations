@@ -523,7 +523,7 @@ commands:
     params:
       identifier: { type: string, required: true, max_length: 128, pattern: '^[A-Za-z0-9_.-]+$', label: Upload identifier, description: "A name the caller chooses for this upload, the same for every chunk." }
       number: { type: int, min: 0, required: true, label: Chunk number, description: "The chunk's sequence number." }
-      file_type: { type: string, default: bin, max_length: 16, pattern: '^[A-Za-z0-9]+$', label: File type, description: "The package's extension, bin for a firmware package." }
+      file_type: { type: string, required: true, max_length: 16, pattern: '^[A-Za-z0-9]+$', label: File type, description: "The file type field as the upload takes it; the document's only example gives video, in what looks like placeholder data, and no list of values." }
       file: { type: binary, required: true, label: Chunk, description: "This chunk's bytes, a consecutive part of the firmware package." }
     send:
       method: POST
@@ -838,8 +838,8 @@ quirks:
       State is polled: the dashboard, notification counts and the boards
       and devices (gateway output devices) every 5 seconds; users, roles,
       the logged-in user, network interfaces, system settings, the
-      front-screen setting, port aggregation and the notification list
-      every 30 seconds. Users and roles are read as one page of up to 1000
+      front-screen setting, port aggregation, the aggregatable ports and
+      the notification list every 30 seconds. Users and roles are read as one page of up to 1000
       entries, since the format cannot follow pages. Every write the
       platform accepts has what it changed read again.
   - models: [all]
@@ -918,6 +918,7 @@ state:
   devices.*.network.*.ip: { type: string, description: "A network interface, keyed by name: its address" }
   devices.*.network.*.netmask: { type: string, description: "Its subnet mask" }
   devices.*.network.*.gateway: { type: string, description: "Its gateway" }
+  devices.*.network.*.model: { type: string, description: "Its model as the platform reports it" }
   devices.*.network.*.tx_speed: { type: float, description: "Transmit speed as reported" }
   devices.*.network.*.rx_speed: { type: float, description: "Receive speed as reported" }
   devices.*.network.*.tx_packets: { type: int, description: "Packets sent" }
@@ -935,6 +936,7 @@ state:
   dashboard.services.*.offline_devices: { type: int, description: "Of those, offline" }
   dashboard.services.*.total_channels: { type: int, description: "Channels of that service" }
   dashboard.services.*.error_devices: { type: int, description: "Devices of that service in error" }
+  dashboard.services.*.updated: { type: string, description: "When that service's statistics were last computed" }
   # noti/summary and noti/list
   notifications_summary.warnings: { type: int, description: "Number of warning messages" }
   notifications_summary.errors: { type: int, description: "Number of error messages" }
@@ -952,6 +954,8 @@ state:
   aggregation.enabled: { type: bool, description: "Whether the group is on" }
   aggregation.configured: { type: string, description: "The switch ports configured in the group, as JSON text" }
   aggregation.aggregated: { type: string, description: "The switch ports aggregated now, as JSON text" }
+  aggregation_ports.*.name: { type: string, description: "A switch port that can be aggregated, keyed by port number: its name" }
+  aggregation_ports.*.type: { type: string, description: "Its type as the switch reports it" }
 
 telemetry:
   poll:
@@ -969,6 +973,7 @@ telemetry:
         - { method: GET, path: /api/v1/netmgr/lcd-checkConf }
         - { method: GET, path: /api/v1/systemctrl/get }
         - { method: GET, path: /api/v1/sw/aggr/dump }
+        - { method: GET, path: /api/v1/sw/aggr/ports }
         - { method: GET, path: /api/v1/noti/list }
   updates:
     - path: "^/api/v1/getinfo$"
@@ -1093,6 +1098,7 @@ telemetry:
         ip: "$.ip"
         mask: "$.mask"
         gw: "$.gw"
+        model: "$.model"
         tx_speed: "$.tx.speed"
         tx_pkt: "$.tx.pkt"
         tx_err: "$.tx.error"
@@ -1103,6 +1109,7 @@ telemetry:
         "devices.{serial:key}.network.{if:key}.ip": "{ip}"
         "devices.{serial:key}.network.{if:key}.netmask": "{mask}"
         "devices.{serial:key}.network.{if:key}.gateway": "{gw}"
+        "devices.{serial:key}.network.{if:key}.model": "{model}"
         "devices.{serial:key}.network.{if:key}.tx_speed": "{tx_speed}"
         "devices.{serial:key}.network.{if:key}.rx_speed": "{rx_speed}"
         "devices.{serial:key}.network.{if:key}.tx_packets": "{tx_pkt}"
@@ -1128,13 +1135,14 @@ telemetry:
       json_match: { "$.code": "^200$" }
       json_each: "$.data.*"
       each_match: { "$.total_devices": "^\\d+$" }
-      json: { total: "$.total_devices", online: "$.online_devices", offline: "$.offline_devices", channels: "$.total_channels", errors: "$.error_devices" }
+      json: { total: "$.total_devices", online: "$.online_devices", offline: "$.offline_devices", channels: "$.total_channels", errors: "$.error_devices", updated: "$.update_time" }
       state:
         "dashboard.services.{key}.total_devices": "{total}"
         "dashboard.services.{key}.online_devices": "{online}"
         "dashboard.services.{key}.offline_devices": "{offline}"
         "dashboard.services.{key}.total_channels": "{channels}"
         "dashboard.services.{key}.error_devices": "{errors}"
+        "dashboard.services.{key}.updated": "{updated}"
     - path: "^/api/v1/noti/summary$"
       json_match: { "$.code": "^200$" }
       json: { w: "$.data.warning_count", e: "$.data.error_count", i: "$.data.info_count", u: "$.data.unread_count" }
@@ -1170,6 +1178,14 @@ telemetry:
         aggregation.enabled: { value: "{enable}", map: { "1": true, "0": false } }
         aggregation.configured: "{configured}"
         aggregation.aggregated: "{aggregated}"
+    - path: "^/api/v1/sw/aggr/ports$"
+      json_match: { "$.code": "^200$" }
+      json_each: "$.data"
+      json: { port: "$.port", name: "$.name", type: "$.type" }
+      replace: aggregation_ports
+      state:
+        "aggregation_ports.{port}.name": "{name}"
+        "aggregation_ports.{port}.type": "{type}"
 
     # ── Read-backs: what a write changed is read again once it is
     # answered ───────────────────────────────────────────────────────────

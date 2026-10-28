@@ -1,0 +1,695 @@
+spec: 1
+id: pikvm
+name: PiKVM (KVMD HTTP API)
+vendor: PiKVM
+category: other
+
+# PiKVM serves its API through Nginx on HTTPS 443 (HTTP 80 redirects), with a
+# self-signed certificate by default. Every request is authenticated with
+# HTTP Basic credentials (no WWW-Authenticate challenge) or X-KVMD headers.
+# A websocket at /api/ws sends every subsystem's state on opening, then each
+# change; stream=0 keeps it from starting the video streamer.
+
+source:
+  - title: PiKVM HTTP API reference
+    author: PiKVM (Pi-KVM project documentation)
+    url: https://docs.pikvm.org/api/
+    note: >
+      Read in October 2026. Authentication: HTTP Basic without a challenge, X-KVMD-User and X-KVMD-Passwd, the
+      auth_token cookie from POST /api/auth/login, /api/auth/check (401 without credentials, 403 for wrong ones),
+      2FA as the TOTP code appended to the password. The websocket at /api/ws with stream=0, its initial
+      gpio_model_state, info_*_state, wol_state, gpio_state, hid_state, atx_state, msd_state and streamer_state events
+      and the loop event, ping and pong, and key events. GET /api/info (fields auth, extras, fan, hw, meta, system),
+      GET /api/log (seek), GET /api/hid, POST /api/hid/set_params (keyboard_output usb, ps2, disabled; mouse_output
+      usb, usb_win98, usb_rel, ps2, disabled; jiggler), POST /api/hid/set_connected, POST /api/hid/reset, GET
+      /api/hid/keymaps, POST /api/hid/print (limit, keymap, slow, delay 0 to 5 s), POST
+      /api/hid/events/send_shortcut, send_key (key, state, finish), send_mouse_button (left, middle, right, up, down;
+      state), send_mouse_move (to_x, to_y), send_mouse_relative, send_mouse_wheel; GET /api/atx, POST /api/atx/power
+      (on, off, off_hard, reset_hard; wait), POST /api/atx/click (power, power_long, reset; wait); GET /api/msd, POST
+      /api/msd/write (image, the body), POST /api/msd/write_remote (url, image, timeout), POST /api/msd/set_params
+      (image, cdrom, rw), POST /api/msd/set_connected, POST /api/msd/remove, POST /api/msd/reset; GET /api/gpio, POST
+      /api/gpio/switch (channel, state, wait), POST /api/gpio/pulse (channel, delay, wait); GET /api/streamer, GET and
+      DELETE /api/streamer/snapshot with OCR (ocr, ocr_langs, ocr_left, ocr_top, ocr_right, ocr_bottom), GET
+      /api/streamer/ocr; the PiKVM Switch: GET /api/switch, set_active_prev, set_active_next, set_active (port 0 to
+      19 or unit,port), set_beacon (state, port, uplink, downlink), set_port_params (port, edid_id, dummy, name,
+      atx_click_power_delay, atx_click_power_long_delay, atx_click_reset_delay), set_colors (body
+      RRGGBB:BB:IIII), reset (unit, bootloader), edids/create, edids/change, edids/remove, atx/power, atx/click;
+      Redfish: GET /redfish/v1/Systems/0, POST ComputerSystem.Reset (On, ForceOff, GracefulShutdown, ForceRestart,
+      ForceOn, PushPowerButton), VirtualMedia.InsertMedia and EjectMedia; GET /api/export/prometheus/metrics.
+      The project's code is GPL and was not read; only this documentation.
+
+transport:
+  type: http
+  port: 443
+  scheme: { setting: scheme }
+  accept_invalid_certs: true
+  # HTTP Basic is accepted on every request and needs no challenge.
+  auth: basic
+  refusal_status: [401, 403]
+  timeout_ms: 10000
+  probe: { method: GET, path: /api/auth/check }
+
+settings:
+  scheme: { type: enum, values: [https, http], default: https, label: Scheme,
+            description: "https reaches the API on 443 with PiKVM's self-signed certificate accepted; http on 80, where PiKVM normally redirects to https." }
+  username: { type: string, max_length: 256, default: admin, label: User name, description: "A KVMD user (admin by default)." }
+  password: { type: string, secret: true, max_length: 256, default: admin, label: Password, description: "The user's password (admin by default); with two-factor authentication on, the integration cannot log in, since the code changes every 30 s." }
+
+ports:
+  - { port: 443, protocol: https, role: control }
+  - { port: 80, protocol: http, role: control, when: "scheme http" }
+  - { port: 443, protocol: wss, role: push }
+
+models:
+  - id: pikvm
+    name: PiKVM (V3, V4 Mini, V4 Plus and DIY builds running KVMD)
+    supports: &all [get_info, get_log, get_metrics, check_auth,
+               get_hid, set_keyboard_output, set_mouse_output, set_jiggler, set_hid_connected, reset_hid,
+               get_keymaps, type_text, type_text_slow, send_shortcut, send_key, key_down, key_up,
+               mouse_click, mouse_button_down, mouse_button_up, mouse_move, mouse_move_relative, mouse_wheel,
+               get_atx, atx_power, atx_click,
+               get_msd, msd_upload, msd_upload_remote, msd_set_image, msd_set_media, msd_set_writable,
+               msd_set_connected, msd_remove, msd_reset,
+               get_gpio, gpio_switch, gpio_pulse,
+               get_streamer, get_ocr_state, ocr_screen, delete_snapshot,
+               get_switch, switch_previous, switch_next, switch_set_active, switch_set_beacon,
+               switch_set_port_name, switch_set_port_edid, switch_set_port_dummy, switch_set_port_atx_delays,
+               switch_set_colors, switch_reboot, switch_create_edid, switch_change_edid, switch_remove_edid,
+               switch_atx_power, switch_atx_click,
+               redfish_get_system, redfish_reset, redfish_insert_media, redfish_eject_media]
+    verification: none
+
+commands:
+  # ── System ────────────────────────────────────────────────────────────────
+  get_info:
+    summary: "General information: auth, extras, fan, hw (platform, health), meta and system (KVMD, streamer, kernel) (GET /api/info)"
+    send: { method: GET, path: /api/info }
+    expect: { status: 200, json_path: "$.result" }
+    returns: value
+  get_log:
+    summary: The KVMD services' log as text, for the last seek seconds (GET /api/log)
+    params:
+      seek: { type: int, min: 0, max: 31536000, default: 3600, label: Period, description: "How many seconds of log to return, counted back from now." }
+    send: { method: GET, path: /api/log, query: { seek: "{seek}" } }
+    expect: { status: 200 }
+    returns: text
+  get_metrics:
+    summary: The Prometheus metrics as text (GET /api/export/prometheus/metrics)
+    send: { method: GET, path: /api/export/prometheus/metrics }
+    expect: { status: 200 }
+    returns: text
+  check_auth:
+    summary: Check the credentials (GET /api/auth/check); a refusal makes the device unauthorized
+    send: { method: GET, path: /api/auth/check }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Keyboard and mouse (HID) ─────────────────────────────────────────────
+  get_hid:
+    summary: The keyboard and mouse state (GET /api/hid)
+    send: { method: GET, path: /api/hid }
+    expect: { status: 200, json_path: "$.result" }
+    returns: value
+  set_keyboard_output:
+    summary: Choose the emulated keyboard (POST /api/hid/set_params)
+    params:
+      output: { type: enum, values: [usb, ps2, disabled], required: true, label: Keyboard, description: "usb, ps2 (with the PS/2 adapter) or disabled." }
+    send: { method: POST, path: /api/hid/set_params, query: { keyboard_output: "{output}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  set_mouse_output:
+    summary: Choose the emulated mouse (POST /api/hid/set_params)
+    params:
+      output: { type: enum, values: [usb, usb_win98, usb_rel, ps2, disabled], required: true, label: Mouse, description: "usb (absolute), usb_win98 (absolute, for Windows 98), usb_rel (relative), ps2 or disabled." }
+    send: { method: POST, path: /api/hid/set_params, query: { mouse_output: "{output}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  set_jiggler:
+    summary: Turn the mouse jiggler on or off (POST /api/hid/set_params)
+    params:
+      enabled: { type: bool, required: true, label: Jiggler, description: "True moves the mouse periodically so the host does not sleep." }
+    send: { method: POST, path: /api/hid/set_params, query: { jiggler: "{enabled:bool01}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  set_hid_connected:
+    summary: Connect or disconnect the emulated keyboard and mouse from the host (POST /api/hid/set_connected)
+    params:
+      connected: { type: bool, required: true, label: Connected, description: "False unplugs the keyboard and mouse from the host." }
+    send: { method: POST, path: /api/hid/set_connected, query: { connected: "{connected:bool01}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  reset_hid:
+    summary: Reset the keyboard and mouse to their initial state (POST /api/hid/reset)
+    send: { method: POST, path: /api/hid/reset }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  get_keymaps:
+    summary: "The keyboard layouts available for type_text, and the default (GET /api/hid/keymaps)"
+    send: { method: GET, path: /api/hid/keymaps }
+    expect: { status: 200, json_path: "$.result.keymaps" }
+    returns: value
+  type_text:
+    summary: Type text on the host as key presses, all of it, in a keyboard layout (POST /api/hid/print)
+    params:
+      text: { type: string, max_length: 1048576, required: true, label: Text, description: "The text to type, on one line; press Enter with send_key." }
+      keymap: { type: string, pattern: '^[a-z0-9-]+$', max_length: 32, default: en-us, label: Layout, description: "The host's keyboard layout, one get_keymaps lists, such as en-us or de." }
+    send: { method: POST, path: /api/hid/print, query: { limit: "0", keymap: "{keymap}" }, body: "{text}", content_type: text/plain }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  type_text_slow:
+    summary: Type text slowly, with a pause between key presses, for hosts that drop fast input (POST /api/hid/print)
+    params:
+      text: { type: string, max_length: 1048576, required: true, label: Text, description: "The text to type, on one line; press Enter with send_key." }
+      keymap: { type: string, pattern: '^[a-z0-9-]+$', max_length: 32, default: en-us, label: Layout, description: "The host's keyboard layout, such as en-us." }
+      delay: { type: float, min: 0, max: 5, default: 0.02, label: Delay, description: "Seconds between key presses." }
+    send: { method: POST, path: /api/hid/print, query: { limit: "0", keymap: "{keymap}", slow: "1", delay: "{delay:.3f}" }, body: "{text}", content_type: text/plain }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  send_shortcut:
+    summary: Press a key combination and release it (POST /api/hid/events/send_shortcut)
+    params:
+      keys: { type: string, pattern: '^[A-Za-z0-9]+(,[A-Za-z0-9]+)*$', max_length: 256, required: true, label: Keys, description: "Key names in web form separated by commas, pressed in order and released, such as ControlLeft,AltLeft,Delete." }
+    send: { method: POST, path: /api/hid/events/send_shortcut, query: { keys: "{keys}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  send_key:
+    summary: Press and release one key (POST /api/hid/events/send_key)
+    params:
+      key: { type: string, pattern: '^[A-Za-z0-9]+$', max_length: 64, required: true, label: Key, description: "The key's web name (the KeyboardEvent code), such as Enter, KeyA or F12." }
+    send: { method: POST, path: /api/hid/events/send_key, query: { key: "{key}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  key_down:
+    summary: Press and hold a key (POST /api/hid/events/send_key, state 1); a non-modifier key is released at once when finish is set
+    params:
+      key: { type: string, pattern: '^[A-Za-z0-9]+$', max_length: 64, required: true, label: Key, description: "The key's web name, such as ShiftLeft." }
+      finish: { type: bool, default: false, label: Release at once, description: "Release a non-modifier key right after pressing it, so it cannot stick on an unstable connection." }
+    send: { method: POST, path: /api/hid/events/send_key, query: { key: "{key}", state: "1", finish: "{finish:bool01}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  key_up:
+    summary: Release a key (POST /api/hid/events/send_key, state 0)
+    params:
+      key: { type: string, pattern: '^[A-Za-z0-9]+$', max_length: 64, required: true, label: Key, description: "The key's web name." }
+    send: { method: POST, path: /api/hid/events/send_key, query: { key: "{key}", state: "0" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  mouse_click:
+    summary: Click a mouse button, or move the wheel up or down one step (POST /api/hid/events/send_mouse_button)
+    params:
+      button: { type: enum, values: [left, middle, right, up, down], default: left, label: Button, description: "The button: left, middle, right, or up and down for the extra buttons." }
+    send: { method: POST, path: /api/hid/events/send_mouse_button, query: { button: "{button}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  mouse_button_down:
+    summary: Press and hold a mouse button (POST /api/hid/events/send_mouse_button, state 1)
+    params:
+      button: { type: enum, values: [left, middle, right, up, down], default: left, label: Button, description: "The button to hold." }
+    send: { method: POST, path: /api/hid/events/send_mouse_button, query: { button: "{button}", state: "1" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  mouse_button_up:
+    summary: Release a mouse button (POST /api/hid/events/send_mouse_button, state 0)
+    params:
+      button: { type: enum, values: [left, middle, right, up, down], default: left, label: Button, description: "The button to release." }
+    send: { method: POST, path: /api/hid/events/send_mouse_button, query: { button: "{button}", state: "0" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  mouse_move:
+    summary: Move the pointer to absolute coordinates, 0,0 being the screen's center (POST /api/hid/events/send_mouse_move; absolute mouse only)
+    params:
+      x: { type: int, min: -32768, max: 32767, required: true, label: X, description: "Horizontal position: -32768 is the left edge, 32767 the right." }
+      y: { type: int, min: -32768, max: 32767, required: true, label: Y, description: "Vertical position: -32768 is the top edge, 32767 the bottom." }
+    send: { method: POST, path: /api/hid/events/send_mouse_move, query: { to_x: "{x}", to_y: "{y}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  mouse_move_relative:
+    summary: Move the pointer by an offset (POST /api/hid/events/send_mouse_relative)
+    params:
+      dx: { type: int, min: -32768, max: 32767, required: true, label: Horizontal offset, description: "Pixels to the right (negative to the left)." }
+      dy: { type: int, min: -32768, max: 32767, required: true, label: Vertical offset, description: "Pixels down (negative up)." }
+    send: { method: POST, path: /api/hid/events/send_mouse_relative, query: { delta_x: "{dx}", delta_y: "{dy}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  mouse_wheel:
+    summary: Scroll the mouse wheel (POST /api/hid/events/send_mouse_wheel)
+    params:
+      dx: { type: int, min: -32768, max: 32767, default: 0, label: Horizontal scroll, description: "Horizontal wheel movement." }
+      dy: { type: int, min: -32768, max: 32767, required: true, label: Vertical scroll, description: "Vertical wheel movement; positive scrolls up, as the API's example." }
+    send: { method: POST, path: /api/hid/events/send_mouse_wheel, query: { delta_x: "{dx}", delta_y: "{dy}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+
+  # ── ATX power ─────────────────────────────────────────────────────────────
+  get_atx:
+    summary: The ATX state (enabled, busy, power and disk LEDs) (GET /api/atx)
+    send: { method: GET, path: /api/atx }
+    expect: { status: 200, json_path: "$.result" }
+    returns: value
+  atx_power:
+    summary: Bring the host's power to a state (POST /api/atx/power); see the quirk on hard actions
+    params:
+      action: { type: enum, values: ["on", "off", off_hard, reset_hard], required: true, label: Action, description: "on presses power if the host is off; off presses power (a soft shutdown); off_hard holds power 5 s or more; reset_hard presses reset." }
+      wait: { type: bool, default: false, label: Wait, description: "Answer only when the operation is done, rather than at once." }
+    send: { method: POST, path: /api/atx/power, query: { action: "{action}", wait: "{wait:bool01}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  atx_click:
+    summary: Press a case button (POST /api/atx/click)
+    params:
+      button: { type: enum, values: [power, power_long, reset], required: true, label: Button, description: "power is a short press of the power button, power_long a press of 5 s or more, reset the reset button." }
+      wait: { type: bool, default: false, label: Wait, description: "Answer only when the press is done." }
+    send: { method: POST, path: /api/atx/click, query: { button: "{button}", wait: "{wait:bool01}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+
+  # ── Mass storage drive ────────────────────────────────────────────────────
+  get_msd:
+    summary: The mass storage drive's state, images and storage (GET /api/msd)
+    send: { method: GET, path: /api/msd }
+    expect: { status: 200, json_path: "$.result" }
+    returns: value
+  msd_upload:
+    summary: Upload a disk image to the drive's storage (POST /api/msd/write, the image as the body)
+    params:
+      image: { type: string, pattern: '^[^/\\]+$', max_length: 255, required: true, label: Image name, description: "The name the image is stored under, such as installer.iso." }
+      data: { type: binary, required: true, label: Image, description: "The image file, given as a host file or base64." }
+    send: { method: POST, path: /api/msd/write, query: { image: "{image}" }, body: { binary: data }, content_type: application/octet-stream }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  msd_upload_remote:
+    summary: Have PiKVM download an image from an HTTP or HTTPS URL into its storage (POST /api/msd/write_remote); answered when the download ends
+    params:
+      url: { type: string, pattern: '^https?://\S+$', max_length: 4096, required: true, label: URL, description: "Where PiKVM downloads the image from." }
+      image: { type: string, pattern: '^[^/\\]+$', max_length: 255, required: true, label: Image name, description: "The name the image is stored under." }
+      timeout_s: { type: int, min: 0, max: 86400, default: 10, label: Request timeout, description: "Seconds PiKVM waits for the remote server to answer." }
+    send: { method: POST, path: /api/msd/write_remote, query: { url: "{url}", image: "{image}", timeout: "{timeout_s}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  msd_set_image:
+    summary: Choose the image the drive presents, or bind a remote image by URL (POST /api/msd/set_params)
+    params:
+      image: { type: string, max_length: 4096, required: true, label: Image, description: "An image name in storage, or an http, https, smb, nfs, sftp or nbd URL PiKVM binds over the network." }
+    send: { method: POST, path: /api/msd/set_params, query: { image: "{image}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  msd_set_media:
+    summary: Present the drive as a CD-ROM or as a flash drive (POST /api/msd/set_params)
+    params:
+      cdrom: { type: bool, required: true, label: CD-ROM, description: "True presents a CD-ROM (always read-only), false a flash drive." }
+    send: { method: POST, path: /api/msd/set_params, query: { cdrom: "{cdrom:bool01}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  msd_set_writable:
+    summary: Make the flash drive read-write or read-only (POST /api/msd/set_params)
+    params:
+      rw: { type: bool, required: true, label: Writable, description: "True lets the host write to the image; ignored for a CD-ROM." }
+    send: { method: POST, path: /api/msd/set_params, query: { rw: "{rw:bool01}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  msd_set_connected:
+    summary: Connect the drive to the host, or disconnect it (POST /api/msd/set_connected)
+    params:
+      connected: { type: bool, required: true, label: Connected, description: "True plugs the drive into the host." }
+    send: { method: POST, path: /api/msd/set_connected, query: { connected: "{connected:bool01}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  msd_remove:
+    summary: Delete an image from the drive's storage (POST /api/msd/remove)
+    params:
+      image: { type: string, max_length: 255, required: true, label: Image, description: "The image name." }
+    send: { method: POST, path: /api/msd/remove, query: { image: "{image}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  msd_reset:
+    summary: Reset the drive and drop the parameters set (POST /api/msd/reset)
+    send: { method: POST, path: /api/msd/reset }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+
+  # ── User GPIO ─────────────────────────────────────────────────────────────
+  get_gpio:
+    summary: The user GPIO model (channels and their view) and state (GET /api/gpio)
+    send: { method: GET, path: /api/gpio }
+    expect: { status: 200, json_path: "$.result" }
+    returns: value
+  gpio_switch:
+    summary: Switch a GPIO output channel on or off (POST /api/gpio/switch)
+    params:
+      channel: { type: string, pattern: '^[A-Za-z0-9_-]+$', max_length: 128, required: true, label: Channel, description: "The output channel's name as configured, such as relay1." }
+      state: { type: bool, required: true, label: State, description: "True switches it on." }
+      wait: { type: bool, default: false, label: Wait, description: "Answer only when the switch is done." }
+    send: { method: POST, path: /api/gpio/switch, query: { channel: "{channel}", state: "{state:bool01}", wait: "{wait:bool01}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  gpio_pulse:
+    summary: Pulse a GPIO output channel (POST /api/gpio/pulse); only channels configured for pulses
+    params:
+      channel: { type: string, pattern: '^[A-Za-z0-9_-]+$', max_length: 128, required: true, label: Channel, description: "The output channel's name." }
+      delay: { type: float, min: 0, max: 3600, default: 0, label: Pulse time, description: "Seconds the pulse lasts; 0 uses the channel's default." }
+      wait: { type: bool, default: false, label: Wait, description: "Answer only when the pulse is done." }
+    send: { method: POST, path: /api/gpio/pulse, query: { channel: "{channel}", delay: "{delay:.3f}", wait: "{wait:bool01}" } }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+
+  # ── Video streamer ────────────────────────────────────────────────────────
+  get_streamer:
+    summary: The video streamer's state, limits and parameters (GET /api/streamer)
+    send: { method: GET, path: /api/streamer }
+    expect: { status: 200, json_path: "$.result" }
+    returns: value
+  get_ocr_state:
+    summary: The OCR service's state and languages (GET /api/streamer/ocr)
+    send: { method: GET, path: /api/streamer/ocr }
+    expect: { status: 200, json_path: "$.result.ocr" }
+    returns: value
+  ocr_screen:
+    summary: Read the text on the host's screen, or a region of it, with OCR (GET /api/streamer/snapshot?ocr=1) and return it
+    params:
+      langs: { type: string, pattern: '^[a-z_]+(,[a-z_]+)*$', max_length: 128, default: eng, label: Languages, description: "Tesseract language codes separated by commas, such as eng or eng,deu." }
+      left: { type: int, min: -1, max: 65535, default: -1, label: Left, description: "The region's left edge in pixels from the top left; -1 for the whole screen." }
+      top: { type: int, min: -1, max: 65535, default: -1, label: Top, description: "The region's top edge; -1 for the whole screen." }
+      right: { type: int, min: -1, max: 65535, default: -1, label: Right, description: "The region's right bound as the API takes it; -1 for the whole screen." }
+      bottom: { type: int, min: -1, max: 65535, default: -1, label: Bottom, description: "The region's bottom bound; -1 for the whole screen." }
+    send: { method: GET, path: /api/streamer/snapshot, query: { ocr: "1", ocr_langs: "{langs}", ocr_left: "{left}", ocr_top: "{top}", ocr_right: "{right}", ocr_bottom: "{bottom}" } }
+    expect: { status: 200 }
+    returns: text
+  delete_snapshot:
+    summary: Delete the saved snapshot from memory (DELETE /api/streamer/snapshot)
+    send: { method: DELETE, path: /api/streamer/snapshot }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+
+  # ── PiKVM Switch ──────────────────────────────────────────────────────────
+  get_switch:
+    summary: The PiKVM Switch's state (GET /api/switch)
+    send: { method: GET, path: /api/switch }
+    expect: { status: 200, json_path: "$.result" }
+    returns: value
+  switch_previous:
+    summary: Switch to the previous port (POST /api/switch/set_active_prev)
+    send: { method: POST, path: /api/switch/set_active_prev }
+    expect: { status: 200 }
+    returns: ack
+  switch_next:
+    summary: Switch to the next port (POST /api/switch/set_active_next)
+    send: { method: POST, path: /api/switch/set_active_next }
+    expect: { status: 200 }
+    returns: ack
+  switch_set_active:
+    summary: Switch to a port (POST /api/switch/set_active)
+    params:
+      port: { type: string, pattern: '^([0-9]|1[0-9]|[0-4][.,][0-3])$', required: true, label: Port, description: "The port: 0 to 19 counting across chained switches, or unit,port such as 2,2." }
+    send: { method: POST, path: /api/switch/set_active, query: { port: "{port}" } }
+    expect: { status: 200 }
+    returns: ack
+  switch_set_beacon:
+    summary: Turn a port's beacon light on or off (POST /api/switch/set_beacon)
+    params:
+      port: { type: string, pattern: '^([0-9]|1[0-9]|[0-4][.,][0-3])$', required: true, label: Port, description: "The port: 0 to 19, or unit,port." }
+      state: { type: bool, required: true, label: Beacon, description: "True lights the beacon." }
+    send: { method: POST, path: /api/switch/set_beacon, query: { port: "{port}", state: "{state:bool01}" } }
+    expect: { status: 200 }
+    returns: ack
+  switch_set_port_name:
+    summary: Name a port (POST /api/switch/set_port_params)
+    params:
+      port: { type: int, min: 0, max: 19, required: true, label: Port, description: "The port, 0 to 19." }
+      name: { type: string, pattern: '^[A-Za-z0-9]*$', max_length: 64, required: true, label: Name, description: "ASCII letters and digits; empty clears the name." }
+    send: { method: POST, path: /api/switch/set_port_params, query: { port: "{port}", name: "{name}" } }
+    expect: { status: 200 }
+    returns: ack
+  switch_set_port_edid:
+    summary: Give a port an EDID (POST /api/switch/set_port_params)
+    params:
+      port: { type: int, min: 0, max: 19, required: true, label: Port, description: "The port, 0 to 19." }
+      edid_id: { type: string, pattern: '^[A-Za-z0-9-]+$', max_length: 64, required: true, label: EDID, description: "The EDID's identifier, or default." }
+    send: { method: POST, path: /api/switch/set_port_params, query: { port: "{port}", edid_id: "{edid_id}" } }
+    expect: { status: 200 }
+    returns: ack
+  switch_set_port_dummy:
+    summary: Have a port pretend a display is attached to its host (POST /api/switch/set_port_params)
+    params:
+      port: { type: int, min: 0, max: 19, required: true, label: Port, description: "The port, 0 to 19." }
+      dummy: { type: bool, required: true, label: Dummy display, description: "True makes the host see a display." }
+    send: { method: POST, path: /api/switch/set_port_params, query: { port: "{port}", dummy: "{dummy:bool01}" } }
+    expect: { status: 200 }
+    returns: ack
+  switch_set_port_atx_delays:
+    summary: Set how long a port's ATX power, long power and reset clicks last (POST /api/switch/set_port_params)
+    params:
+      port: { type: int, min: 0, max: 19, required: true, label: Port, description: "The port, 0 to 19." }
+      power: { type: float, min: 0, max: 10, required: true, label: Power click, description: "Seconds of a power button click." }
+      power_long: { type: float, min: 0, max: 10, required: true, label: Long power click, description: "Seconds of a long power button press." }
+      reset: { type: float, min: 0, max: 10, required: true, label: Reset click, description: "Seconds of a reset button click." }
+    send: { method: POST, path: /api/switch/set_port_params, query: { port: "{port}", atx_click_power_delay: "{power:.2f}", atx_click_power_long_delay: "{power_long:.2f}", atx_click_reset_delay: "{reset:.2f}" } }
+    expect: { status: 200 }
+    returns: ack
+  switch_set_colors:
+    summary: Set the beacon color, brightness and blink interval of the switch and its chain (POST /api/switch/set_colors)
+    params:
+      beacon: { type: string, pattern: '^[0-9A-Fa-f]{6}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{4}$', required: true, label: Beacon, description: "RRGGBB:BB:IIII in hex: the color, the brightness (FF full) and the blink interval in ms, such as FFA500:BF:0028." }
+    send: { method: POST, path: /api/switch/set_colors, body: "{beacon}", content_type: application/x-www-form-urlencoded }
+    expect: { status: 200 }
+    returns: ack
+  switch_reboot:
+    summary: Reboot a switch unit, optionally into its flashing mode (POST /api/switch/reset)
+    params:
+      unit: { type: int, min: 0, max: 4, required: true, label: Unit, description: "The unit in the chain, 0 to 4." }
+      bootloader: { type: bool, default: false, label: Flashing mode, description: "Enter the reflashing mode after rebooting." }
+    send: { method: POST, path: /api/switch/reset, query: { unit: "{unit}", bootloader: "{bootloader:bool01}" } }
+    expect: { status: 200 }
+    returns: ack
+  switch_create_edid:
+    summary: Create an EDID from its name and data (POST /api/switch/edids/create)
+    params:
+      name: { type: string, pattern: '^[A-Za-z0-9 ._-]+$', max_length: 128, required: true, label: Name, description: "The EDID's name." }
+      data: { type: string, pattern: '^[0-9A-Fa-f]+$', max_length: 1024, required: true, label: Data, description: "The EDID bytes in hex (256 bytes for a base block with one extension)." }
+    send: { method: POST, path: /api/switch/edids/create, query: { name: "{name}", data: "{data}" } }
+    expect: { status: 200 }
+    returns: ack
+  switch_change_edid:
+    summary: Rename an EDID and replace its data (POST /api/switch/edids/change)
+    params:
+      id: { type: string, pattern: '^[A-Za-z0-9-]+$', max_length: 64, required: true, label: EDID, description: "The EDID's identifier." }
+      name: { type: string, pattern: '^[A-Za-z0-9 ._-]+$', max_length: 128, required: true, label: Name, description: "Its new name." }
+      data: { type: string, pattern: '^[0-9A-Fa-f]+$', max_length: 1024, required: true, label: Data, description: "Its new bytes in hex." }
+    send: { method: POST, path: /api/switch/edids/change, query: { id: "{id}", name: "{name}", data: "{data}" } }
+    expect: { status: 200 }
+    returns: ack
+  switch_remove_edid:
+    summary: Delete an EDID (POST /api/switch/edids/remove)
+    params:
+      id: { type: string, pattern: '^[A-Za-z0-9-]+$', max_length: 64, required: true, label: EDID, description: "The EDID's identifier." }
+    send: { method: POST, path: /api/switch/edids/remove, query: { id: "{id}" } }
+    expect: { status: 200 }
+    returns: ack
+  switch_atx_power:
+    summary: Bring a switch port's host to a power state (POST /api/switch/atx/power)
+    params:
+      port: { type: int, min: 0, max: 19, required: true, label: Port, description: "The port, 0 to 19." }
+      action: { type: enum, values: ["on", "off", off_hard, reset_hard], required: true, label: Action, description: "on, off (soft), off_hard (held power) or reset_hard." }
+    send: { method: POST, path: /api/switch/atx/power, query: { port: "{port}", action: "{action}" } }
+    expect: { status: 200 }
+    returns: ack
+  switch_atx_click:
+    summary: Press a case button of a switch port's host (POST /api/switch/atx/click)
+    params:
+      port: { type: int, min: 0, max: 19, required: true, label: Port, description: "The port, 0 to 19." }
+      button: { type: enum, values: [power, power_long, reset], required: true, label: Button, description: "power, power_long or reset." }
+    send: { method: POST, path: /api/switch/atx/click, query: { port: "{port}", button: "{button}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Redfish ───────────────────────────────────────────────────────────────
+  redfish_get_system:
+    summary: The Redfish computer system (power state, host name, reset types) (GET /redfish/v1/Systems/0)
+    send: { method: GET, path: /redfish/v1/Systems/0 }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  redfish_reset:
+    summary: Redfish power control (POST /redfish/v1/Systems/0/Actions/ComputerSystem.Reset)
+    params:
+      type: { type: enum, values: ["On", ForceOff, GracefulShutdown, ForceRestart, ForceOn, PushPowerButton], required: true, label: Reset type, description: "On, ForceOff (hard off), GracefulShutdown, ForceRestart (hard reset), ForceOn or PushPowerButton." }
+    send: { method: POST, path: /redfish/v1/Systems/0/Actions/ComputerSystem.Reset, body: '{"ResetType":{type:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+  redfish_insert_media:
+    summary: Insert an image into the mass storage drive through Redfish (VirtualMedia.InsertMedia)
+    params:
+      image: { type: string, max_length: 4096, required: true, label: Image, description: "An image name in storage, or a URL." }
+      inserted: { type: bool, default: true, label: Connect, description: "Connect the drive to the host as well, rather than only configure it." }
+      write_protected: { type: bool, default: true, label: Read-only, description: "Present the image read-only." }
+    send: { method: POST, path: /redfish/v1/Managers/BMC/VirtualMedia/MSD/Actions/VirtualMedia.InsertMedia,
+            body: '{"Image":{image:json},"Inserted":{inserted},"WriteProtected":{write_protected}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+  redfish_eject_media:
+    summary: Eject the mass storage drive's image through Redfish (VirtualMedia.EjectMedia)
+    send: { method: POST, path: /redfish/v1/Managers/BMC/VirtualMedia/MSD/Actions/VirtualMedia.EjectMedia, body: "{}", content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+state:
+  system.kvmd_version: { type: string, description: "The KVMD version" }
+  system.streamer_app: { type: string, description: "The video streamer program, such as ustreamer" }
+  system.streamer_version: { type: string, description: "Its version" }
+  system.kernel_release: { type: string, description: "The Linux kernel release" }
+  hw.platform_type: { type: string, description: "The platform type, such as rpi" }
+  hw.platform_base: { type: string, description: "The board, such as Raspberry Pi 4 Model B Rev 1.5" }
+  hw.cpu_temp: { type: float, unit: °C, description: "The CPU temperature" }
+  hw.undervoltage: { type: bool, description: "The board is under-voltage now" }
+  hw.throttled: { type: bool, description: "The CPU is throttled now" }
+  meta.host: { type: string, description: "The server host name the PiKVM is configured with" }
+  hid.online: { type: bool, description: "Whether the keyboard and mouse emulation is working" }
+  hid.busy: { type: bool, description: "Whether it is busy" }
+  hid.keyboard.online: { type: bool, description: "Whether the host has the keyboard" }
+  hid.keyboard.caps_lock: { type: bool, description: "The host's Caps Lock LED" }
+  hid.keyboard.num_lock: { type: bool, description: "The host's Num Lock LED" }
+  hid.keyboard.scroll_lock: { type: bool, description: "The host's Scroll Lock LED" }
+  hid.keyboard.output: { type: string, description: "The emulated keyboard: usb, ps2, or empty when it cannot be chosen" }
+  hid.mouse.online: { type: bool, description: "Whether the host has the mouse" }
+  hid.mouse.absolute: { type: bool, description: "Whether the mouse is absolute" }
+  hid.mouse.output: { type: string, description: "The emulated mouse: usb, usb_win98, usb_rel or ps2" }
+  hid.jiggler.enabled: { type: bool, description: "Whether the mouse jiggler is available" }
+  hid.jiggler.active: { type: bool, description: "Whether the jiggler is on" }
+  hid.jiggler.interval: { type: int, unit: s, description: "Seconds between jiggles" }
+  atx.enabled: { type: bool, description: "Whether ATX power control is fitted and on" }
+  atx.busy: { type: bool, description: "Whether an ATX operation is in progress (commands refused meanwhile)" }
+  atx.power_led: { type: bool, description: "The host's power LED: true when the host is on" }
+  atx.hdd_led: { type: bool, description: "The host's disk activity LED" }
+  msd.enabled: { type: bool, description: "Whether the mass storage drive is fitted and on" }
+  msd.online: { type: bool, description: "Whether it is working" }
+  msd.busy: { type: bool, description: "Whether it is busy (an upload, a change)" }
+  msd.drive.connected: { type: bool, description: "Whether the drive is connected to the host" }
+  msd.drive.cdrom: { type: bool, description: "Whether it is presented as a CD-ROM (false: a flash drive)" }
+  msd.drive.rw: { type: bool, description: "Whether the flash drive is writable" }
+  msd.drive.image: { type: string, description: "The image the drive presents; empty for none" }
+  msd.storage.images.*.size: { type: int, unit: bytes, description: "An image in storage, keyed by its name: its size" }
+  msd.storage.images.*.complete: { type: bool, description: "Whether it is complete (not being uploaded)" }
+  streamer.online: { type: bool, description: "Whether the video source has a signal" }
+  streamer.width: { type: int, unit: px, description: "The source's width" }
+  streamer.height: { type: int, unit: px, description: "The source's height" }
+  streamer.captured_fps: { type: float, unit: fps, description: "Frames a second captured" }
+  streamer.desired_fps: { type: int, unit: fps, description: "The frame rate asked of the streamer" }
+  streamer.quality: { type: int, description: "The JPEG quality asked, 1 to 100" }
+  gpio.inputs.*.online: { type: bool, description: "A GPIO input channel, keyed by its name: whether it is working" }
+  gpio.inputs.*.state: { type: bool, description: "Its state" }
+  gpio.outputs.*.online: { type: bool, description: "A GPIO output channel, keyed by its name: whether it is working" }
+  gpio.outputs.*.state: { type: bool, description: "Its state" }
+  gpio.outputs.*.busy: { type: bool, description: "Whether a switch or pulse is in progress on it" }
+
+telemetry:
+  websocket:
+    # stream=0: watching state does not start the video streamer.
+    path: /api/ws?stream=0
+    scheme: { setting: scheme }
+    send:
+      - '{"event_type":"ping","event":{}}'
+    every_ms: 30000
+    idle_ms: 75000
+  updates:
+    - json_match: { "$.event_type": "^info_system_state$" }
+      json: { kvmd: "$.event.kvmd.version", app: "$.event.streamer.app", sv: "$.event.streamer.version", kernel: "$.event.kernel.release" }
+      state: { system.kvmd_version: "{kvmd}", system.streamer_app: "{app}", system.streamer_version: "{sv}", system.kernel_release: "{kernel}" }
+    - json_match: { "$.event_type": "^info_hw_state$" }
+      json: { type: "$.event.platform.type", base: "$.event.platform.base", temp: "$.event.health.temp.cpu",
+              under: "$.event.health.throttling.parsed_flags.undervoltage.now", thr: "$.event.health.throttling.parsed_flags.throttled.now" }
+      state: { hw.platform_type: "{type}", hw.platform_base: "{base}", hw.cpu_temp: "{temp}", hw.undervoltage: "{under}", hw.throttled: "{thr}" }
+    - json_match: { "$.event_type": "^info_meta_state$" }
+      json: { host: "$.event.server.host" }
+      state: { meta.host: "{host}" }
+    - json_match: { "$.event_type": "^hid_state$" }
+      json: { online: "$.event.online", busy: "$.event.busy", kon: "$.event.keyboard.online", caps: "$.event.keyboard.leds.caps",
+              num: "$.event.keyboard.leds.num", scroll: "$.event.keyboard.leds.scroll", kout: "$.event.keyboard.outputs.active",
+              mon: "$.event.mouse.online", abs: "$.event.mouse.absolute", mout: "$.event.mouse.outputs.active",
+              jen: "$.event.jiggler.enabled", jact: "$.event.jiggler.active", jint: "$.event.jiggler.interval" }
+      state: { hid.online: "{online}", hid.busy: "{busy}", hid.keyboard.online: "{kon}", hid.keyboard.caps_lock: "{caps}",
+               hid.keyboard.num_lock: "{num}", hid.keyboard.scroll_lock: "{scroll}", hid.keyboard.output: "{kout}",
+               hid.mouse.online: "{mon}", hid.mouse.absolute: "{abs}", hid.mouse.output: "{mout}",
+               hid.jiggler.enabled: "{jen}", hid.jiggler.active: "{jact}", hid.jiggler.interval: "{jint}" }
+    - json_match: { "$.event_type": "^atx_state$" }
+      json: { enabled: "$.event.enabled", busy: "$.event.busy", power: "$.event.leds.power", hdd: "$.event.leds.hdd" }
+      state: { atx.enabled: "{enabled}", atx.busy: "{busy}", atx.power_led: "{power}", atx.hdd_led: "{hdd}" }
+    - json_match: { "$.event_type": "^msd_state$" }
+      json: { enabled: "$.event.enabled", online: "$.event.online", busy: "$.event.busy", connected: "$.event.drive.connected",
+              cdrom: "$.event.drive.cdrom", rw: "$.event.drive.rw", image: "$.event.drive.image.name" }
+      state: { msd.enabled: "{enabled}", msd.online: "{online}", msd.busy: "{busy}", msd.drive.connected: "{connected}",
+               msd.drive.cdrom: "{cdrom}", msd.drive.rw: "{rw}", msd.drive.image: "{image}" }
+    # No image: the event carries null, which assigns nothing, so it is matched.
+    - json_match: { "$.event_type": "^msd_state$", "$.event.drive.image": "^null$" }
+      json: {}
+      state: { msd.drive.image: "" }
+    - json_match: { "$.event_type": "^msd_state$", "$.event.storage.images": "^\\{" }
+      json_each: "$.event.storage.images.*"
+      json: { size: "$.size", complete: "$.complete" }
+      replace: msd.storage.images
+      state: { "msd.storage.images.{key:key}.size": "{size}", "msd.storage.images.{key:key}.complete": "{complete}" }
+    - json_match: { "$.event_type": "^streamer_state$" }
+      json: { online: "$.event.streamer.source.online", w: "$.event.streamer.source.resolution.width", h: "$.event.streamer.source.resolution.height",
+              cfps: "$.event.streamer.source.captured_fps", dfps: "$.event.params.desired_fps", q: "$.event.params.quality" }
+      state: { streamer.online: "{online}", streamer.width: "{w}", streamer.height: "{h}", streamer.captured_fps: "{cfps}",
+               streamer.desired_fps: "{dfps}", streamer.quality: "{q}" }
+    # The streamer stopped (no watcher): no source to report.
+    - json_match: { "$.event_type": "^streamer_state$", "$.event.streamer": "^null$" }
+      json: {}
+      state: { streamer.online: "false" }
+    - json_match: { "$.event_type": "^gpio_state$" }
+      json_each: "$.event.inputs.*"
+      json: { online: "$.online", state: "$.state" }
+      state: { "gpio.inputs.{key:key}.online": "{online}", "gpio.inputs.{key:key}.state": "{state}" }
+    - json_match: { "$.event_type": "^gpio_state$" }
+      json_each: "$.event.outputs.*"
+      json: { online: "$.online", state: "$.state", busy: "$.busy" }
+      state: { "gpio.outputs.{key:key}.online": "{online}", "gpio.outputs.{key:key}.state": "{state}", "gpio.outputs.{key:key}.busy": "{busy}" }
+    # The same states in GET replies ({ok, result}).
+    - path: "^/api/atx$"
+      json: { enabled: "$.result.enabled", busy: "$.result.busy", power: "$.result.leds.power", hdd: "$.result.leds.hdd" }
+      state: { atx.enabled: "{enabled}", atx.busy: "{busy}", atx.power_led: "{power}", atx.hdd_led: "{hdd}" }
+    - path: "^/api/hid$"
+      json: { online: "$.result.online", busy: "$.result.busy", kon: "$.result.keyboard.online", caps: "$.result.keyboard.leds.caps",
+              num: "$.result.keyboard.leds.num", scroll: "$.result.keyboard.leds.scroll", kout: "$.result.keyboard.outputs.active",
+              mon: "$.result.mouse.online", abs: "$.result.mouse.absolute", mout: "$.result.mouse.outputs.active",
+              jen: "$.result.jiggler.enabled", jact: "$.result.jiggler.active", jint: "$.result.jiggler.interval" }
+      state: { hid.online: "{online}", hid.busy: "{busy}", hid.keyboard.online: "{kon}", hid.keyboard.caps_lock: "{caps}",
+               hid.keyboard.num_lock: "{num}", hid.keyboard.scroll_lock: "{scroll}", hid.keyboard.output: "{kout}",
+               hid.mouse.online: "{mon}", hid.mouse.absolute: "{abs}", hid.mouse.output: "{mout}",
+               hid.jiggler.enabled: "{jen}", hid.jiggler.active: "{jact}", hid.jiggler.interval: "{jint}" }
+    - path: "^/api/msd$"
+      json: { enabled: "$.result.enabled", online: "$.result.online", busy: "$.result.busy", connected: "$.result.drive.connected",
+              cdrom: "$.result.drive.cdrom", rw: "$.result.drive.rw", image: "$.result.drive.image.name" }
+      state: { msd.enabled: "{enabled}", msd.online: "{online}", msd.busy: "{busy}", msd.drive.connected: "{connected}",
+               msd.drive.cdrom: "{cdrom}", msd.drive.rw: "{rw}", msd.drive.image: "{image}" }
+    - path: "^/api/gpio$"
+      json_each: "$.result.state.outputs.*"
+      json: { online: "$.online", state: "$.state", busy: "$.busy" }
+      state: { "gpio.outputs.{key:key}.online": "{online}", "gpio.outputs.{key:key}.state": "{state}", "gpio.outputs.{key:key}.busy": "{busy}" }
+    - path: "^/api/gpio$"
+      json_each: "$.result.state.inputs.*"
+      json: { online: "$.online", state: "$.state" }
+      state: { "gpio.inputs.{key:key}.online": "{online}", "gpio.inputs.{key:key}.state": "{state}" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      atx_power off_hard and reset_hard, atx_click power_long and reset, switch_atx_power and redfish_reset ForceOff and
+      ForceRestart cut or reset the host's power at once, losing whatever it had not saved; a host in a show stops.
+  - models: [all]
+    severity: info
+    text: >
+      Every subsystem's state comes from the websocket, which sends it all on opening and each change after; it is
+      opened with stream=0 so watching does not start the video streamer, and pinged every 30 s. Writes are answered
+      with ok and their effect arrives as an event. Fields a KVMD version lacks (jiggler, outputs) stay unset.
+  - models: [all]
+    severity: info
+    text: >
+      Credentials go as HTTP Basic on every request, as PiKVM accepts them without a challenge; a 401 or 403 is a refused
+      credential. Two-factor authentication needs a new code every 30 s appended to the password, which a stored
+      password cannot carry: turn it off for this integration's user, or the device is unauthorized.
+  - models: [all]
+    severity: info
+    text: >
+      Mass storage, user GPIO, the PiKVM Switch and ATX need the matching hardware and configuration; on a PiKVM without
+      them the commands fail with KVMD's error. The Switch API's answers are not documented beyond their status, so its
+      commands are acknowledged by status 200.

@@ -1,0 +1,166 @@
+spec: 1
+id: ptp
+name: PTP version 2 (IEEE 1588) network monitor
+vendor: IEEE (Precision Time Protocol; any PTP grandmaster, boundary, transparent or ordinary clock, under profiles such as SMPTE ST 2059-2, AES67 and IEEE 802.1AS)
+category: other
+implementation: native
+reason: >
+  PTP is binary datagrams multicast among a network's clocks on two fixed UDP ports, not a conversation with one
+  device: the core joins the PTP groups, decodes the common header and each message type's body, keeps every port
+  it hears by its clock identity and port number, pairs two-step Sync messages with their Follow_Up, and chooses
+  each domain's best master with the dataset comparison, all of which needs logic the format cannot express.
+
+source:
+  - title: "IEEE Std 802.1AS-2020, Timing and Synchronization for Time-Sensitive Applications"
+    author: IEEE 802.1 Working Group (free through the IEEE GET Program for IEEE 802 standards)
+    url: https://ieeexplore.ieee.org/browse/standards/get-program/page/series?id=68
+    note: >
+      A profile of IEEE 1588 (whose own text is sold, not public) using 1588's message formats, read here for them:
+      the common header (majorSdoId and messageType, versionPTP and minorVersionPTP, messageLength, domainNumber,
+      flagField, correctionField in nanoseconds scaled by 2^16, sourcePortIdentity as an 8-byte clockIdentity and a
+      port number, sequenceId, logMessageInterval) and the flags (alternateMasterFlag, twoStepFlag, unicastFlag,
+      leap61, leap59, currentUtcOffsetValid, ptpTimescale, timeTraceable, frequencyTraceable); the Announce body
+      (originTimestamp, currentUtcOffset, grandmasterPriority1, grandmasterClockQuality of clockClass, clockAccuracy
+      and offsetScaledLogVariance, grandmasterPriority2, grandmasterIdentity, stepsRemoved, timeSource); Sync and
+      Follow_Up with 10-byte timestamps of 48-bit seconds and 32-bit nanoseconds; the peer delay messages (clauses
+      10.6 and 11.4); clockAccuracy and timeSource values (clause 8.6.2); and the systemIdentity comparison that
+      chooses the grandmaster: priority1, clockClass, clockAccuracy, offsetScaledLogVariance, priority2,
+      clockIdentity, then stepsRemoved and the sender's port identity (clause 10.3).
+  - title: "Service Name and Transport Protocol Port Number Registry; IPv4 Multicast Address Space Registry"
+    author: IANA
+    url: https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml
+    note: >
+      ptp-event on UDP 319 and ptp-general on UDP 320; 224.0.1.129 (PTP-primary, with 224.0.1.130 to 224.0.1.132
+      the alternates of version 1) and 224.0.0.107 (PTP-pdelay) in
+      https://www.iana.org/assignments/multicast-addresses/multicast-addresses.xhtml.
+  - title: "RFC 8575: YANG Data Model for the Precision Time Protocol (PTP) (May 2019)"
+    author: "Y. Jiang, Ed., X. Liu, J. Xu, R. Cummings, Ed. (IETF)"
+    url: https://www.rfc-editor.org/rfc/rfc8575
+    note: >
+      The IEEE 1588-2008 data sets as published in the IETF: default (priority1, priority2, clock quality: class,
+      accuracy, offset scaled log variance, domain), parent (grandmaster identity, quality and priorities), time
+      properties (current UTC offset and its validity, leap59, leap61, time and frequency traceable, PTP timescale,
+      time source) and port data sets (port identity, port state, log announce, sync and minimum delay request
+      intervals, delay mechanism).
+  - title: "tcpdump, print-ptp.c (Precision Time Protocol printer)"
+    author: The Tcpdump Group (BSD licence)
+    url: https://github.com/the-tcpdump-group/tcpdump/blob/master/print-ptp.c
+    note: >
+      Corroboration only, for what 802.1AS does not carry: messageType values 1 (Delay_Req), 9 (Delay_Resp) and D
+      (Management) of IEEE 1588's end-to-end delay mechanism, the Delay_Resp body (receiveTimestamp and requesting
+      port identity), and the 34-byte header and Announce layouts, which agree with 802.1AS.
+
+settings:
+  bind_address: { type: string, pattern: '^[0-9A-Fa-f.:]*$', max_length: 45, default: "", label: Bind address,
+                  description: "The local IPv4 address of the network interface on the PTP network, where the groups are joined; empty binds where the core binds and joins on every IPv4 interface." }
+  domains: { type: string, pattern: '^[0-9 ,;]*$', max_length: 1024, default: "", label: Domains,
+             description: "Domain numbers to keep, separated by commas (0 for the default profile, 127 for SMPTE ST 2059-2's default); empty keeps every domain heard." }
+  peer_delay: { type: bool, default: true, label: Peer delay group,
+                description: "Also join 224.0.0.107, where peer delay messages (802.1AS, some AES67 and SMPTE networks) are sent." }
+  timeout_ms: { type: int, min: 100, max: 3600000, default: 6000, label: Silence timeout,
+                description: "Milliseconds a port may stay silent before it is marked offline and no longer counted for the best master (three announce intervals of 2 s by default)." }
+  report_interval_ms: { type: int, min: 0, max: 60000, default: 1000, label: Report interval,
+                        description: "The shortest time in milliseconds between two reports of one port's Sync figures; Sync arrives up to 128 times a second." }
+  event_port: { type: int, min: 1, max: 65535, default: 319, label: Event port,
+                description: "The UDP port of event messages; 319 as standard." }
+  general_port: { type: int, min: 1, max: 65535, default: 320, label: General port,
+                  description: "The UDP port of general messages; 320 as standard." }
+
+ports:
+  - { port: 319, protocol: udp, role: control, listener: core, setting: event_port, note: "PTP event messages (Sync, Delay_Req, Pdelay_Req, Pdelay_Resp), received from 224.0.1.129 and 224.0.0.107 and shared with other programs on the host" }
+  - { port: 320, protocol: udp, role: control, listener: core, setting: general_port, note: "PTP general messages (Announce, Follow_Up, Delay_Resp, Pdelay_Resp_Follow_Up, Signaling, Management)" }
+
+models:
+  - id: ptp
+    name: PTP version 2 network (any clocks on UDP over IPv4; the core listens and sends nothing)
+    supports: [reset]
+    verification: none
+
+commands:
+  reset:
+    summary: Forget every port and grandmaster heard, and learn them again from the next messages
+    returns: ack
+
+state:
+  event_port: { type: int, description: "The event port listened on" }
+  general_port: { type: int, description: "The general port listened on" }
+  domains.*.best_master: { type: string, description: "The port (clock identity:port number) whose Announce wins the dataset comparison among the domain's online ports; empty when none announces" }
+  domains.*.grandmaster.identity: { type: string, description: "The best master's grandmaster clock identity, as an EUI-64 such as 00-1D-C1-FF-FE-0A-1B-2C" }
+  domains.*.grandmaster.priority1: { type: int, description: "Its grandmasterPriority1, 0 to 255, lower wins" }
+  domains.*.grandmaster.priority2: { type: int, description: "Its grandmasterPriority2" }
+  domains.*.grandmaster.clock_class: { type: int, description: "Its clockClass (6 locked to a primary reference, 7 in holdover, 52 and 187 degraded, 248 default, 255 slave-only)" }
+  domains.*.grandmaster.clock_accuracy: { type: string, description: "Its clockAccuracy code in hex, such as 0x21" }
+  domains.*.grandmaster.clock_accuracy_text: { type: string, description: "What the code means, such as 100 ns, or unknown (0xFE)" }
+  domains.*.grandmaster.offset_scaled_log_variance: { type: int, description: "Its offsetScaledLogVariance, the stability estimate (0xFFFF unknown)" }
+  domains.*.grandmaster.steps_removed: { type: int, description: "Boundary clocks between the best master and the grandmaster" }
+  domains.*.grandmaster.time_source: { type: string, description: "Its timeSource code in hex, such as 0x20" }
+  domains.*.grandmaster.time_source_text: { type: string, description: "atomic_clock, gps, terrestrial_radio, serial_time_code, ptp, ntp, hand_set, other, internal_oscillator or reserved" }
+  domains.*.grandmaster.current_utc_offset: { type: int, unit: s, description: "TAI minus UTC as announced" }
+  domains.*.grandmaster.current_utc_offset_valid: { type: bool, description: "Whether the UTC offset is known to be correct" }
+  domains.*.grandmaster.leap61: { type: bool, description: "The last minute of the current UTC day has 61 seconds" }
+  domains.*.grandmaster.leap59: { type: bool, description: "The last minute of the current UTC day has 59 seconds" }
+  domains.*.grandmaster.ptp_timescale: { type: bool, description: "The timescale is PTP's (TAI since 1970); false is an arbitrary timescale" }
+  domains.*.grandmaster.time_traceable: { type: bool, description: "The time is traceable to a primary reference" }
+  domains.*.grandmaster.frequency_traceable: { type: bool, description: "The frequency is traceable to a primary reference" }
+  domains.*.ports.*.online: { type: bool, description: "Whether the port (keyed clock identity:port number) was heard within timeout_ms" }
+  domains.*.ports.*.address: { type: string, description: "The IP address its messages come from" }
+  domains.*.ports.*.role: { type: string, description: "What its traffic shows: master (Announce or Sync), slave (Delay_Req), peer (only peer delay messages) or unknown; inferred, not its port state" }
+  domains.*.ports.*.version: { type: string, description: "The PTP version its messages give: 2.0 (1588-2008) or 2.1 (1588-2019)" }
+  domains.*.ports.*.log_announce_interval: { type: int, description: "Log2 of its Announce interval in seconds (1 is 2 s)" }
+  domains.*.ports.*.log_sync_interval: { type: int, description: "Log2 of its Sync interval in seconds (-3 is 8 a second)" }
+  domains.*.ports.*.log_min_delay_req_interval: { type: int, description: "Log2 of the delay request interval its Delay_Resp messages ask of slaves" }
+  domains.*.ports.*.log_min_pdelay_req_interval: { type: int, description: "Log2 of its peer delay request interval" }
+  domains.*.ports.*.announce.identity: { type: string, description: "The grandmaster identity its Announce messages carry" }
+  domains.*.ports.*.announce.priority1: { type: int, description: "Announced grandmasterPriority1" }
+  domains.*.ports.*.announce.priority2: { type: int, description: "Announced grandmasterPriority2" }
+  domains.*.ports.*.announce.clock_class: { type: int, description: "Announced grandmaster clockClass" }
+  domains.*.ports.*.announce.clock_accuracy: { type: string, description: "Announced clockAccuracy code in hex" }
+  domains.*.ports.*.announce.clock_accuracy_text: { type: string, description: "What the code means" }
+  domains.*.ports.*.announce.offset_scaled_log_variance: { type: int, description: "Announced offsetScaledLogVariance" }
+  domains.*.ports.*.announce.steps_removed: { type: int, description: "Announced stepsRemoved" }
+  domains.*.ports.*.announce.time_source: { type: string, description: "Announced timeSource code in hex" }
+  domains.*.ports.*.announce.time_source_text: { type: string, description: "What the time source code means" }
+  domains.*.ports.*.announce.current_utc_offset: { type: int, unit: s, description: "Announced TAI minus UTC" }
+  domains.*.ports.*.announce.current_utc_offset_valid: { type: bool, description: "Announced currentUtcOffsetValid" }
+  domains.*.ports.*.announce.leap61: { type: bool, description: "Announced leap61" }
+  domains.*.ports.*.announce.leap59: { type: bool, description: "Announced leap59" }
+  domains.*.ports.*.announce.ptp_timescale: { type: bool, description: "Announced ptpTimescale" }
+  domains.*.ports.*.announce.time_traceable: { type: bool, description: "Announced timeTraceable" }
+  domains.*.ports.*.announce.frequency_traceable: { type: bool, description: "Announced frequencyTraceable" }
+  domains.*.ports.*.sync.two_step: { type: bool, description: "Whether its Sync messages are two-step, their time in a Follow_Up" }
+  domains.*.ports.*.sync.origin: { type: string, description: "The PTP time of its last Sync as seconds.nanoseconds (the Follow_Up's precise origin for two-step)" }
+  domains.*.ports.*.sync.correction_ns: { type: float, unit: ns, description: "The correction field of its last Sync (and Follow_Up): residence and path time transparent clocks added" }
+  domains.*.ports.*.sync.host_offset_ms: { type: float, unit: ms, description: "This host's clock minus the Sync's time in UTC, with the network and software delay included: how far the host is from PTP time, to the millisecond; present only on a PTP timescale with a known UTC offset" }
+  domains.*.ports.*.sync.rate_hz: { type: float, unit: Hz, description: "Sync messages a second heard since the last report" }
+  domains.*.ports.*.sync.count: { type: int, description: "Sync messages heard since opening" }
+  domains.*.ports.*.sync.missed: { type: int, description: "Sync sequence numbers skipped since opening: messages lost on the way, or not sent" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      The integration only listens: it sends no PTP message, takes no part in the best master choice, and is not a
+      clock. Opened with no host it hears every clock on the network; it is connected while its two ports are open.
+      Ports 319 and 320 are privileged on Linux and macOS: a core not allowed to bind them reports so and tries again
+      after 1 s, doubling to 30 s. Another PTP program on the host (a PTP daemon) keeps working beside it, since the
+      ports are shared.
+  - models: [all]
+    severity: info
+    text: >
+      PTP over UDP and IPv4 only: messages carried straight on Ethernet (ethertype 88F7h, as 802.1AS and some SMPTE
+      and AES67 devices send them) and PTP over IPv6 are not heard. Multicast reaches the host only where the network
+      forwards the PTP groups to it (IGMP snooping with a querier); unicast PTP between other devices is not seen.
+  - models: [all]
+    severity: info
+    text: >
+      Offsets: the offset of each slave from its master is not derivable from what a listener hears (it needs the
+      slave's receive times), so it is not offered; nor are Management messages sent to read a clock's data sets.
+      host_offset_ms compares the core's clock, as the operating system has it, with the PTP time each Sync carries,
+      so it includes the path delay and the host's receive latency (typically well under a millisecond on a LAN).
+  - models: [all]
+    severity: info
+    text: >
+      A port's role is inferred from the messages it sends, not read from it: a master sends Announce and Sync, a
+      slave Delay_Req, and with the peer delay mechanism every port sends peer delay messages. The best master is
+      what the dataset comparison of the heard Announce messages picks; clocks with different domains, profiles or
+      priorities may still choose otherwise, for example when an alternate master or a slave-only clock is set.
