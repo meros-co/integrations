@@ -1,0 +1,496 @@
+spec: 1
+id: meyersound-galaxy
+name: Meyer Sound Galileo GALAXY Network Platform (text protocol)
+vendor: Meyer Sound
+category: other
+
+# GALAXY's control server takes text commands over TCP 25003: <path>=<value>
+# sets a control point, <path> alone reads it (answered <path>=<value> or
+# <path>='<value>'), ?<path> describes it, +<path> [ms] subscribes and -<path>
+# unsubscribes, and :name runs a built-in (snapshots, ping). Paths may be
+# regular expressions, reaching several points at once. Lines end in CR or
+# LF. The same server takes OSC on 25004, which is not used here.
+source:
+  - title: "Programming Guide: Galileo GALAXY Network Platform, PN 05.230.008.01 Rev B4 (2021)"
+    author: Meyer Sound Laboratories
+    url: https://docs.meyersound.com/pdf/galileo-galaxy_pg_b4.pdf
+    note: >
+      Manufacturer document. Addressing, the two protocols and their ports
+      (25003 text, 25004 OSC; virtual units on 50503 and down) p.3-8; replies
+      on the same TCP connection; set, get, describe, subscribe (default 30
+      ms, 0-100 ms, kept until unsubscribe or disconnect on TCP) and
+      unsubscribe, regular expressions in paths p.5, p.12-16; built-in
+      functions recall_snapshot (with the exclusion mask), update_snapshot,
+      create_snapshot, delete_snapshot, ping p.9-11; every control point with
+      its default p.19-40. Ranges, units and enumerations are not tabulated:
+      the server describes each point (?<path>).
+  - title: "Programming Guide: Galileo GALAXY (current web edition, read 27 October 2026)"
+    author: Meyer Sound Laboratories
+    url: https://docs.meyersound.com/products/en/programming-guide---galileo-galaxy.html
+    note: >
+      Manufacturer document; the same control points as Rev B4, and the port
+      table for several physical and virtual units (25003, 25103, 25203, ...).
+
+transport:
+  type: line-tcp
+  port: 25003
+  framing: terminated
+  terminator: lf
+  encoding: utf-8
+  timeout_ms: 2000
+  reply: expected
+  # Answers are <path>=<value>, ?{...} descriptions and :pong; pushed
+  # subscription values look like answers and are told apart by the path
+  # each command names (expect.reply_contains).
+  reply_match: "^(/|\\?\\{|:pong)"
+  probe: ":ping"
+
+ports:
+  - { port: 25003, protocol: tcp, role: control, note: "The text protocol; a second unit on one host uses 25103, a third 25203; Compass's virtual units 50503, 50403, ..." }
+
+models:
+  - id: galaxy-408
+    name: Meyer Sound GALAXY 408
+    supports: &all
+      - set_input_gain
+      - set_input_mute
+      - set_input_delay
+      - set_input_eq_bypass
+      - set_input_ushaping_bypass
+      - set_output_gain
+      - set_output_mute
+      - set_output_delay
+      - set_output_polarity
+      - set_output_eq_bypass
+      - set_output_ushaping_bypass
+      - set_output_highpass_bypass
+      - set_output_highpass_frequency
+      - set_output_lowpass_bypass
+      - set_output_lowpass_frequency
+      - set_output_atmospheric_bypass
+      - set_matrix_gain
+      - set_matrix_delay
+      - set_matrix_delay_bypass
+      - set_input_name
+      - set_output_name
+      - set_output_mute_relay
+      - set_front_panel_lockout
+      - set_project_name
+      - set_boot_snapshot
+      - set_control_point
+      - get_control_point
+      - describe_control_point
+      - subscribe
+      - unsubscribe
+      - recall_snapshot
+      - recall_snapshot_excluding
+      - update_snapshot
+      - create_snapshot
+      - delete_snapshot
+      - ping
+    verification: none
+  - id: galaxy-816
+    name: Meyer Sound GALAXY 816
+    supports: *all
+    verification: none
+  - id: galaxy-816-aes
+    name: Meyer Sound GALAXY 816-AES
+    supports: *all
+    verification: none
+  - id: bluehorn-816
+    name: Meyer Sound Bluehorn 816 processor
+    supports: *all
+    verification: none
+
+commands:
+  set_input_gain:
+    summary: "Set a processing input's gain in dB (/processing/input/...)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true, label: Input, description: "Processing input, 1 to 8 (A to H)." }
+      gain_db: { type: float, required: true, label: "Gain", description: "Input gain in dB. The range is the unit's own: describe_control_point reads it." }
+    send: "/processing/input/{input}/gain={gain_db:.2f}"
+    returns: none
+
+  set_input_mute:
+    summary: "Mute or unmute a processing input (/processing/input/...)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true, label: Input, description: "Processing input, 1 to 8 (A to H)." }
+      muted: { type: bool, required: true, label: "Muted", description: "On mutes the input, off unmutes it." }
+    send: "/processing/input/{input}/mute={muted}"
+    returns: none
+
+  set_input_delay:
+    summary: "Set a processing input's delay (/processing/input/...)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true, label: Input, description: "Processing input, 1 to 8 (A to H)." }
+      delay: { type: float, required: true, label: "Delay", description: "Input delay, in the delay type's unit. The range is the unit's own: describe_control_point reads it." }
+    send: "/processing/input/{input}/delay={delay:.2f}"
+    returns: none
+
+  set_input_eq_bypass:
+    summary: "Bypass a processing input's parametric EQ (/processing/input/...)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true, label: Input, description: "Processing input, 1 to 8 (A to H)." }
+      bypassed: { type: bool, required: true, label: "EQ bypass", description: "On bypasses the parametric EQ." }
+    send: "/processing/input/{input}/eq/bypass={bypassed}"
+    returns: none
+
+  set_input_ushaping_bypass:
+    summary: "Bypass a processing input's U-Shaping (/processing/input/...)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true, label: Input, description: "Processing input, 1 to 8 (A to H)." }
+      bypassed: { type: bool, required: true, label: "U-Shaping bypass", description: "On bypasses U-Shaping." }
+    send: "/processing/input/{input}/ushaping/bypass={bypassed}"
+    returns: none
+
+  set_output_gain:
+    summary: "Set a processing output's gain in dB (/processing/output/...)"
+    params:
+      output: { type: int, min: 1, max: 16, required: true, label: Output, description: "Processing output, 1 to 16." }
+      gain_db: { type: float, required: true, label: "Gain", description: "Output gain in dB. The range is the unit's own: describe_control_point reads it." }
+    send: "/processing/output/{output}/gain={gain_db:.2f}"
+    returns: none
+
+  set_output_mute:
+    summary: "Mute or unmute a processing output (/processing/output/...)"
+    params:
+      output: { type: int, min: 1, max: 16, required: true, label: Output, description: "Processing output, 1 to 16." }
+      muted: { type: bool, required: true, label: "Muted", description: "On mutes the output, off unmutes it." }
+    send: "/processing/output/{output}/mute={muted}"
+    returns: none
+
+  set_output_delay:
+    summary: "Set a processing output's delay (/processing/output/...)"
+    params:
+      output: { type: int, min: 1, max: 16, required: true, label: Output, description: "Processing output, 1 to 16." }
+      delay: { type: float, required: true, label: "Delay", description: "Output delay, in the delay type's unit. The range is the unit's own: describe_control_point reads it." }
+    send: "/processing/output/{output}/delay={delay:.2f}"
+    returns: none
+
+  set_output_polarity:
+    summary: "Reverse a processing output's polarity (/processing/output/...)"
+    params:
+      output: { type: int, min: 1, max: 16, required: true, label: Output, description: "Processing output, 1 to 16." }
+      reversed: { type: bool, required: true, label: "Polarity reversed", description: "On reverses the output's polarity." }
+    send: "/processing/output/{output}/polarity_reversal={reversed}"
+    returns: none
+
+  set_output_eq_bypass:
+    summary: "Bypass a processing output's parametric EQ (/processing/output/...)"
+    params:
+      output: { type: int, min: 1, max: 16, required: true, label: Output, description: "Processing output, 1 to 16." }
+      bypassed: { type: bool, required: true, label: "EQ bypass", description: "On bypasses the parametric EQ." }
+    send: "/processing/output/{output}/eq/bypass={bypassed}"
+    returns: none
+
+  set_output_ushaping_bypass:
+    summary: "Bypass a processing output's U-Shaping (/processing/output/...)"
+    params:
+      output: { type: int, min: 1, max: 16, required: true, label: Output, description: "Processing output, 1 to 16." }
+      bypassed: { type: bool, required: true, label: "U-Shaping bypass", description: "On bypasses U-Shaping." }
+    send: "/processing/output/{output}/ushaping/bypass={bypassed}"
+    returns: none
+
+  set_output_highpass_bypass:
+    summary: "Bypass a processing output's high-pass filter (/processing/output/...)"
+    params:
+      output: { type: int, min: 1, max: 16, required: true, label: Output, description: "Processing output, 1 to 16." }
+      bypassed: { type: bool, required: true, label: "High-pass bypass", description: "On bypasses the high-pass filter." }
+    send: "/processing/output/{output}/highpass/bypass={bypassed}"
+    returns: none
+
+  set_output_highpass_frequency:
+    summary: "Set a processing output's high-pass frequency (/processing/output/...)"
+    params:
+      output: { type: int, min: 1, max: 16, required: true, label: Output, description: "Processing output, 1 to 16." }
+      hz: { type: float, required: true, label: "Frequency", description: "High-pass frequency in Hz. The range is the unit's own: describe_control_point reads it." }
+    send: "/processing/output/{output}/highpass/frequency={hz:.2f}"
+    returns: none
+
+  set_output_lowpass_bypass:
+    summary: "Bypass a processing output's low-pass filter (/processing/output/...)"
+    params:
+      output: { type: int, min: 1, max: 16, required: true, label: Output, description: "Processing output, 1 to 16." }
+      bypassed: { type: bool, required: true, label: "Low-pass bypass", description: "On bypasses the low-pass filter." }
+    send: "/processing/output/{output}/lowpass/bypass={bypassed}"
+    returns: none
+
+  set_output_lowpass_frequency:
+    summary: "Set a processing output's low-pass frequency (/processing/output/...)"
+    params:
+      output: { type: int, min: 1, max: 16, required: true, label: Output, description: "Processing output, 1 to 16." }
+      hz: { type: float, required: true, label: "Frequency", description: "Low-pass frequency in Hz. The range is the unit's own: describe_control_point reads it." }
+    send: "/processing/output/{output}/lowpass/frequency={hz:.2f}"
+    returns: none
+
+  set_output_atmospheric_bypass:
+    summary: "Bypass a processing output's atmospheric correction (/processing/output/...)"
+    params:
+      output: { type: int, min: 1, max: 16, required: true, label: Output, description: "Processing output, 1 to 16." }
+      bypassed: { type: bool, required: true, label: "Atmospheric bypass", description: "On bypasses atmospheric correction." }
+    send: "/processing/output/{output}/atmospheric/bypass={bypassed}"
+    returns: none
+
+  set_matrix_gain:
+    summary: "Set a matrix crosspoint's gain in dB (/processing/matrix/...)"
+    params:
+      matrix_input: { type: int, min: 1, max: 32, required: true, label: Matrix input, description: "Matrix input, 1 to 32 (1-8 the processed inputs)." }
+      output: { type: int, min: 1, max: 16, required: true, label: Output, description: "Processing output, 1 to 16." }
+      gain_db: { type: float, required: true, label: "Gain", description: "Crosspoint gain in dB; -90 is off. The range is the unit's own: describe_control_point reads it." }
+    send: "/processing/matrix/{matrix_input}/{output}/gain={gain_db:.2f}"
+    returns: none
+
+  set_matrix_delay:
+    summary: "Set a matrix crosspoint's delay (/processing/matrix/...)"
+    params:
+      matrix_input: { type: int, min: 1, max: 32, required: true, label: Matrix input, description: "Matrix input, 1 to 32 (1-8 the processed inputs)." }
+      output: { type: int, min: 1, max: 16, required: true, label: Output, description: "Processing output, 1 to 16." }
+      delay: { type: float, required: true, label: "Delay", description: "Crosspoint delay, in the delay type's unit. The range is the unit's own: describe_control_point reads it." }
+    send: "/processing/matrix/{matrix_input}/{output}/delay={delay:.2f}"
+    returns: none
+
+  set_matrix_delay_bypass:
+    summary: "Bypass a matrix crosspoint's delay (/processing/matrix/...)"
+    params:
+      matrix_input: { type: int, min: 1, max: 32, required: true, label: Matrix input, description: "Matrix input, 1 to 32 (1-8 the processed inputs)." }
+      output: { type: int, min: 1, max: 16, required: true, label: Output, description: "Processing output, 1 to 16." }
+      bypassed: { type: bool, required: true, label: "Delay bypass", description: "On bypasses the crosspoint delay." }
+    send: "/processing/matrix/{matrix_input}/{output}/delay_bypass={bypassed}"
+    returns: none
+
+  set_input_name:
+    summary: "Name a device input (/device/input/...)"
+    params:
+      input: { type: int, min: 1, max: 32, required: true, label: Input, description: "Device input, 1 to 32: 1-8 the processed inputs, 9-32 the other matrix inputs." }
+      name: { type: string, max_length: 64, pattern: "^[^\\r\\n']+$", required: true, label: "Name", description: "The input's name, without line breaks." }
+    send: "/device/input/{input}/name={name}"
+    returns: none
+
+  set_output_name:
+    summary: "Name a device output (/device/output/...)"
+    params:
+      output: { type: int, min: 1, max: 16, required: true, label: Output, description: "Processing output, 1 to 16." }
+      name: { type: string, max_length: 64, pattern: "^[^\\r\\n']+$", required: true, label: "Name", description: "The output's name, without line breaks." }
+    send: "/device/output/{output}/name={name}"
+    returns: none
+
+  set_output_mute_relay:
+    summary: "Engage a device output's mute relay (/device/output/...)"
+    params:
+      output: { type: int, min: 1, max: 16, required: true, label: Output, description: "Processing output, 1 to 16." }
+      engaged: { type: bool, required: true, label: "Mute relay", description: "On engages the output's mute relay." }
+    send: "/device/output/{output}/mute_relay={engaged}"
+    returns: none
+
+  set_front_panel_lockout:
+    summary: "Lock or unlock the front panel (/system/hardware/front_panel_lockout)"
+    params:
+      locked: { type: bool, required: true, label: "Front panel locked", description: "On locks the front panel." }
+    send: "/system/hardware/front_panel_lockout={locked}"
+    returns: none
+
+  set_project_name:
+    summary: "Name the project (/project/name)"
+    params:
+      name: { type: string, max_length: 64, pattern: "^[^\\r\\n']+$", required: true, label: "Project name", description: "The project's name, without line breaks." }
+    send: "/project/name={name}"
+    returns: none
+
+  set_boot_snapshot:
+    summary: "Choose the snapshot recalled at boot (/project/boot_snapshot_id)"
+    params:
+      snapshot: { type: int, min: 0, max: 9999, required: true, label: "Snapshot", description: "The snapshot recalled at boot." }
+    send: "/project/boot_snapshot_id={snapshot}"
+    returns: none
+
+  set_control_point:
+    summary: "Set any control point, or every one a regular expression matches (<path>=<value>)"
+    params:
+      path: { type: string, max_length: 256, pattern: "^/[A-Za-z0-9_/().*+?|\\[\\]\\\\-]+$", required: true, label: "Control point", description: "The control point's path, such as /processing/input/1/gain; GALAXY also takes a regular expression to reach several (/processing/input/[1-4]/mute)." }
+      value: { type: string, max_length: 256, pattern: "^[^\\r\\n]+$", required: true, label: "Value", description: "The value as GALAXY writes it: a number, true or false, or text." }
+    send: "{path}={value}"
+    returns: none
+
+  get_control_point:
+    summary: "Read a control point (<path>); the answer goes to state and is returned"
+    params:
+      path: { type: string, max_length: 256, pattern: "^/[A-Za-z0-9_/().*+?|\\[\\]\\\\-]+$", required: true, label: "Control point", description: "The control point's path, such as /processing/input/1/gain; GALAXY also takes a regular expression to reach several (/processing/input/[1-4]/mute)." }
+    send: "{path}"
+    expect: { reply_contains: "{path}=", matches: "=(.*)$" }
+    returns: value
+
+  describe_control_point:
+    summary: "Describe a control point: its description, read-only flag, value, minimum, maximum, default, step and units (?<path>)"
+    params:
+      path: { type: string, max_length: 256, pattern: "^/[A-Za-z0-9_/().*+?|\\[\\]\\\\-]+$", required: true, label: "Control point", description: "The control point's path, such as /processing/input/1/gain; GALAXY also takes a regular expression to reach several (/processing/input/[1-4]/mute)." }
+    send: "?{path}"
+    expect: { reply_contains: "?{" }
+    returns: text
+
+  subscribe:
+    summary: "Subscribe to a control point or a regular expression of them (+<path> <ms>): the current values, then each change, at most every interval"
+    params:
+      path: { type: string, max_length: 256, pattern: "^/[A-Za-z0-9_/().*+?|\\[\\]\\\\-]+$", required: true, label: "Control point", description: "The control point's path, such as /processing/input/1/gain; GALAXY also takes a regular expression to reach several (/processing/input/[1-4]/mute)." }
+      interval_ms: { type: int, min: 0, max: 100, required: true, label: "Interval", description: "Least time between two reports of a fast-changing value, 0 to 100 ms." }
+    send: "+{path} {interval_ms}"
+    returns: none
+
+  unsubscribe:
+    summary: "Unsubscribe from a control point or a regular expression of them (-<path>)"
+    params:
+      path: { type: string, max_length: 256, pattern: "^/[A-Za-z0-9_/().*+?|\\[\\]\\\\-]+$", required: true, label: "Control point", description: "The control point's path, such as /processing/input/1/gain; GALAXY also takes a regular expression to reach several (/processing/input/[1-4]/mute)." }
+    send: "-{path}"
+    returns: none
+
+  recall_snapshot:
+    summary: "Recall a snapshot (:recall_snapshot)"
+    params:
+      snapshot: { type: int, min: 0, max: 9999, required: true, label: "Snapshot", description: "The snapshot's id." }
+    send: ":recall_snapshot {snapshot}"
+    returns: none
+
+  recall_snapshot_excluding:
+    summary: "Recall a snapshot leaving parts out (:recall_snapshot with an exclusion mask)"
+    params:
+      snapshot: { type: int, min: 0, max: 9999, required: true, label: "Snapshot", description: "The snapshot's id." }
+      exclude: { type: int, min: 1, max: 511, required: true, label: "Exclusions", description: "A sum: 1 exclusion on (nothing else left out), then +2 input channel types, +4 input and output voltage ranges, +8 input and output mutes, +16 update the active snapshot before recalling, +32 SIM3 bus address, +64 SIM3 probe point, +128 clock sync mode, +256 AVB configuration (9 recalls everything but the mutes)." }
+    send: ":recall_snapshot {snapshot} {exclude}"
+    returns: none
+
+  update_snapshot:
+    summary: "Store the current settings in an existing snapshot (:update_snapshot)"
+    params:
+      snapshot: { type: int, min: 0, max: 9999, required: true, label: "Snapshot", description: "The snapshot's id." }
+    send: ":update_snapshot {snapshot}"
+    returns: none
+
+  create_snapshot:
+    summary: "Create a snapshot of the current settings with a name and comment (:create_snapshot)"
+    params:
+      name: { type: string, max_length: 64, pattern: "^[^\\s']+$", required: true, label: "Name", description: "The snapshot's name, one word (no spaces)." }
+      comment: { type: string, max_length: 256, pattern: "^[^\\r\\n']+$", required: true, label: "Comment", description: "The snapshot's comment, without line breaks." }
+    send: ":create_snapshot {name} {comment}"
+    returns: none
+
+  delete_snapshot:
+    summary: "Delete a snapshot (:delete_snapshot)"
+    params:
+      snapshot: { type: int, min: 0, max: 9999, required: true, label: "Snapshot", description: "The snapshot's id." }
+    send: ":delete_snapshot {snapshot}"
+    returns: none
+
+  ping:
+    summary: "Ping the server (:ping), answered :pong"
+    send: ":ping"
+    expect: { contains: ":pong" }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      recall_snapshot replaces the processor's settings at once (mutes too,
+      unless excluded); update_snapshot and delete_snapshot overwrite or remove
+      a stored snapshot; set_control_point with a regular expression changes
+      every point it matches. None can be undone from here.
+  - models: [all]
+    severity: info
+    text: >
+      On connecting the core subscribes to every control point by subtree
+      (regular expressions, at most every 100 ms), so GALAXY sends each value
+      at once and every change after; the meters come the same way. TCP
+      subscriptions last until the connection closes. Every value is kept in
+      points, keyed by its path, as GALAXY writes it; the main ones are also
+      typed under inputs, outputs, matrix, meters, device, project and
+      snapshot. Opened for commands only, nothing is subscribed.
+  - models: [all]
+    severity: info
+    text: >
+      Sets are not acknowledged in the guide: they report unverified, and the
+      subscription reports the new value. The guide gives no ranges, units or
+      enumerations (delay types, filter types, slopes, modes, scales); GALAXY
+      describes each point with describe_control_point, and clamping or
+      refusals are the unit's. Errors (writing a status point) are not
+      documented. Several units on one host take ports 25103, 25203 and so on:
+      open the device with that port.
+
+state:
+  points.*: { type: string, description: "Every control point the core has heard, keyed by its path (a key holding slashes), as GALAXY writes the value: a number, true or false, or text" }
+  inputs.*.gain: { type: float, unit: "dB", description: "Processing input gain (/processing/input/N/gain)" }
+  inputs.*.mute: { type: bool, description: "Processing input muted (/processing/input/N/mute)" }
+  inputs.*.delay: { type: float, description: "Processing input delay (/processing/input/N/delay)" }
+  outputs.*.gain: { type: float, unit: "dB", description: "Processing output gain (/processing/output/N/gain)" }
+  outputs.*.mute: { type: bool, description: "Processing output muted (/processing/output/N/mute)" }
+  outputs.*.delay: { type: float, description: "Processing output delay (/processing/output/N/delay)" }
+  outputs.*.polarity_reversed: { type: bool, description: "Processing output polarity reversed (/processing/output/N/polarity_reversal)" }
+  matrix.*.*.gain: { type: float, unit: "dB", description: "Matrix crosspoint gain, keyed by matrix input then output; -90 is off (/processing/matrix/N/N/gain)" }
+  inputs.*.name: { type: string, description: "Device input name (1-32) (/device/input/N/name)" }
+  outputs.*.name: { type: string, description: "Device output name (/device/output/N/name)" }
+  meters.inputs.*: { type: float, unit: "dB", description: "Input meter (/status/meter/input/N)" }
+  meters.outputs.*: { type: float, unit: "dB", description: "Output meter (/status/meter/output/N)" }
+  meters.matrix_inputs.*: { type: float, unit: "dB", description: "Matrix input meter (/status/meter/matrix_input/N)" }
+  device.model: { type: string, description: "Model (GX-408, GX-816, ...) (/status/model_string)" }
+  device.name: { type: string, description: "AVDECC entity name (/entity/entity_name)" }
+  device.firmware: { type: string, description: "Firmware version (/entity/firmware_version)" }
+  device.serial: { type: string, description: "Serial number (/entity/serial_number)" }
+  snapshot.active_id: { type: int, description: "Active snapshot id, -1 for none (/project/snapshot/active/id)" }
+  snapshot.active_name: { type: string, description: "Active snapshot name (/project/snapshot/active/name)" }
+  snapshot.active_modified: { type: bool, description: "Settings changed since the active snapshot was recalled (/project/snapshot/active/modified)" }
+  project.name: { type: string, description: "Project name (/project/name)" }
+
+telemetry:
+  subscribe:
+    send:
+      - "+/processing/.* 100"
+      - "+/device/.* 100"
+      - "+/project/.* 100"
+      - "+/system/.* 100"
+      - "+/entity/.* 100"
+      - "+/status/(avb|clock|hardware|network|led|snapshot)/.* 100"
+      - "+/status/(beam_control_input_source|connected_client_count|connected_osc_tcp_client_count|connected_osc_upd_client_count|connected_text_tcp_client_count|identify_active|lcd_log_message|log_message|matrix_crosspoints_used|model_string) 100"
+      - "+/status/meter/.* 100"
+  updates:
+    - match: "^(/[^=]+)='?(.*?)'?$"
+      state: { "points.{1:key}": "{2}" }
+    - match: "^/processing/input/([0-9]+)/gain='?(.*?)'?$"
+      state: { "inputs.{1}.gain": "{2}" }
+    - match: "^/processing/input/([0-9]+)/mute='?(.*?)'?$"
+      state: { "inputs.{1}.mute": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: "^/processing/input/([0-9]+)/delay='?(.*?)'?$"
+      state: { "inputs.{1}.delay": "{2}" }
+    - match: "^/processing/output/([0-9]+)/gain='?(.*?)'?$"
+      state: { "outputs.{1}.gain": "{2}" }
+    - match: "^/processing/output/([0-9]+)/mute='?(.*?)'?$"
+      state: { "outputs.{1}.mute": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: "^/processing/output/([0-9]+)/delay='?(.*?)'?$"
+      state: { "outputs.{1}.delay": "{2}" }
+    - match: "^/processing/output/([0-9]+)/polarity_reversal='?(.*?)'?$"
+      state: { "outputs.{1}.polarity_reversed": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: "^/processing/matrix/([0-9]+)/([0-9]+)/gain='?(.*?)'?$"
+      state: { "matrix.{1}.{2}.gain": "{3}" }
+    - match: "^/device/input/([0-9]+)/name='?(.*?)'?$"
+      state: { "inputs.{1}.name": "{2}" }
+    - match: "^/device/output/([0-9]+)/name='?(.*?)'?$"
+      state: { "outputs.{1}.name": "{2}" }
+    - match: "^/status/meter/input/([0-9]+)='?(.*?)'?$"
+      state: { "meters.inputs.{1}": "{2}" }
+    - match: "^/status/meter/output/([0-9]+)='?(.*?)'?$"
+      state: { "meters.outputs.{1}": "{2}" }
+    - match: "^/status/meter/matrix_input/([0-9]+)='?(.*?)'?$"
+      state: { "meters.matrix_inputs.{1}": "{2}" }
+    - match: "^/status/model_string='?(.*?)'?$"
+      state: { "device.model": "{1}" }
+    - match: "^/entity/entity_name='?(.*?)'?$"
+      state: { "device.name": "{1}" }
+    - match: "^/entity/firmware_version='?(.*?)'?$"
+      state: { "device.firmware": "{1}" }
+    - match: "^/entity/serial_number='?(.*?)'?$"
+      state: { "device.serial": "{1}" }
+    - match: "^/project/snapshot/active/id='?(.*?)'?$"
+      state: { "snapshot.active_id": "{1}" }
+    - match: "^/project/snapshot/active/name='?(.*?)'?$"
+      state: { "snapshot.active_name": "{1}" }
+    - match: "^/project/snapshot/active/modified='?(.*?)'?$"
+      state: { "snapshot.active_modified": { value: "{1}", map: { "true": true, "false": false } } }
+    - match: "^/project/name='?(.*?)'?$"
+      state: { "project.name": "{1}" }

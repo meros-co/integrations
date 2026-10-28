@@ -2515,6 +2515,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that settings.exposure.iso is null (absent from state) in automatic exposure, and which settings fields the camera writes as null in other modes. ([specs/meros-camera.yaml:596](specs/meros-camera.yaml#L596))
 - [ ] On a phone with talkback on, confirm that get_talkback_url's address takes a director's WebRTC offer, and that new_talkback_address cuts off a director on the old one. ([specs/meros-camera.yaml:536](specs/meros-camera.yaml#L536))
 
+## meyersound-galaxy — Meyer Sound GALAXY
+
+- [ ] Record the exact answer forms: whether get answers are quoted (path='value') or not, whether a set is answered at all, and the error text for a status point or an unknown path. ([specs/meyersound-galaxy.yaml:45](specs/meyersound-galaxy.yaml#L45))
+- [ ] Confirm that subscribing with a regular expression per subtree is accepted, sends every current value, and that the device keeps up with every point subscribed at 100 ms. ([specs/meyersound-galaxy.yaml:444](specs/meyersound-galaxy.yaml#L444))
+- [ ] Check how create_snapshot separates a name with spaces from the comment (the guide gives no quoting). ([specs/meyersound-galaxy.yaml:368](specs/meyersound-galaxy.yaml#L368))
+- [ ] Record each typed point's range, units and enumeration with describe_control_point (delay types, filter types, slopes, scales), which the guide does not tabulate. ([specs/meyersound-galaxy.yaml:107](specs/meyersound-galaxy.yaml#L107))
+
 ## midi-show-control — MIDI Show Control (MSC) device
 
 - [ ] Against an MSC lighting console (ETC Eos, grandMA, Chamsys), confirm GO, STOP, RESUME, TIMED_GO, SET and FIRE act as described for its device ID and command format, and whether it answers all_types and the all-call ID 127. ([specs/midi-show-control.yaml:318](specs/midi-show-control.yaml#L318))
