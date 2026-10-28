@@ -152,6 +152,28 @@ source:
       RS232zone[X], Status (x3Vx1), Type, Unlock, USBHostLogic,
       USBHostRoute (local, remote), Version, VOUT (-80 to 0, +, -, sta),
       VOUTMute (1-2), x?AVx1 (inputs 1-2) p.4-11.
+  - title: "AT-UHD-CLSO-840 Application Programming Interface, firmware 0.1.40 (version 1, September 2018)"
+    author: Atlona Inc.
+    url: https://atlona.com/pdf/AT-UHD-CLSO-840_API.pdf
+    note: >
+      Manufacturer document (Internet Archive copy, 20240807070408).
+      Case-sensitive commands, CR after each and CR LF after each answer,
+      "Command FAILED" p.3; All#, AudioSrc (outputs 1-4: ana, dig), Blink,
+      Broadcast, Clear, Recall and Save (presets 1-5), CSpara, EDIDMSet
+      (inputs 1-5: default, save1-4, int1-23), EDIDOut1 save1-4, HDCPSet
+      with a space (HDCPSet 1 on), HTTPPort, InputBroadcast, InputStatus
+      (five digits: HDMI 1, HDMI 2, VGA, DisplayPort 4, HDMI 5), IPAddUser,
+      IPCFG, IPChangePass, IPDelUser, IPDHCP, IPLogin, IPPort, IPQuit,
+      IPStatic, IPTimeout (1-60000), Lock, LockST, MirrorAudio (audio
+      outputs 1-4, Out1-Out4 or 0), Mreset, PWOFF, PWON, PWSTA,
+      RS232paraV[baud,data,parity,stop] (zones 1-5), RS232zoneX[Y] (zones
+      1-2), Status (x1AVx1,...,x1Ax1,...), TrigCEC1 on|off, Type (full),
+      Unlock, Version (Firmware 0.1.55), VIN (inputs 1-4, -10 to 10, +, -),
+      VOUT (outputs 1-4, -79 to 15, +, -), VOUTMute (1-4), x?$ (1-4), x?All,
+      x?AVx? (inputs 1-8, outputs 1-4), x?Ax? p.4-22. Parts of the document
+      were copied from other products (AT-JUNO-451, AT-HDVS-210U-TX-WP) and
+      the command table's descriptions are shifted against the names; the
+      per-command pages are used.
   - title: "AT-OME-MH21 Application Programming Interface, version 1.0 (September 2020)"
     author: Atlona Inc.
     url: https://atlona.com/pdf/AT-OME-MH21_API.pdf
@@ -259,6 +281,7 @@ maps:
   lock_word: { "true": "Lock", "false": "Unlock" }
   ir_word: { "true": "IRON", "false": "IROFF" }
   relay_word: { "true": "close", "false": "open" }
+  mirror_target: { "0": "0", "1": "Out1", "2": "Out2", "3": "Out3", "4": "Out4" }
   parity_digit: { none: "0", odd: "1", even: "2" }
 
 ports:
@@ -380,6 +403,31 @@ models:
       default, save1-save4 or int1-int14. Inputs, outputs and presets can
       be named (InNameSet, OutNameSet, PreNameSet). EDIDOut is not offered,
       as for the 44M.
+  - id: at-uhd-clso-840
+    name: Atlona AT-UHD-CLSO-840 (8x4 HDBaseT and HDMI matrix switcher)
+    supports:
+      [route, route_all, reset_routing, get_routing, route_audio,
+       save_preset, recall_preset, clear_preset,
+       set_output_video, get_output_video, set_output_mute, get_output_mute,
+       set_output_volume, increase_output_volume, decrease_output_volume,
+       set_input_volume, increase_input_volume, decrease_input_volume,
+       set_output_audio_type, set_audio_mirror, get_input_signals,
+       set_input_edid, get_input_edid, save_output_edid, set_input_hdcp, get_input_hdcp,
+       power_on, power_off, get_power, set_blink, get_blink, set_broadcast, get_broadcast,
+       set_input_broadcast, get_input_broadcast, set_front_panel_lock, get_front_panel_lock,
+       set_dhcp, get_dhcp, set_static_ip, get_network, set_telnet_login, get_telnet_login,
+       set_telnet_port, get_telnet_port, set_http_port, set_telnet_timeout,
+       add_user, delete_user, change_password,
+       set_serial, get_serial, set_zone_serial_line, send_zone_serial, trigger_cec,
+       factory_reset, get_model, get_model_full, get_firmware]
+    verification: none
+    notes: >
+      Routes take inputs 1-8 and outputs 1-4 (HDMI 1-2, HDBaseT 3-4); x?$,
+      VOUT, VOUTMute, AudioSrc and MirrorAudio take outputs 1-4, VIN inputs
+      1-4, EDIDMSet, HDCPSet and InputStatus inputs 1-5 (HDMI 1, HDMI 2, VGA,
+      DisplayPort 4, HDMI 5 on the receiver). RS-232 zones 1-2 for display
+      commands, 1-5 for line settings. Presets 1-5; EDID memories 1-4.
+      TrigCEC takes output 1 and on or off only.
   - id: at-ome-ms42
     name: Atlona AT-OME-MS42 (Omega 4x2 matrix switcher with USB)
     supports:
@@ -534,6 +582,15 @@ commands:
     expect: { reply_contains: "x", matches: '^(x\d+A?Vx\d+(?:, ?x\d+A?Vx\d+)*)$' }
     returns: value
 
+  route_audio:
+    summary: Route a video input's audio to an audio output (xINAxOUT)
+    params:
+      input: { type: int, min: 1, max: 8, required: true, label: Input, description: "The video input whose audio is sent, from 1." }
+      output: { type: int, min: 1, max: 4, required: true, label: Output, description: "The audio output, 1-4." }
+    send: "x{input}Ax{output}"
+    expect: { reply_contains: "x{input}A", not_contains: "Command FAILED" }
+    returns: ack
+
   get_output_route:
     summary: Read the input routed to one output (StatusxOUT)
     params:
@@ -593,7 +650,7 @@ commands:
       muted:  { type: bool, required: true, label: Muted, description: "On mutes the output's audio; off unmutes it." }
     send:
       - { models: [at-ome-st31], message: "VOUTMute {output} {muted:map.onoff}" }
-      - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-sr21], message: "VOUTMute{output} {muted:map.onoff}" }
+      - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-sr21, at-uhd-clso-840], message: "VOUTMute{output} {muted:map.onoff}" }
     expect: { reply_contains: "VOUTMute", not_contains: "Command FAILED" }
     returns: ack
 
@@ -602,7 +659,7 @@ commands:
     params: { output: *zone }
     send:
       - { models: [at-ome-st31], message: "VOUTMute {output} sta" }
-      - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-sr21], message: "VOUTMute{output} sta" }
+      - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-sr21, at-uhd-clso-840], message: "VOUTMute{output} sta" }
     expect: { reply_contains: "VOUTMute", matches: ' (on|off)$' }
     returns: value
 
@@ -690,6 +747,47 @@ commands:
     send: "HDMIAUD sta"
     expect: { reply_contains: "HDMIAUD ", matches: ' (on|off)$' }
     returns: value
+
+  set_input_volume:
+    summary: Set an input's audio level in dB (VINN level)
+    params:
+      input: &vin_input { type: int, min: 1, max: 4, required: true, label: Input, description: "The input, 1-4." }
+      level: { type: int, min: -10, max: 10, required: true, label: Level, description: "Input level in dB, -10 to 10." }
+    send: "VIN{input} {level}"
+    expect: { reply_contains: "VIN{input} ", not_contains: "Command FAILED" }
+    returns: ack
+
+  increase_input_volume:
+    summary: Raise an input's audio level one step (VINN +)
+    params: { input: *vin_input }
+    send: "VIN{input} +"
+    expect: { reply_contains: "VIN{input} ", not_contains: "Command FAILED" }
+    returns: ack
+
+  decrease_input_volume:
+    summary: Lower an input's audio level one step (VINN -)
+    params: { input: *vin_input }
+    send: "VIN{input} -"
+    expect: { reply_contains: "VIN{input} ", not_contains: "Command FAILED" }
+    returns: ack
+
+  set_output_audio_type:
+    summary: Choose analog or digital audio for an output (AudioSrcN ana|dig)
+    params:
+      output: { type: int, min: 1, max: 4, required: true, label: Output, description: "The output, 1-4 (HDMI 1-2, HDBaseT 3-4)." }
+      type: { type: enum, values: [ana, dig], required: true, label: Audio type, description: "ana for analog audio, dig for digital (embedded) audio." }
+    send: "AudioSrc{output} {type}"
+    expect: { reply_contains: "AudioSrc{output} ", not_contains: "Command FAILED" }
+    returns: ack
+
+  set_audio_mirror:
+    summary: Make an audio output follow a video output's audio, or stop it (MirrorAudioN OutM, or 0)
+    params:
+      audio_output: { type: int, min: 1, max: 4, required: true, label: Audio output, description: "The audio output, 1-4." }
+      video_output: { type: int, min: 0, max: 4, required: true, label: Video output, description: "The video output to follow, 1-4, or 0 to stop mirroring." }
+    send: "MirrorAudio{audio_output} {video_output:map.mirror_target}"
+    expect: { reply_contains: "MirrorAudio{audio_output} ", not_contains: "Command FAILED" }
+    returns: ack
 
   set_mirror:
     summary: Mirror an HDBaseT output on an HDMI output (MirrorHdmiN OutM)
@@ -813,7 +911,7 @@ commands:
       output: { type: int, min: 1, max: 20, required: true, label: Output, description: "The output whose display's EDID is read, from 1." }
       memory: { type: int, min: 1, max: 10, required: true, label: Memory, description: "The EDID memory: 1-10 on PRO3 matrices, 1-8 on the AT-HDR-H2H-88MA." }
     send:
-      - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m], message: "EDIDOut{output} save{memory}" }
+      - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-uhd-clso-840], message: "EDIDOut{output} save{memory}" }
       - { models: [at-hdr-h2h-88ma], message: "EDIDOut{output} mem{memory}" }
     expect: { reply_contains: "EDIDOut{output} ", not_contains: "Command FAILED" }
     returns: ack
@@ -838,7 +936,7 @@ commands:
               description: "on reports an HDCP-compliant sink, off a non-compliant one so no HDCP content is sent, auto follows the display (MH21 only)." }
     send:
       - { models: [at-hdr-h2h-88ma, at-hdr-h2h-44ma], message: "HDCPSet{input} {mode}" }
-      - { models: [at-ome-mh21, at-hdr-h2h-44m], message: "HDCPSet {input} {mode}" }
+      - { models: [at-ome-mh21, at-hdr-h2h-44m, at-uhd-clso-840], message: "HDCPSet {input} {mode}" }
     expect: { reply_contains: "HDCPSet", not_contains: "Command FAILED" }
     returns: ack
 
@@ -848,7 +946,7 @@ commands:
       input: { type: int, min: 1, max: 8, required: true, label: Input, description: "The input from 1." }
     send:
       - { models: [at-hdr-h2h-88ma, at-hdr-h2h-44ma], message: "HDCPSet{input} sta" }
-      - { models: [at-ome-mh21, at-hdr-h2h-44m], message: "HDCPSet {input} sta" }
+      - { models: [at-ome-mh21, at-hdr-h2h-44m, at-uhd-clso-840], message: "HDCPSet {input} sta" }
     expect: { reply_contains: "HDCPSet", matches: ' (on|off|auto)$' }
     returns: value
 
@@ -913,6 +1011,12 @@ commands:
     params: { relay: *relay }
     send: "RelayAct{relay} sta"
     expect: { reply_contains: "RelayAct{relay} ", matches: ' (open|close)$' }
+    returns: value
+
+  get_front_panel_lock:
+    summary: Read whether the front-panel buttons are locked (LockST)
+    send: "LockST"
+    expect: { matches: '^(Lock|Unlock)$' }
     returns: value
 
   power_on:
@@ -1491,7 +1595,7 @@ commands:
   get_firmware:
     summary: Read the firmware version (Version; VersionMCU on the H2H)
     send:
-      - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-st31, at-ome-sr21, at-ome-mh21], message: "Version" }
+      - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-uhd-clso-840, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-st31, at-ome-sr21, at-ome-mh21], message: "Version" }
       - { models: [at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma], message: "VersionMCU" }
     expect: { matches: '^(?:Firmware )?(\d[\w.]*)$' }
     returns: value
@@ -1545,6 +1649,18 @@ commands:
       zone: { type: int, min: 1, max: 16, required: true, label: Zone, description: "The HDBaseT output (zone), 1-16." }
       baud: { type: enum, values: ["2400", "9600", "19200", "38400", "56000", "57600", "115200"], required: true, label: Baud rate, description: "Bits per second." }
     send: "RS232para{zone}[{baud}]"
+    expect: { reply_contains: "RS232para{zone}", not_contains: "Command FAILED" }
+    returns: ack
+
+  set_zone_serial_line:
+    summary: Set one RS-232 zone's line (RS232paraN[baud,data,parity,stop])
+    params:
+      zone: { type: int, min: 1, max: 5, required: true, label: Zone, description: "The RS-232 zone, 1-5." }
+      baud: { type: enum, values: ["2400", "9600", "19200", "38400", "56000", "57600", "115200"], required: true, label: Baud rate, description: "Bits per second." }
+      data_bits: { type: int, min: 8, max: 9, default: 8, label: Data bits, description: "8 or 9 data bits, as the document lists." }
+      parity: { type: enum, values: [none, odd, even], default: none, label: Parity, description: "Parity, sent as 0, 1 or 2." }
+      stop_bits: { type: int, min: 1, max: 2, default: 1, label: Stop bits, description: "1 or 2 stop bits." }
+    send: "RS232para{zone}[{baud},{data_bits},{parity:map.parity_digit},{stop_bits}]"
     expect: { reply_contains: "RS232para{zone}", not_contains: "Command FAILED" }
     returns: ack
 
@@ -1665,6 +1781,10 @@ state:
   outputs.*.video_enabled:   { type: bool, description: "Whether the output sends a signal (x?$)" }
   outputs.*.audio_muted:     { type: bool, description: "Whether the output's or zone's audio is muted (VOUTMute); keyed by zone" }
   outputs.*.volume:          { type: int, unit: dB, description: "Output or zone volume (VOUT); kept from set and sta answers only" }
+  audio_outputs.*.input:     { type: int, description: "Video input whose audio the audio output carries (x?Ax?, Status; AT-UHD-CLSO-840)" }
+  audio_outputs.*.mirror_of: { type: int, description: "Video output the audio output follows, or 0 (MirrorAudio; AT-UHD-CLSO-840)" }
+  outputs.*.audio_type:      { type: string, description: "Audio an output carries: ana (analog) or dig (digital) (AudioSrc; AT-UHD-CLSO-840)" }
+  inputs.*.volume:           { type: int, unit: dB, description: "Input audio level (VIN; AT-UHD-CLSO-840); kept from set answers only" }
   outputs.*.mirror_of:       { type: int, description: "HDBaseT output an HDMI output mirrors, or 0 when not mirroring (MirrorHdmi, UnMirror); keyed by HDMI output" }
   analog_outputs.*.source:   { type: string, description: "Audio an analog output carries: HDBaseT, HDMI, AUX1-3 (AUD)" }
   analog_outputs.*.mono:     { type: bool, description: "Whether the analog output is mono (SetMono)" }
@@ -1735,9 +1855,9 @@ telemetry:
       send:
         - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "Status" }
         - { models: [at-ome-mh21], message: "Statusx1" }
-        - { models: [at-ome-st31, at-ome-sr21], message: "Status" }
-        - { models: [at-ome-st31], message: "PWSTA" }
-        - { models: [at-ome-st31, at-ome-sr21], message: "InputStatus" }
+        - { models: [at-ome-st31, at-ome-sr21, at-uhd-clso-840], message: "Status" }
+        - { models: [at-ome-st31, at-uhd-clso-840], message: "PWSTA" }
+        - { models: [at-ome-st31, at-ome-sr21, at-uhd-clso-840], message: "InputStatus" }
         - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "PWSTA" }
         - { models: [at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "InputStatus" }
         - { models: [at-ome-mh21], message: "InputStatus1" }
@@ -1867,6 +1987,36 @@ telemetry:
         - { models: [at-ome-ms42], message: "UsbVbusControl sta" }
         - { models: [at-ome-mh21], message: "UsbHostRoute sta" }
         - { models: [at-ome-mh21], message: "UsbMode sta" }
+        # The AT-UHD-CLSO-840.
+        - { models: [at-uhd-clso-840], message: "Type" }
+        - { models: [at-uhd-clso-840], message: "Version" }
+        - { models: [at-uhd-clso-840], message: "IPCFG" }
+        - { models: [at-uhd-clso-840], message: "Blink sta" }
+        - { models: [at-uhd-clso-840], message: "Broadcast sta" }
+        - { models: [at-uhd-clso-840], message: "InputBroadcast sta" }
+        - { models: [at-uhd-clso-840], message: "IPDHCP sta" }
+        - { models: [at-uhd-clso-840], message: "IPLogin sta" }
+        - { models: [at-uhd-clso-840], message: "IPPort sta" }
+        - { models: [at-uhd-clso-840], message: "CSpara[sta]" }
+        - { models: [at-uhd-clso-840], message: "LockST" }
+        - { models: [at-uhd-clso-840], message: "x1$ sta" }
+        - { models: [at-uhd-clso-840], message: "x2$ sta" }
+        - { models: [at-uhd-clso-840], message: "x3$ sta" }
+        - { models: [at-uhd-clso-840], message: "x4$ sta" }
+        - { models: [at-uhd-clso-840], message: "VOUTMute1 sta" }
+        - { models: [at-uhd-clso-840], message: "VOUTMute2 sta" }
+        - { models: [at-uhd-clso-840], message: "VOUTMute3 sta" }
+        - { models: [at-uhd-clso-840], message: "VOUTMute4 sta" }
+        - { models: [at-uhd-clso-840], message: "EDIDMSet1 sta" }
+        - { models: [at-uhd-clso-840], message: "EDIDMSet2 sta" }
+        - { models: [at-uhd-clso-840], message: "EDIDMSet3 sta" }
+        - { models: [at-uhd-clso-840], message: "EDIDMSet4 sta" }
+        - { models: [at-uhd-clso-840], message: "EDIDMSet5 sta" }
+        - { models: [at-uhd-clso-840], message: "HDCPSet 1 sta" }
+        - { models: [at-uhd-clso-840], message: "HDCPSet 2 sta" }
+        - { models: [at-uhd-clso-840], message: "HDCPSet 3 sta" }
+        - { models: [at-uhd-clso-840], message: "HDCPSet 4 sta" }
+        - { models: [at-uhd-clso-840], message: "HDCPSet 5 sta" }
         # The ST31 and SR21.
         - { models: [at-ome-st31, at-ome-sr21], message: "Type" }
         - { models: [at-ome-st31, at-ome-sr21], message: "Version" }
@@ -1914,6 +2064,26 @@ telemetry:
       match_each: 'x(\d+)A?Vx(\d+)'
       match_each_in: 1
       state: { "outputs.{3}.input": "{2}" }
+    # The AT-UHD-CLSO-840's Status adds audio routes (x1Ax1) after the
+    # video ones; audio route echoes are the same pairs.
+    - models: [at-uhd-clso-840]
+      match: '^(x\d+A?V?x\d+(?:, ?x\d+A?V?x\d+)*)$'
+      match_each: 'x(\d+)AVx(\d+)'
+      match_each_in: 1
+      state: { "outputs.{3}.input": "{2}" }
+    - models: [at-uhd-clso-840]
+      match: '^(x\d+A?V?x\d+(?:, ?x\d+A?V?x\d+)*)$'
+      match_each: 'x(\d+)Ax(\d+)'
+      match_each_in: 1
+      state: { "audio_outputs.{3}.input": "{2}" }
+    - match: '^MirrorAudio(\d) Out(\d)$'
+      state: { "audio_outputs.{1}.mirror_of": "{2}" }
+    - match: '^MirrorAudio(\d) 0$'
+      state: { "audio_outputs.{1}.mirror_of": "0" }
+    - match: '^AudioSrc(\d) (ana|dig)$'
+      state: { "outputs.{1}.audio_type": "{2}" }
+    - match: '^VIN(\d) (-?\d+)$'
+      state: { "inputs.{1}.volume": "{2}" }
     # Names (AT-HDR-H2H-44MA): get and set answers alike.
     - match: '^InName(?:Get|Set) ?(\d+) (.+)$'
       state: { "inputs.{1}.name": "{2}" }
@@ -2137,6 +2307,18 @@ quirks:
       answered "SetCmd on CRLF [PWON]", and IRSetCmd's syntax as "IRSetCmd
       X[Y]" with the example "IRSetCmd off poweroff"; neither says where
       the command text goes. Set them in the web GUI.
+  - models: [at-uhd-clso-840]
+    severity: info
+    text: >
+      Inferred from a document with copy errors: the audio route answer
+      (its x?Ax? example is answered x6AVx2, read here as a video route, so
+      an audio route answered that way is shown as a video route until the
+      next Status), VIN's answer to + and - naming the new level (as VOUT's
+      example does), HDCPSet taking the input before the mode (its syntax
+      line has the mode only), and EDIDOut taking output 1 only. VOUT, VIN,
+      AudioSrc and MirrorAudio have no read command, so those values are
+      known from this connection's own set answers only. Status lists audio
+      routes after the video ones in one line.
   - models: [at-ome-st31, at-ome-sr21]
     severity: info
     text: >

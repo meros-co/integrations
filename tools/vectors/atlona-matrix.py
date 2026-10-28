@@ -320,3 +320,26 @@ at_t("hdmi-audio-sr21", "HDMIAUD on", {"hdmi_audio": True}, **AT_SR21)
 at_t("relay-sr21", "RelayAct1 close", {"relays": {"1": {"closed": True}}}, **AT_SR21)
 at_t("usb-host-route-sr21", "USBHostRoute local", {"usb": {"host_route": "local"}}, **AT_SR21)
 at_t("input-status-sr21", "InputStatus2 1", {"inputs": {"2": {"signal": True}}}, **AT_SR21)
+
+# AT-UHD-CLSO-840 (examples x6Ax2, VIN1 2, AudioSrc2 ana, MirrorAudio2 Out3, RS232para1[115200,8,0,1])
+AT_840 = {"model": "at-uhd-clso-840"}
+at("route_audio", {"input": 6, "output": 2}, "x6Ax2", device_reply="x6Ax2\r\n", expect_result=AT_OK, **AT_840)
+at("set_input_volume", {"input": 1, "level": 2}, "VIN1 2", device_reply="VIN1 2\r\n", expect_result=AT_OK, **AT_840)
+at("increase_input_volume", {"input": 1}, "VIN1 +", **AT_840)
+at("decrease_input_volume", {"input": 1}, "VIN1 -", **AT_840)
+at("set_output_audio_type", {"output": 2, "type": "ana"}, "AudioSrc2 ana", device_reply="AudioSrc2 ana\r\n",
+   expect_result=AT_OK, **AT_840)
+at("set_audio_mirror", {"audio_output": 2, "video_output": 3}, "MirrorAudio2 Out3", device_reply="MirrorAudio2 Out3\r\n",
+   expect_result=AT_OK, **AT_840)
+at("set_audio_mirror", {"audio_output": 2, "video_output": 0}, "MirrorAudio2 0", file="set_audio_mirror-off", **AT_840)
+at_v("get_front_panel_lock", {}, "LockST", "Unlock", "Unlock", **AT_840)
+at("set_zone_serial_line", {"zone": 1, "baud": "115200", "data_bits": 8, "parity": "none", "stop_bits": 1},
+   "RS232para1[115200,8,0,1]", device_reply="RS232para1[115200,8,0,1]\r\n", expect_result=AT_OK, **AT_840)
+at("set_input_hdcp", {"input": 1, "mode": "on"}, "HDCPSet 1 on", file="set_input_hdcp-clso840", **AT_840)
+at_v("get_firmware", {}, "Version", "Firmware 0.1.55", "0.1.55", file="get_firmware-clso840", **AT_840)
+at_t("status-clso840", "x1AVx1,x2AVx2,x3AVx3,x4AVx4,x1Ax1,x3Ax2,x3Ax3,x4Ax4",
+     {"outputs": {"1": {"input": 1}, "2": {"input": 2}, "3": {"input": 3}, "4": {"input": 4}},
+      "audio_outputs": {"1": {"input": 1}, "2": {"input": 3}, "3": {"input": 3}, "4": {"input": 4}}}, **AT_840)
+at_t("audio-mirror-clso840", "MirrorAudio2 Out3", {"audio_outputs": {"2": {"mirror_of": 3}}}, **AT_840)
+at_t("audio-type-clso840", "AudioSrc2 ana", {"outputs": {"2": {"audio_type": "ana"}}}, **AT_840)
+at_t("input-volume-clso840", "VIN1 2", {"inputs": {"1": {"volume": 2}}}, **AT_840)
