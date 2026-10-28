@@ -1756,7 +1756,15 @@ impl SpecEngine {
                     port,
                 )?
             }
-            _ => endpoints_of(&t, &ctx.settings, &url_host(&ctx), "http", false, false, port)?,
+            _ => endpoints_of(
+                &t,
+                &ctx.settings,
+                &url_host(&ctx),
+                "http",
+                false,
+                false,
+                port,
+            )?,
         };
         let keepalive = keepalive_of(&t, &transport)?;
         // A list of probes, each for some models: the first for this one.
