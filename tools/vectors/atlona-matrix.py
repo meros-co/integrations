@@ -267,3 +267,25 @@ at_t("usb-vbus", "UsbVbusControl on", {"usb": {"vbus": True}})
 at_t("usb-mode", "UsbMode follow usb", {"usb": {"mode": "follow usb"}})
 at_t("usb-route", "UsbRoute 3", {"usb": {"route": 3}})
 at_t("usb-css", "UsbCSS on", {"usb": {"superspeed": True}})
+
+# AT-HDR-H2H-44M and -44MA (their API documents): HDCPSet with a space on the
+# 44M, and the 44MA's names (InNameSet2 bluray_player, OutNameGet3 SonyXBR7,
+# PreNameSet4 HuddleRm2).
+AT_44M = {"model": "at-hdr-h2h-44m"}
+AT_44MA = {"model": "at-hdr-h2h-44ma"}
+at("set_input_hdcp", {"input": 1, "mode": "on"}, "HDCPSet 1 on", device_reply="HDCPSet 1 on\r\n",
+   expect_result=AT_OK, file="set_input_hdcp-44m", **AT_44M)
+at_v("get_input_hdcp", {"input": 2}, "HDCPSet 2 sta", "HDCPSet 2 off", "off", file="get_input_hdcp-44m", **AT_44M)
+at("set_input_name", {"input": 2, "name": "bluray_player"}, "InNameSet2 bluray_player",
+   device_reply="InNameSet2 bluray_player\r\n", expect_result=AT_OK, **AT_44MA)
+at_v("get_input_name", {"input": 2}, "InNameGet2", "InNameGet2 bluray_player", "bluray_player", **AT_44MA)
+at("set_output_name", {"output": 3, "name": "SonyXBR7"}, "OutNameSet3 SonyXBR7", **AT_44MA)
+at_v("get_output_name", {"output": 3}, "OutNameGet3", "OutNameGet3 SonyXBR7", "SonyXBR7", **AT_44MA)
+at("set_preset_name", {"preset": 4, "name": "HuddleRm2"}, "PreNameSet4 HuddleRm2", **AT_44MA)
+at_v("get_preset_name", {"preset": 4}, "PreNameGet4", "PreNameGet 4 HuddleRm2", "HuddleRm2", **AT_44MA)
+telemetry(AT, "input-name", model="at-hdr-h2h-44ma", inbound="InNameGet2 bluray_player\r\n",
+          expect_state={"inputs": {"2": {"name": "bluray_player"}}})
+telemetry(AT, "output-name", model="at-hdr-h2h-44ma", inbound="OutNameSet3 SonyXBR7\r\n",
+          expect_state={"outputs": {"3": {"name": "SonyXBR7"}}})
+telemetry(AT, "preset-name", model="at-hdr-h2h-44ma", inbound="PreNameGet 4 HuddleRm2\r\n",
+          expect_state={"presets": {"4": {"name": "HuddleRm2"}}})

@@ -143,6 +143,24 @@ source:
       UsbMode, UsbHostRoute, Version, VOUTMute, x1$, x1All, xXAVx1 p.5-29.
       The command summary's descriptions are shifted a row against the
       names; the per-command pages are used.
+  - title: "AT-HDR-H2H-44M Application Programming Interface (version 1, February 2022)"
+    author: Atlona Inc.
+    url: https://atlona.com/pdf/AT-HDR-H2H-44M_API.pdf
+    note: >
+      Manufacturer document (Internet Archive copy, 20221205145108). Case-sensitive commands, CR after each
+      and CR LF after each answer, "Command FAILED" (p.3); All#, Blink, Broadcast, Clear, Recall and Save
+      (presets 1-4), CSpara, EDIDMSet (default, save1-4, int1-12), EDIDOut, HDCPSet with a space (HDCPSet 1
+      on), IPAddUser, IPCFG, IPDelUser, IPDHCP, IPLogin, IPPort, IPQuit, IPStatic, IPTimeout (1-3600), IROFF,
+      IRON, IRSTA, Lock, Mreset, PWOFF, PWON, PWSTA, Status, System sta, Telnet, TrigCEC (outputs 1-4), Type,
+      Unlock, VersionMCU, VOUTMute (1-4), x?All, x?$, x?AVx& (1-4) p.5-16.
+  - title: "AT-HDR-H2H-44MA Application Programming Interface (version 1, February 2018)"
+    author: Atlona Inc.
+    url: https://atlona.com/pdf/AT-HDR-H2H-44MA_API.pdf
+    note: >
+      Manufacturer document (Internet Archive copy, 20230803181418). SSHv2, RS-232, TCP/IP and Telnet 23; CR
+      and CR LF; 500 ms between commands; "Command FAILED:" and the command (p.2); the 44M's set with
+      HDCPSetN without a space, EDIDMSet int1-14, IPTimeout 1-60000, and InNameGet/InNameSet,
+      OutNameGet/OutNameSet and PreNameGet/PreNameSet for inputs, outputs and presets 1-4 (p.4-19).
   - title: Bitfocus Companion module companion-module-atlona-omega (MIT), src/main.ts
     author: Bitfocus AS and contributors
     url: https://github.com/bitfocus/companion-module-atlona-omega
@@ -173,7 +191,7 @@ transport:
   pacing:
     min_interval_ms: 0
     by_model:
-      - { models: [at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], min_interval_ms: 500 }
+      - { models: [at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21, at-hdr-h2h-44ma], min_interval_ms: 500 }
   # The same API on each unit's RS-232 control port (every document: "Commands
   # can be sent using RS-232, Telnet ..."). Line defaults: MS42, PS62 and SW32
   # 115200 8N1, ST31A and MH21 9600 8N1 (their p.2-3). The PRO3 and H2H
@@ -294,6 +312,44 @@ models:
       default, save1-save8 or int1-int14; EDIDOut saves an output's EDID to
       mem1-mem8. A refused command is answered "Command FAILED:" and the
       command (p.4).
+  - id: at-hdr-h2h-44m
+    name: Atlona AT-HDR-H2H-44M (4K HDR 4x4 HDMI matrix)
+    supports:
+      [route, route_all, reset_routing, get_routing,
+       save_preset, recall_preset, clear_preset,
+       set_output_video, get_output_video, set_output_mute, get_output_mute,
+       set_input_edid, get_input_edid, set_input_hdcp, get_input_hdcp,
+       power_on, power_off, get_power, set_blink, get_blink, set_broadcast, get_broadcast,
+       set_front_panel_lock, set_ir, get_ir, set_telnet, get_telnet,
+       set_dhcp, get_dhcp, set_static_ip, get_network, get_system, set_telnet_login, get_telnet_login,
+       set_telnet_port, get_telnet_port, set_telnet_timeout, add_user, delete_user,
+       set_serial, get_serial, trigger_cec, factory_reset, get_model, get_firmware]
+    verification: none
+    notes: >
+      Inputs and outputs 1-4, all HDMI; presets 1-4. EDIDMSet takes
+      default, save1-save4 or int1-int12. HDCPSet is written with a space
+      before the input (HDCPSet 1 on). Its document's EDIDOut takes one
+      number (EDIDOut 1) without saying whether it is an output or a
+      memory, so save_output_edid is not offered.
+  - id: at-hdr-h2h-44ma
+    name: Atlona AT-HDR-H2H-44MA (4K HDR 4x4 HDMI matrix)
+    supports:
+      [route, route_all, reset_routing, get_routing,
+       save_preset, recall_preset, clear_preset,
+       set_output_video, get_output_video, set_output_mute, get_output_mute,
+       set_input_edid, get_input_edid, set_input_hdcp, get_input_hdcp,
+       power_on, power_off, get_power, set_blink, get_blink, set_broadcast, get_broadcast,
+       set_front_panel_lock, set_ir, get_ir, set_telnet, get_telnet,
+       set_dhcp, get_dhcp, set_static_ip, get_network, get_system, set_telnet_login, get_telnet_login,
+       set_telnet_port, get_telnet_port, set_telnet_timeout, add_user, delete_user,
+       set_serial, get_serial, trigger_cec, factory_reset, get_model, get_firmware,
+       set_input_name, get_input_name, set_output_name, get_output_name, set_preset_name, get_preset_name]
+    verification: none
+    notes: >
+      Inputs and outputs 1-4, all HDMI; presets 1-4. EDIDMSet takes
+      default, save1-save4 or int1-int14. Inputs, outputs and presets can
+      be named (InNameSet, OutNameSet, PreNameSet). EDIDOut is not offered,
+      as for the 44M.
   - id: at-ome-ms42
     name: Atlona AT-OME-MS42 (Omega 4x2 matrix switcher with USB)
     supports:
@@ -675,8 +731,8 @@ commands:
       mode: { type: enum, values: ["on", "off", auto], required: true, label: HDCP,
               description: "on reports an HDCP-compliant sink, off a non-compliant one so no HDCP content is sent, auto follows the display (MH21 only)." }
     send:
-      - { models: [at-hdr-h2h-88ma], message: "HDCPSet{input} {mode}" }
-      - { models: [at-ome-mh21], message: "HDCPSet {input} {mode}" }
+      - { models: [at-hdr-h2h-88ma, at-hdr-h2h-44ma], message: "HDCPSet{input} {mode}" }
+      - { models: [at-ome-mh21, at-hdr-h2h-44m], message: "HDCPSet {input} {mode}" }
     expect: { reply_contains: "HDCPSet", not_contains: "Command FAILED" }
     returns: ack
 
@@ -685,9 +741,55 @@ commands:
     params:
       input: { type: int, min: 1, max: 8, required: true, label: Input, description: "The input from 1." }
     send:
-      - { models: [at-hdr-h2h-88ma], message: "HDCPSet{input} sta" }
-      - { models: [at-ome-mh21], message: "HDCPSet {input} sta" }
+      - { models: [at-hdr-h2h-88ma, at-hdr-h2h-44ma], message: "HDCPSet{input} sta" }
+      - { models: [at-ome-mh21, at-hdr-h2h-44m], message: "HDCPSet {input} sta" }
     expect: { reply_contains: "HDCPSet", matches: ' (on|off|auto)$' }
+    returns: value
+
+  # ── Names (AT-HDR-H2H-44MA) ────────────────────────────────────────────
+  set_input_name:
+    summary: Name an input (InNameSetN name)
+    params:
+      input: &name_port { type: int, min: 1, max: 4, required: true, label: Input, description: "The input from 1." }
+      name: &port_name { type: string, max_length: 32, pattern: '^\S+$', required: true, label: Name, description: "The name, without spaces (the document's examples use underscores)." }
+    send: "InNameSet{input} {name}"
+    expect: { reply_contains: "InNameSet{input}", not_contains: "Command FAILED" }
+    returns: ack
+  get_input_name:
+    summary: Read an input's name (InNameGetN)
+    params: { input: *name_port }
+    send: "InNameGet{input}"
+    expect: { reply_contains: "InNameGet", matches: '^InNameGet ?\d+ (.*)$' }
+    returns: value
+  set_output_name:
+    summary: Name an output (OutNameSetN name)
+    params:
+      output: { type: int, min: 1, max: 4, required: true, label: Output, description: "The output from 1." }
+      name: *port_name
+    send: "OutNameSet{output} {name}"
+    expect: { reply_contains: "OutNameSet{output}", not_contains: "Command FAILED" }
+    returns: ack
+  get_output_name:
+    summary: Read an output's name (OutNameGetN)
+    params:
+      output: { type: int, min: 1, max: 4, required: true, label: Output, description: "The output from 1." }
+    send: "OutNameGet{output}"
+    expect: { reply_contains: "OutNameGet", matches: '^OutNameGet ?\d+ (.*)$' }
+    returns: value
+  set_preset_name:
+    summary: Name a routing preset (PreNameSetN name)
+    params:
+      preset: { type: int, min: 1, max: 4, required: true, label: Preset, description: "The preset from 1." }
+      name: *port_name
+    send: "PreNameSet{preset} {name}"
+    expect: { reply_contains: "PreNameSet{preset}", not_contains: "Command FAILED" }
+    returns: ack
+  get_preset_name:
+    summary: Read a routing preset's name (PreNameGetN)
+    params:
+      preset: { type: int, min: 1, max: 4, required: true, label: Preset, description: "The preset from 1." }
+    send: "PreNameGet{preset}"
+    expect: { reply_contains: "PreNameGet", matches: '^PreNameGet ?\d+ (.*)$' }
     returns: value
 
   # ── Power and front panel ────────────────────────────────────────────────
@@ -1268,7 +1370,7 @@ commands:
     summary: Read the firmware version (Version; VersionMCU on the H2H)
     send:
       - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "Version" }
-      - { models: [at-hdr-h2h-88ma], message: "VersionMCU" }
+      - { models: [at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma], message: "VersionMCU" }
     expect: { matches: '^(?:Firmware )?(\d[\w.]*)$' }
     returns: value
 
@@ -1444,6 +1546,9 @@ state:
   outputs.*.mirror_of:       { type: int, description: "HDBaseT output an HDMI output mirrors, or 0 when not mirroring (MirrorHdmi, UnMirror); keyed by HDMI output" }
   analog_outputs.*.source:   { type: string, description: "Audio an analog output carries: HDBaseT, HDMI, AUX1-3 (AUD)" }
   analog_outputs.*.mono:     { type: bool, description: "Whether the analog output is mono (SetMono)" }
+  inputs.*.name:             { type: string, description: "The input's name (InNameGet, InNameSet; AT-HDR-H2H-44MA)" }
+  outputs.*.name:            { type: string, description: "The output's name (OutNameGet, OutNameSet; AT-HDR-H2H-44MA)" }
+  presets.*.name:            { type: string, description: "A routing preset's name, keyed by preset (PreNameGet, PreNameSet; AT-HDR-H2H-44MA)" }
   inputs.*.signal:           { type: bool, description: "Whether a source is detected on the input (InputStatus)" }
   inputs.*.edid:             { type: string, description: "EDID assigned to the input: default, saveN or intN (EDIDMSet)" }
   inputs.*.hdcp:             { type: string, description: "HDCP the input reports: on, off or auto (HDCPSet)" }
@@ -1503,40 +1608,52 @@ telemetry:
     # What changes in use: routing, power, signal presence.
     - every_ms: 5000
       send:
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "Status" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "Status" }
         - { models: [at-ome-mh21], message: "Statusx1" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-ome-ms42, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "PWSTA" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "PWSTA" }
         - { models: [at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "InputStatus" }
         - { models: [at-ome-mh21], message: "InputStatus1" }
         - { models: [at-ome-mh21], message: "InputStatus2" }
     # What an operator configures: read on connecting and every minute.
     - every_ms: 60000
       send:
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "Type" }
+        - { models: [at-hdr-h2h-44ma], message: "InNameGet1" }
+        - { models: [at-hdr-h2h-44ma], message: "InNameGet2" }
+        - { models: [at-hdr-h2h-44ma], message: "InNameGet3" }
+        - { models: [at-hdr-h2h-44ma], message: "InNameGet4" }
+        - { models: [at-hdr-h2h-44ma], message: "OutNameGet1" }
+        - { models: [at-hdr-h2h-44ma], message: "OutNameGet2" }
+        - { models: [at-hdr-h2h-44ma], message: "OutNameGet3" }
+        - { models: [at-hdr-h2h-44ma], message: "OutNameGet4" }
+        - { models: [at-hdr-h2h-44ma], message: "PreNameGet1" }
+        - { models: [at-hdr-h2h-44ma], message: "PreNameGet2" }
+        - { models: [at-hdr-h2h-44ma], message: "PreNameGet3" }
+        - { models: [at-hdr-h2h-44ma], message: "PreNameGet4" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "Type" }
         - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "Version" }
-        - { models: [at-hdr-h2h-88ma], message: "VersionMCU" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "IPCFG" }
-        - { models: [at-hdr-h2h-88ma, at-ome-mh21], message: "System sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "Blink sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma], message: "Broadcast sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "IPDHCP sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-ome-mh21], message: "IPLogin sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-ome-mh21], message: "IPPort sta" }
+        - { models: [at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma], message: "VersionMCU" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "IPCFG" }
+        - { models: [at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-mh21], message: "System sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "Blink sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma], message: "Broadcast sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "IPDHCP sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-mh21], message: "IPLogin sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-mh21], message: "IPPort sta" }
         - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m], message: "syslock sta" }
         - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m], message: "show_host_name" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-hdr-h2h-88ma, at-ome-mh21], message: "CSpara[sta]" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-mh21], message: "CSpara[sta]" }
         - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-ome-ps62], message: "RS232para sta" }
-        - { models: [at-hdr-h2h-88ma], message: "IRSTA" }
-        - { models: [at-hdr-h2h-88ma], message: "Telnet sta" }
+        - { models: [at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma], message: "IRSTA" }
+        - { models: [at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma], message: "Telnet sta" }
         # Per output and input: the PRO3 44M's numbering, then the others'.
         - { models: [at-uhd-pro3-44m], message: "x1$ sta" }
         - { models: [at-uhd-pro3-44m], message: "x2$ sta" }
         - { models: [at-uhd-pro3-44m], message: "x3$ sta" }
         - { models: [at-uhd-pro3-44m], message: "x4$ sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-ome-ms42, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "x1$ sta" }
-        - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-ome-ms42, at-ome-sw32, at-ome-st31a], message: "x2$ sta" }
-        - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma], message: "x3$ sta" }
-        - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma], message: "x4$ sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "x1$ sta" }
+        - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-sw32, at-ome-st31a], message: "x2$ sta" }
+        - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma], message: "x3$ sta" }
+        - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma], message: "x4$ sta" }
         - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma], message: "x5$ sta" }
         - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma], message: "x6$ sta" }
         - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma], message: "x7$ sta" }
@@ -1553,10 +1670,10 @@ telemetry:
         - { models: [at-uhd-pro3-1616m], message: "x18$ sta" }
         - { models: [at-uhd-pro3-1616m], message: "x19$ sta" }
         - { models: [at-uhd-pro3-1616m], message: "x20$ sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "VOUTMute1 sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "VOUTMute2 sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-ome-ps62], message: "VOUTMute3 sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-ome-ps62], message: "VOUTMute4 sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "VOUTMute1 sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "VOUTMute2 sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ps62], message: "VOUTMute3 sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ps62], message: "VOUTMute4 sta" }
         - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma], message: "VOUTMute5 sta" }
         - { models: [at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma], message: "VOUTMute6 sta" }
         - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma], message: "VOUTMute7 sta" }
@@ -1576,10 +1693,10 @@ telemetry:
         - { models: [at-ome-ps62], message: "VOUT4 sta" }
         - { models: [at-ome-ps62], message: "SetMono1 sta" }
         - { models: [at-ome-ps62], message: "SetMono2 sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-ome-mh21], message: "EDIDMSet1 sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-ome-mh21], message: "EDIDMSet2 sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma], message: "EDIDMSet3 sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma], message: "EDIDMSet4 sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-mh21], message: "EDIDMSet1 sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-mh21], message: "EDIDMSet2 sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma], message: "EDIDMSet3 sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma], message: "EDIDMSet4 sta" }
         - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma], message: "EDIDMSet5 sta" }
         - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma], message: "EDIDMSet6 sta" }
         - { models: [at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma], message: "EDIDMSet7 sta" }
@@ -1592,10 +1709,14 @@ telemetry:
         - { models: [at-uhd-pro3-1616m], message: "EDIDMSet14 sta" }
         - { models: [at-uhd-pro3-1616m], message: "EDIDMSet15 sta" }
         - { models: [at-uhd-pro3-1616m], message: "EDIDMSet16 sta" }
-        - { models: [at-hdr-h2h-88ma], message: "HDCPSet1 sta" }
-        - { models: [at-hdr-h2h-88ma], message: "HDCPSet2 sta" }
-        - { models: [at-hdr-h2h-88ma], message: "HDCPSet3 sta" }
-        - { models: [at-hdr-h2h-88ma], message: "HDCPSet4 sta" }
+        - { models: [at-hdr-h2h-88ma, at-hdr-h2h-44ma], message: "HDCPSet1 sta" }
+        - { models: [at-hdr-h2h-44m], message: "HDCPSet 1 sta" }
+        - { models: [at-hdr-h2h-88ma, at-hdr-h2h-44ma], message: "HDCPSet2 sta" }
+        - { models: [at-hdr-h2h-44m], message: "HDCPSet 2 sta" }
+        - { models: [at-hdr-h2h-88ma, at-hdr-h2h-44ma], message: "HDCPSet3 sta" }
+        - { models: [at-hdr-h2h-44m], message: "HDCPSet 3 sta" }
+        - { models: [at-hdr-h2h-88ma, at-hdr-h2h-44ma], message: "HDCPSet4 sta" }
+        - { models: [at-hdr-h2h-44m], message: "HDCPSet 4 sta" }
         - { models: [at-hdr-h2h-88ma], message: "HDCPSet5 sta" }
         - { models: [at-hdr-h2h-88ma], message: "HDCPSet6 sta" }
         - { models: [at-hdr-h2h-88ma], message: "HDCPSet7 sta" }
@@ -1640,10 +1761,17 @@ telemetry:
       match_each: 'x(\d+)A?Vx(\d+)'
       match_each_in: 1
       state: { "outputs.{3}.input": "{2}" }
+    # Names (AT-HDR-H2H-44MA): get and set answers alike.
+    - match: '^InName(?:Get|Set) ?(\d+) (.+)$'
+      state: { "inputs.{1}.name": "{2}" }
+    - match: '^OutName(?:Get|Set) ?(\d+) (.+)$'
+      state: { "outputs.{1}.name": "{2}" }
+    - match: '^PreName(?:Get|Set) ?(\d+) (.+)$'
+      state: { "presets.{1}.name": "{2}" }
     # Answers that change routing without naming it: read it again.
     - match: '^(?:x\d+All|All#|Recall\d+)$'
       then_send:
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-ome-ps62], message: "Status" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ps62], message: "Status" }
         - { models: [at-ome-mh21], message: "Statusx1" }
     - match: '^PWO(N|FF)$'
       state: { power: { value: "{1}", map: { "N": true, "FF": false } } }
@@ -1802,7 +1930,7 @@ quirks:
       at once, on air, and cannot be undone from here; factory_reset (Mreset)
       erases the unit's settings, its network settings included, and may
       leave it unreachable at its old address.
-  - models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-ome-mh21]
+  - models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-mh21]
     severity: warning
     text: >
       Telnet asks for a user name and password while IPLogin is on, as it is
