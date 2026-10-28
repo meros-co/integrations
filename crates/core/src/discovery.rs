@@ -41,6 +41,7 @@ pub const PROTOCOLS: &[(&str, &[&str])] = &[
             "meros-camera",
             "midi-show-control",
             "nmos-node",
+            "nmos-registry",
         ],
     ),
 ];
@@ -107,7 +108,8 @@ pub(crate) struct Discovery {
         feature = "generic-midi",
         feature = "meros-camera",
         feature = "midi-show-control",
-        feature = "nmos-node"
+        feature = "nmos-node",
+        feature = "nmos-registry"
     ))]
     mdns: crate::mdns::Mdns,
     /// The protocols that find a device in the core's catalogue.
@@ -141,7 +143,8 @@ impl Discovery {
                 feature = "generic-midi",
                 feature = "meros-camera",
                 feature = "midi-show-control",
-                feature = "nmos-node"
+                feature = "nmos-node",
+                feature = "nmos-registry"
             ))]
             mdns: crate::mdns::Mdns::new(catalog),
             available: protocols_for(catalog),
@@ -209,7 +212,8 @@ impl Discovery {
                     feature = "generic-midi",
                     feature = "meros-camera",
                     feature = "midi-show-control",
-                    feature = "nmos-node"
+                    feature = "nmos-node",
+                    feature = "nmos-registry"
                 ))]
                 if mdns {
                     self.mdns.stop();
@@ -238,7 +242,8 @@ impl Discovery {
                     feature = "generic-midi",
                     feature = "meros-camera",
                     feature = "midi-show-control",
-                    feature = "nmos-node"
+                    feature = "nmos-node",
+                    feature = "nmos-registry"
                 ))]
                 if mdns {
                     self.mdns.listen(services)?;
@@ -270,7 +275,8 @@ impl Discovery {
                     feature = "generic-midi",
                     feature = "meros-camera",
                     feature = "midi-show-control",
-                    feature = "nmos-node"
+                    feature = "nmos-node",
+                    feature = "nmos-registry"
                 ))]
                 if mdns {
                     self.mdns.listen(services)?;

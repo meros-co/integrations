@@ -59,7 +59,8 @@ mod mcp_discovery;
     feature = "generic-midi",
     feature = "meros-camera",
     feature = "midi-show-control",
-    feature = "nmos-node"
+    feature = "nmos-node",
+    feature = "nmos-registry"
 ))]
 mod mdns;
 #[cfg(any(feature = "generic-midi", feature = "midi-show-control"))]

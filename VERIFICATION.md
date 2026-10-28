@@ -2909,6 +2909,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that GET /map/activations/ (with the trailing slash) answers the scheduled activations on IS-08 Nodes. ([specs/nmos-node.yaml:1058](specs/nmos-node.yaml#L1058))
 - [ ] Check that reading IS-07 event states every 2 seconds is fast enough for tally, and what a Node without IS-07 answers at /x-nmos/events. ([specs/nmos-node.yaml:684](specs/nmos-node.yaml#L684))
 
+## nmos-registry — AMWA NMOS registry (IS-04 Query API)
+
+- [ ] Check against a registry (nmos-cpp's and a vendor's) that GET /x-nmos/query answers as the liveness probe. ([specs/nmos-registry.yaml:35](specs/nmos-registry.yaml#L35))
+- [ ] Check that a registry answers the subscription POST with a ws_href the core can reach (a registry behind NAT or naming a host name), and that the first grain on each websocket is the whole list. ([specs/nmos-registry.yaml:39](specs/nmos-registry.yaml#L39))
+- [ ] Check that a registry accepts max_update_rate_ms 0 and 100, and how it batches changes at 100. ([specs/nmos-registry.yaml:60](specs/nmos-registry.yaml#L60))
+- [ ] Record a registry's default page size for the get_ commands, and check query_resources with basic queries and paging. ([specs/nmos-registry.yaml:201](specs/nmos-registry.yaml#L201))
+- [ ] Check that a registry answers create_subscription with 200 for an existing identical subscription and 201 for a new one. ([specs/nmos-registry.yaml:230](specs/nmos-registry.yaml#L230))
+- [ ] Check that a grain deleting a resource carries its id in path (and pre), as the module reads it. ([specs/nmos-registry.yaml:364](specs/nmos-registry.yaml#L364))
+- [ ] Check what an mDNS browse of _nmos-query._tcp finds on a network with several registries (TXT pri), and whether registries advertise only by unicast DNS-SD there. ([crates/core/src/mdns.rs:258](crates/core/src/mdns.rs#L258))
+
 ## novastar-central-control — NovaStar COEX central control protocol
 
 - [ ] Record a refused request's answer (a non-zero ACK byte is assumed) and whether its checksum covers the aa 55 header as the documented answer's does. ([specs/novastar-central-control.yaml:153](specs/novastar-central-control.yaml#L153))

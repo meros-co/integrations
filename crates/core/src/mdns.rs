@@ -31,7 +31,10 @@
 //! AMWA documents NMOS's advertisements (IS-04, Discovery - Peer to Peer
 //! Operation): a Node API as `_nmos-node._tcp`, its port in SRV, with TXT
 //! `api_proto` (`http` or `https`) and `api_ver` (the versions it serves). A
-//! Node is reported at its SRV port, once per address and port.
+//! Node is reported at its SRV port, once per address and port. A registry's
+//! Query API is advertised as `_nmos-query._tcp` (Discovery - Registered
+//! Operation), with TXT `pri` (0 to 99 live, 100 and above for development)
+//! and `api_auth` as well, and is reported the same way.
 //!
 //! Apple documents RTP-MIDI's advertisement (MIDI Network Driver Protocol):
 //! each session's control port is advertised as `_apple-midi._udp`, its data
@@ -129,6 +132,7 @@ pub(crate) const SPECS: &[&str] = &[
     "meros-camera",
     "midi-show-control",
     "nmos-node",
+    "nmos-registry",
 ];
 
 /// One way to recognise a device: instances of `service` (whose TXT `class`
@@ -246,6 +250,15 @@ const RULES: &[Rule] = &[
         class: None,
         spec: "nmos-node",
         source: "AMWA IS-04 v1.3, Discovery - Peer to Peer Operation: a Node API advertised as _nmos-node._tcp, its port in SRV, TXT api_proto (http or https) and api_ver",
+        key_txt: None,
+        srv_port: true,
+        name_txt: None,
+    },
+    Rule {
+        service: "_nmos-query._tcp.local",
+        class: None,
+        spec: "nmos-registry",
+        source: "AMWA IS-04 v1.3, Discovery - Registered Operation: a Query API advertised as _nmos-query._tcp, its port in SRV, TXT api_proto, api_ver, api_auth and pri",
         key_txt: None,
         srv_port: true,
         name_txt: None,
@@ -1687,6 +1700,7 @@ mod tests {
                 "_smartview._tcp.local",
                 APPLE_MIDI,
                 "_nmos-node._tcp.local",
+                "_nmos-query._tcp.local",
                 MEROS_CAMERA
             ]
         );

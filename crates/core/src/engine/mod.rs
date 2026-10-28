@@ -3805,7 +3805,7 @@ impl SpecEngine {
 
     /// Offer a message to the telemetry rules: as JSON where it parses (a
     /// websocket message, a line or block of a JSON protocol), and as text.
-    fn apply_message(&mut self, cx: &mut Cx, text: &str) {
+    pub(crate) fn apply_message(&mut self, cx: &mut Cx, text: &str) {
         if let Ok(doc) = serde_json::from_str::<Value>(text) {
             self.offer(cx, &telemetry::Inbound::Json(&doc));
         }
