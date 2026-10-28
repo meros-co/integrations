@@ -414,7 +414,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | Panasonic AV-HS410, AV-UHS500, AV-HLC100, AV-HSW10, AV-HS6000 | Panasonic switcher TCP protocol | On request |
 | OSEE GoStream Deck / Duet | TCP / UDP protocol | On request |
 | Livestream Studio | TCP 9923 text API | Community (Livestream publishes no document; the Companion module's commands were found by its users) |
-| Telestream Wirecast | Local scripting (AppleScript / COM) | Community |
+| Telestream Wirecast | No network control API (local AppleScript / COM only) | Closed |
 | Ecamm Live | Local HTTP API | Community |
 | Meld Studio | WebSocket JSON | Public |
 | Grass Valley K-Frame / Kayenne / Korona | Proprietary | Closed |
@@ -519,7 +519,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 |---|---|---|
 | ProPresenter 6 and early 7 (legacy remote) | WebSocket JSON | Community |
 | Microsoft PowerPoint without the OSCPoint add-in (`oscpoint`) | Local automation through a helper | Closed |
-| Apple Keynote | AppleScript through a helper on the Mac (the core has no local-automation transport yet) | Public |
+| Apple Keynote | No network control API (local AppleScript only) | Closed |
 | MediaShout | TCP / HTTP | Unknown |
 
 ### Media servers
