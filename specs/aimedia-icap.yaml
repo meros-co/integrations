@@ -1,0 +1,393 @@
+spec: 1
+id: aimedia-icap
+name: AI-Media / EEG iCap (REST API)
+vendor: AI-Media (EEG)
+category: other
+
+# iCap is AI-Media's cloud captioning network between caption encoders and
+# captioners. Its REST API at https://icap.eegapis.com/api/1.0/<company>/...
+# manages a company's accounts: users (encoders, captioners), access codes,
+# encoder sharing, CaptionCast events and e-mail notices, and reads the live
+# encoders and captioners, logs, sessions and uptime. Requests carry the
+# company's administrator account as HTTP Basic credentials. The device is
+# opened at the host icap.eegapis.com, port 443.
+
+source:
+  - title: EEG / Ai-Media iCap REST API Documentation v1.0
+    author: AI-Media and EEG Enterprises
+    url: https://www.eegicap.com/api/docs/
+    note: >
+      Manufacturer document (copyright 2013-2022), read 2026-10-27. Entry
+      point https://icap.eegapis.com/api/; HTTP Basic with an administrator
+      account; JSON POST bodies. Every resource used here: users (list with
+      limit, offset, sort online|username|usertype|email, sortdir, filter;
+      get; create with username, password, usertype
+      admin|captioner|encoder|relay|monitor; delete with cascade), access
+      codes (list with sort online|primaryencoder|username|service; get;
+      create with accesscode, broadcaster, primaryencoder, service 1 to 6,
+      sharedwith, secondaryencoder [{broadcaster, encoder}], answered 201;
+      PUT with every field to change one; delete), encoder permissions
+      (list, get, POST encoder and agencies, DELETE encoder/agency), encoder
+      activity, shared encoders, CaptionCast (billable; 401 without a paid
+      account), logs (eventlog|captionlog, username|accesscode, value,
+      timeframe in seconds up to a year, limit, offset, captioningonly),
+      active encoders and captioners, sessions and uptime between epoch
+      seconds (uptime needs Broadcast Plus), providers, relay names, e-mail
+      notice subscriptions (DailyCaptionLog, AllUsers, AllEncoders,
+      UserAccount), session login and logout, system health overview
+      (providers, relay names and health need no credentials).
+
+transport:
+  type: http
+  port: 443
+  scheme: https
+  auth: basic
+  timeout_ms: 10000
+  probe: { method: GET, path: /api/1.0/health/overview }
+
+settings:
+  company: { type: string, required: true, max_length: 128, pattern: '^[^/?#]+$', label: Company,
+             description: "Your iCap company name, as in the account's namespace." }
+  username: { type: string, required: true, max_length: 128, label: Administrator,
+              description: "User name of an iCap administrator account of the company." }
+  password: { type: string, secret: true, required: true, max_length: 256, label: Password,
+              description: "Password of the administrator account." }
+
+ports:
+  - { port: 443, protocol: https, role: control, note: "icap.eegapis.com, AI-Media's cloud" }
+
+models:
+  - id: icap
+    name: iCap cloud account (company namespace)
+    supports: [list_users, list_users_page, get_user, create_user, delete_user, list_access_codes,
+               list_access_codes_page, get_access_code, create_access_code, update_access_code, delete_access_code,
+               list_encoder_permissions, get_encoder_permissions, share_encoder, unshare_encoder,
+               get_encoder_activity, list_shared_encoders, list_captioncasts, get_captioncast,
+               create_captioncast, delete_captioncast, get_logs, get_logs_page, list_active_encoders,
+               list_active_captioners, get_sessions, get_uptime, list_providers, list_relay_servers,
+               get_health, list_email_subscriptions, list_email_subscriptions_for, subscribe_email,
+               subscribe_email_user, unsubscribe_email, unsubscribe_email_user]
+    verification: none
+
+commands:
+  # ── Users ───────────────────────────────────────────────────────────────
+  list_users:
+    summary: List the company's users, most active first (GET users)
+    send: { method: GET, path: "/api/1.0/{settings.company}/users" }
+    expect: &value { status: 200, json_path: "$" }
+    returns: value
+  list_users_page:
+    summary: List a page of the company's users, sorted and filtered (GET users?limit&offset&sort&sortdir&filter)
+    params:
+      limit: &limit { type: int, min: 1, max: 100000, required: true, label: Limit, description: "Records per page." }
+      offset: &offset { type: int, min: 0, default: 0, label: Offset, description: "Records skipped." }
+      sort: { type: enum, values: [online, username, usertype, email], default: online, label: Sort, description: "Field sorted by; online puts active users first." }
+      direction: &sortdir { type: enum, values: [asc, desc], default: asc, label: Direction, description: "Sort order." }
+      filter: &filter { type: string, max_length: 128, default: "", label: Filter, description: "Partial, case-insensitive match on the name; empty for all." }
+    send: { method: GET, path: "/api/1.0/{settings.company}/users",
+            query: { limit: "{limit}", offset: "{offset}", sort: "{sort}", sortdir: "{direction}", filter: "{filter}" } }
+    expect: *value
+    returns: value
+  get_user:
+    summary: Read a user account (GET users/<username>)
+    params:
+      user: &user { type: string, max_length: 128, required: true, label: User, description: "User name in the company." }
+    send: { method: GET, path: "/api/1.0/{settings.company}/users/{user}" }
+    expect: *value
+    returns: value
+  create_user:
+    summary: Create a user account (POST users)
+    params:
+      user: *user
+      password: { type: string, secret: true, max_length: 256, required: true, label: Password, description: "The new account's password." }
+      type: { type: enum, values: [admin, captioner, encoder, relay, monitor], required: true, label: User type, description: "Kind of account." }
+    send: { method: POST, path: "/api/1.0/{settings.company}/users", content_type: application/json,
+            body: '{"username":{user:json},"password":{password:json},"usertype":"{type}"}' }
+    expect: &created { status: [200, 201] }
+    returns: ack
+  delete_user:
+    summary: Delete a user account; with cascade, also from the access codes it encodes for (DELETE users/<username>)
+    params:
+      user: *user
+      cascade: { type: bool, default: false, label: Cascade,
+                 description: "Remove the user from the access codes naming it as an encoder; without it the delete fails then." }
+    send: { method: DELETE, path: "/api/1.0/{settings.company}/users/{user}", query: { cascade: "{cascade}" } }
+    expect: &ok { status: [200, 204] }
+    returns: ack
+
+  # ── Access codes ────────────────────────────────────────────────────────
+  list_access_codes:
+    summary: List the company's access codes, active first (GET accesscodes)
+    send: { method: GET, path: "/api/1.0/{settings.company}/accesscodes" }
+    expect: *value
+    returns: value
+  list_access_codes_page:
+    summary: List a page of the access codes, sorted and filtered (GET accesscodes?limit&offset&sort&sortdir&filter)
+    params:
+      limit: *limit
+      offset: *offset
+      sort: { type: enum, values: [online, primaryencoder, username, service], default: online, label: Sort, description: "Field sorted by." }
+      direction: *sortdir
+      filter: *filter
+    send: { method: GET, path: "/api/1.0/{settings.company}/accesscodes",
+            query: { limit: "{limit}", offset: "{offset}", sort: "{sort}", sortdir: "{direction}", filter: "{filter}" } }
+    expect: *value
+    returns: value
+  get_access_code:
+    summary: Read an access code (GET accesscodes/<code>)
+    params:
+      code: &code { type: string, max_length: 128, required: true, label: Access code, description: "The access code." }
+    send: { method: GET, path: "/api/1.0/{settings.company}/accesscodes/{code}" }
+    expect: *value
+    returns: value
+  create_access_code:
+    summary: Create an access code for an encoder (POST accesscodes; 201)
+    params: &acparams
+      code: *code
+      broadcaster: { type: string, max_length: 128, required: true, label: Broadcaster, description: "Company owning the primary encoder." }
+      encoder: { type: string, max_length: 128, required: true, label: Primary encoder, description: "Encoder that uses the access code." }
+      service: { type: int, min: 1, max: 6, required: true, label: Service, description: "Caption service, 1 to 6." }
+      shared_with: { type: json, required: true, label: Shared with, description: "JSON array of company names the code is shared with, [] for none." }
+      secondary: { type: json, required: true, label: Secondary encoders,
+                   description: "JSON array of {\"broadcaster\", \"encoder\"} for further encoders, [] for none." }
+    send: { method: POST, path: "/api/1.0/{settings.company}/accesscodes", content_type: application/json,
+            body: '{"accesscode":{code:json},"broadcaster":{broadcaster:json},"primaryencoder":{encoder:json},"service":{service},"sharedwith":{shared_with},"secondaryencoder":{secondary}}' }
+    expect: *created
+    returns: ack
+  update_access_code:
+    summary: Replace an access code's settings, every field given (PUT accesscodes)
+    params: *acparams
+    send: { method: PUT, path: "/api/1.0/{settings.company}/accesscodes", content_type: application/json,
+            body: '{"accesscode":{code:json},"broadcaster":{broadcaster:json},"primaryencoder":{encoder:json},"service":{service},"sharedwith":{shared_with},"secondaryencoder":{secondary}}' }
+    expect: *ok
+    returns: ack
+  delete_access_code:
+    summary: Delete an access code (DELETE accesscodes/<code>)
+    params:
+      code: *code
+    send: { method: DELETE, path: "/api/1.0/{settings.company}/accesscodes/{code}" }
+    expect: *ok
+    returns: ack
+
+  # ── Encoders ────────────────────────────────────────────────────────────
+  list_encoder_permissions:
+    summary: List the company's encoders shared with other companies (GET encoderpermissions)
+    send: { method: GET, path: "/api/1.0/{settings.company}/encoderpermissions" }
+    expect: *value
+    returns: value
+  get_encoder_permissions:
+    summary: Read whom an encoder is shared with (GET encoderpermissions/<encoder>)
+    params:
+      encoder: &encoder { type: string, max_length: 128, required: true, label: Encoder, description: "Encoder user name in the company." }
+    send: { method: GET, path: "/api/1.0/{settings.company}/encoderpermissions/{encoder}" }
+    expect: *value
+    returns: value
+  share_encoder:
+    summary: Share an encoder with other companies (POST encoderpermissions)
+    params:
+      encoder: *encoder
+      agencies: { type: json, required: true, label: Agencies, description: "JSON array of company names to share the encoder with." }
+    send: { method: POST, path: "/api/1.0/{settings.company}/encoderpermissions", content_type: application/json,
+            body: '{"encoder":{encoder:json},"agencies":{agencies}}' }
+    expect: *created
+    returns: ack
+  unshare_encoder:
+    summary: Stop sharing an encoder with a company (DELETE encoderpermissions/<encoder>/<agency>)
+    params:
+      encoder: *encoder
+      agency: { type: string, max_length: 128, required: true, label: Agency, description: "Company the encoder is no longer shared with." }
+    send: { method: DELETE, path: "/api/1.0/{settings.company}/encoderpermissions/{encoder}/{agency}" }
+    expect: *ok
+    returns: ack
+  get_encoder_activity:
+    summary: List the caption agencies serving an encoder now, with access code and service (GET encoderactivity/<encoder>)
+    params:
+      encoder: *encoder
+    send: { method: GET, path: "/api/1.0/{settings.company}/encoderactivity/{encoder}" }
+    expect: *value
+    returns: value
+  list_shared_encoders:
+    summary: List the encoders other companies share with this one (GET sharedencoders)
+    send: { method: GET, path: "/api/1.0/{settings.company}/sharedencoders" }
+    expect: *value
+    returns: value
+
+  # ── CaptionCast ─────────────────────────────────────────────────────────
+  list_captioncasts:
+    summary: List the CaptionCast definitions (GET captioncasts)
+    send: { method: GET, path: "/api/1.0/{settings.company}/captioncasts" }
+    expect: *value
+    returns: value
+  get_captioncast:
+    summary: Read a CaptionCast definition (GET captioncasts/<eventcode>)
+    params:
+      event: &event { type: string, max_length: 128, required: true, label: Event code, description: "CaptionCast event code." }
+    send: { method: GET, path: "/api/1.0/{settings.company}/captioncasts/{event}" }
+    expect: *value
+    returns: value
+  create_captioncast:
+    summary: Create a CaptionCast event fed by an access code; billable (POST captioncasts; 201)
+    params:
+      event: *event
+      code: *code
+      banner: { type: string, max_length: 1024, default: "", label: Banner, description: "Banner text shown to CaptionCast viewers." }
+    send: { method: POST, path: "/api/1.0/{settings.company}/captioncasts", content_type: application/json,
+            body: '{"eventcode":{event:json},"accesscode":{code:json},"banner":{banner:json}}' }
+    expect: *created
+    returns: ack
+  delete_captioncast:
+    summary: Delete a CaptionCast definition (DELETE captioncasts/<eventcode>)
+    params:
+      event: *event
+    send: { method: DELETE, path: "/api/1.0/{settings.company}/captioncasts/{event}" }
+    expect: *ok
+    returns: ack
+
+  # ── Logs, activity, sessions, uptime ────────────────────────────────────
+  get_logs:
+    summary: Read the event or caption log for a user or access code over a time back (GET logs/<type>/<by>/<value>/<seconds>)
+    params: &logparams
+      log: { type: enum, values: [eventlog, captionlog], required: true, label: Log,
+             description: "eventlog: user activity; captionlog: encoder/captioner sessions with start and end times." }
+      by: { type: enum, values: [username, accesscode], required: true, label: Filter by,
+            description: "Filter by user name or access code (access code is not valid for captionlog)." }
+      value: { type: string, max_length: 128, required: true, label: Value, description: "The user name or access code." }
+      seconds: { type: int, min: 1, max: 31622400, required: true, label: Time back, description: "How far back, in seconds (86400 a day), at most a year." }
+      captioning_only: { type: bool, default: false, label: Captioning only, description: "Only Start Captioning and End Captioning events (eventlog)." }
+    send: { method: GET, path: "/api/1.0/{settings.company}/logs/{log}/{by}/{value}/{seconds}",
+            query: { captioningonly: "{captioning_only:bool01}" } }
+    expect: *value
+    returns: value
+  get_logs_page:
+    summary: Read a page of a log (GET logs/... with limit and offset; 100,000 records by default)
+    params:
+      log: { type: enum, values: [eventlog, captionlog], required: true, label: Log, description: "eventlog or captionlog." }
+      by: { type: enum, values: [username, accesscode], required: true, label: Filter by, description: "Filter by user name or access code." }
+      value: { type: string, max_length: 128, required: true, label: Value, description: "The user name or access code." }
+      seconds: { type: int, min: 1, max: 31622400, required: true, label: Time back, description: "How far back, in seconds, at most a year." }
+      captioning_only: { type: bool, default: false, label: Captioning only, description: "Only Start Captioning and End Captioning events (eventlog)." }
+      limit: *limit
+      offset: *offset
+    send: { method: GET, path: "/api/1.0/{settings.company}/logs/{log}/{by}/{value}/{seconds}",
+            query: { limit: "{limit}", offset: "{offset}", captioningonly: "{captioning_only:bool01}" } }
+    expect: *value
+    returns: value
+  list_active_encoders:
+    summary: List the company's encoders active now (GET active-encoders)
+    send: { method: GET, path: "/api/1.0/{settings.company}/active-encoders" }
+    expect: *value
+    returns: value
+  list_active_captioners:
+    summary: List the company's captioners active now (GET active-captioners)
+    send: { method: GET, path: "/api/1.0/{settings.company}/active-captioners" }
+    expect: *value
+    returns: value
+  get_sessions:
+    summary: List a user's session ids between two times (GET sessions/<username>/<start>/<end>)
+    params: &period
+      user: *user
+      start: { type: int, min: 0, required: true, label: From, description: "Start, in Unix seconds (UTC)." }
+      end: { type: int, min: 0, required: true, label: To, description: "End, in Unix seconds (UTC)." }
+    send: { method: GET, path: "/api/1.0/{settings.company}/sessions/{user}/{start}/{end}" }
+    expect: *value
+    returns: value
+  get_uptime:
+    summary: Read a user's iCap uptime between two times, with outages and a fraction such as 0.99 (GET uptime/...; Broadcast Plus)
+    params: *period
+    send: { method: GET, path: "/api/1.0/{settings.company}/uptime/{user}/{start}/{end}" }
+    expect: *value
+    returns: value
+
+  # ── Directory and health ────────────────────────────────────────────────
+  list_providers:
+    summary: List the iCap caption agencies with their codes and contacts (GET /api/1.0/providers)
+    send: { method: GET, path: /api/1.0/providers }
+    expect: *value
+    returns: value
+  list_relay_servers:
+    summary: List the iCap relay servers (GET /api/1.0/relaynames)
+    send: { method: GET, path: /api/1.0/relaynames }
+    expect: *value
+    returns: value
+  get_health:
+    summary: Read iCap's system health overview (GET /api/1.0/health/overview)
+    send: { method: GET, path: /api/1.0/health/overview }
+    expect: *value
+    returns: value
+
+  # ── E-mail notices ──────────────────────────────────────────────────────
+  list_email_subscriptions:
+    summary: List every e-mail notice subscription of the company (GET emailnotices/subscriptions)
+    send: { method: GET, path: "/api/1.0/{settings.company}/emailnotices/subscriptions" }
+    expect: *value
+    returns: value
+  list_email_subscriptions_for:
+    summary: List an address's e-mail notice subscriptions (GET emailnotices/subscriptions/<address>)
+    params:
+      email: &email { type: string, max_length: 256, pattern: '^[^@\s]+@[^@\s]+$', required: true, label: E-mail, description: "E-mail address receiving the notices." }
+    send: { method: GET, path: "/api/1.0/{settings.company}/emailnotices/subscriptions/{email}" }
+    expect: *value
+    returns: value
+  subscribe_email:
+    summary: Subscribe an address to a company-wide notice (POST emailnotices/subscriptions)
+    params:
+      email: *email
+      type: &subtype { type: enum, values: [DailyCaptionLog, AllUsers, AllEncoders], required: true, label: Notice,
+                       description: "DailyCaptionLog: a daily log of caption sessions; AllUsers or AllEncoders: connect and disconnect notices." }
+    send: { method: POST, path: "/api/1.0/{settings.company}/emailnotices/subscriptions", content_type: application/json,
+            body: '{"emailaddr":{email:json},"subscriptiontype":"{type}"}' }
+    expect: *created
+    returns: ack
+  subscribe_email_user:
+    summary: Subscribe an address to one user's connect and disconnect notices (POST emailnotices/subscriptions, UserAccount)
+    params:
+      email: *email
+      user: *user
+    send: { method: POST, path: "/api/1.0/{settings.company}/emailnotices/subscriptions", content_type: application/json,
+            body: '{"emailaddr":{email:json},"subscriptiontype":"UserAccount","useraccount":{user:json}}' }
+    expect: *created
+    returns: ack
+  unsubscribe_email:
+    summary: Remove a company-wide notice subscription (DELETE emailnotices/subscriptions)
+    params:
+      email: *email
+      type: *subtype
+    send: { method: DELETE, path: "/api/1.0/{settings.company}/emailnotices/subscriptions", content_type: application/json,
+            body: '{"emailaddr":{email:json},"subscriptiontype":"{type}"}' }
+    expect: *ok
+    returns: ack
+  unsubscribe_email_user:
+    summary: Remove a user's notice subscription (DELETE emailnotices/subscriptions, UserAccount)
+    params:
+      email: *email
+      user: *user
+    send: { method: DELETE, path: "/api/1.0/{settings.company}/emailnotices/subscriptions", content_type: application/json,
+            body: '{"emailaddr":{email:json},"subscriptiontype":"UserAccount","useraccount":{user:json}}' }
+    expect: *ok
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      A production cloud service: every request goes to AI-Media's iCap over
+      the public internet with the company's administrator credentials. The
+      documents do not show the replies' JSON, so reads return the reply as
+      it is and nothing is kept in state; the live encoders and captioners are
+      read with list_active_encoders and list_active_captioners.
+  - models: [all]
+    severity: info
+    text: >
+      The session cookie login is not used: every request carries the Basic
+      credentials, which the API accepts. Changing an access code takes every
+      field (PUT); the documents give the method but not the path, and the
+      spec uses the access code collection's. CaptionCast events are
+      billable, and creating one answers 401 without a paid CaptionCast
+      account, which the core reads as a refused credential. Uptime needs a
+      Broadcast Plus plan.
+  - models: [all]
+    severity: critical
+    text: >
+      delete_user, delete_access_code and update_access_code change which
+      encoders and captioners can reach each other; delete_user with cascade
+      removes the user from every access code.

@@ -19,6 +19,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-7thsense", &["7thsense-delta"]),
     ("vendor-ableton", &["ableton-live"]),
     ("vendor-aes70", &["aes70"]),
+    ("vendor-aimedia", &["aimedia-icap"]),
     (
         "vendor-aja",
         &["aja-bridge-live", "aja-helo", "aja-kipro", "aja-kumo"],
@@ -50,6 +51,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-avstumpfl", &["avstumpfl-pixera"]),
     ("vendor-avolites", &["avolites-titan"]),
     ("vendor-avproedge", &["avproedge-matrix"]),
+    ("vendor-aximmetry", &["aximmetry"]),
     ("vendor-axis", &["axis-ptz"]),
     (
         "vendor-barco",
@@ -93,6 +95,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-castr", &["castr"]),
     ("vendor-bss", &["bss-london"]),
     ("vendor-chamsys", &["chamsys-magicq", "chamsys-magicq-udp"]),
+    ("vendor-characterworks", &["characterworks"]),
     (
         "vendor-christie",
         &[
@@ -103,6 +106,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-churchapps", &["freeshow"]),
+    ("vendor-chyron", &["chyron-prime"]),
     ("vendor-clock8001", &["clock-8001"]),
     ("vendor-cockos", &["cockos-reaper", "cockos-reaper-web"]),
     ("vendor-dahua", &["dahua-ptz"]),
@@ -134,6 +138,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-disguise", &["disguise"]),
     ("vendor-dsan", &["dsan-limitimer", "dsan-perfectcue"]),
     ("vendor-dtvideolabs", &["dtvideolabs-playbackpro-plus"]),
+    ("vendor-eeg", &["eeg-smart-encoder"]),
     ("vendor-epiphan", &["epiphan-pearl"]),
     ("vendor-epson", &["epson-projector"]),
     ("vendor-etc", &["etc-echo", "etc-eos", "etc-paradigm"]),
@@ -171,6 +176,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-greenhippo", &["greenhippo-hippotizer"]),
     ("vendor-h2r", &["h2r-graphics"]),
     ("vendor-highend", &["highend-hog4"]),
+    ("vendor-holographics", &["holographics"]),
     ("vendor-holyrics", &["holyrics"]),
     ("vendor-imagine", &["vdcp"]),
     ("vendor-imimot", &["imimot-mitti"]),
@@ -222,6 +228,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-nec",
         &["nec-display", "nec-projector", "nec-projector-ascii"],
     ),
+    ("vendor-newblue", &["newblue-captivate"]),
     ("vendor-newtek", &["newtek-3play", "newtek-tricaster"]),
     (
         "vendor-novastar",
@@ -245,6 +252,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-philips", &["philips-sicp"]),
+    ("vendor-pixotope", &["pixotope"]),
     ("vendor-pjlink", &["pjlink"]),
     ("vendor-planningcenter", &["planningcenter-services"]),
     ("vendor-pltech", &["kuma-timer"]),
@@ -312,6 +320,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "shure-wireless",
         ],
     ),
+    ("vendor-singular", &["singular-datastream", "singular-live"]),
     ("vendor-sofie", &["sofie-chef"]),
     ("vendor-softouch", &["softouch-easyworship"]),
     (
@@ -334,6 +343,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-sounddevices", &["sounddevices-pixnet"]),
+    ("vendor-spx", &["spx-graphics"]),
     ("vendor-stagetimer", &["stagetimer"]),
     ("vendor-streamlabs", &["streamlabs-desktop"]),
     ("vendor-studiocoast", &["vmix"]),
@@ -372,6 +382,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-videolan", &["videolan-vlc"]),
     ("vendor-vimeo", &["vimeo-live"]),
     ("vendor-vioso", &["vioso-exaplay"]),
+    ("vendor-vizrt", &["vizrt-trio"]),
     ("vendor-wyrestorm", &["wyrestorm-matrix"]),
     (
         "vendor-yamaha",
@@ -386,6 +397,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-zcam", &["zcam"]),
+    ("vendor-zerodensity", &["zerodensity-reality-hub"]),
     ("vendor-zinc", &["oscpoint"]),
 ];
 

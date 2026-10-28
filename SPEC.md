@@ -1326,7 +1326,13 @@ followed by directives after `:`. A name is made of letters, digits, `_` and
 A word in braces that is a protocol's own text, not a placeholder
 (Lightware LW2's `{VC}`), escapes its braces with a backslash: `\{VC}` and
 `\{VC\}` are both sent as `{VC}`. `\{` and `\}` are always a literal
-brace, and a backslash before anything else is itself.
+brace, and a backslash before anything else is itself. A protocol that
+writes a backslash before a value (Chyron's Intelligent Interface,
+`P\LOAD\1\1000\\`) doubles it there: `\\` before a brace is one backslash,
+and the brace keeps its meaning, so `P\LOAD\\{channel}\\{scene}\\` sends
+`P\LOAD\1\1000\\` (the last `\\`, before no brace, is sent as it is).
+Backslashes pair up from the left, so `\\\{` is a pair sent as it is
+followed by a literal brace.
 
 **Every substituted value is always present.** A parameter used in a template
 must be `required` or have a `default`. A protocol clause that exists only when

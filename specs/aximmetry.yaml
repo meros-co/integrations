@@ -1,0 +1,309 @@
+spec: 1
+id: aximmetry
+name: Aximmetry Composer (HTTP control)
+vendor: Aximmetry
+category: other
+
+# Aximmetry Composer, with Edit > Preferences > Enable HTTP Control, takes
+# actions as XML in the body of an HTTP POST to http://<host>:<port> (21463
+# in the documents' example): one <action type="..." .../> per request, or a
+# ComposerGroupAction holding several. Every action answers <response
+# Code="0" Message="OK"/>, a non-zero Code being an error; queries add a
+# <ReturnValue>. Nothing is pushed.
+
+source:
+  - title: Aximmetry Knowledge Base, External Control of Aximmetry via HTTP (Introduction, Action Format Basics, Network Setup and Sending Actions, General Elements of Actions, List of Actions)
+    author: Aximmetry
+    url: https://aximmetry.com/learn/virtual-production-workflow/setting-up-inputs-outputs-for-virtual-production/external-controllers/external-control-of-aximmetry-via-http/list-of-actions/
+    note: >
+      Manufacturer documents, read 2026-10-27 (articles dated 2026-APR-11 to
+      2026-SEP-04). POST to http://ip:Port (example http://127.0.0.1:21463),
+      the action as XML in the body; no OPTIONS handling, so no Content-Type
+      or text/plain; the response element with Code and Message, ReturnValue
+      for queries; the Document selector (empty for the running compound, @
+      for the active one, or an open document's path); module and panel paths
+      (Root\..., relative, . and ..); pin value formats; ComposerGroupAction;
+      every action used here with its parameters and response format
+      (document, module, pin, control board, sequence and system actions).
+
+transport:
+  type: http
+  port: 21463
+  scheme: http
+  auth: none
+  timeout_ms: 8000
+  probe: { method: POST, path: /, body: '<action type="ComposerNopAction" />', content_type: text/plain }
+
+ports:
+  - { port: 21463, protocol: http, role: control, note: "HTTP Control port set in Composer's Preferences; 21463 in the documents' example" }
+
+models:
+  - id: composer
+    name: Aximmetry Composer (Professional and Broadcast editions)
+    supports: [close_all_documents, open_and_run_document, begin_composite, finish_composite,
+               finish_all_composites, find_modules, list_pins, set_pin_value, get_pin_value, get_pin_live_value,
+               list_control_boards, list_panels, press_button, set_button, get_button, list_buttons,
+               list_panel_properties, set_panel_property, get_panel_property, set_sequence_part_property,
+               get_sequence_part_property, group_actions, nop, active_sensing, restart_reopening_document,
+               restart_opening_document]
+    verification: none
+
+commands:
+  # ── Documents ───────────────────────────────────────────────────────────
+  close_all_documents:
+    summary: Close every open document without asking about unsaved changes (ComposerCloseAllDocumentsAction)
+    send: { method: POST, path: /, body: '<action type="ComposerCloseAllDocumentsAction" />', content_type: text/plain }
+    expect: &ok { status: 200, matches: 'Code="0"' }
+    returns: ack
+  open_and_run_document:
+    summary: Open a compound and run it, optionally closing the others first (ComposerOpenAndRunDocumentAction)
+    params:
+      path: &path { type: string, max_length: 1024, required: true, pattern: '^[^"&<>]+$', label: Compound,
+                    description: "Path of the .xcomp compound file on the Aximmetry machine." }
+      close_all: { type: bool, default: false, label: Close others, description: "Close every open document first." }
+    send: { method: POST, path: /, body: '<action type="ComposerOpenAndRunDocumentAction" Path="{path}" CloseAll="{close_all}" />', content_type: text/plain }
+    expect: *ok
+    returns: text
+  begin_composite:
+    summary: Open an undo scope on a document, so the following edits are one Undo History item (ComposerBeginCompositeAction)
+    params:
+      document: &document { type: string, max_length: 1024, default: "", pattern: '^[^"&<>]*$', label: Document,
+                            description: "Empty for the running compound, @ for the document active in Composer, or the path of an open document." }
+      text: { type: string, max_length: 256, required: true, pattern: '^[^"&<>]+$', label: Undo text, description: "Name shown in the Undo History." }
+    send: { method: POST, path: /, body: '<action type="ComposerBeginCompositeAction" Document="{document}" DisplayText="{text}" />', content_type: text/plain }
+    expect: *ok
+    returns: ack
+  finish_composite:
+    summary: Close a document's open undo scope (ComposerFinishCompositeAction)
+    params:
+      document: *document
+    send: { method: POST, path: /, body: '<action type="ComposerFinishCompositeAction" Document="{document}" />', content_type: text/plain }
+    expect: *ok
+    returns: ack
+  finish_all_composites:
+    summary: Close every open undo scope (ComposerFinishAllCompositesAction)
+    send: { method: POST, path: /, body: '<action type="ComposerFinishAllCompositesAction" />', content_type: text/plain }
+    expect: *ok
+    returns: ack
+
+  # ── Modules and pins ────────────────────────────────────────────────────
+  find_modules:
+    summary: Find modules under a compound whose names match a wildcard pattern; the reply lists their paths (ComposerFindModulesAction)
+    params:
+      document: *document
+      module: &module { type: string, max_length: 1024, default: Root, pattern: '^[^"&<>]*$', label: Module,
+                        description: "Module or compound path: Root, Root\\Compound\\Module, a path relative to the compound in focus, or empty for it." }
+      pattern: { type: string, max_length: 256, default: "*", pattern: '^[^"&<>]*$', label: Name pattern, description: "Wildcard pattern for module names." }
+      recursive: &recursive { type: bool, default: true, label: Recursive, description: "Search sub-compounds too." }
+    send: { method: POST, path: /, body: '<action type="ComposerFindModulesAction" Document="{document}" Module="{module}" NamePattern="{pattern}" Recursive="{recursive}" />', content_type: text/plain }
+    expect: *ok
+    returns: text
+  list_pins:
+    summary: List a module's externally controllable input pins with their types (ComposerEnumPinsAction)
+    params:
+      document: *document
+      module: *module
+    send: { method: POST, path: /, body: '<action type="ComposerEnumPinsAction" Document="{document}" Module="{module}" />', content_type: text/plain }
+    expect: *ok
+    returns: text
+  set_pin_value:
+    summary: Set an input pin's value from text, the most used action (ComposerSetPinValueAction)
+    params:
+      document: *document
+      module: *module
+      pin: &pin { type: string, max_length: 256, required: true, pattern: '^[^"&<>]+$', label: Pin, description: "Pin name or friendly name." }
+      value: &pinvalue { type: string, max_length: 65536, required: true, pattern: '^[^"&<>]*$', label: Value,
+                         description: "Value as text in the pin type's format: true/false, 42, 0.5, \"0.25, 0.5, 1.25\", #RRGGBB, an enum's internal name." }
+      undoable: &undoable { type: bool, default: false, label: Undoable, description: "Run the change as an undoable command shown in Undo History." }
+      suppress_change: { type: bool, default: false, label: Not a document change, description: "Apply without marking the document changed." }
+    send: { method: POST, path: /, body: '<action type="ComposerSetPinValueAction" Document="{document}" Module="{module}" Pin="{pin}" Value="{value}" Undoable="{undoable}" SuppressDocChange="{suppress_change}" />', content_type: text/plain }
+    expect: *ok
+    returns: ack
+  get_pin_value:
+    summary: Read an input pin's stored value as text (ComposerGetPinValueAction)
+    params:
+      document: *document
+      module: *module
+      pin: *pin
+    send: { method: POST, path: /, body: '<action type="ComposerGetPinValueAction" Document="{document}" Module="{module}" Pin="{pin}" />', content_type: text/plain }
+    expect: &attrvalue { status: 200, matches: '(?s)Code="0".*<ReturnValue[^>]* value="([^"]*)"' }
+    returns: value
+  get_pin_live_value:
+    summary: Read a pin's live runtime value, input or output, where its type has one (ComposerGetPinLiveValueAction)
+    params:
+      document: *document
+      module: *module
+      pin: *pin
+      output: { type: bool, default: false, label: Output pin, description: "true reads an output pin, false an input pin." }
+    send: { method: POST, path: /, body: '<action type="ComposerGetPinLiveValueAction" Document="{document}" Module="{module}" Pin="{pin}" Output="{output}" />', content_type: text/plain }
+    expect: &textvalue { status: 200, matches: '(?s)Code="0".*<ReturnValue>(.*)</ReturnValue>' }
+    returns: value
+
+  # ── Control boards ──────────────────────────────────────────────────────
+  list_control_boards:
+    summary: List the control boards under a compound (ComposerEnumCtrBoardsAction)
+    params:
+      document: *document
+      module: *module
+      recursive: *recursive
+    send: { method: POST, path: /, body: '<action type="ComposerEnumCtrBoardsAction" Document="{document}" Module="{module}" Recursive="{recursive}" />', content_type: text/plain }
+    expect: *ok
+    returns: text
+  list_panels:
+    summary: List a control board's panels with their paths (ComposerEnumCtrBoardPanelsAction)
+    params:
+      document: *document
+      board: { type: string, max_length: 1024, required: true, pattern: '^[^"&<>]+$', label: Control board,
+               description: "Control board path, such as Root\\VirtualCam_3-Cam\\CAMERAS." }
+    send: { method: POST, path: /, body: '<action type="ComposerEnumCtrBoardPanelsAction" Document="{document}" Module="{board}" />', content_type: text/plain }
+    expect: *ok
+    returns: text
+  press_button:
+    summary: Press a control board button, as a click does; an ON/OFF button toggles (ComposerCtrBoardPressButtonAction)
+    params:
+      document: *document
+      panel: &panel { type: string, max_length: 1024, required: true, pattern: '^[^"&<>]+$', label: Panel,
+                      description: "Panel path, such as Root\\VirtualCam_3-Cam\\CAMERAS\\SELECT CAMERA." }
+      button: &button { type: string, max_length: 256, required: true, pattern: '^[^"&<>]+$', label: Button,
+                        description: "Button name, such as CAM 2; an icon button is On." }
+      undoable: *undoable
+    send: { method: POST, path: /, body: '<action type="ComposerCtrBoardPressButtonAction" Document="{document}" Module="{panel}" Button="{button}" Undoable="{undoable}" />', content_type: text/plain }
+    expect: *ok
+    returns: ack
+  set_button:
+    summary: Set an ON/OFF button's state (ComposerCtrBoardSetButtonAction)
+    params:
+      document: *document
+      panel: *panel
+      button: *button
+      state: { type: bool, required: true, label: "On", description: "true turns the button on, false off." }
+      undoable: *undoable
+    send: { method: POST, path: /, body: '<action type="ComposerCtrBoardSetButtonAction" Document="{document}" Module="{panel}" Button="{button}" State="{state}" Undoable="{undoable}" />', content_type: text/plain }
+    expect: *ok
+    returns: ack
+  get_button:
+    summary: Read whether a button is on (ComposerCtrBoardGetButtonAction)
+    params:
+      document: *document
+      panel: *panel
+      button: *button
+    send: { method: POST, path: /, body: '<action type="ComposerCtrBoardGetButtonAction" Document="{document}" Module="{panel}" Button="{button}" />', content_type: text/plain }
+    expect: *textvalue
+    returns: value
+  list_buttons:
+    summary: List a panel's buttons with their type, group, index and gap (ComposerEnumCtrBoardButtonsAction)
+    params:
+      document: *document
+      panel: *panel
+    send: { method: POST, path: /, body: '<action type="ComposerEnumCtrBoardButtonsAction" Document="{document}" Module="{panel}" />', content_type: text/plain }
+    expect: *ok
+    returns: text
+  list_panel_properties:
+    summary: List a panel's editable properties with their types and descriptors (ComposerEnumCtrBoardPropertiesAction)
+    params:
+      document: *document
+      panel: *panel
+    send: { method: POST, path: /, body: '<action type="ComposerEnumCtrBoardPropertiesAction" Document="{document}" Module="{panel}" />', content_type: text/plain }
+    expect: *ok
+    returns: text
+  set_panel_property:
+    summary: Set a panel property by its display name (ComposerSetCtrBoardPropertyValueAction)
+    params:
+      document: *document
+      panel: *panel
+      property: &panelprop { type: string, max_length: 256, required: true, pattern: '^[^"&<>]+$', label: Property,
+                             description: "Property display name; a partial, case-insensitive match picks the shortest name." }
+      value: *pinvalue
+      undoable: *undoable
+    send: { method: POST, path: /, body: '<action type="ComposerSetCtrBoardPropertyValueAction" Document="{document}" Module="{panel}" Property="{property}" Value="{value}" Undoable="{undoable}" />', content_type: text/plain }
+    expect: *ok
+    returns: ack
+  get_panel_property:
+    summary: Read a panel property's stored value (ComposerGetCtrBoardPropertyValueAction)
+    params:
+      document: *document
+      panel: *panel
+      property: *panelprop
+    send: { method: POST, path: /, body: '<action type="ComposerGetCtrBoardPropertyValueAction" Document="{document}" Module="{panel}" Property="{property}" />', content_type: text/plain }
+    expect: *attrvalue
+    returns: value
+
+  # ── Sequences ───────────────────────────────────────────────────────────
+  set_sequence_part_property:
+    summary: Set a property of a sequence part (ComposerSetSequencePartPropertyAction)
+    params:
+      document: *document
+      module: *module
+      part: &part { type: int, min: 1, required: true, label: Part, description: "Part of the sequence track, from 1." }
+      property: &seqprop { type: string, max_length: 256, required: true, pattern: '^[^"&<>]+$', label: Property, description: "Property name of the part." }
+      value: *pinvalue
+    send: { method: POST, path: /, body: '<action type="ComposerSetSequencePartPropertyAction" Document="{document}" Module="{module}" Part="{part}" Property="{property}" Value="{value}" />', content_type: text/plain }
+    expect: *ok
+    returns: ack
+  get_sequence_part_property:
+    summary: Read a property of a sequence part (ComposerGetSequencePartPropertyAction)
+    params:
+      document: *document
+      module: *module
+      part: *part
+      property: *seqprop
+    send: { method: POST, path: /, body: '<action type="ComposerGetSequencePartPropertyAction" Document="{document}" Module="{module}" Part="{part}" Property="{property}" />', content_type: text/plain }
+    expect: *textvalue
+    returns: value
+
+  # ── Groups and system ───────────────────────────────────────────────────
+  group_actions:
+    summary: Send several actions in one request (ComposerGroupAction holding <action> elements, nested groups allowed)
+    params:
+      actions: { type: string, max_length: 1048576, required: true, pattern: '^\s*<action[\s\S]*>\s*$', label: Actions,
+                 description: "The <action .../> elements, written as Aximmetry documents them, placed inside the group." }
+    send: { method: POST, path: /, body: '<action type="ComposerGroupAction">{actions}</action>', content_type: text/plain }
+    expect: *ok
+    returns: ack
+  nop:
+    summary: Do nothing, to test the connection (ComposerNopAction)
+    send: { method: POST, path: /, body: '<action type="ComposerNopAction" />', content_type: text/plain }
+    expect: *ok
+    returns: ack
+  active_sensing:
+    summary: Check that the render engine is still running; fails if it has stopped (ComposerActiveSensingAction)
+    send: { method: POST, path: /, body: '<action type="ComposerActiveSensingAction" />', content_type: text/plain }
+    expect: *ok
+    returns: ack
+  restart_reopening_document:
+    summary: Restart Composer and reopen the compound running now (ComposerRestartApplicationAction)
+    send: { method: POST, path: /, body: '<action type="ComposerRestartApplicationAction" ReopenCurrentlyRunningDocument="true" />', content_type: text/plain }
+    expect: *ok
+    returns: ack
+  restart_opening_document:
+    summary: Restart Composer and open a compound (ComposerRestartApplicationAction)
+    params:
+      path: *path
+    send: { method: POST, path: /, body: '<action type="ComposerRestartApplicationAction" ReopenCurrentlyRunningDocument="false" OpenDocument="{path}" />', content_type: text/plain }
+    expect: *ok
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Aximmetry pushes nothing and has no state of its own to report over
+      HTTP; what a scene exposes depends on the scene, so values are read
+      with the query commands (get_pin_value, get_button, get_panel_property)
+      rather than kept in state. A command fails when the response's Code is
+      not 0; its Message says why.
+  - models: [all]
+    severity: info
+    text: >
+      Parameters are written into XML attributes, so they may not hold a
+      double quote, an ampersand or angle brackets. Paths use backslashes as
+      Aximmetry writes them (Root\Compound\Module). An empty Document is the
+      running compound, as the documents define it. HTTP Control must be
+      enabled in Edit > Preferences (forum answers say it needs a
+      Professional or Broadcast edition); its port is set there.
+  - models: [all]
+    severity: critical
+    text: >
+      close_all_documents closes every document without saving; the restart
+      commands restart Composer and its output; open_and_run_document replaces
+      what runs when close_all is set.

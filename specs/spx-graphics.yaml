@@ -1,0 +1,554 @@
+spec: 1
+id: spx-graphics
+name: SPX Graphics Controller (HTTP API)
+vendor: SPX Graphics (Softpix)
+category: other
+
+# SPX Graphics Controller takes its public API as HTTP requests under
+# /api/v1 on its web port (5656 by default; 5000 on old installations). SPX
+# serves the API's own documentation at GET /api/v1, which is where SPX's
+# help says the current list of calls is; that page is generated from
+# routes/routes-api-v1.js in SPX's MIT repository, and the spec follows it.
+# Three editions: SPX Solo (the free one) answers the Common API and the basic
+# Controller API, SPX Production adds item-by-id control and the invoke
+# handlers, SPX Broadcast adds the Server API (the reads among them).
+
+source:
+  - title: SPX Graphics Controller API v1 documentation page (GET /api/v1), as served by SPX 1.4.1
+    author: SPX Graphics / Softpix (Tuomo Kulomaa)
+    url: https://github.com/TuomoKu/SPX-GC/blob/master/routes/routes-api-v1.js
+    note: >
+      Manufacturer document: the "functionsDoc" object the /api/v1 page renders
+      (SPX-GC repository, MIT licence, package version 1.4.1, read 2026-10-27).
+      Sections "Common API" (version, panic, feedproxy GET and POST), "Controller
+      API" (rundown/focusPrevious, focusNext, stopAllLayers, item/play,
+      item/continue, item/stop, rundown/load?file=Project/Rundown, focusFirst,
+      focusLast, focusByID/<id>, item/play|continue|stop/<id>,
+      invokeTemplateFunction, invokeExtensionFunction; "Some endpoints require
+      SPX Production license") and "Server API" ("SPX Broadcast license
+      required": directplayout, controlRundownItemByID, getprojects,
+      getrundowns, allrundowns, rundown/get, rundown/json GET and POST,
+      getlayerstate, gettemplates, executeScript, getFileList,
+      saveCustomJSON), each with its version, method, example and request body.
+      The same file's handlers were read for what the page leaves out: the
+      apikey parameter (query on GET, body on POST, utils/spx_auth.js), a wrong
+      or missing key answered with 200 and {"error": ...}, the version reply's
+      fields, the Solo edition's 501 for the commercial endpoints, and the
+      rundown file's templates array with itemID, onair ("true"/"false"),
+      playserver, playchannel, playlayer, webplayout and DataFields
+      (routes/routes-application.js).
+  - title: SPX Knowledge Base, "Public API of SPX"
+    author: SPX Graphics
+    url: https://spxgc.tawk.help/article/help-api
+    note: >
+      Manufacturer document, read 2026-10-27. The API lives at
+      http://localhost:5656/api/v1 and its locally hosted page is the current
+      reference; the API key arrived in v1.1.4, is set as apikey in
+      config.json, empty by default (no restriction), and is passed as a URL
+      parameter; invokeTemplateFunction passes JSON as url-encoded
+      stringified text; rundown/json POST needs project, file and templates
+      (each with relpath and DataFields); controlRundownItemByID was fixed in
+      1.3.0; invokeExtensionFunction arrived in 1.3.0.
+  - title: companion-module-spx-gc (Bitfocus Companion module, MIT licence)
+    author: Bitfocus AS
+    url: https://github.com/bitfocus/companion-module-spx-gc
+    note: >
+      Read for corroboration only (actions.js): the same GET paths and query
+      names, port 5656. No code taken.
+
+transport:
+  type: http
+  port: 5656
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  # /api/v1/version needs no API key.
+  probe: { method: GET, path: /api/v1/version }
+
+settings:
+  apikey: { type: string, secret: true, default: "", max_length: 256,
+            label: API key,
+            description: "The apikey set in SPX's config.json; leave empty when SPX has none, which lets any computer on the network send commands." }
+
+ports:
+  - { port: 5656, protocol: http, role: control, note: "SPX web server; installations from before version 1.0 used 5000" }
+
+models:
+  - id: spx-solo
+    name: SPX Solo (free edition)
+    supports: [get_version, panic, feed_proxy, feed_proxy_post, focus_previous, focus_next, focus_first,
+                     focus_last, focus_item, stop_all_layers, play, continue, stop, load_rundown]
+    verification: none
+  - id: spx-production
+    name: SPX Production
+    supports: [get_version, panic, feed_proxy, feed_proxy_post, focus_previous, focus_next,
+                           focus_first, focus_last, focus_item, stop_all_layers, play, continue, stop,
+                           load_rundown, play_item, continue_item, stop_item, invoke_template_function,
+                           invoke_extension_function]
+    verification: none
+  - id: spx-broadcast
+    name: SPX Broadcast
+    supports: [get_version, panic, feed_proxy, feed_proxy_post, focus_previous, focus_next, focus_first,
+               focus_last, focus_item, stop_all_layers, play, continue, stop, load_rundown, play_item,
+               continue_item, stop_item, invoke_template_function, invoke_extension_function,
+               direct_playout, direct_playout_update_item, control_rundown_item, get_projects,
+               get_rundowns, get_all_rundowns, get_rundown, get_rundown_file, save_rundown_file,
+               get_layer_state, get_templates, execute_script, get_file_list, save_custom_json]
+    verification: none
+
+commands:
+  # ── Common API ───────────────────────────────────────────────────────────
+  get_version:
+    summary: Read SPX's version, host id, host name, platform and uptime (GET /api/v1/version)
+    send: { method: GET, path: /api/v1/version }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  panic:
+    summary: >
+      Force-clear every output layer without out-animations (GET /api/v1/panic).
+      For emergencies only: the rundown items keep their on-air state.
+    send: { method: GET, path: /api/v1/panic, query: { apikey: "{settings.apikey}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  feed_proxy:
+    summary: Fetch a CORS-protected feed through SPX and return it (GET /api/v1/feedproxy?url=&format=)
+    params:
+      url:    { type: string, max_length: 2048, required: true, label: URL,
+                description: "Address of the feed to fetch; SPX passes it on as it is." }
+      format: { type: enum, values: [json, xml], default: json, label: Format,
+                description: "xml answers as application/rss+xml, json as application/json." }
+    send: { method: GET, path: /api/v1/feedproxy, query: { url: "{url}", format: "{format}", apikey: "{settings.apikey}" } }
+    expect: { status: 200 }
+    returns: text
+
+  feed_proxy_post:
+    summary: >
+      Have SPX make a request with custom headers and return its answer
+      (POST /api/v1/feedproxy with {url, headers, postBody}; a postBody makes it a POST, else a GET)
+    params:
+      url:     { type: string, max_length: 2048, required: true, label: URL,
+                 description: "Address of the external endpoint SPX calls." }
+      headers: { type: json, required: true, label: Headers,
+                 description: "JSON object of header names to values SPX sends, such as Authorization." }
+      post_body: { type: string, multiline: true, max_length: 1048576, required: true, label: POST body,
+                   description: "Body for the outgoing POST as JSON text; SPX parses it before sending." }
+    send:
+      method: POST
+      path: /api/v1/feedproxy
+      body: '{"url":{url:json},"headers":{headers},"postBody":{post_body:json},"apikey":{settings.apikey:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  # ── Controller API: the rundown on screen ───────────────────────────────
+  focus_previous:
+    summary: Move the rundown focus up one item; it stops at the top (GET /api/v1/rundown/focusPrevious)
+    send: { method: GET, path: /api/v1/rundown/focusPrevious, query: { apikey: "{settings.apikey}" } }
+    expect: { status: 200 }
+    returns: ack
+  focus_next:
+    summary: Move the rundown focus down one item; it stops at the end (GET /api/v1/rundown/focusNext)
+    send: { method: GET, path: /api/v1/rundown/focusNext, query: { apikey: "{settings.apikey}" } }
+    expect: { status: 200 }
+    returns: ack
+  focus_first:
+    summary: Move the rundown focus to the first item (GET /api/v1/rundown/focusFirst)
+    send: { method: GET, path: /api/v1/rundown/focusFirst, query: { apikey: "{settings.apikey}" } }
+    expect: { status: 200 }
+    returns: ack
+  focus_last:
+    summary: Move the rundown focus to the last item (GET /api/v1/rundown/focusLast)
+    send: { method: GET, path: /api/v1/rundown/focusLast, query: { apikey: "{settings.apikey}" } }
+    expect: { status: 200 }
+    returns: ack
+  focus_item:
+    summary: Move the rundown focus to an item by its id (GET /api/v1/rundown/focusByID/<id>)
+    params:
+      item: { type: string, max_length: 128, required: true, label: Item,
+              description: "Rundown item id (itemID), as SPX shows it; items can be renamed in SPX." }
+    send: { method: GET, path: "/api/v1/rundown/focusByID/{item}", query: { apikey: "{settings.apikey}" } }
+    expect: { status: 200 }
+    returns: ack
+  stop_all_layers:
+    summary: Animate out every layer the current rundown uses, without clearing them (GET /api/v1/rundown/stopAllLayers)
+    send: { method: GET, path: /api/v1/rundown/stopAllLayers, query: { apikey: "{settings.apikey}" } }
+    expect: { status: 200 }
+    returns: ack
+  play:
+    summary: Play the focused item (GET /api/v1/item/play)
+    send: { method: GET, path: /api/v1/item/play, query: { apikey: "{settings.apikey}" } }
+    expect: { status: 200 }
+    returns: ack
+  continue:
+    summary: Send continue to the focused item; the template must support it (GET /api/v1/item/continue)
+    send: { method: GET, path: /api/v1/item/continue, query: { apikey: "{settings.apikey}" } }
+    expect: { status: 200 }
+    returns: ack
+  stop:
+    summary: Stop the focused item (GET /api/v1/item/stop)
+    send: { method: GET, path: /api/v1/item/stop, query: { apikey: "{settings.apikey}" } }
+    expect: { status: 200 }
+    returns: ack
+  load_rundown:
+    summary: Open a rundown of a project in the controller (GET /api/v1/rundown/load?file=Project/Rundown)
+    params:
+      project: { type: string, max_length: 256, pattern: "^[^/]+$", required: true, label: Project,
+                 description: "Project folder name, as in SPX's project list." }
+      rundown: { type: string, max_length: 256, pattern: "^[^/]+$", required: true, label: Rundown,
+                 description: "Rundown name without .json." }
+    send: { method: GET, path: /api/v1/rundown/load, query: { file: "{project}/{rundown}", apikey: "{settings.apikey}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Controller API: SPX Production ──────────────────────────────────────
+  play_item:
+    summary: Play an item of the active rundown by id (GET /api/v1/item/play/<id>; SPX Production)
+    params:
+      item: { type: string, max_length: 128, required: true, label: Item,
+              description: "Rundown item id (itemID) on the active rundown." }
+    send: { method: GET, path: "/api/v1/item/play/{item}", query: { apikey: "{settings.apikey}" } }
+    expect: { status: 200 }
+    returns: ack
+  continue_item:
+    summary: Send continue to an item of the active rundown by id (GET /api/v1/item/continue/<id>; SPX Production)
+    params:
+      item: { type: string, max_length: 128, required: true, label: Item,
+              description: "Rundown item id (itemID) on the active rundown." }
+    send: { method: GET, path: "/api/v1/item/continue/{item}", query: { apikey: "{settings.apikey}" } }
+    expect: { status: 200 }
+    returns: ack
+  stop_item:
+    summary: Stop an item of the active rundown by id (GET /api/v1/item/stop/<id>; SPX Production)
+    params:
+      item: { type: string, max_length: 128, required: true, label: Item,
+              description: "Rundown item id (itemID) on the active rundown." }
+    send: { method: GET, path: "/api/v1/item/stop/{item}", query: { apikey: "{settings.apikey}" } }
+    expect: { status: 200 }
+    returns: ack
+  invoke_template_function:
+    summary: >
+      Call a function in a playing template (GET /api/v1/invokeTemplateFunction;
+      SPX Production). JSON is passed as stringified text in params.
+    params:
+      playserver:  { type: string, max_length: 64, default: OVERLAY, label: Play server,
+                     description: "Name of the CasparCG server the template plays on, or - for web playout only." }
+      playchannel: { type: int, min: 1, default: 1, label: Channel,
+                     description: "CasparCG channel number." }
+      playlayer:   { type: int, min: 1, required: true, label: Layer,
+                     description: "CasparCG layer number." }
+      webplayout:  { type: int, min: 1, required: true, label: Web layer,
+                     description: "Web playout layer number; usually the same as the CasparCG layer." }
+      function:    { type: string, max_length: 128, pattern: "^[A-Za-z_$][A-Za-z0-9_$]*$", required: true,
+                     label: Function, description: "Name of the template's JavaScript function." }
+      params:      { type: string, max_length: 65536, default: "", label: Parameters,
+                     description: "Argument passed to the function: text, or stringified JSON." }
+    send:
+      method: GET
+      path: /api/v1/invokeTemplateFunction
+      query: { playserver: "{playserver}", playchannel: "{playchannel}", playlayer: "{playlayer}",
+               webplayout: "{webplayout}", function: "{function}", params: "{params}", apikey: "{settings.apikey}" }
+    expect: { status: 200 }
+    returns: ack
+  invoke_extension_function:
+    summary: Call a function in an SPX extension through SPX's messaging (GET /api/v1/invokeExtensionFunction; SPX Production, 1.3.0)
+    params:
+      function: { type: string, max_length: 128, pattern: "^[A-Za-z_$][A-Za-z0-9_$]*$", required: true,
+                  label: Function, description: "Name of the extension's function, such as sendCmd." }
+      params:   { type: string, max_length: 65536, default: "", label: Parameters,
+                  description: "Argument passed to the function: text, or stringified JSON." }
+    send: { method: GET, path: /api/v1/invokeExtensionFunction,
+            query: { function: "{function}", params: "{params}", apikey: "{settings.apikey}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Server API: SPX Broadcast ───────────────────────────────────────────
+  direct_playout:
+    summary: >
+      Fill a template and play, continue or stop it without the rundown
+      (POST /api/v1/directplayout; SPX Broadcast)
+    params:
+      server:   { type: string, max_length: 64, default: OVERLAY, label: Play server,
+                  description: "CasparCG server name (casparServer), or - for web playout only." }
+      channel:  { type: int, min: 1, default: 1, label: Channel, description: "CasparCG channel (casparChannel)." }
+      layer:    { type: int, min: 1, required: true, label: Layer, description: "CasparCG layer (casparLayer)." }
+      web_layer: { type: int, min: 1, required: true, label: Web layer, description: "Web playout layer (webplayoutLayer)." }
+      template: { type: string, max_length: 1024, required: true, label: Template,
+                  description: "Template path relative to SPX's ASSETS/templates, such as /vendor/pack/template.html." }
+      out:      { type: string, max_length: 32, default: manual, label: Out,
+                  description: "How the graphic leaves: manual, or a duration in milliseconds as SPX's templates take it." }
+      fields:   { type: json, required: true, label: Fields,
+                  description: "DataFields array as SPX documents it: [{\"field\": \"f0\", \"value\": \"Firstname\"}, ...]." }
+      command:  { type: enum, values: [play, continue, stop], required: true, label: Command,
+                  description: "What to do with the template." }
+    send:
+      method: POST
+      path: /api/v1/directplayout
+      body: '{"casparServer":{server:json},"casparChannel":"{channel}","casparLayer":"{layer}","webplayoutLayer":"{web_layer}","relativeTemplatePath":{template:json},"out":{out:json},"DataFields":{fields},"command":"{command}","apikey":{settings.apikey:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+  direct_playout_update_item:
+    summary: >
+      Direct playout that also updates a rundown item, in the UI and
+      optionally in its file (POST /api/v1/directplayout with updateRundownItem; SPX Broadcast 1.3.2)
+    params:
+      server:   { type: string, max_length: 64, default: OVERLAY, label: Play server,
+                  description: "CasparCG server name (casparServer), or - for web playout only." }
+      channel:  { type: int, min: 1, default: 1, label: Channel, description: "CasparCG channel (casparChannel)." }
+      layer:    { type: int, min: 1, required: true, label: Layer, description: "CasparCG layer (casparLayer)." }
+      web_layer: { type: int, min: 1, required: true, label: Web layer, description: "Web playout layer (webplayoutLayer)." }
+      template: { type: string, max_length: 1024, required: true, label: Template,
+                  description: "Template path relative to SPX's ASSETS/templates, such as /vendor/pack/template.html." }
+      out:      { type: string, max_length: 32, default: manual, label: Out,
+                  description: "How the graphic leaves: manual, or a duration in milliseconds as SPX's templates take it." }
+      fields:   { type: json, required: true, label: Fields,
+                  description: "DataFields array as SPX documents it: [{\"field\": \"f0\", \"value\": \"Firstname\"}, ...]." }
+      command:  { type: enum, values: [play, continue, stop], required: true, label: Command,
+                  description: "What to do with the template." }
+      item:      { type: string, max_length: 128, required: true, label: Item,
+                   description: "Rundown item id (itemID) to update." }
+      project:   { type: string, max_length: 256, required: true, label: Project,
+                   description: "Project holding the rundown." }
+      rundown:   { type: string, max_length: 256, required: true, label: Rundown,
+                   description: "Rundown name without .json." }
+      update_ui: { type: bool, default: true, label: Update UI,
+                   description: "Whether the controller's view of the item is updated." }
+      persist:   { type: bool, default: true, label: Persist,
+                   description: "Whether the change is saved to the rundown file." }
+    send:
+      method: POST
+      path: /api/v1/directplayout
+      body: '{"casparServer":{server:json},"casparChannel":"{channel}","casparLayer":"{layer}","webplayoutLayer":"{web_layer}","relativeTemplatePath":{template:json},"out":{out:json},"DataFields":{fields},"command":"{command}","updateRundownItem":{"updateUI":{update_ui},"itemID":{item:json},"persist":{persist},"project":{project:json},"rundown":{rundown:json}},"apikey":{settings.apikey:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+  control_rundown_item:
+    summary: >
+      Play or stop an item of any rundown with its stored values, loaded or not
+      (GET /api/v1/controlRundownItemByID?file=&item=&command=; SPX Broadcast)
+    params:
+      project: { type: string, max_length: 256, pattern: "^[^/]+$", required: true, label: Project,
+                 description: "Project folder name." }
+      rundown: { type: string, max_length: 256, pattern: "^[^/]+$", required: true, label: Rundown,
+                 description: "Rundown name without .json." }
+      item:    { type: string, max_length: 128, required: true, label: Item,
+                 description: "Rundown item id (itemID)." }
+      command: { type: enum, values: [play, stop], required: true, label: Command,
+                 description: "Play or stop the item." }
+    send: { method: GET, path: /api/v1/controlRundownItemByID,
+            query: { file: "{project}/{rundown}", item: "{item}", command: "{command}", apikey: "{settings.apikey}" } }
+    expect: { status: 200 }
+    returns: ack
+  get_projects:
+    summary: List the projects, as an array of names (GET /api/v1/getprojects; SPX Broadcast)
+    send: { method: GET, path: /api/v1/getprojects, query: { apikey: "{settings.apikey}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_rundowns:
+    summary: List a project's rundowns, as an array of names (GET /api/v1/getrundowns?project=; SPX Broadcast)
+    params:
+      project: { type: string, max_length: 256, required: true, label: Project, description: "Project folder name." }
+    send: { method: GET, path: /api/v1/getrundowns, query: { project: "{project}", apikey: "{settings.apikey}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_all_rundowns:
+    summary: List every project and its rundowns (GET /api/v1/allrundowns; SPX Broadcast 1.3.0)
+    send: { method: GET, path: /api/v1/allrundowns, query: { apikey: "{settings.apikey}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_rundown:
+    summary: Read the current rundown as JSON (GET /api/v1/rundown/get; SPX Broadcast)
+    send: { method: GET, path: /api/v1/rundown/get, query: { apikey: "{settings.apikey}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_rundown_file:
+    summary: Read a rundown file of a project as JSON (GET /api/v1/rundown/json?project=&rundown=; SPX Broadcast 1.3.0)
+    params:
+      project: { type: string, max_length: 256, required: true, label: Project, description: "Project folder name." }
+      rundown: { type: string, max_length: 256, required: true, label: Rundown, description: "Rundown name without .json." }
+    send: { method: GET, path: /api/v1/rundown/json, query: { project: "{project}", rundown: "{rundown}", apikey: "{settings.apikey}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  save_rundown_file:
+    summary: >
+      Create or replace a rundown file (POST /api/v1/rundown/json with
+      {project, file, content}; SPX Broadcast 1.3.0). The content is SPX's
+      rundown JSON: {"comment", "templates": [{relpath, DataFields, playserver, ...}]}.
+    params:
+      project: { type: string, max_length: 256, required: true, label: Project,
+                 description: "Name of an existing project." }
+      file:    { type: string, max_length: 256, required: true, label: File,
+                 description: "Rundown file name, such as newRundown.json." }
+      content: { type: json, required: true, label: Rundown,
+                 description: "Rundown JSON as SPX writes it, with a templates array whose items carry relpath and DataFields." }
+    send:
+      method: POST
+      path: /api/v1/rundown/json
+      body: '{"project":{project:json},"file":{file:json},"content":{content},"apikey":{settings.apikey:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+  get_layer_state:
+    summary: >
+      Read the server's memory of its web-playout layers (GET /api/v1/getlayerstate;
+      SPX Broadcast); templates loaded through the API may not show
+    send: { method: GET, path: /api/v1/getlayerstate, query: { apikey: "{settings.apikey}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_templates:
+    summary: Read a project's templates and their settings (GET /api/v1/gettemplates?project=; SPX Broadcast 1.1.3)
+    params:
+      project: { type: string, max_length: 256, required: true, label: Project, description: "Project folder name." }
+    send: { method: GET, path: /api/v1/gettemplates, query: { project: "{project}", apikey: "{settings.apikey}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  execute_script:
+    summary: Run a script or batch file from ASSETS/scripts with its associated shell (GET /api/v1/executeScript?file=; SPX Broadcast 1.3.0)
+    params:
+      file: { type: string, max_length: 256, pattern: "^[^/\\\\]+$", required: true, label: Script,
+              description: "File name in SPX's ASSETS/scripts folder, such as win-open-calculator.bat." }
+    send: { method: GET, path: /api/v1/executeScript, query: { file: "{file}", apikey: "{settings.apikey}" } }
+    expect: { status: 200 }
+    returns: ack
+  get_file_list:
+    summary: List the file names in a subfolder of ASSETS (GET /api/v1/getFileList?assetsfolder=; SPX Broadcast 1.3.0)
+    params:
+      folder: { type: string, max_length: 256, required: true, label: Folder,
+                description: "Subfolder of SPX's ASSETS folder, such as excel." }
+    send: { method: GET, path: /api/v1/getFileList, query: { assetsfolder: "{folder}", apikey: "{settings.apikey}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  save_custom_json:
+    summary: >
+      Create or replace a JSON file in ASSETS/json, optionally in a subfolder
+      (POST /api/v1/saveCustomJSON with {subfolder, filename, content}; SPX Broadcast 1.3.0)
+    params:
+      subfolder: { type: string, max_length: 256, default: "", label: Subfolder,
+                   description: "Subfolder of ASSETS/json; empty for the folder itself." }
+      filename:  { type: string, max_length: 256, required: true, label: File name,
+                   description: "Name of the JSON file, such as myData.json." }
+      content:   { type: json, required: true, label: Content,
+                   description: "Any JSON value; SPX saves it as the file's content." }
+    send:
+      method: POST
+      path: /api/v1/saveCustomJSON
+      body: '{"subfolder":{subfolder:json},"filename":{filename:json},"content":{content},"apikey":{settings.apikey:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+telemetry:
+  # SPX pushes nothing over HTTP. The version is read now and then; the
+  # current rundown and the project list are reads of SPX Broadcast, which
+  # Solo and Production answer with 501 (ignored).
+  poll:
+    - every_ms: 2000
+      send:
+        - { models: [spx-broadcast], method: GET, path: /api/v1/rundown/get, query: { apikey: "{settings.apikey}" } }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /api/v1/version }
+        - { models: [spx-broadcast], method: GET, path: /api/v1/getprojects, query: { apikey: "{settings.apikey}" } }
+  updates:
+    - path: "^/api/v1/version"
+      json: { vendor: "$.vendor", product: "$.product", version: "$.version", id: "$.id",
+              hostname: "$.hostname", os: "$.os", uptime: "$.uptime.seconds" }
+      state:
+        system.product: "{product}"
+        system.version: "{version}"
+        system.host_id: "{id}"
+        system.hostname: "{hostname}"
+        system.os: "{os}"
+        system.uptime_s: "{uptime}"
+    - path: "^/api/v1/rundown/get"
+      json_match: { "$.templates": "^\\[" }
+      json_each: "$.templates"
+      json: { id: "$.itemID", onair: "$.onair", description: "$.description", server: "$.playserver",
+              channel: "$.playchannel", layer: "$.playlayer", web_layer: "$.webplayout",
+              template: "$.relpath", out: "$.out" }
+      replace: rundown.items
+      state:
+        "rundown.items.{id:key}.index": "{index:+1}"
+        "rundown.items.{id:key}.on_air": { value: "{onair}", map: { "true": true, "false": false } }
+        "rundown.items.{id:key}.description": "{description}"
+        "rundown.items.{id:key}.server": "{server}"
+        "rundown.items.{id:key}.channel": "{channel}"
+        "rundown.items.{id:key}.layer": "{layer}"
+        "rundown.items.{id:key}.web_layer": "{web_layer}"
+        "rundown.items.{id:key}.template": "{template}"
+        "rundown.items.{id:key}.out": "{out}"
+    - path: "^/api/v1/rundown/get"
+      json_each: "$.templates[*].DataFields"
+      json: { id: "$^.itemID", field: "$.field", value: "$.value" }
+      state: { "rundown.items.{id:key}.fields.{field:key}": "{value}" }
+    - path: "^/api/v1/getprojects"
+      json_match: { "$": "^\\[" }
+      json_each: "$"
+      json: { name: "$" }
+      replace: projects
+      state: { "projects.{name:key}": "true" }
+
+state:
+  system.product: { type: string, description: "Product name SPX reports, such as SPX Solo" }
+  system.version: { type: string, description: "SPX version" }
+  system.host_id: { type: string, description: "SPX's host id (from the network adapter), as the version reply gives it" }
+  system.hostname: { type: string, description: "Host name configured in SPX; empty when none" }
+  system.os: { type: string, description: "Platform SPX runs on, as Node reports it (win32, darwin, linux)" }
+  system.uptime_s: { type: int, unit: s, description: "Time since SPX started" }
+  rundown.items.*.index: { type: int, description: "Place of the item in the current rundown, from 1; keyed by item id (itemID)" }
+  rundown.items.*.on_air: { type: bool, description: "Whether the item is playing, as the rundown records it" }
+  rundown.items.*.description: { type: string, description: "Item's description in the rundown" }
+  rundown.items.*.server: { type: string, description: "CasparCG server the item plays on, or - for web playout only" }
+  rundown.items.*.channel: { type: string, description: "CasparCG channel the item plays on" }
+  rundown.items.*.layer: { type: string, description: "CasparCG layer the item plays on" }
+  rundown.items.*.web_layer: { type: string, description: "Web playout layer the item plays on, or - for none" }
+  rundown.items.*.template: { type: string, description: "Template path relative to ASSETS/templates" }
+  rundown.items.*.out: { type: string, description: "How the item leaves: manual, or a duration" }
+  rundown.items.*.fields.*: { type: string, description: "Value of each template field (f0, f1, ...) of the item" }
+  projects.*: { type: bool, description: "Each project SPX holds, keyed by name; always true" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      SPX acknowledges controller commands at once ("Sent request to SPX
+      Controller. Acknowledgement is not to be expected."): an ack means the
+      request reached SPX, not that the item played. A missing or wrong API key
+      is answered with 200 and {"error": "... API key ... Access denied."}
+      (SPX's code, not its documentation page), which the format cannot tell
+      from success (a refusal must be a 4xx or 5xx): such commands report ok
+      and do nothing, and the reads put nothing in state. Check the apikey
+      setting when commands have no effect.
+  - models: [spx-solo, spx-production]
+    severity: info
+    text: >
+      SPX Solo answers the SPX Production and SPX Broadcast endpoints with 501
+      Not Implemented, and SPX Production the SPX Broadcast ones (the Server
+      API), so these models do not list them. Only SPX Broadcast can read the
+      current rundown, so on the other editions state holds the version alone.
+  - models: [spx-broadcast]
+    severity: warning
+    text: >
+      The current rundown is read every 2 s from rundown/get, whose shape the
+      documentation page does not give ("Returns current rundown as json"):
+      the spec reads it as SPX's rundown file, a templates array of items with
+      itemID, onair ("true" or "false"), playserver, playchannel, playlayer,
+      webplayout, relpath, out and DataFields. Items without an itemID are not
+      kept. The page warns that getlayerstate may not show templates loaded
+      through the API, so it is a command, not state.
+  - models: [all]
+    severity: critical
+    text: >
+      panic clears every output layer at once without out-animations and does
+      not save the items' on-air state, so the controller shows them as before
+      once reloaded; the page reserves it for emergencies. execute_script runs a
+      file on the SPX computer with its shell.
+  - models: [all]
+    severity: info
+    text: >
+      The API key is sent as the apikey query parameter on GET and in the JSON
+      body on POST, as SPX reads it; an empty key is sent empty, which SPX
+      accepts when it has none. The documentation page notes that special
+      characters in directplayout values did not work at the time of writing.

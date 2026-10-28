@@ -231,23 +231,47 @@ pub(crate) fn render(
     // `\{` and `\}` are literal braces (SPEC.md §4, Templates): the text
     // between them is rendered on its own, so an escaped brace never opens
     // or closes a placeholder, and a bare word in braces (Lightware's
-    // `\{VC}`) is sent as it is.
+    // `\{VC}`) is sent as it is. `\\` before a brace is one backslash and
+    // leaves the brace as it is, so a placeholder can follow a backslash
+    // (Chyron's `P\LOAD\1\1000\\`).
     let mut out = String::with_capacity(template.len());
     let mut rest = template;
-    while let Some(at) = escaped_brace(rest) {
+    while let Some((at, double)) = escaped_brace(rest) {
         out.push_str(&render_unescaped(&rest[..at], values, escape)?);
-        out.push_str(&rest[at + 1..at + 2]);
+        if double {
+            out.push('\\');
+        } else {
+            out.push_str(&rest[at + 1..at + 2]);
+        }
         rest = &rest[at + 2..];
     }
     out.push_str(&render_unescaped(rest, values, escape)?);
     Ok(out)
 }
 
-/// Where the first `\{` or `\}` in `text` starts.
-fn escaped_brace(text: &str) -> Option<usize> {
+/// Where the first `\{`, `\}`, `\\{` or `\\}` in `text` starts, and whether
+/// it is the doubled backslash (a backslash before an unescaped brace).
+fn escaped_brace(text: &str) -> Option<(usize, bool)> {
     let bytes = text.as_bytes();
-    (0..bytes.len().saturating_sub(1))
-        .find(|&i| bytes[i] == b'\\' && (bytes[i + 1] == b'{' || bytes[i + 1] == b'}'))
+    let brace = |i: usize| bytes.get(i).is_some_and(|b| *b == b'{' || *b == b'}');
+    // Backslashes pair up from the left: `\\\{` is a backslash, then `\{`.
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'\\' {
+            if brace(i + 1) {
+                return Some((i, false));
+            }
+            if bytes.get(i + 1) == Some(&b'\\') {
+                if brace(i + 2) {
+                    return Some((i, true));
+                }
+                i += 2;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    None
 }
 
 fn render_unescaped(
@@ -683,6 +707,22 @@ mod tests {
             Ok("{layer}".into())
         );
         assert_eq!(go(r"x\", json!({}), spec), Ok(r"x\".into()));
+    }
+
+    #[test]
+    fn a_doubled_backslash_before_a_brace_is_one_backslash() {
+        let spec = "layer: {type: string}";
+        // A placeholder after a backslash, and a trailing pair kept as it is.
+        assert_eq!(
+            go(r"P\LOAD\\{layer}\1000\\", json!({"layer": "1"}), spec),
+            Ok(r"P\LOAD\1\1000\\".into())
+        );
+        assert_eq!(
+            go(r"a\\{layer}\\{layer}\\", json!({"layer": "V"}), spec),
+            Ok(r"a\V\V\\".into())
+        );
+        // A pair before no brace is itself, then an escaped brace.
+        assert_eq!(go(r"\\\{x}", json!({}), spec), Ok(r"\\{x}".into()));
     }
 
     #[test]

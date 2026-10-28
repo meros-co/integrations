@@ -1,0 +1,544 @@
+spec: 1
+id: holographics
+name: Holographics (REST API and Socket.IO)
+vendor: Holographics
+category: other
+
+# Holographics serves its API at http://<host>:3000/api: REST services for
+# the state (theme and colours), widgets, their entries, themes, palettes and
+# settings, no authentication. The same services answer over Socket.IO on the
+# same port, which also pushes stateChanged with the whole state whenever it
+# changes; this spec reads that push, and polls the state as a fallback.
+
+source:
+  - title: Holographics API 1.5.3 (SwaggerHub)
+    author: Holographics (Floris Porro)
+    url: https://app.swaggerhub.com/apis-docs/holographics/holographics-api/1.5.3
+    note: >
+      Manufacturer document (raw https://api.swaggerhub.com/apis/holographics/holographics-api/1.5.3),
+      read 2026-10-27. Host localhost:3000, base path /api, no
+      authentication. Every service used here: status, state (GET, PUT,
+      PATCH, DELETE resets to defaults), themes (find, get, update with
+      contents, remove, validate with stylus, reset), animations, mediafiles,
+      fonts, log (level, type, limit), palettes, widgets (with toggle and its
+      visibility rules), entries, widgetmodules (refresh, reset), settings
+      (logging.level normal|debug|devdebug, updates.channel
+      latest|beta|alpha), update (download, cancel, install), license; the
+      models (State, Widget, Style Properties, Color Properties, Entry,
+      Palette, Theme, Status) and the Error object {name, code, message,
+      className, data}.
+  - title: holographics-client-sdk 1.6.1 (EXAMPLES.md, README.md, services.json; MIT licence)
+    author: Holographics (Floris Porro)
+    url: https://github.com/hologfx/holographics-client-sdk
+    note: >
+      The vendor's own SDK, whose EXAMPLES.md is generated from the API each
+      release: the REST route of every service with trailing slashes
+      (/api/state/, /api/widgets/:id, PUT /api/widgets/:id/toggle), the
+      Socket.IO events, and that the REST client sends a call's data as the
+      request body (index.js) and Socket.IO 2 (package.json); the README
+      documents the stateChanged event. No code taken.
+  - title: Holographics documentation
+    author: Holographics
+    url: https://docs.hologfx.io/
+    note: Manufacturer documents; the API applies to Holographics 1.2 and later.
+
+transport:
+  type: http
+  port: 3000
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe: { method: GET, path: /api/status/ }
+
+ports:
+  - { port: 3000, protocol: http, role: control, note: "Holographics' web server: REST API under /api" }
+  - { port: 3000, protocol: ws, role: push, note: "Socket.IO on the same port: stateChanged" }
+
+models:
+  - id: holographics
+    name: Holographics 1.2 and later
+    supports: [get_status, get_state, replace_state, patch_state, reset_state, set_theme, set_style,
+               list_themes, get_theme, save_theme, delete_theme, validate_theme, reset_themes, list_animations,
+               list_media_files, list_fonts, get_log, list_palettes, get_palette, create_palette, update_palette,
+               patch_palette, delete_palette, list_widgets, get_widget, create_widget, update_widget,
+               patch_widget, delete_widget, toggle_widget, list_entries, get_entry, create_entry, update_entry,
+               patch_entry, set_entry_visibility, delete_entry, list_widget_modules, reset_widget_modules,
+               get_settings, patch_settings, set_logging_level, set_update_channel, check_update,
+               download_update, cancel_update_download, install_update, get_license, validate_license]
+    verification: none
+
+commands:
+  # ── Status and state ────────────────────────────────────────────────────
+  get_status:
+    summary: Read the host's IP address and Holographics' version (GET /api/status/)
+    send: { method: GET, path: /api/status/ }
+    expect: &value { status: 200, json_path: "$" }
+    returns: value
+  get_state:
+    summary: Read the state, the global style with the active theme and colours, widgets and entries (GET /api/state/)
+    send: { method: GET, path: /api/state/ }
+    expect: *value
+    returns: value
+  replace_state:
+    summary: Replace the state with new data (PUT /api/state/)
+    params:
+      data: { type: json, required: true, label: State,
+              description: "State object as Holographics documents it, such as {\"style\": {\"activeTheme\": \"default.styl\", ...}}." }
+    send: { method: PUT, path: /api/state/, body: "{data}", content_type: application/json }
+    expect: &ok { status: 200 }
+    returns: ack
+  patch_state:
+    summary: Merge new data into the state (PATCH /api/state/)
+    params:
+      data: { type: json, required: true, label: Changes,
+              description: "Object merged into the state, such as {\"style\": {\"activeTheme\": \"3D.styl\"}}." }
+    send: { method: PATCH, path: /api/state/, body: "{data}", content_type: application/json }
+    expect: *ok
+    returns: ack
+  reset_state:
+    summary: Reset the state to its defaults (DELETE /api/state/)
+    send: { method: DELETE, path: /api/state/ }
+    expect: *ok
+    returns: ack
+  set_theme:
+    summary: Activate a theme (PATCH /api/state/ with style.activeTheme)
+    params:
+      theme: { type: string, max_length: 256, required: true, label: Theme,
+               description: "Theme file name, such as default.styl or 3D.styl." }
+    send: { method: PATCH, path: /api/state/, body: '{"style":{"activeTheme":{theme:json}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_style:
+    summary: Set one global style value, a colour, padding or font size (PATCH /api/state/ with style)
+    params:
+      key: { type: enum, values: [primary_color, secondary_color, background_a, background_b, text_a, text_b, canvas_bg,
+                                  global_padding, widget_padding, font_size],
+             required: true, label: Style value,
+             description: "Colours are passed to the theme; canvas_bg colours the render view's background; paddings and font size are numbers as text." }
+      value: { type: string, max_length: 64, required: true, label: Value,
+               description: "A CSS colour such as rgb(69, 151, 251) or rgba(255, 255, 255, 0), or a number such as 3." }
+    send: { method: PATCH, path: /api/state/, body: '{"style":{"{key}":{value:json}}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  # ── Themes, animations, media, fonts, log ───────────────────────────────
+  list_themes:
+    summary: List the themes with their contents and variables (GET /api/themes/)
+    send: { method: GET, path: /api/themes/ }
+    expect: *value
+    returns: value
+  get_theme:
+    summary: Read a theme (GET /api/themes/<file name>)
+    params:
+      theme: &theme { type: string, max_length: 256, required: true, label: Theme, description: "Theme file name, such as default.styl." }
+    send: { method: GET, path: "/api/themes/{theme}" }
+    expect: *value
+    returns: value
+  save_theme:
+    summary: Write a theme's Stylus contents, creating it if missing (PUT /api/themes/<file name>)
+    params:
+      theme: *theme
+      contents: { type: string, multiline: true, max_length: 1048576, required: true, label: Contents,
+                  description: "The theme's Stylus source." }
+    send: { method: PUT, path: "/api/themes/{theme}", body: '{"contents":{contents:json}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  delete_theme:
+    summary: Delete a theme; a default theme is restored instead (DELETE /api/themes/<file name>)
+    params:
+      theme: *theme
+    send: { method: DELETE, path: "/api/themes/{theme}" }
+    expect: *ok
+    returns: ack
+  validate_theme:
+    summary: Check whether Stylus contents compile to CSS; answers {valid, error} (POST /api/themes/validate)
+    params:
+      stylus: { type: string, multiline: true, max_length: 1048576, required: true, label: Stylus,
+                description: "Stylus source to check." }
+    send: { method: POST, path: /api/themes/validate, body: '{"stylus":{stylus:json}}', content_type: application/json }
+    expect: *value
+    returns: value
+  reset_themes:
+    summary: Restore the default themes (GET /api/themes/reset)
+    send: { method: GET, path: /api/themes/reset }
+    expect: *ok
+    returns: ack
+  list_animations:
+    summary: List the animations (GET /api/animations/)
+    send: { method: GET, path: /api/animations/ }
+    expect: *value
+    returns: value
+  list_media_files:
+    summary: List the media files with their types (GET /api/mediafiles/)
+    send: { method: GET, path: /api/mediafiles/ }
+    expect: *value
+    returns: value
+  list_fonts:
+    summary: List the fonts (GET /api/fonts/)
+    send: { method: GET, path: /api/fonts/ }
+    expect: *value
+    returns: value
+  get_log:
+    summary: Read the log, filtered by level and type (GET /api/log/)
+    params:
+      level: { type: enum, values: [LOW, MEDIUM, HIGH], default: LOW, label: Level, description: "Lowest level returned." }
+      type: { type: enum, values: [DEFAULT, INFO, ERROR, SUCCESS, WARNING], default: DEFAULT, label: Type, description: "Message type." }
+      limit: { type: int, min: 1, max: 100000, default: 100, label: Limit, description: "Most messages returned." }
+    send: { method: GET, path: /api/log/, query: { level: "{level}", type: "{type}", limit: "{limit}" } }
+    expect: *value
+    returns: value
+
+  # ── Palettes ────────────────────────────────────────────────────────────
+  list_palettes:
+    summary: List the colour palettes (GET /api/palettes/)
+    send: { method: GET, path: /api/palettes/ }
+    expect: *value
+    returns: value
+  get_palette:
+    summary: Read a palette (GET /api/palettes/<id>)
+    params:
+      id: &palette { type: string, max_length: 64, required: true, label: Palette, description: "Palette id, generated by Holographics." }
+    send: { method: GET, path: "/api/palettes/{id}" }
+    expect: *value
+    returns: value
+  create_palette:
+    summary: Create a palette (POST /api/palettes/)
+    params:
+      name: { type: string, max_length: 256, required: true, label: Name, description: "Palette name." }
+      colors: { type: json, required: true, label: Colours, description: "JSON array of colours, [\"#8dccad\", \"#988864\"]." }
+    send: { method: POST, path: /api/palettes/, body: '{"name":{name:json},"colors":{colors}}', content_type: application/json }
+    expect: *value
+    returns: value
+  update_palette:
+    summary: Replace a palette (PUT /api/palettes/<id>)
+    params:
+      id: *palette
+      data: { type: json, required: true, label: Palette, description: "Palette object {name, colors}." }
+    send: { method: PUT, path: "/api/palettes/{id}", body: "{data}", content_type: application/json }
+    expect: *ok
+    returns: ack
+  patch_palette:
+    summary: Merge changes into a palette (PATCH /api/palettes/<id>)
+    params:
+      id: *palette
+      data: { type: json, required: true, label: Changes, description: "Fields of the palette to change, name and/or colors." }
+    send: { method: PATCH, path: "/api/palettes/{id}", body: "{data}", content_type: application/json }
+    expect: *ok
+    returns: ack
+  delete_palette:
+    summary: Delete a palette (DELETE /api/palettes/<id>)
+    params:
+      id: *palette
+    send: { method: DELETE, path: "/api/palettes/{id}" }
+    expect: *ok
+    returns: ack
+
+  # ── Widgets ─────────────────────────────────────────────────────────────
+  list_widgets:
+    summary: List the widgets (GET /api/widgets/)
+    send: { method: GET, path: /api/widgets/ }
+    expect: *value
+    returns: value
+  get_widget:
+    summary: Read a widget (GET /api/widgets/<id>)
+    params:
+      id: &widget { type: string, max_length: 64, required: true, label: Widget, description: "Widget id, generated by Holographics." }
+    send: { method: GET, path: "/api/widgets/{id}" }
+    expect: *value
+    returns: value
+  create_widget:
+    summary: Create a widget of a widget module, such as Clock or BroadcastMessage (POST /api/widgets/)
+    params:
+      data: { type: json, required: true, label: Widget,
+              description: "Widget object, at least {\"type\": \"Clock\"}, with optional name, style and props." }
+    send: { method: POST, path: /api/widgets/, body: "{data}", content_type: application/json }
+    expect: *value
+    returns: value
+  update_widget:
+    summary: Replace a widget (PUT /api/widgets/<id>)
+    params:
+      id: *widget
+      data: { type: json, required: true, label: Widget, description: "Widget object {type, name, style, props}." }
+    send: { method: PUT, path: "/api/widgets/{id}", body: "{data}", content_type: application/json }
+    expect: *ok
+    returns: ack
+  patch_widget:
+    summary: Merge changes into a widget, its name, style or props (PATCH /api/widgets/<id>)
+    params:
+      id: *widget
+      data: { type: json, required: true, label: Changes,
+              description: "Fields to change, such as {\"name\": \"Hello world\"} or {\"style\": {\"horizontal_position\": \"right\"}}." }
+    send: { method: PATCH, path: "/api/widgets/{id}", body: "{data}", content_type: application/json }
+    expect: *ok
+    returns: ack
+  delete_widget:
+    summary: Delete a widget (DELETE /api/widgets/<id>)
+    params:
+      id: *widget
+    send: { method: DELETE, path: "/api/widgets/{id}" }
+    expect: *ok
+    returns: ack
+  toggle_widget:
+    summary: >
+      Show or hide a widget (PUT /api/widgets/<id>/toggle): its visibility prop
+      without entries, every entry with several active entries, else the first entry
+    params:
+      id: *widget
+      visible: { type: bool, required: true, label: Visible, description: "true shows the widget, false hides it." }
+    send: { method: PUT, path: "/api/widgets/{id}/toggle", body: '{"visibility":{visible}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  # ── Entries ─────────────────────────────────────────────────────────────
+  list_entries:
+    summary: List a widget's entries (GET /api/entries/ with {widgetId})
+    params:
+      widget: { type: string, max_length: 64, required: true, label: Widget, description: "Id of the widget whose entries are listed." }
+    send: { method: GET, path: /api/entries/, body: '{"widgetId":{widget:json}}', content_type: application/json }
+    expect: *value
+    returns: value
+  get_entry:
+    summary: Read an entry (GET /api/entries/<id>)
+    params:
+      id: &entry { type: string, max_length: 64, required: true, label: Entry, description: "Entry id, generated by Holographics." }
+    send: { method: GET, path: "/api/entries/{id}" }
+    expect: *value
+    returns: value
+  create_entry:
+    summary: Add an entry to a widget, with its props and visibility (POST /api/entries/)
+    params:
+      widget: { type: string, max_length: 64, required: true, label: Widget, description: "Id of the widget the entry belongs to." }
+      props: { type: json, required: true, label: Props, description: "Props the widget module defines, such as {\"message\": \"Test 123\"}." }
+      visible: { type: bool, default: false, label: Visible, description: "Whether the entry shows in the render view." }
+    send: { method: POST, path: /api/entries/, body: '{"widgetId":{widget:json},"props":{props},"visibility":{visible}}', content_type: application/json }
+    expect: *value
+    returns: value
+  update_entry:
+    summary: Replace an entry (PUT /api/entries/<id>)
+    params:
+      id: *entry
+      data: { type: json, required: true, label: Entry, description: "Entry object {widgetId, props, visibility}." }
+    send: { method: PUT, path: "/api/entries/{id}", body: "{data}", content_type: application/json }
+    expect: *ok
+    returns: ack
+  patch_entry:
+    summary: Merge changes into an entry, its props or visibility (PATCH /api/entries/<id>)
+    params:
+      id: *entry
+      data: { type: json, required: true, label: Changes, description: "Fields to change, such as {\"props\": {\"message\": \"Hello\"}}." }
+    send: { method: PATCH, path: "/api/entries/{id}", body: "{data}", content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_entry_visibility:
+    summary: Show or hide an entry (PATCH /api/entries/<id> with visibility)
+    params:
+      id: *entry
+      visible: { type: bool, required: true, label: Visible, description: "true shows the entry in the render view." }
+    send: { method: PATCH, path: "/api/entries/{id}", body: '{"visibility":{visible}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  delete_entry:
+    summary: Delete an entry (DELETE /api/entries/<id>)
+    params:
+      id: *entry
+    send: { method: DELETE, path: "/api/entries/{id}" }
+    expect: *ok
+    returns: ack
+
+  # ── Widget modules, settings, updates, licence ─────────────────────────
+  list_widget_modules:
+    summary: List the widget modules with their props (GET /api/widgetmodules/)
+    send: { method: GET, path: /api/widgetmodules/ }
+    expect: *value
+    returns: value
+  reset_widget_modules:
+    summary: Restore the default widget modules (GET /api/widgetmodules/reset)
+    send: { method: GET, path: /api/widgetmodules/reset }
+    expect: *ok
+    returns: ack
+  get_settings:
+    summary: Read the settings, logging level and update channel (GET /api/settings/)
+    send: { method: GET, path: /api/settings/ }
+    expect: *value
+    returns: value
+  patch_settings:
+    summary: Merge changes into the settings (PATCH /api/settings/)
+    params:
+      data: { type: json, required: true, label: Changes, description: "Settings to change, {\"logging\": {\"level\": ...}, \"updates\": {\"channel\": ...}}." }
+    send: { method: PATCH, path: /api/settings/, body: "{data}", content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_logging_level:
+    summary: Set the logging level (PATCH /api/settings/ with logging.level)
+    params:
+      level: { type: enum, values: [normal, debug, devdebug], required: true, label: Logging level, description: "How much Holographics logs." }
+    send: { method: PATCH, path: /api/settings/, body: '{"logging":{"level":"{level}"}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  set_update_channel:
+    summary: Set the update channel (PATCH /api/settings/ with updates.channel)
+    params:
+      channel: { type: enum, values: [latest, beta, alpha], required: true, label: Update channel, description: "Which releases are offered." }
+    send: { method: PATCH, path: /api/settings/, body: '{"updates":{"channel":"{channel}"}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  check_update:
+    summary: Check for an update (GET /api/update/)
+    send: { method: GET, path: /api/update/ }
+    expect: *value
+    returns: value
+  download_update:
+    summary: Download the available update (GET /api/update/download)
+    send: { method: GET, path: /api/update/download }
+    expect: *ok
+    returns: ack
+  cancel_update_download:
+    summary: Cancel the update download (GET /api/update/cancelDownload)
+    send: { method: GET, path: /api/update/cancelDownload }
+    expect: *ok
+    returns: ack
+  install_update:
+    summary: Install the downloaded update (GET /api/update/install)
+    send: { method: GET, path: /api/update/install }
+    expect: *ok
+    returns: ack
+  get_license:
+    summary: Read the licence (GET /api/license/)
+    send: { method: GET, path: /api/license/ }
+    expect: *value
+    returns: value
+  validate_license:
+    summary: Validate the licence (GET /api/license/validate)
+    send: { method: GET, path: /api/license/validate }
+    expect: *value
+    returns: value
+
+telemetry:
+  # Socket.IO 2 (Engine.IO 3) on the API's port: stateChanged carries the
+  # whole state on every change. The state is also read every 10 s.
+  websocket:
+    path: /socket.io/
+    socketio: { engine_io: 3 }
+  poll:
+    - every_ms: 10000
+      send: [{ method: GET, path: /api/state/ }]
+    - every_ms: 60000
+      send: [{ method: GET, path: /api/status/ }]
+  updates:
+    - path: "^/api/status/$"
+      json: { ip: "$.ip", version: "$.version" }
+      state: { system.ip: "{ip}", system.version: "{version}" }
+    # The state, read or pushed.
+    - path: "^/api/state/$"
+      json: &style_json { theme: "$.style.activeTheme", primary: "$.style.primary_color", secondary: "$.style.secondary_color",
+                          bg_a: "$.style.background_a", bg_b: "$.style.background_b", text_a: "$.style.text_a",
+                          text_b: "$.style.text_b", canvas: "$.style.canvas_bg", gpad: "$.style.global_padding",
+                          wpad: "$.style.widget_padding", font: "$.style.font_size" }
+      state: &style_state
+        style.active_theme: "{theme}"
+        style.primary_color: "{primary}"
+        style.secondary_color: "{secondary}"
+        style.background_a: "{bg_a}"
+        style.background_b: "{bg_b}"
+        style.text_a: "{text_a}"
+        style.text_b: "{text_b}"
+        style.canvas_bg: "{canvas}"
+        style.global_padding: "{gpad}"
+        style.widget_padding: "{wpad}"
+        style.font_size: "{font}"
+    - json_match: { "$.event": "^stateChanged$" }
+      json: { theme: "$.data.style.activeTheme", primary: "$.data.style.primary_color", secondary: "$.data.style.secondary_color",
+              bg_a: "$.data.style.background_a", bg_b: "$.data.style.background_b", text_a: "$.data.style.text_a",
+              text_b: "$.data.style.text_b", canvas: "$.data.style.canvas_bg", gpad: "$.data.style.global_padding",
+              wpad: "$.data.style.widget_padding", font: "$.data.style.font_size" }
+      state: *style_state
+    - path: "^/api/state/$"
+      json_match: { "$.widgets": "^\\[" }
+      json_each: "$.widgets"
+      json: &widget_json { id: "$.id", type: "$.type", name: "$.name", visibility: "$.props.visibility" }
+      replace: widgets
+      state: &widget_state
+        "widgets.{id:key}.type": "{type}"
+        "widgets.{id:key}.name": "{name}"
+        "widgets.{id:key}.visible": { value: "{visibility}", map: { "true": true, "false": false } }
+    - json_match: { "$.event": "^stateChanged$", "$.data.widgets": "^\\[" }
+      json_each: "$.data.widgets"
+      json: *widget_json
+      replace: widgets
+      state: *widget_state
+    - path: "^/api/state/$"
+      json_match: { "$.entries": "^\\[" }
+      json_each: "$.entries"
+      json: &entry_json { id: "$.id", widget: "$.widgetId", widget_old: "$.widget_id", visibility: "$.visibility", props: "$.props" }
+      replace: entries
+      state: &entry_state
+        "entries.{id:key}.widget": "{widget}"
+        "entries.{id:key}.visible": "{visibility}"
+        "entries.{id:key}.props": "{props}"
+    - path: "^/api/state/$"
+      json_each: "$.entries"
+      each_match: { "$.widget_id": "." }
+      json: { id: "$.id", widget: "$.widget_id" }
+      state: { "entries.{id:key}.widget": "{widget}" }
+    - json_match: { "$.event": "^stateChanged$", "$.data.entries": "^\\[" }
+      json_each: "$.data.entries"
+      json: *entry_json
+      replace: entries
+      state: *entry_state
+    - json_match: { "$.event": "^stateChanged$" }
+      json_each: "$.data.entries"
+      each_match: { "$.widget_id": "." }
+      json: { id: "$.id", widget: "$.widget_id" }
+      state: { "entries.{id:key}.widget": "{widget}" }
+
+state:
+  system.ip: { type: string, description: "IP address of the Holographics host" }
+  system.version: { type: string, description: "Holographics version" }
+  style.active_theme: { type: string, description: "Active theme file, such as default.styl" }
+  style.primary_color: { type: string, description: "Primary colour, as CSS (rgb(69, 151, 251))" }
+  style.secondary_color: { type: string, description: "Secondary colour, as CSS" }
+  style.background_a: { type: string, description: "Background colour A, as CSS" }
+  style.background_b: { type: string, description: "Background colour B, as CSS" }
+  style.text_a: { type: string, description: "Text colour A, as CSS" }
+  style.text_b: { type: string, description: "Text colour B, as CSS" }
+  style.canvas_bg: { type: string, description: "Render view background colour, as CSS (rgba with alpha 0 for transparent)" }
+  style.global_padding: { type: string, description: "Global padding, as Holographics holds it (a number as text)" }
+  style.widget_padding: { type: string, description: "Widget padding, as Holographics holds it" }
+  style.font_size: { type: string, description: "Font size multiplier in em, as text" }
+  widgets.*.type: { type: string, description: "Widget module the widget comes from, such as Clock or BroadcastMessage, keyed by widget id" }
+  widgets.*.name: { type: string, description: "Widget's display name; empty when none" }
+  widgets.*.visible: { type: bool, description: "A widget without entries: whether it shows (its visibility prop); absent for widgets with entries" }
+  entries.*.widget: { type: string, description: "Id of the widget the entry belongs to, keyed by entry id" }
+  entries.*.visible: { type: bool, description: "Whether the entry shows in the render view" }
+  entries.*.props: { type: string, description: "The entry's props as compact JSON, such as {\"message\":\"Test 123\"}; their fields depend on the widget module" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The API has no authentication: anyone reaching port 3000 controls
+      Holographics. Errors answer with a 4xx or 5xx status and {name, code,
+      message, className, data}.
+  - models: [all]
+    severity: info
+    text: >
+      State follows the stateChanged event Holographics pushes over Socket.IO
+      with the whole state, and a read of the state every 10 s (the status
+      every minute): the global style, the widgets and the entries. The
+      documents' state example names an entry's widget widget_id where the
+      entry model says widgetId; both are read. Other Socket.IO events
+      (service created, patched, removed) are not documented.
+  - models: [all]
+    severity: info
+    text: >
+      Requests carry the call's data as the JSON body, as the vendor's SDK
+      sends it (the Swagger page shows {id, data}, the Socket.IO form), and
+      list_entries sends its {widgetId} filter as the body of a GET, as the SDK
+      does. Licence changes, machine registration and the debug service are
+      left out. The control panel (/control) and render view (/render) are web
+      pages, not API.
+  - models: [all]
+    severity: critical
+    text: >
+      reset_state, reset_themes and reset_widget_modules restore defaults and
+      discard changes; install_update installs software on the host.

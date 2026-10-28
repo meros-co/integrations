@@ -79,6 +79,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that a wrong key or identity shows as a refused handshake (and which alert the device sends), and that the device answers the keep-alive sent first inside the secure session as it does over TCP. ([specs/aes70.yaml:427](specs/aes70.yaml#L427))
 - [ ] On a device that speaks secure OCP.1 over DTLS, confirm it takes one OCP.1 PDU per record and datagram and answers the same way, whether it asks for a cookie, and that it sends its flight again when the controller's is lost. ([specs/aes70.yaml:444](specs/aes70.yaml#L444))
 
+## aimedia-icap — AI-Media / EEG iCap
+
+- [ ] Record the JSON replies of the list and get calls (users, access codes, active encoders and captioners, health), so the live encoders and captioners can be kept in state. ([specs/aimedia-icap.yaml:375](specs/aimedia-icap.yaml#L375))
+- [ ] Confirm the path of the access code PUT (the collection, as the spec sends it, or accesscodes/<code>). ([specs/aimedia-icap.yaml:384](specs/aimedia-icap.yaml#L384))
+- [ ] Record the body of a 401 for wrong credentials and for a CaptionCast without a paid account, so the two can be told apart. ([specs/aimedia-icap.yaml:384](specs/aimedia-icap.yaml#L384))
+- [ ] Record the success statuses of POST and DELETE calls (200, 201 or 204 accepted). ([specs/aimedia-icap.yaml:106](specs/aimedia-icap.yaml#L106))
+
 ## aja-bridge-live — AJA BRIDGE LIVE
 
 - [ ] Confirm the unit's remote API address: https on 443 with a self-signed certificate (as the API document's examples), and whether http on 8080 is reachable from the network or only on the unit (the manual's examples). ([specs/aja-bridge-live.yaml:51](specs/aja-bridge-live.yaml#L51))
@@ -310,6 +317,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check how audio master channels are numbered (0 or 1 for the master) for live_system_get_audio_master_volume and mute. ([specs/avstumpfl-pixera.yaml:6805](specs/avstumpfl-pixera.yaml#L6805))
 - [ ] Check that replies to polled getters come back compact or spaced as the poll rules read them, with strings escaped as JSON. ([specs/avstumpfl-pixera.yaml:6802](specs/avstumpfl-pixera.yaml#L6802))
 - [ ] Confirm what utility_run_js_script answers for a script that throws, and whether it is subject to the allowlist. ([specs/avstumpfl-pixera.yaml:6743](specs/avstumpfl-pixera.yaml#L6743))
+
+## aximmetry — Aximmetry Composer
+
+- [ ] Record the default HTTP Control port (21463 is the documents' example) and the editions that offer HTTP Control. ([specs/aximmetry.yaml:31](specs/aximmetry.yaml#L31))
+- [ ] Check that an empty Document attribute is taken as the running compound, as the documents say of an omitted or empty one. ([specs/aximmetry.yaml:300](specs/aximmetry.yaml#L300))
+- [ ] Record the HTTP status of an error response (non-zero Code) and the error codes Aximmetry uses. ([specs/aximmetry.yaml:293](specs/aximmetry.yaml#L293))
+- [ ] Check whether XML character references (&amp;, &quot;) are decoded in attribute values, so values holding them could be sent. ([specs/aximmetry.yaml:298](specs/aximmetry.yaml#L298))
 
 ## axis-ptz — Axis PTZ cameras and video encoders (VAPIX PTZ API)
 
@@ -976,6 +990,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether QuickQ DIN accepts remote control. ([specs/chamsys-magicq-udp.yaml:852](specs/chamsys-magicq-udp.yaml#L852))
 - [ ] On MQ40 and MQ40N, confirm the remote protocol works. ([specs/chamsys-magicq-udp.yaml:830](specs/chamsys-magicq-udp.yaml#L830))
 
+## characterworks — CharacterWorks
+
+- [ ] Confirm the request path (/) and content type (application/json) the Remote Control Server accepts. ([specs/characterworks.yaml:348](specs/characterworks.yaml#L348))
+- [ ] Record what a command does without a channel, and whether other channel names (more live channels) exist. ([specs/characterworks.yaml:339](specs/characterworks.yaml#L339))
+- [ ] Confirm the row selection action is select_data_source_rows (the document's examples write source). ([specs/characterworks.yaml:344](specs/characterworks.yaml#L344))
+- [ ] Record the HTTP status of a failure reply (the spec reads the result field, whatever the status). ([specs/characterworks.yaml:329](specs/characterworks.yaml#L329))
+
 ## christie-1dlp — Christie 1DLP projectors
 
 - [ ] Check that a set sent with the "#" prefix is answered by its echo over TCP, and whether the echo keeps the "#" ("(#PWR 1)") or drops it ("(PWR 1)"). ([specs/christie-1dlp.yaml:479](specs/christie-1dlp.yaml#L479))
@@ -1090,6 +1111,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] The UID login echo, and whether it repeats the password. ([specs/christie-trulife.yaml:1779](specs/christie-trulife.yaml#L1779))
 - [ ] Whether LAS+EBLU/EGRN/ERED (and LAS+EPOW on Mirage SST) are safe on the 4K40-RGB and Mirage SST, where they are still documented (not offered). ([specs/christie-trulife.yaml:2724](specs/christie-trulife.yaml#L2724))
 - [ ] The RS232 IN data bits, parity, stop bits and connector (not in these references). ([specs/christie-trulife.yaml:2731](specs/christie-trulife.yaml#L2731))
+
+## chyron-prime — Chyron PRIME (Intelligent Interface)
+
+- [ ] Record the default serial line settings of an Intelligent Interface COM connection (9600 8N1, no flow control assumed). ([specs/chyron-prime.yaml:764](specs/chyron-prime.yaml#L764))
+- [ ] Confirm each reply ends with CR LF, and record the replies to the B commands (AN, AV, QS, QL, TH, SL, SA, SX, MX, CO, CS, SI, QE); the spec takes a reply to start with * or an eight-digit error code. ([specs/chyron-prime.yaml:62](specs/chyron-prime.yaml#L62))
+- [ ] Record what PRIME answers to the default heartbeat (two backslashes). ([specs/chyron-prime.yaml:39](specs/chyron-prime.yaml#L39))
+- [ ] Check that a buffer of * and a layer expression of * are accepted wherever the spec sends them (play_all with channel *, clear with layer *). ([specs/chyron-prime.yaml:189](specs/chyron-prime.yaml#L189))
+- [ ] Record the External Update X command PRIME sends, so it can be read into state. ([specs/chyron-prime.yaml:63](specs/chyron-prime.yaml#L63))
+- [ ] Check that the UTF-8 encoding setting of the connection carries non-ASCII text correctly. ([specs/chyron-prime.yaml:761](specs/chyron-prime.yaml#L761))
 
 ## clock-8001 — Clock-8001
 
@@ -1424,6 +1454,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Confirm the TP-2000X-PC takes commands ended by a carriage return alone and sends its LED messages with the > prefix and a CR. ([specs/dsan-perfectcue.yaml:103](specs/dsan-perfectcue.yaml#L103))
 - [ ] Check whether the LED states are sent on connecting or only on change, and whether flow control is needed. ([specs/dsan-perfectcue.yaml:96](specs/dsan-perfectcue.yaml#L96))
+
+## eeg-smart-encoder — EEG / AI-Media caption encoders
+
+- [ ] Record what the encoder answers to a command and to the status commands (?, O, +, A, b, S, e), so replies can be checked and status read into state. ([specs/eeg-smart-encoder.yaml:250](specs/eeg-smart-encoder.yaml#L250))
+- [ ] Record the HD492 serial ports' stop bits and flow control (1 stop bit and none assumed from the HD1492 manual). ([specs/eeg-smart-encoder.yaml:264](specs/eeg-smart-encoder.yaml#L264))
+- [ ] Check whether Telnet needs a login and which port the Telnet page offers by default. ([specs/eeg-smart-encoder.yaml:261](specs/eeg-smart-encoder.yaml#L261))
+- [ ] Check whether a CR after CTRL+C is harmful or needed when ending a mode (the spec sends CTRL+C alone). ([specs/eeg-smart-encoder.yaml:123](specs/eeg-smart-encoder.yaml#L123))
+- [ ] Define the HD492 PassThru pairing argument, and the message command parameters (Title, Channel, Repeat, K/D, O/H, N/L). ([specs/eeg-smart-encoder.yaml:272](specs/eeg-smart-encoder.yaml#L272))
 
 ## emberplus — Ember+
 
@@ -1820,6 +1858,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which keys of the Hog OS 5 table work on Hog 4 OS 3.x and 4.x. ([specs/highend-hog4.yaml:534](specs/highend-hog4.yaml#L534))
 - [ ] Confirm that refreshall makes the console send every status, and whether repeating it every 60 s is noticeable on the console. ([specs/highend-hog4.yaml:489](specs/highend-hog4.yaml#L489))
 - [ ] Check whether the HPU acts on front panel keys, encoders and faders sent over OSC. ([specs/highend-hog4.yaml:556](specs/highend-hog4.yaml#L556))
+
+## holographics — Holographics
+
+- [ ] Confirm the REST API takes a call's data as the whole JSON body (as the vendor SDK sends it), not wrapped as {id, data}. ([specs/holographics.yaml:534](specs/holographics.yaml#L534))
+- [ ] Check that list_entries' widgetId filter is honoured when sent as the body of a GET (or whether it must be a query parameter, ?widgetId=). ([specs/holographics.yaml:293](specs/holographics.yaml#L293))
+- [ ] Confirm the Socket.IO server speaks Engine.IO 3 (Socket.IO 2) and pushes stateChanged with the whole state on every change. ([specs/holographics.yaml:421](specs/holographics.yaml#L421))
+- [ ] Record whether an entry in the state carries widgetId or widget_id. ([specs/holographics.yaml:528](specs/holographics.yaml#L528))
+- [ ] Record the reply of GET /api/update/ and /api/license/ so they can be kept in state. ([specs/holographics.yaml:385](specs/holographics.yaml#L385))
 
 ## holyrics — Holyrics
 
@@ -2535,6 +2581,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check how negative lens travel times and half-second values are written ("lens focus time -1.5"). ([specs/nec-projector-ascii.yaml:246](specs/nec-projector-ascii.yaml#L246))
 - [ ] Confirm the NORMAL standby mode refuses ASCII commands on the network on other models. ([specs/nec-projector-ascii.yaml:435](specs/nec-projector-ascii.yaml#L435))
 
+## newblue-captivate — NewBlue Captivate / Titler Live
+
+- [ ] Check that subscribe with empty parameters, sent at once on connecting, starts the notification stream on the TCP socket. ([specs/newblue-captivate.yaml:811](specs/newblue-captivate.yaml#L811))
+- [ ] Record a data notification (event data) so variable changes can be read from the push instead of the poll. ([specs/newblue-captivate.yaml:924](specs/newblue-captivate.yaml#L924))
+- [ ] Confirm a failed command answers with result.success false (and an error field) rather than an error reply, for macro and setTitleName with an unknown title. ([specs/newblue-captivate.yaml:926](specs/newblue-captivate.yaml#L926))
+- [ ] Check whether boolean-like flags (merge, autoCache) are accepted as the text "1" and setDynamic, verbose, showUI and sendVideo as the number 1, as the document types them. ([specs/newblue-captivate.yaml:214](specs/newblue-captivate.yaml#L214))
+- [ ] Confirm getTitleControlInfo with empty parameters lists every title, and that its reply carries result.command. ([specs/newblue-captivate.yaml:826](specs/newblue-captivate.yaml#L826))
+- [ ] Confirm saveSettings answers {"result": null} on success and what it answers on failure. ([specs/newblue-captivate.yaml:166](specs/newblue-captivate.yaml#L166))
+
 ## newtek-3play — NewTek / Vizrt 3Play
 
 - [ ] Record the shortcuts a 3Play's macro recorder shows for replay operations (mark in and out, cue, play on outputs A and B, play speed, play lists, recording), so they can become typed commands. ([specs/newtek-3play.yaml:258](specs/newtek-3play.yaml#L258))
@@ -2808,6 +2863,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record whether the schedule report echoes its page, and whether a page set with D1 0x10 is page 1 disabled (the document's example). ([specs/philips-sicp.yaml:759](specs/philips-sicp.yaml#L759))
 - [ ] Record whether the multi-window report (FD) starts with the window number. ([specs/philips-sicp.yaml:792](specs/philips-sicp.yaml#L792))
 - [ ] Confirm the operating hours report is a big-endian 16-bit count of hours. ([specs/philips-sicp.yaml:724](specs/philips-sicp.yaml#L724))
+
+## pixotope — Pixotope
+
+- [ ] Record the Gateway's HTTP answer bodies (to a Set, a Get, a Call, and a Call that times out), so replies can be read into state. ([specs/pixotope.yaml:321](specs/pixotope.yaml#L321))
+- [ ] Check that ~LOCAL~-Engine addresses the Engine on the Gateway's machine, as the Editor's examples write it. ([specs/pixotope.yaml:330](specs/pixotope.yaml#L330))
+- [ ] Check which API version the URL should carry for current releases (24.1.0 is used by default). ([specs/pixotope.yaml:65](specs/pixotope.yaml#L65))
+- [ ] Confirm the Store answers a Get of State.General.FrameRate, used as the liveness probe. ([specs/pixotope.yaml:62](specs/pixotope.yaml#L62))
 
 ## pjlink — PJLink
 
@@ -3346,6 +3408,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On ULX-D, check that a metering interval above 65535 ms (to 99999, as documented) is accepted. ([specs/shure-wireless.yaml:260](specs/shure-wireless.yaml#L260))
 - [ ] On ULX-D, confirm set_encryption, regenerate_encryption_key and set_frequency_diversity_mode need an IR sync before audio returns, and how long a key regeneration takes. ([specs/shure-wireless.yaml:582](specs/shure-wireless.yaml#L582))
 
+## singular-datastream — Singular.live data stream
+
+- [ ] Record the answer to a payload over 60 KB and to an unknown private token. ([specs/singular-datastream.yaml:69](specs/singular-datastream.yaml#L69))
+
+## singular-live — Singular.live control app
+
+- [ ] Record Singular's answer to an unknown app token, an unknown sub-composition and a malformed payload (status and body). ([specs/singular-live.yaml:352](specs/singular-live.yaml#L352))
+- [ ] Check whether a request may name both subCompositionId and subCompositionName (the reference marks both required, the examples send one). ([specs/singular-live.yaml:347](specs/singular-live.yaml#L347))
+- [ ] Confirm the control data carries subCompositionName for each sub-composition (the reference lists it, its example omits it). ([specs/singular-live.yaml:272](specs/singular-live.yaml#L272))
+- [ ] Check that GET requests are not counted against the rate limits (only the POST/PATCH control and command endpoints are listed). ([specs/singular-live.yaml:261](specs/singular-live.yaml#L261))
+
 ## sofie-chef — Sofie Chef
 
 - [ ] Record the REST answers: GET /api/status and /api/list bodies (the list is read as the WebSocket list body) and the PUT routes' status and body. ([specs/sofie-chef.yaml:177](specs/sofie-chef.yaml#L177))
@@ -3451,6 +3524,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm formatAllDrives's label rules and the EXFAT argument. ([specs/sounddevices-pixnet.yaml:140](specs/sounddevices-pixnet.yaml#L140))
 - [ ] Confirm PIXNET answers 200 to a command, its answer to a refused one, and whether it asks for a login. ([specs/sounddevices-pixnet.yaml:77](specs/sounddevices-pixnet.yaml#L77))
 - [ ] Find the PIXNET status replies (GET /sounddevices/transport and the settings) so the recorder's state can be read. ([specs/sounddevices-pixnet.yaml:172](specs/sounddevices-pixnet.yaml#L172))
+
+## spx-graphics — SPX Graphics Controller
+
+- [ ] Record what SPX Production and SPX Broadcast answer for a wrong or missing API key (SPX Solo's code answers 200 with {"error": ...}). ([specs/spx-graphics.yaml:518](specs/spx-graphics.yaml#L518))
+- [ ] Record the reply of rundown/get on SPX Broadcast and confirm it is the rundown file (templates with itemID, onair as "true"/"false", playserver, playchannel, playlayer, webplayout, relpath, out, DataFields). ([specs/spx-graphics.yaml:534](specs/spx-graphics.yaml#L534))
+- [ ] Record the replies of getprojects, getrundowns, allrundowns, gettemplates, getlayerstate and getFileList, so more of them can be kept in state. ([specs/spx-graphics.yaml:539](specs/spx-graphics.yaml#L539))
+- [ ] Check whether the commercial editions answer the controller commands with 200 and the same JSON as SPX Solo, and the status of an unknown item id. ([specs/spx-graphics.yaml:516](specs/spx-graphics.yaml#L516))
+- [ ] Check that a load_rundown file value with its slash percent-encoded (%2F) is read as project/rundown. ([specs/spx-graphics.yaml:195](specs/spx-graphics.yaml#L195))
 
 ## stagetimer — Stagetimer
 
@@ -3785,6 +3866,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a camera answers commands right after Address Set and IF_Clear broadcast on opening, and whether one that already has its address needs them. ([specs/visca.yaml:130](specs/visca.yaml#L130))
 - [ ] On Sony, confirm the 200 ms before a cancel counts from the pan/tilt drive's ACK (the core's reading of "after executing"); on the other vendors' cameras, which document no such gap and get none, check whether a cancel sent within 200 ms of a drive starting still stops it. ([specs/visca.yaml:1194](specs/visca.yaml#L1194))
 
+## vizrt-trio — Vizrt Viz Trio
+
+- [ ] Record what Viz Trio sends back for a command with no result (nothing, an empty line, or an acknowledgement); the spec waits for nothing. ([specs/vizrt-trio.yaml:910](specs/vizrt-trio.yaml#L910))
+- [ ] Record what a read answers when its result is empty (page:getpagename with no page read, playlist:get_current with none): an empty line, or nothing. ([specs/vizrt-trio.yaml:930](specs/vizrt-trio.yaml#L930))
+- [ ] Confirm a command ended by a line feed alone is accepted (the documents say a new line; some clients send CR LF). ([specs/vizrt-trio.yaml:54](specs/vizrt-trio.yaml#L54))
+- [ ] Check how boolean arguments are written (true/false as sent here, or 1/0) for page:fire, page:fire_all and goto_manual_graphics_mode. ([specs/vizrt-trio.yaml:267](specs/vizrt-trio.yaml#L267))
+- [ ] Check how arguments holding spaces are quoted when they are not the last one (channel and page names). ([specs/vizrt-trio.yaml:920](specs/vizrt-trio.yaml#L920))
+
 ## vmix — vMix
 
 - [ ] Capture a full XML state from vMix 27 or later (with a replay, a GT title, a list, a video call and layered inputs) so the parsing can be checked against the real shape; the shapes used here are inferred from vMix's old documented example and the MIT-licensed Companion module. ([specs/vmix.yaml:87](specs/vmix.yaml#L87))
@@ -3946,3 +4035,11 @@ Nothing specific is listed for these yet, but test results are still welcome: ge
 - [ ] Record the answers of /ctrl/tc, /ctrl/stream_setting?action=query, /ctrl/rtmp, /ctrl/srt, /ctrl/ndi, /ctrl/pt?action=query, /ctrl/network?action=info, /ctrl/card?action=present, /ctrl/preset?action=get_info and /ctrl/framing/all_status, so their fields can be read into state. ([specs/zcam.yaml:3191](specs/zcam.yaml#L3191))
 - [ ] Check the valid ranges of fspeed for /ctrl/lens zoom and focus, the pan/tilt speeds of action=pt, preset and trace numbers, and the framing fov, target_lost and placement values. ([specs/zcam.yaml:3191](specs/zcam.yaml#L3191))
 - [ ] Find out how a client logs in when the camera's user accounts or HTTPS authentication are on, and whether clip downloads need it. ([specs/zcam.yaml:3199](specs/zcam.yaml#L3199))
+
+## zerodensity-reality-hub — Zero Density Reality Hub
+
+- [ ] Record the port Reality Hub serves its REST API on (80 assumed) and whether it is served over https. ([specs/zerodensity-reality-hub.yaml:656](specs/zerodensity-reality-hub.yaml#L656))
+- [ ] Confirm a 403 for a missing module permission carries code INSUFFICIENT_PERMISSIONS, so it is not taken for a refused key. ([specs/zerodensity-reality-hub.yaml:54](specs/zerodensity-reality-hub.yaml#L54))
+- [ ] Check that a node, property or function path holding slashes is accepted percent-encoded (%2F) as one segment. ([specs/zerodensity-reality-hub.yaml:672](specs/zerodensity-reality-hub.yaml#L672))
+- [ ] Record the units of an engine's usedSpace and diskSpace. ([specs/zerodensity-reality-hub.yaml:642](specs/zerodensity-reality-hub.yaml#L642))
+- [ ] Check whether a rundown no longer loaded should be removed from state (the spec keeps its last items). ([specs/zerodensity-reality-hub.yaml:663](specs/zerodensity-reality-hub.yaml#L663))
