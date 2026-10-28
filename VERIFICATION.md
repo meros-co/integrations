@@ -3425,6 +3425,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Capture SAMPLE with metering on, and confirm its four values follow Channel Number Assignments (1-2 Dante inputs, 3 summed input, 4 Dante output). ([specs/shure-mxn5.yaml:468](specs/shure-mxn5.yaml#L468))
 - [ ] Check the PRESET_NAME answer for an empty preset ({empty}). ([specs/shure-mxn5.yaml:162](specs/shure-mxn5.yaml#L162))
 
+## shure-mxw — Shure Microflex Wireless and MXW neXt
+
+- [ ] Confirm the SAMPLE scales on legacy MXW access points (the neXt document's RF level minus 110 dBm and audio minus 120 dB are assumed for both). ([specs/shure-mxw.yaml:1163](specs/shure-mxw.yaml#L1163))
+- [ ] Confirm that GET 0 <parameter> on a legacy access point or charger is answered with one REP per channel or bay (used on connecting). ([specs/shure-mxw.yaml:661](specs/shure-mxw.yaml#L661))
+- [ ] Check which TX_STATUS values each generation takes (MUTE and STANDBY on legacy, MUTED on neXt) and what an MXWNDX charger does with SET TX_STATUS. ([specs/shure-mxw.yaml:677](specs/shure-mxw.yaml#L677))
+- [ ] Confirm the mute word of INPUT_CH_MUTE, OUTPUT_CH_MUTE and AUTOMIX_OUT_MUTE (MUTE in the text, MUTED in the examples) and whether AUTOMIX_OUT_MUTE takes a channel number. ([specs/shure-mxw.yaml:594](specs/shure-mxw.yaml#L594))
+- [ ] Record the Auracast sample rates the access points accept, and the AVAILABLE_CHANNELS query the document mentions. ([specs/shure-mxw.yaml:1014](specs/shure-mxw.yaml#L1014))
+- [ ] Check the LED_STATUS reply to a secondary microphone's set (the document shows it without SEC) and the neXt reply's CH prefix. ([specs/shure-mxw.yaml:1159](specs/shure-mxw.yaml#L1159))
+- [ ] Check whether UNLINK also works on MXWNCS charger bays, as the document's wording suggests. ([specs/shure-mxw.yaml:634](specs/shure-mxw.yaml#L634))
+
 ## shure-p300 — Shure P300
 
 - [ ] Check that a SET answered by the REP of the new value is never interleaved with a change report for the same parameter on another channel, or note how often it happens. ([specs/shure-p300.yaml:40](specs/shure-p300.yaml#L40))

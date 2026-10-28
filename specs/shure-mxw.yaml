@@ -1,0 +1,1306 @@
+spec: 1
+id: shure-mxw
+name: "Shure Microflex Wireless (MXW and MXW neXt access points and charging stations)"
+vendor: Shure
+category: wireless
+
+# Microflex Wireless command strings on TCP 2202: GET, SET and REP in angle
+# brackets, a REP pushed whenever a value changes (metered values aside), and
+# SAMPLE meters while a meter rate is set. Commands for microphones go to the
+# access point, which relays them; charging stations take their own. On legacy
+# MXW a channel can have a primary and a secondary microphone (SEC before the
+# channel number); MXW neXt rack units also take BAY or CH before it, and accept
+# the legacy strings except where noted.
+# The gains of the neXt audio channels use the shure_gain conversion.
+source:
+  - title: "Microflex Wireless Command Strings, Version 2.4 (2025-C)"
+    author: Shure Incorporated
+    url: "https://pubs.shure.com/command-strings/MXW/en-US"
+    note: >
+      Manufacturer document (PDF docId 7282, page numbers the PDF's). TCP 2202, the controller the
+      client, GET/SET/REP/SAMPLE and REP on change p.3; SEC and PRI microphones p.3; recommended re-
+      reads when TX_AVAILABLE turns YES p.4; External LED Control and External Mute p.5-6, p.12;
+      CHAN_NAME (8 characters set, 31 reported) and DEVICE_ID p.8-9; UNLINK, FLASH, METER_RATE and
+      SAMPLE p.9-10; TX_AVAILABLE, TX_STATUS, AUDIO_GAIN (000-060, minus 25 dB) with INC/DEC,
+      INT_AUDIO_GAIN (000-040), BUTTON_STS, LED_STATUS (ON, OF, ST, FL, PU, NC), TX_TYPE,
+      BP_MIC_SELECT, BATT_CHARGE, BATT_RUN_TIME (65532-65535), BATT_HEALTH, BATT_TIME_TO_FULL,
+      TX_DEVICE_ID (12 characters) p.11-18; MXWNCS REMOTE_LINK and TX_DEVICE_ID p.18-19; REP ERR and
+      the 252-255 and 65532-65535 codes p.20. Further charger commands for an unlinked microphone
+      are given only by Shure support (p.18) and are not here.
+  - title: "MXWneXt Command Strings, Version 3.0 (2026-J)"
+    author: Shure Incorporated
+    url: "https://www.shure.com/en-US/docs/commandstrings/MXWneXt"
+    note: >
+      Manufacturer document (PDF docId 10684). Legacy strings accepted except where noted p.4; GET
+      ALL, FLASH (no microphone identify on neXt), DEVICE_MODEL, SYSTEM_OPERATION_MODE, FW_VER,
+      SERIAL_NUM, DEVICE_ID (1-31 characters), METER_RATE with GET (RF 000-127 for dBm + 110, audio
+      000-120 for dB + 120), REBOOT p.4-8; AUDIO_GAIN on neXt (000-040) and INPUT_CH_GAIN (0-1400 in
+      tenths offset by 1100; Dante 1-19, wireless 21-39, analog 41, USB 51), INPUT_CH_MUTE,
+      OUTPUT_CH_GAIN, OUTPUT_CH_MUTE (Dante 1-9, analog 41-42, USB 51, back channel 61),
+      AUTOMIX_OUT_MUTE, CHAN_NAME, DECT_CHANNEL_COUNT, REMOTE_LINK, UNLINK p.9-16; TX_STATUS,
+      TX_AVAILABLE, TX_DEVICE_ID, TX_TYPE and TX_MODEL, BP_MIC_SELECT (with SET), LED_STATUS,
+      BUTTON_STS, BAY and CH p.17-20; BATT_HEALTH, BATT_RUN_TIME, BATT_TIME_TO_FULL (65533-65535),
+      BATT_CHARGE p.20-22; Auracast AC_BC_ENABLE, AC_BC_ENCRYPTION, AC_BC_NAME, AC_BC_CODE,
+      AC_POWER, AC_BC_SAMPLE_RATE, AC_BC_QOS p.22-26.
+
+transport:
+  type: line-tcp
+  port: 2202
+  framing: delimited
+  open: "< "
+  close: " >"
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # Answers and change reports are both REP: commands name the parameter
+  # their REP carries (expect.reply_contains).
+  reply_match: "^< (?:REP |ERROR)"
+  error_match: "^< (?:REP ERR|ERROR) ?>"
+  probe: "GET DEVICE_ID"
+
+conversions:
+  # INPUT_CH_GAIN and OUTPUT_CH_GAIN: tenths of a dB offset by 1100 (0-1400 = -110.0 to +30.0 dB)
+  shure_gain:
+    points: [[0, -110.0], [1400, 30.0]]
+
+ports:
+  - { port: 2202, protocol: tcp, role: control }
+
+maps:
+  slot: { "primary": "", "secondary": "SEC ", "bay": "BAY ", "channel": "CH " }
+
+models:
+  - id: mxwapt2
+    name: "Shure MXWAPT2 access point (2 channels)"
+    supports:
+      - get_device_id
+      - set_device_id
+      - flash
+      - flash_microphone
+      - set_meter_rate
+      - get_channel_name
+      - set_channel_name
+      - unlink
+      - get_transmitter_available
+      - get_transmitter_status
+      - set_transmitter_status
+      - get_gain
+      - set_gain
+      - increase_gain
+      - decrease_gain
+      - get_internal_mic_gain
+      - set_internal_mic_gain
+      - increase_internal_mic_gain
+      - decrease_internal_mic_gain
+      - get_button
+      - get_led
+      - set_led
+      - get_transmitter_type
+      - get_bodypack_mic
+      - get_battery_charge
+      - get_battery_minutes
+      - get_battery_health
+      - get_battery_time_to_full
+      - get_transmitter_name
+      - set_transmitter_name
+    verification: none
+  - id: mxwapt4
+    name: "Shure MXWAPT4 access point (4 channels)"
+    supports:
+      - get_device_id
+      - set_device_id
+      - flash
+      - flash_microphone
+      - set_meter_rate
+      - get_channel_name
+      - set_channel_name
+      - unlink
+      - get_transmitter_available
+      - get_transmitter_status
+      - set_transmitter_status
+      - get_gain
+      - set_gain
+      - increase_gain
+      - decrease_gain
+      - get_internal_mic_gain
+      - set_internal_mic_gain
+      - increase_internal_mic_gain
+      - decrease_internal_mic_gain
+      - get_button
+      - get_led
+      - set_led
+      - get_transmitter_type
+      - get_bodypack_mic
+      - get_battery_charge
+      - get_battery_minutes
+      - get_battery_health
+      - get_battery_time_to_full
+      - get_transmitter_name
+      - set_transmitter_name
+    verification: none
+  - id: mxwapt8
+    name: "Shure MXWAPT8 access point (8 channels)"
+    supports:
+      - get_device_id
+      - set_device_id
+      - flash
+      - flash_microphone
+      - set_meter_rate
+      - get_channel_name
+      - set_channel_name
+      - unlink
+      - get_transmitter_available
+      - get_transmitter_status
+      - set_transmitter_status
+      - get_gain
+      - set_gain
+      - increase_gain
+      - decrease_gain
+      - get_internal_mic_gain
+      - set_internal_mic_gain
+      - increase_internal_mic_gain
+      - decrease_internal_mic_gain
+      - get_button
+      - get_led
+      - set_led
+      - get_transmitter_type
+      - get_bodypack_mic
+      - get_battery_charge
+      - get_battery_minutes
+      - get_battery_health
+      - get_battery_time_to_full
+      - get_transmitter_name
+      - set_transmitter_name
+    verification: none
+  - id: mxwncs2
+    name: "Shure MXWNCS2 networked charging station (2 bays)"
+    supports:
+      - get_device_id
+      - set_device_id
+      - flash
+      - remote_link
+      - get_transmitter_available
+      - get_transmitter_status
+      - get_battery_charge
+      - get_battery_health
+      - get_battery_time_to_full
+      - get_transmitter_name
+      - set_transmitter_name
+    verification: none
+  - id: mxwncs4
+    name: "Shure MXWNCS4 networked charging station (4 bays)"
+    supports:
+      - get_device_id
+      - set_device_id
+      - flash
+      - remote_link
+      - get_transmitter_available
+      - get_transmitter_status
+      - get_battery_charge
+      - get_battery_health
+      - get_battery_time_to_full
+      - get_transmitter_name
+      - set_transmitter_name
+    verification: none
+  - id: mxwncs8
+    name: "Shure MXWNCS8 networked charging station (8 bays)"
+    supports:
+      - get_device_id
+      - set_device_id
+      - flash
+      - remote_link
+      - get_transmitter_available
+      - get_transmitter_status
+      - get_battery_charge
+      - get_battery_health
+      - get_battery_time_to_full
+      - get_transmitter_name
+      - set_transmitter_name
+    verification: none
+  - id: mxwapxd2
+    name: "Shure MXW neXt MXWAPXD2 access point with dock (2 channels)"
+    supports:
+      - get_device_id
+      - set_device_id
+      - flash
+      - flash_microphone
+      - get_model
+      - get_firmware
+      - get_serial_number
+      - get_operation_mode
+      - set_operation_mode
+      - get_channel_count
+      - reboot
+      - get_all
+      - get_automix_mute
+      - set_automix_mute
+      - set_meter_rate
+      - get_meter_rate
+      - get_channel_name
+      - set_channel_name
+      - unlink
+      - get_transmitter_available
+      - get_transmitter_status
+      - set_transmitter_status
+      - get_gain
+      - set_gain
+      - increase_gain
+      - decrease_gain
+      - get_internal_mic_gain
+      - set_internal_mic_gain
+      - increase_internal_mic_gain
+      - decrease_internal_mic_gain
+      - get_button
+      - get_led
+      - set_led
+      - get_transmitter_type
+      - get_bodypack_mic
+      - set_bodypack_mic
+      - get_battery_charge
+      - get_battery_minutes
+      - get_battery_health
+      - get_battery_time_to_full
+      - get_transmitter_name
+      - set_transmitter_name
+      - get_input_gain
+      - set_input_gain
+      - increase_input_gain
+      - decrease_input_gain
+      - get_input_mute
+      - set_input_mute
+      - get_output_gain
+      - set_output_gain
+      - increase_output_gain
+      - decrease_output_gain
+      - get_output_mute
+      - set_output_mute
+      - get_auracast_broadcast
+      - set_auracast_broadcast
+      - get_auracast_encryption
+      - set_auracast_encryption
+      - get_auracast_power
+      - set_auracast_power
+      - get_auracast_quality
+      - set_auracast_quality
+      - get_auracast_sample_rate
+      - set_auracast_sample_rate
+      - get_auracast_name
+      - set_auracast_name
+      - get_auracast_code
+      - set_auracast_code
+    verification: none
+  - id: mxwapx4
+    name: "Shure MXW neXt MXWAPX4 access point (4 channels)"
+    supports:
+      - get_device_id
+      - set_device_id
+      - flash
+      - flash_microphone
+      - get_model
+      - get_firmware
+      - get_serial_number
+      - get_operation_mode
+      - set_operation_mode
+      - get_channel_count
+      - reboot
+      - get_all
+      - get_automix_mute
+      - set_automix_mute
+      - set_meter_rate
+      - get_meter_rate
+      - get_channel_name
+      - set_channel_name
+      - unlink
+      - get_transmitter_available
+      - get_transmitter_status
+      - set_transmitter_status
+      - get_gain
+      - set_gain
+      - increase_gain
+      - decrease_gain
+      - get_internal_mic_gain
+      - set_internal_mic_gain
+      - increase_internal_mic_gain
+      - decrease_internal_mic_gain
+      - get_button
+      - get_led
+      - set_led
+      - get_transmitter_type
+      - get_bodypack_mic
+      - set_bodypack_mic
+      - get_battery_charge
+      - get_battery_minutes
+      - get_battery_health
+      - get_transmitter_name
+      - set_transmitter_name
+      - get_input_gain
+      - set_input_gain
+      - increase_input_gain
+      - decrease_input_gain
+      - get_input_mute
+      - set_input_mute
+      - get_output_gain
+      - set_output_gain
+      - increase_output_gain
+      - decrease_output_gain
+      - get_output_mute
+      - set_output_mute
+      - get_auracast_broadcast
+      - set_auracast_broadcast
+      - get_auracast_encryption
+      - set_auracast_encryption
+      - get_auracast_power
+      - set_auracast_power
+      - get_auracast_quality
+      - set_auracast_quality
+      - get_auracast_sample_rate
+      - set_auracast_sample_rate
+      - get_auracast_name
+      - set_auracast_name
+      - get_auracast_code
+      - set_auracast_code
+    verification: none
+  - id: mxwapx8
+    name: "Shure MXW neXt MXWAPX8 access point (8 channels)"
+    supports:
+      - get_device_id
+      - set_device_id
+      - flash
+      - flash_microphone
+      - get_model
+      - get_firmware
+      - get_serial_number
+      - get_operation_mode
+      - set_operation_mode
+      - get_channel_count
+      - reboot
+      - get_all
+      - get_automix_mute
+      - set_automix_mute
+      - set_meter_rate
+      - get_meter_rate
+      - get_channel_name
+      - set_channel_name
+      - unlink
+      - get_transmitter_available
+      - get_transmitter_status
+      - set_transmitter_status
+      - get_gain
+      - set_gain
+      - increase_gain
+      - decrease_gain
+      - get_internal_mic_gain
+      - set_internal_mic_gain
+      - increase_internal_mic_gain
+      - decrease_internal_mic_gain
+      - get_button
+      - get_led
+      - set_led
+      - get_transmitter_type
+      - get_bodypack_mic
+      - set_bodypack_mic
+      - get_battery_charge
+      - get_battery_minutes
+      - get_battery_health
+      - get_transmitter_name
+      - set_transmitter_name
+      - get_input_gain
+      - set_input_gain
+      - increase_input_gain
+      - decrease_input_gain
+      - get_input_mute
+      - set_input_mute
+      - get_output_gain
+      - set_output_gain
+      - increase_output_gain
+      - decrease_output_gain
+      - get_output_mute
+      - set_output_mute
+      - get_auracast_broadcast
+      - set_auracast_broadcast
+      - get_auracast_encryption
+      - set_auracast_encryption
+      - get_auracast_power
+      - set_auracast_power
+      - get_auracast_quality
+      - set_auracast_quality
+      - get_auracast_sample_rate
+      - set_auracast_sample_rate
+      - get_auracast_name
+      - set_auracast_name
+      - get_auracast_code
+      - set_auracast_code
+    verification: none
+  - id: mxwndx4
+    name: "Shure MXW neXt MXWNDX4 networked charging station (4 bays)"
+    supports:
+      - get_device_id
+      - set_device_id
+      - flash
+      - get_model
+      - get_firmware
+      - get_serial_number
+      - reboot
+      - get_all
+      - remote_link_next
+      - get_transmitter_available
+      - get_transmitter_status
+      - set_transmitter_status
+      - get_battery_charge
+      - get_battery_health
+      - get_battery_time_to_full
+      - get_transmitter_name
+      - set_transmitter_name
+    verification: none
+  - id: mxwndx8
+    name: "Shure MXW neXt MXWNDX8 networked charging station (8 bays)"
+    supports:
+      - get_device_id
+      - set_device_id
+      - flash
+      - get_model
+      - get_firmware
+      - get_serial_number
+      - reboot
+      - get_all
+      - remote_link_next
+      - get_transmitter_available
+      - get_transmitter_status
+      - set_transmitter_status
+      - get_battery_charge
+      - get_battery_health
+      - get_battery_time_to_full
+      - get_transmitter_name
+      - set_transmitter_name
+    verification: none
+  - id: mxwndx4g
+    name: "Shure MXW neXt MXWNDX4G networked charging station (4 bays, gooseneck and boundary)"
+    supports:
+      - get_device_id
+      - set_device_id
+      - flash
+      - get_model
+      - get_firmware
+      - get_serial_number
+      - reboot
+      - get_all
+      - remote_link_next
+      - get_transmitter_available
+      - get_transmitter_status
+      - set_transmitter_status
+      - get_battery_charge
+      - get_battery_health
+      - get_battery_time_to_full
+      - get_transmitter_name
+      - set_transmitter_name
+    verification: none
+  - id: mxwndx8g
+    name: "Shure MXW neXt MXWNDX8G networked charging station (8 bays, gooseneck and boundary)"
+    supports:
+      - get_device_id
+      - set_device_id
+      - flash
+      - get_model
+      - get_firmware
+      - get_serial_number
+      - reboot
+      - get_all
+      - remote_link_next
+      - get_transmitter_available
+      - get_transmitter_status
+      - set_transmitter_status
+      - get_battery_charge
+      - get_battery_health
+      - get_battery_time_to_full
+      - get_transmitter_name
+      - set_transmitter_name
+    verification: none
+
+commands:
+  get_device_id:
+    summary: "Read the device ID (DEVICE_ID)"
+    send: "GET DEVICE_ID"
+    expect: { reply_contains: " DEVICE_ID ", matches: " DEVICE_ID \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_device_id:
+    summary: "Set the device ID (DEVICE_ID)"
+    params:
+      value: { type: string, required: true, max_length: 31, pattern: "^[\\x20-\\x3b\\x3d\\x3f-\\x7a\\x7c\\x7e]+$", label: "Device ID", description: "1 to 8 characters on legacy MXW; 1 to 31 letters, digits and hyphens on MXW neXt (no hyphen first or last)." }
+    send: "SET DEVICE_ID \\{{value}\\}"
+    expect: { reply_contains: " DEVICE_ID ", contains: " DEVICE_ID " }
+    returns: ack
+  flash:
+    summary: "Identify the device by flashing its lights (FLASH); it stops by itself"
+    params:
+      enabled: { type: bool, required: true, label: "Flash", description: "On flashes the lights, off stops them." }
+    send: "SET FLASH {enabled:on_off}"
+    expect: { reply_contains: " FLASH ", contains: " FLASH " }
+    returns: ack
+  flash_microphone:
+    summary: "Identify a microphone by flashing its lights (FLASH on a channel); legacy MXW only, neXt answers ERROR"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+      enabled: { type: bool, required: true, label: "Flash", description: "On flashes the microphone's lights, off stops them." }
+    send: "SET {slot:map.slot}{channel} FLASH {enabled:on_off}"
+    expect: { reply_contains: " FLASH ", contains: " FLASH " }
+    returns: ack
+  get_model:
+    summary: "Read the model (DEVICE_MODEL)"
+    send: "GET DEVICE_MODEL"
+    expect: { reply_contains: " DEVICE_MODEL ", matches: " DEVICE_MODEL \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_firmware:
+    summary: "Read the firmware version (a * after it: self test failed) (FW_VER)"
+    send: "GET FW_VER"
+    expect: { reply_contains: " FW_VER ", matches: " FW_VER \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_serial_number:
+    summary: "Read the serial number (SERIAL_NUM)"
+    send: "GET SERIAL_NUM"
+    expect: { reply_contains: " SERIAL_NUM ", matches: " SERIAL_NUM \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_operation_mode:
+    summary: "Read the system operation mode (SYSTEM_OPERATION_MODE)"
+    send: "GET SYSTEM_OPERATION_MODE"
+    expect: { reply_contains: " SYSTEM_OPERATION_MODE ", matches: " SYSTEM_OPERATION_MODE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_operation_mode:
+    summary: "Set the system operation mode (SYSTEM_OPERATION_MODE)"
+    params:
+      mode: { type: enum, values: [PRESENTATION, CONFERENCE, DIRECT, CUSTOM], required: true, label: "Mode", description: "PRESENTATION, CONFERENCE, DIRECT or CUSTOM." }
+    send: "SET SYSTEM_OPERATION_MODE {mode}"
+    expect: { reply_contains: " SYSTEM_OPERATION_MODE ", contains: " SYSTEM_OPERATION_MODE " }
+    returns: ack
+  get_channel_count:
+    summary: "Read the number of DECT channels (DECT_CHANNEL_COUNT)"
+    send: "GET DECT_CHANNEL_COUNT"
+    expect: { reply_contains: " DECT_CHANNEL_COUNT ", matches: " DECT_CHANNEL_COUNT \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  reboot:
+    summary: "Restart the unit (REBOOT); not acknowledged"
+    send: "SET REBOOT"
+    returns: none
+  get_all:
+    summary: "Ask for every parameter (GET ALL); the answers update state"
+    send: "GET ALL"
+    returns: none
+  get_automix_mute:
+    summary: "Read the automix output mute (AUTOMIX_OUT_MUTE)"
+    send: "GET AUTOMIX_OUT_MUTE"
+    expect: { reply_contains: " AUTOMIX_OUT_MUTE ", matches: " AUTOMIX_OUT_MUTE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_automix_mute:
+    summary: "Mute, unmute or toggle the automix output (AUTOMIX_OUT_MUTE)"
+    params:
+      state: { type: enum, values: [MUTE, ACTIVE, TOGGLE], required: true, label: "Mute", description: "MUTE mutes the automix output, ACTIVE unmutes it, TOGGLE switches it." }
+    send: "SET AUTOMIX_OUT_MUTE {state}"
+    expect: { reply_contains: " AUTOMIX_OUT_MUTE ", contains: " AUTOMIX_OUT_MUTE " }
+    returns: ack
+  set_meter_rate:
+    summary: "Set a channel's metering interval (METER_RATE): SAMPLE messages at that interval, 0 to stop"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+      rate_ms: { type: int, min: 0, max: 65535, required: true, label: "Metering interval", description: "Interval in ms from 100, or 0 to stop metering." }
+    send: "SET {slot:map.slot}{channel} METER_RATE {rate_ms:05d}"
+    expect: { reply_contains: " METER_RATE ", contains: " METER_RATE " }
+    returns: ack
+  get_meter_rate:
+    summary: "Read a channel's metering interval (METER_RATE), MXW neXt"
+    params:
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+    send: "GET {channel} METER_RATE"
+    expect: { reply_contains: " METER_RATE ", matches: " METER_RATE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_channel_name:
+    summary: "Read a channel's name (CHAN_NAME)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+    send: "GET {slot:map.slot}{channel} CHAN_NAME"
+    expect: { reply_contains: " CHAN_NAME ", matches: " CHAN_NAME \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_channel_name:
+    summary: "Set a channel's name (CHAN_NAME), up to 8 characters"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+      name: { type: string, required: true, max_length: 8, pattern: "^[\\x20-\\x3b\\x3d\\x3f-\\x7a\\x7c\\x7e]+$", label: "Name", description: "1 to 8 characters: letters, digits, space and punctuation other than < > { }." }
+    send: "SET {slot:map.slot}{channel} CHAN_NAME \\{{name}\\}"
+    expect: { reply_contains: " CHAN_NAME ", contains: " CHAN_NAME " }
+    returns: ack
+  unlink:
+    summary: "Unlink the microphone from a channel (UNLINK)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 1, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model)." }
+    send: "SET {slot:map.slot}{channel} UNLINK"
+    expect: { reply_contains: " UNLINK ", contains: "SUCCESS" }
+    returns: ack
+  remote_link:
+    summary: "Link the microphone docked in a charger bay to an access point's channel (REMOTE_LINK, firmware 4.0)"
+    params:
+      mic: { type: enum, values: [PRI, SEC], default: PRI, label: "Microphone", description: "PRI to link it as the channel's primary microphone, SEC as its secondary (legacy MXW)." }
+      bay: { type: int, min: 1, max: 8, required: true, label: "Bay", description: "Charger bay holding the microphone, from 1." }
+      channel: { type: int, min: 1, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model)." }
+      access_point: { type: string, required: true, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: "Access point", description: "IPv4 address of the access point, dotted." }
+    send: "SET {mic} {bay} REMOTE_LINK {channel} \\{{access_point}\\}"
+    expect: { reply_contains: " REMOTE_LINK ", contains: "SUCCESS" }
+    returns: ack
+  remote_link_next:
+    summary: "Link the microphone docked in a charger bay to an access point's channel (REMOTE_LINK)"
+    params:
+      bay: { type: int, min: 1, max: 8, required: true, label: "Bay", description: "Charger bay holding the microphone, from 1." }
+      channel: { type: int, min: 1, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model)." }
+      access_point: { type: string, required: true, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: "Access point", description: "IPv4 address of the access point, dotted." }
+    send: "SET {bay} REMOTE_LINK {channel} \\{{access_point}\\}"
+    expect: { reply_contains: " REMOTE_LINK ", contains: "SUCCESS" }
+    returns: ack
+  get_transmitter_available:
+    summary: "Read whether a microphone is linked, on and reachable (TX_AVAILABLE)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+    send: "GET {slot:map.slot}{channel} TX_AVAILABLE"
+    expect: { reply_contains: " TX_AVAILABLE ", matches: " TX_AVAILABLE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_transmitter_status:
+    summary: "Read a microphone's status (ACTIVE, MUTE or MUTED, STANDBY, ON_CHARGER, UNKNOWN) (TX_STATUS)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+    send: "GET {slot:map.slot}{channel} TX_STATUS"
+    expect: { reply_contains: " TX_STATUS ", matches: " TX_STATUS \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_transmitter_status:
+    summary: "Set a microphone's status (TX_STATUS): active, muted, standby or off"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+      status: { type: enum, values: ["ACTIVE", "MUTE", "MUTED", "STANDBY", "OFF"], required: true, label: "Status", description: "ACTIVE unmutes, MUTE (legacy) or MUTED (neXt) mutes, STANDBY (legacy) puts it in standby, OFF turns it off." }
+    send: "SET {slot:map.slot}{channel} TX_STATUS {status}"
+    expect: { reply_contains: " TX_STATUS ", contains: " TX_STATUS " }
+    returns: ack
+  get_gain:
+    summary: "Read a microphone's gain (AUDIO_GAIN)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+    send: "GET {slot:map.slot}{channel} AUDIO_GAIN"
+    expect: { reply_contains: " AUDIO_GAIN ", matches: " AUDIO_GAIN \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_gain:
+    summary: "Set a microphone's gain in dB (AUDIO_GAIN)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+      gain_db: { type: int, min: -25, max: 35, required: true, label: "Gain", description: "Gain in dB, -25 to +35 dB on legacy MXW, -25 to +15 dB on neXt." }
+    send: "SET {slot:map.slot}{channel} AUDIO_GAIN {gain_db:+25}"
+    expect: { reply_contains: " AUDIO_GAIN ", contains: " AUDIO_GAIN " }
+    returns: ack
+  increase_gain:
+    summary: "Increase a microphone's gain by a step in dB (AUDIO_GAIN INC)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+      step: { type: int, min: 1, max: 60, required: true, label: "Step", description: "Amount to change the gain by, in dB." }
+    send: "SET {slot:map.slot}{channel} AUDIO_GAIN INC {step}"
+    expect: { reply_contains: " AUDIO_GAIN ", contains: " AUDIO_GAIN " }
+    returns: ack
+  decrease_gain:
+    summary: "Decrease a microphone's gain by a step in dB (AUDIO_GAIN DEC)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+      step: { type: int, min: 1, max: 60, required: true, label: "Step", description: "Amount to change the gain by, in dB." }
+    send: "SET {slot:map.slot}{channel} AUDIO_GAIN DEC {step}"
+    expect: { reply_contains: " AUDIO_GAIN ", contains: " AUDIO_GAIN " }
+    returns: ack
+  get_internal_mic_gain:
+    summary: "Read a bodypack's internal microphone gain (INT_AUDIO_GAIN)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+    send: "GET {slot:map.slot}{channel} INT_AUDIO_GAIN"
+    expect: { reply_contains: " INT_AUDIO_GAIN ", matches: " INT_AUDIO_GAIN \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_internal_mic_gain:
+    summary: "Set a bodypack's internal microphone gain in dB (INT_AUDIO_GAIN)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+      gain_db: { type: int, min: -25, max: 15, required: true, label: "Gain", description: "Gain in dB, -25 to +15 dB." }
+    send: "SET {slot:map.slot}{channel} INT_AUDIO_GAIN {gain_db:+25}"
+    expect: { reply_contains: " INT_AUDIO_GAIN ", contains: " INT_AUDIO_GAIN " }
+    returns: ack
+  increase_internal_mic_gain:
+    summary: "Increase a bodypack's internal microphone gain by a step in dB (INT_AUDIO_GAIN INC)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+      step: { type: int, min: 1, max: 60, required: true, label: "Step", description: "Amount to change the gain by, in dB." }
+    send: "SET {slot:map.slot}{channel} INT_AUDIO_GAIN INC {step}"
+    expect: { reply_contains: " INT_AUDIO_GAIN ", contains: " INT_AUDIO_GAIN " }
+    returns: ack
+  decrease_internal_mic_gain:
+    summary: "Decrease a bodypack's internal microphone gain by a step in dB (INT_AUDIO_GAIN DEC)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+      step: { type: int, min: 1, max: 60, required: true, label: "Step", description: "Amount to change the gain by, in dB." }
+    send: "SET {slot:map.slot}{channel} INT_AUDIO_GAIN DEC {step}"
+    expect: { reply_contains: " INT_AUDIO_GAIN ", contains: " INT_AUDIO_GAIN " }
+    returns: ack
+  get_button:
+    summary: "Read whether a microphone's button is pressed (BUTTON_STS)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+    send: "GET {slot:map.slot}{channel} BUTTON_STS"
+    expect: { reply_contains: " BUTTON_STS ", matches: " BUTTON_STS \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_led:
+    summary: "Read a microphone's red and green LEDs (LED_STATUS)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+    send: "GET {slot:map.slot}{channel} LED_STATUS"
+    expect: { reply_contains: " LED_STATUS ", matches: " LED_STATUS \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_led:
+    summary: "Set a microphone's red and green LEDs (LED_STATUS); needs External LED Control"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+      red: { type: enum, values: ["ON", "OF", "ST", "FL", "PU", "NC"], required: true, label: "Red LED", description: "ON, OF off, ST strobe, FL flash, PU pulse or NC no change." }
+      green: { type: enum, values: ["ON", "OF", "ST", "FL", "PU", "NC"], required: true, label: "Green LED", description: "ON, OF off, ST strobe, FL flash, PU pulse or NC no change." }
+    send: "SET {slot:map.slot}{channel} LED_STATUS {red} {green}"
+    expect: { reply_contains: " LED_STATUS ", contains: " LED_STATUS " }
+    returns: ack
+  get_transmitter_type:
+    summary: "Read a microphone's type (TX_TYPE)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+    send: "GET {slot:map.slot}{channel} TX_TYPE"
+    expect: { reply_contains: " TX_TYPE ", matches: " TX_TYPE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_bodypack_mic:
+    summary: "Read a bodypack's microphone input (BP_MIC_SELECT)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+    send: "GET {slot:map.slot}{channel} BP_MIC_SELECT"
+    expect: { reply_contains: " BP_MIC_SELECT ", matches: " BP_MIC_SELECT \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_bodypack_mic:
+    summary: "Choose a bodypack's microphone input (BP_MIC_SELECT), MXW neXt"
+    params:
+      channel: { type: int, min: 1, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model)." }
+      input: { type: enum, values: [INT, EXT, AUTO], required: true, label: "Input", description: "INT the internal microphone, EXT an external one, AUTO either." }
+    send: "SET {channel} BP_MIC_SELECT {input}"
+    expect: { reply_contains: " BP_MIC_SELECT ", contains: " BP_MIC_SELECT " }
+    returns: ack
+  get_battery_charge:
+    summary: "Read a microphone's battery charge (BATT_CHARGE)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+    send: "GET {slot:map.slot}{channel} BATT_CHARGE"
+    expect: { reply_contains: " BATT_CHARGE ", matches: " BATT_CHARGE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_minutes:
+    summary: "Read a microphone's battery time left (BATT_RUN_TIME)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+    send: "GET {slot:map.slot}{channel} BATT_RUN_TIME"
+    expect: { reply_contains: " BATT_RUN_TIME ", matches: " BATT_RUN_TIME \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_health:
+    summary: "Read a microphone's battery health (BATT_HEALTH)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+    send: "GET {slot:map.slot}{channel} BATT_HEALTH"
+    expect: { reply_contains: " BATT_HEALTH ", matches: " BATT_HEALTH \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_time_to_full:
+    summary: "Read a microphone's charging time left (BATT_TIME_TO_FULL)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+    send: "GET {slot:map.slot}{channel} BATT_TIME_TO_FULL"
+    expect: { reply_contains: " BATT_TIME_TO_FULL ", matches: " BATT_TIME_TO_FULL \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_transmitter_name:
+    summary: "Read a microphone's device ID (TX_DEVICE_ID)"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+    send: "GET {slot:map.slot}{channel} TX_DEVICE_ID"
+    expect: { reply_contains: " TX_DEVICE_ID ", matches: " TX_DEVICE_ID \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_transmitter_name:
+    summary: "Set a microphone's device ID (TX_DEVICE_ID), 1-12 letters, digits and hyphens"
+    params:
+      slot: { type: enum, values: [primary, secondary, bay, channel], default: primary, label: "Microphone", description: "primary (the channel's microphone), secondary (legacy MXW's second microphone, SEC), or on MXW neXt rack units bay (BAY, the dock bay on the MXWAPXD2) or channel (CH)." }
+      channel: { type: int, min: 0, max: 8, required: true, label: "Channel", description: "Channel or bay from 1 (2, 4 or 8 by model); 0 is every one where the document allows it." }
+      name: { type: string, required: true, max_length: 12, pattern: "^[A-Za-z0-9-]+$", label: "Name", description: "1 to 12 letters, digits and hyphens (no hyphen first or last)." }
+    send: "SET {slot:map.slot}{channel} TX_DEVICE_ID \\{{name}\\}"
+    expect: { reply_contains: " TX_DEVICE_ID ", contains: " TX_DEVICE_ID " }
+    returns: ack
+  get_input_gain:
+    summary: "Read an input's gain (in tenths of a dB offset by 1100) (INPUT_CH_GAIN)"
+    params:
+      channel: { type: int, min: 0, max: 61, required: true, label: "Channel", description: "Inputs: 1-19 Dante (1-5 Dante in, 6-19 Dante mic in), 21-39 wireless microphones, 41 analog (MXWAPXD2), 51 USB; outputs: 1-9 Dante (4 on MXWAPXD2, 5 on MXWAPX4), 41-42 analog, 51 USB, 61 back channel; 0 is all." }
+    send: "GET {channel} INPUT_CH_GAIN"
+    expect: { reply_contains: " INPUT_CH_GAIN ", matches: " INPUT_CH_GAIN \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_input_gain:
+    summary: "Set an input's gain in tenths of a dB (INPUT_CH_GAIN)"
+    params:
+      channel: { type: int, min: 0, max: 61, required: true, label: "Channel", description: "Inputs: 1-19 Dante (1-5 Dante in, 6-19 Dante mic in), 21-39 wireless microphones, 41 analog (MXWAPXD2), 51 USB; outputs: 1-9 Dante (4 on MXWAPXD2, 5 on MXWAPX4), 41-42 analog, 51 USB, 61 back channel; 0 is all." }
+      gain_tenth_db: { type: int, min: -1100, max: 300, required: true, label: "Gain", description: "Gain in tenths of a dB, -1100 (-110.0 dB) to 300 (+30.0 dB)." }
+    send: "SET {channel} INPUT_CH_GAIN {gain_tenth_db:+1100}"
+    expect: { reply_contains: " INPUT_CH_GAIN ", contains: " INPUT_CH_GAIN " }
+    returns: ack
+  increase_input_gain:
+    summary: "Increase an input's gain by a step in tenths of a dB (INPUT_CH_GAIN INC)"
+    params:
+      channel: { type: int, min: 0, max: 61, required: true, label: "Channel", description: "Inputs: 1-19 Dante (1-5 Dante in, 6-19 Dante mic in), 21-39 wireless microphones, 41 analog (MXWAPXD2), 51 USB; outputs: 1-9 Dante (4 on MXWAPXD2, 5 on MXWAPX4), 41-42 analog, 51 USB, 61 back channel; 0 is all." }
+      step: { type: int, min: 1, max: 1400, required: true, label: "Step", description: "Amount to change the gain by, in tenths of a dB." }
+    send: "SET {channel} INPUT_CH_GAIN INC {step}"
+    expect: { reply_contains: " INPUT_CH_GAIN ", contains: " INPUT_CH_GAIN " }
+    returns: ack
+  decrease_input_gain:
+    summary: "Decrease an input's gain by a step in tenths of a dB (INPUT_CH_GAIN DEC)"
+    params:
+      channel: { type: int, min: 0, max: 61, required: true, label: "Channel", description: "Inputs: 1-19 Dante (1-5 Dante in, 6-19 Dante mic in), 21-39 wireless microphones, 41 analog (MXWAPXD2), 51 USB; outputs: 1-9 Dante (4 on MXWAPXD2, 5 on MXWAPX4), 41-42 analog, 51 USB, 61 back channel; 0 is all." }
+      step: { type: int, min: 1, max: 1400, required: true, label: "Step", description: "Amount to change the gain by, in tenths of a dB." }
+    send: "SET {channel} INPUT_CH_GAIN DEC {step}"
+    expect: { reply_contains: " INPUT_CH_GAIN ", contains: " INPUT_CH_GAIN " }
+    returns: ack
+  get_input_mute:
+    summary: "Read an input's mute (INPUT_CH_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 61, required: true, label: "Channel", description: "Inputs: 1-19 Dante (1-5 Dante in, 6-19 Dante mic in), 21-39 wireless microphones, 41 analog (MXWAPXD2), 51 USB; outputs: 1-9 Dante (4 on MXWAPXD2, 5 on MXWAPX4), 41-42 analog, 51 USB, 61 back channel; 0 is all." }
+    send: "GET {channel} INPUT_CH_MUTE"
+    expect: { reply_contains: " INPUT_CH_MUTE ", matches: " INPUT_CH_MUTE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_input_mute:
+    summary: "Mute, unmute or toggle an input (INPUT_CH_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 61, required: true, label: "Channel", description: "Inputs: 1-19 Dante (1-5 Dante in, 6-19 Dante mic in), 21-39 wireless microphones, 41 analog (MXWAPXD2), 51 USB; outputs: 1-9 Dante (4 on MXWAPXD2, 5 on MXWAPX4), 41-42 analog, 51 USB, 61 back channel; 0 is all." }
+      state: { type: enum, values: [MUTE, ACTIVE, TOGGLE], required: true, label: "Mute", description: "MUTE mutes, ACTIVE unmutes, TOGGLE switches." }
+    send: "SET {channel} INPUT_CH_MUTE {state}"
+    expect: { reply_contains: " INPUT_CH_MUTE ", contains: " INPUT_CH_MUTE " }
+    returns: ack
+  get_output_gain:
+    summary: "Read an output's gain (in tenths of a dB offset by 1100) (OUTPUT_CH_GAIN)"
+    params:
+      channel: { type: int, min: 0, max: 61, required: true, label: "Channel", description: "Inputs: 1-19 Dante (1-5 Dante in, 6-19 Dante mic in), 21-39 wireless microphones, 41 analog (MXWAPXD2), 51 USB; outputs: 1-9 Dante (4 on MXWAPXD2, 5 on MXWAPX4), 41-42 analog, 51 USB, 61 back channel; 0 is all." }
+    send: "GET {channel} OUTPUT_CH_GAIN"
+    expect: { reply_contains: " OUTPUT_CH_GAIN ", matches: " OUTPUT_CH_GAIN \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_output_gain:
+    summary: "Set an output's gain in tenths of a dB (OUTPUT_CH_GAIN)"
+    params:
+      channel: { type: int, min: 0, max: 61, required: true, label: "Channel", description: "Inputs: 1-19 Dante (1-5 Dante in, 6-19 Dante mic in), 21-39 wireless microphones, 41 analog (MXWAPXD2), 51 USB; outputs: 1-9 Dante (4 on MXWAPXD2, 5 on MXWAPX4), 41-42 analog, 51 USB, 61 back channel; 0 is all." }
+      gain_tenth_db: { type: int, min: -1100, max: 300, required: true, label: "Gain", description: "Gain in tenths of a dB, -1100 (-110.0 dB) to 300 (+30.0 dB)." }
+    send: "SET {channel} OUTPUT_CH_GAIN {gain_tenth_db:+1100}"
+    expect: { reply_contains: " OUTPUT_CH_GAIN ", contains: " OUTPUT_CH_GAIN " }
+    returns: ack
+  increase_output_gain:
+    summary: "Increase an output's gain by a step in tenths of a dB (OUTPUT_CH_GAIN INC)"
+    params:
+      channel: { type: int, min: 0, max: 61, required: true, label: "Channel", description: "Inputs: 1-19 Dante (1-5 Dante in, 6-19 Dante mic in), 21-39 wireless microphones, 41 analog (MXWAPXD2), 51 USB; outputs: 1-9 Dante (4 on MXWAPXD2, 5 on MXWAPX4), 41-42 analog, 51 USB, 61 back channel; 0 is all." }
+      step: { type: int, min: 1, max: 1400, required: true, label: "Step", description: "Amount to change the gain by, in tenths of a dB." }
+    send: "SET {channel} OUTPUT_CH_GAIN INC {step}"
+    expect: { reply_contains: " OUTPUT_CH_GAIN ", contains: " OUTPUT_CH_GAIN " }
+    returns: ack
+  decrease_output_gain:
+    summary: "Decrease an output's gain by a step in tenths of a dB (OUTPUT_CH_GAIN DEC)"
+    params:
+      channel: { type: int, min: 0, max: 61, required: true, label: "Channel", description: "Inputs: 1-19 Dante (1-5 Dante in, 6-19 Dante mic in), 21-39 wireless microphones, 41 analog (MXWAPXD2), 51 USB; outputs: 1-9 Dante (4 on MXWAPXD2, 5 on MXWAPX4), 41-42 analog, 51 USB, 61 back channel; 0 is all." }
+      step: { type: int, min: 1, max: 1400, required: true, label: "Step", description: "Amount to change the gain by, in tenths of a dB." }
+    send: "SET {channel} OUTPUT_CH_GAIN DEC {step}"
+    expect: { reply_contains: " OUTPUT_CH_GAIN ", contains: " OUTPUT_CH_GAIN " }
+    returns: ack
+  get_output_mute:
+    summary: "Read an output's mute (OUTPUT_CH_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 61, required: true, label: "Channel", description: "Inputs: 1-19 Dante (1-5 Dante in, 6-19 Dante mic in), 21-39 wireless microphones, 41 analog (MXWAPXD2), 51 USB; outputs: 1-9 Dante (4 on MXWAPXD2, 5 on MXWAPX4), 41-42 analog, 51 USB, 61 back channel; 0 is all." }
+    send: "GET {channel} OUTPUT_CH_MUTE"
+    expect: { reply_contains: " OUTPUT_CH_MUTE ", matches: " OUTPUT_CH_MUTE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_output_mute:
+    summary: "Mute, unmute or toggle an output (OUTPUT_CH_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 61, required: true, label: "Channel", description: "Inputs: 1-19 Dante (1-5 Dante in, 6-19 Dante mic in), 21-39 wireless microphones, 41 analog (MXWAPXD2), 51 USB; outputs: 1-9 Dante (4 on MXWAPXD2, 5 on MXWAPX4), 41-42 analog, 51 USB, 61 back channel; 0 is all." }
+      state: { type: enum, values: [MUTE, ACTIVE, TOGGLE], required: true, label: "Mute", description: "MUTE mutes, ACTIVE unmutes, TOGGLE switches." }
+    send: "SET {channel} OUTPUT_CH_MUTE {state}"
+    expect: { reply_contains: " OUTPUT_CH_MUTE ", contains: " OUTPUT_CH_MUTE " }
+    returns: ack
+  get_auracast_broadcast:
+    summary: "Read an Auracast broadcast (AC_BC_ENABLE)"
+    params:
+      channel: { type: int, min: 0, max: 8, required: true, label: "Auracast channel", description: "Auracast broadcast channel from 1 (not the microphone channel); 0 is all." }
+    send: "GET {channel} AC_BC_ENABLE"
+    expect: { reply_contains: " AC_BC_ENABLE ", matches: " AC_BC_ENABLE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_auracast_broadcast:
+    summary: "Turn an Auracast broadcast on or off (AC_BC_ENABLE)"
+    params:
+      channel: { type: int, min: 0, max: 8, required: true, label: "Auracast channel", description: "Auracast broadcast channel from 1 (not the microphone channel); 0 is all." }
+      enabled: { type: bool, required: true, label: "On", description: "On turns it on, off turns it off." }
+    send: "SET {channel} AC_BC_ENABLE {enabled:on_off}"
+    expect: { reply_contains: " AC_BC_ENABLE ", contains: " AC_BC_ENABLE " }
+    returns: ack
+  get_auracast_encryption:
+    summary: "Read an Auracast broadcast's encryption (AC_BC_ENCRYPTION)"
+    params:
+      channel: { type: int, min: 0, max: 8, required: true, label: "Auracast channel", description: "Auracast broadcast channel from 1 (not the microphone channel); 0 is all." }
+    send: "GET {channel} AC_BC_ENCRYPTION"
+    expect: { reply_contains: " AC_BC_ENCRYPTION ", matches: " AC_BC_ENCRYPTION \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_auracast_encryption:
+    summary: "Turn an Auracast broadcast's encryption on or off (AC_BC_ENCRYPTION)"
+    params:
+      channel: { type: int, min: 0, max: 8, required: true, label: "Auracast channel", description: "Auracast broadcast channel from 1 (not the microphone channel); 0 is all." }
+      enabled: { type: bool, required: true, label: "On", description: "On turns it on, off turns it off." }
+    send: "SET {channel} AC_BC_ENCRYPTION {enabled:on_off}"
+    expect: { reply_contains: " AC_BC_ENCRYPTION ", contains: " AC_BC_ENCRYPTION " }
+    returns: ack
+  get_auracast_power:
+    summary: "Read the Auracast transmit power (all broadcasts) (AC_POWER)"
+    params:
+      channel: { type: int, min: 0, max: 8, required: true, label: "Auracast channel", description: "Auracast broadcast channel from 1 (not the microphone channel); 0 is all." }
+    send: "GET {channel} AC_POWER"
+    expect: { reply_contains: " AC_POWER ", matches: " AC_POWER \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_auracast_power:
+    summary: "Set the Auracast transmit power (all broadcasts) (AC_POWER)"
+    params:
+      channel: { type: int, min: 0, max: 8, required: true, label: "Auracast channel", description: "Auracast broadcast channel from 1 (not the microphone channel); 0 is all." }
+      value: { type: enum, values: [LOW, MED, HIGH], required: true, label: "Value", description: "One of LOW, MED, HIGH." }
+    send: "SET {channel} AC_POWER {value}"
+    expect: { reply_contains: " AC_POWER ", contains: " AC_POWER " }
+    returns: ack
+  get_auracast_quality:
+    summary: "Read the Auracast quality of service (all broadcasts): LL low latency, HR high reliability (AC_BC_QOS)"
+    params:
+      channel: { type: int, min: 0, max: 8, required: true, label: "Auracast channel", description: "Auracast broadcast channel from 1 (not the microphone channel); 0 is all." }
+    send: "GET {channel} AC_BC_QOS"
+    expect: { reply_contains: " AC_BC_QOS ", matches: " AC_BC_QOS \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_auracast_quality:
+    summary: "Set the Auracast quality of service (all broadcasts): LL low latency, HR high reliability (AC_BC_QOS)"
+    params:
+      channel: { type: int, min: 0, max: 8, required: true, label: "Auracast channel", description: "Auracast broadcast channel from 1 (not the microphone channel); 0 is all." }
+      value: { type: enum, values: [LL, HR], required: true, label: "Value", description: "One of LL, HR." }
+    send: "SET {channel} AC_BC_QOS {value}"
+    expect: { reply_contains: " AC_BC_QOS ", contains: " AC_BC_QOS " }
+    returns: ack
+  get_auracast_sample_rate:
+    summary: "Read an Auracast broadcast's sample rate (AC_BC_SAMPLE_RATE)"
+    params:
+      channel: { type: int, min: 0, max: 8, required: true, label: "Auracast channel", description: "Auracast broadcast channel from 1 (not the microphone channel); 0 is all." }
+    send: "GET {channel} AC_BC_SAMPLE_RATE"
+    expect: { reply_contains: " AC_BC_SAMPLE_RATE ", matches: " AC_BC_SAMPLE_RATE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_auracast_sample_rate:
+    summary: "Set an Auracast broadcast's sample rate in Hz (AC_BC_SAMPLE_RATE); allowed rates are not documented"
+    params:
+      channel: { type: int, min: 0, max: 8, required: true, label: "Auracast channel", description: "Auracast broadcast channel from 1 (not the microphone channel); 0 is all." }
+      hz: { type: int, min: 8000, max: 48000, required: true, label: "Sample rate", description: "Sample rate in Hz, as the access point accepts it." }
+    send: "SET {channel} AC_BC_SAMPLE_RATE {hz}Hz"
+    expect: { reply_contains: " AC_BC_SAMPLE_RATE ", contains: " AC_BC_SAMPLE_RATE " }
+    returns: ack
+  get_auracast_name:
+    summary: "Read an Auracast broadcast's name (AC_BC_NAME)"
+    params:
+      channel: { type: int, min: 0, max: 8, required: true, label: "Auracast channel", description: "Auracast broadcast channel from 1 (not the microphone channel); 0 is all." }
+    send: "GET {channel} AC_BC_NAME"
+    expect: { reply_contains: " AC_BC_NAME ", matches: " AC_BC_NAME \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_auracast_name:
+    summary: "Set an Auracast broadcast's name (AC_BC_NAME), 4-31 characters, only while the broadcast is off"
+    params:
+      channel: { type: int, min: 0, max: 8, required: true, label: "Auracast channel", description: "Auracast broadcast channel from 1 (not the microphone channel); 0 is all." }
+      value: { type: string, required: true, max_length: 31, pattern: "^[^<>{}]{4,31}$", label: "Value", description: "4 to 31 characters, without < > { }." }
+    send: "SET {channel} AC_BC_NAME \\{{value}\\}"
+    expect: { reply_contains: " AC_BC_NAME ", contains: " AC_BC_NAME " }
+    returns: ack
+  get_auracast_code:
+    summary: "Read an Auracast broadcast's code (AC_BC_CODE)"
+    params:
+      channel: { type: int, min: 0, max: 8, required: true, label: "Auracast channel", description: "Auracast broadcast channel from 1 (not the microphone channel); 0 is all." }
+    send: "GET {channel} AC_BC_CODE"
+    expect: { reply_contains: " AC_BC_CODE ", matches: " AC_BC_CODE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_auracast_code:
+    summary: "Set an Auracast broadcast's code (AC_BC_CODE), 4-16 characters, only while the broadcast is off"
+    params:
+      channel: { type: int, min: 0, max: 8, required: true, label: "Auracast channel", description: "Auracast broadcast channel from 1 (not the microphone channel); 0 is all." }
+      value: { type: string, required: true, max_length: 16, pattern: "^[^<>{}]{4,16}$", label: "Value", description: "4 to 16 characters, without < > { }." }
+    send: "SET {channel} AC_BC_CODE \\{{value}\\}"
+    expect: { reply_contains: " AC_BC_CODE ", contains: " AC_BC_CODE " }
+    returns: ack
+
+state:
+  device.id: { type: string, description: "Device ID" }
+  device.flash: { type: bool, description: "Identifying (flashing)" }
+  device.model: { type: string, description: "Model" }
+  device.firmware: { type: string, description: "Firmware version (a * after it: self test failed)" }
+  device.serial_number: { type: string, description: "Serial number" }
+  device.operation_mode: { type: string, description: "System operation mode: PRESENTATION, CONFERENCE, DIRECT or CUSTOM" }
+  device.channel_count: { type: int, description: "Number of DECT channels: 2, 4 or 8" }
+  device.automix_muted: { type: bool, description: "Automix output muted" }
+  channels.*.meter_rate: { type: int, unit: "ms", description: "Metering interval in ms, 0 off" }
+  channels.*.secondary.meter_rate: { type: int, unit: "ms", description: "Metering interval in ms, 0 off (the secondary microphone, legacy MXW)" }
+  channels.*.rf_level: { type: int, unit: "dBm", description: "Received RF level from SAMPLE (wire 000-127, minus 110); kept while metering runs" }
+  channels.*.audio_level: { type: int, unit: "dB", description: "Audio level from SAMPLE (wire 000-120, minus 120: -120 muted, 0 full scale)" }
+  channels.*.secondary.rf_level: { type: int, unit: "dBm", description: "Received RF level of the secondary microphone" }
+  channels.*.secondary.audio_level: { type: int, unit: "dB", description: "Audio level of the secondary microphone" }
+  channels.*.name: { type: string, description: "Channel name" }
+  channels.*.secondary.name: { type: string, description: "Channel name (the secondary microphone, legacy MXW)" }
+  channels.*.transmitter_available: { type: string, description: "Microphone available: YES or NO" }
+  channels.*.secondary.transmitter_available: { type: string, description: "Microphone available: YES or NO (the secondary microphone, legacy MXW)" }
+  bays.*.transmitter_available: { type: string, description: "Microphone available: YES or NO (the transmitter in a dock bay, MXWAPXD2)" }
+  channels.*.transmitter_status: { type: string, description: "Microphone status: ACTIVE, MUTE (MUTED on neXt), STANDBY, ON_CHARGER or UNKNOWN" }
+  channels.*.secondary.transmitter_status: { type: string, description: "Microphone status: ACTIVE, MUTE (MUTED on neXt), STANDBY, ON_CHARGER or UNKNOWN (the secondary microphone, legacy MXW)" }
+  bays.*.transmitter_status: { type: string, description: "Microphone status: ACTIVE, MUTE (MUTED on neXt), STANDBY, ON_CHARGER or UNKNOWN (the transmitter in a dock bay, MXWAPXD2)" }
+  channels.*.gain: { type: int, unit: "dB", description: "Microphone's gain in dB (-25 to +35 dB on legacy MXW, -25 to +15 dB on neXt; wire minus 25)" }
+  channels.*.secondary.gain: { type: int, unit: "dB", description: "Microphone's gain in dB (-25 to +35 dB on legacy MXW, -25 to +15 dB on neXt; wire minus 25) (the secondary microphone, legacy MXW)" }
+  channels.*.internal_mic_gain: { type: int, unit: "dB", description: "Bodypack's internal microphone gain in dB (-25 to +15 dB; wire minus 25)" }
+  channels.*.secondary.internal_mic_gain: { type: int, unit: "dB", description: "Bodypack's internal microphone gain in dB (-25 to +15 dB; wire minus 25) (the secondary microphone, legacy MXW)" }
+  channels.*.button: { type: string, description: "Button: ON pressed, OFF released" }
+  channels.*.secondary.button: { type: string, description: "Button: ON pressed, OFF released (the secondary microphone, legacy MXW)" }
+  channels.*.led: { type: string, description: "Red then green LED: ON, OF off, ST strobe, FL flash, PU pulse" }
+  channels.*.secondary.led: { type: string, description: "Red then green LED: ON, OF off, ST strobe, FL flash, PU pulse (the secondary microphone, legacy MXW)" }
+  channels.*.transmitter_type: { type: string, description: "Microphone type: MXW1, MXW2, MXW6, MXW8 (MXW1X-MXW8X on neXt) or UNKNOWN" }
+  channels.*.secondary.transmitter_type: { type: string, description: "Microphone type: MXW1, MXW2, MXW6, MXW8 (MXW1X-MXW8X on neXt) or UNKNOWN (the secondary microphone, legacy MXW)" }
+  bays.*.transmitter_type: { type: string, description: "Microphone type: MXW1, MXW2, MXW6, MXW8 (MXW1X-MXW8X on neXt) or UNKNOWN (the transmitter in a dock bay, MXWAPXD2)" }
+  channels.*.bodypack_mic: { type: string, description: "Bodypack input: INT, EXT, AUTO, ERR (not a bodypack) or UNKNOWN" }
+  channels.*.secondary.bodypack_mic: { type: string, description: "Bodypack input: INT, EXT, AUTO, ERR (not a bodypack) or UNKNOWN (the secondary microphone, legacy MXW)" }
+  channels.*.battery_charge: { type: int, unit: "%", description: "Battery charge in percent" }
+  channels.*.secondary.battery_charge: { type: int, unit: "%", description: "Battery charge in percent (the secondary microphone, legacy MXW)" }
+  bays.*.battery_charge: { type: int, unit: "%", description: "Battery charge in percent (the transmitter in a dock bay, MXWAPXD2)" }
+  channels.*.battery_minutes: { type: int, unit: "min", description: "Minutes until the microphone turns off; 65532 wall power, 65533 on charger, 65534 calculating, 65535 off" }
+  channels.*.secondary.battery_minutes: { type: int, unit: "min", description: "Minutes until the microphone turns off; 65532 wall power, 65533 on charger, 65534 calculating, 65535 off (the secondary microphone, legacy MXW)" }
+  bays.*.battery_minutes: { type: int, unit: "min", description: "Minutes until the microphone turns off; 65532 wall power, 65533 on charger, 65534 calculating, 65535 off (the transmitter in a dock bay, MXWAPXD2)" }
+  channels.*.battery_health: { type: int, unit: "%", description: "Battery health, percent of its factory capacity" }
+  channels.*.secondary.battery_health: { type: int, unit: "%", description: "Battery health, percent of its factory capacity (the secondary microphone, legacy MXW)" }
+  bays.*.battery_health: { type: int, unit: "%", description: "Battery health, percent of its factory capacity (the transmitter in a dock bay, MXWAPXD2)" }
+  channels.*.battery_time_to_full: { type: int, unit: "min", description: "Minutes until the battery is full; 65533-65535 not charging, full or off (codes differ between legacy and neXt)" }
+  channels.*.secondary.battery_time_to_full: { type: int, unit: "min", description: "Minutes until the battery is full; 65533-65535 not charging, full or off (codes differ between legacy and neXt) (the secondary microphone, legacy MXW)" }
+  bays.*.battery_time_to_full: { type: int, unit: "min", description: "Minutes until the battery is full; 65533-65535 not charging, full or off (codes differ between legacy and neXt) (the transmitter in a dock bay, MXWAPXD2)" }
+  channels.*.transmitter_name: { type: string, description: "Microphone device ID (UNKNOWN when none)" }
+  channels.*.secondary.transmitter_name: { type: string, description: "Microphone device ID (UNKNOWN when none) (the secondary microphone, legacy MXW)" }
+  bays.*.transmitter_name: { type: string, description: "Microphone device ID (UNKNOWN when none) (the transmitter in a dock bay, MXWAPXD2)" }
+  inputs.*.gain: { type: float, unit: "dB", description: "Gain of input channel, -110.0 to +30.0 dB (wire 0-1400 in tenths offset by 1100), keyed by channel number" }
+  inputs.*.muted: { type: bool, description: "Muted, keyed by input channel number" }
+  outputs.*.gain: { type: float, unit: "dB", description: "Gain of output channel, -110.0 to +30.0 dB (wire 0-1400 in tenths offset by 1100), keyed by channel number" }
+  outputs.*.muted: { type: bool, description: "Muted, keyed by output channel number" }
+  auracast.*.broadcast: { type: bool, description: "An Auracast broadcast on, keyed by Auracast channel" }
+  auracast.*.encryption: { type: bool, description: "An Auracast broadcast's encryption on, keyed by Auracast channel" }
+  auracast.*.power: { type: string, description: "The Auracast transmit power (all broadcasts), keyed by Auracast channel" }
+  auracast.*.quality: { type: string, description: "The Auracast quality of service (all broadcasts): LL low latency, HR high reliability, keyed by Auracast channel" }
+  auracast.*.sample_rate: { type: int, unit: "Hz", description: "Broadcast sample rate, keyed by Auracast channel" }
+  auracast.*.name: { type: string, description: "An Auracast broadcast's name, keyed by Auracast channel" }
+  auracast.*.code: { type: string, description: "An Auracast broadcast's code, keyed by Auracast channel" }
+
+telemetry:
+  # The device ID, and every channel's or bay's parameters. Changes are
+  # pushed after that (see the quirks).
+  poll:
+    send:
+      - "GET DEVICE_ID"
+      - { models: [mxwapxd2, mxwapx4, mxwapx8, mxwndx4, mxwndx8, mxwndx4g, mxwndx8g], message: "GET ALL" }
+      - { models: [mxwapt2, mxwapt4, mxwapt8], message: "GET 0 CHAN_NAME" }
+      - { models: [mxwapt2, mxwapt4, mxwapt8], message: "GET 0 TX_AVAILABLE" }
+      - { models: [mxwapt2, mxwapt4, mxwapt8], message: "GET 0 TX_STATUS" }
+      - { models: [mxwapt2, mxwapt4, mxwapt8], message: "GET 0 AUDIO_GAIN" }
+      - { models: [mxwapt2, mxwapt4, mxwapt8], message: "GET 0 INT_AUDIO_GAIN" }
+      - { models: [mxwapt2, mxwapt4, mxwapt8], message: "GET 0 BUTTON_STS" }
+      - { models: [mxwapt2, mxwapt4, mxwapt8], message: "GET 0 LED_STATUS" }
+      - { models: [mxwapt2, mxwapt4, mxwapt8], message: "GET 0 TX_TYPE" }
+      - { models: [mxwapt2, mxwapt4, mxwapt8], message: "GET 0 BP_MIC_SELECT" }
+      - { models: [mxwapt2, mxwapt4, mxwapt8], message: "GET 0 BATT_CHARGE" }
+      - { models: [mxwapt2, mxwapt4, mxwapt8], message: "GET 0 BATT_RUN_TIME" }
+      - { models: [mxwapt2, mxwapt4, mxwapt8], message: "GET 0 BATT_HEALTH" }
+      - { models: [mxwapt2, mxwapt4, mxwapt8], message: "GET 0 BATT_TIME_TO_FULL" }
+      - { models: [mxwapt2, mxwapt4, mxwapt8], message: "GET 0 TX_DEVICE_ID" }
+      - { models: [mxwncs2, mxwncs4, mxwncs8], message: "GET 0 TX_AVAILABLE" }
+      - { models: [mxwncs2, mxwncs4, mxwncs8], message: "GET 0 TX_STATUS" }
+      - { models: [mxwncs2, mxwncs4, mxwncs8], message: "GET 0 BATT_CHARGE" }
+      - { models: [mxwncs2, mxwncs4, mxwncs8], message: "GET 0 BATT_HEALTH" }
+      - { models: [mxwncs2, mxwncs4, mxwncs8], message: "GET 0 BATT_TIME_TO_FULL" }
+      - { models: [mxwncs2, mxwncs4, mxwncs8], message: "GET 0 TX_DEVICE_ID" }
+  updates:
+    - match: "^< REP DEVICE_ID \\{?(.*?) *\\}? >$"
+      state: { "device.id": "{1}" }
+    - match: "^< REP FLASH (ON|OFF) >$"
+      state: { "device.flash": { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP DEVICE_MODEL \\{?(.*?) *\\}? >$"
+      state: { "device.model": "{1}" }
+    - match: "^< REP FW_VER \\{?(.*?) *\\}? >$"
+      state: { "device.firmware": "{1}" }
+    - match: "^< REP SERIAL_NUM \\{?(.*?) *\\}? >$"
+      state: { "device.serial_number": "{1}" }
+    - match: "^< REP SYSTEM_OPERATION_MODE ([A-Z]+) >$"
+      state: { "device.operation_mode": "{1}" }
+    - match: "^< REP DECT_CHANNEL_COUNT (\\d+) >$"
+      state: { "device.channel_count": "{1}" }
+    - match: "^< REP AUTOMIX_OUT_MUTE (MUTED?|ACTIVE) >$"
+      state: { "device.automix_muted": { value: "{1}", map: { "MUTED": true, "MUTE": true, "ACTIVE": false } } }
+    - match: "^< REP (?:PRI |CH )?(\\d+) METER_RATE (\\d{5}) >$"
+      state: { "channels.{1}.meter_rate": "{2}" }
+    - match: "^< REP SEC (\\d+) METER_RATE (\\d{5}) >$"
+      state: { "channels.{1}.secondary.meter_rate": "{2}" }
+    - match: "^< SAMPLE (\\d+) (\\d{3}) (\\d{3}) >$"
+      state: { "channels.{1}.rf_level": "{2:-110}", "channels.{1}.audio_level": "{3:-120}" }
+    - match: "^< SAMPLE SEC (\\d+) (\\d{3}) (\\d{3}) >$"
+      state: { "channels.{1}.secondary.rf_level": "{2:-110}", "channels.{1}.secondary.audio_level": "{3:-120}" }
+    - match: "^< REP (?:PRI |CH )?(\\d+) CHAN_NAME \\{?(.*?) *\\}? >$"
+      state: { "channels.{1}.name": "{2}" }
+    - match: "^< REP SEC (\\d+) CHAN_NAME \\{?(.*?) *\\}? >$"
+      state: { "channels.{1}.secondary.name": "{2}" }
+    - match: "^< REP (?:PRI |CH )?(\\d+) TX_AVAILABLE (YES|NO) >$"
+      state: { "channels.{1}.transmitter_available": "{2}" }
+    - match: "^< REP SEC (\\d+) TX_AVAILABLE (YES|NO) >$"
+      state: { "channels.{1}.secondary.transmitter_available": "{2}" }
+    - match: "^< REP BAY (\\d+) TX_AVAILABLE (YES|NO) >$"
+      state: { "bays.{1}.transmitter_available": "{2}" }
+    - match: "^< REP (\\d+) TX_AVAILABLE YES >$"
+      then_send: ["GET {1} TX_STATUS", "GET {1} AUDIO_GAIN", "GET {1} BATT_RUN_TIME", "GET {1} BATT_CHARGE", "GET {1} BATT_HEALTH", "GET {1} BUTTON_STS", "GET {1} LED_STATUS", "GET {1} TX_TYPE"]
+    - match: "^< REP (?:PRI |CH )?(\\d+) TX_STATUS ([A-Z_]+) >$"
+      state: { "channels.{1}.transmitter_status": "{2}" }
+    - match: "^< REP SEC (\\d+) TX_STATUS ([A-Z_]+) >$"
+      state: { "channels.{1}.secondary.transmitter_status": "{2}" }
+    - match: "^< REP BAY (\\d+) TX_STATUS ([A-Z_]+) >$"
+      state: { "bays.{1}.transmitter_status": "{2}" }
+    - match: "^< REP (?:PRI |CH )?(\\d+) AUDIO_GAIN (0\\d\\d) >$"
+      state: { "channels.{1}.gain": "{2:-25}" }
+    - match: "^< REP SEC (\\d+) AUDIO_GAIN (0\\d\\d) >$"
+      state: { "channels.{1}.secondary.gain": "{2:-25}" }
+    - match: "^< REP (?:PRI |CH )?(\\d+) INT_AUDIO_GAIN (0\\d\\d) >$"
+      state: { "channels.{1}.internal_mic_gain": "{2:-25}" }
+    - match: "^< REP SEC (\\d+) INT_AUDIO_GAIN (0\\d\\d) >$"
+      state: { "channels.{1}.secondary.internal_mic_gain": "{2:-25}" }
+    - match: "^< REP (?:PRI |CH )?(\\d+) BUTTON_STS (ON|OFF) >$"
+      state: { "channels.{1}.button": "{2}" }
+    - match: "^< REP SEC (\\d+) BUTTON_STS (ON|OFF) >$"
+      state: { "channels.{1}.secondary.button": "{2}" }
+    - match: "^< REP (?:PRI |CH )?(\\d+) LED_STATUS ([A-Z]{2} [A-Z]{2}) >$"
+      state: { "channels.{1}.led": "{2}" }
+    - match: "^< REP SEC (\\d+) LED_STATUS ([A-Z]{2} [A-Z]{2}) >$"
+      state: { "channels.{1}.secondary.led": "{2}" }
+    - match: "^< REP (?:PRI |CH )?(\\d+) TX_TYPE ([A-Z0-9_]+) >$"
+      state: { "channels.{1}.transmitter_type": "{2}" }
+    - match: "^< REP SEC (\\d+) TX_TYPE ([A-Z0-9_]+) >$"
+      state: { "channels.{1}.secondary.transmitter_type": "{2}" }
+    - match: "^< REP BAY (\\d+) TX_TYPE ([A-Z0-9_]+) >$"
+      state: { "bays.{1}.transmitter_type": "{2}" }
+    - match: "^< REP (?:PRI |CH )?(\\d+) BP_MIC_SELECT ([A-Z]+) >$"
+      state: { "channels.{1}.bodypack_mic": "{2}" }
+    - match: "^< REP SEC (\\d+) BP_MIC_SELECT ([A-Z]+) >$"
+      state: { "channels.{1}.secondary.bodypack_mic": "{2}" }
+    - match: "^< REP (?:PRI |CH )?(\\d+) BATT_CHARGE (0\\d\\d|100) >$"
+      state: { "channels.{1}.battery_charge": "{2}" }
+    - match: "^< REP SEC (\\d+) BATT_CHARGE (0\\d\\d|100) >$"
+      state: { "channels.{1}.secondary.battery_charge": "{2}" }
+    - match: "^< REP BAY (\\d+) BATT_CHARGE (0\\d\\d|100) >$"
+      state: { "bays.{1}.battery_charge": "{2}" }
+    - match: "^< REP (?:PRI |CH )?(\\d+) BATT_RUN_TIME (\\d{5}) >$"
+      state: { "channels.{1}.battery_minutes": "{2}" }
+    - match: "^< REP SEC (\\d+) BATT_RUN_TIME (\\d{5}) >$"
+      state: { "channels.{1}.secondary.battery_minutes": "{2}" }
+    - match: "^< REP BAY (\\d+) BATT_RUN_TIME (\\d{5}) >$"
+      state: { "bays.{1}.battery_minutes": "{2}" }
+    - match: "^< REP (?:PRI |CH )?(\\d+) BATT_HEALTH (0\\d\\d|100) >$"
+      state: { "channels.{1}.battery_health": "{2}" }
+    - match: "^< REP SEC (\\d+) BATT_HEALTH (0\\d\\d|100) >$"
+      state: { "channels.{1}.secondary.battery_health": "{2}" }
+    - match: "^< REP BAY (\\d+) BATT_HEALTH (0\\d\\d|100) >$"
+      state: { "bays.{1}.battery_health": "{2}" }
+    - match: "^< REP (?:PRI |CH )?(\\d+) BATT_TIME_TO_FULL (\\d{5}) >$"
+      state: { "channels.{1}.battery_time_to_full": "{2}" }
+    - match: "^< REP SEC (\\d+) BATT_TIME_TO_FULL (\\d{5}) >$"
+      state: { "channels.{1}.secondary.battery_time_to_full": "{2}" }
+    - match: "^< REP BAY (\\d+) BATT_TIME_TO_FULL (\\d{5}) >$"
+      state: { "bays.{1}.battery_time_to_full": "{2}" }
+    - match: "^< REP (?:PRI |CH )?(\\d+) TX_DEVICE_ID \\{?(.*?) *\\}? >$"
+      state: { "channels.{1}.transmitter_name": "{2}" }
+    - match: "^< REP SEC (\\d+) TX_DEVICE_ID \\{?(.*?) *\\}? >$"
+      state: { "channels.{1}.secondary.transmitter_name": "{2}" }
+    - match: "^< REP BAY (\\d+) TX_DEVICE_ID \\{?(.*?) *\\}? >$"
+      state: { "bays.{1}.transmitter_name": "{2}" }
+    - match: "^< REP (\\d+) INPUT_CH_GAIN (\\d{1,4}) >$"
+      state: { "inputs.{1}.gain": "{2:from.shure_gain}" }
+    - match: "^< REP (\\d+) INPUT_CH_MUTE (MUTED?|ACTIVE) >$"
+      state: { "inputs.{1}.muted": { value: "{2}", map: { "MUTED": true, "MUTE": true, "ACTIVE": false } } }
+    - match: "^< REP (\\d+) OUTPUT_CH_GAIN (\\d{1,4}) >$"
+      state: { "outputs.{1}.gain": "{2:from.shure_gain}" }
+    - match: "^< REP (\\d+) OUTPUT_CH_MUTE (MUTED?|ACTIVE) >$"
+      state: { "outputs.{1}.muted": { value: "{2}", map: { "MUTED": true, "MUTE": true, "ACTIVE": false } } }
+    - match: "^< REP (\\d+) AC_BC_ENABLE (ON|OFF) >$"
+      state: { "auracast.{1}.broadcast": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP (\\d+) AC_BC_ENCRYPTION (ON|OFF) >$"
+      state: { "auracast.{1}.encryption": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP (\\d+) AC_POWER ([A-Z]+) >$"
+      state: { "auracast.{1}.power": "{2}" }
+    - match: "^< REP (\\d+) AC_BC_QOS ([A-Z]+) >$"
+      state: { "auracast.{1}.quality": "{2}" }
+    - match: "^< REP (\\d+) AC_BC_SAMPLE_RATE (\\d+)Hz >$"
+      state: { "auracast.{1}.sample_rate": "{2}" }
+    - match: "^< REP (\\d+) AC_BC_NAME \\{?(.*?) *\\}? >$"
+      state: { "auracast.{1}.name": "{2}" }
+    - match: "^< REP (\\d+) AC_BC_CODE \\{?(.*?) *\\}? >$"
+      state: { "auracast.{1}.code": "{2}" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Every change is reported unasked; metered values come as SAMPLE only while a meter rate is set
+      (never started here; a consumer sets one). On connecting the core asks for the device ID and
+      for every channel's or bay's parameters (GET 0 ALL on neXt rack units, which document it; one
+      GET per parameter elsewhere). Opened for commands only, nothing is asked.
+  - models: [all]
+    severity: info
+    text: >
+      When a transmitter becomes available (TX_AVAILABLE NO to YES) Shure advises reading its
+      status, gains, battery, button, LED and type again; the core does so for the channel
+      (then_send). Values 252-255 (three digits) and 65532-65535 (five digits) mean not available;
+      battery minutes 65532 powered by a wall charger, 65533 on charger, 65534 calculating, 65535
+      off.
+  - models: [all]
+    severity: info
+    text: >
+      Commands are matched to their REP by the parameter name, not by the channel: a change to the
+      same parameter on another channel arriving in the same moment could be taken for the answer.
+      An error answer is < REP ERR > (neXt also < ERROR >).
+  - models: [mxwapt2, mxwapt4, mxwapt8, mxwapxd2, mxwapx4, mxwapx8]
+    severity: info
+    text: >
+      LED_STATUS can be set only with External LED Control chosen in the web application (else REP
+      ERR); with Mute Preference set to External Mute a microphone never reports MUTE.
+  - models: [mxwapt2, mxwapt4, mxwapt8, mxwapxd2, mxwapx4, mxwapx8]
+    severity: critical
+    text: >
+      unlink removes a transmitter's link to the channel at once, even while it is off or on a non-
+      networked charger, after which it cannot reconnect until linked again; set_transmitter_status
+      OFF turns a microphone off.
+  - models: [mxwapxd2, mxwapx4, mxwapx8, mxwndx4, mxwndx8, mxwndx4g, mxwndx8g]
+    severity: critical
+    text: >
+      reboot restarts the unit, interrupting audio, and is not acknowledged.
+  - models: [mxwapxd2, mxwapx4, mxwapx8]
+    severity: info
+    text: >
+      Auracast commands take the Auracast channel (not the microphone channel) and may answer ERR
+      without a licence or with an invalid configuration; names and codes can be set only while the
+      broadcast is off.
