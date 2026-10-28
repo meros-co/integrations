@@ -224,6 +224,8 @@ V.append({"spec": BC, "command": "upload_preset", "input": {"preset": "Studio A"
                              "content_type": "application/octet-stream"},
           "http_reply": {"status": 200, "body": '{"presetAdded":"Studio A"}'},
           "expect_result": _val("Studio A")})
+# Saved to the host file named (never written by a vector).
+_bc("download_preset", {"preset": "Studio A.cset", "to": {"file": "Studio A.cset"}}, "GET", "/presets/Studio%20A.cset")
 _bc("delete_preset", {"preset": "Studio A.cset"}, "DELETE", "/presets/Studio%20A.cset",
     http_reply={"status": 404}, expect_result=_err(404))
 
