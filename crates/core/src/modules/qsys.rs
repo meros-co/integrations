@@ -852,6 +852,9 @@ enum Purpose {
     Status,
     /// Change group upkeep and keepalives; failures are logged.
     Internal,
+    /// The design's components and their controls' names, read into
+    /// `design.components` while monitored.
+    Catalogue,
     Command {
         id: CommandId,
         value: bool,
@@ -1022,6 +1025,7 @@ impl Qsys {
         self.pending.retain(|_, p| p.purpose != Purpose::Logon);
         self.arm_reply_timer(cx);
         cx.connection(Connection::Connected);
+        self.read_catalogue(cx);
         // Commands only: `groups` is never filled, so nothing is rebuilt.
         let groups: Vec<(String, Group)> = self
             .groups
@@ -1057,6 +1061,75 @@ impl Qsys {
                     None,
                 );
             }
+        }
+    }
+
+    /// The design's named components (Component.GetComponents), then each
+    /// one's controls (Component.GetControls), so a consumer has every name
+    /// it can address; while monitored only.
+    fn read_catalogue(&mut self, cx: &mut Cx) {
+        if self.monitor {
+            self.send(
+                cx,
+                "Component.GetComponents",
+                json!({}),
+                Purpose::Catalogue,
+                None,
+            );
+        }
+    }
+
+    /// A catalogue reply into `design.components`: each component's type,
+    /// and its controls' names once they are read.
+    fn catalogue(&mut self, cx: &mut Cx, method: &str, result: &Value) {
+        match method {
+            "Component.GetComponents" => {
+                let Some(list) = result.as_array() else {
+                    return;
+                };
+                let mut components = Map::new();
+                let mut names = Vec::new();
+                for c in list {
+                    let Some(name) = c.get("Name").and_then(Value::as_str) else {
+                        continue;
+                    };
+                    let mut entry = Map::new();
+                    if let Some(t) = c.get("Type") {
+                        entry.insert("type".into(), t.clone());
+                    }
+                    if let Some(id) = c.get("ID") {
+                        entry.insert("id".into(), id.clone());
+                    }
+                    components.insert(name.to_string(), Value::Object(entry));
+                    names.push(name.to_string());
+                }
+                // The list replaces the last: a component gone leaves state.
+                cx.state(json!({"design": {"components": null}}));
+                cx.state(json!({"design": {"components": components}}));
+                for name in names {
+                    self.send(
+                        cx,
+                        "Component.GetControls",
+                        json!({ "Name": name }),
+                        Purpose::Catalogue,
+                        None,
+                    );
+                }
+            }
+            "Component.GetControls" => {
+                let (Some(name), Some(controls)) = (
+                    result.get("Name").and_then(Value::as_str),
+                    result.get("Controls").and_then(Value::as_array),
+                ) else {
+                    return;
+                };
+                let names: Vec<Value> = controls
+                    .iter()
+                    .filter_map(|c| c.get("Name").cloned())
+                    .collect();
+                cx.state(json!({"design": {"components": { name: { "controls": names } }}}));
+            }
+            _ => {}
         }
     }
 
@@ -1140,7 +1213,10 @@ impl Qsys {
         let changed = self.design_code.as_deref().is_some_and(|old| old != code);
         self.design_code = Some(code.to_string());
         if changed {
-            cx.state(json!({"controls": null, "components": null}));
+            cx.state(json!({"controls": null, "components": null, "design": null}));
+            if self.ready {
+                self.read_catalogue(cx);
+            }
             if self.ready {
                 let ids: Vec<String> = self.groups.keys().cloned().collect();
                 for id in ids {
@@ -1293,6 +1369,10 @@ impl Qsys {
             if let Some(status) = result.as_object() {
                 self.engine(cx, status);
             }
+        } else if p.purpose == Purpose::Catalogue {
+            // Names only: the values a catalogue read carries are not kept,
+            // since nothing keeps them current.
+            self.catalogue(cx, &p.method, &result);
         } else if let Some(patch) = result_patch(&p.method, &result) {
             cx.state(patch);
         }
@@ -1302,7 +1382,7 @@ impl Qsys {
                     self.become_ready(cx);
                 }
             }
-            Purpose::Internal => {}
+            Purpose::Internal | Purpose::Catalogue => {}
             Purpose::Command { id, value } => {
                 let outcome = if value {
                     Outcome::Value { value: result }
@@ -1441,7 +1521,7 @@ impl Module for Qsys {
                         }
                         // A Logon may go unanswered; the StatusGet after it decides.
                         Purpose::Logon => {}
-                        Purpose::Internal => cx.log(
+                        Purpose::Internal | Purpose::Catalogue => cx.log(
                             Level::Debug,
                             format!("no reply to {} within {REPLY_TIMEOUT} ms", p.method),
                         ),
@@ -2194,6 +2274,47 @@ mod tests {
     }
 
     #[test]
+    fn the_designs_components_and_control_names_are_read_into_state() {
+        let mut m = module(json!({}));
+        let a = connect(&mut m);
+        let status = sent(&a).pop().unwrap();
+        let a = feed(
+            &mut m,
+            10,
+            json!({"jsonrpc": "2.0", "id": status["id"], "result": {"State": "Active",
+                "DesignName": "D", "DesignCode": "abc"}}),
+        );
+        let ask = sent(&a).pop().unwrap();
+        assert_eq!(ask["method"], "Component.GetComponents");
+        let a = feed(
+            &mut m,
+            20,
+            json!({"jsonrpc": "2.0", "id": ask["id"], "result": [
+                {"Name": "Bank.A", "Type": "snapshot_controller", "ID": "Bank.A", "Properties": []},
+                {"Name": "Gain1", "Type": "gain", "Properties": []}]}),
+        );
+        assert_eq!(
+            state(&a),
+            json!({"design": {"components": {"Bank.A": {"type": "snapshot_controller", "id": "Bank.A"},
+                "Gain1": {"type": "gain"}}}})
+        );
+        let asks = sent(&a);
+        assert_eq!(asks.len(), 2);
+        assert_eq!(asks[0]["params"], json!({"Name": "Bank.A"}));
+        let a = feed(
+            &mut m,
+            30,
+            json!({"jsonrpc": "2.0", "id": asks[1]["id"], "result": {"Name": "Gain1",
+                "Controls": [{"Name": "gain", "Value": -12.0}, {"Name": "mute", "Value": 0.0}]}}),
+        );
+        // Names only: no value goes into state.
+        assert_eq!(
+            state(&a),
+            json!({"design": {"components": {"Gain1": {"controls": ["gain", "mute"]}}}})
+        );
+    }
+
+    #[test]
     fn logon_then_status_and_connected() {
         let mut m = module(json!({"username": "control", "pin": "1234"}));
         let a = connect(&mut m);
@@ -2421,6 +2542,7 @@ mod tests {
         assert_eq!(
             methods,
             [
+                "Component.GetComponents",
                 "ChangeGroup.AddControl",
                 "ChangeGroup.AddComponentControl",
                 "ChangeGroup.AutoPoll"
@@ -2438,8 +2560,10 @@ mod tests {
                 "DesignName": "Other", "DesignCode": "xyz", "IsRedundant": false, "IsEmulator": false}}),
         );
         assert!(a.contains(&Action::State(
-            json!({"controls": null, "components": null})
+            json!({"controls": null, "components": null, "design": null})
         )));
+        // The new design's components are read again.
+        assert_eq!(sent(&a)[0]["method"], "Component.GetComponents");
     }
 
     #[test]
