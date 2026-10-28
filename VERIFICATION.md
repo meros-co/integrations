@@ -4011,6 +4011,27 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On a 2.25 unit, confirm the list, inputs and capacity endpoints answer 404 and that encoder 0, decoder 0 and streams 0-4 answer on the shared paths. ([specs/teradek-prism.yaml:2061](specs/teradek-prism.yaml#L2061))
 - [ ] Record the units of the audio delay and volume fields (encoder audio delay, audio output delay and embedded volume, channel volume). ([specs/teradek-prism.yaml:1963](specs/teradek-prism.yaml#L1963))
 
+## tractus-fullview — Tractus FullView for NDI
+
+- [ ] Record the answer of /displays, and whether it names each display's source, to keep state field by field. ([specs/tractus-fullview.yaml:71](specs/tractus-fullview.yaml#L71))
+- [ ] Check the answer to a source change (status and body) and to a display number that does not exist. ([specs/tractus-fullview.yaml:46](specs/tractus-fullview.yaml#L46))
+
+## tractus-multiview — Tractus Multiview for NDI
+
+- [ ] Record /viewers, /receivers and /current answers: whether the fields are PascalCase as documented or camelCase, and the shapes of Layout, AudioPeakdBFS, ReceiverWatchdogTimeout, DefaultInstances and NdiSenderType. ([specs/tractus-multiview.yaml:539](specs/tractus-multiview.yaml#L539))
+- [ ] Check that GET /current answers promptly enough to serve as the liveness probe. ([specs/tractus-multiview.yaml:40](specs/tractus-multiview.yaml#L40))
+- [ ] Check which layout codes /viewer/{viewer}/layout takes (the default list gives 1L12SV for "1 Large + 12 Small", possibly a typo) and whether custom layouts' codes work. ([specs/tractus-multiview.yaml:176](specs/tractus-multiview.yaml#L176))
+- [ ] Check that /viewer/{viewer}/ndi/ takes true and false (the documentation says "likely"). ([specs/tractus-multiview.yaml:217](specs/tractus-multiview.yaml#L217))
+- [ ] Record what a preset bank identifier is (a number, a name) and its range. ([specs/tractus-multiview.yaml:230](specs/tractus-multiview.yaml#L230))
+- [ ] Record the RGBA format caption backgrounds take, and whether caption positions take decimals. ([specs/tractus-multiview.yaml:386](specs/tractus-multiview.yaml#L386))
+- [ ] Record the caption, layout import and layout template bodies from the Swagger reference on a running instance. ([specs/tractus-multiview.yaml:454](specs/tractus-multiview.yaml#L454))
+
+## tractus-router — Tractus Router for NDI
+
+- [ ] Record the router's HTTP port, and whether its routes take GET. ([specs/tractus-router.yaml:28](specs/tractus-router.yaml#L28))
+- [ ] Record the answers of /slots and /sources to keep the slots field by field, and the answer to a slot or source that does not exist. ([specs/tractus-router.yaml:136](specs/tractus-router.yaml#L136))
+- [ ] Check that a slot or source name holding a slash or a percent sign reaches the router intact. ([specs/tractus-router.yaml:56](specs/tractus-router.yaml#L56))
+
 ## tsl-umd-display — TSL UMD tally sent to displays and multiviewers
 
 - [ ] Check that a V4.0 display or multiviewer with a right display lights the right display's tallies from the second XDATA byte (right_lh, right_text_tally, right_rh), and that one without ignores it. ([specs/tsl-umd-display.yaml:76](specs/tsl-umd-display.yaml#L76))

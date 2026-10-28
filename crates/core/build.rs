@@ -390,6 +390,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ),
     ("vendor-teradek", &["teradek-prism"]),
     ("vendor-tinkerlist", &["cuez-automator"]),
+    (
+        "vendor-tractus",
+        &["tractus-fullview", "tractus-multiview", "tractus-router"],
+    ),
     ("vendor-tsl", &["tsl-umd-display", "tsl-umd-listener"]),
     (
         "vendor-turtleav",

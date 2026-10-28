@@ -1,0 +1,97 @@
+spec: 1
+id: tractus-fullview
+name: Tractus FullView for NDI (HTTP API)
+vendor: Tractus Events
+category: display
+
+source:
+  - title: Tractus Tools for NDI, HTTP API (FullView for NDI)
+    author: Tractus Events (Northern HCI Solutions Inc.)
+    url: https://tractus.gitbook.io/tractus-tools-for-ndi/http-api
+    note: >
+      Manufacturer documentation, the source of every request here: port 9901 on
+      every interface, GET /display/{displayNumber}/source/{name} with displays
+      numbered from 0 and the source percent-encoded, GET /displays, and GET
+      /debug with its SdlEvents, BlitRender and RenderLoop figures in
+      milliseconds.
+  - title: Tractus Tools for NDI, About FullView for NDI 6.2 and Operating Modes
+    author: Tractus Events
+    url: https://tractus.gitbook.io/tractus-tools-for-ndi/fullview-for-ndi/about-fullview-for-ndi-6.2
+    note: >
+      Every display of a Windows PC becomes an NDI receiver (or, with
+      --singleinput, one receiver across all of them); source assignments are
+      remembered across restarts; adding or removing a display needs a restart.
+
+transport:
+  type: http
+  port: 9901
+  scheme: http
+  auth: none
+  timeout_ms: 5000
+  probe: { method: GET, path: /displays }
+
+ports:
+  - { port: 9901, protocol: http, role: control, note: "FullView's HTTP API, on every interface" }
+
+models:
+  - id: fullview
+    name: Tractus FullView for NDI
+    supports: [set_display_source, get_displays, get_debug]
+    verification: none
+    notes: >
+      Free Windows software that turns each display output of a PC into an NDI
+      receiver.
+
+commands:
+  set_display_source:
+    summary: "Show an NDI source on a display (GET /display/{display}/source/{name})"
+    params:
+      display: { type: int, min: 0, max: 63, required: true,
+        label: Display, description: "The display, numbered from 0 in Windows' display order." }
+      source: { type: string, required: true, max_length: 256,
+        label: NDI source, description: "The NDI source's full name, such as ALPHAVII (Test Pattern)." }
+    send:
+      - { method: GET, path: "/display/{display}/source/{source}" }
+      - { method: GET, path: /displays }
+    expect: { status: 200 }
+    returns: ack
+
+  get_displays:
+    summary: "List the displays (GET /displays)"
+    send: { method: GET, path: /displays }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_debug:
+    summary: "Read the renderer's performance figures: SdlEvents, BlitRender and RenderLoop in milliseconds (GET /debug)"
+    send: { method: GET, path: /debug }
+    expect: { status: 200 }
+    returns: text
+
+telemetry:
+  # Nothing is pushed: the displays are read every 5 seconds.
+  poll:
+    every_ms: 5000
+    send: [{ method: GET, path: /displays }]
+  updates:
+    - path: "^/displays$"
+      json: { body: "$" }
+      state: { displays: "{body}" }
+
+state:
+  displays: { type: string, description: "The displays, as JSON text, as /displays gives them" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The documentation shows no answer for /displays (it says display bounds and
+      positions will be added) and does not say whether it holds each display's
+      source, so the list is kept whole as JSON text. A source set from NDI
+      Discovery rather than this API is seen only there.
+
+  - models: [all]
+    severity: info
+    text: >
+      The API takes no credential. Displays added or removed while FullView runs
+      are seen only after it restarts.

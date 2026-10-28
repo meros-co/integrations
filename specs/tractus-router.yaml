@@ -1,0 +1,175 @@
+spec: 1
+id: tractus-router
+name: Tractus Router for NDI (HTTP API)
+vendor: Tractus Events
+category: router
+
+source:
+  - title: Router for NDI, API Documentation
+    author: Tractus Events (Northern HCI Solutions Inc.)
+    url: https://www.tractusevents.com/tools/ndi-router/
+    note: >
+      Manufacturer page, the source of every request here: the output slots
+      (/slots), clearing a slot to the blank sender, setting a slot's NDI source,
+      adding a slot with or without a default source, deleting and renaming a
+      slot, removing every slot (/reset) and the sources the router sees
+      (/sources). It names no port, HTTP method or answer.
+  - title: The Tractus PowerTools for NDI Suite
+    author: Tractus Events
+    url: https://powertoolsforndi.web.app
+    note: Router for NDI routes NDI sources to any number of output slots, controlled by an HTTP API.
+
+transport:
+  type: http
+  port: null
+  scheme: http
+  auth: none
+  timeout_ms: 5000
+  probe: { method: GET, path: /slots }
+
+ports:
+  - { port: null, protocol: http, role: control, note: "Tractus documents no port: the router's HTTP port is given when it is opened" }
+
+models:
+  - id: router
+    name: Tractus Router for NDI
+    supports: [get_slots, get_sources, set_slot_source, clear_slot, add_slot, add_slot_with_source,
+               delete_slot, rename_slot, reset]
+    verification: none
+    notes: >
+      Software that routes NDI sources to output slots, each an NDI sender of its
+      own.
+
+commands:
+  get_slots:
+    summary: "List the output slots (/slots)"
+    send: { method: GET, path: /slots }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_sources:
+    summary: "List the NDI sources the router sees (/sources)"
+    send: { method: GET, path: /sources }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_slot_source:
+    summary: "Route an NDI source to an output slot (/slot/{name}/set/{source})"
+    params:
+      slot: { type: string, required: true, max_length: 256,
+        label: Slot, description: "The output slot's name." }
+      source: { type: string, required: true, max_length: 256,
+        label: NDI source, description: "The NDI source's full name, such as STUDIO-PC (Camera 1)." }
+    send:
+      - { method: GET, path: "/slot/{slot}/set/{source}" }
+      - { method: GET, path: /slots }
+    expect: { status: 200 }
+    returns: ack
+
+  clear_slot:
+    summary: "Clear an output slot: it sends the blank sender (/slot/{name}/clear)"
+    params:
+      slot: { type: string, required: true, max_length: 256,
+        label: Slot, description: "The output slot's name." }
+    send:
+      - { method: GET, path: "/slot/{slot}/clear" }
+      - { method: GET, path: /slots }
+    expect: { status: 200 }
+    returns: ack
+
+  add_slot:
+    summary: "Add an output slot (/slots/add/{name})"
+    params:
+      slot: { type: string, required: true, max_length: 256,
+        label: Slot, description: "The new output slot's name, which names its NDI sender." }
+    send:
+      - { method: GET, path: "/slots/add/{slot}" }
+      - { method: GET, path: /slots }
+    expect: { status: 200 }
+    returns: ack
+
+  add_slot_with_source:
+    summary: "Add an output slot with a default NDI source (/slots/add/{name}/{source})"
+    params:
+      slot: { type: string, required: true, max_length: 256,
+        label: Slot, description: "The new output slot's name, which names its NDI sender." }
+      source: { type: string, required: true, max_length: 256,
+        label: NDI source, description: "The NDI source the slot sends at first." }
+    send:
+      - { method: GET, path: "/slots/add/{slot}/{source}" }
+      - { method: GET, path: /slots }
+    expect: { status: 200 }
+    returns: ack
+
+  delete_slot:
+    summary: "Delete an output slot (/slots/delete/{name})"
+    params:
+      slot: { type: string, required: true, max_length: 256,
+        label: Slot, description: "The output slot to delete." }
+    send:
+      - { method: GET, path: "/slots/delete/{slot}" }
+      - { method: GET, path: /slots }
+    expect: { status: 200 }
+    returns: ack
+
+  rename_slot:
+    summary: "Rename an output slot (/slot/{name}/rename/{new_name})"
+    params:
+      slot: { type: string, required: true, max_length: 256,
+        label: Slot, description: "The output slot to rename." }
+      new_name: { type: string, required: true, max_length: 256,
+        label: New name, description: "The slot's new name." }
+    send:
+      - { method: GET, path: "/slot/{slot}/rename/{new_name}" }
+      - { method: GET, path: /slots }
+    expect: { status: 200 }
+    returns: ack
+
+  reset:
+    summary: "Remove every output slot (/reset)"
+    send:
+      - { method: GET, path: /reset }
+      - { method: GET, path: /slots }
+    expect: { status: 200 }
+    returns: ack
+
+telemetry:
+  # Nothing is pushed: the slots are read every 2 seconds, the sources every 10.
+  poll:
+    - every_ms: 2000
+      send: [{ method: GET, path: /slots }]
+    - every_ms: 10000
+      send: [{ method: GET, path: /sources }]
+  updates:
+    - path: "^/slots$"
+      json: { body: "$" }
+      state: { slots: "{body}" }
+    - path: "^/sources$"
+      json: { body: "$" }
+      state: { sources: "{body}" }
+
+state:
+  slots: { type: string, description: "The output slots with their sources, as JSON text, as /slots gives them" }
+  sources: { type: string, description: "The NDI sources the router sees, as JSON text, as /sources gives them" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Tractus documents the router's routes but not its port, HTTP method or
+      answers: the port is given when the router is opened, every request is a
+      GET (as in Tractus's other NDI tools), and the slot and source lists are
+      kept whole as JSON text.
+
+  - models: [all]
+    severity: critical
+    text: >
+      reset removes every output slot, and with them the NDI senders that
+      receivers downstream follow; delete_slot removes one. Neither asks for
+      confirmation.
+
+  - models: [all]
+    severity: info
+    text: >
+      The API takes no credential. Slot and source names are sent as path segments,
+      percent-encoded, so names holding a slash are sent as %2F.
