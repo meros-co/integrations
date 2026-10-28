@@ -583,7 +583,18 @@ fn answer_internal(engine: &mut SpecEngine, cx: &mut Cx, success: &[u8]) {
             let reply = super::osc::encode(&address, &[]);
             engine.datagram(cx, "device", SocketAddr::new(HOST, 1), &reply);
         }
-        Some(super::Await::Ws(_)) => engine.ws(cx, "device", WsInput::Text("{}".into())),
+        // A websocket whose replies `reply_match` tells from its pushes
+        // (QLC+) is answered with a line it takes as a reply.
+        Some(super::Await::Ws(_)) => {
+            let text = match &engine.transport {
+                super::Transport::Ws {
+                    reply_match: Some(re),
+                    ..
+                } if !re.is_match("{}") => String::from_utf8_lossy(success).trim_end().to_string(),
+                _ => "{}".to_string(),
+            };
+            engine.ws(cx, "device", WsInput::Text(text))
+        }
         // A query to an endpoint beside a line transport (a HyperDeck's
         // configuration API): an empty JSON answer.
         Some(super::Await::Http(id)) => {
@@ -794,6 +805,8 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         "%001 POST 000003",
         // The Grass Valley Kaleido gateway: an XML acknowledgement.
         "<ack/>",
+        // QLC+'s web API: an answer to a QLC+API query.
+        "QLC+API|ok",
     ];
     let line = match &engine.transport {
         super::Transport::LineTcp {
@@ -801,6 +814,10 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
             ..
         }
         | super::Transport::LineUdp {
+            reply_match: Some(re),
+            ..
+        }
+        | super::Transport::Ws {
             reply_match: Some(re),
             ..
         } => {

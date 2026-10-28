@@ -20,6 +20,8 @@ async fn a_g3_g4_is_discovered_and_identified_as_a_receiver() {
         action: DiscoverAction::Listen,
         protocols: vec!["mcp".into()],
         hints: vec![],
+        dns_servers: vec![],
+        dns_domains: vec![],
     })
     .unwrap();
 
@@ -72,12 +74,16 @@ async fn a_g3_g4_is_discovered_and_identified_as_a_receiver() {
             action: DiscoverAction::Scan,
             protocols: vec!["nope".into()],
             hints: vec![],
+            dns_servers: vec![],
+            dns_domains: vec![],
         })
         .is_err());
     core.discover(DiscoverRequest {
         action: DiscoverAction::Stop,
         protocols: vec![],
         hints: vec![],
+        dns_servers: vec![],
+        dns_domains: vec![],
     })
     .unwrap();
 }

@@ -40,6 +40,8 @@
 pub mod catalog;
 mod digest;
 mod discovery;
+#[cfg(feature = "nmos-registry")]
+mod dns_sd;
 mod engine;
 pub mod events;
 #[cfg(test)]

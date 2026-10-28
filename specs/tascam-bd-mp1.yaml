@@ -51,6 +51,9 @@ transport:
   reply_match: "^(n?ack|!7|@0BDER)"
   error_match: "^(nack|@0BDERBUSY)"
   probe: "!7?PWR"
+  # Each status the player notifies by itself is answered with "ack" (§4.4.3), or it is sent once more; the
+  # status answering a status request other than ?PWR (answered ack alone) is not.
+  acknowledge: { match: "^!7", send: ack, framed: false, answers: '^!7\?(?:[^P]|P[^W]|PW[^R])' }
   # At least 30 ms between commands (§4.3.6).
   pacing:
     min_interval_ms: 30
@@ -565,9 +568,11 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      The player expects the host to answer each status it sends by itself with "ack" within 30 ms; the spec format
-      cannot answer a push without awaiting a reply, so the player sends each such status twice and then stops
-      repeating it. State is unaffected. "nack" (or BUSY when commands come too fast) fails the command.
+      The player expects the host to answer each status it sends by itself with "ack" within 30 ms, and sends it once
+      more without one; the core answers each such status at once, opened for commands only too. The status that
+      answers a status request is not a notification and is not answered: the next status after each request but ?PWR
+      (answered ack alone) is taken as its answer (unless it has not come within the timeout, or nack came instead).
+      "nack" (or BUSY when commands come too fast) fails the command.
   - models: [all]
     severity: warning
     text: >

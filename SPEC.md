@@ -1188,7 +1188,14 @@ Every message, reply or not, is also offered to the telemetry rules (§8).
 device pushes and what it sends back goes to the rules. While a step with
 `await_reply` (a login) still waits for its answer, they queue behind it
 instead, each taking the next message as its reply, since such a device
-accepts nothing before the login is answered (DHD's Control API). Pings are answered by
+accepts nothing before the login is answered (DHD's Control API). A device
+whose replies `reply_match` tells from what it pushes has its telemetry
+messages queued instead, as on `line-tcp`: each poll, subscription and
+`then_send` message is sent in turn and takes the next message matching
+`reply_match` as its reply, so a rule can tie a reply to the message it
+answers with `request_match` (§8, "Replies and what they answer"). QLC+
+answers `QLC+API|getFunctionStatus|<id>` with `QLC+API|getFunctionStatus|Running`,
+naming no function, while it pushes `GM_VALUE|...` at any time. Pings are answered by
 the core. `wss` uses TLS 1.2 or later and checks the device's certificate
 against the same public roots as `https`; a device with a self-signed
 certificate declares `accept_invalid_certs: true`, as for `http`: the
@@ -1363,6 +1370,61 @@ keeps the connection rather than state; it is paced like any message. The
 timer starts when the connection is ready and stops when it is lost or the
 credential refused. A device that answers its keep-alive should rather have
 a `probe`, which checks the answer.
+
+### Acknowledgements
+
+Some devices want the host to answer what they send by themselves. A Denon
+Professional or TASCAM Blu-ray player notifies each change of its status and
+waits 30 ms for the host's ACK, sending the status once more without it; a
+RED camera keeps an RCP2 connection only while the client echoes its
+`rcp_session` messages back. `acknowledge` on a `line-tcp`, `line-serial`,
+`line-udp` or `ws` transport lists what such messages look like and the
+answer to each:
+
+```yaml
+transport:
+  type: line-tcp
+  port: 9030
+  framing: terminated
+  terminator: cr
+  acknowledge:
+    match: "^@0"                  # a status, from "@0" to CR
+    send: "\u0006"                # the ACK byte
+    framed: false                 # alone: no CR after it
+    answers: '^@0\?'              # a status request is answered with a status
+```
+
+Each entry selects messages with `match`, a regex over the message's text
+(its captures `{1}`, `{2}`, ...), or on a websocket or a JSON line
+protocol with `json_match` and `json`, as a telemetry rule does (§8, JSON
+messages). `send` is a template over those captures and the settings, framed
+as any message is unless `framed: false` sends it exactly as rendered. A
+`json` name stands for its value as JSON text, a string with its quotes, so
+an echo sends back exactly what the device sent, whatever its type. A
+list of entries answers each message with the first entry it matches. A RED
+camera's session:
+
+```yaml
+  acknowledge:
+    - json_match: { "$.type": "^rcp_session$", "$.status": "^open$" }
+      json: { data: "$.data" }
+      send: '{"type":"rcp_session","data":{data}}'
+```
+
+Every message an entry matches is answered at once, whether or not it is
+also taken as a command's reply and whether or not the device is monitored:
+the answer keeps the connection, or stops the device repeating itself, and
+is no request for state. It awaits no reply and is not paced, since the
+device waits for it. A device that sends the same message as the answer to
+a request (the Denon player answers `@0?ST` with ACK and then `@0STPL`,
+which it also notifies when the status changes) names those requests with
+`answers`, a regex over the text of each message sent: after each one sent,
+the next message an entry matches is its answer and is not acknowledged,
+unless it has not come within the transport's `timeout_ms`, or an error
+answer (`error_match`) came instead. The messages still go to the
+telemetry rules as any message does. `tools/validate.py` checks the
+regexes and the templates' placeholders; the engine's own tests play the
+exchange.
 
 ### Settings and connection setup
 
@@ -2570,6 +2632,21 @@ alike, and never a message the device pushes. Rules without
 `request_match` see replies as before. A telemetry vector for such a rule
 gives `request`, the text of the message the `inbound` reply answers.
 
+The same holds on a `ws` transport, for a text message and the reply taken
+for it, in order or by `reply_json` (§2, `ws`); with `reply_match` there,
+telemetry messages are queued so that each has its reply. QLC+'s statuses
+are read for each function its list names:
+
+```yaml
+    - match: "^QLC\\+API\\|getFunctionsList\\|"
+      match_each: '(\d+)\|([^|]*)(?:\||$)'
+      state: { "functions.{1}.name": "{2}" }
+      then_send: ["QLC+API|getFunctionStatus|{1}"]
+    - match: "^QLC\\+API\\|getFunctionStatus\\|(.*?)\\s*$"
+      request_match: '^QLC\+API\|getFunctionStatus\|(\d+)$'
+      state: { "functions.{2}.status": "{1}" }
+```
+
 With `then_send` (below, "Re-reads on a push"), a reply can have more read: the NLB's VDN table
 names each amplifier, and each name has that amplifier's status, power and
 mutes read in turn.
@@ -3219,6 +3296,7 @@ events, as the ATEM's do.
 | `resolume-push` | Resolume Arena and Avenue's websocket API (`ws://host:port/api/v1`): reads the composition Resolume sends on connecting and after each structural change into state keyed by unique id (composition, layers, columns, clips, decks, layer groups, and the effects in their chains), subscribes to every parameter that state shows with `{"action":"subscribe","parameter":"/parameter/by-id/<id>"}`, and applies each `parameter_subscribed` and `parameter_update`. A new composition is diffed against the last: removed items leave state and are unsubscribed, new ones are subscribed. Reads the composition again over REST after a deck switch, after a structural command of the session's own, and as a slow safety refresh (`composition_refresh_s`) for a deck's `closed`, which is not a parameter. Reopens the websocket after 1 s doubling to 30 s |
 | `hyperdeck-ftp` | Blackmagic HyperDeck's FTP server (TCP 21, `ftp_port`; anonymous unless `ftp_username` is set) for the files on its media: `list_files` (MLSD, or LIST in the Unix or DOS form), `delete_file`, `rename_file`, `create_folder`, each answered when done on a connection of its own, and `download_file` and `upload_file`, one at a time in the background on another, with `cancel_transfer`. Passive data connections (PASV, EPSV over IPv6) always go to the control connection's peer, whatever address the reply names. An upload's or a rename's target is checked with SIZE first and replaced only with `overwrite`; a download is checked against SIZE. Each connection logs in, works and quits; a reply is waited for 15 s, a transfer may be silent 30 s |
 | `nmos-query-websocket` | An AMWA NMOS registry's Query API subscriptions (IS-04): creates a non-persistent subscription for each resource type (`POST /x-nmos/query/<query_version>/subscriptions`), opens the websocket its answer names in `ws_href` (with the bearer token, where set), and offers each grain to the spec's telemetry rules as JSON: `{"nmos": <type>, "op": "sync", "items": [...]}` for the first on a websocket (every resource, which the spec replaces), `{"nmos": <type>, "op": "set", "items": [...]}` for resources added or changed, and `{"nmos": <type>, "op": "delete", "ids": [...]}` for those gone. Subscribes again when a websocket closes, after 1 s doubling to 30 s |
+| `nmos-event-transports` | An AMWA NMOS Node's IS-07 event transports: lists the Node's Senders every 30 s, reads the active IS-05 parameters of each whose transport is `urn:x-nmos:transport:websocket` or `urn:x-nmos:transport:mqtt` (and enabled), and listens where each publishes. Senders sharing a `connection_uri` share one websocket, sent a `subscription` command naming every `ext_is_07_source_id` and a `health` command every 5 s, and reopened when silent 12 s (with the bearer token where `connection_authorization` is true); Senders sharing a broker share one MQTT 3.1.1 connection (TLS for `secure-mqtt`, `mqtt_username` and `mqtt_password` where `broker_authorization` is true), subscribed at QoS 0 to each `broker_topic` and `connection_status_broker_topic`. Offers each `state`, `reboot` and `shutdown` message to the rules as it is, and each connection status as `{"message_type": "connection_status", "active", "sender_id"}`. Reopens what closes after 1 s doubling to 30 s |
 | `ultimatte-preset-archive` | Blackmagic Ultimatte 12's binary settings channel (TCP 9996, `archive_port`), which the vendor's Smart Remote 4 and Software Control use for Archive All and Restore: `export_presets` reads every preset of the FILE LIST the unit last sent on its text port, and its `GPISettings` and `SavedSettings`, one request per connection, into a zip in Archive All's layout on the host; `import_presets` writes such a zip's presets in name order, then `GPISettings`, then `SavedSettings`, stopping at the first refusal; `export_preset`, `import_preset`, `export_settings` and `import_settings` move one of them to or from a host file. A connection that does not open, or a read the unit drops unanswered, is tried once more after 250 ms |
 
 ## HTTP service

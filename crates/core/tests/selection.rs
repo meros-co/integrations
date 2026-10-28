@@ -42,6 +42,8 @@ fn discover(protocols: &[&str], action: DiscoverAction) -> DiscoverRequest {
         action,
         protocols: protocols.iter().map(|p| p.to_string()).collect(),
         hints: vec![],
+        dns_servers: vec![],
+        dns_domains: vec![],
     }
 }
 
@@ -101,7 +103,7 @@ async fn a_selected_device_opens_and_any_other_is_refused() {
 fn discovery_runs_only_the_protocols_of_the_selected_devices() {
     let core = wireless();
     assert_eq!(core.discovery_protocols(), ["mcp"]);
-    for excluded in ["ssdp", "pjlink", "mdns"] {
+    for excluded in ["ssdp", "pjlink", "mdns", "dns-sd"] {
         let err = core
             .discover(discover(&[excluded], DiscoverAction::Scan))
             .unwrap_err();

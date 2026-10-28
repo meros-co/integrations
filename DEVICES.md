@@ -458,7 +458,6 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | Blackmagic GPI and Tally Interface | Configured only by Videohub Hardware Panel Setup or ATEM Setup over USB; no published protocol | Closed |
 | AJA FS2 / FS4 / FS-HDR (BRIDGE LIVE is built; 12G-AM has no network control) | AJA REST /config: only the generic framework is documented, no device parameters | Public |
 | BirdDog Central, Connect, PLAY PRO, OG4, SDM (converters, PLAY and Pod are built) | Central: undocumented HTTP; Connect: cloud API behind an account | Community |
-| AMWA NMOS beyond nmos-node and nmos-registry (IS-04 Node and Query APIs, IS-05, IS-07 over REST, IS-08 and mDNS discovery are built): unicast DNS-SD discovery of registries, IS-07 event websocket and MQTT transports | DNS-SD over unicast DNS; WebSocket / MQTT | Public |
 | Matrox Monarch EDGE (Monarch HD, HDX and LCS are built; ConvertIP is controlled through NMOS IS-04 / IS-05 only) | RESTful API documented by Matrox on request | On request |
 | Haivision Connect DVR (Makito X4 and KB are built) | No published API: its documents cover the web interface only | Unknown |
 

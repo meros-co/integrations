@@ -73,3 +73,23 @@ telemetry(QLC, "widgets-list", inbound_ws="QLC+API|getWidgetsList|4|Blackout|9|C
 # "QLC+ also pushes GM_VALUE|<value>|<display> when it changes."
 telemetry(QLC, "grand-master", inbound_ws="GM_VALUE|128|50%",
           expect_state={"grand_master": {"value": 128, "display": "50%"}})
+# Each list item has its details read in turn; their answers name nothing,
+# so each is tied to the request it answers.
+telemetry(QLC, "functions-list-reads", inbound_ws="QLC+API|getFunctionsList|0|Scene 1|",
+          expect_then_send=["QLC+API|getFunctionType|0", "QLC+API|getFunctionStatus|0"],
+          expect_state={"functions": {"0": {"name": "Scene 1"}}})
+telemetry(QLC, "widgets-list-reads", inbound_ws="QLC+API|getWidgetsList|4|Blackout|",
+          expect_then_send=["QLC+API|getWidgetType|4", "QLC+API|getWidgetFunction|4", "QLC+API|getWidgetStatus|4"],
+          expect_state={"widgets": {"4": {"caption": "Blackout"}}})
+telemetry(QLC, "function-type", inbound="QLC+API|getFunctionType|Chaser", request="QLC+API|getFunctionType|1",
+          expect_state={"functions": {"1": {"type": "Chaser"}}})
+telemetry(QLC, "function-status", inbound="QLC+API|getFunctionStatus|Running", request="QLC+API|getFunctionStatus|1",
+          expect_state={"functions": {"1": {"status": "Running", "running": True}}})
+telemetry(QLC, "function-stopped", inbound="QLC+API|getFunctionStatus|Stopped", request="QLC+API|getFunctionStatus|3",
+          expect_state={"functions": {"3": {"status": "Stopped", "running": False}}})
+telemetry(QLC, "widget-type", inbound="QLC+API|getWidgetType|Slider", request="QLC+API|getWidgetType|7",
+          expect_state={"widgets": {"7": {"type": "Slider"}}})
+telemetry(QLC, "widget-function", inbound="QLC+API|getWidgetFunction|2|Chaser|Intro", request="QLC+API|getWidgetFunction|7",
+          expect_state={"widgets": {"7": {"function": "2|Chaser|Intro"}}})
+telemetry(QLC, "widget-status", inbound="QLC+API|getWidgetStatus|PLAY|3", request="QLC+API|getWidgetStatus|9",
+          expect_state={"widgets": {"9": {"status": "PLAY|3"}}})

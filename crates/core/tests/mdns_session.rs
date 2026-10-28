@@ -148,6 +148,8 @@ async fn blackmagic_devices_answer_a_query_and_are_identified() {
         action: DiscoverAction::Scan,
         protocols: vec!["mdns".into()],
         hints: vec![RESPONDER],
+        dns_servers: vec![],
+        dns_domains: vec![],
     })
     .unwrap();
 
@@ -201,6 +203,8 @@ async fn blackmagic_devices_answer_a_query_and_are_identified() {
         action: DiscoverAction::Stop,
         protocols: vec!["mdns".into()],
         hints: vec![],
+        dns_servers: vec![],
+        dns_domains: vec![],
     })
     .unwrap();
 }

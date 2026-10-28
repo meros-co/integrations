@@ -243,3 +243,11 @@ ph_ws("ws-remote-device", {"data": {"remote_devices": [
 ph_ws("ws-lua", {"broadcast": "lua", "data": {"slider_level": "56"}}, {"lua": {"slider_level": "56"}})
 # Downloads saved to the host file named (never written by a vector).
 V.append({"spec": PH, "command": "download_project", "input": {"to": {"file": "project.pharos"}}, "expect_request": {"method": "GET", "target": "/api/project/file"}})
+
+# The WebSocket's subscriptions on opening, without security (no token
+# attribute; WebSocket API, Authentication and Keep Alive).
+telemetry(PH, "ws-connect", inbound_ws='{"broadcast":"beacon","data":{"on":true}}',
+          expect_connect_ws=['{"subscribe":"scene"}', '{"subscribe":"timeline"}', '{"subscribe":"group"}',
+                             '{"subscribe":"beacon"}', '{"subscribe":"remote_device"}', '{"subscribe":"lua"}',
+                             '{"subscribe":"content_target"}', '{}'],
+          expect_state={"beacon": True})

@@ -1058,7 +1058,7 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
     # API's subscriptions) feeds json_match rules too.
     has_json = (transport_type in ("ws", "line-tcp", "line-serial", "line-udp")
                 or "websocket" in telemetry or "sse" in telemetry or "zeromq" in telemetry
-                or doc.get("extension") in ("nmos-query-websocket",))
+                or doc.get("extension") in ("nmos-query-websocket", "nmos-event-transports"))
     if "sse" in telemetry and transport_type != "http":
         errors.append("telemetry.sse needs an http transport")
     declared = [key.split(".") for key in (doc.get("state") or {})]
@@ -1105,8 +1105,9 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                 re.compile(asked)
             except re.error as e:
                 errors.append(f"{where}.request_match: {e}")
-            if "match" not in rule or transport_type not in ("line-tcp", "line-serial", "line-udp"):
-                errors.append(f"{where}: a request_match regex goes with match, on a line transport")
+            # On a websocket, the message a reply answers (SPEC.md §2, ws).
+            if "match" not in rule or transport_type not in ("line-tcp", "line-serial", "line-udp", "ws"):
+                errors.append(f"{where}: a request_match regex goes with match, on a line or websocket transport")
         if "match_each" in rule and ("match" not in rule or "path" in rule) and "address" not in rule:
             errors.append(f"{where}: match_each reads the rest of a message a match rule matched, "
                           "or a capture of an address rule")
@@ -1418,6 +1419,51 @@ def pacing_checks(doc: dict) -> list[str]:
     return errors
 
 
+def acknowledge_checks(doc: dict) -> list[str]:
+    """`transport.acknowledge` (SPEC.md §2, Acknowledgements): on a line or
+    websocket transport, each entry selects with match or json_match, its
+    regexes compile as RE2, and its answer names only its captures and the
+    settings."""
+    t = doc.get("transport") or {}
+    block = t.get("acknowledge")
+    if block is None:
+        return []
+    errors: list[str] = []
+    if t.get("type") not in ("line-tcp", "line-serial", "line-udp", "ws"):
+        errors.append("transport.acknowledge needs a line-tcp, line-serial, line-udp or ws transport")
+    settings = doc.get("settings") or {}
+    entries = block if isinstance(block, list) else [block]
+    for i, entry in enumerate(entries):
+        at = f"transport.acknowledge[{i}]"
+        if ("match" in entry) == ("json_match" in entry):
+            errors.append(f"{at}: give match or json_match, not both")
+        groups = 0
+        patterns = [("match", entry["match"])] if "match" in entry else []
+        patterns += [(f"json_match {k}", v) for k, v in (entry.get("json_match") or {}).items()]
+        patterns += [("answers", entry["answers"])] if "answers" in entry else []
+        for what, pattern in patterns:
+            try:
+                compiled = re.compile(pattern)
+            except (re.error, TypeError) as e:
+                errors.append(f"{at}.{what}: {e}")
+                continue
+            if re.search(r"\(\?<?[=!]|\\[1-9]", pattern):
+                errors.append(f"{at}.{what}: lookaround and backreferences are not RE2")
+            if what != "answers":
+                groups += compiled.groups
+        for k in (entry.get("json_match") or {}):
+            if not k.startswith("$"):
+                errors.append(f"{at}.json_match: '{k}' is not a JSON path")
+        names = set(entry.get("json") or {})
+        for m in PLACEHOLDER.finditer(entry.get("send") or ""):
+            name = m.group(1)
+            if name.startswith("settings."):
+                errors += check_template("text", m.group(0), {}, settings, f"{at}.send")
+            elif not ((name.isdigit() and 1 <= int(name) <= groups) or name in names):
+                errors.append(f"{at}.send: '{{{name}}}' is not one of the entry's captures")
+    return errors
+
+
 def expand_serial(doc: dict) -> list[str]:
     """A line-tcp transport's `serial` block stands for the `link` setting and
     the six serial settings (SPEC.md §2, "The same protocol on a serial
@@ -1594,7 +1640,7 @@ def main() -> int:
 
         errors = expand_serial(doc)
         errors += cross_field_checks(doc, rel) + port_checks(doc) + serial_checks(doc) + midi_checks(doc) + label_checks(doc)
-        errors += pacing_checks(doc)
+        errors += pacing_checks(doc) + acknowledge_checks(doc)
 
         # Spec ids are the consumer-facing contract; they must be unique.
         spec_id = doc["id"]

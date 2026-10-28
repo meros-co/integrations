@@ -69,6 +69,7 @@ ports:
   - { port: null, protocol: http, role: control, note: "the Query API port has no standard number: it is given when the registry is opened, from its _nmos-query._tcp SRV record or its configuration" }
   - { port: null, protocol: ws, role: push, note: "each subscription's websocket, at the ws_href the registry names (usually the Query API's port)" }
   - { port: 5353, protocol: udp, role: discovery, note: "mDNS / DNS-SD: _nmos-query._tcp" }
+  - { port: 53, protocol: udp, role: discovery, note: "unicast DNS-SD: _nmos-query._tcp in the site's DNS domain, asked of its DNS servers" }
 models:
   - id: registry
     name: Any AMWA NMOS registry (IS-04 Query API v1.0 to v1.3)
@@ -511,7 +512,9 @@ quirks:
     severity: info
     text: >
       A registry has no standard port: open it with the Query API's port from its
-      _nmos-query._tcp advertisement or its configuration. State comes from six
+      _nmos-query._tcp advertisement or its configuration: discovery finds it by
+      mDNS (mdns) and, on a network that advertises it in unicast DNS, by
+      DNS-SD over the site's DNS servers (dns-sd). State comes from six
       non-persistent websocket subscriptions, one per resource type; each starts
       with the whole list, so a reconnection leaves nothing stale. The Query API
       is read only: connections are made on each Node with nmos-node, whose

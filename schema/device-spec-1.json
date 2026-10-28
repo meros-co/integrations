@@ -993,7 +993,8 @@
         "resolume-push",
         "ultimatte-preset-archive",
         "hyperdeck-ftp",
-        "nmos-query-websocket"
+        "nmos-query-websocket",
+        "nmos-event-transports"
       ],
       "description": "A native addition to a spec-driven device, for what the format cannot express. Named here so it is never hidden."
     },
@@ -1069,6 +1070,60 @@
     }
   },
   "$defs": {
+    "acknowledge": {
+      "description": "What the device sends by itself and wants answered, and the answer (SPEC.md section 2, Acknowledgements): one entry or a list.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/acknowledge_entry"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/acknowledge_entry"
+          }
+        }
+      ]
+    },
+    "acknowledge_entry": {
+      "type": "object",
+      "required": [
+        "send"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "match": {
+          "type": "string",
+          "description": "A regex over the message's text; its captures are {1}, {2}..."
+        },
+        "json_match": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "JSON paths to regexes the message's values must match, as a telemetry rule's."
+        },
+        "json": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Capture names to JSON paths; each stands for its value as JSON text."
+        },
+        "send": {
+          "type": "string",
+          "description": "The answer, a template over the captures and the settings."
+        },
+        "framed": {
+          "type": "boolean",
+          "description": "false sends the answer exactly as rendered, without the transport's framing."
+        },
+        "answers": {
+          "type": "string",
+          "description": "A regex over messages sent that the device answers with a message of this kind: the next one after each is that answer, not acknowledged."
+        }
+      }
+    },
     "pushWebsocket": {
       "type": "object",
       "additionalProperties": false,
@@ -1430,6 +1485,9 @@
             },
             "probe": {
               "type": "string"
+            },
+            "acknowledge": {
+              "$ref": "#/$defs/acknowledge"
             },
             "keepalive": {
               "type": "object",
@@ -1840,6 +1898,9 @@
             "probe": {
               "type": "string"
             },
+            "acknowledge": {
+              "$ref": "#/$defs/acknowledge"
+            },
             "keepalive": {
               "type": "object",
               "required": [
@@ -1933,6 +1994,9 @@
             },
             "probe": {
               "type": "string"
+            },
+            "acknowledge": {
+              "$ref": "#/$defs/acknowledge"
             },
             "reply_match": {
               "type": "string",
@@ -2603,6 +2667,9 @@
             },
             "probe": {
               "type": "string"
+            },
+            "acknowledge": {
+              "$ref": "#/$defs/acknowledge"
             },
             "keepalive": {
               "type": "object",
