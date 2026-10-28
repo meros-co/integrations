@@ -1,0 +1,969 @@
+spec: 1
+id: shure-mxcw
+name: "Shure Microflex Complete Wireless (MXCWAPT access point)"
+vendor: Shure
+category: other
+
+# The MXCWAPT's command strings on TCP 2202: GET, SET and REP in angle
+# brackets, a REP pushed whenever a value changes on the access point, its web
+# application or a conference unit. Seats are the conference units, numbered
+# from 1; 0 is every seat where the document allows it. The MXCWNCS charging
+# station is in shure-chargers.
+source:
+  - title: "MXCW Command Strings, Version 8.1 (2021-K)"
+    author: Shure Incorporated
+    url: "https://pubs.shure.com/command-strings/MXCW/en-US"
+    note: >
+      Manufacturer document (PDF docId 6944, page numbers the PDF's). TCP 2202, GET/SET/REP/SAMPLE,
+      REP on change, REP ERR, UNKNOWN for an unavailable seat, index ranges p.3; MIC_STATUS,
+      SPEAK_REQUEST, SPEAK_RELEASE, ALL_DELEGATE_MIC_OFF, EXCLUSIVE_MUTE, GLOBAL_MUTE,
+      REQUEST_LIST_STATUS, SPEAK_LIST_STATUS, CLEAR_REQUEST_LIST, NEXT_MIC_ON, MAX_TOTAL_SPEAKERS,
+      MAX_DELEGATE_SPEAKERS, MAX_NUM_REQUESTS, OPERATION_MODE, INTERRUPT_MODE, MIC_PRIORITY p.4-11;
+      LOUDSPEAKER_VOLUME (000-036, minus 30), AUX_INPUT_PAD, AUX_INPUT_GAIN (000-040),
+      AUX_OUTPUT_GAIN (000-030), MIC_GAIN, DANTE_INPUT_GAIN, DANTE_OUTPUT_GAIN, the AGC and mute
+      switches p.12-18; FLASH, ROLE, SEAT_NAME, RF_POWER, DEVICE_ID, ALL, BATT_CHARGE,
+      BATT_RUN_TIME, BATT_CYCLE, BATT_HEALTH, UNIT_AVAILABLE p.18-26; AUDIO_METER_RATE with
+      AUDIO_SAMPLE (000-098, minus 98) and RF_METER_RATE with RSSI p.26-27; AUX mutes, MODEL
+      p.27-28; voting START_VOTE to CLOSE_VOTING_RESULTS p.28-39; AUDIO_INPUT_SPEAKLIST, WDU_OFF,
+      WDU_LOCK_WELCOME, WELCOME_LOCK_RESET, RETAIN_SEAT_PERSISTENCE p.39-41.
+
+transport:
+  type: line-tcp
+  port: 2202
+  framing: delimited
+  open: "< "
+  close: " >"
+  encoding: utf-8
+  timeout_ms: 2000
+  reply: expected
+  # Answers and change reports are both REP: commands name the parameter
+  # their REP carries (expect.reply_contains). AUDIO_SAMPLE is never a reply.
+  reply_match: "^< REP "
+  error_match: "^< REP ERR"
+  probe: "GET MODEL"
+
+ports:
+  - { port: 2202, protocol: tcp, role: control }
+
+models:
+  - id: mxcwapt
+    name: "Shure MXCWAPT access point (Microflex Complete Wireless conference system)"
+    supports:
+      - get_model
+      - get_device_id
+      - set_device_id
+      - get_flash
+      - set_flash
+      - get_seat_flash
+      - set_seat_flash
+      - get_rf_power
+      - set_rf_power
+      - get_all
+      - get_mic
+      - set_mic
+      - request_to_speak
+      - release_speaker
+      - all_delegate_mics_off
+      - clear_request_list
+      - next_mic_on
+      - turn_off_units
+      - reset_welcome_lock
+      - set_exclusive_mute
+      - get_global_mute
+      - set_global_mute
+      - get_in_request_list
+      - get_in_speak_list
+      - get_max_speakers
+      - set_max_speakers
+      - get_max_delegate_speakers
+      - set_max_delegate_speakers
+      - get_max_requests
+      - set_max_requests
+      - get_discussion_mode
+      - set_discussion_mode
+      - get_interrupt_mode
+      - set_interrupt_mode
+      - get_priority
+      - set_priority
+      - get_role
+      - set_role
+      - get_seat_name
+      - set_seat_name
+      - get_unit_available
+      - get_audio_input_speaklist
+      - set_audio_input_speaklist
+      - get_welcome_lock
+      - set_welcome_lock
+      - get_retain_seats
+      - set_retain_seats
+      - get_loudspeaker_volume
+      - set_loudspeaker_volume
+      - get_mic_gain
+      - set_mic_gain
+      - get_dante_input_gain
+      - set_dante_input_gain
+      - get_dante_output_gain
+      - set_dante_output_gain
+      - get_aux_input_gain
+      - set_aux_input_gain
+      - get_aux_output_gain
+      - set_aux_output_gain
+      - get_aux_input_pad
+      - set_aux_input_pad
+      - get_aux_input_agc
+      - set_aux_input_agc
+      - get_aux_input_mute
+      - set_aux_input_mute
+      - get_aux_output_mute
+      - set_aux_output_mute
+      - get_dante_input_agc
+      - set_dante_input_agc
+      - get_dante_input_mute
+      - set_dante_input_mute
+      - get_dante_output_mute
+      - set_dante_output_mute
+      - get_mic_agc
+      - set_mic_agc
+      - get_battery_charge
+      - get_battery_minutes
+      - get_battery_cycles
+      - get_battery_health
+      - get_audio_meter_rate
+      - set_audio_meter_rate
+      - get_rf_meter_rate
+      - set_rf_meter_rate
+      - start_vote
+      - complete_vote
+      - pause_vote
+      - resume_vote
+      - cancel_vote
+      - share_voting_results
+      - close_voting_results
+      - get_voting_configuration
+      - get_voting_state
+      - get_voting_configuration_name
+      - get_voting_button_name
+      - get_final_voting_selection
+      - get_final_voting_results
+    verification: none
+
+commands:
+  get_model:
+    summary: "Read the model (MODEL)"
+    send: "GET MODEL"
+    expect: { reply_contains: " MODEL ", matches: " MODEL \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_device_id:
+    summary: "Read the device ID (DEVICE_ID)"
+    send: "GET DEVICE_ID"
+    expect: { reply_contains: " DEVICE_ID ", matches: " DEVICE_ID \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_device_id:
+    summary: "Set the device ID (DEVICE_ID)"
+    params:
+      value: { type: string, required: true, max_length: 31, pattern: "^[A-Za-z0-9-]+$", label: "Device ID", description: "1 to 31 letters, digits and hyphens, not starting or ending with a hyphen." }
+    send: "SET DEVICE_ID \\{{value}\\}"
+    expect: { reply_contains: " DEVICE_ID ", contains: " DEVICE_ID " }
+    returns: ack
+  get_flash:
+    summary: "Read the access point's identify flash (FLASH)"
+    send: "GET FLASH"
+    expect: { reply_contains: " FLASH ", matches: " FLASH \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_flash:
+    summary: "Turn the access point's identify flash on or off (FLASH)"
+    params:
+      enabled: { type: bool, required: true, label: "Flash", description: "On flashes the access point's lights, off stops them." }
+    send: "SET FLASH {enabled:on_off}"
+    expect: { reply_contains: " FLASH ", contains: " FLASH " }
+    returns: ack
+  get_seat_flash:
+    summary: "Read a conference unit's identify flash (FLASH)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+    send: "GET {seat} FLASH"
+    expect: { reply_contains: " FLASH ", matches: " FLASH \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_seat_flash:
+    summary: "Turn a conference unit's identify flash on or off (FLASH)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+      enabled: { type: bool, required: true, label: "Flash", description: "On flashes the unit's lights, off stops them." }
+    send: "SET {seat} FLASH {enabled:on_off}"
+    expect: { reply_contains: " FLASH ", contains: " FLASH " }
+    returns: ack
+  get_rf_power:
+    summary: "Read the RF power (RF_POWER)"
+    send: "GET RF_POWER"
+    expect: { reply_contains: " RF_POWER ", matches: " RF_POWER \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_rf_power:
+    summary: "Set the RF power (RF_POWER)"
+    params:
+      value: { type: enum, values: ["OFF", "LOW", "MEDIUM", "HIGH", "MAXIMUM"], required: true, label: "RF power", description: "OFF, LOW, MEDIUM, HIGH or MAXIMUM." }
+    send: "SET RF_POWER {value}"
+    expect: { reply_contains: " RF_POWER ", contains: " RF_POWER " }
+    returns: ack
+  get_all:
+    summary: "Ask for every parameter (GET ALL); the answers update state"
+    send: "GET ALL"
+    returns: none
+  get_mic:
+    summary: "Read a seat's microphone (MIC_STATUS)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+    send: "GET {seat} MIC_STATUS"
+    expect: { reply_contains: " MIC_STATUS ", matches: " MIC_STATUS \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_mic:
+    summary: "Turn a seat's microphone on or off (MIC_STATUS)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+      enabled: { type: bool, required: true, label: "Microphone on", description: "On turns the seat's microphone on, off turns it off." }
+    send: "SET {seat} MIC_STATUS {enabled:on_off}"
+    expect: { reply_contains: " MIC_STATUS ", contains: " MIC_STATUS " }
+    returns: ack
+  request_to_speak:
+    summary: "Add a seat to the speaker or request list, as if its button were pressed (SPEAK_REQUEST)"
+    params:
+      seat: { type: int, min: 1, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1." }
+    send: "SET {seat} SPEAK_REQUEST TRUE"
+    returns: none
+  release_speaker:
+    summary: "Take a seat off the speaker or request list (SPEAK_RELEASE)"
+    params:
+      seat: { type: int, min: 1, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1." }
+    send: "SET {seat} SPEAK_RELEASE TRUE"
+    returns: none
+  all_delegate_mics_off:
+    summary: "Turn every delegate microphone off (ALL_DELEGATE_MIC_OFF)"
+    send: "SET ALL_DELEGATE_MIC_OFF TRUE"
+    returns: none
+  clear_request_list:
+    summary: "Clear the request list (CLEAR_REQUEST_LIST)"
+    send: "SET CLEAR_REQUEST_LIST TRUE"
+    returns: none
+  next_mic_on:
+    summary: "Turn on the next microphone of the request list (NEXT_MIC_ON)"
+    send: "SET NEXT_MIC_ON TRUE"
+    returns: none
+  turn_off_units:
+    summary: "Turn every conference unit off (WDU_OFF)"
+    send: "SET WDU_OFF TRUE"
+    returns: none
+  reset_welcome_lock:
+    summary: "Reset the welcome lock of the conference units (WELCOME_LOCK_RESET)"
+    send: "SET WELCOME_LOCK_RESET TRUE"
+    returns: none
+  set_exclusive_mute:
+    summary: "Mute every other microphone from a chairman seat, or release it (EXCLUSIVE_MUTE)"
+    params:
+      seat: { type: int, min: 1, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1." }
+      enabled: { type: bool, required: true, label: "Exclusive mute", description: "On mutes every other microphone, off releases them; only for a chairman seat." }
+    send: "SET {seat} EXCLUSIVE_MUTE {enabled:on_off}"
+    expect: { reply_contains: " EXCLUSIVE_MUTE ", contains: " EXCLUSIVE_MUTE " }
+    returns: ack
+  get_global_mute:
+    summary: "Read the global mute (GLOBAL_MUTE)"
+    send: "GET GLOBAL_MUTE"
+    expect: { reply_contains: " GLOBAL_MUTE ", matches: " GLOBAL_MUTE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_global_mute:
+    summary: "Turn the global mute on or off (GLOBAL_MUTE)"
+    params:
+      enabled: { type: bool, required: true, label: "Global mute", description: "On mutes every microphone, off releases this controller's hold (another controller may still hold it)." }
+    send: "SET GLOBAL_MUTE {enabled:on_off}"
+    expect: { reply_contains: " GLOBAL_MUTE ", contains: " GLOBAL_MUTE " }
+    returns: ack
+  get_in_request_list:
+    summary: "Read whether a seat is in the request list (REQUEST_LIST_STATUS)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+    send: "GET {seat} REQUEST_LIST_STATUS"
+    expect: { reply_contains: " REQUEST_LIST_STATUS ", matches: " REQUEST_LIST_STATUS \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_in_speak_list:
+    summary: "Read whether a seat is in the speaker list (SPEAK_LIST_STATUS)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+    send: "GET {seat} SPEAK_LIST_STATUS"
+    expect: { reply_contains: " SPEAK_LIST_STATUS ", matches: " SPEAK_LIST_STATUS \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_max_speakers:
+    summary: "Read the most microphones on at once (MAX_TOTAL_SPEAKERS)"
+    send: "GET MAX_TOTAL_SPEAKERS"
+    expect: { reply_contains: " MAX_TOTAL_SPEAKERS ", matches: " MAX_TOTAL_SPEAKERS \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_max_speakers:
+    summary: "Set the most microphones on at once (MAX_TOTAL_SPEAKERS)"
+    params:
+      value: { type: int, min: 1, max: 9, required: true, label: "Number", description: "A single digit, 1 to 9 (the document gives no range)." }
+    send: "SET MAX_TOTAL_SPEAKERS {value}"
+    expect: { reply_contains: " MAX_TOTAL_SPEAKERS ", contains: " MAX_TOTAL_SPEAKERS " }
+    returns: ack
+  get_max_delegate_speakers:
+    summary: "Read the most delegate microphones on at once (MAX_DELEGATE_SPEAKERS)"
+    send: "GET MAX_DELEGATE_SPEAKERS"
+    expect: { reply_contains: " MAX_DELEGATE_SPEAKERS ", matches: " MAX_DELEGATE_SPEAKERS \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_max_delegate_speakers:
+    summary: "Set the most delegate microphones on at once (MAX_DELEGATE_SPEAKERS)"
+    params:
+      value: { type: int, min: 1, max: 9, required: true, label: "Number", description: "A single digit, 1 to 9 (the document gives no range)." }
+    send: "SET MAX_DELEGATE_SPEAKERS {value}"
+    expect: { reply_contains: " MAX_DELEGATE_SPEAKERS ", contains: " MAX_DELEGATE_SPEAKERS " }
+    returns: ack
+  get_max_requests:
+    summary: "Read the most requests in the request list (MAX_NUM_REQUESTS)"
+    send: "GET MAX_NUM_REQUESTS"
+    expect: { reply_contains: " MAX_NUM_REQUESTS ", matches: " MAX_NUM_REQUESTS \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_max_requests:
+    summary: "Set the most requests in the request list (MAX_NUM_REQUESTS)"
+    params:
+      value: { type: int, min: 1, max: 9, required: true, label: "Number", description: "A single digit, 1 to 9 (the document gives no range)." }
+    send: "SET MAX_NUM_REQUESTS {value}"
+    expect: { reply_contains: " MAX_NUM_REQUESTS ", contains: " MAX_NUM_REQUESTS " }
+    returns: ack
+  get_discussion_mode:
+    summary: "Read the discussion mode (OPERATION_MODE)"
+    send: "GET OPERATION_MODE"
+    expect: { reply_contains: " OPERATION_MODE ", matches: " OPERATION_MODE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_discussion_mode:
+    summary: "Set the discussion mode (OPERATION_MODE)"
+    params:
+      value: { type: enum, values: ["AUTO", "MANUAL", "FIFO", "HANDSFREE"], required: true, label: "Mode", description: "AUTO, MANUAL, FIFO or HANDSFREE." }
+    send: "SET OPERATION_MODE {value}"
+    expect: { reply_contains: " OPERATION_MODE ", contains: " OPERATION_MODE " }
+    returns: ack
+  get_interrupt_mode:
+    summary: "Read who may interrupt a speaker (INTERRUPT_MODE)"
+    send: "GET INTERRUPT_MODE"
+    expect: { reply_contains: " INTERRUPT_MODE ", matches: " INTERRUPT_MODE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_interrupt_mode:
+    summary: "Set who may interrupt a speaker (INTERRUPT_MODE)"
+    params:
+      value: { type: enum, values: ["NOT_ALLOWED", "HIGHER_PRIORITY", "EQUAL_AND_HIGHER_PRIORITY"], required: true, label: "Interrupt mode", description: "NOT_ALLOWED, HIGHER_PRIORITY or EQUAL_AND_HIGHER_PRIORITY." }
+    send: "SET INTERRUPT_MODE {value}"
+    expect: { reply_contains: " INTERRUPT_MODE ", contains: " INTERRUPT_MODE " }
+    returns: ack
+  get_priority:
+    summary: "Read a seat's microphone priority (MIC_PRIORITY)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+    send: "GET {seat} MIC_PRIORITY"
+    expect: { reply_contains: " MIC_PRIORITY ", matches: " MIC_PRIORITY \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_priority:
+    summary: "Set a seat's microphone priority (MIC_PRIORITY)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+      value: { type: int, min: 0, max: 9, required: true, label: "Priority", description: "A single digit, 0 to 9 (the document gives no range)." }
+    send: "SET {seat} MIC_PRIORITY {value}"
+    expect: { reply_contains: " MIC_PRIORITY ", contains: " MIC_PRIORITY " }
+    returns: ack
+  get_role:
+    summary: "Read a seat's role (ROLE)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+    send: "GET {seat} ROLE"
+    expect: { reply_contains: " ROLE ", matches: " ROLE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_role:
+    summary: "Set a seat's role (ROLE)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+      value: { type: enum, values: ["DELEGATE", "CHAIRMAN", "LISTENER", "AMBIENT", "REMOTE_CALLER", "DUAL_DELEGATE"], required: true, label: "Role", description: "DELEGATE, CHAIRMAN, LISTENER, AMBIENT, REMOTE_CALLER or DUAL_DELEGATE (which brings the next seat online)." }
+    send: "SET {seat} ROLE {value}"
+    expect: { reply_contains: " ROLE ", contains: " ROLE " }
+    returns: ack
+  get_seat_name:
+    summary: "Read a seat's name (SEAT_NAME)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+    send: "GET {seat} SEAT_NAME"
+    expect: { reply_contains: " SEAT_NAME ", matches: " SEAT_NAME \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_seat_name:
+    summary: "Set a seat's name (SEAT_NAME)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+      value: { type: string, required: true, max_length: 128, pattern: "^[^{}<>\\x00-\\x1f]+$", label: "Name", description: "Up to 128 bytes of UTF-8 without { } < >." }
+    send: "SET {seat} SEAT_NAME \\{{value}\\}"
+    expect: { reply_contains: " SEAT_NAME ", contains: " SEAT_NAME " }
+    returns: ack
+  get_unit_available:
+    summary: "Read whether a conference unit is online (UNIT_AVAILABLE)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+    send: "GET {seat} UNIT_AVAILABLE"
+    expect: { reply_contains: " UNIT_AVAILABLE ", matches: " UNIT_AVAILABLE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_audio_input_speaklist:
+    summary: "Read whether the audio input joins the speaker list (AUDIO_INPUT_SPEAKLIST)"
+    send: "GET AUDIO_INPUT_SPEAKLIST"
+    expect: { reply_contains: " AUDIO_INPUT_SPEAKLIST ", matches: " AUDIO_INPUT_SPEAKLIST \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_audio_input_speaklist:
+    summary: "Turn whether the audio input joins the speaker list on or off (AUDIO_INPUT_SPEAKLIST)"
+    params:
+      enabled: { type: bool, required: true, label: "Audio input in speaker list", description: "On lets the audio input take a place in the speaker list, off keeps it out." }
+    send: "SET AUDIO_INPUT_SPEAKLIST {enabled:on_off}"
+    expect: { reply_contains: " AUDIO_INPUT_SPEAKLIST ", contains: " AUDIO_INPUT_SPEAKLIST " }
+    returns: ack
+  get_welcome_lock:
+    summary: "Read the conference units' welcome lock (WDU_LOCK_WELCOME)"
+    send: "GET WDU_LOCK_WELCOME"
+    expect: { reply_contains: " WDU_LOCK_WELCOME ", matches: " WDU_LOCK_WELCOME \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_welcome_lock:
+    summary: "Set the conference units' welcome lock (WDU_LOCK_WELCOME)"
+    params:
+      value: { type: enum, values: ["ENABLED", "DISABLED"], required: true, label: "Welcome lock", description: "ENABLED or DISABLED." }
+    send: "SET WDU_LOCK_WELCOME {value}"
+    expect: { reply_contains: " WDU_LOCK_WELCOME ", contains: " WDU_LOCK_WELCOME " }
+    returns: ack
+  get_retain_seats:
+    summary: "Read whether seat assignments are kept (RETAIN_SEAT_PERSISTENCE)"
+    send: "GET RETAIN_SEAT_PERSISTENCE"
+    expect: { reply_contains: " RETAIN_SEAT_PERSISTENCE ", matches: " RETAIN_SEAT_PERSISTENCE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_retain_seats:
+    summary: "Set whether seat assignments are kept (RETAIN_SEAT_PERSISTENCE)"
+    params:
+      value: { type: enum, values: ["ENABLED", "DISABLED"], required: true, label: "Retain seats", description: "ENABLED keeps seat numbers across restarts, DISABLED does not." }
+    send: "SET RETAIN_SEAT_PERSISTENCE {value}"
+    expect: { reply_contains: " RETAIN_SEAT_PERSISTENCE ", contains: " RETAIN_SEAT_PERSISTENCE " }
+    returns: ack
+  get_loudspeaker_volume:
+    summary: "Read the conference units' loudspeaker volume (LOUDSPEAKER_VOLUME)"
+    send: "GET LOUDSPEAKER_VOLUME"
+    expect: { reply_contains: " LOUDSPEAKER_VOLUME ", matches: " LOUDSPEAKER_VOLUME \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_loudspeaker_volume:
+    summary: "Set the conference units' loudspeaker volume (LOUDSPEAKER_VOLUME), dB"
+    params:
+      value: { type: int, min: -30, max: 6, required: true, label: "Volume", description: "Volume in dB, -30 to +6." }
+    send: "SET LOUDSPEAKER_VOLUME {value:+30}"
+    expect: { reply_contains: " LOUDSPEAKER_VOLUME ", contains: " LOUDSPEAKER_VOLUME " }
+    returns: ack
+  get_mic_gain:
+    summary: "Read a seat's microphone gain (MIC_GAIN)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+    send: "GET {seat} MIC_GAIN"
+    expect: { reply_contains: " MIC_GAIN ", matches: " MIC_GAIN \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_mic_gain:
+    summary: "Set a seat's microphone gain (MIC_GAIN), dB"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+      value: { type: int, min: -30, max: 10, required: true, label: "Gain", description: "Gain in dB, -30 to +10." }
+    send: "SET {seat} MIC_GAIN {value:+30}"
+    expect: { reply_contains: " MIC_GAIN ", contains: " MIC_GAIN " }
+    returns: ack
+  get_dante_input_gain:
+    summary: "Read a Dante input's gain (DANTE_INPUT_GAIN)"
+    params:
+      channel: { type: int, min: 0, max: 10, required: true, label: "Dante channel", description: "Dante channel, 1 to 10; 0 is all." }
+    send: "GET {channel} DANTE_INPUT_GAIN"
+    expect: { reply_contains: " DANTE_INPUT_GAIN ", matches: " DANTE_INPUT_GAIN \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_dante_input_gain:
+    summary: "Set a Dante input's gain (DANTE_INPUT_GAIN), dB"
+    params:
+      channel: { type: int, min: 0, max: 10, required: true, label: "Dante channel", description: "Dante channel, 1 to 10; 0 is all." }
+      value: { type: int, min: -30, max: 10, required: true, label: "Gain", description: "Gain in dB, -30 to +10." }
+    send: "SET {channel} DANTE_INPUT_GAIN {value:+30}"
+    expect: { reply_contains: " DANTE_INPUT_GAIN ", contains: " DANTE_INPUT_GAIN " }
+    returns: ack
+  get_dante_output_gain:
+    summary: "Read a Dante output's gain (DANTE_OUTPUT_GAIN)"
+    params:
+      channel: { type: int, min: 0, max: 10, required: true, label: "Dante channel", description: "Dante channel, 1 to 10; 0 is all." }
+    send: "GET {channel} DANTE_OUTPUT_GAIN"
+    expect: { reply_contains: " DANTE_OUTPUT_GAIN ", matches: " DANTE_OUTPUT_GAIN \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_dante_output_gain:
+    summary: "Set a Dante output's gain (DANTE_OUTPUT_GAIN), dB"
+    params:
+      channel: { type: int, min: 0, max: 10, required: true, label: "Dante channel", description: "Dante channel, 1 to 10; 0 is all." }
+      value: { type: int, min: -30, max: 0, required: true, label: "Gain", description: "Gain in dB, -30 to +0." }
+    send: "SET {channel} DANTE_OUTPUT_GAIN {value:+30}"
+    expect: { reply_contains: " DANTE_OUTPUT_GAIN ", contains: " DANTE_OUTPUT_GAIN " }
+    returns: ack
+  get_aux_input_gain:
+    summary: "Read the aux input's gain (AUX_INPUT_GAIN)"
+    params:
+      channel: { type: int, min: 0, max: 1, default: 1, label: "Aux channel", description: "The aux input or output, 1; 0 is all." }
+    send: "GET {channel} AUX_INPUT_GAIN"
+    expect: { reply_contains: " AUX_INPUT_GAIN ", matches: " AUX_INPUT_GAIN \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_aux_input_gain:
+    summary: "Set the aux input's gain (AUX_INPUT_GAIN), dB"
+    params:
+      channel: { type: int, min: 0, max: 1, default: 1, label: "Aux channel", description: "The aux input or output, 1; 0 is all." }
+      value: { type: int, min: -30, max: 10, required: true, label: "Gain", description: "Gain in dB, -30 to +10." }
+    send: "SET {channel} AUX_INPUT_GAIN {value:+30}"
+    expect: { reply_contains: " AUX_INPUT_GAIN ", contains: " AUX_INPUT_GAIN " }
+    returns: ack
+  get_aux_output_gain:
+    summary: "Read the aux output's gain (AUX_OUTPUT_GAIN)"
+    params:
+      channel: { type: int, min: 0, max: 1, default: 1, label: "Aux channel", description: "The aux input or output, 1; 0 is all." }
+    send: "GET {channel} AUX_OUTPUT_GAIN"
+    expect: { reply_contains: " AUX_OUTPUT_GAIN ", matches: " AUX_OUTPUT_GAIN \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_aux_output_gain:
+    summary: "Set the aux output's gain (AUX_OUTPUT_GAIN), dB"
+    params:
+      channel: { type: int, min: 0, max: 1, default: 1, label: "Aux channel", description: "The aux input or output, 1; 0 is all." }
+      value: { type: int, min: -30, max: 0, required: true, label: "Gain", description: "Gain in dB, -30 to 0." }
+    send: "SET {channel} AUX_OUTPUT_GAIN {value:+30}"
+    expect: { reply_contains: " AUX_OUTPUT_GAIN ", contains: " AUX_OUTPUT_GAIN " }
+    returns: ack
+  get_aux_input_pad:
+    summary: "Read the aux input pad (AUX_INPUT_PAD)"
+    params:
+      channel: { type: int, min: 0, max: 1, default: 1, label: "Aux channel", description: "The aux input or output, 1; 0 is all." }
+    send: "GET {channel} AUX_INPUT_PAD"
+    expect: { reply_contains: " AUX_INPUT_PAD ", matches: " AUX_INPUT_PAD \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_aux_input_pad:
+    summary: "Turn the aux input pad on or off (AUX_INPUT_PAD)"
+    params:
+      channel: { type: int, min: 0, max: 1, default: 1, label: "Aux channel", description: "The aux input or output, 1; 0 is all." }
+      enabled: { type: bool, required: true, label: "Pad", description: "On engages the aux input's pad." }
+    send: "SET {channel} AUX_INPUT_PAD {enabled:on_off}"
+    expect: { reply_contains: " AUX_INPUT_PAD ", contains: " AUX_INPUT_PAD " }
+    returns: ack
+  get_aux_input_agc:
+    summary: "Read the aux input's AGC (AUX_INPUT_AGC)"
+    params:
+      channel: { type: int, min: 0, max: 1, default: 1, label: "Aux channel", description: "The aux input or output, 1; 0 is all." }
+    send: "GET {channel} AUX_INPUT_AGC"
+    expect: { reply_contains: " AUX_INPUT_AGC ", matches: " AUX_INPUT_AGC \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_aux_input_agc:
+    summary: "Turn the aux input's AGC on or off (AUX_INPUT_AGC)"
+    params:
+      channel: { type: int, min: 0, max: 1, default: 1, label: "Aux channel", description: "The aux input or output, 1; 0 is all." }
+      enabled: { type: bool, required: true, label: "AGC", description: "On turns the aux input's automatic gain control on." }
+    send: "SET {channel} AUX_INPUT_AGC {enabled:on_off}"
+    expect: { reply_contains: " AUX_INPUT_AGC ", contains: " AUX_INPUT_AGC " }
+    returns: ack
+  get_aux_input_mute:
+    summary: "Read the aux input mute (AUX_INPUT_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 1, default: 1, label: "Aux channel", description: "The aux input or output, 1; 0 is all." }
+    send: "GET {channel} AUX_INPUT_MUTE"
+    expect: { reply_contains: " AUX_INPUT_MUTE ", matches: " AUX_INPUT_MUTE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_aux_input_mute:
+    summary: "Turn the aux input mute on or off (AUX_INPUT_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 1, default: 1, label: "Aux channel", description: "The aux input or output, 1; 0 is all." }
+      enabled: { type: bool, required: true, label: "Muted", description: "On mutes the aux input." }
+    send: "SET {channel} AUX_INPUT_MUTE {enabled:on_off}"
+    expect: { reply_contains: " AUX_INPUT_MUTE ", contains: " AUX_INPUT_MUTE " }
+    returns: ack
+  get_aux_output_mute:
+    summary: "Read the aux output mute (AUX_OUTPUT_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 1, default: 1, label: "Aux channel", description: "The aux input or output, 1; 0 is all." }
+    send: "GET {channel} AUX_OUTPUT_MUTE"
+    expect: { reply_contains: " AUX_OUTPUT_MUTE ", matches: " AUX_OUTPUT_MUTE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_aux_output_mute:
+    summary: "Turn the aux output mute on or off (AUX_OUTPUT_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 1, default: 1, label: "Aux channel", description: "The aux input or output, 1; 0 is all." }
+      enabled: { type: bool, required: true, label: "Muted", description: "On mutes the aux output." }
+    send: "SET {channel} AUX_OUTPUT_MUTE {enabled:on_off}"
+    expect: { reply_contains: " AUX_OUTPUT_MUTE ", contains: " AUX_OUTPUT_MUTE " }
+    returns: ack
+  get_dante_input_agc:
+    summary: "Read a Dante input's AGC (DANTE_INPUT_AGC)"
+    params:
+      channel: { type: int, min: 0, max: 10, required: true, label: "Dante channel", description: "Dante channel, 1 to 10; 0 is all." }
+    send: "GET {channel} DANTE_INPUT_AGC"
+    expect: { reply_contains: " DANTE_INPUT_AGC ", matches: " DANTE_INPUT_AGC \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_dante_input_agc:
+    summary: "Turn a Dante input's AGC on or off (DANTE_INPUT_AGC)"
+    params:
+      channel: { type: int, min: 0, max: 10, required: true, label: "Dante channel", description: "Dante channel, 1 to 10; 0 is all." }
+      enabled: { type: bool, required: true, label: "AGC", description: "On turns the Dante input's automatic gain control on." }
+    send: "SET {channel} DANTE_INPUT_AGC {enabled:on_off}"
+    expect: { reply_contains: " DANTE_INPUT_AGC ", contains: " DANTE_INPUT_AGC " }
+    returns: ack
+  get_dante_input_mute:
+    summary: "Read a Dante input's mute (DANTE_INPUT_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 10, required: true, label: "Dante channel", description: "Dante channel, 1 to 10; 0 is all." }
+    send: "GET {channel} DANTE_INPUT_MUTE"
+    expect: { reply_contains: " DANTE_INPUT_MUTE ", matches: " DANTE_INPUT_MUTE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_dante_input_mute:
+    summary: "Turn a Dante input's mute on or off (DANTE_INPUT_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 10, required: true, label: "Dante channel", description: "Dante channel, 1 to 10; 0 is all." }
+      enabled: { type: bool, required: true, label: "Muted", description: "On mutes the Dante input." }
+    send: "SET {channel} DANTE_INPUT_MUTE {enabled:on_off}"
+    expect: { reply_contains: " DANTE_INPUT_MUTE ", contains: " DANTE_INPUT_MUTE " }
+    returns: ack
+  get_dante_output_mute:
+    summary: "Read a Dante output's mute (DANTE_OUTPUT_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 10, required: true, label: "Dante channel", description: "Dante channel, 1 to 10; 0 is all." }
+    send: "GET {channel} DANTE_OUTPUT_MUTE"
+    expect: { reply_contains: " DANTE_OUTPUT_MUTE ", matches: " DANTE_OUTPUT_MUTE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_dante_output_mute:
+    summary: "Turn a Dante output's mute on or off (DANTE_OUTPUT_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 10, required: true, label: "Dante channel", description: "Dante channel, 1 to 10; 0 is all." }
+      enabled: { type: bool, required: true, label: "Muted", description: "On mutes the Dante output." }
+    send: "SET {channel} DANTE_OUTPUT_MUTE {enabled:on_off}"
+    expect: { reply_contains: " DANTE_OUTPUT_MUTE ", contains: " DANTE_OUTPUT_MUTE " }
+    returns: ack
+  get_mic_agc:
+    summary: "Read a seat's microphone AGC (MIC_AGC)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+    send: "GET {seat} MIC_AGC"
+    expect: { reply_contains: " MIC_AGC ", matches: " MIC_AGC \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_mic_agc:
+    summary: "Turn a seat's microphone AGC on or off (MIC_AGC)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+      enabled: { type: bool, required: true, label: "AGC", description: "On turns the seat's automatic gain control on." }
+    send: "SET {seat} MIC_AGC {enabled:on_off}"
+    expect: { reply_contains: " MIC_AGC ", contains: " MIC_AGC " }
+    returns: ack
+  get_battery_charge:
+    summary: "Read a conference unit's battery charge (BATT_CHARGE)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+    send: "GET {seat} BATT_CHARGE"
+    expect: { reply_contains: " BATT_CHARGE ", matches: " BATT_CHARGE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_minutes:
+    summary: "Read a conference unit's battery time left (BATT_RUN_TIME)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+    send: "GET {seat} BATT_RUN_TIME"
+    expect: { reply_contains: " BATT_RUN_TIME ", matches: " BATT_RUN_TIME \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_cycles:
+    summary: "Read a conference unit's battery charge cycles (BATT_CYCLE)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+    send: "GET {seat} BATT_CYCLE"
+    expect: { reply_contains: " BATT_CYCLE ", matches: " BATT_CYCLE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_health:
+    summary: "Read a conference unit's battery health (percent of design capacity) (BATT_HEALTH)"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+    send: "GET {seat} BATT_HEALTH"
+    expect: { reply_contains: " BATT_HEALTH ", matches: " BATT_HEALTH \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_audio_meter_rate:
+    summary: "Read the audio metering interval in ms (0 off) (AUDIO_METER_RATE)"
+    send: "GET AUDIO_METER_RATE"
+    expect: { reply_contains: " AUDIO_METER_RATE ", matches: " AUDIO_METER_RATE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_audio_meter_rate:
+    summary: "Set the audio metering interval in ms (0 off) (AUDIO_METER_RATE), ms"
+    params:
+      value: { type: int, min: 0, max: 99999, required: true, label: "Interval", description: "Interval in ms from 100 to 99999, or 0 to stop." }
+    send: "SET AUDIO_METER_RATE {value}"
+    expect: { reply_contains: " AUDIO_METER_RATE ", contains: " AUDIO_METER_RATE " }
+    returns: ack
+  get_rf_meter_rate:
+    summary: "Read the RF metering interval in ms (0 off) (RF_METER_RATE)"
+    send: "GET RF_METER_RATE"
+    expect: { reply_contains: " RF_METER_RATE ", matches: " RF_METER_RATE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_rf_meter_rate:
+    summary: "Set the RF metering interval in ms (0 off) (RF_METER_RATE), ms"
+    params:
+      value: { type: int, min: 0, max: 99999, required: true, label: "Interval", description: "Interval in ms from 100 to 99999, or 0 to stop." }
+    send: "SET RF_METER_RATE {value}"
+    expect: { reply_contains: " RF_METER_RATE ", contains: " RF_METER_RATE " }
+    returns: ack
+  start_vote:
+    summary: "Start a vote with a voting configuration (START_VOTE)"
+    params:
+      configuration: { type: int, min: 1, max: 50, required: true, label: "Voting configuration", description: "Voting configuration, 1 to 50; one that does not exist is refused." }
+    send: "SET START_VOTE {configuration}"
+    returns: none
+  complete_vote:
+    summary: "Complete the vote (COMPLETE_VOTE)"
+    send: "SET COMPLETE_VOTE TRUE"
+    returns: none
+  pause_vote:
+    summary: "Pause the vote (PAUSE_VOTE)"
+    send: "SET PAUSE_VOTE TRUE"
+    returns: none
+  resume_vote:
+    summary: "Resume the paused vote (RESUME_VOTE)"
+    send: "SET RESUME_VOTE TRUE"
+    returns: none
+  cancel_vote:
+    summary: "Cancel the vote (CANCEL_VOTE)"
+    send: "SET CANCEL_VOTE TRUE"
+    returns: none
+  share_voting_results:
+    summary: "Show the vote's results on the conference units (SHARE_VOTING_RESULTS)"
+    send: "SET SHARE_VOTING_RESULTS TRUE"
+    returns: none
+  close_voting_results:
+    summary: "Close the results shown on the conference units (CLOSE_VOTING_RESULTS)"
+    send: "SET CLOSE_VOTING_RESULTS TRUE"
+    returns: none
+  get_voting_configuration:
+    summary: "Read the voting configuration in use (VOTING_CONFIGURATION)"
+    send: "GET VOTING_CONFIGURATION"
+    expect: { reply_contains: " VOTING_CONFIGURATION ", matches: " VOTING_CONFIGURATION \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_voting_state:
+    summary: "Read the voting state (VOTING_STATE)"
+    send: "GET VOTING_STATE"
+    expect: { reply_contains: " VOTING_STATE ", matches: " VOTING_STATE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_voting_configuration_name:
+    summary: "Read a voting configuration's name (VOTING_CONFIGURATION_NAME)"
+    params:
+      configuration: { type: int, min: 0, max: 50, required: true, label: "Voting configuration", description: "Voting configuration, 1 to 50; 0 is all." }
+    send: "GET {configuration} VOTING_CONFIGURATION_NAME"
+    expect: { reply_contains: " VOTING_CONFIGURATION_NAME ", matches: " VOTING_CONFIGURATION_NAME \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_voting_button_name:
+    summary: "Read a voting button's name in a configuration (VOTING_BUTTON_NAME)"
+    params:
+      configuration: { type: int, min: 0, max: 50, required: true, label: "Voting configuration", description: "Voting configuration, 1 to 50; 0 is all." }
+      button: { type: int, min: 0, max: 5, required: true, label: "Button", description: "Voting button, 1 to 5; 0 is all." }
+    send: "GET {configuration} {button} VOTING_BUTTON_NAME"
+    expect: { reply_contains: " VOTING_BUTTON_NAME ", matches: " VOTING_BUTTON_NAME \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_final_voting_selection:
+    summary: "Read the button a seat chose in the completed vote (FINAL_VOTING_SELECTION); 0 for every seat"
+    params:
+      seat: { type: int, min: 0, max: 65535, required: true, label: "Seat", description: "Conference unit (seat) number from 1; 0 is every seat where the command allows it." }
+    send: "GET {seat} FINAL_VOTING_SELECTION"
+    expect: { reply_contains: " FINAL_VOTING_SELECTION ", matches: " FINAL_VOTING_SELECTION \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_final_voting_results:
+    summary: "Ask for the completed vote's count per button (FINAL_VOTING_RESULT); the counts go to state"
+    send: "GET 0 FINAL_VOTING_RESULT"
+    returns: none
+
+state:
+  device.model: { type: string, description: "The model" }
+  device.device_id: { type: string, description: "The device ID" }
+  device.flash: { type: bool, description: "The access point's identify flash" }
+  seats.*.flash: { type: bool, description: "A conference unit's identify flash" }
+  device.rf_power: { type: string, description: "The RF power" }
+  seats.*.mic: { type: bool, description: "A seat's microphone" }
+  seats.*.exclusive_mute: { type: bool, description: "Exclusive mute held by this chairman seat" }
+  device.global_mute: { type: bool, description: "The global mute" }
+  seats.*.in_request_list: { type: string, description: "Whether a seat is in the request list: IN_LIST or NOT_IN_LIST" }
+  seats.*.in_speak_list: { type: string, description: "Whether a seat is in the speaker list: IN_LIST or NOT_IN_LIST" }
+  device.max_speakers: { type: int, description: "The most microphones on at once" }
+  device.max_delegate_speakers: { type: int, description: "The most delegate microphones on at once" }
+  device.max_requests: { type: int, description: "The most requests in the request list" }
+  device.discussion_mode: { type: string, description: "The discussion mode" }
+  device.interrupt_mode: { type: string, description: "Who may interrupt a speaker" }
+  seats.*.priority: { type: int, description: "A seat's microphone priority" }
+  seats.*.role: { type: string, description: "A seat's role" }
+  seats.*.name: { type: string, description: "A seat's name" }
+  seats.*.unit_available: { type: string, description: "Unit status: AVAILABLE, OFFLINE or NOT_REGISTERED" }
+  device.audio_input_speaklist: { type: bool, description: "Whether the audio input joins the speaker list" }
+  device.welcome_lock: { type: string, description: "The conference units' welcome lock" }
+  device.retain_seats: { type: string, description: "Whether seat assignments are kept" }
+  device.loudspeaker_volume: { type: int, unit: "dB", description: "The conference units' loudspeaker volume" }
+  seats.*.mic_gain: { type: int, unit: "dB", description: "A seat's microphone gain" }
+  dante.*.dante_input_gain: { type: int, unit: "dB", description: "A Dante input's gain" }
+  dante.*.dante_output_gain: { type: int, unit: "dB", description: "A Dante output's gain" }
+  aux.*.input_gain: { type: int, unit: "dB", description: "The aux input's gain" }
+  aux.*.output_gain: { type: int, unit: "dB", description: "The aux output's gain" }
+  aux.*.input_pad: { type: bool, description: "The aux input pad" }
+  aux.*.input_agc: { type: bool, description: "The aux input's AGC" }
+  aux.*.input_mute: { type: bool, description: "The aux input mute" }
+  aux.*.output_mute: { type: bool, description: "The aux output mute" }
+  dante.*.input_agc: { type: bool, description: "A Dante input's AGC" }
+  dante.*.input_mute: { type: bool, description: "A Dante input's mute" }
+  dante.*.output_mute: { type: bool, description: "A Dante output's mute" }
+  seats.*.mic_agc: { type: bool, description: "A seat's microphone AGC" }
+  seats.*.battery_charge: { type: int, unit: "%", description: "A conference unit's battery charge" }
+  seats.*.battery_minutes: { type: int, unit: "min", description: "A conference unit's battery time left" }
+  seats.*.battery_cycles: { type: int, description: "A conference unit's battery charge cycles" }
+  seats.*.battery_health: { type: int, unit: "%", description: "A conference unit's battery health (percent of design capacity)" }
+  device.audio_meter_rate: { type: int, unit: "ms", description: "The audio metering interval in ms (0 off)" }
+  device.rf_meter_rate: { type: int, unit: "ms", description: "The RF metering interval in ms (0 off)" }
+  meters.aux_input_peak: { type: int, unit: "dB", description: "Aux input peak level, -98 to 0, from AUDIO_SAMPLE" }
+  meters.aux_input_rms: { type: int, unit: "dB", description: "Aux input RMS level, -98 to 0" }
+  meters.slots.*.peak: { type: int, unit: "dB", description: "Uplink slot peak level, -98 to 0, by slot from 1" }
+  meters.slots.*.rms: { type: int, unit: "dB", description: "Uplink slot RMS level, -98 to 0" }
+  seats.*.rssi: { type: string, unit: "dBm", description: "Average estimated received signal power at the conference unit, as sent (RF_METER_RATE)" }
+  device.voting_configuration: { type: int, description: "The voting configuration in use" }
+  device.voting_state: { type: string, description: "Voting state: INACTIVE, PAUSE, ACTIVE or COMPLETE" }
+  voting.configurations.*.name: { type: string, description: "A voting configuration's name" }
+  voting.configurations.*.buttons.*.name: { type: string, description: "Voting button name, keyed by configuration then button" }
+  voting.seats.*.interim_selection: { type: int, description: "Button the seat has chosen so far (open votes only)" }
+  voting.seats.*.final_selection: { type: int, description: "Button the seat chose in the completed vote (open votes only)" }
+  voting.buttons.*.interim_count: { type: int, description: "Votes for the button so far (open votes only)" }
+  voting.buttons.*.final_count: { type: int, description: "Votes for the button in the completed vote" }
+  voting.results_shared: { type: bool, description: "Results shown on the conference units" }
+
+telemetry:
+  # GET ALL on connecting; every change is pushed after that.
+  poll:
+    send: ["GET ALL"]
+  updates:
+    - match: "^< REP MODEL \\{?(.*?) *\\}? >$"
+      state: { "device.model": "{1}" }
+    - match: "^< REP DEVICE_ID \\{?(.*?) *\\}? >$"
+      state: { "device.device_id": "{1}" }
+    - match: "^< REP FLASH (ON|OFF) >$"
+      state: { "device.flash": { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP (\\d+) FLASH (ON|OFF) >$"
+      state: { "seats.{1}.flash": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP RF_POWER ([A-Z]+) >$"
+      state: { "device.rf_power": "{1}" }
+    - match: "^< REP (\\d+) MIC_STATUS (ON|OFF) >$"
+      state: { "seats.{1}.mic": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP (\\d+) EXCLUSIVE_MUTE (ON|OFF) >$"
+      state: { "seats.{1}.exclusive_mute": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP GLOBAL_MUTE (ON|OFF) >$"
+      state: { "device.global_mute": { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP (\\d+) REQUEST_LIST_STATUS (IN_LIST|NOT_IN_LIST) >$"
+      state: { "seats.{1}.in_request_list": "{2}" }
+    - match: "^< REP (\\d+) SPEAK_LIST_STATUS (IN_LIST|NOT_IN_LIST) >$"
+      state: { "seats.{1}.in_speak_list": "{2}" }
+    - match: "^< REP MAX_TOTAL_SPEAKERS (\\d+) >$"
+      state: { "device.max_speakers": "{1}" }
+    - match: "^< REP MAX_DELEGATE_SPEAKERS (\\d+) >$"
+      state: { "device.max_delegate_speakers": "{1}" }
+    - match: "^< REP MAX_NUM_REQUESTS (\\d+) >$"
+      state: { "device.max_requests": "{1}" }
+    - match: "^< REP OPERATION_MODE ([A-Z]+) >$"
+      state: { "device.discussion_mode": "{1}" }
+    - match: "^< REP INTERRUPT_MODE ([A-Z_]+) >$"
+      state: { "device.interrupt_mode": "{1}" }
+    - match: "^< REP (\\d+) MIC_PRIORITY (\\d+) >$"
+      state: { "seats.{1}.priority": "{2}" }
+    - match: "^< REP (\\d+) ROLE ([A-Z_]+) >$"
+      state: { "seats.{1}.role": "{2}" }
+    - match: "^< REP (\\d+) SEAT_NAME \\{?(.*?) *\\}? >$"
+      state: { "seats.{1}.name": "{2}" }
+    - match: "^< REP (\\d+) UNIT_AVAILABLE ([A-Z_]+) >$"
+      state: { "seats.{1}.unit_available": "{2}" }
+    - match: "^< REP AUDIO_INPUT_SPEAKLIST (ON|OFF) >$"
+      state: { "device.audio_input_speaklist": { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP WDU_LOCK_WELCOME (ENABLED|DISABLED) >$"
+      state: { "device.welcome_lock": "{1}" }
+    - match: "^< REP RETAIN_SEAT_PERSISTENCE (ENABLED|DISABLED) >$"
+      state: { "device.retain_seats": "{1}" }
+    - match: "^< REP LOUDSPEAKER_VOLUME (0\\d\\d) >$"
+      state: { "device.loudspeaker_volume": "{1:-30}" }
+    - match: "^< REP (\\d+) MIC_GAIN (0\\d\\d) >$"
+      state: { "seats.{1}.mic_gain": "{2:-30}" }
+    - match: "^< REP (\\d+) DANTE_INPUT_GAIN (0\\d\\d) >$"
+      state: { "dante.{1}.dante_input_gain": "{2:-30}" }
+    - match: "^< REP (\\d+) DANTE_OUTPUT_GAIN (0\\d\\d) >$"
+      state: { "dante.{1}.dante_output_gain": "{2:-30}" }
+    - match: "^< REP (\\d+) AUX_INPUT_GAIN (\\d{1,3}) >$"
+      state: { "aux.{1}.input_gain": "{2:-30}" }
+    - match: "^< REP (\\d+) AUX_OUTPUT_GAIN (\\d{1,3}) >$"
+      state: { "aux.{1}.output_gain": "{2:-30}" }
+    - match: "^< REP (\\d+) AUX_INPUT_PAD (ON|OFF) >$"
+      state: { "aux.{1}.input_pad": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP (\\d+) AUX_INPUT_AGC (ON|OFF) >$"
+      state: { "aux.{1}.input_agc": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP (\\d+) AUX_INPUT_MUTE (ON|OFF) >$"
+      state: { "aux.{1}.input_mute": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP (\\d+) AUX_OUTPUT_MUTE (ON|OFF) >$"
+      state: { "aux.{1}.output_mute": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP (\\d+) DANTE_INPUT_AGC (ON|OFF) >$"
+      state: { "dante.{1}.input_agc": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP (\\d+) DANTE_INPUT_MUTE (ON|OFF) >$"
+      state: { "dante.{1}.input_mute": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP (\\d+) DANTE_OUTPUT_MUTE (ON|OFF) >$"
+      state: { "dante.{1}.output_mute": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP (\\d+) MIC_AGC (ON|OFF) >$"
+      state: { "seats.{1}.mic_agc": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP (\\d+) BATT_CHARGE (0\\d\\d|100) >$"
+      state: { "seats.{1}.battery_charge": "{2}" }
+    - match: "^< REP (\\d+) BATT_RUN_TIME (\\d{5}) >$"
+      state: { "seats.{1}.battery_minutes": "{2}" }
+    - match: "^< REP (\\d+) BATT_CYCLE (\\d{4}) >$"
+      state: { "seats.{1}.battery_cycles": "{2}" }
+    - match: "^< REP (\\d+) BATT_HEALTH (0\\d\\d|100) >$"
+      state: { "seats.{1}.battery_health": "{2}" }
+    - match: "^< REP AUDIO_METER_RATE (\\d+) >$"
+      state: { "device.audio_meter_rate": "{1}" }
+    - match: "^< REP RF_METER_RATE (\\d+) >$"
+      state: { "device.rf_meter_rate": "{1}" }
+    - match: "^< AUDIO_SAMPLE (\\d{3}) (\\d{3})((?: \\d{3} \\d{3})*) >$"
+      match_each: "(\\d{3}) (\\d{3})"
+      match_each_in: 3
+      state: { meters.aux_input_peak: "{1:-98}", meters.aux_input_rms: "{2:-98}", "meters.slots.{index:+1}.peak": "{4:-98}", "meters.slots.{index:+1}.rms": "{5:-98}" }
+    - match: "^< REP (\\d+) RSSI (\\S+) >$"
+      state: { "seats.{1}.rssi": "{2}" }
+    - match: "^< REP VOTING_CONFIGURATION (\\d+) >$"
+      state: { "device.voting_configuration": "{1}" }
+    - match: "^< REP VOTING_STATE ([A-Z]+) >$"
+      state: { "device.voting_state": "{1}" }
+    - match: "^< REP (\\d+) VOTING_CONFIGURATION_NAME \\{?(.*?) *\\}? >$"
+      state: { "voting.configurations.{1}.name": "{2}" }
+    - match: "^< REP (\\d+) (\\d+) VOTING_BUTTON_NAME \\{?(.*?) *\\}? >$"
+      state: { "voting.configurations.{1}.buttons.{2}.name": "{3}" }
+    - match: "^< REP (\\d+) INTERIM_VOTING_SELECTION (\\d+) >$"
+      state: { "voting.seats.{1}.interim_selection": "{2}" }
+    - match: "^< REP (\\d+) FINAL_VOTING_SELECTION (\\d+) >$"
+      state: { "voting.seats.{1}.final_selection": "{2}" }
+    - match: "^< REP (\\d+) INTERIM_VOTING_RESULT (\\d+) >$"
+      state: { "voting.buttons.{1}.interim_count": "{2}" }
+    - match: "^< REP (\\d+) FINAL_VOTING_RESULT (\\d+) >$"
+      state: { "voting.buttons.{1}.final_count": "{2}" }
+    - match: "^< REP SHARE_VOTING_RESULTS TRUE >$"
+      state: { voting.results_shared: "true" }
+    - match: "^< REP CLOSE_VOTING_RESULTS TRUE >$"
+      state: { voting.results_shared: "false" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      One GET ALL on connecting reads every parameter; the access point reports every change after
+      that, so nothing is polled. Opened for commands only, nothing is asked. Meters
+      (AUDIO_METER_RATE, RF_METER_RATE) are never started here; a consumer that sets a rate gets
+      them in state.
+  - models: [all]
+    severity: info
+    text: >
+      Commands are matched to their REP by the parameter name, not by the seat: a change to the same
+      parameter on another seat arriving in the same moment could be taken for the answer. Several
+      commands answer with other parameters (a speak request with SPEAK_LIST_STATUS or
+      REQUEST_LIST_STATUS, a vote start with VOTING_STATE): their answers go to state, and the
+      command reports unverified. A seat that is offline may not answer at all; a registered seat
+      that is unavailable answers UNKNOWN.
+  - models: [all]
+    severity: critical
+    text: >
+      turn_off_units turns every conference unit off, start_vote, complete_vote and cancel_vote
+      change a vote in progress, and set_role to DUAL_DELEGATE brings a second seat online (setting
+      it back deregisters that seat). None can be undone from here.
+  - models: [all]
+    severity: info
+    text: >
+      SEAT_NAME takes UTF-8 except { } < >, up to 128 bytes, and is reported padded to 128 bytes; an
+      NFC card's name overrides it, and setting it while a card is inserted answers REP ERR. Gains
+      are whole dB: MIC_GAIN, DANTE_INPUT_GAIN and AUX_INPUT_GAIN -30 to +10, DANTE_OUTPUT_GAIN and
+      AUX_OUTPUT_GAIN -30 to 0, LOUDSPEAKER_VOLUME -30 to +6.

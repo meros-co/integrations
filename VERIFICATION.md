@@ -3417,6 +3417,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Capture SAMPLE with metering on, and confirm the values follow Channel Number Assignments for automatic coverage on and off, and that METER_RATE, METER_RATE_POSTGATE, METER_RATE_MXR_GAIN and METER_RATE_AECREF all report as plain SAMPLE (so only one should run at a time); record the MXA910, MXA710, MXA310 and MXA902/901 forms, taken here from the MXA920 document. ([specs/shure-mxa.yaml:1851](specs/shure-mxa.yaml#L1851))
 - [ ] Capture SAMPLE TALKER_POSITIONS on an MXA920 (and an MXA910 if it reports them) and confirm the six values per talker (lobe, coverage area, X, Y, Z, reserved) as the document's example gives them. ([specs/shure-mxa.yaml:1864](specs/shure-mxa.yaml#L1864))
 
+## shure-mxcw — Shure Microflex Complete Wireless
+
+- [ ] Record the ranges of MAX_TOTAL_SPEAKERS, MAX_DELEGATE_SPEAKERS, MAX_NUM_REQUESTS and MIC_PRIORITY (the document gives one digit and no range). ([specs/shure-mxcw.yaml:298](specs/shure-mxcw.yaml#L298))
+- [ ] Confirm the AUDIO_SAMPLE layout (aux input peak and RMS, then a peak and RMS per uplink slot) and how many slots it carries. ([specs/shure-mxcw.yaml:913](specs/shure-mxcw.yaml#L913))
+- [ ] Record the RSSI report's value format (RF_METER_RATE). ([specs/shure-mxcw.yaml:917](specs/shure-mxcw.yaml#L917))
+- [ ] Check whether AUX_INPUT_GAIN replies are padded to three digits (the examples show 4 and 12). ([specs/shure-mxcw.yaml:505](specs/shure-mxcw.yaml#L505))
+- [ ] Confirm START_VOTE takes the configuration number unpadded and what VOTING_CONFIGURATION reports. ([specs/shure-mxcw.yaml:700](specs/shure-mxcw.yaml#L700))
+
 ## shure-mxn5 — Shure MXN5-C
 
 - [ ] Check what an MXN5-C that is not V1 answers to GET 00 ALL. ([specs/shure-mxn5.yaml:460](specs/shure-mxn5.yaml#L460))
