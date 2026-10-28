@@ -1031,14 +1031,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## camstreamer — CamStreamer apps for Axis cameras
 
-- [ ] Confirm the 6.x stream list's path (/local/camstreamer/stream_list.cgi; the page also writes /local/camstreamer/stream/stream_list.cgi for one stream) and whether its answer is the bare {"streamList": [...]} or wrapped in {status, message, data}. ([specs/camstreamer.yaml:635](specs/camstreamer.yaml#L635))
-- [ ] Confirm set_stream_enabled.cgi takes stream_id and enabled (the page writes stream_id=?stream_id=), on 6.x and 4.x. ([specs/camstreamer.yaml:162](specs/camstreamer.yaml#L162))
-- [ ] Confirm set_stream's body is one stream object (the page shows only the whole streamList). ([specs/camstreamer.yaml:153](specs/camstreamer.yaml#L153))
-- [ ] Record how an unlicensed app answers its API calls (status and body). ([specs/camstreamer.yaml:529](specs/camstreamer.yaml#L529))
-- [ ] Confirm param.cgi lists CamOverlay.Enabled and camswitcher.masterAudio as root.CamOverlay.Enabled= and root.camswitcher.masterAudio= lines (the group names' case as the page writes them). ([specs/camstreamer.yaml:688](specs/camstreamer.yaml#L688))
-- [ ] Confirm CamScripter's PackageConfigurations parameter is camscripter.PackageConfigurations in param.cgi, and network_camera_list.cgi's path under /local/camscripter/. ([specs/camstreamer.yaml:497](specs/camstreamer.yaml#L497))
-- [ ] Record the shape of playlist_queue_list.cgi's and clips.cgi's answers, to keep the queue in state. ([specs/camstreamer.yaml:395](specs/camstreamer.yaml#L395))
-- [ ] Confirm upload_custom_image takes the picture as the raw POST body (as curl --data-binary sends it). ([specs/camstreamer.yaml:357](specs/camstreamer.yaml#L357))
+- [ ] Confirm the 6.x stream list's path (/local/camstreamer/stream_list.cgi; the page also writes /local/camstreamer/stream/stream_list.cgi for one stream) and whether its answer is the bare {"streamList": [...]} or wrapped in {status, message, data}. ([specs/camstreamer.yaml:692](specs/camstreamer.yaml#L692))
+- [ ] Confirm set_stream_enabled.cgi takes stream_id and enabled (the page writes stream_id=?stream_id=), on 6.x and 4.x. ([specs/camstreamer.yaml:164](specs/camstreamer.yaml#L164))
+- [ ] Confirm set_stream's body is one stream object (the page shows only the whole streamList). ([specs/camstreamer.yaml:155](specs/camstreamer.yaml#L155))
+- [ ] Record how an unlicensed app answers its API calls (status and body). ([specs/camstreamer.yaml:531](specs/camstreamer.yaml#L531))
+- [ ] Confirm param.cgi lists CamOverlay.Enabled and camswitcher.masterAudio as root.CamOverlay.Enabled= and root.camswitcher.masterAudio= lines (the group names' case as the page writes them). ([specs/camstreamer.yaml:745](specs/camstreamer.yaml#L745))
+- [ ] Confirm CamScripter's PackageConfigurations parameter is camscripter.PackageConfigurations in param.cgi, and network_camera_list.cgi's path under /local/camscripter/. ([specs/camstreamer.yaml:499](specs/camstreamer.yaml#L499))
+- [ ] Record the shape of playlist_queue_list.cgi's and clips.cgi's answers, to keep the queue in state. ([specs/camstreamer.yaml:397](specs/camstreamer.yaml#L397))
+- [ ] Confirm upload_custom_image takes the picture as the raw POST body (as curl --data-binary sends it). ([specs/camstreamer.yaml:359](specs/camstreamer.yaml#L359))
+- [ ] Record each app's ws_authorization.cgi answer: CamStreamer 6.x and CamSwitcher give the token in data, CamStreamer 4.x and CamOverlay in message (the page prints those with a trailing comma), read with a regex either way. ([specs/camstreamer.yaml:658](specs/camstreamer.yaml#L658))
+- [ ] Confirm the apps' websockets answer on the camera's own HTTP port as ws (the page writes wss only), with subprotocol events, the token as the first message, and the camera's credential not needed on the opening. ([specs/camstreamer.yaml:645](specs/camstreamer.yaml#L645))
+- [ ] Confirm the events' field types (enabled, active and isStreaming as 0 or 1, serviceId and port as numbers, StreamAvailable's state as a boolean) and what automationState and PortChanged's port and value mean. ([specs/camstreamer.yaml:788](specs/camstreamer.yaml#L788))
 
 ## canon-ptz — Canon PTZ and pro video cameras (XC protocol)
 
@@ -1416,41 +1419,42 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Confirm IP control on TCP 9030 for the DN-500BD MKII (its guide documents RS-232C only; the port is the DN-500BD guide's and the Companion module's). ([specs/denon-dn500bd.yaml:48](specs/denon-dn500bd.yaml#L48))
 - [ ] Confirm ACK and NACK are the bare bytes 06H and 15H with no CR, on TCP as on RS-232C. ([specs/denon-dn500bd.yaml:56](specs/denon-dn500bd.yaml#L56))
-- [ ] Confirm the player repeats an unacknowledged status once and nothing worse follows when the host never answers ACK, and which statuses it sends by itself. ([specs/denon-dn500bd.yaml:1325](specs/denon-dn500bd.yaml#L1325))
-- [ ] Confirm the RS-232C speed's factory setting (115200 assumed). ([specs/denon-dn500bd.yaml:68](specs/denon-dn500bd.yaml#L68))
-- [ ] Confirm the total group and group answers carry the "?" (@0?PCTG0003) as the guide prints them. ([specs/denon-dn500bd.yaml:776](specs/denon-dn500bd.yaml#L776))
-- [ ] Confirm ?DVANGL is answered @0DVANGL and the angle's number. ([specs/denon-dn500bd.yaml:337](specs/denon-dn500bd.yaml#L337))
-- [ ] Confirm the speaker setting's level form (a sign and two digits; the guide writes vvv and vvvv) and the delay's unit and range. ([specs/denon-dn500bd.yaml:557](specs/denon-dn500bd.yaml#L557))
-- [ ] Confirm the output volume answers: a sign and two digits, 000, inf and FX. ([specs/denon-dn500bd.yaml:612](specs/denon-dn500bd.yaml#L612))
-- [ ] Confirm the speaker configurations 4.1, 5.1 and 6.1 (the guide gives LR, ST, 2.1, 3.1 and 7.1 as examples) and whether ?DVSCCh reads it back. ([specs/denon-dn500bd.yaml:549](specs/denon-dn500bd.yaml#L549))
-- [ ] Confirm the DN-500BD MKII's rewind (PCSLSR) and that its guide's fast forward code (PCGPPV, the previous title's) is a misprint. ([specs/denon-dn500bd.yaml:400](specs/denon-dn500bd.yaml#L400))
-- [ ] Check whether the DN-500BD MKII answers the menu settings' requests (?PCAP and the others) as the DN-500BD does; its guide lists none, so the spec does not ask it. ([specs/denon-dn500bd.yaml:854](specs/denon-dn500bd.yaml#L854))
-- [ ] Confirm DHCP is set with @0IpAUTO and eight zeros, and the IP settings' twelve-digit form. ([specs/denon-dn500bd.yaml:663](specs/denon-dn500bd.yaml#L663))
+- [ ] Confirm the host's ACK is the byte 06H alone (no CR after it), that each status the player notifies by itself is answered within 30 ms by it and not sent again, and which statuses it sends by itself. ([specs/denon-dn500bd.yaml:62](specs/denon-dn500bd.yaml#L62))
+- [ ] Confirm the RS-232C speed's factory setting (115200 assumed). ([specs/denon-dn500bd.yaml:71](specs/denon-dn500bd.yaml#L71))
+- [ ] Confirm the total group and group answers carry the "?" (@0?PCTG0003) as the guide prints them. ([specs/denon-dn500bd.yaml:779](specs/denon-dn500bd.yaml#L779))
+- [ ] Confirm ?DVANGL is answered @0DVANGL and the angle's number. ([specs/denon-dn500bd.yaml:340](specs/denon-dn500bd.yaml#L340))
+- [ ] Confirm the speaker setting's level form (a sign and two digits; the guide writes vvv and vvvv) and the delay's unit and range. ([specs/denon-dn500bd.yaml:560](specs/denon-dn500bd.yaml#L560))
+- [ ] Confirm the output volume answers: a sign and two digits, 000, inf and FX. ([specs/denon-dn500bd.yaml:615](specs/denon-dn500bd.yaml#L615))
+- [ ] Confirm the speaker configurations 4.1, 5.1 and 6.1 (the guide gives LR, ST, 2.1, 3.1 and 7.1 as examples) and whether ?DVSCCh reads it back. ([specs/denon-dn500bd.yaml:552](specs/denon-dn500bd.yaml#L552))
+- [ ] Confirm the DN-500BD MKII's rewind (PCSLSR) and that its guide's fast forward code (PCGPPV, the previous title's) is a misprint. ([specs/denon-dn500bd.yaml:403](specs/denon-dn500bd.yaml#L403))
+- [ ] Check whether the DN-500BD MKII answers the menu settings' requests (?PCAP and the others) as the DN-500BD does; its guide lists none, so the spec does not ask it. ([specs/denon-dn500bd.yaml:857](specs/denon-dn500bd.yaml#L857))
+- [ ] Confirm DHCP is set with @0IpAUTO and eight zeros, and the IP settings' twelve-digit form. ([specs/denon-dn500bd.yaml:666](specs/denon-dn500bd.yaml#L666))
+- [ ] Confirm a status request's own answer wants no ACK (the guide's status request flow shows none), that ?PW is answered ACK alone, and that BUSY (@0BDERBUSY) wants none. ([specs/denon-dn500bd.yaml:62](specs/denon-dn500bd.yaml#L62))
 
 ## denon-dn500cb — Denon Professional DN-500CB
 
 - [ ] Confirm ACK and NACK are the bare bytes 06H and 15H with no CR, and statuses end in CR. ([specs/denon-dn500cb.yaml:33](specs/denon-dn500cb.yaml#L33))
-- [ ] Confirm the player repeats an unacknowledged status once and nothing worse follows when the host never answers ACK. ([specs/denon-dn500cb.yaml:207](specs/denon-dn500cb.yaml#L207))
-- [ ] Confirm the RS-232C speed's factory setting (115200 assumed). ([specs/denon-dn500cb.yaml:47](specs/denon-dn500cb.yaml#L47))
-- [ ] Confirm track selection is @0Tr and four digits with no space, and the artist and album answers' form (the guide shows a space after at and al). ([specs/denon-dn500cb.yaml:126](specs/denon-dn500cb.yaml#L126))
-- [ ] Confirm the track time answer is MMMSS (five digits) on this model. ([specs/denon-dn500cb.yaml:263](specs/denon-dn500cb.yaml#L263))
+- [ ] Confirm the host's ACK is the byte 06H alone (no CR after it), that each status the player notifies by itself is answered by it and not sent again, and that a status request's own answer, ?PW's ACK alone and BUSY want none. ([specs/denon-dn500cb.yaml:39](specs/denon-dn500cb.yaml#L39))
+- [ ] Confirm the RS-232C speed's factory setting (115200 assumed). ([specs/denon-dn500cb.yaml:50](specs/denon-dn500cb.yaml#L50))
+- [ ] Confirm track selection is @0Tr and four digits with no space, and the artist and album answers' form (the guide shows a space after at and al). ([specs/denon-dn500cb.yaml:129](specs/denon-dn500cb.yaml#L129))
+- [ ] Confirm the track time answer is MMMSS (five digits) on this model. ([specs/denon-dn500cb.yaml:268](specs/denon-dn500cb.yaml#L268))
 
 ## denon-dn500r — Denon Professional DN-500R
 
 - [ ] Confirm ACK and NACK are the bare bytes 06H and 15H with no CR, and statuses end in CR. ([specs/denon-dn500r.yaml:44](specs/denon-dn500r.yaml#L44))
-- [ ] Confirm the recorder repeats an unacknowledged status once and nothing worse follows when the host never answers ACK. ([specs/denon-dn500r.yaml:1669](specs/denon-dn500r.yaml#L1669))
-- [ ] Confirm the RS-232C speed's factory setting (9600 assumed). ([specs/denon-dn500r.yaml:58](specs/denon-dn500r.yaml#L58))
-- [ ] Check random's and program list playback's codes: set 00 for on, but answered 01 for on as the guide prints it. ([specs/denon-dn500r.yaml:1318](specs/denon-dn500r.yaml#L1318))
-- [ ] Confirm rename_file (@0RN, a four-digit file number and a name) is not taken for random (@0RN00 or @0RN01). ([specs/denon-dn500r.yaml:788](specs/denon-dn500r.yaml#L788))
-- [ ] Confirm ?FE answers each media's free space and its unit; the media size request (?SF in the guide) is the folder name's. ([specs/denon-dn500r.yaml:882](specs/denon-dn500r.yaml#L882))
-- [ ] Confirm the track change the recorder sends by itself: "@Tr NNNN" as printed, or @0Tr. ([specs/denon-dn500r.yaml:1919](specs/denon-dn500r.yaml#L1919))
-- [ ] Confirm the three-digit hot start assignment @0HS, and the four-digit one's code (printed @hs without the ID). ([specs/denon-dn500r.yaml:702](specs/denon-dn500r.yaml#L702))
-- [ ] Confirm the codes printed with a space (@0PO XX, @0IN XX and others) take no space. ([specs/denon-dn500r.yaml:1087](specs/denon-dn500r.yaml#L1087))
-- [ ] Confirm the fade in answer's code: FL as printed, or FI. ([specs/denon-dn500r.yaml:1360](specs/denon-dn500r.yaml#L1360))
-- [ ] Confirm the recording sample rate is asked with ?FS (the guide prints @0FSNN as the request). ([specs/denon-dn500r.yaml:1225](specs/denon-dn500r.yaml#L1225))
-- [ ] Confirm the recording volume answer's form: two characters per channel, signed or not. ([specs/denon-dn500r.yaml:915](specs/denon-dn500r.yaml#L915))
-- [ ] Confirm the hot start information's time is HHHmmssttt (ten digits) after the colon. ([specs/denon-dn500r.yaml:1961](specs/denon-dn500r.yaml#L1961))
-- [ ] Confirm the timer answers carry no timer number (the spec takes it from the request) and their field order. ([specs/denon-dn500r.yaml:1890](specs/denon-dn500r.yaml#L1890))
+- [ ] Confirm the host's ACK is the byte 06H alone (no CR after it), that each status the recorder notifies by itself is answered by it and not sent again, and that a status request's own answer and BUSY want none. ([specs/denon-dn500r.yaml:50](specs/denon-dn500r.yaml#L50))
+- [ ] Confirm the RS-232C speed's factory setting (9600 assumed). ([specs/denon-dn500r.yaml:61](specs/denon-dn500r.yaml#L61))
+- [ ] Check random's and program list playback's codes: set 00 for on, but answered 01 for on as the guide prints it. ([specs/denon-dn500r.yaml:1321](specs/denon-dn500r.yaml#L1321))
+- [ ] Confirm rename_file (@0RN, a four-digit file number and a name) is not taken for random (@0RN00 or @0RN01). ([specs/denon-dn500r.yaml:791](specs/denon-dn500r.yaml#L791))
+- [ ] Confirm ?FE answers each media's free space and its unit; the media size request (?SF in the guide) is the folder name's. ([specs/denon-dn500r.yaml:885](specs/denon-dn500r.yaml#L885))
+- [ ] Confirm the track change the recorder sends by itself: "@Tr NNNN" as printed, or @0Tr. ([specs/denon-dn500r.yaml:1924](specs/denon-dn500r.yaml#L1924))
+- [ ] Confirm the three-digit hot start assignment @0HS, and the four-digit one's code (printed @hs without the ID). ([specs/denon-dn500r.yaml:705](specs/denon-dn500r.yaml#L705))
+- [ ] Confirm the codes printed with a space (@0PO XX, @0IN XX and others) take no space. ([specs/denon-dn500r.yaml:1090](specs/denon-dn500r.yaml#L1090))
+- [ ] Confirm the fade in answer's code: FL as printed, or FI. ([specs/denon-dn500r.yaml:1363](specs/denon-dn500r.yaml#L1363))
+- [ ] Confirm the recording sample rate is asked with ?FS (the guide prints @0FSNN as the request). ([specs/denon-dn500r.yaml:1228](specs/denon-dn500r.yaml#L1228))
+- [ ] Confirm the recording volume answer's form: two characters per channel, signed or not. ([specs/denon-dn500r.yaml:918](specs/denon-dn500r.yaml#L918))
+- [ ] Confirm the hot start information's time is HHHmmssttt (ten digits) after the colon. ([specs/denon-dn500r.yaml:1966](specs/denon-dn500r.yaml#L1966))
+- [ ] Confirm the timer answers carry no timer number (the spec takes it from the request) and their field order. ([specs/denon-dn500r.yaml:1895](specs/denon-dn500r.yaml#L1895))
 
 ## dhd-aes67 — DHD audio AES67 / RAVENNA interfaces (Control API)
 
@@ -3587,10 +3591,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## qlcplus — QLC+ (Web API)
 
-- [ ] Check that QLC+ without -wa accepts a WebSocket opened with an empty Basic credential. ([specs/qlcplus.yaml:462](specs/qlcplus.yaml#L462))
-- [ ] Record the messages QLC+ pushes for widget and function changes, so they can be read into state. ([specs/qlcplus.yaml:462](specs/qlcplus.yaml#L462))
-- [ ] Check the value ranges widgets take (sliders, XY pads, speed dial factors, page and step numbers) and what sdResetChannel and sdResetUniverse answer. ([specs/qlcplus.yaml:473](specs/qlcplus.yaml#L473))
-- [ ] On QLC+ 4, check that each documented QLC+API command and widget message works as on version 5. ([specs/qlcplus.yaml:481](specs/qlcplus.yaml#L481))
+- [ ] Check that QLC+ without -wa accepts a WebSocket opened with an empty Basic credential. ([specs/qlcplus.yaml:490](specs/qlcplus.yaml#L490))
+- [ ] Record the messages QLC+ pushes for widget and function changes, so they can be read into state. ([specs/qlcplus.yaml:490](specs/qlcplus.yaml#L490))
+- [ ] Check the value ranges widgets take (sliders, XY pads, speed dial factors, page and step numbers) and what sdResetChannel and sdResetUniverse answer. ([specs/qlcplus.yaml:490](specs/qlcplus.yaml#L490))
+- [ ] On QLC+ 4, check that each documented QLC+API command and widget message works as on version 5. ([specs/qlcplus.yaml:511](specs/qlcplus.yaml#L511))
+- [ ] Check that getFunctionStatus answers Running or Stopped exactly, and record the forms of getWidgetFunction's and getWidgetStatus's answers, which are kept as text. ([specs/qlcplus.yaml:473](specs/qlcplus.yaml#L473))
 
 ## qsys — Q-SYS
 
@@ -3616,10 +3621,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## red-rcp2 — RED DSMC3 cameras (RCP2 over WebSocket)
 
-- [ ] Check every message form, parameter id, value scale and enumeration in this spec against RED's RCP2 documents (behind a RED account login) or a camera; none comes from RED's own documentation. ([specs/red-rcp2.yaml:367](specs/red-rcp2.yaml#L367))
-- [ ] Record the camera's answers to rcp_config and rcp_get_types on connecting, and whether the WebSocket path is / on port 9998. ([specs/red-rcp2.yaml:51](specs/red-rcp2.yaml#L51))
-- [ ] Record an rcp_session message, to confirm its data is echoed back as it is (a number assumed), and how long the camera waits for the echo before dropping the connection. ([specs/red-rcp2.yaml:351](specs/red-rcp2.yaml#L351))
-- [ ] Confirm the RECORD_FORMAT numbers, the EXTERNAL_TALLY state, opacity, style and thickness numbers, the ISO and color temperature ranges, and the units of SENSOR_FRAME_RATE and EXPOSURE_ADJUST. ([specs/red-rcp2.yaml:268](specs/red-rcp2.yaml#L268))
+- [ ] Check every message form, parameter id, value scale and enumeration in this spec against RED's RCP2 documents (behind a RED account login) or a camera; none comes from RED's own documentation. ([specs/red-rcp2.yaml:369](specs/red-rcp2.yaml#L369))
+- [ ] Record the camera's answers to rcp_config and rcp_get_types on connecting, and whether the WebSocket path is / on port 9998. ([specs/red-rcp2.yaml:58](specs/red-rcp2.yaml#L58))
+- [ ] Record an rcp_session message, to confirm its data is echoed back as it came, and how long the camera waits for the echo before dropping the connection. ([specs/red-rcp2.yaml:53](specs/red-rcp2.yaml#L53))
+- [ ] Confirm the RECORD_FORMAT numbers, the EXTERNAL_TALLY state, opacity, style and thickness numbers, the ISO and color temperature ranges, and the units of SENSOR_FRAME_RATE and EXPOSURE_ADJUST. ([specs/red-rcp2.yaml:275](specs/red-rcp2.yaml#L275))
 
 ## renewedvision-pvp — Renewed Vision PVP
 
@@ -4329,26 +4334,26 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## tascam-bd-mp1 — TASCAM BD-MP1 / BD-MP1MKII
 
 - [ ] Confirm how the player ends its messages: "ack" and "nack" with or without CR, and statuses (such as !7SSTPL) ended by CR; TEAC's later document shows them without CR. ([specs/tascam-bd-mp1.yaml:50](specs/tascam-bd-mp1.yaml#L50))
-- [ ] Confirm the player repeats an unacknowledged status notification once and nothing worse follows when the host never answers "ack". ([specs/tascam-bd-mp1.yaml:566](specs/tascam-bd-mp1.yaml#L566))
-- [ ] Confirm no flow control is needed on RS-232C. ([specs/tascam-bd-mp1.yaml:63](specs/tascam-bd-mp1.yaml#L63))
-- [ ] Confirm a status request is answered "ack" first, then the status, and a set with "ack" alone. ([specs/tascam-bd-mp1.yaml:131](specs/tascam-bd-mp1.yaml#L131))
-- [ ] Confirm the status notifications of the chapter and chapter count use the short forms TN and TT, the answers TNM and TTN. ([specs/tascam-bd-mp1.yaml:644](specs/tascam-bd-mp1.yaml#L644))
-- [ ] Confirm the answer to ?SCN is the direction and speed letters (!7SCNFf). ([specs/tascam-bd-mp1.yaml:670](specs/tascam-bd-mp1.yaml#L670))
-- [ ] Confirm the BD-MP1MKII's color keys are CBCX1-CBCX4 as its document writes them, not CBC1-CBC4. ([specs/tascam-bd-mp1.yaml:284](specs/tascam-bd-mp1.yaml#L284))
-- [ ] Confirm power on works only on RS-232C, and that get_power gets no answer in standby. ([specs/tascam-bd-mp1.yaml:128](specs/tascam-bd-mp1.yaml#L128))
-- [ ] Confirm the speaker setting's level form (a sign and two digits) and the delay's unit (centimeters on the BD-MP1MKII, milliseconds on the BD-MP1) and range. ([specs/tascam-bd-mp1.yaml:470](specs/tascam-bd-mp1.yaml#L470))
+- [ ] Confirm the host's ACK is "ack" alone (no CR after it), that each status notification answered by it is not sent again, and that a status request's own answer and ?PWR's ack want none. ([specs/tascam-bd-mp1.yaml:56](specs/tascam-bd-mp1.yaml#L56))
+- [ ] Confirm no flow control is needed on RS-232C. ([specs/tascam-bd-mp1.yaml:66](specs/tascam-bd-mp1.yaml#L66))
+- [ ] Confirm a status request is answered "ack" first, then the status, and a set with "ack" alone. ([specs/tascam-bd-mp1.yaml:134](specs/tascam-bd-mp1.yaml#L134))
+- [ ] Confirm the status notifications of the chapter and chapter count use the short forms TN and TT, the answers TNM and TTN. ([specs/tascam-bd-mp1.yaml:649](specs/tascam-bd-mp1.yaml#L649))
+- [ ] Confirm the answer to ?SCN is the direction and speed letters (!7SCNFf). ([specs/tascam-bd-mp1.yaml:675](specs/tascam-bd-mp1.yaml#L675))
+- [ ] Confirm the BD-MP1MKII's color keys are CBCX1-CBCX4 as its document writes them, not CBC1-CBC4. ([specs/tascam-bd-mp1.yaml:287](specs/tascam-bd-mp1.yaml#L287))
+- [ ] Confirm power on works only on RS-232C, and that get_power gets no answer in standby. ([specs/tascam-bd-mp1.yaml:131](specs/tascam-bd-mp1.yaml#L131))
+- [ ] Confirm the speaker setting's level form (a sign and two digits) and the delay's unit (centimeters on the BD-MP1MKII, milliseconds on the BD-MP1) and range. ([specs/tascam-bd-mp1.yaml:473](specs/tascam-bd-mp1.yaml#L473))
 
 ## tascam-bd-mp4k — TASCAM BD-MP4K
 
 - [ ] Confirm how the player ends its messages: "ack" and "nack" with or without CR, and statuses (such as !7SSTPL) ended by CR; Ver. 1.01 shows them without CR. ([specs/tascam-bd-mp4k.yaml:48](specs/tascam-bd-mp4k.yaml#L48))
-- [ ] Confirm the player repeats an unacknowledged status notification once and nothing worse follows when the host never answers "ack". ([specs/tascam-bd-mp4k.yaml:679](specs/tascam-bd-mp4k.yaml#L679))
-- [ ] Confirm the RS-232C speed's factory setting (115200 assumed), and that no flow control is needed. ([specs/tascam-bd-mp4k.yaml:57](specs/tascam-bd-mp4k.yaml#L57))
-- [ ] Confirm a status request is answered "ack" first, then the status, and a set with "ack" alone. ([specs/tascam-bd-mp4k.yaml:146](specs/tascam-bd-mp4k.yaml#L146))
-- [ ] Confirm the status notifications of the chapter and chapter count use the short forms TN and TT, the answers TNM and TTN. ([specs/tascam-bd-mp4k.yaml:760](specs/tascam-bd-mp4k.yaml#L760))
-- [ ] Confirm the downmix is read with ?DNM (as the document gives it) and answered DMX. ([specs/tascam-bd-mp4k.yaml:626](specs/tascam-bd-mp4k.yaml#L626))
-- [ ] Confirm the color adjustment answer is the color letter then three signed two-digit values (!7MVCR+01-02+03). ([specs/tascam-bd-mp4k.yaml:825](specs/tascam-bd-mp4k.yaml#L825))
-- [ ] Confirm power on works only on RS-232C at 57600 bit/s, and that get_power gets no answer in standby. ([specs/tascam-bd-mp4k.yaml:143](specs/tascam-bd-mp4k.yaml#L143))
-- [ ] Confirm the speaker level's form, four characters in tenths of a dB rounded to 0 or 5, and the delay in centimeters. ([specs/tascam-bd-mp4k.yaml:482](specs/tascam-bd-mp4k.yaml#L482))
+- [ ] Confirm the host's ACK is "ack" alone (no CR after it), that each status notification answered by it is not sent again, and that a status request's own answer and ?PWR's ack want none. ([specs/tascam-bd-mp4k.yaml:54](specs/tascam-bd-mp4k.yaml#L54))
+- [ ] Confirm the RS-232C speed's factory setting (115200 assumed), and that no flow control is needed. ([specs/tascam-bd-mp4k.yaml:60](specs/tascam-bd-mp4k.yaml#L60))
+- [ ] Confirm a status request is answered "ack" first, then the status, and a set with "ack" alone. ([specs/tascam-bd-mp4k.yaml:149](specs/tascam-bd-mp4k.yaml#L149))
+- [ ] Confirm the status notifications of the chapter and chapter count use the short forms TN and TT, the answers TNM and TTN. ([specs/tascam-bd-mp4k.yaml:765](specs/tascam-bd-mp4k.yaml#L765))
+- [ ] Confirm the downmix is read with ?DNM (as the document gives it) and answered DMX. ([specs/tascam-bd-mp4k.yaml:629](specs/tascam-bd-mp4k.yaml#L629))
+- [ ] Confirm the color adjustment answer is the color letter then three signed two-digit values (!7MVCR+01-02+03). ([specs/tascam-bd-mp4k.yaml:830](specs/tascam-bd-mp4k.yaml#L830))
+- [ ] Confirm power on works only on RS-232C at 57600 bit/s, and that get_power gets no answer in standby. ([specs/tascam-bd-mp4k.yaml:146](specs/tascam-bd-mp4k.yaml#L146))
+- [ ] Confirm the speaker level's form, four characters in tenths of a dB rounded to 0 or 5, and the delay in centimeters. ([specs/tascam-bd-mp4k.yaml:485](specs/tascam-bd-mp4k.yaml#L485))
 
 ## tascam-cd-400u — TASCAM CD-400U / CD-400UDAB
 
