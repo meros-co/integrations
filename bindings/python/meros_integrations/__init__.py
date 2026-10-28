@@ -153,7 +153,8 @@ class Core:
         {"action": "listen" | "scan" | "stop", "protocols": [...], "hints": [...]}.
         Protocols: "mcp" (Sennheiser G3/G4), "ssdp" (Sony cameras), "pjlink"
         (PJLink projectors), "mdns" (Blackmagic ATEM, Videohub, HyperDeck,
-        SmartView and MultiView, and Meros Cameras); none means every
+        SmartView and MultiView, and Meros Cameras), "umbra" (DMXControl 3's
+        Umbra servers); none means every
         protocol that finds a device in this core's catalogue. Hints are
         addresses where devices were last seen. Found devices arrive as {"event": "discovered", ...}
         events."""

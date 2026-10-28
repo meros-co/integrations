@@ -74,6 +74,10 @@ mod datavideo_switcher_table;
 mod dbaudio;
 #[cfg(feature = "dhd-ecp")]
 mod dhd_ecp;
+#[cfg(feature = "dmxcontrol3")]
+mod dmxcontrol3;
+#[cfg(feature = "dmxcontrol3")]
+pub(crate) mod dmxcontrol3_schema;
 #[cfg(feature = "digitalprojection-insight-laser")]
 mod dp_insight;
 #[cfg(feature = "softouch-easyworship")]
@@ -356,6 +360,8 @@ pub(crate) fn construct(
         "novastar-h" => Ok(Box::new(novastar_h::NovastarH::new(context))),
         #[cfg(feature = "obs-studio")]
         "obs-studio" => Ok(Box::new(obs::Obs::new(context))),
+        #[cfg(feature = "dmxcontrol3")]
+        "dmxcontrol3" => Ok(Box::new(dmxcontrol3::Dmx3::new(context))),
         #[cfg(feature = "omt")]
         "omt" => Ok(Box::new(omt::Sender::new(context))),
         #[cfg(feature = "omt-discovery")]

@@ -9,9 +9,11 @@
 //! Sony cameras (SSDP) by `crate::ssdp`, and PJLink Class 2 projectors
 //! (SRCH/ACKN and LKUP on UDP 4352) by `crate::pjlink_discovery`, and
 //! Blackmagic Design devices, Meros Cameras, RTP-MIDI sessions and NMOS
-//! Nodes (mDNS / DNS-SD) by
-//! `crate::mdns`, whose rules are there. Each is compiled only with the
-//! integrations whose devices it finds. Protocols are independent: each listens, scans and stops on its own.
+//! Nodes (mDNS / DNS-SD) by `crate::mdns`, and DMXControl 3's Umbra servers
+//! (their announcements on UDP 17474) by `crate::umbra_discovery`, whose
+//! rules are there. Each is compiled only with the integrations whose
+//! devices it finds. Protocols are independent: each listens, scans and
+//! stops on its own.
 
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
@@ -29,6 +31,7 @@ pub const PROTOCOLS: &[(&str, &[&str])] = &[
     ("mcp", &["sennheiser-ew-g3-g4"]),
     ("ssdp", &["sony-camera"]),
     ("pjlink", &["pjlink"]),
+    ("umbra", &["dmxcontrol3"]),
     (
         "mdns",
         &[
@@ -52,11 +55,11 @@ pub struct DiscoverRequest {
     /// `listen` (passively), `scan` (listen, and probe now) or `stop`.
     pub action: DiscoverAction,
     /// Which discovery protocols: `mcp` (Sennheiser G3/G4), `ssdp` (Sony
-    /// cameras), `pjlink` (PJLink Class 2 projectors) and `mdns` (Blackmagic
+    /// cameras), `pjlink` (PJLink Class 2 projectors), `mdns` (Blackmagic
     /// ATEM, Videohub, HyperDeck, SmartView and MultiView, Meros Cameras,
-    /// RTP-MIDI sessions and NMOS Nodes). Empty means every
-    /// protocol that finds a device in this core's catalogue; naming one that
-    /// finds none of them is an error.
+    /// RTP-MIDI sessions and NMOS Nodes) and `umbra` (DMXControl 3). Empty
+    /// means every protocol that finds a device in this core's catalogue;
+    /// naming one that finds none of them is an error.
     #[serde(default)]
     pub protocols: Vec<String>,
     /// Addresses where devices were last seen. An MCP scan also sweeps their
@@ -99,6 +102,8 @@ pub(crate) struct Discovery {
     ssdp: crate::ssdp::Ssdp,
     #[cfg(feature = "pjlink")]
     pjlink: crate::pjlink_discovery::PjLinkDiscovery,
+    #[cfg(feature = "dmxcontrol3")]
+    umbra: crate::umbra_discovery::UmbraDiscovery,
     #[cfg(any(
         feature = "blackmagic-atem",
         feature = "blackmagic-hyperdeck",
@@ -134,6 +139,8 @@ impl Discovery {
             ssdp: crate::ssdp::Ssdp::new(catalog),
             #[cfg(feature = "pjlink")]
             pjlink: Default::default(),
+            #[cfg(feature = "dmxcontrol3")]
+            umbra: Default::default(),
             #[cfg(any(
                 feature = "blackmagic-atem",
                 feature = "blackmagic-hyperdeck",
@@ -186,9 +193,14 @@ impl Discovery {
         let wants = |p: &str| wanted.contains(&p);
         // A protocol whose integration is not built in is never available, so
         // its branches below are compiled only with that integration.
-        let (mcp, ssdp, pjlink, mdns) =
-            (wants("mcp"), wants("ssdp"), wants("pjlink"), wants("mdns"));
-        let _ = (mcp, ssdp, pjlink, mdns);
+        let (mcp, ssdp, pjlink, mdns, umbra) = (
+            wants("mcp"),
+            wants("ssdp"),
+            wants("pjlink"),
+            wants("mdns"),
+            wants("umbra"),
+        );
+        let _ = (mcp, ssdp, pjlink, mdns, umbra);
         match request.action {
             DiscoverAction::Stop => {
                 #[cfg(feature = "sennheiser-ew-g3-g4")]
@@ -202,6 +214,10 @@ impl Discovery {
                 #[cfg(feature = "pjlink")]
                 if pjlink {
                     self.pjlink.stop(services);
+                }
+                #[cfg(feature = "dmxcontrol3")]
+                if umbra {
+                    self.umbra.stop();
                 }
                 #[cfg(any(
                     feature = "blackmagic-atem",
@@ -232,6 +248,10 @@ impl Discovery {
                 #[cfg(feature = "pjlink")]
                 if pjlink {
                     self.pjlink.listen(services)?;
+                }
+                #[cfg(feature = "dmxcontrol3")]
+                if umbra {
+                    self.umbra.listen(services)?;
                 }
                 #[cfg(any(
                     feature = "blackmagic-atem",
@@ -265,6 +285,10 @@ impl Discovery {
                 if pjlink {
                     self.pjlink.listen(services)?;
                     self.pjlink.scan(services, &request.hints);
+                }
+                #[cfg(feature = "dmxcontrol3")]
+                if umbra {
+                    self.umbra.scan(services)?;
                 }
                 #[cfg(any(
                     feature = "blackmagic-atem",
@@ -333,7 +357,10 @@ mod tests {
         assert_eq!(projectors.wanted(&request(&[])).unwrap(), ["pjlink"]);
 
         let every = Discovery::new(&Catalog::source_tree());
-        assert_eq!(every.protocols(), ["mcp", "ssdp", "pjlink", "mdns"]);
+        assert_eq!(
+            every.protocols(),
+            ["mcp", "ssdp", "pjlink", "umbra", "mdns"]
+        );
 
         let switchers = Discovery::new(&catalog(&["blackmagic-atem", "vmix"]));
         assert_eq!(switchers.wanted(&request(&[])).unwrap(), ["mdns"]);
