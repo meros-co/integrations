@@ -216,8 +216,8 @@ commands:
     returns: value
 
   list_service_types:
-    summary: The organization's service types, up to 100 (ServiceType list)
-    send: { method: GET, path: /services/v2/service_types, query: { per_page: "100" } }
+    summary: The organization's service types, every page (ServiceType list)
+    send: { method: GET, path: /services/v2/service_types, query: { per_page: "100" }, pages: &pages { items: ["$.data", "$.included"], next: "$.links.next" } }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -227,7 +227,7 @@ commands:
       service_type_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
                          label: Service type ID,
                          description: "The numeric id of the service type." }
-    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/live_controllers", query: { per_page: "100" } }
+    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/live_controllers", query: { per_page: "100" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -291,7 +291,7 @@ commands:
     returns: value
 
   list_items:
-    summary: A plan's items, up to 100, each with its sequence (Plan edge items)
+    summary: A plan's items, every page, each with its sequence (Plan edge items)
     params:
       service_type_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
                          label: Service type ID,
@@ -299,7 +299,7 @@ commands:
       plan_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
                  label: Plan ID,
                  description: "The numeric id of the plan whose items are listed." }
-    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}/items", query: { per_page: "100" } }
+    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}/items", query: { per_page: "100" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -320,7 +320,7 @@ commands:
     returns: value
 
   list_item_notes:
-    summary: An item's notes, such as lighting or camera notes, up to 100 (Item edge item_notes)
+    summary: An item's notes, such as lighting or camera notes, every page (Item edge item_notes)
     params:
       service_type_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
                          label: Service type ID,
@@ -331,7 +331,7 @@ commands:
       item_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
                  label: Item ID,
                  description: "The numeric id of the item whose notes are listed." }
-    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}/items/{item_id}/item_notes", query: { per_page: "100" } }
+    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}/items/{item_id}/item_notes", query: { per_page: "100" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -344,7 +344,7 @@ commands:
       plan_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
                  label: Plan ID,
                  description: "The numeric id of the plan whose times are listed." }
-    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}/plan_times", query: { per_page: "100" } }
+    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}/plan_times", query: { per_page: "100" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -512,7 +512,7 @@ commands:
   list_item_note_categories:
     summary: A service type's item note categories (such as Lighting or Camera), whose ids item notes take (ItemNoteCategory list)
     params: { service_type_id: *st }
-    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/item_note_categories", query: { per_page: "100" } }
+    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/item_note_categories", query: { per_page: "100" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -564,7 +564,7 @@ commands:
   list_plan_note_categories:
     summary: A service type's plan note categories, whose ids plan notes take (PlanNoteCategory list)
     params: { service_type_id: *st }
-    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plan_note_categories", query: { per_page: "100" } }
+    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plan_note_categories", query: { per_page: "100" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -573,7 +573,7 @@ commands:
     params:
       service_type_id: *st
       plan_id: *plan
-    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}/notes", query: { per_page: "100" } }
+    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}/notes", query: { per_page: "100" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -689,7 +689,7 @@ commands:
       title: { type: string, pattern: "\\S", max_length: 255, required: true,
                label: Title,
                description: "The title to look for." }
-    send: { method: GET, path: /services/v2/songs, query: { "where[title]": "{title}", per_page: "100" } }
+    send: { method: GET, path: /services/v2/songs, query: { "where[title]": "{title}", per_page: "100" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -706,7 +706,7 @@ commands:
   list_arrangements:
     summary: A song's arrangements with BPM, meter, length, sequence, lyrics and chord chart (Song edge arrangements)
     params: { song_id: *song }
-    send: { method: GET, path: "/services/v2/songs/{song_id}/arrangements", query: { per_page: "100" } }
+    send: { method: GET, path: "/services/v2/songs/{song_id}/arrangements", query: { per_page: "100" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -726,7 +726,7 @@ commands:
     params:
       song_id: *song
       arrangement_id: *arrangement
-    send: { method: GET, path: "/services/v2/songs/{song_id}/arrangements/{arrangement_id}/keys", query: { per_page: "100" } }
+    send: { method: GET, path: "/services/v2/songs/{song_id}/arrangements/{arrangement_id}/keys", query: { per_page: "100" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -769,7 +769,7 @@ commands:
   list_media_attachments:
     summary: A media item's files (Media edge attachments)
     params: { media_id: *media }
-    send: { method: GET, path: "/services/v2/media/{media_id}/attachments", query: { per_page: "100" } }
+    send: { method: GET, path: "/services/v2/media/{media_id}/attachments", query: { per_page: "100" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -789,7 +789,7 @@ commands:
       service_type_id: *st
       plan_id: *plan
       item_id: *item
-    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}/items/{item_id}/attachments", query: { per_page: "100" } }
+    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}/items/{item_id}/attachments", query: { per_page: "100" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -798,14 +798,14 @@ commands:
     params:
       service_type_id: *st
       plan_id: *plan
-    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}/all_attachments", query: { per_page: "100" } }
+    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}/all_attachments", query: { per_page: "100" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
   list_song_attachments:
     summary: A song's files, such as chord charts and audio (Song edge attachments)
     params: { song_id: *song }
-    send: { method: GET, path: "/services/v2/songs/{song_id}/attachments", query: { per_page: "100" } }
+    send: { method: GET, path: "/services/v2/songs/{song_id}/attachments", query: { per_page: "100" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -906,13 +906,14 @@ quirks:
       plans.<plan_id>.items.<plans.<plan_id>.item_times.<current_item_time_id>.item_id>.
       Countdowns are computed by the consumer from live_start_at and length;
       Planning Center reports times, not a running clock. Each read of a
-      plan's items or times that holds the whole list (no next link) replaces
-      the last, so an item deleted from the plan leaves the state; each Live
-      reply replaces the plan's item times with the current and next ones.
-      Only the first 100 items and plan times of the plan are read: for a
-      plan with more, nothing is replaced and a deleted item stays until the
-      integration is opened again. Plans read with list_plans are added to
-      plans and never removed, since a list of plans is filtered and paged.
+      plan's items or times replaces the last, so an item deleted from the
+      plan leaves the state; each Live reply replaces the plan's item times
+      with the current and next ones. Lists are read whole: the core follows
+      each answer's next link (100 a page) and joins the pages into one
+      reply, so a plan of any length is kept whole, and the list commands
+      return every entry. Plans read with list_plans (one page, filtered)
+      and the song and media libraries (list_songs, list_media, a page at a
+      time with offset) are added to and never removed.
 
   - models: [all]
     severity: info
@@ -1055,9 +1056,9 @@ telemetry:
           query: { include: "current_item_time,next_item_time" } }
       - { method: GET, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}" }
       - { method: GET, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}/items",
-          query: { per_page: "100", include: "song,arrangement,key" } }
+          query: { per_page: "100", include: "song,arrangement,key" }, pages: *pages }
       - { method: GET, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}/plan_times",
-          query: { per_page: "100" } }
+          query: { per_page: "100" }, pages: *pages }
   updates:
     # The Live resource: from a read, or the reply to a LIVE action.
     - path: '^/services/v2/service_types/\d+/plans/(\d+)/live(/(go_to_next_item|go_to_previous_item|toggle_control))?(\?.*)?$'
@@ -1159,11 +1160,11 @@ telemetry:
         plans.{id}.total_length: "{total_length}"
         plans.{id}.items_count: "{items_count}"
         plans.{id}.planning_center_url: "{url}"
-    # A plan's items. A list that is complete (top-level links with no next:
-    # the first page holds them all) also replaces the plan's items, by the
-    # rule after this one, so an item deleted from the plan leaves the
-    # state. A plan of more than 100 items is read one page deep: its items
-    # are added to, never replaced.
+    # A plan's items. Read with every page joined, the list is complete
+    # (top-level links with no next: the last page's), so it also replaces
+    # the plan's items, by the rule after this one, and an item deleted from
+    # the plan leaves the state. A list one page deep (another command's
+    # page) is added to, never replaced.
     - path: '^/services/v2/service_types/\d+/plans/(\d+)/items(\?.*)?$'
       json_each: "$.data"
       json:
@@ -1256,7 +1257,7 @@ telemetry:
       json: {}
       then_send:
         - { method: GET, path: "/services/v2/service_types/{1}/plans/{2}/items",
-            query: { per_page: "100", include: "song,arrangement,key" } }
+            query: { per_page: "100", include: "song,arrangement,key" }, pages: *pages }
     # A plan's times; a complete list (no next link) replaces the last, by
     # the rule after this one.
     - path: '^/services/v2/service_types/\d+/plans/(\d+)/plan_times(\?.*)?$'
@@ -1301,7 +1302,7 @@ telemetry:
     - path: '^/services/v2/service_types/(\d+)/plans/(\d+)/plan_times/\d+$'
       json: {}
       then_send:
-        - { method: GET, path: "/services/v2/service_types/{1}/plans/{2}/plan_times", query: { per_page: "100" } }
+        - { method: GET, path: "/services/v2/service_types/{1}/plans/{2}/plan_times", query: { per_page: "100" }, pages: *pages }
     # A created plan.
     - path: '^/services/v2/service_types/(\d+)/plans$'
       json_match: { "$.data.type": "^Plan$" }
@@ -1335,7 +1336,7 @@ telemetry:
     - path: '^/services/v2/service_types/(\d+)/plans/(\d+)/items/(\d+)/item_notes/\d+$'
       json: {}
       then_send:
-        - { method: GET, path: "/services/v2/service_types/{1}/plans/{2}/items/{3}/item_notes", query: { per_page: "100" } }
+        - { method: GET, path: "/services/v2/service_types/{1}/plans/{2}/items/{3}/item_notes", query: { per_page: "100" }, pages: *pages }
     # Plan notes, the same way.
     - path: '^/services/v2/service_types/\d+/plans/(\d+)/notes\?'
       json_each: "$.data"
@@ -1353,7 +1354,7 @@ telemetry:
     - path: '^/services/v2/service_types/(\d+)/plans/(\d+)/notes/\d+$'
       json: {}
       then_send:
-        - { method: GET, path: "/services/v2/service_types/{1}/plans/{2}/notes", query: { per_page: "100" } }
+        - { method: GET, path: "/services/v2/service_types/{1}/plans/{2}/notes", query: { per_page: "100" }, pages: *pages }
     # The service types; a complete list (no next link) replaces the last,
     # by the rule after this one.
     - path: '^/services/v2/service_types(\?.*)?$'
