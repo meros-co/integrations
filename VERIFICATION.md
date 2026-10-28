@@ -3810,6 +3810,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm an empty apiKey query parameter is accepted when no apiKey is configured. ([specs/sofie-chef.yaml:175](specs/sofie-chef.yaml#L175))
 - [ ] Confirm the WebSocket API on apiPort + 1 (path /) pushes status on connecting and on each change without a request or the apiKey. ([specs/sofie-chef.yaml:186](specs/sofie-chef.yaml#L186))
 
+## sofie-core — Sofie Core (User Actions REST API and Live Status Gateway)
+
+- [ ] Confirm the API answers under /api/v1.0 on port 3000 of a production Sofie Core, and which statuses a PUT or POST answers with. ([specs/sofie-core.yaml:44](specs/sofie-core.yaml#L44))
+- [ ] Confirm the Live Status Gateway accepts the four subscriptions on one connection and sends each topic's current state when subscribed. ([specs/sofie-core.yaml:915](specs/sofie-core.yaml#L915))
+- [ ] Confirm sending false for an optional boolean (activate's rehearsal, the T-timer flags, move_next_segment's ignoreQuickLoop) behaves as leaving it out. ([specs/sofie-core.yaml:1076](specs/sofie-core.yaml#L1076))
+- [ ] Confirm an activePlaylist event with no active playlist carries id null, as the gateway's schema allows. ([specs/sofie-core.yaml:1084](specs/sofie-core.yaml#L1084))
+
 ## softouch-easyworship — Softouch EasyWorship
 
 - [ ] Confirm the whole exchange against EasyWorship 7.3 or later: the pairing request and its paired and notPaired answers, a heartbeat after each message, and status messages. ([specs/softouch-easyworship.yaml:130](specs/softouch-easyworship.yaml#L130))

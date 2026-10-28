@@ -355,7 +355,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-singular", &["singular-datastream", "singular-live"]),
-    ("vendor-sofie", &["sofie-chef"]),
+    ("vendor-sofie", &["sofie-chef", "sofie-core"]),
     ("vendor-softouch", &["softouch-easyworship"]),
     (
         "vendor-softron",
