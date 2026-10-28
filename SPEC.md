@@ -702,6 +702,29 @@ An API request refused with 401 while a refresh is already in flight waits
 for that refresh and is sent once more with the new token, as when it starts
 one itself.
 
+A service that issues an account's own API client its tokens with the
+client credentials grant (RFC 6749 §4.4), rather than through a user's
+sign-in, says `client_credentials: true`. BoxCast gives an account a client
+id and secret for its own use, and answers them with an access token alone:
+
+```yaml
+  oauth:
+    token_url: https://auth.boxcast.com/oauth2/token
+    client_auth: basic
+    client_credentials: true
+```
+
+When there is no refresh token and both `client_id` and `client_secret` are
+set, every refresh above is that grant instead: a form-encoded POST of
+`grant_type=client_credentials`, with the client per `client_auth`. It is
+made when there is no access token, when the token nears its expiry, and on
+a 401, as a refresh is, and its answer is read the same way (a
+`refresh_token` in it is kept and used from then on); a refusal from the
+token endpoint is terminal. A refresh token, when given, is used instead,
+and with neither the access token is a plain bearer token as before. The
+client secret is the credential here, so a consumer that cannot hold it
+leaves it empty and passes tokens it obtained itself.
+
 Where the operator chooses HTTP or HTTPS on the device, `scheme` names a
 setting instead: `scheme: { setting: scheme }` with `scheme: { type: enum,
 values: [http, https], default: http }`. A device serving HTTPS on another
