@@ -615,67 +615,6 @@ struct Push {
     /// offered under, as that GET's reply would be (a Blackmagic camera's
     /// property pushes, in the format its REST GET returns).
     as_reply: Option<AsReply>,
-    /// `token`: a request whose answer holds a token the websocket is opened
-    /// with, asked for again before each opening (CamStreamer's
-    /// `ws_authorization.cgi`, a token valid for 30 seconds).
-    token: Option<PushToken>,
-}
-
-/// `telemetry.websocket.token`: the request, and where its answer holds the
-/// token: a JSON path, or a regex's first group over the body.
-#[derive(Debug, Clone)]
-struct PushToken {
-    request: Value,
-    json_path: Option<String>,
-    re: Option<Regex>,
-}
-
-impl PushToken {
-    fn parse(v: Option<&Value>) -> Result<Option<PushToken>, String> {
-        let Some(v) = v else {
-            return Ok(None);
-        };
-        let request = v
-            .get("request")
-            .filter(|r| r.is_object())
-            .ok_or("telemetry.websocket.token needs a request")?
-            .clone();
-        let json_path = str_field(v, "json_path").map(str::to_string);
-        let re = match str_field(v, "match") {
-            Some(p) => {
-                Some(Regex::new(p).map_err(|e| format!("telemetry.websocket.token.match: {e}"))?)
-            }
-            None => None,
-        };
-        if json_path.is_some() == re.is_some() {
-            return Err("telemetry.websocket.token takes json_path or match".into());
-        }
-        Ok(Some(PushToken {
-            request,
-            json_path,
-            re,
-        }))
-    }
-
-    /// The token in an answer's body, when it holds one.
-    fn read(&self, body: &[u8]) -> Option<String> {
-        let token = match (&self.json_path, &self.re) {
-            (Some(path), _) => {
-                let doc: Value = serde_json::from_slice(body).ok()?;
-                match expect::json_path(&doc, path)? {
-                    Value::String(s) => s.clone(),
-                    Value::Number(n) => n.to_string(),
-                    _ => return None,
-                }
-            }
-            (None, Some(re)) => {
-                let text = std::str::from_utf8(body).ok()?;
-                re.captures(text)?.get(1)?.as_str().to_string()
-            }
-            (None, None) => return None,
-        };
-        (!token.is_empty()).then_some(token)
-    }
 }
 
 /// `as_reply` (`telemetry.sse`, `telemetry.websocket`): each message is also
@@ -924,10 +863,6 @@ struct Job {
     login: bool,
     /// Sent once more after a fresh login: a second "session ended" stands.
     relogged: bool,
-    /// The request for the push websocket's token
-    /// (`telemetry.websocket.token`): its answer is never offered to the
-    /// rules, and opens the websocket.
-    push_token: bool,
     /// A `then_send` item's captures: the types of `params`, which hold
     /// them.
     specs: Option<Arc<BTreeMap<String, ParamSpec>>>,
@@ -943,7 +878,6 @@ impl Job {
             setup,
             login: false,
             relogged: false,
-            push_token: false,
             specs: None,
         }
     }
@@ -1019,10 +953,6 @@ pub(crate) struct SpecEngine {
     session_value: Option<Value>,
     /// `telemetry.websocket`: a push channel beside the transport.
     push: Option<Push>,
-    /// The token the push websocket is being opened with
-    /// (`telemetry.websocket.token`). A secret: never logged, offered to the
-    /// rules or kept in state.
-    push_token: Option<String>,
     push_backoff: Millis,
     /// `telemetry.sse`: an event stream beside an HTTP transport.
     events: Option<HttpRequest>,
@@ -1940,13 +1870,7 @@ impl SpecEngine {
             }
             Some(o) => listen_port(o.get("listen_port"), &ctx.settings)?,
         };
-        // A list names each entry's `models`: the first for this one is used,
-        // and a model none names has no push websocket.
-        let push_entry = match spec.telemetry.as_ref().and_then(|t| t.get("websocket")) {
-            Some(Value::Array(entries)) => entries.iter().find(|e| for_model(e, &ctx.model)),
-            other => other,
-        };
-        let push = match push_entry {
+        let push = match spec.telemetry.as_ref().and_then(|t| t.get("websocket")) {
             None => None,
             Some(w) => {
                 // A port, or `{setting: name}` naming the operator's (an
@@ -2108,7 +2032,6 @@ impl SpecEngine {
                     url,
                     idle,
                     as_reply: as_reply_of(w.get("as_reply"), "telemetry.websocket")?,
-                    token: PushToken::parse(w.get("token"))?,
                 })
             }
         };
@@ -2257,7 +2180,6 @@ impl SpecEngine {
             session_token: None,
             session_value: None,
             push,
-            push_token: None,
             push_backoff: RECONNECT_MIN,
             events,
             events_json,
@@ -4105,123 +4027,9 @@ impl SpecEngine {
     }
 
     fn open_push(&mut self, cx: &mut Cx) {
-        if !self.monitor || self.refused.is_some() {
+        if !self.monitor {
             return;
         }
-        let Some(push) = &self.push else {
-            return;
-        };
-        // A token first: asked for over the transport, in the queue, and the
-        // websocket opened with it when the answer comes.
-        if let Some(token) = &push.token {
-            let asked = self.queue.iter().any(|j| j.push_token)
-                || self.current.as_ref().is_some_and(|f| f.job.push_token);
-            if !asked {
-                let item = token.request.clone();
-                self.queue.push_back(Job {
-                    push_token: true,
-                    ..Job::internal(Some(item), false)
-                });
-                self.pump(cx);
-            }
-            return;
-        }
-        self.open_push_now(cx);
-    }
-
-    /// The push websocket's `send` items and `url` take the token as
-    /// `{token}`, a string.
-    fn token_params(&self) -> (Params, BTreeMap<String, ParamSpec>) {
-        let mut params = Params::new();
-        let mut specs = BTreeMap::new();
-        if let Some(token) = &self.push_token {
-            params.insert("token".into(), Value::String(token.clone()));
-            if let Ok(spec) = serde_json::from_value(serde_json::json!({"type": "string"})) {
-                specs.insert("token".into(), spec);
-            }
-        }
-        (params, specs)
-    }
-
-    /// The token request answered: the websocket opens with the token, or
-    /// the request is made again after the push websocket's backoff.
-    fn push_token_answered(&mut self, cx: &mut Cx, result: Result<HttpResponse, String>) {
-        cx.cancel_timer(REPLY);
-        let Some(flight) = self.current.take() else {
-            return;
-        };
-        if flight.route == Route::Main {
-            cx.round_trip(cx.now().saturating_sub(flight.sent_at));
-            self.pacer.answered(cx.now());
-        }
-        let refused = match (&self.transport, &result) {
-            (
-                Transport::Http {
-                    auth,
-                    refusal,
-                    refusal_body,
-                    ..
-                },
-                Ok(response),
-            ) => {
-                *auth != HttpAuth::None
-                    && flight.route == Route::Main
-                    && refused_by_status(refusal, refusal_body, response.status, &response.body)
-            }
-            _ => false,
-        };
-        let token = match &result {
-            Ok(r) if (200..300).contains(&r.status) => self
-                .push
-                .as_ref()
-                .and_then(|p| p.token.as_ref())
-                .and_then(|t| t.read(&r.body)),
-            _ => None,
-        };
-        match (token, result) {
-            _ if refused => {
-                self.refuse(
-                    cx,
-                    "the device refused the credential asking for the websocket's token".into(),
-                );
-                return;
-            }
-            (Some(token), _) => {
-                if flight.route == Route::Main {
-                    self.heard(cx);
-                }
-                self.push_token = Some(token);
-                self.open_push_now(cx);
-            }
-            // Never the body: it may hold a token.
-            (None, Ok(r)) => {
-                cx.log(
-                    Level::Warning,
-                    format!(
-                        "no websocket token in the answer (HTTP {}); asking again",
-                        r.status
-                    ),
-                );
-                self.push_retry(cx);
-            }
-            (None, Err(_)) => {
-                cx.log(
-                    Level::Warning,
-                    "the websocket token was not answered; asking again",
-                );
-                self.push_retry(cx);
-            }
-        }
-        self.pump(cx);
-    }
-
-    /// Open the push websocket again after its backoff.
-    fn push_retry(&mut self, cx: &mut Cx) {
-        cx.set_timer(PUSH_RECONNECT, self.push_backoff);
-        self.push_backoff = (self.push_backoff * 2).min(RECONNECT_MAX);
-    }
-
-    fn open_push_now(&mut self, cx: &mut Cx) {
         let Some(push) = &self.push else {
             return;
         };
@@ -4229,9 +4037,13 @@ impl SpecEngine {
         if let Some(template) = &push.url {
             // Rendered from the settings now, so a refreshed token is used;
             // each value percent-encoded, as in a query.
-            let (token, token_specs) = self.token_params();
-            let rendered = render(template, &self.values(&token, &token_specs), percent_encode)
-                .and_then(|url| check_push_url(&url).map(|()| url));
+            let (no_params, no_specs) = (Params::new(), BTreeMap::new());
+            let rendered = render(
+                template,
+                &self.values(&no_params, &no_specs),
+                percent_encode,
+            )
+            .and_then(|url| check_push_url(&url).map(|()| url));
             match rendered {
                 Ok(url) => request.url = url,
                 Err(e) => {
@@ -4414,9 +4226,9 @@ impl SpecEngine {
         if let Some(every) = self.push.as_ref().and_then(|p| p.every) {
             cx.set_timer(PUSH_RENEW, every);
         }
-        // `{token}`: the token the websocket was opened with, if any.
-        let (token, token_specs) = self.token_params();
-        let values = self.values(&token, &token_specs);
+        let empty = Params::new();
+        let empty_specs = BTreeMap::new();
+        let values = self.values(&empty, &empty_specs);
         let set = |name: &str| {
             self.settings.get(name).is_some_and(|v| {
                 !v.is_null() && v.as_str() != Some("") && v.as_bool() != Some(false)
@@ -4840,14 +4652,6 @@ impl Module for SpecEngine {
             self.current.as_ref().and_then(|f| f.awaiting.as_ref()),
             Some(Await::Http(r)) if *r == id
         );
-        // The token's answer: never offered to the rules.
-        if ours && self.current.as_ref().is_some_and(|f| f.job.push_token) {
-            self.request_paths.remove(&id);
-            if self.refused.is_none() {
-                self.push_token_answered(cx, result);
-            }
-            return;
-        }
         // The login's answer holds the session: never offered to the rules.
         if ours && self.current.as_ref().is_some_and(|f| f.job.login) {
             self.request_paths.remove(&id);
@@ -4982,14 +4786,6 @@ impl Module for SpecEngine {
                     return;
                 };
                 self.pacer.answered(cx.now());
-                // The token not answered: asked for again after a while.
-                if flight.job.push_token {
-                    cx.log(
-                        Level::Warning,
-                        "the websocket token was not answered; asking again",
-                    );
-                    self.push_retry(cx);
-                }
                 match flight.id {
                     Some(id) => cx.complete(id, Err(CommandError::Timeout)),
                     None => {
@@ -5158,7 +4954,6 @@ impl Module for SpecEngine {
             push.request = new.request;
             push.credentialed = new.credentialed;
             push.send = new.send;
-            push.token = new.token;
         }
         // A refresh in flight was for the old tokens: its answer is ignored.
         self.oauth = fresh.oauth;

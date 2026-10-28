@@ -468,26 +468,13 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
 
     transport = doc.get("transport") or {}
     websocket = (doc.get("telemetry") or {}).get("websocket")
-    # A list gives one websocket per model (SPEC.md §8): each entry is checked.
-    websockets = ([w for w in websocket if isinstance(w, dict)] if isinstance(websocket, list)
-                  else [websocket] if isinstance(websocket, dict) else [])
-    if isinstance(websocket, list):
-        model_ids = {m.get("id") for m in doc.get("models") or []}
-        named: set = set()
-        for i, w in enumerate(websockets):
-            for m in w.get("models") or []:
-                if m not in model_ids:
-                    errors.append(f"telemetry.websocket[{i}].models: no model '{m}'")
-                elif m in named:
-                    errors.append(f"telemetry.websocket[{i}].models: model '{m}' has an earlier entry")
-                named.add(m)
     schemes = [("transport", transport.get("scheme"),
                 {"ws", "wss"} if transport_type == "ws"
                 else {"tcp", "tls"} if transport_type == "line-tcp" else {"http", "https"})]
-    for w in websockets:
-        schemes.append(("telemetry.websocket", w.get("scheme"), {"ws", "wss"}))
-    for where_, block in [("telemetry.websocket", w) for w in websockets] + [
-                          ("telemetry.sse", (doc.get("telemetry") or {}).get("sse") or {})]:
+    if websocket:
+        schemes.append(("telemetry.websocket", websocket.get("scheme"), {"ws", "wss"}))
+    for where_, block in (("telemetry.websocket", websocket or {}),
+                          ("telemetry.sse", (doc.get("telemetry") or {}).get("sse") or {})):
         reply = block.get("as_reply")
         if reply is None:
             continue
@@ -514,15 +501,14 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
     for where_, obj, default in [
             ("transport", transport, "ws" if transport_type == "ws"
              else "tcp" if transport_type == "line-tcp" else "http"),
-            *[("telemetry.websocket", w, "ws") for w in websockets]]:
+            ("telemetry.websocket", websocket or {}, "ws")]:
         scheme = obj.get("scheme", default)
         if obj.get("accept_invalid_certs") is True and scheme in ("ws", "http", "tcp"):
             errors.append(f"{where_}.accept_invalid_certs needs a TLS scheme (wss, https, tls or a setting)")
-    for websocket in websockets:
+    if websocket:
         url = websocket.get("url")
         if url is not None:
-            errors += check_template("text", url, {"token": {"type": "string", "required": True}}
-                                     if websocket.get("token") else {}, settings, "telemetry.websocket.url")
+            errors += check_template("text", url, {}, settings, "telemetry.websocket.url")
             # The scheme and host are literal; only the path and query may
             # hold placeholders.
             m = re.match(r"^(wss?)://(\[[^\]]*\]|[^/?:{]+)", url)
@@ -538,25 +524,6 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                 errors.append(f"telemetry.websocket.port names unknown setting '{port.get('setting')}'")
             elif decl.get("type") != "int":
                 errors.append("telemetry.websocket.port's setting must be an int")
-        # `token` (SPEC.md §8): a request whose answer holds the token, read
-        # by a JSON path or a regex's first group; `{token}` then names it.
-        token = websocket.get("token")
-        token_param = {}
-        if token is not None:
-            token_param = {"token": {"type": "string", "required": True}}
-            if not isinstance(token.get("request"), dict):
-                errors.append("telemetry.websocket.token needs a request")
-            else:
-                for context, text in template_strings([token["request"]]):
-                    errors += check_template(context, text, {}, settings, "telemetry.websocket.token.request")
-            if ("json_path" in token) == ("match" in token):
-                errors.append("telemetry.websocket.token takes json_path or match")
-            if "match" in token:
-                try:
-                    if re.compile(token["match"]).groups < 1:
-                        errors.append("telemetry.websocket.token.match needs a group holding the token")
-                except re.error as e:
-                    errors.append(f"telemetry.websocket.token.match: {e}")
         for i, item in enumerate(websocket.get("send", []) if isinstance(websocket.get("send"), list)
                                  else [websocket.get("send")] if websocket.get("send") else []):
             # An object: its message, sent while a setting is set (or not).
@@ -567,7 +534,7 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                         errors.append(f"telemetry.websocket.send[{i}].{key}: unknown setting '{item[key]}'")
             if "{session.id" in text and not transport.get("session"):
                 errors.append(f"telemetry.websocket.send[{i}]: {{session.id}} needs transport.session")
-            errors += check_template("text", text, token_param, settings, f"telemetry.websocket.send[{i}]")
+            errors += check_template("text", text, {}, settings, f"telemetry.websocket.send[{i}]")
     auth = transport.get("auth")
     methods = set() if isinstance(auth, dict) else {auth}
     if isinstance(auth, dict):
@@ -665,10 +632,9 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         errors += check_template("text", text, {}, settings, f"transport.headers.{name}")
     if ("header" in methods) != bool(transport.get("auth_header")):
         errors.append("auth: header and auth_header go together")
-    for w in websockets:
-        sio = w.get("socketio")
-        if isinstance(sio, dict) and sio.get("auth"):
-            errors += check_template("text", sio["auth"], {}, settings, "telemetry.websocket.socketio.auth")
+    sio = (websocket or {}).get("socketio")
+    if isinstance(sio, dict) and sio.get("auth"):
+        errors += check_template("text", sio["auth"], {}, settings, "telemetry.websocket.socketio.auth")
     for method in sorted(methods & {"basic", "digest"}):
         if not {"username", "password"} <= settings.keys():
             errors.append(f"auth: {method} needs 'username' and 'password' settings")

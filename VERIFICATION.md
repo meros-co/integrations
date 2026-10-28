@@ -1031,17 +1031,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## camstreamer — CamStreamer apps for Axis cameras
 
-- [ ] Confirm the 6.x stream list's path (/local/camstreamer/stream_list.cgi; the page also writes /local/camstreamer/stream/stream_list.cgi for one stream) and whether its answer is the bare {"streamList": [...]} or wrapped in {status, message, data}. ([specs/camstreamer.yaml:692](specs/camstreamer.yaml#L692))
-- [ ] Confirm set_stream_enabled.cgi takes stream_id and enabled (the page writes stream_id=?stream_id=), on 6.x and 4.x. ([specs/camstreamer.yaml:164](specs/camstreamer.yaml#L164))
-- [ ] Confirm set_stream's body is one stream object (the page shows only the whole streamList). ([specs/camstreamer.yaml:155](specs/camstreamer.yaml#L155))
-- [ ] Record how an unlicensed app answers its API calls (status and body). ([specs/camstreamer.yaml:531](specs/camstreamer.yaml#L531))
-- [ ] Confirm param.cgi lists CamOverlay.Enabled and camswitcher.masterAudio as root.CamOverlay.Enabled= and root.camswitcher.masterAudio= lines (the group names' case as the page writes them). ([specs/camstreamer.yaml:745](specs/camstreamer.yaml#L745))
-- [ ] Confirm CamScripter's PackageConfigurations parameter is camscripter.PackageConfigurations in param.cgi, and network_camera_list.cgi's path under /local/camscripter/. ([specs/camstreamer.yaml:499](specs/camstreamer.yaml#L499))
-- [ ] Record the shape of playlist_queue_list.cgi's and clips.cgi's answers, to keep the queue in state. ([specs/camstreamer.yaml:397](specs/camstreamer.yaml#L397))
-- [ ] Confirm upload_custom_image takes the picture as the raw POST body (as curl --data-binary sends it). ([specs/camstreamer.yaml:359](specs/camstreamer.yaml#L359))
-- [ ] Record each app's ws_authorization.cgi answer: CamStreamer 6.x and CamSwitcher give the token in data, CamStreamer 4.x and CamOverlay in message (the page prints those with a trailing comma), read with a regex either way. ([specs/camstreamer.yaml:658](specs/camstreamer.yaml#L658))
-- [ ] Confirm the apps' websockets answer on the camera's own HTTP port as ws (the page writes wss only), with subprotocol events, the token as the first message, and the camera's credential not needed on the opening. ([specs/camstreamer.yaml:645](specs/camstreamer.yaml#L645))
-- [ ] Confirm the events' field types (enabled, active and isStreaming as 0 or 1, serviceId and port as numbers, StreamAvailable's state as a boolean) and what automationState and PortChanged's port and value mean. ([specs/camstreamer.yaml:788](specs/camstreamer.yaml#L788))
+- [ ] Confirm the 6.x stream list's path (/local/camstreamer/stream_list.cgi; the page also writes /local/camstreamer/stream/stream_list.cgi for one stream) and whether its answer is the bare {"streamList": [...]} or wrapped in {status, message, data}. ([specs/camstreamer.yaml:635](specs/camstreamer.yaml#L635))
+- [ ] Confirm set_stream_enabled.cgi takes stream_id and enabled (the page writes stream_id=?stream_id=), on 6.x and 4.x. ([specs/camstreamer.yaml:162](specs/camstreamer.yaml#L162))
+- [ ] Confirm set_stream's body is one stream object (the page shows only the whole streamList). ([specs/camstreamer.yaml:153](specs/camstreamer.yaml#L153))
+- [ ] Record how an unlicensed app answers its API calls (status and body). ([specs/camstreamer.yaml:529](specs/camstreamer.yaml#L529))
+- [ ] Confirm param.cgi lists CamOverlay.Enabled and camswitcher.masterAudio as root.CamOverlay.Enabled= and root.camswitcher.masterAudio= lines (the group names' case as the page writes them). ([specs/camstreamer.yaml:688](specs/camstreamer.yaml#L688))
+- [ ] Confirm CamScripter's PackageConfigurations parameter is camscripter.PackageConfigurations in param.cgi, and network_camera_list.cgi's path under /local/camscripter/. ([specs/camstreamer.yaml:497](specs/camstreamer.yaml#L497))
+- [ ] Record the shape of playlist_queue_list.cgi's and clips.cgi's answers, to keep the queue in state. ([specs/camstreamer.yaml:395](specs/camstreamer.yaml#L395))
+- [ ] Confirm upload_custom_image takes the picture as the raw POST body (as curl --data-binary sends it). ([specs/camstreamer.yaml:357](specs/camstreamer.yaml#L357))
 
 ## canon-ptz — Canon PTZ and pro video cameras (XC protocol)
 

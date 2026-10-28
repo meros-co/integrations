@@ -2518,40 +2518,6 @@ and never logged, since it may hold a token. The transport's credential and
 or 403 answer to its opening is a refusal of that token: refreshed once if it
 can be, as on the transport, and otherwise the terminal refusal of §2.
 
-A device that opens its websocket only to a token it hands out first gives
-the request for it as `token`. CamStreamer's apps answer
-`ws_authorization.cgi` with a token valid for 30 seconds or until the first
-connection, and take it as the websocket's first message:
-
-```yaml
-telemetry:
-  websocket:
-    path: /local/camstreamer/events
-    subprotocol: events
-    token:
-      request: { method: GET, path: /local/camstreamer/api/ws_authorization.cgi }
-      match: '"data"\s*:\s*"([^"]+)"'    # or json_path: "$.data"
-    send: ['{"authorization":{token:json}}']
-```
-
-Before each opening and reopening, the core sends `request`, a request like a
-poll item's (on the transport, with its credential and session, or on an
-`endpoint`), in the command queue, and reads the token from its answer: the
-string or number at `json_path`, or the first group of `match`, a regex over
-the body (for an answer that is not quite JSON). The websocket then opens,
-and `{token}`, a string, names the token in `send` and in `url`. An answer
-without a token, or no answer, is tried again after the websocket's backoff
-(1 s doubling to 30 s); a refusal of the credential is the terminal refusal
-of §2. The token is a secret: its answer is never offered to the telemetry
-rules, and it is never logged or kept in state. Nothing is asked for while
-the device is open for commands only, since the websocket is not opened.
-
-A family whose models push on different websockets (each of CamStreamer's
-apps on its own path, with its own token) gives `websocket` as a list, each
-entry naming its `models`; the first entry for the device's model is used,
-and a model no entry names opens none. `tools/validate.py` checks that each
-model is named once.
-
 `idle_ms` reopens the websocket when nothing at all has arrived on it for
 that long, for a service that sends keepalives, where silence means a dead
 connection.
