@@ -1,0 +1,1188 @@
+spec: 1
+id: pharos-designer
+name: Pharos Designer controllers (LPC, LPC X, TPC, VLC, VLC+) HTTP and WebSocket API
+vendor: Pharos Architectural Controls
+category: lighting
+
+# Written from Pharos's Controller API reference (release 12.0): the HTTP API
+# under /api on the controller's web server, and the WebSocket API at /query
+# on the same server for change broadcasts. Playback actions propagate to
+# every controller in the project, so any one controller can be opened.
+source:
+  - title: Controller API, Release 12.0 (Web API Authentication; HTTP API; WebSocket API)
+    author: Carallon Ltd (Pharos Architectural Controls)
+    url: https://pharos-designer-controller-api.readthedocs.io/_/downloads/en/latest/pdf/
+    note: >
+      Dated Oct 09, 2026; HTML at https://pharos-designer-controller-api.readthedocs.io/en/latest/.
+      Chapter 2: cookie and token authentication, POST /authenticate, a new token "valid for 5
+      minutes" from each authenticated request; the cookie is set when original_url is given as
+      a query parameter. Chapter 5, HTTP API: /api/api_version (Designer 2.12 and later),
+      beacon (POST toggles, PUT enable), channel park (POST) and unpark (DELETE), cloud,
+      cmdline (needs the Command Line Parser enabled; 501 otherwise), config (GET and POST, with
+      restart in the answer), content_target (VLC/VLC+ only), controller, dali and
+      dali_interface, factory_reset, fan_speed, fixtures, group (master_intensity; not on VLC),
+      input, log, lua, output (enable/disable a protocol; channel levels of a universe), override
+      (PUT, DELETE; RGB or hue/saturation, temperature, fade, path), project, project/file
+      (application/vnd.pharos), protocol, playback_group, rdm discovery, rdm_devices, rdm get and
+      set, rdm parameter_descriptions, remote_device, replication, reset, scene (start,
+      start_release_others, release, toggle; group and same_group), status_monitor (not on VLC),
+      system, temperature, text_slot, time, timeline (start, start_release_others, release,
+      toggle, pause, resume, set_rate, set_position with position, time or flag), trigger (fire
+      with var and conditions; list), user (add, update, delete) and user_groups,
+      guest_groups. Chapter 7, WebSocket API: endpoint /query (ws on 80, wss on 443; LPC 8 and
+      LPC X and VLC 16 HTTP connections at most), the token attribute when security is enabled,
+      a keep-alive "every ~10 seconds" that "may be an empty JSON object", {"subscribe":
+      "<channel>"}, the beacon, content_target, group, io_module, log, lua, remote_device,
+      scene, timeline, rdm_discovery and rdm_get_set channels and their change messages.
+
+transport:
+  type: http
+  port: 80
+  https_port: 443
+  scheme: { setting: scheme }
+  accept_invalid_certs: true
+  timeout_ms: 5000
+  probe: { method: GET, path: /api/system, session: false }
+  # With security enabled, a login answers with a token cookie that later
+  # requests carry; without it, nothing logs in.
+  session:
+    when_set: username
+    login:
+      method: POST
+      path: /authenticate
+      query: { original_url: / }
+      body: '{"username":{settings.username:json},"password":{settings.password:json}}'
+      content_type: application/json
+    capture: { cookie: token }
+    login_status: [200, 302, 303]
+    relogin: { status: [401] }
+
+settings:
+  scheme: { type: enum, values: [http, https], default: http, label: Connection, description: "http on port 80, or https on port 443 with the controller's own certificate." }
+  username: { type: string, default: "", max_length: 128, label: Username, description: "A controller user with at least Status access (Control to change anything) when the controller has security enabled; leave empty when it has none." }
+  password: { type: string, secret: true, default: "", max_length: 128, label: Password, description: "That user's password." }
+
+ports:
+  - { port: 80, protocol: http, role: control, when: "scheme http" }
+  - { port: 443, protocol: https, role: control, when: "scheme https" }
+  - { port: 80, protocol: ws, role: push, when: "scheme http", note: "WebSocket API at /query" }
+  - { port: 443, protocol: wss, role: push, when: "scheme https", note: "WebSocket API at /query" }
+
+models:
+  - id: lpc
+    name: Pharos LPC 1, 2 and 4
+    supports: &common [toggle_beacon, set_beacon, park_channels, unpark_channels, set_cloud_device_key,
+      clear_cloud_device_key, run_command, set_ip, set_dhcp, set_name_servers, set_web_ports,
+      set_datetime, set_watchdog, set_log_level, set_syslog, set_ntp, mark_dali_fixed,
+      refresh_dali, factory_reset, set_group_master, set_output_enabled, override_intensity,
+      override_rgb, override_hue_saturation, override_temperature, override_snapshot,
+      release_override, release_all_overrides, upload_project, rdm_discovery, rdm_discovery_update,
+      rdm_patch_assign, rdm_patch_replace, rdm_get, rdm_set, reboot, start_scene,
+      start_scene_release_others, start_scene_release_same_group, release_scene, toggle_scene,
+      release_all_scenes, release_scenes_in_group, start_timeline, start_timeline_release_others,
+      start_timeline_release_same_group, release_timeline, toggle_timeline, release_all_timelines,
+      release_timelines_in_group, pause_timeline, resume_timeline, pause_all_timelines,
+      resume_all_timelines, set_timeline_rate, set_timeline_position, set_timeline_time,
+      set_timeline_flag, refresh_status_monitor, refresh_fixture_status, set_text_slot,
+      fire_trigger, fire_trigger_with_var, add_user, update_user, delete_user, get_api_version,
+      get_lua_variables, get_log, get_output_levels, get_fixtures, get_fixture, get_rdm_devices,
+      get_rdm_device, get_rdm_discovery, get_rdm_unpatched, get_rdm_parameter_descriptions,
+      get_dali_interfaces, get_dali, get_user_groups, get_guest_groups]
+    verification: none
+  - id: lpc-x
+    name: Pharos LPC X
+    supports: *common
+    verification: none
+  - id: tpc
+    name: Pharos TPC
+    supports: *common
+    verification: none
+  - id: vlc
+    name: Pharos VLC
+    supports: &vlc [toggle_beacon, set_beacon, park_channels, unpark_channels, set_cloud_device_key,
+      clear_cloud_device_key, run_command, set_ip, set_dhcp, set_name_servers, set_web_ports,
+      set_datetime, set_watchdog, set_log_level, set_syslog, set_ntp, mark_dali_fixed,
+      refresh_dali, factory_reset, set_content_target_master, set_output_enabled,
+      override_intensity, override_rgb, override_hue_saturation, override_temperature,
+      override_snapshot, release_override, release_all_overrides, upload_project, rdm_discovery,
+      rdm_discovery_update, rdm_patch_assign, rdm_patch_replace, rdm_get, rdm_set, reboot,
+      start_scene, start_scene_release_others, start_scene_release_same_group, release_scene,
+      toggle_scene, release_all_scenes, release_scenes_in_group, start_timeline,
+      start_timeline_release_others, start_timeline_release_same_group, release_timeline,
+      toggle_timeline, release_all_timelines, release_timelines_in_group, pause_timeline,
+      resume_timeline, pause_all_timelines, resume_all_timelines, set_timeline_rate,
+      set_timeline_position, set_timeline_time, set_timeline_flag, set_text_slot, fire_trigger,
+      fire_trigger_with_var, add_user, update_user, delete_user, get_api_version,
+      get_lua_variables, get_log, get_output_levels, get_fixtures, get_fixture, get_rdm_devices,
+      get_rdm_device, get_rdm_discovery, get_rdm_unpatched, get_rdm_parameter_descriptions,
+      get_dali_interfaces, get_dali, get_user_groups, get_guest_groups]
+    verification: none
+  - id: vlc-plus
+    name: Pharos VLC+
+    supports: *vlc
+    verification: none
+
+commands:
+  toggle_beacon:
+    summary: "Toggle beacon mode, flashing the controller's LEDs or screen (POST /api/beacon)"
+    send: { method: POST, path: /api/beacon }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_beacon:
+    summary: "Turn beacon mode on or off (PUT /api/beacon)"
+    params:
+      enabled: { type: bool, required: true, label: Beacon, description: "On starts beacon mode, off stops it." }
+    send: { method: PUT, path: /api/beacon, body: '{"enable":{enabled}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  park_channels:
+    summary: "Park output channels of a universe at a level, 0-255 (POST /api/channel)"
+    params:
+      universe: &universe { type: string, pattern: "^[a-z-]+(:[a-z0-9]+){1,3}$", max_length: 64, required: true, label: Universe, description: "Universe key string, such as dmx:1, art-net:2, kinet:1:1, rio-dmx:rio44:1 or edn:edn20:4:1." }
+      channels: &channels { type: string, pattern: "^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$", max_length: 256, required: true, label: Channels, description: "Channel numbers, comma separated with ranges, such as 1-3,5." }
+      level: { type: int, min: 0, max: 255, required: true, label: Level, description: "Level to park the channels at, 0 to 255." }
+    send: { method: POST, path: /api/channel, body: '{"universe":{universe:json},"channels":{channels:json},"level":{level}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  unpark_channels:
+    summary: "Unpark output channels of a universe (DELETE /api/channel)"
+    params: { universe: *universe, channels: *channels }
+    send: { method: DELETE, path: /api/channel, body: '{"universe":{universe:json},"channels":{channels:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_cloud_device_key:
+    summary: "Set the key for connecting to the remote site (POST /api/cloud set_device_key)"
+    params:
+      key: { type: string, max_length: 256, required: true, secret: true, label: Device key, description: "The cloud device key to connect with." }
+    send: { method: POST, path: /api/cloud, body: '{"action":"set_device_key","cloud_device_key":{key:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  clear_cloud_device_key:
+    summary: "Clear the remote site device key (POST /api/cloud clear_device_key)"
+    send: { method: POST, path: /api/cloud, body: '{"action":"clear_device_key"}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  run_command:
+    summary: "Run a Lua script or a command line on the controller (POST /api/cmdline); answers Executed or the error"
+    params:
+      input: { type: string, multiline: true, max_length: 65536, required: true, label: Script, description: "The Lua script or command to run, such as tl = 1 get_timeline(tl):start()." }
+    send: { method: POST, path: /api/cmdline, body: '{"input":{input:json}}', content_type: application/json }
+    expect: { status: 200, matches: "(?s)^\\s*(.*?)\\s*$" }
+    returns: value
+
+  set_ip:
+    summary: "Set the management interface's IP address, subnet mask and gateway (POST /api/config)"
+    params:
+      ip: &ipv4 { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", max_length: 15, required: true, label: IP address, description: "IPv4 address in dotted-decimal form." }
+      subnet_mask: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", max_length: 15, required: true, label: Subnet mask, description: "Subnet mask in dotted-decimal form, such as 255.255.255.0." }
+      gateway: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", max_length: 15, required: true, label: Gateway, description: "Gateway address in dotted-decimal form." }
+    send: { method: POST, path: /api/config, body: '{"ip":{ip:json},"subnet_mask":{subnet_mask:json},"gateway":{gateway:json}}', content_type: application/json }
+    expect: &config_ok { status: 200, json_path: "$.restart" }
+    returns: value
+
+  set_dhcp:
+    summary: "Turn DHCP on the management interface on or off (POST /api/config)"
+    params:
+      enabled: { type: bool, required: true, label: DHCP, description: "On takes the address from DHCP, off uses the static address." }
+    send: { method: POST, path: /api/config, body: '{"dhcp_enabled":{enabled}}', content_type: application/json }
+    expect: *config_ok
+    returns: value
+
+  set_name_servers:
+    summary: "Set the primary and secondary name servers (POST /api/config)"
+    params:
+      primary: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", max_length: 15, required: true, label: Primary name server, description: "Primary DNS server address." }
+      secondary: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", max_length: 15, required: true, label: Secondary name server, description: "Secondary DNS server address." }
+    send: { method: POST, path: /api/config, body: '{"name_server_1":{primary:json},"name_server_2":{secondary:json}}', content_type: application/json }
+    expect: *config_ok
+    returns: value
+
+  set_web_ports:
+    summary: "Set the web server's HTTP and HTTPS ports (POST /api/config)"
+    params:
+      http_port: { type: int, min: 1, max: 65535, required: true, label: HTTP port, description: "Port for HTTP access to the web server." }
+      https_port: { type: int, min: 1, max: 65535, required: true, label: HTTPS port, description: "Port for HTTPS access to the web server." }
+    send: { method: POST, path: /api/config, body: '{"http_port":{http_port},"https_port":{https_port}}', content_type: application/json }
+    expect: *config_ok
+    returns: value
+
+  set_datetime:
+    summary: "Set the controller's clock, ISO 8601 local time (POST /api/config)"
+    params:
+      datetime: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2})?$", max_length: 19, required: true, label: Date and time, description: "Date and time such as 2024-06-27T09:30; fractional seconds and time zone are not taken." }
+    send: { method: POST, path: /api/config, body: '{"datetime":{datetime:json}}', content_type: application/json }
+    expect: *config_ok
+    returns: value
+
+  set_watchdog:
+    summary: "Turn the hardware watchdog on or off (POST /api/config)"
+    params:
+      enabled: { type: bool, required: true, label: Watchdog, description: "On enables the hardware watchdog, off disables it." }
+    send: { method: POST, path: /api/config, body: '{"watchdog_enabled":{enabled}}', content_type: application/json }
+    expect: *config_ok
+    returns: value
+
+  set_log_level:
+    summary: "Set the log's verbosity, 1-5 (POST /api/config)"
+    params:
+      level: { type: int, min: 1, max: 5, required: true, label: Log level, description: "Log verbosity from 1 (least) to 5 (most)." }
+    send: { method: POST, path: /api/config, body: '{"log_level":{level}}', content_type: application/json }
+    expect: *config_ok
+    returns: value
+
+  set_syslog:
+    summary: "Turn sending the log to a syslog server on or off, and set the server (POST /api/config)"
+    params:
+      enabled: { type: bool, required: true, label: Syslog, description: "On sends the log to the syslog server." }
+      ip: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", max_length: 15, required: true, label: Syslog server, description: "IP address of the syslog server." }
+    send: { method: POST, path: /api/config, body: '{"syslog_enabled":{enabled},"syslog_ip":{ip:json}}', content_type: application/json }
+    expect: *config_ok
+    returns: value
+
+  set_ntp:
+    summary: "Turn fetching time from an NTP server on or off, and set the server (POST /api/config)"
+    params:
+      enabled: { type: bool, required: true, label: NTP, description: "On fetches the time from the NTP server." }
+      ip: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", max_length: 15, required: true, label: NTP server, description: "IP address of the NTP server." }
+    send: { method: POST, path: /api/config, body: '{"ntp_enabled":{enabled},"ntp_ip":{ip:json}}', content_type: application/json }
+    expect: *config_ok
+    returns: value
+
+  mark_dali_fixed:
+    summary: "Mark a DALI error as fixed (POST /api/dali mark_fixed)"
+    params:
+      interface: &dali_interface { type: int, min: 0, max: 255, required: true, label: DALI interface, description: "DALI interface ID, from 0 for Interface 1 in Designer." }
+      address: { type: int, min: 0, max: 63, required: true, label: Short address, description: "DALI short address, 0 to 63." }
+    send: { method: POST, path: /api/dali, body: '{"interface":{interface},"address":{address},"action":"mark_fixed"}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  refresh_dali:
+    summary: "Refresh the DALI data of an address (POST /api/dali refresh)"
+    params:
+      interface: *dali_interface
+      address: { type: int, min: 0, max: 63, required: true, label: Short address, description: "DALI short address, 0 to 63." }
+    send: { method: POST, path: /api/dali, body: '{"interface":{interface},"address":{address},"action":"refresh"}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  factory_reset:
+    summary: "Reset the controller to factory settings, network settings and user accounts included (POST /api/factory_reset)"
+    send: { method: POST, path: /api/factory_reset }
+    expect: { status: [200, 202, 204] }
+    returns: ack
+
+  set_content_target_master:
+    summary: "Master a content target's intensity, 0.0 to 1.0, with a fade and delay (POST /api/content_target)"
+    params:
+      type: { type: enum, values: [primary, secondary, target_3, target_4, target_5, target_6, target_7, target_8], default: primary, label: Content target, description: "The content target; only primary on a VLC." }
+      level: { type: float, min: 0.0, max: 1.0, required: true, label: Level, description: "Master intensity from 0.0 to 1.0." }
+      fade: &fade { type: float, min: 0.0, max: 86400.0, default: 0.0, label: Fade time, description: "Fade time in seconds." }
+      delay: &delay { type: float, min: 0.0, max: 86400.0, default: 0.0, label: Delay, description: "Time to wait before the change, in seconds." }
+    send: { method: POST, path: /api/content_target, body: '{"action":"master_intensity","type":"{type}","level":{level:.3f},"fade":{fade:.3f},"delay":{delay:.3f}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_group_master:
+    summary: "Master a group's intensity, 0.0 to 1.0, with a fade and delay; group 0 is All Fixtures (POST /api/group)"
+    params:
+      group: &group { type: int, min: 0, max: 65535, required: true, label: Group, description: "Group number; 0 is the All Fixtures group." }
+      level: { type: float, min: 0.0, max: 1.0, required: true, label: Level, description: "Master level from 0.0 to 1.0." }
+      fade: *fade
+      delay: *delay
+    send: { method: POST, path: /api/group, body: '{"action":"master_intensity","num":{group},"level":{level:.3f},"fade":{fade:.3f},"delay":{delay:.3f}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_output_enabled:
+    summary: "Enable or disable the output of a protocol (POST /api/output)"
+    params:
+      protocol: { type: enum, values: [dmx, pathport, sacn, art-net, kinet, rio-dmx, edn, edn-spi], required: true, label: Protocol, description: "The output protocol." }
+      enabled: { type: bool, required: true, label: Output, description: "On enables the protocol's output, off disables it." }
+    send: { method: POST, path: /api/output, body: '{"protocol":"{protocol}","action":"{enabled:map.enable_action}"}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  override_intensity:
+    summary: "Override the intensity of a fixture or group, 0-255, with a fade and crossfade path (PUT /api/override)"
+    params:
+      target: &target { type: enum, values: [fixture, group], required: true, label: Target, description: "fixture or group." }
+      num: &num { type: int, min: 0, max: 2147483647, required: true, label: Number, description: "Fixture or group number; group 0 is All Fixtures." }
+      intensity: { type: int, min: 0, max: 255, required: true, label: Intensity, description: "Intensity, 0 to 255." }
+      fade: *fade
+      path: &path { type: enum, values: [Default, Linear, Start, End, Braked, Accelerated, Damped, Overshoot, Col At Start, Col At End, Int At Start, Int At End, Colour First, Intensity First], default: Default, label: Crossfade path, description: "The crossfade path the override fades along." }
+    send: { method: PUT, path: /api/override, body: '{"target":"{target}","num":{num},"intensity":{intensity},"fade":{fade:.3f},"path":"{path}"}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  override_rgb:
+    summary: "Override the intensity and RGB color of a fixture or group (PUT /api/override)"
+    params:
+      target: *target
+      num: *num
+      intensity: { type: int, min: 0, max: 255, required: true, label: Intensity, description: "Intensity, 0 to 255." }
+      red: { type: int, min: 0, max: 255, required: true, label: Red, description: "Red, 0 to 255." }
+      green: { type: int, min: 0, max: 255, required: true, label: Green, description: "Green, 0 to 255." }
+      blue: { type: int, min: 0, max: 255, required: true, label: Blue, description: "Blue, 0 to 255." }
+      fade: *fade
+      path: *path
+    send: { method: PUT, path: /api/override, body: '{"target":"{target}","num":{num},"intensity":{intensity},"colour":{"red":{red},"green":{green},"blue":{blue}},"fade":{fade:.3f},"path":"{path}"}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  override_hue_saturation:
+    summary: "Override the intensity and hue/saturation color of a fixture or group (PUT /api/override)"
+    params:
+      target: *target
+      num: *num
+      intensity: { type: int, min: 0, max: 255, required: true, label: Intensity, description: "Intensity, 0 to 255." }
+      hue: { type: int, min: 0, max: 255, required: true, label: Hue, description: "Hue, 0 to 255." }
+      saturation: { type: int, min: 0, max: 255, required: true, label: Saturation, description: "Saturation, 0 to 255." }
+      fade: *fade
+      path: *path
+    send: { method: PUT, path: /api/override, body: '{"target":"{target}","num":{num},"intensity":{intensity},"colour":{"hue":{hue},"saturation":{saturation}},"fade":{fade:.3f},"path":"{path}"}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  override_temperature:
+    summary: "Override the intensity and colour temperature component of a fixture or group, 0-255 (PUT /api/override)"
+    params:
+      target: *target
+      num: *num
+      intensity: { type: int, min: 0, max: 255, required: true, label: Intensity, description: "Intensity, 0 to 255." }
+      temperature: { type: int, min: 0, max: 255, required: true, label: Temperature, description: "Temperature component, 0 to 255." }
+      fade: *fade
+      path: *path
+    send: { method: PUT, path: /api/override, body: '{"target":"{target}","num":{num},"intensity":{intensity},"temperature":{temperature},"fade":{fade:.3f},"path":"{path}"}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  override_snapshot:
+    summary: "Override a fixture or group with a snapshot of its current intensity and colour (PUT /api/override)"
+    params: { target: *target, num: *num }
+    send: { method: PUT, path: /api/override, body: '{"target":"{target}","num":{num},"intensity":"snapshot","colour":"snapshot"}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  release_override:
+    summary: "Release the overrides of a fixture or group with a fade (DELETE /api/override)"
+    params: { target: *target, num: *num, fade: *fade }
+    send: { method: DELETE, path: /api/override, body: '{"target":"{target}","num":{num},"fade":{fade:.3f}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  release_all_overrides:
+    summary: "Release every override with a fade (DELETE /api/override)"
+    params: { fade: *fade }
+    send: { method: DELETE, path: /api/override, body: '{"fade":{fade:.3f}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  upload_project:
+    summary: "Upload a project exported with Designer's Export Project For Upload, switching the controller to it (POST /api/project/file)"
+    params:
+      file: { type: binary, required: true, label: Project file, description: "The project file exported for upload from Designer's Network tab, not a saved Designer project." }
+    send: { method: POST, path: /api/project/file, body: { binary: file }, content_type: application/vnd.pharos }
+    expect: { status: [200, 202, 204] }
+    returns: ack
+
+  rdm_discovery:
+    summary: "Start a full RDM discovery on a universe; results arrive on the rdm_discovery channel (POST /api/rdm/discovery)"
+    params: { universe: *universe }
+    send: { method: POST, path: /api/rdm/discovery, body: '{"universe":{universe:json}}', content_type: application/json }
+    expect: { status: 202 }
+    returns: ack
+
+  rdm_discovery_update:
+    summary: "Start a faster RDM discovery update on a universe (PUT /api/rdm/discovery)"
+    params: { universe: *universe }
+    send: { method: PUT, path: /api/rdm/discovery, body: '{"universe":{universe:json}}', content_type: application/json }
+    expect: { status: 202 }
+    returns: ack
+
+  rdm_patch_assign:
+    summary: "Assign an unpatched RDM device to a fixture (PUT /api/rdm_devices/<uid>/patch assign)"
+    params:
+      uid: &uid { type: string, pattern: "^[0-9a-f]{4}:[0-9a-f]{8}(:[0-9]+)?$", max_length: 24, required: true, label: RDM UID, description: "RDM device UID such as 072c:0004fe02." }
+      fixture: { type: int, min: 1, max: 2147483647, required: true, label: Fixture, description: "User number of the fixture to assign the device to." }
+    send: { method: PUT, path: "/api/rdm_devices/{uid}/patch", body: '{"action":"assign","fixture_number":{fixture}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  rdm_patch_replace:
+    summary: "Replace an offline RDM device with an unpatched one (PUT /api/rdm_devices/<uid>/patch replace)"
+    params:
+      uid: *uid
+      target: { type: string, pattern: "^[0-9a-f]{4}:[0-9a-f]{8}(:[0-9]+)?$", max_length: 24, required: true, label: Device to replace, description: "UID of the offline RDM device to replace." }
+    send: { method: PUT, path: "/api/rdm_devices/{uid}/patch", body: '{"action":"replace","target_device_id":{target:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  rdm_get:
+    summary: "Queue an RDM Get; its result arrives on the rdm_get_set channel (POST /api/rdm/get, body as the reference's RDM Get payload: universe, destination_uid, pid, meta, max_rx_length)"
+    params:
+      request: { type: json, required: true, label: Request, description: "The RDM Get payload as the reference documents it, such as {\"universe\":\"dmx:2\",\"destination_uid\":\"072c:0004fe02\",\"pid\":\"DEVICE_INFO\"}." }
+    send: { method: POST, path: /api/rdm/get, body: "{request}", content_type: application/json }
+    expect: { status: 202 }
+    returns: ack
+
+  rdm_set:
+    summary: "Queue an RDM Set; its result arrives on the rdm_get_set channel (POST /api/rdm/set, body as the reference's RDM Set payload)"
+    params:
+      request: { type: json, required: true, label: Request, description: "The RDM Set payload as the reference documents it: universe, destination_uid, pid and the PID's data." }
+    send: { method: POST, path: /api/rdm/set, body: "{request}", content_type: application/json }
+    expect: { status: 202 }
+    returns: ack
+
+  reboot:
+    summary: "Reboot the controller (POST /api/reset)"
+    send: { method: POST, path: /api/reset }
+    expect: { status: [200, 202, 204] }
+    returns: ack
+
+  start_scene:
+    summary: "Start a scene (POST /api/scene start)"
+    params:
+      scene: &scene { type: int, min: 1, max: 2147483647, required: true, label: Scene, description: "Scene number." }
+    send: { method: POST, path: /api/scene, body: '{"action":"start","num":{scene}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  start_scene_release_others:
+    summary: "Start a scene and release the others in a playback group, with a release fade (POST /api/scene start_release_others)"
+    params:
+      scene: *scene
+      group: &pbgroup { type: string, pattern: "^!?[^\"\\\\]+$", max_length: 128, required: true, label: Playback group, description: "Playback group name or number; a name starting with ! means every group except that one." }
+      fade: *fade
+    send: { method: POST, path: /api/scene, body: '{"action":"start_release_others","num":{scene},"group":{group:json},"fade":{fade:.3f}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  start_scene_release_same_group:
+    summary: "Start a scene and release the others in its own playback group (POST /api/scene start_release_others, same_group)"
+    params: { scene: *scene, fade: *fade }
+    send: { method: POST, path: /api/scene, body: '{"action":"start_release_others","num":{scene},"same_group":true,"fade":{fade:.3f}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  release_scene:
+    summary: "Release a scene with a fade (POST /api/scene release)"
+    params: { scene: *scene, fade: *fade }
+    send: { method: POST, path: /api/scene, body: '{"action":"release","num":{scene},"fade":{fade:.3f}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  toggle_scene:
+    summary: "Toggle a scene, releasing it with a fade if started (POST /api/scene toggle)"
+    params: { scene: *scene, fade: *fade }
+    send: { method: POST, path: /api/scene, body: '{"action":"toggle","num":{scene},"fade":{fade:.3f}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  release_all_scenes:
+    summary: "Release every scene with a fade (POST /api/scene release, no num)"
+    params: { fade: *fade }
+    send: { method: POST, path: /api/scene, body: '{"action":"release","fade":{fade:.3f}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  release_scenes_in_group:
+    summary: "Release every scene of a playback group, or every group but one with !name (POST /api/scene release, group)"
+    params: { group: *pbgroup, fade: *fade }
+    send: { method: POST, path: /api/scene, body: '{"action":"release","group":{group:json},"fade":{fade:.3f}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  start_timeline:
+    summary: "Start a timeline (POST /api/timeline start)"
+    params:
+      timeline: &timeline { type: int, min: 1, max: 2147483647, required: true, label: Timeline, description: "Timeline number." }
+    send: { method: POST, path: /api/timeline, body: '{"action":"start","num":{timeline}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  start_timeline_release_others:
+    summary: "Start a timeline and release the others in a playback group, with a release fade (POST /api/timeline start_release_others)"
+    params: { timeline: *timeline, group: *pbgroup, fade: *fade }
+    send: { method: POST, path: /api/timeline, body: '{"action":"start_release_others","num":{timeline},"group":{group:json},"fade":{fade:.3f}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  start_timeline_release_same_group:
+    summary: "Start a timeline and release the others in its own playback group (POST /api/timeline start_release_others, same_group)"
+    params: { timeline: *timeline, fade: *fade }
+    send: { method: POST, path: /api/timeline, body: '{"action":"start_release_others","num":{timeline},"same_group":true,"fade":{fade:.3f}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  release_timeline:
+    summary: "Release a timeline with a fade (POST /api/timeline release)"
+    params: { timeline: *timeline, fade: *fade }
+    send: { method: POST, path: /api/timeline, body: '{"action":"release","num":{timeline},"fade":{fade:.3f}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  toggle_timeline:
+    summary: "Toggle a timeline, releasing it with a fade if running (POST /api/timeline toggle)"
+    params: { timeline: *timeline, fade: *fade }
+    send: { method: POST, path: /api/timeline, body: '{"action":"toggle","num":{timeline},"fade":{fade:.3f}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  release_all_timelines:
+    summary: "Release every timeline with a fade (POST /api/timeline release, no num)"
+    params: { fade: *fade }
+    send: { method: POST, path: /api/timeline, body: '{"action":"release","fade":{fade:.3f}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  release_timelines_in_group:
+    summary: "Release every timeline of a playback group, or every group but one with !name (POST /api/timeline release, group)"
+    params: { group: *pbgroup, fade: *fade }
+    send: { method: POST, path: /api/timeline, body: '{"action":"release","group":{group:json},"fade":{fade:.3f}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  pause_timeline:
+    summary: "Pause a timeline (POST /api/timeline pause)"
+    params: { timeline: *timeline }
+    send: { method: POST, path: /api/timeline, body: '{"action":"pause","num":{timeline}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  resume_timeline:
+    summary: "Resume a paused timeline (POST /api/timeline resume)"
+    params: { timeline: *timeline }
+    send: { method: POST, path: /api/timeline, body: '{"action":"resume","num":{timeline}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  pause_all_timelines:
+    summary: "Pause every timeline (POST /api/timeline pause, no num)"
+    send: { method: POST, path: /api/timeline, body: '{"action":"pause"}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  resume_all_timelines:
+    summary: "Resume every timeline (POST /api/timeline resume, no num)"
+    send: { method: POST, path: /api/timeline, body: '{"action":"resume"}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_timeline_rate:
+    summary: "Set a timeline's rate, 1.0 being its default (POST /api/timeline set_rate)"
+    params:
+      timeline: *timeline
+      rate: { type: string, pattern: "^([0-9]+(\\.[0-9]+)?|[0-9]+:[0-9]+)$", max_length: 16, required: true, label: Rate, description: "Rate as a decimal such as 0.5, or a bounded integer such as 10:100; 1.0 is the default rate." }
+    send: { method: POST, path: /api/timeline, body: '{"action":"set_rate","num":{timeline},"rate":{rate:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_timeline_position:
+    summary: "Move a timeline to a fraction of its length (POST /api/timeline set_position, position)"
+    params:
+      timeline: *timeline
+      position: { type: string, pattern: "^([0-9]+(\\.[0-9]+)?|[0-9]+:[0-9]+)$", max_length: 16, required: true, label: Position, description: "Fraction of the timeline's length as a decimal such as 0.5, or a bounded integer such as 1:3." }
+    send: { method: POST, path: /api/timeline, body: '{"action":"set_position","num":{timeline},"position":{position:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_timeline_time:
+    summary: "Move a timeline to a time in seconds (POST /api/timeline set_position, time)"
+    params:
+      timeline: *timeline
+      time: { type: float, min: 0.0, max: 8640000.0, required: true, label: Time, description: "Absolute time within the timeline, in seconds." }
+    send: { method: POST, path: /api/timeline, body: '{"action":"set_position","num":{timeline},"time":{time:.3f}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_timeline_flag:
+    summary: "Move a timeline to a flag by name (POST /api/timeline set_position, flag)"
+    params:
+      timeline: *timeline
+      flag: { type: string, max_length: 128, required: true, label: Flag, description: "Name of the timeline flag, such as Start sparkle." }
+    send: { method: POST, path: /api/timeline, body: '{"action":"set_position","num":{timeline},"flag":{flag:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  refresh_status_monitor:
+    summary: "Refresh the status of every fixture and device (POST /api/status_monitor refresh)"
+    send: { method: POST, path: /api/status_monitor, body: '{"action":"refresh"}', content_type: application/json }
+    expect: { status: [200, 202, 204] }
+    returns: ack
+
+  refresh_fixture_status:
+    summary: "Refresh the status of one fixture (POST /api/status_monitor refresh, fixture_number)"
+    params:
+      fixture: { type: int, min: 1, max: 2147483647, required: true, label: Fixture, description: "User number of the fixture." }
+    send: { method: POST, path: /api/status_monitor, body: '{"action":"refresh","fixture_number":{fixture}}', content_type: application/json }
+    expect: { status: [200, 202, 204] }
+    returns: ack
+
+  set_text_slot:
+    summary: "Set a text slot's value, which propagates to every controller (PUT /api/text_slot)"
+    params:
+      name: { type: string, max_length: 256, required: true, label: Text slot, description: "Text slot name as in the project." }
+      value: { type: string, multiline: true, max_length: 65536, required: true, label: Value, description: "The new text." }
+    send: { method: PUT, path: /api/text_slot, body: '{"name":{name:json},"value":{value:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  fire_trigger:
+    summary: "Fire a trigger, testing its conditions (POST /api/trigger)"
+    params:
+      trigger: &trigger { type: int, min: 1, max: 2147483647, required: true, label: Trigger, description: "User number of the trigger." }
+    send: { method: POST, path: /api/trigger, body: '{"num":{trigger}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  fire_trigger_with_var:
+    summary: "Fire a trigger with variables, testing its conditions or not (POST /api/trigger, var and conditions)"
+    params:
+      trigger: *trigger
+      var: { type: string, max_length: 1024, required: true, label: Variables, description: "Comma-separated values for the trigger, such as 2,4,5 or \"string1\",\"string2\"." }
+      conditions: { type: bool, default: true, label: Test conditions, description: "On tests the trigger's conditions before running its actions, off runs them regardless." }
+    send: { method: POST, path: /api/trigger, body: '{"num":{trigger},"var":{var:json},"conditions":{conditions}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  add_user:
+    summary: "Add a user account (POST /api/user)"
+    params:
+      session_password: &session_password { type: string, secret: true, max_length: 128, required: true, label: Your password, description: "The password of the user this session is signed in as." }
+      username: &user { type: string, max_length: 128, required: true, label: User, description: "Name of the user account." }
+      password: { type: string, secret: true, max_length: 128, required: true, label: Password, description: "The account's password." }
+      access: &access { type: json, required: true, label: Access, description: "The access levels as a JSON array, from Admin, Control and Status, such as [\"Control\",\"Status\"]." }
+    send: { method: POST, path: /api/user, body: '{"session_password":{session_password:json},"username":{username:json},"password":{password:json},"access":{access}}', content_type: application/json }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+
+  update_user:
+    summary: "Change a user account's password and access levels (PUT /api/user)"
+    params:
+      session_password: *session_password
+      username: *user
+      password: { type: string, secret: true, max_length: 128, required: true, label: Password, description: "The account's new password." }
+      access: *access
+    send: { method: PUT, path: /api/user, body: '{"session_password":{session_password:json},"username":{username:json},"password":{password:json},"access":{access}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  delete_user:
+    summary: "Delete a user account (DELETE /api/user)"
+    params: { session_password: *session_password, username: *user }
+    send: { method: DELETE, path: /api/user, body: '{"session_password":{session_password:json},"username":{username:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_api_version:
+    summary: "The API version the project uses (GET /api/api_version; Designer 2.12 and later)"
+    send: { method: GET, path: /api/api_version }
+    expect: { status: 200, json_path: "$.version" }
+    returns: value
+
+  get_lua_variables:
+    summary: "Current values of Lua variables by name (GET /api/lua?variables=...)"
+    params:
+      variables: { type: string, pattern: "^[A-Za-z_][A-Za-z0-9_]*(,[A-Za-z_][A-Za-z0-9_]*)*$", max_length: 1024, required: true, label: Variables, description: "Lua variable names, comma separated, such as bob,alice." }
+    send: { method: GET, path: /api/lua, query: { variables: "{variables}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_log:
+    summary: "The controller's whole log (GET /api/log)"
+    send: { method: GET, path: /api/log }
+    expect: { status: 200, json_path: "$.log" }
+    returns: value
+
+  get_output_levels:
+    summary: "The levels a universe is outputting, as channel level strings (GET /api/output?universe=...)"
+    params: { universe: *universe }
+    send: { method: GET, path: /api/output, query: { universe: "{universe}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_fixtures:
+    summary: "Every fixture of the project with its status, custom properties and RDM devices (GET /api/fixtures)"
+    send: { method: GET, path: /api/fixtures, query: { with_custom_properties: "true", with_rdm_devices: "true" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_fixture:
+    summary: "One fixture and its status (GET /api/fixtures/<number>)"
+    params:
+      fixture: { type: int, min: 1, max: 2147483647, required: true, label: Fixture, description: "User number of the fixture." }
+    send: { method: GET, path: "/api/fixtures/{fixture}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_rdm_devices:
+    summary: "RDM devices that are offline, or unpatched (GET /api/rdm_devices?offline=true or ?unpatched=true)"
+    params:
+      filter: { type: enum, values: [offline, unpatched], required: true, label: Devices, description: "offline for offline devices, unpatched for unpatched devices." }
+    send: { method: GET, path: /api/rdm_devices, raw_query: "{filter}=true" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_rdm_device:
+    summary: "One RDM device and its status (GET /api/rdm_devices/<uid>)"
+    params: { uid: *uid }
+    send: { method: GET, path: "/api/rdm_devices/{uid}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_rdm_discovery:
+    summary: "Cached results of the last RDM discovery of a universe (GET /api/rdm/discovery?universe=...)"
+    params: { universe: *universe }
+    send: { method: GET, path: /api/rdm/discovery, query: { universe: "{universe}" } }
+    expect: { status: 200, json_path: "$.devices" }
+    returns: value
+
+  get_rdm_unpatched:
+    summary: "Unpatched devices found by RDM discovery (GET /api/rdm/discovery/unpatched)"
+    send: { method: GET, path: /api/rdm/discovery/unpatched }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_rdm_parameter_descriptions:
+    summary: "Descriptions of the RDM parameters the controller supports (GET /api/rdm/parameter_descriptions)"
+    send: { method: GET, path: /api/rdm/parameter_descriptions }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_dali_interfaces:
+    summary: "The DALI interfaces in the system (GET /api/dali_interface)"
+    send: { method: GET, path: /api/dali_interface }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_dali:
+    summary: "Ballast status, errors, power and schedule of a DALI interface (GET /api/dali?interface=...)"
+    params: { interface: *dali_interface }
+    send: { method: GET, path: /api/dali, query: { interface: "{interface}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_user_groups:
+    summary: "The user groups available (GET /api/user_groups)"
+    send: { method: GET, path: /api/user_groups }
+    expect: { status: 200, json_path: "$.user_groups" }
+    returns: value
+
+  get_guest_groups:
+    summary: "The guest groups available (GET /api/guest_groups)"
+    send: { method: GET, path: /api/guest_groups }
+    expect: { status: 200, json_path: "$.guest_groups" }
+    returns: value
+
+maps:
+  enable_action: { "true": enable, "false": disable }
+
+state:
+  scenes.*.name: { type: string, description: "Scene name" }
+  scenes.*.group: { type: string, description: "Scene playback group name" }
+  scenes.*.group_num: { type: int, description: "Scene playback group number" }
+  scenes.*.state: { type: string, description: "Scene state: none, started or released" }
+  scenes.*.onstage: { type: bool, description: "Whether the scene affects the output of any fixture" }
+  timelines.*.name: { type: string, description: "Timeline name" }
+  timelines.*.group: { type: string, description: "Timeline playback group name" }
+  timelines.*.group_num: { type: int, description: "Timeline playback group number" }
+  timelines.*.length: { type: int, unit: ms, description: "Timeline length" }
+  timelines.*.source_bus: { type: string, description: "Time source: internal, timecode_1 to timecode_6 or audio_1 to audio_4" }
+  timelines.*.timecode_format: { type: string, description: "Incoming timecode format on the source bus, such as SMPTE30" }
+  timelines.*.audio_band: { type: int, description: "Audio band of an audio time source; 0 is the volume band" }
+  timelines.*.audio_channel: { type: string, description: "Audio channel of an audio time source: left, right or combined" }
+  timelines.*.audio_peak: { type: bool, description: "The Peak setting of an audio time source" }
+  timelines.*.time_offset: { type: int, unit: ms, description: "Time offset" }
+  timelines.*.state: { type: string, description: "Timeline state: none, running, paused, holding_at_end or released" }
+  timelines.*.onstage: { type: bool, description: "Whether the timeline affects the output of any fixture" }
+  timelines.*.position: { type: int, unit: ms, description: "Playback position" }
+  timelines.*.rate_adjusted: { type: bool, description: "Whether the playback rate differs from the default" }
+  timelines.*.priority: { type: string, description: "Priority: high, above_normal, normal, below_normal or low" }
+  groups.*.name: { type: string, description: "Group name" }
+  groups.*.level: { type: int, unit: percent, description: "Group master level, 0 to 100" }
+  content_targets.*.level: { type: int, unit: percent, description: "Content target master level, 0 to 100, keyed by name (VLC and VLC+)" }
+  playback_groups.*.name: { type: string, description: "Playback group name" }
+  triggers.*.name: { type: string, description: "Trigger name" }
+  triggers.*.type: { type: string, description: "Trigger type, such as Startup or Timeline Started" }
+  triggers.*.description: { type: string, description: "Trigger description" }
+  triggers.*.trigger_text: { type: string, description: "When the trigger runs, as the controller describes it" }
+  text_slots.*.value: { type: string, description: "Text slot value, keyed by text slot name" }
+  controllers.*.name: { type: string, description: "Controller name" }
+  controllers.*.type: { type: string, description: "Controller type, such as LPC" }
+  controllers.*.serial: { type: string, description: "Controller serial number" }
+  controllers.*.ip_address: { type: string, description: "Controller IP address, empty when it is not discovered" }
+  controllers.*.online: { type: bool, description: "Whether the controller is online on the local network" }
+  controllers.*.is_network_primary: { type: bool, description: "Whether the controller is the project's network primary" }
+  remote_devices.*.name: { type: string, description: "Remote device name" }
+  remote_devices.*.type: { type: string, description: "Remote device type, such as RIO 44 or EDN 20" }
+  remote_devices.*.online: { type: bool, description: "Whether the remote device is online with compatible firmware" }
+  protocols.*.name: { type: string, description: "Output protocol name, keyed by protocol type number" }
+  protocols.*.disabled: { type: bool, description: "Whether the protocol's output is disabled" }
+  inputs.*.type: { type: string, description: "Input type: Analog, Digital or Contact Closure" }
+  inputs.*.level: { type: int, unit: percent, description: "Analog input level, 0 to 100" }
+  inputs.*.active: { type: bool, description: "Digital or contact closure input state" }
+  project.name: { type: string, description: "Project name" }
+  project.author: { type: string, description: "Project author" }
+  project.filename: { type: string, description: "Project file name" }
+  project.unique_id: { type: string, description: "Project unique ID" }
+  project.upload_date: { type: string, description: "When the project was uploaded" }
+  replication.name: { type: string, description: "Install replication name" }
+  replication.unique_id: { type: string, description: "Install replication unique ID" }
+  system.hardware_type: { type: string, description: "Controller hardware type" }
+  system.channel_capacity: { type: int, description: "Channel capacity" }
+  system.serial_number: { type: string, description: "Serial number" }
+  system.memory_total: { type: string, description: "Total memory, as the controller writes it" }
+  system.memory_used: { type: string, description: "Memory used" }
+  system.memory_available: { type: string, description: "Memory available" }
+  system.lua_memory_used: { type: string, description: "Lua memory used" }
+  system.lua_memory_allowed: { type: string, description: "Lua memory allowed" }
+  system.storage_size: { type: string, description: "Storage size" }
+  system.bootloader_version: { type: string, description: "Bootloader version" }
+  system.firmware_version: { type: string, description: "Firmware version" }
+  system.reset_reason: { type: string, description: "Reason for the last reset" }
+  system.last_boot_time: { type: string, description: "Last boot time" }
+  system.ip_address: { type: string, description: "IP address" }
+  system.subnet_mask: { type: string, description: "Subnet mask" }
+  system.default_gateway: { type: string, description: "Default gateway" }
+  system.host_name: { type: string, description: "Host name" }
+  system.domain_name: { type: string, description: "Domain name" }
+  system.vlan_tag: { type: int, description: "VLAN tag (LPC and TPC)" }
+  temperature.sys_temp: { type: float, unit: "°C", description: "System temperature (LPC X, VLC, VLC+)" }
+  temperature.core1_temp: { type: float, unit: "°C", description: "Core 1 temperature (LPC X, VLC, VLC+)" }
+  temperature.core2_temp: { type: float, unit: "°C", description: "Core 2 temperature (LPC X rev 1)" }
+  temperature.ambient_temp: { type: float, unit: "°C", description: "Ambient temperature (TPC, LPC X rev 1)" }
+  temperature.cc_temp: { type: float, unit: "°C", description: "CC temperature (LPC X rev 2, VLC, VLC+)" }
+  temperature.gpu_temp: { type: float, unit: "°C", description: "GPU temperature (VLC, VLC+)" }
+  fans.fan_1: { type: int, unit: rpm, description: "Left-hand fan speed" }
+  fans.fan_2: { type: int, unit: rpm, description: "Right-hand fan speed" }
+  time.datetime: { type: string, description: "Controller local time as text" }
+  time.local_time: { type: int, unit: ms, description: "Controller local time in milliseconds" }
+  time.uptime: { type: int, unit: ms, description: "Time since the last boot" }
+  cloud.connected: { type: bool, description: "Whether the controller is connected to the remote site" }
+  cloud.connecting: { type: bool, description: "Whether the controller is connecting to the remote site" }
+  config.ip: { type: string, description: "Management interface IP address" }
+  config.subnet_mask: { type: string, description: "Management interface subnet mask" }
+  config.gateway: { type: string, description: "Management interface gateway" }
+  config.dhcp_enabled: { type: bool, description: "Whether DHCP assigns the address" }
+  config.name_server_1: { type: string, description: "Primary name server" }
+  config.name_server_2: { type: string, description: "Secondary name server" }
+  config.http_port: { type: int, description: "Web server HTTP port" }
+  config.https_port: { type: int, description: "Web server HTTPS port" }
+  config.datetime: { type: string, description: "Date and time on the controller's clock" }
+  config.watchdog_enabled: { type: bool, description: "Whether the hardware watchdog is enabled" }
+  config.log_level: { type: int, description: "Log verbosity, 1 to 5" }
+  config.syslog_enabled: { type: bool, description: "Whether the log goes to a syslog server" }
+  config.syslog_ip: { type: string, description: "Syslog server address" }
+  config.ntp_enabled: { type: bool, description: "Whether the time comes from an NTP server" }
+  config.ntp_ip: { type: string, description: "NTP server address" }
+  status_monitor.completed_at: { type: string, description: "When the latest full status refresh completed" }
+  status_monitor.discovered_device_count: { type: int, description: "Devices discovered, patched and unpatched" }
+  status_monitor.unpatched_device_count: { type: int, description: "Unpatched devices discovered" }
+  beacon: { type: bool, description: "Whether beacon mode is on, from the WebSocket" }
+  lua.*: { type: string, description: "Values a project script pushes with push_to_web, keyed by name" }
+
+telemetry:
+  # Change broadcasts on the WebSocket API; the keep-alive is the empty
+  # object, sent with the subscriptions every 10 s.
+  websocket:
+    path: /query
+    scheme: { setting: scheme }
+    send:
+      - '{"subscribe":"scene"}'
+      - '{"subscribe":"timeline"}'
+      - '{"subscribe":"group"}'
+      - '{"subscribe":"beacon"}'
+      - '{"subscribe":"remote_device"}'
+      - '{"subscribe":"lua"}'
+      - '{"subscribe":"content_target"}'
+      - '{}'
+    every_ms: 10000
+  poll:
+    - every_ms: 2000
+      send:
+        - { method: GET, path: /api/scene }
+        - { method: GET, path: /api/timeline }
+        - { models: [lpc, lpc-x, tpc], method: GET, path: /api/group }
+        - { models: [vlc, vlc-plus], method: GET, path: /api/content_target }
+        - { method: GET, path: /api/input }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /api/system }
+        - { method: GET, path: /api/temperature }
+        - { method: GET, path: /api/fan_speed }
+        - { method: GET, path: /api/time }
+        - { method: GET, path: /api/project }
+        - { method: GET, path: /api/replication }
+        - { method: GET, path: /api/controller }
+        - { method: GET, path: /api/remote_device }
+        - { method: GET, path: /api/protocol }
+        - { method: GET, path: /api/text_slot }
+        - { method: GET, path: /api/playback_group }
+        - { method: GET, path: /api/trigger }
+        - { method: GET, path: /api/cloud }
+        - { method: GET, path: /api/config }
+        - { models: [lpc, lpc-x, tpc], method: GET, path: /api/status_monitor }
+  updates:
+    - path: "^/api/scene$"
+      json_each: "$.scenes"
+      json: { num: "$.num", name: "$.name", group: "$.group", group_num: "$.group_num", state: "$.state", onstage: "$.onstage" }
+      replace: scenes
+      state:
+        "scenes.{num}.name": "{name}"
+        "scenes.{num}.group": "{group}"
+        "scenes.{num}.group_num": "{group_num}"
+        "scenes.{num}.state": "{state}"
+        "scenes.{num}.onstage": "{onstage}"
+    - path: "^/api/timeline$"
+      json_each: "$.timelines"
+      json: { num: "$.num", name: "$.name", group: "$.group", group_num: "$.group_num", length: "$.length",
+              source_bus: "$.source_bus", timecode_format: "$.timecode_format", audio_band: "$.audio_band",
+              audio_channel: "$.audio_channel", audio_peak: "$.audio_peak", time_offset: "$.time_offset",
+              state: "$.state", onstage: "$.onstage", position: "$.position", rate_adjusted: "$.rate_adjusted",
+              priority: "$.priority" }
+      replace: timelines
+      state:
+        "timelines.{num}.name": "{name}"
+        "timelines.{num}.group": "{group}"
+        "timelines.{num}.group_num": "{group_num}"
+        "timelines.{num}.length": "{length}"
+        "timelines.{num}.source_bus": "{source_bus}"
+        "timelines.{num}.timecode_format": "{timecode_format}"
+        "timelines.{num}.audio_band": "{audio_band}"
+        "timelines.{num}.audio_channel": "{audio_channel}"
+        "timelines.{num}.audio_peak": "{audio_peak}"
+        "timelines.{num}.time_offset": "{time_offset}"
+        "timelines.{num}.state": "{state}"
+        "timelines.{num}.onstage": "{onstage}"
+        "timelines.{num}.position": "{position}"
+        "timelines.{num}.rate_adjusted": "{rate_adjusted}"
+        "timelines.{num}.priority": "{priority}"
+    - path: "^/api/group$"
+      json_each: "$.groups"
+      json: { num: "$.num", name: "$.name", level: "$.level" }
+      state: { "groups.{num}.name": "{name}", "groups.{num}.level": "{level}" }
+    - path: "^/api/content_target$"
+      json_each: "$.content_targets"
+      json: { name: "$.name", level: "$.level" }
+      state: { "content_targets.{name:key}.level": "{level}" }
+    - path: "^/api/input$"
+      json_each: "$.gpio"
+      each_match: { "$.type": "^Analog$" }
+      json: { input: "$.input", type: "$.type", value: "$.value" }
+      state: { "inputs.{input}.type": "{type}", "inputs.{input}.level": "{value}" }
+    - path: "^/api/input$"
+      json_each: "$.gpio"
+      each_match: { "$.type": "^(Digital|Contact Closure)$" }
+      json: { input: "$.input", type: "$.type", value: "$.value" }
+      state: { "inputs.{input}.type": "{type}", "inputs.{input}.active": "{value}" }
+    - path: "^/api/system$"
+      json: { hardware_type: "$.hardware_type", channel_capacity: "$.channel_capacity", serial_number: "$.serial_number",
+              memory_total: "$.memory_total", memory_used: "$.memory_used", memory_available: "$.memory_available",
+              lua_memory_used: "$.lua_memory_used", lua_memory_allowed: "$.lua_memory_allowed",
+              storage_size: "$.storage_size", bootloader_version: "$.bootloader_version",
+              firmware_version: "$.firmware_version", reset_reason: "$.reset_reason",
+              last_boot_time: "$.last_boot_time", ip_address: "$.ip_address", subnet_mask: "$.subnet_mask",
+              default_gateway: "$.default_gateway", host_name: "$.host_name", domain_name: "$.domain_name",
+              vlan_tag: "$.vlan_tag" }
+      state:
+        system.hardware_type: "{hardware_type}"
+        system.channel_capacity: "{channel_capacity}"
+        system.serial_number: "{serial_number}"
+        system.memory_total: "{memory_total}"
+        system.memory_used: "{memory_used}"
+        system.memory_available: "{memory_available}"
+        system.lua_memory_used: "{lua_memory_used}"
+        system.lua_memory_allowed: "{lua_memory_allowed}"
+        system.storage_size: "{storage_size}"
+        system.bootloader_version: "{bootloader_version}"
+        system.firmware_version: "{firmware_version}"
+        system.reset_reason: "{reset_reason}"
+        system.last_boot_time: "{last_boot_time}"
+        system.ip_address: "{ip_address}"
+        system.subnet_mask: "{subnet_mask}"
+        system.default_gateway: "{default_gateway}"
+        system.host_name: "{host_name}"
+        system.domain_name: "{domain_name}"
+        system.vlan_tag: "{vlan_tag}"
+    - path: "^/api/temperature$"
+      json: { sys: "$.sys_temp", core1: "$.core1_temp", core2: "$.core2_temp", ambient: "$.ambient_temp", cc: "$.cc_temp", gpu: "$.gpu_temp" }
+      state:
+        temperature.sys_temp: "{sys}"
+        temperature.core1_temp: "{core1}"
+        temperature.core2_temp: "{core2}"
+        temperature.ambient_temp: "{ambient}"
+        temperature.cc_temp: "{cc}"
+        temperature.gpu_temp: "{gpu}"
+    - path: "^/api/fan_speed$"
+      json: { fan_1: "$.fan_speed.fan_1", fan_2: "$.fan_speed.fan_2" }
+      state: { fans.fan_1: "{fan_1}", fans.fan_2: "{fan_2}" }
+    - path: "^/api/time$"
+      json: { datetime: "$.datetime", local_time: "$.local_time", uptime: "$.uptime" }
+      state: { time.datetime: "{datetime}", time.local_time: "{local_time}", time.uptime: "{uptime}" }
+    - path: "^/api/project$"
+      json: { name: "$.name", author: "$.author", filename: "$.filename", unique_id: "$.unique_id", upload_date: "$.upload_date" }
+      state:
+        project.name: "{name}"
+        project.author: "{author}"
+        project.filename: "{filename}"
+        project.unique_id: "{unique_id}"
+        project.upload_date: "{upload_date}"
+    - path: "^/api/replication$"
+      json: { name: "$.name", unique_id: "$.unique_id" }
+      state: { replication.name: "{name}", replication.unique_id: "{unique_id}" }
+    - path: "^/api/controller$"
+      json_each: "$.controllers"
+      json: { num: "$.num", type: "$.type", name: "$.name", serial: "$.serial", ip: "$.ip_address", online: "$.online", primary: "$.is_network_primary" }
+      replace: controllers
+      state:
+        "controllers.{num}.name": "{name}"
+        "controllers.{num}.type": "{type}"
+        "controllers.{num}.serial": "{serial}"
+        "controllers.{num}.ip_address": "{ip}"
+        "controllers.{num}.online": "{online}"
+        "controllers.{num}.is_network_primary": "{primary}"
+    - path: "^/api/remote_device$"
+      json_each: "$.remote_devices"
+      json: { num: "$.num", name: "$.name", type: "$.type", online: "$.online" }
+      replace: remote_devices
+      state: { "remote_devices.{num}.name": "{name}", "remote_devices.{num}.type": "{type}", "remote_devices.{num}.online": "{online}" }
+    - path: "^/api/protocol$"
+      json_each: "$.outputs"
+      json: { type: "$.type", name: "$.name", disabled: "$.disabled" }
+      replace: protocols
+      state: { "protocols.{type}.name": "{name}", "protocols.{type}.disabled": "{disabled}" }
+    - path: "^/api/text_slot$"
+      json_each: "$.text_slots"
+      json: { name: "$.name", value: "$.value" }
+      replace: text_slots
+      state: { "text_slots.{name:key}.value": "{value}" }
+    - path: "^/api/playback_group$"
+      json_each: "$.playback_groups"
+      json: { num: "$.num", name: "$.name" }
+      replace: playback_groups
+      state: { "playback_groups.{num}.name": "{name}" }
+    - path: "^/api/trigger$"
+      json_each: "$.triggers"
+      json: { num: "$.num", name: "$.name", type: "$.type", description: "$.description", text: "$.trigger_text" }
+      replace: triggers
+      state:
+        "triggers.{num}.name": "{name}"
+        "triggers.{num}.type": "{type}"
+        "triggers.{num}.description": "{description}"
+        "triggers.{num}.trigger_text": "{text}"
+    - path: "^/api/cloud$"
+      json: { connected: "$.connected", connecting: "$.connecting" }
+      state: { cloud.connected: "{connected}", cloud.connecting: "{connecting}" }
+    - path: "^/api/config$"
+      json: { ip: "$.ip", subnet_mask: "$.subnet_mask", gateway: "$.gateway", dhcp: "$.dhcp_enabled", ns1: "$.name_server_1",
+              ns2: "$.name_server_2", http_port: "$.http_port", https_port: "$.https_port", datetime: "$.datetime",
+              watchdog: "$.watchdog_enabled", log_level: "$.log_level", syslog: "$.syslog_enabled", syslog_ip: "$.syslog_ip",
+              ntp: "$.ntp_enabled", ntp_ip: "$.ntp_ip" }
+      state:
+        config.ip: "{ip}"
+        config.subnet_mask: "{subnet_mask}"
+        config.gateway: "{gateway}"
+        config.dhcp_enabled: "{dhcp}"
+        config.name_server_1: "{ns1}"
+        config.name_server_2: "{ns2}"
+        config.http_port: "{http_port}"
+        config.https_port: "{https_port}"
+        config.datetime: "{datetime}"
+        config.watchdog_enabled: "{watchdog}"
+        config.log_level: "{log_level}"
+        config.syslog_enabled: "{syslog}"
+        config.syslog_ip: "{syslog_ip}"
+        config.ntp_enabled: "{ntp}"
+        config.ntp_ip: "{ntp_ip}"
+    - path: "^/api/status_monitor$"
+      json: { completed_at: "$.latest_refresh_all.completed_at", discovered: "$.latest_refresh_all.discovered_device_count",
+              unpatched: "$.latest_refresh_all.unpatched_device_count" }
+      state:
+        status_monitor.completed_at: "{completed_at}"
+        status_monitor.discovered_device_count: "{discovered}"
+        status_monitor.unpatched_device_count: "{unpatched}"
+    # WebSocket broadcasts.
+    - json_match: { "$.broadcast": "^scene$" }
+      json: { num: "$.data.num", state: "$.data.state", onstage: "$.data.onstage" }
+      state: { "scenes.{num}.state": "{state}", "scenes.{num}.onstage": "{onstage}" }
+    - json_match: { "$.broadcast": "^timeline$" }
+      json: { num: "$.data.num", state: "$.data.state", onstage: "$.data.onstage", position: "$.data.position" }
+      state: { "timelines.{num}.state": "{state}", "timelines.{num}.onstage": "{onstage}", "timelines.{num}.position": "{position}" }
+    - json_match: { "$.broadcast": "^group$" }
+      json: { num: "$.data.num", name: "$.data.name", level: "$.data.level" }
+      state: { "groups.{num}.name": "{name}", "groups.{num}.level": "{level}" }
+    - json_match: { "$.broadcast": "^beacon$" }
+      json: { beacon_on: "$.data.on" }
+      state: { beacon: "{beacon_on}" }
+    - json_match: { "$.data.content_targets": "^\\[" }
+      json_each: "$.data.content_targets"
+      json: { name: "$.name", level: "$.level" }
+      state: { "content_targets.{name:key}.level": "{level}" }
+    - json_match: { "$.data.remote_devices": "^\\[" }
+      json_each: "$.data.remote_devices"
+      json: { num: "$.num", name: "$.name", type: "$.type", online: "$.online" }
+      state: { "remote_devices.{num}.name": "{name}", "remote_devices.{num}.type": "{type}", "remote_devices.{num}.online": "{online}" }
+    - json_match: { "$.broadcast": "^lua$" }
+      json_each: "$.data.*"
+      json: { value: "$" }
+      state: { "lua.{key:key}": "{value}" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      With security enabled the session logs in with POST /authenticate?original_url=/ and keeps
+      the token cookie the answer sets; a token lasts 5 minutes from the request that issued it,
+      and the session logs in again when a request is refused with 401. That the cookie comes
+      with a redirect (or a 200) and that an expired token is answered 401 are inferred. Wrong
+      credentials are answered with a redirect to the referring page, which the session reads as
+      a login without a session, not as a refusal. The WebSocket wants the token inside each
+      message, which the spec format cannot add, so with security enabled the broadcasts do not
+      come and state is kept by polling only.
+  - models: [all]
+    severity: warning
+    text: >
+      The WebSocket keep-alive and the subscriptions are sent together every 10 s, so a
+      controller receives the same subscription again each time; whether a repeated
+      subscription duplicates the broadcasts is not documented. A WebSocket uses one of the
+      controller's HTTP connections (8 on an LPC, 16 on an LPC X or VLC). Scenes, timelines,
+      groups, content targets and inputs are also polled every 2 s; the rest every 30 s. The
+      timeline broadcast's example in the reference is labeled "scene"; the rule reads
+      "timeline" as the subscription names it.
+  - models: [all]
+    severity: info
+    text: >
+      Optional attributes become separate commands or explicit values: a fade of 0, a delay of
+      0, the Default crossfade path and conditions true are sent when not given. The group
+      "All Fixtures" (group 0) is read without a number and is not kept. RDM discovery and
+      RDM Get and Set results arrive on the rdm_discovery and rdm_get_set channels and are not
+      kept in state; get_rdm_discovery and get_rdm_device read results on demand. The Ping
+      endpoint is given in the reference as POST /api/beacon, the beacon's own path, so it is
+      not built. Downloading the project file (GET /api/project/file) is not built: the format
+      has no file download for a spec-driven command. Lua values pushed with push_to_web are
+      kept as text.
+  - models: [vlc, vlc-plus]
+    severity: info
+    text: >
+      Group masters and the status monitor are not available on a VLC or VLC+; content targets
+      are VLC and VLC+ only, and only the primary target exists on a VLC.
+  - models: [all]
+    severity: info
+    text: >
+      Over https the controller is assumed to present its own self-signed certificate, which is
+      accepted. The run_command endpoint answers 501 unless the project enables the Command
+      Line Parser in its web interface settings.
+  - models: [all]
+    severity: critical
+    text: >
+      factory_reset erases the configuration, network settings and user accounts; reboot,
+      upload_project, set_ip, set_dhcp and set_web_ports interrupt or move the controller (the
+      config answer says whether it restarts); playback actions propagate to every controller
+      in the project. None can be undone remotely.

@@ -1,0 +1,1530 @@
+spec: 1
+id: madrix
+name: MADRIX 5 (OSC and HTTP Remote)
+vendor: inoage
+category: lighting
+
+# Written from the MADRIX 5 help: its fixed OSC address space (UDP 9001, with
+# feedback to the sender on 9002) for control and state, and its HTTP Remote
+# (the integrated web server, /RemoteCommands/?<Function>) for what OSC does
+# not reach: storage places by number, ticker text, cue list editing, names
+# and descriptions, and the values OSC does not report.
+source:
+  - title: MADRIX 5 Help, Input, Interoperability, And Remote Control > OSC
+    author: inoage GmbH
+    url: https://help.madrix.com/m5/html/madrix/hidd_osc.html
+    note: >
+      MADRIX 5.8 help, retrieved 2026-10-27. Enable Server, Network Port "The default value is
+      9001"; Enable Feedback, Destination Network Port "The default value is 9002", feedback
+      "sends states and data ... back to the remote controller"; integer and float arguments
+      only; case-sensitive addresses; "N-1 means that the function works with an index, and this
+      index starts with 0". The address space table: /Audio/Input|Output, /DeckA or /DeckB
+      (Pause, SpeedMaster, Submaster, Filter, FilterColor, Storages/Index, Places/Index,
+      StoragePlace with SpeedPitch, Submaster, Filter, Chaser and Layers/[0 ... N-1]), /Output
+      (Freeze, Master, Blackout, Filter, FilterColor, StrobeColor, Strobe), /Fade (Time, Type,
+      Value, Automatic, ToLeft, ToRight, ToCenter), /ColorKit/GlobalColors/[1 ... N],
+      /GroupControl (Defaults, Groups/[0 ... N-1], Chaser, FadeTime, Presets/Index "No Feedback
+      Wanted"), /DmxFaderTool/Faders/[0 ... 23], /CueLists, /Timelines (Index, PlaybackState,
+      AudioSegments, CueSegments, Markers/Id), /SetupRegisters/Id, /Trigger/Ports/[0 ... 63]/
+      PositionAndValue, /Main/View, /Main/FeedbackAll ("a single command to initially sync all
+      available functions with the client"), /ArtNet/Input/TimeCode/StreamId, with Up, Down and
+      Offset methods; the Logfile line "The OSC sender has subscribed to this session and will
+      get feedback".
+  - title: MADRIX 5 Help, Input, Interoperability, And Remote Control > Remote HTTP
+    author: inoage GmbH
+    url: https://help.madrix.com/m5/html/madrix/hidd_remote_http.html
+    note: >
+      MADRIX 5.8 help. Preferences > Remote Control > HTTP: Enable, Network Port (recommended 80,
+      alternatives 3128, 8080, 8081); "commands are case-sensitive ... That does not apply to any
+      parameters you want to pass"; the full list of remote commands at the address below.
+  - title: MADRIX 5.8a - HTTP Remote Control - Documentation
+    author: inoage GmbH
+    url: https://help.madrix.com/m5/httpremote/HttpRemoteControl.html
+    note: >
+      Retrieved 2026-10-27. The remote directory /RemoteCommands; each function is called as
+      /RemoteCommands/?<Function> or /RemoteCommands/?<Function>=<value> (the page's own links);
+      Get functions answer the value ("current fadetime is 1"). Set functions used here:
+      SetStorage, SetStorageWithoutFade, SetStorageDeckA|B, SetStorageWithoutFadeDeckA|B
+      (S<storage>P<place>, 1-256), SetLayerDeckA|B, SetTextTicker, SetTextTickerLayerDeckA|B
+      (<layer>_<text>, 0 for all), SetBpm, SetGroupPresetWithFade, SetCuelistGo, Back, GoTo,
+      AddCue, AddOccupiedStoragePlaces, DeleteCue, DeleteAll, FollowCue, Storage, StoragePlace,
+      FadeType, FadeTime, Duration, TimeCode, Date, GroupPreset (<item>_<value>), SetGlobalColor
+      (<id>_R150G0A200W50). Get functions used here: GetProduct, GetVersion, GetVersionNumber,
+      GetHostName, GetHostLabel, GetMatrixSizeX|Y|Z, GetCuelistCount, GetTimelinesCount,
+      GetGroupCount, GetSetupRegisterCurrentId, GetStorageDeckA|B, GetStoragePlaceDeckA|B,
+      GetLayerDeckA|B, GetLayerCountDeckA|B, GetLayerNameDeckA|B, GetLayerEffectNameDeckA|B,
+      GetLayerTickerTextDeckA|B, GetCuelistCueCurrent, GetTimelinesDuration, GetCuelistName,
+      GetTimelinesName, GetCuelistDescription, GetStoragePlaceDescription,
+      GetStoragePlaceFullState, GetGroupDisplayName, GetGroupPresetDescription,
+      GetGlobalColorDescription, GetSetupRegisterDescription.
+
+transport:
+  type: osc-udp
+  port: 9001
+  reply: none
+  listen_port: { setting: feedback_port }
+  endpoints:
+    http:
+      port: { setting: http_port }
+
+settings:
+  feedback_port:
+    type: int
+    min: 1
+    max: 65535
+    default: 9002
+    label: Feedback port
+    description: "Local UDP port this host listens on for MADRIX's OSC feedback: MADRIX's Destination Network Port under Preferences > Remote Control > OSC, 9002 by default; empty reads nothing back."
+  http_port:
+    type: int
+    min: 1
+    max: 65535
+    default: 80
+    label: HTTP Remote port
+    description: "The Network Port of MADRIX's web server under Preferences > Remote Control > HTTP; 80 is recommended, 3128, 8080 and 8081 the alternatives."
+
+ports:
+  - { port: 9001, protocol: udp, role: control, note: "MADRIX's OSC server port (Preferences > Remote Control > OSC)" }
+  - { port: 9002, protocol: udp, role: feedback, listener: core, setting: feedback_port, note: "MADRIX's OSC Destination Network Port" }
+  - { port: 80, protocol: http, role: control, setting: http_port, note: "MADRIX's HTTP Remote web server" }
+
+maps:
+  deck: { a: "DeckA", b: "DeckB" }
+  channel: { red: "Red", green: "Green", blue: "Blue", white: "White" }
+  global_channel: { red: "Red", green: "Green", blue: "Blue", white: "White", alpha: "Alpha" }
+  playback_state: { stopped: "0", paused: "1", playing: "2" }
+  strobe_mode: { output_and_color: "0", output_and_black: "1", black_and_color: "2" }
+  fade_type: { crossfade: "0", white_fade: "1", black_fade: "2", wipe_x: "3", wipe_y: "4", wipe_x_cross: "5", wipe_y_cross: "6", slide_x: "7", slide_y: "8", slide_x_cross: "9", slide_y_cross: "10", wipe_z: "11", wipe_z_cross: "12", slide_z: "13", slide_z_cross: "14" }
+  fade_to: { auto: "Automatic", deck_a: "ToLeft", deck_b: "ToRight", center: "ToCenter" }
+  cue_list_mode: { loop: "0", shuffle: "1" }
+  timecode_source: { none: "0", system_time: "1", midi: "2", artnet: "3", smpte: "4" }
+  direction: { up: "Up", down: "Down" }
+  step_target: { output_filter: "Output/Filter", output_filter_color_mode: "Output/FilterColor/Mode", output_filter_color_global: "Output/FilterColor/GlobalId", strobe_color_mode: "Output/StrobeColor/Mode", strobe_color_global: "Output/StrobeColor/GlobalId", fade_type: "Fade/Type", group_chaser_step: "GroupControl/Chaser/Steps/Index", group_preset: "GroupControl/Presets/Index", cue_list: "CueLists/Index", cue_list_timecode_source: "CueLists/TimeCodeSource", cue: "CueLists/Cues/Index", timeline: "Timelines/Index", audio_segment: "Timelines/AudioSegments/Index", cue_segment: "Timelines/CueSegments/Index", marker: "Timelines/Markers/Id", setup_register: "SetupRegisters/Id", view: "Main/View", artnet_timecode_stream: "ArtNet/Input/TimeCode/StreamId" }
+  deck_step_target: { filter: "Filter", filter_color_mode: "FilterColor/Mode", filter_color_global: "FilterColor/GlobalId", storage: "Storages/Index", place: "Places/Index", place_filter: "StoragePlace/Filter", place_chaser_step: "StoragePlace/Chaser/Steps/Index" }
+  layer_step_target: { filter: "Filter", mix_mode: "MixMode", chaser_step: "Chaser/Steps/Index" }
+  offset_target: { audio_input_level: "Audio/Input/Level", audio_output_level: "Audio/Output/Level", master: "Output/Master", output_filter_red: "Output/FilterColor/Red", output_filter_green: "Output/FilterColor/Green", output_filter_blue: "Output/FilterColor/Blue", output_filter_white: "Output/FilterColor/White", strobe_red: "Output/StrobeColor/Red", strobe_green: "Output/StrobeColor/Green", strobe_blue: "Output/StrobeColor/Blue", strobe_white: "Output/StrobeColor/White", strobe: "Output/Strobe", fade_time: "Fade/Time", crossfader: "Fade/Value", group_chaser_speed_pitch: "GroupControl/Chaser/SpeedPitch", group_fade_time: "GroupControl/FadeTime" }
+  deck_offset_target: { speed_master: "SpeedMaster", submaster: "Submaster", filter_red: "FilterColor/Red", filter_green: "FilterColor/Green", filter_blue: "FilterColor/Blue", filter_white: "FilterColor/White", place_speed_pitch: "StoragePlace/SpeedPitch", place_submaster: "StoragePlace/Submaster", place_chaser_speed_pitch: "StoragePlace/Chaser/SpeedPitch" }
+  layer_offset_target: { submaster: "Submaster", opacity: "Opacity", chaser_speed_pitch: "Chaser/SpeedPitch" }
+
+models:
+  - id: madrix5
+    name: MADRIX 5
+    supports: [
+      set_audio_input_level, set_audio_input_mute, set_audio_output_level, set_audio_output_mute, set_audio_input_agc,
+      set_deck_pause, set_deck_speed_master, set_deck_submaster, set_deck_filter, set_deck_filter_color_mode,
+      set_deck_filter_color_global, set_deck_filter_color_channel, set_deck_filter_color_rgb, select_deck_storage, select_deck_place,
+      set_place_speed_pitch, set_place_submaster, set_place_filter, set_place_chaser_state, set_place_chaser_speed_pitch,
+      select_place_chaser_step, set_layer_submaster, set_layer_opacity, set_layer_blind, set_layer_solo,
+      set_layer_filter, set_layer_mix_mode, set_layer_chaser_state, set_layer_chaser_speed_pitch, select_layer_chaser_step,
+      set_freeze, set_master, set_blackout, set_output_filter, set_output_filter_color_mode,
+      set_output_filter_color_global, set_output_filter_color_channel, set_output_filter_color_rgb, set_strobe_color_mode, set_strobe_color_global,
+      set_strobe_color_channel, set_strobe_color_rgb, set_strobe, set_fade_time, set_fade_type,
+      set_crossfader, crossfade, set_global_color_channel, set_global_color_rgb, set_group_defaults,
+      set_group_value, set_group_flash, set_group_chaser_state, set_group_chaser_speed_pitch, select_group_chaser_step,
+      set_group_fade_time, recall_group_preset, set_dmx_fader_state, set_dmx_fader_value, select_cue_list,
+      set_cue_list_state, set_cue_list_mode, set_cue_list_timecode_source, select_cue, select_timeline,
+      set_timeline_state, select_audio_segment, select_cue_segment, select_marker, load_setup_register,
+      set_trigger_port, set_view, feedback_all, set_artnet_timecode_stream, step,
+      deck_step, layer_step, offset, deck_offset, layer_offset,
+      global_color_offset, group_value_offset, dmx_fader_offset, set_storage_place, set_storage_place_without_fade,
+      set_deck_storage_place, set_deck_storage_place_without_fade, set_current_layer, set_ticker_text, set_deck_ticker_text,
+      set_bpm, recall_group_preset_with_fade, cue_list_go, cue_list_back, cue_list_go_to,
+      cue_list_add_cue, cue_list_add_occupied_places, cue_list_delete_cue, cue_list_delete_all, set_cue_follow,
+      set_cue_storage, set_cue_place, set_cue_fade_type, set_cue_fade_time, set_cue_duration,
+      set_cue_timecode, set_cue_date, set_cue_group_preset, set_global_color, get_cue_list_name,
+      get_timeline_name, get_cue_description, get_storage_place_description, get_storage_place_filled, get_group_name,
+      get_group_preset_description, get_global_color_description, get_setup_register_description, get_value
+    ]
+    verification: none
+
+commands:
+  set_audio_input_level:
+    summary: "Set the audio input level, 0-100 (\"/Audio/Input/Level\")"
+    params:
+      level: { type: "int", min: 0, max: 100, required: true, label: "Level", description: "Audio input level in percent, 0 to 100." }
+    send: { address: "/Audio/Input/Level", args: [ { value: "{level}", type: "int" } ] }
+    returns: none
+
+  set_audio_input_mute:
+    summary: "Mute or unmute the audio input (\"/Audio/Input/Mute\")"
+    params:
+      muted: { type: "bool", required: true, label: "Muted", description: "On mutes the audio input, off unmutes it." }
+    send: { address: "/Audio/Input/Mute", args: [ { value: "{muted:bool01}", type: "int" } ] }
+    returns: none
+
+  set_audio_output_level:
+    summary: "Set the audio output level, 0-100 (\"/Audio/Output/Level\")"
+    params:
+      level: { type: "int", min: 0, max: 100, required: true, label: "Level", description: "Audio output level in percent, 0 to 100." }
+    send: { address: "/Audio/Output/Level", args: [ { value: "{level}", type: "int" } ] }
+    returns: none
+
+  set_audio_output_mute:
+    summary: "Mute or unmute the audio output (\"/Audio/Output/Mute\")"
+    params:
+      muted: { type: "bool", required: true, label: "Muted", description: "On mutes the audio output, off unmutes it." }
+    send: { address: "/Audio/Output/Mute", args: [ { value: "{muted:bool01}", type: "int" } ] }
+    returns: none
+
+  set_audio_input_agc:
+    summary: "Turn the audio input's automatic gain control on or off (\"/Audio/Input/Agc\")"
+    params:
+      enabled: { type: "bool", required: true, label: "Auto gain", description: "On turns automatic gain control on, off turns it off." }
+    send: { address: "/Audio/Input/Agc", args: [ { value: "{enabled:bool01}", type: "int" } ] }
+    returns: none
+
+  set_deck_pause:
+    summary: "Pause or play a deck's storage speed (\"/DeckA|DeckB/Pause\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      paused: { type: "bool", required: true, label: "Paused", description: "On pauses the deck's effects, off plays them." }
+    send: { address: "/{deck:map.deck}/Pause", args: [ { value: "{paused:bool01}", type: "int" } ] }
+    returns: none
+
+  set_deck_speed_master:
+    summary: "Set a deck's speed master, -20.0 to 20.0 (\"/DeckA|DeckB/SpeedMaster\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      speed: { type: "float", min: -20.0, max: 20.0, required: true, label: "Speed master", description: "Speed master from -20.0 to 20.0." }
+    send: { address: "/{deck:map.deck}/SpeedMaster", args: [ { value: "{speed}", type: "float" } ] }
+    returns: none
+
+  set_deck_submaster:
+    summary: "Set a deck's submaster, 0-255 (\"/DeckA|DeckB/Submaster\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      level: { type: "int", min: 0, max: 255, required: true, label: "Submaster", description: "Submaster level, 0 to 255." }
+    send: { address: "/{deck:map.deck}/Submaster", args: [ { value: "{level}", type: "int" } ] }
+    returns: none
+
+  set_deck_filter:
+    summary: "Set a deck's filter, 0-102 (\"/DeckA|DeckB/Filter\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      filter: { type: "int", min: 0, max: 102, required: true, label: "Filter", description: "Filter number from 0 (None) to 102 (SwapHVD5), as listed in MADRIX's filter menu." }
+    send: { address: "/{deck:map.deck}/Filter", args: [ { value: "{filter}", type: "int" } ] }
+    returns: none
+
+  set_deck_filter_color_mode:
+    summary: "Set a deck's filter color mode, 0-3 (\"/DeckA|DeckB/FilterColor/Mode\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      mode: { type: "int", min: 0, max: 3, required: true, label: "Filter color mode", description: "Filter color mode from 0 (Thru) to 3 (Ignore), as listed in MADRIX." }
+    send: { address: "/{deck:map.deck}/FilterColor/Mode", args: [ { value: "{mode}", type: "int" } ] }
+    returns: none
+
+  set_deck_filter_color_global:
+    summary: "Set a deck's filter color to a global color (\"/DeckA|DeckB/FilterColor/GlobalId\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      id: { type: "int", min: 1, max: 65535, required: true, label: "Global color", description: "Global color ID from the Color Kit, from 1." }
+    send: { address: "/{deck:map.deck}/FilterColor/GlobalId", args: [ { value: "{id}", type: "int" } ] }
+    returns: none
+
+  set_deck_filter_color_channel:
+    summary: "Set one channel of a deck's filter color, 0-255 (\"/DeckA|DeckB/FilterColor/Red|Green|Blue|White\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      channel: { type: "enum", values: ["red", "green", "blue", "white"], required: true, label: "Channel", description: "Color channel: red, green, blue or white." }
+      value: { type: "int", min: 0, max: 255, required: true, label: "Value", description: "Channel value, 0 to 255." }
+    send: { address: "/{deck:map.deck}/FilterColor/{channel:map.channel}", args: [ { value: "{value}", type: "int" } ] }
+    returns: none
+
+  set_deck_filter_color_rgb:
+    summary: "Set a deck's filter color as red, green and blue (\"/DeckA|DeckB/FilterColor/Rgb\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      red: { type: "int", min: 0, max: 255, required: true, label: "Red", description: "Red, 0 to 255." }
+      green: { type: "int", min: 0, max: 255, required: true, label: "Green", description: "Green, 0 to 255." }
+      blue: { type: "int", min: 0, max: 255, required: true, label: "Blue", description: "Blue, 0 to 255." }
+    send: { address: "/{deck:map.deck}/FilterColor/Rgb", args: [ { value: "{red}", type: "int" }, { value: "{green}", type: "int" }, { value: "{blue}", type: "int" } ] }
+    returns: none
+
+  select_deck_storage:
+    summary: "Select a storage on a deck by index (\"/DeckA|DeckB/Storages/Index\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      index: { type: "int", min: 0, max: 255, required: true, label: "Storage", description: "Storage index, counted from 0 for storage 1." }
+    send: { address: "/{deck:map.deck}/Storages/Index", args: [ { value: "{index}", type: "int" } ] }
+    returns: none
+
+  select_deck_place:
+    summary: "Select a storage place on a deck by index (\"/DeckA|DeckB/Places/Index\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      index: { type: "int", min: 0, max: 255, required: true, label: "Storage place", description: "Storage place index, counted from 0 for place 1." }
+    send: { address: "/{deck:map.deck}/Places/Index", args: [ { value: "{index}", type: "int" } ] }
+    returns: none
+
+  set_place_speed_pitch:
+    summary: "Set the speed pitch of a deck's current storage place (\"/DeckA|DeckB/StoragePlace/SpeedPitch\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      pitch: { type: "float", min: -10.0, max: 10.0, required: true, label: "Speed pitch", description: "Speed pitch from -10.0 to 10.0." }
+    send: { address: "/{deck:map.deck}/StoragePlace/SpeedPitch", args: [ { value: "{pitch}", type: "float" } ] }
+    returns: none
+
+  set_place_submaster:
+    summary: "Set the submaster of a deck's current storage place, 0-255 (\"/DeckA|DeckB/StoragePlace/Submaster\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      level: { type: "int", min: 0, max: 255, required: true, label: "Submaster", description: "Submaster level, 0 to 255." }
+    send: { address: "/{deck:map.deck}/StoragePlace/Submaster", args: [ { value: "{level}", type: "int" } ] }
+    returns: none
+
+  set_place_filter:
+    summary: "Set the filter of a deck's current storage place, 0-102 (\"/DeckA|DeckB/StoragePlace/Filter\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      filter: { type: "int", min: 0, max: 102, required: true, label: "Filter", description: "Filter number from 0 (None) to 102 (SwapHVD5), as listed in MADRIX's filter menu." }
+    send: { address: "/{deck:map.deck}/StoragePlace/Filter", args: [ { value: "{filter}", type: "int" } ] }
+    returns: none
+
+  set_place_chaser_state:
+    summary: "Stop, pause or play the chaser of a deck's current storage place (\"/DeckA|DeckB/StoragePlace/Chaser/PlaybackState\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      state: { type: "enum", values: ["stopped", "paused", "playing"], required: true, label: "Playback state", description: "stopped, paused or playing." }
+    send: { address: "/{deck:map.deck}/StoragePlace/Chaser/PlaybackState", args: [ { value: "{state:map.playback_state}", type: "int" } ] }
+    returns: none
+
+  set_place_chaser_speed_pitch:
+    summary: "Set the chaser speed pitch of a deck's current storage place (\"/DeckA|DeckB/StoragePlace/Chaser/SpeedPitch\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      pitch: { type: "float", min: -10.0, max: 10.0, required: true, label: "Speed pitch", description: "Speed pitch from -10.0 to 10.0." }
+    send: { address: "/{deck:map.deck}/StoragePlace/Chaser/SpeedPitch", args: [ { value: "{pitch}", type: "float" } ] }
+    returns: none
+
+  select_place_chaser_step:
+    summary: "Go to a chaser step of a deck's current storage place (\"/DeckA|DeckB/StoragePlace/Chaser/Steps/Index\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      step: { type: "int", min: 0, max: 65535, required: true, label: "Step", description: "Chaser step index, counted from 0." }
+    send: { address: "/{deck:map.deck}/StoragePlace/Chaser/Steps/Index", args: [ { value: "{step}", type: "int" } ] }
+    returns: none
+
+  set_layer_submaster:
+    summary: "Set a layer's submaster, 0-255 (\"/DeckA|DeckB/StoragePlace/Layers/<n>/Submaster\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      layer: { type: "int", min: 0, max: 254, required: true, label: "Layer", description: "Layer index on the deck's current storage place, counted from 0 for the first layer." }
+      level: { type: "int", min: 0, max: 255, required: true, label: "Submaster", description: "Submaster level, 0 to 255." }
+    send: { address: "/{deck:map.deck}/StoragePlace/Layers/{layer}/Submaster", args: [ { value: "{level}", type: "int" } ] }
+    returns: none
+
+  set_layer_opacity:
+    summary: "Set a layer's opacity, 0-255 (\"/DeckA|DeckB/StoragePlace/Layers/<n>/Opacity\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      layer: { type: "int", min: 0, max: 254, required: true, label: "Layer", description: "Layer index on the deck's current storage place, counted from 0 for the first layer." }
+      level: { type: "int", min: 0, max: 255, required: true, label: "Opacity", description: "Opacity, 0 to 255." }
+    send: { address: "/{deck:map.deck}/StoragePlace/Layers/{layer}/Opacity", args: [ { value: "{level}", type: "int" } ] }
+    returns: none
+
+  set_layer_blind:
+    summary: "Blind or show a layer (\"/DeckA|DeckB/StoragePlace/Layers/<n>/Blind\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      layer: { type: "int", min: 0, max: 254, required: true, label: "Layer", description: "Layer index on the deck's current storage place, counted from 0 for the first layer." }
+      blind: { type: "bool", required: true, label: "Blind", description: "On blinds the layer, off makes it visible." }
+    send: { address: "/{deck:map.deck}/StoragePlace/Layers/{layer}/Blind", args: [ { value: "{blind:bool01}", type: "int" } ] }
+    returns: none
+
+  set_layer_solo:
+    summary: "Solo a layer or end its solo (\"/DeckA|DeckB/StoragePlace/Layers/<n>/Solo\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      layer: { type: "int", min: 0, max: 254, required: true, label: "Layer", description: "Layer index on the deck's current storage place, counted from 0 for the first layer." }
+      solo: { type: "bool", required: true, label: "Solo", description: "On solos the layer, off ends the solo." }
+    send: { address: "/{deck:map.deck}/StoragePlace/Layers/{layer}/Solo", args: [ { value: "{solo:bool01}", type: "int" } ] }
+    returns: none
+
+  set_layer_filter:
+    summary: "Set a layer's filter, 0-102 (\"/DeckA|DeckB/StoragePlace/Layers/<n>/Filter\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      layer: { type: "int", min: 0, max: 254, required: true, label: "Layer", description: "Layer index on the deck's current storage place, counted from 0 for the first layer." }
+      filter: { type: "int", min: 0, max: 102, required: true, label: "Filter", description: "Filter number from 0 (None) to 102 (SwapHVD5), as listed in MADRIX's filter menu." }
+    send: { address: "/{deck:map.deck}/StoragePlace/Layers/{layer}/Filter", args: [ { value: "{filter}", type: "int" } ] }
+    returns: none
+
+  set_layer_mix_mode:
+    summary: "Set a layer's mix mode, 0-21 (\"/DeckA|DeckB/StoragePlace/Layers/<n>/MixMode\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      layer: { type: "int", min: 0, max: 254, required: true, label: "Layer", description: "Layer index on the deck's current storage place, counted from 0 for the first layer." }
+      mode: { type: "int", min: 0, max: 21, required: true, label: "Mix mode", description: "Mix mode from 0 (Normal) to 21 (NegativeMask), as listed in MADRIX." }
+    send: { address: "/{deck:map.deck}/StoragePlace/Layers/{layer}/MixMode", args: [ { value: "{mode}", type: "int" } ] }
+    returns: none
+
+  set_layer_chaser_state:
+    summary: "Stop, pause or play a layer's chaser (\"/DeckA|DeckB/StoragePlace/Layers/<n>/Chaser/PlaybackState\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      layer: { type: "int", min: 0, max: 254, required: true, label: "Layer", description: "Layer index on the deck's current storage place, counted from 0 for the first layer." }
+      state: { type: "enum", values: ["stopped", "paused", "playing"], required: true, label: "Playback state", description: "stopped, paused or playing." }
+    send: { address: "/{deck:map.deck}/StoragePlace/Layers/{layer}/Chaser/PlaybackState", args: [ { value: "{state:map.playback_state}", type: "int" } ] }
+    returns: none
+
+  set_layer_chaser_speed_pitch:
+    summary: "Set a layer's chaser speed pitch (\"/DeckA|DeckB/StoragePlace/Layers/<n>/Chaser/SpeedPitch\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      layer: { type: "int", min: 0, max: 254, required: true, label: "Layer", description: "Layer index on the deck's current storage place, counted from 0 for the first layer." }
+      pitch: { type: "float", min: -10.0, max: 10.0, required: true, label: "Speed pitch", description: "Speed pitch from -10.0 to 10.0." }
+    send: { address: "/{deck:map.deck}/StoragePlace/Layers/{layer}/Chaser/SpeedPitch", args: [ { value: "{pitch}", type: "float" } ] }
+    returns: none
+
+  select_layer_chaser_step:
+    summary: "Go to a step of a layer's chaser (\"/DeckA|DeckB/StoragePlace/Layers/<n>/Chaser/Steps/Index\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      layer: { type: "int", min: 0, max: 254, required: true, label: "Layer", description: "Layer index on the deck's current storage place, counted from 0 for the first layer." }
+      step: { type: "int", min: 0, max: 65535, required: true, label: "Step", description: "Chaser step index, counted from 0." }
+    send: { address: "/{deck:map.deck}/StoragePlace/Layers/{layer}/Chaser/Steps/Index", args: [ { value: "{step}", type: "int" } ] }
+    returns: none
+
+  set_freeze:
+    summary: "Freeze or unfreeze the output (\"/Output/Freeze\")"
+    params:
+      frozen: { type: "bool", required: true, label: "Freeze", description: "On freezes the output, off unfreezes it." }
+    send: { address: "/Output/Freeze", args: [ { value: "{frozen:bool01}", type: "int" } ] }
+    returns: none
+
+  set_master:
+    summary: "Set the master fader, 0-255 (\"/Output/Master\")"
+    params:
+      level: { type: "int", min: 0, max: 255, required: true, label: "Master", description: "Master level, 0 to 255." }
+    send: { address: "/Output/Master", args: [ { value: "{level}", type: "int" } ] }
+    returns: none
+
+  set_blackout:
+    summary: "Turn the blackout on or off (\"/Output/Blackout\")"
+    params:
+      enabled: { type: "bool", required: true, label: "Blackout", description: "On blacks out the output, off ends the blackout." }
+    send: { address: "/Output/Blackout", args: [ { value: "{enabled:bool01}", type: "int" } ] }
+    returns: none
+
+  set_output_filter:
+    summary: "Set the main output filter, 0-102 (\"/Output/Filter\")"
+    params:
+      filter: { type: "int", min: 0, max: 102, required: true, label: "Filter", description: "Filter number from 0 (None) to 102 (SwapHVD5), as listed in MADRIX's filter menu." }
+    send: { address: "/Output/Filter", args: [ { value: "{filter}", type: "int" } ] }
+    returns: none
+
+  set_output_filter_color_mode:
+    summary: "Set the main output's filter color mode, 0-3 (\"/Output/FilterColor/Mode\")"
+    params:
+      mode: { type: "int", min: 0, max: 3, required: true, label: "Filter color mode", description: "Filter color mode from 0 (Thru) to 3 (Ignore), as listed in MADRIX." }
+    send: { address: "/Output/FilterColor/Mode", args: [ { value: "{mode}", type: "int" } ] }
+    returns: none
+
+  set_output_filter_color_global:
+    summary: "Set the main output's filter color to a global color (\"/Output/FilterColor/GlobalId\")"
+    params:
+      id: { type: "int", min: 1, max: 65535, required: true, label: "Global color", description: "Global color ID from the Color Kit, from 1." }
+    send: { address: "/Output/FilterColor/GlobalId", args: [ { value: "{id}", type: "int" } ] }
+    returns: none
+
+  set_output_filter_color_channel:
+    summary: "Set one channel of the main output's filter color, 0-255 (\"/Output/FilterColor/Red|Green|Blue|White\")"
+    params:
+      channel: { type: "enum", values: ["red", "green", "blue", "white"], required: true, label: "Channel", description: "Color channel: red, green, blue or white." }
+      value: { type: "int", min: 0, max: 255, required: true, label: "Value", description: "Channel value, 0 to 255." }
+    send: { address: "/Output/FilterColor/{channel:map.channel}", args: [ { value: "{value}", type: "int" } ] }
+    returns: none
+
+  set_output_filter_color_rgb:
+    summary: "Set the main output's filter color as red, green and blue (\"/Output/FilterColor/Rgb\")"
+    params:
+      red: { type: "int", min: 0, max: 255, required: true, label: "Red", description: "Red, 0 to 255." }
+      green: { type: "int", min: 0, max: 255, required: true, label: "Green", description: "Green, 0 to 255." }
+      blue: { type: "int", min: 0, max: 255, required: true, label: "Blue", description: "Blue, 0 to 255." }
+    send: { address: "/Output/FilterColor/Rgb", args: [ { value: "{red}", type: "int" }, { value: "{green}", type: "int" }, { value: "{blue}", type: "int" } ] }
+    returns: none
+
+  set_strobe_color_mode:
+    summary: "Set the main output strobe mode (\"/Output/StrobeColor/Mode\")"
+    params:
+      mode: { type: "enum", values: ["output_and_color", "output_and_black", "black_and_color"], required: true, label: "Strobe mode", description: "output_and_color, output_and_black or black_and_color, MADRIX's Main Output Strobe modes 0 to 2." }
+    send: { address: "/Output/StrobeColor/Mode", args: [ { value: "{mode:map.strobe_mode}", type: "int" } ] }
+    returns: none
+
+  set_strobe_color_global:
+    summary: "Set the strobe color to a global color (\"/Output/StrobeColor/GlobalId\")"
+    params:
+      id: { type: "int", min: 1, max: 65535, required: true, label: "Global color", description: "Global color ID from the Color Kit, from 1." }
+    send: { address: "/Output/StrobeColor/GlobalId", args: [ { value: "{id}", type: "int" } ] }
+    returns: none
+
+  set_strobe_color_channel:
+    summary: "Set one channel of the strobe color, 0-255 (\"/Output/StrobeColor/Red|Green|Blue|White\")"
+    params:
+      channel: { type: "enum", values: ["red", "green", "blue", "white"], required: true, label: "Channel", description: "Color channel: red, green, blue or white." }
+      value: { type: "int", min: 0, max: 255, required: true, label: "Value", description: "Channel value, 0 to 255." }
+    send: { address: "/Output/StrobeColor/{channel:map.channel}", args: [ { value: "{value}", type: "int" } ] }
+    returns: none
+
+  set_strobe_color_rgb:
+    summary: "Set the strobe color as red, green and blue (\"/Output/StrobeColor/Rgb\")"
+    params:
+      red: { type: "int", min: 0, max: 255, required: true, label: "Red", description: "Red, 0 to 255." }
+      green: { type: "int", min: 0, max: 255, required: true, label: "Green", description: "Green, 0 to 255." }
+      blue: { type: "int", min: 0, max: 255, required: true, label: "Blue", description: "Blue, 0 to 255." }
+    send: { address: "/Output/StrobeColor/Rgb", args: [ { value: "{red}", type: "int" }, { value: "{green}", type: "int" }, { value: "{blue}", type: "int" } ] }
+    returns: none
+
+  set_strobe:
+    summary: "Set the main output strobe, 0 (off) to 9 (\"/Output/Strobe\")"
+    params:
+      strobe: { type: "int", min: 0, max: 9, required: true, label: "Strobe", description: "0 for off, then 1 (every tenth frame) to 9 (every second frame)." }
+    send: { address: "/Output/Strobe", args: [ { value: "{strobe}", type: "int" } ] }
+    returns: none
+
+  set_fade_time:
+    summary: "Set the crossfade time in seconds (\"/Fade/Time\")"
+    params:
+      seconds: { type: "float", min: 0.0, max: 3600.0, required: true, label: "Fade time", description: "Crossfade time in seconds, 0 to 3600." }
+    send: { address: "/Fade/Time", args: [ { value: "{seconds}", type: "float" } ] }
+    returns: none
+
+  set_fade_type:
+    summary: "Set the crossfade type (\"/Fade/Type\")"
+    params:
+      type: { type: "enum", values: ["crossfade", "white_fade", "black_fade", "wipe_x", "wipe_y", "wipe_x_cross", "wipe_y_cross", "slide_x", "slide_y", "slide_x_cross", "slide_y_cross", "wipe_z", "wipe_z_cross", "slide_z", "slide_z_cross"], required: true, label: "Fade type", description: "The crossfade type, from crossfade (0) to slide_z_cross (14)." }
+    send: { address: "/Fade/Type", args: [ { value: "{type:map.fade_type}", type: "int" } ] }
+    returns: none
+
+  set_crossfader:
+    summary: "Set the crossfader between deck A (0) and deck B (255) (\"/Fade/Value\")"
+    params:
+      value: { type: "int", min: 0, max: 255, required: true, label: "Crossfader", description: "Crossfader position, 0 for deck A and 255 for deck B, 0 to 255." }
+    send: { address: "/Fade/Value", args: [ { value: "{value}", type: "int" } ] }
+    returns: none
+
+  crossfade:
+    summary: "Start an automatic crossfade, or one to deck A, deck B or the center (\"/Fade/Automatic|ToLeft|ToRight|ToCenter\")"
+    params:
+      to: { type: "enum", values: ["auto", "deck_a", "deck_b", "center"], required: true, label: "Fade to", description: "auto for the other deck, deck_a (left), deck_b (right) or center." }
+    send: { address: "/Fade/{to:map.fade_to}" }
+    returns: none
+
+  set_global_color_channel:
+    summary: "Set one channel of a global color, 0-255 (\"/ColorKit/GlobalColors/<id>/Red|Green|Blue|White|Alpha\")"
+    params:
+      id: { type: "int", min: 1, max: 65535, required: true, label: "Global color", description: "Global color ID from the Color Kit, from 1." }
+      channel: { type: "enum", values: ["red", "green", "blue", "white", "alpha"], required: true, label: "Channel", description: "Color channel: red, green, blue, white or alpha." }
+      value: { type: "int", min: 0, max: 255, required: true, label: "Value", description: "Channel value, 0 to 255." }
+    send: { address: "/ColorKit/GlobalColors/{id}/{channel:map.global_channel}", args: [ { value: "{value}", type: "int" } ] }
+    returns: none
+
+  set_global_color_rgb:
+    summary: "Set a global color as red, green and blue (\"/ColorKit/GlobalColors/<id>/Rgb\")"
+    params:
+      id: { type: "int", min: 1, max: 65535, required: true, label: "Global color", description: "Global color ID from the Color Kit, from 1." }
+      red: { type: "int", min: 0, max: 255, required: true, label: "Red", description: "Red, 0 to 255." }
+      green: { type: "int", min: 0, max: 255, required: true, label: "Green", description: "Green, 0 to 255." }
+      blue: { type: "int", min: 0, max: 255, required: true, label: "Blue", description: "Blue, 0 to 255." }
+    send: { address: "/ColorKit/GlobalColors/{id}/Rgb", args: [ { value: "{red}", type: "int" }, { value: "{green}", type: "int" }, { value: "{blue}", type: "int" } ] }
+    returns: none
+
+  set_group_defaults:
+    summary: "Set every group back to its default value (\"/GroupControl/Defaults\")"
+    send: { address: "/GroupControl/Defaults" }
+    returns: none
+
+  set_group_value:
+    summary: "Set a group's value, 0-255 (\"/GroupControl/Groups/<n>/Value\")"
+    params:
+      group: { type: "int", min: 0, max: 65535, required: true, label: "Group", description: "Group index in Group Control, counted from 0 for the first group." }
+      value: { type: "int", min: 0, max: 255, required: true, label: "Value", description: "Group value, 0 to 255." }
+    send: { address: "/GroupControl/Groups/{group}/Value", args: [ { value: "{value}", type: "int" } ] }
+    returns: none
+
+  set_group_flash:
+    summary: "Turn a group's flash mode on or off (\"/GroupControl/Groups/<n>/Flash\")"
+    params:
+      group: { type: "int", min: 0, max: 65535, required: true, label: "Group", description: "Group index in Group Control, counted from 0 for the first group." }
+      flash: { type: "bool", required: true, label: "Flash", description: "On turns flash mode on, off turns it off." }
+    send: { address: "/GroupControl/Groups/{group}/Flash", args: [ { value: "{flash:bool01}", type: "int" } ] }
+    returns: none
+
+  set_group_chaser_state:
+    summary: "Stop, pause or play the Group Control chaser (\"/GroupControl/Chaser/PlaybackState\")"
+    params:
+      state: { type: "enum", values: ["stopped", "paused", "playing"], required: true, label: "Playback state", description: "stopped, paused or playing." }
+    send: { address: "/GroupControl/Chaser/PlaybackState", args: [ { value: "{state:map.playback_state}", type: "int" } ] }
+    returns: none
+
+  set_group_chaser_speed_pitch:
+    summary: "Set the Group Control chaser speed pitch (\"/GroupControl/Chaser/SpeedPitch\")"
+    params:
+      pitch: { type: "float", min: -10.0, max: 10.0, required: true, label: "Speed pitch", description: "Speed pitch from -10.0 to 10.0." }
+    send: { address: "/GroupControl/Chaser/SpeedPitch", args: [ { value: "{pitch}", type: "float" } ] }
+    returns: none
+
+  select_group_chaser_step:
+    summary: "Go to a step of the Group Control chaser (\"/GroupControl/Chaser/Steps/Index\")"
+    params:
+      step: { type: "int", min: 0, max: 65535, required: true, label: "Step", description: "Chaser step index, counted from 0." }
+    send: { address: "/GroupControl/Chaser/Steps/Index", args: [ { value: "{step}", type: "int" } ] }
+    returns: none
+
+  set_group_fade_time:
+    summary: "Set the group fade time in seconds (\"/GroupControl/FadeTime\")"
+    params:
+      seconds: { type: "float", min: 0.0, max: 3600.0, required: true, label: "Fade time", description: "Group fade time in seconds, 0 to 3600." }
+    send: { address: "/GroupControl/FadeTime", args: [ { value: "{seconds}", type: "float" } ] }
+    returns: none
+
+  recall_group_preset:
+    summary: "Recall a group preset by index (\"/GroupControl/Presets/Index\")"
+    params:
+      index: { type: "int", min: 0, max: 255, required: true, label: "Preset", description: "Group preset index, counted from 0 for preset 1." }
+    send: { address: "/GroupControl/Presets/Index", args: [ { value: "{index}", type: "int" } ] }
+    returns: none
+
+  set_dmx_fader_state:
+    summary: "Turn a DMX Fader Tool fader on or off (\"/DmxFaderTool/Faders/<n>/State\")"
+    params:
+      fader: { type: "int", min: 0, max: 23, required: true, label: "Fader", description: "DMX Fader Tool fader, 0 to 23." }
+      enabled: { type: "bool", required: true, label: "Enabled", description: "On turns the fader on, off turns it off." }
+    send: { address: "/DmxFaderTool/Faders/{fader}/State", args: [ { value: "{enabled:bool01}", type: "int" } ] }
+    returns: none
+
+  set_dmx_fader_value:
+    summary: "Set a DMX Fader Tool fader, 0-255 (\"/DmxFaderTool/Faders/<n>/Value\")"
+    params:
+      fader: { type: "int", min: 0, max: 23, required: true, label: "Fader", description: "DMX Fader Tool fader, 0 to 23." }
+      value: { type: "int", min: 0, max: 255, required: true, label: "Value", description: "Fader value, 0 to 255." }
+    send: { address: "/DmxFaderTool/Faders/{fader}/Value", args: [ { value: "{value}", type: "int" } ] }
+    returns: none
+
+  select_cue_list:
+    summary: "Select a cue list by index (\"/CueLists/Index\")"
+    params:
+      index: { type: "int", min: 0, max: 65535, required: true, label: "Cue list", description: "Cue list index, counted from 0 for the first." }
+    send: { address: "/CueLists/Index", args: [ { value: "{index}", type: "int" } ] }
+    returns: none
+
+  set_cue_list_state:
+    summary: "Stop, pause or play the selected cue list (\"/CueLists/PlaybackState\")"
+    params:
+      state: { type: "enum", values: ["stopped", "paused", "playing"], required: true, label: "Playback state", description: "stopped, paused or playing." }
+    send: { address: "/CueLists/PlaybackState", args: [ { value: "{state:map.playback_state}", type: "int" } ] }
+    returns: none
+
+  set_cue_list_mode:
+    summary: "Set the cue list playback mode to loop or shuffle (\"/CueLists/PlaybackMode\")"
+    params:
+      mode: { type: "enum", values: ["loop", "shuffle"], required: true, label: "Mode", description: "loop or shuffle." }
+    send: { address: "/CueLists/PlaybackMode", args: [ { value: "{mode:map.cue_list_mode}", type: "int" } ] }
+    returns: none
+
+  set_cue_list_timecode_source:
+    summary: "Set the cue list's time code source (\"/CueLists/TimeCodeSource\")"
+    params:
+      source: { type: "enum", values: ["none", "system_time", "midi", "artnet", "smpte"], required: true, label: "Time code source", description: "none, system_time, midi, artnet or smpte." }
+    send: { address: "/CueLists/TimeCodeSource", args: [ { value: "{source:map.timecode_source}", type: "int" } ] }
+    returns: none
+
+  select_cue:
+    summary: "Go to a cue of the selected cue list by index (\"/CueLists/Cues/Index\")"
+    params:
+      index: { type: "int", min: 0, max: 65535, required: true, label: "Cue", description: "Cue index, counted from 0 for the first." }
+    send: { address: "/CueLists/Cues/Index", args: [ { value: "{index}", type: "int" } ] }
+    returns: none
+
+  select_timeline:
+    summary: "Select a timeline by index (\"/Timelines/Index\")"
+    params:
+      index: { type: "int", min: 0, max: 65535, required: true, label: "Timeline", description: "Timeline index, counted from 0 for the first." }
+    send: { address: "/Timelines/Index", args: [ { value: "{index}", type: "int" } ] }
+    returns: none
+
+  set_timeline_state:
+    summary: "Stop, pause or play the selected timeline (\"/Timelines/PlaybackState\")"
+    params:
+      state: { type: "enum", values: ["stopped", "paused", "playing"], required: true, label: "Playback state", description: "stopped, paused or playing." }
+    send: { address: "/Timelines/PlaybackState", args: [ { value: "{state:map.playback_state}", type: "int" } ] }
+    returns: none
+
+  select_audio_segment:
+    summary: "Go to an audio segment of the timeline (\"/Timelines/AudioSegments/Index\")"
+    params:
+      index: { type: "int", min: 0, max: 65535, required: true, label: "Audio segment", description: "Audio segment index, counted from 0 for the first." }
+    send: { address: "/Timelines/AudioSegments/Index", args: [ { value: "{index}", type: "int" } ] }
+    returns: none
+
+  select_cue_segment:
+    summary: "Go to a cue segment of the timeline (\"/Timelines/CueSegments/Index\")"
+    params:
+      index: { type: "int", min: 0, max: 65535, required: true, label: "Cue segment", description: "Cue segment index, counted from 0 for the first." }
+    send: { address: "/Timelines/CueSegments/Index", args: [ { value: "{index}", type: "int" } ] }
+    returns: none
+
+  select_marker:
+    summary: "Go to a timeline marker by ID (\"/Timelines/Markers/Id\")"
+    params:
+      id: { type: "int", min: 1, max: 65535, required: true, label: "Marker", description: "Marker ID, from 1." }
+    send: { address: "/Timelines/Markers/Id", args: [ { value: "{id}", type: "int" } ] }
+    returns: none
+
+  load_setup_register:
+    summary: "Load a registered setup by ID (\"/SetupRegisters/Id\")"
+    params:
+      id: { type: "int", min: 1, max: 65535, required: true, label: "Setup", description: "Registered setup ID, from 1." }
+    send: { address: "/SetupRegisters/Id", args: [ { value: "{id}", type: "int" } ] }
+    returns: none
+
+  set_trigger_port:
+    summary: "Set a trigger port's position, value and number of segments (\"/Trigger/Ports/<n>/PositionAndValue\")"
+    params:
+      port: { type: "int", min: 0, max: 63, required: true, label: "Port", description: "Trigger port, 0 to 63." }
+      position: { type: "float", min: 0.0, max: 1.0, required: true, label: "Position", description: "Position from 0.0 to 1.0." }
+      value: { type: "float", min: 0.0, max: 1.0, required: true, label: "Value", description: "Value from 0.0 to 1.0." }
+      segments: { type: "int", min: 0, max: 65535, required: true, label: "Segments", description: "Number of segments, 0 or more." }
+    send: { address: "/Trigger/Ports/{port}/PositionAndValue", args: [ { value: "{position}", type: "float" }, { value: "{value}", type: "float" }, { value: "{segments}", type: "int" } ] }
+    returns: none
+
+  set_view:
+    summary: "Switch the main view, 0 (Layers) to 5 (Scheduling) (\"/Main/View\")"
+    params:
+      view: { type: "int", min: 0, max: 5, required: true, label: "View", description: "Main view from 0 (Layers) to 5 (Scheduling), as listed in MADRIX." }
+    send: { address: "/Main/View", args: [ { value: "{view}", type: "int" } ] }
+    returns: none
+
+  feedback_all:
+    summary: "Ask MADRIX to send every feedback value again (\"/Main/FeedbackAll\")"
+    send: { address: "/Main/FeedbackAll" }
+    returns: none
+
+  set_artnet_timecode_stream:
+    summary: "Set the Art-Net time code stream ID received, 0-255 (\"/ArtNet/Input/TimeCode/StreamId\")"
+    params:
+      stream: { type: "int", min: 0, max: 255, required: true, label: "Stream ID", description: "Art-Net time code stream ID, 0 to 255." }
+    send: { address: "/ArtNet/Input/TimeCode/StreamId", args: [ { value: "{stream}", type: "int" } ] }
+    returns: none
+
+  step:
+    summary: "Step a selection up or down, as MADRIX's up and down buttons do (\"/<target>/Up|Down\")"
+    params:
+      target: { type: "enum", values: ["output_filter", "output_filter_color_mode", "output_filter_color_global", "strobe_color_mode", "strobe_color_global", "fade_type", "group_chaser_step", "group_preset", "cue_list", "cue_list_timecode_source", "cue", "timeline", "audio_segment", "cue_segment", "marker", "setup_register", "view", "artnet_timecode_stream"], required: true, label: "Target", description: "What to step, such as cue (the next or previous cue), cue_list, timeline, fade_type or view." }
+      direction: { type: "enum", values: ["up", "down"], required: true, label: "Direction", description: "up or down: the next or previous value, as MADRIX's own up and down buttons step." }
+    send: { address: "/{target:map.step_target}/{direction:map.direction}" }
+    returns: none
+
+  deck_step:
+    summary: "Step a deck's selection up or down, such as its storage place (\"/DeckA|DeckB/<target>/Up|Down\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      target: { type: "enum", values: ["filter", "filter_color_mode", "filter_color_global", "storage", "place", "place_filter", "place_chaser_step"], required: true, label: "Target", description: "What to step: filter, filter_color_mode, filter_color_global, storage, place, place_filter or place_chaser_step." }
+      direction: { type: "enum", values: ["up", "down"], required: true, label: "Direction", description: "up or down: the next or previous value, as MADRIX's own up and down buttons step." }
+    send: { address: "/{deck:map.deck}/{target:map.deck_step_target}/{direction:map.direction}" }
+    returns: none
+
+  layer_step:
+    summary: "Step a layer's filter, mix mode or chaser step up or down (\"/DeckA|DeckB/StoragePlace/Layers/<n>/<target>/Up|Down\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      layer: { type: "int", min: 0, max: 254, required: true, label: "Layer", description: "Layer index on the deck's current storage place, counted from 0 for the first layer." }
+      target: { type: "enum", values: ["filter", "mix_mode", "chaser_step"], required: true, label: "Target", description: "What to step: filter, mix_mode or chaser_step." }
+      direction: { type: "enum", values: ["up", "down"], required: true, label: "Direction", description: "up or down: the next or previous value, as MADRIX's own up and down buttons step." }
+    send: { address: "/{deck:map.deck}/StoragePlace/Layers/{layer}/{target:map.layer_step_target}/{direction:map.direction}" }
+    returns: none
+
+  offset:
+    summary: "Change a value by a relative amount (\"/<target>/Offset\")"
+    params:
+      target: { type: "enum", values: ["audio_input_level", "audio_output_level", "master", "output_filter_red", "output_filter_green", "output_filter_blue", "output_filter_white", "strobe_red", "strobe_green", "strobe_blue", "strobe_white", "strobe", "fade_time", "crossfader", "group_chaser_speed_pitch", "group_fade_time"], required: true, label: "Target", description: "The value to change, such as master, crossfader or fade_time." }
+      amount: { type: "int", min: -65535, max: 65535, required: true, label: "Change", description: "How much to change the value by; negative lowers it." }
+    send: { address: "/{target:map.offset_target}/Offset", args: [ { value: "{amount}", type: "int" } ] }
+    returns: none
+
+  deck_offset:
+    summary: "Change a deck value by a relative amount (\"/DeckA|DeckB/<target>/Offset\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      target: { type: "enum", values: ["speed_master", "submaster", "filter_red", "filter_green", "filter_blue", "filter_white", "place_speed_pitch", "place_submaster", "place_chaser_speed_pitch"], required: true, label: "Target", description: "The deck value to change, such as submaster or speed_master." }
+      amount: { type: "int", min: -65535, max: 65535, required: true, label: "Change", description: "How much to change the value by; negative lowers it." }
+    send: { address: "/{deck:map.deck}/{target:map.deck_offset_target}/Offset", args: [ { value: "{amount}", type: "int" } ] }
+    returns: none
+
+  layer_offset:
+    summary: "Change a layer value by a relative amount (\"/DeckA|DeckB/StoragePlace/Layers/<n>/<target>/Offset\")"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      layer: { type: "int", min: 0, max: 254, required: true, label: "Layer", description: "Layer index on the deck's current storage place, counted from 0 for the first layer." }
+      target: { type: "enum", values: ["submaster", "opacity", "chaser_speed_pitch"], required: true, label: "Target", description: "submaster, opacity or chaser_speed_pitch." }
+      amount: { type: "int", min: -65535, max: 65535, required: true, label: "Change", description: "How much to change the value by; negative lowers it." }
+    send: { address: "/{deck:map.deck}/StoragePlace/Layers/{layer}/{target:map.layer_offset_target}/Offset", args: [ { value: "{amount}", type: "int" } ] }
+    returns: none
+
+  global_color_offset:
+    summary: "Change a global color channel by a relative amount (\"/ColorKit/GlobalColors/<id>/<channel>/Offset\")"
+    params:
+      id: { type: "int", min: 1, max: 65535, required: true, label: "Global color", description: "Global color ID from the Color Kit, from 1." }
+      channel: { type: "enum", values: ["red", "green", "blue", "white", "alpha"], required: true, label: "Channel", description: "Color channel: red, green, blue, white or alpha." }
+      amount: { type: "int", min: -65535, max: 65535, required: true, label: "Change", description: "How much to change the value by; negative lowers it." }
+    send: { address: "/ColorKit/GlobalColors/{id}/{channel:map.global_channel}/Offset", args: [ { value: "{amount}", type: "int" } ] }
+    returns: none
+
+  group_value_offset:
+    summary: "Change a group's value by a relative amount (\"/GroupControl/Groups/<n>/Value/Offset\")"
+    params:
+      group: { type: "int", min: 0, max: 65535, required: true, label: "Group", description: "Group index in Group Control, counted from 0 for the first group." }
+      amount: { type: "int", min: -65535, max: 65535, required: true, label: "Change", description: "How much to change the value by; negative lowers it." }
+    send: { address: "/GroupControl/Groups/{group}/Value/Offset", args: [ { value: "{amount}", type: "int" } ] }
+    returns: none
+
+  dmx_fader_offset:
+    summary: "Change a DMX Fader Tool fader by a relative amount (\"/DmxFaderTool/Faders/<n>/Value/Offset\")"
+    params:
+      fader: { type: "int", min: 0, max: 23, required: true, label: "Fader", description: "DMX Fader Tool fader, 0 to 23." }
+      amount: { type: "int", min: -65535, max: 65535, required: true, label: "Change", description: "How much to change the value by; negative lowers it." }
+    send: { address: "/DmxFaderTool/Faders/{fader}/Value/Offset", args: [ { value: "{amount}", type: "int" } ] }
+    returns: none
+
+  set_storage_place:
+    summary: "Activate a storage place and fade to it (HTTP SetStorage=S<s>P<p>)"
+    params:
+      storage: { type: "int", min: 1, max: 256, required: true, label: "Storage", description: "Storage number, 1 to 256." }
+      place: { type: "int", min: 1, max: 256, required: true, label: "Storage place", description: "Storage place number, 1 to 256." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetStorage=S{storage}P{place}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_storage_place_without_fade:
+    summary: "Activate a storage place without fading to it (HTTP SetStorageWithoutFade=S<s>P<p>)"
+    params:
+      storage: { type: "int", min: 1, max: 256, required: true, label: "Storage", description: "Storage number, 1 to 256." }
+      place: { type: "int", min: 1, max: 256, required: true, label: "Storage place", description: "Storage place number, 1 to 256." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetStorageWithoutFade=S{storage}P{place}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_deck_storage_place:
+    summary: "Activate a storage place on deck A or B and fade to it (HTTP SetStorageDeckA|B=S<s>P<p>)"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      storage: { type: "int", min: 1, max: 256, required: true, label: "Storage", description: "Storage number, 1 to 256." }
+      place: { type: "int", min: 1, max: 256, required: true, label: "Storage place", description: "Storage place number, 1 to 256." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetStorage{deck:map.deck}=S{storage}P{place}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_deck_storage_place_without_fade:
+    summary: "Activate a storage place on deck A or B without fading (HTTP SetStorageWithoutFadeDeckA|B=S<s>P<p>)"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      storage: { type: "int", min: 1, max: 256, required: true, label: "Storage", description: "Storage number, 1 to 256." }
+      place: { type: "int", min: 1, max: 256, required: true, label: "Storage place", description: "Storage place number, 1 to 256." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetStorageWithoutFade{deck:map.deck}=S{storage}P{place}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_current_layer:
+    summary: "Make a layer the current layer of a deck (HTTP SetLayerDeckA|B=<n>)"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      layer: { type: "int", min: 1, max: 255, required: true, label: "Layer", description: "Layer number, from 1." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetLayer{deck:map.deck}={layer}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_ticker_text:
+    summary: "Set the text of every running SCE Ticker effect (HTTP SetTextTicker=<text>)"
+    params:
+      text: { type: "string", max_length: 256, required: true, label: "Text", description: "The ticker text." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetTextTicker={text:url}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_deck_ticker_text:
+    summary: "Set the ticker text of a layer on a deck's current storage, or of every ticker there with 0 (HTTP SetTextTickerLayerDeckA|B=<layer>_<text>)"
+    params:
+      deck: { type: "enum", values: ["a", "b"], required: true, label: "Deck", description: "Storage deck A or B." }
+      layer: { type: "int", min: 0, max: 255, required: true, label: "Layer", description: "Layer number from 1, or 0 for every ticker on the deck's current storage." }
+      text: { type: "string", max_length: 256, required: true, label: "Text", description: "The ticker text." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetTextTickerLayer{deck:map.deck}={layer}_{text:url}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_bpm:
+    summary: "Set the BPM of the current effects (HTTP SetBpm=<bpm>)"
+    params:
+      bpm: { type: "int", min: 1, max: 9999, required: true, label: "BPM", description: "Beats per minute as MADRIX takes it; the documented example is 900." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetBpm={bpm}" }
+    expect: { status: 200 }
+    returns: ack
+
+  recall_group_preset_with_fade:
+    summary: "Recall a group preset and fade to it (HTTP SetGroupPresetWithFade=<n>)"
+    params:
+      preset: { type: "int", min: 1, max: 256, required: true, label: "Preset", description: "Group preset number, 1 to 256." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetGroupPresetWithFade={preset}" }
+    expect: { status: 200 }
+    returns: ack
+
+  cue_list_go:
+    summary: "Activate the next cue of the cue list (HTTP SetCuelistGo)"
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetCuelistGo" }
+    expect: { status: 200 }
+    returns: ack
+
+  cue_list_back:
+    summary: "Activate the previous cue of the cue list (HTTP SetCuelistBack)"
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetCuelistBack" }
+    expect: { status: 200 }
+    returns: ack
+
+  cue_list_go_to:
+    summary: "Skip to a cue number of the cue list (HTTP SetCuelistGoTo=<n>)"
+    params:
+      cue: { type: "int", min: 1, max: 65535, required: true, label: "Cue", description: "Cue number in the cue list, from 1." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetCuelistGoTo={cue}" }
+    expect: { status: 200 }
+    returns: ack
+
+  cue_list_add_cue:
+    summary: "Add a cue to the cue list (HTTP SetCuelistAddCue)"
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetCuelistAddCue" }
+    expect: { status: 200 }
+    returns: ack
+
+  cue_list_add_occupied_places:
+    summary: "Add every occupied storage place to the cue list (HTTP SetCuelistAddOccupiedStoragePlaces)"
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetCuelistAddOccupiedStoragePlaces" }
+    expect: { status: 200 }
+    returns: ack
+
+  cue_list_delete_cue:
+    summary: "Delete a cue from the cue list (HTTP SetCuelistDeleteCue=<n>)"
+    params:
+      cue: { type: "int", min: 1, max: 65535, required: true, label: "Cue", description: "Cue number in the cue list, from 1." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetCuelistDeleteCue={cue}" }
+    expect: { status: 200 }
+    returns: ack
+
+  cue_list_delete_all:
+    summary: "Delete every cue from the cue list (HTTP SetCuelistDeleteAll)"
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetCuelistDeleteAll" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_cue_follow:
+    summary: "Set a cue's follow cue (HTTP SetCuelistFollowCue=<cue>_<follow>)"
+    params:
+      cue: { type: "int", min: 1, max: 65535, required: true, label: "Cue", description: "Cue list item, from 1." }
+      follow: { type: "int", min: 0, max: 65535, required: true, label: "Follow cue", description: "The cue number to follow with." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetCuelistFollowCue={cue}_{follow}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_cue_storage:
+    summary: "Set a cue's storage (HTTP SetCuelistStorage=<cue>_<storage>)"
+    params:
+      cue: { type: "int", min: 1, max: 65535, required: true, label: "Cue", description: "Cue list item, from 1." }
+      storage: { type: "int", min: 1, max: 256, required: true, label: "Storage", description: "Storage number, 1 to 256." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetCuelistStorage={cue}_{storage}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_cue_place:
+    summary: "Set a cue's storage place (HTTP SetCuelistStoragePlace=<cue>_<place>)"
+    params:
+      cue: { type: "int", min: 1, max: 65535, required: true, label: "Cue", description: "Cue list item, from 1." }
+      place: { type: "int", min: 1, max: 256, required: true, label: "Storage place", description: "Storage place number, 1 to 256." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetCuelistStoragePlace={cue}_{place}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_cue_fade_type:
+    summary: "Set a cue's fade type (HTTP SetCuelistFadeType=<cue>_<type>)"
+    params:
+      cue: { type: "int", min: 1, max: 65535, required: true, label: "Cue", description: "Cue list item, from 1." }
+      type: { type: "enum", values: ["crossfade", "white_fade", "black_fade", "wipe_x", "wipe_y", "wipe_x_cross", "wipe_y_cross", "slide_x", "slide_y", "slide_x_cross", "slide_y_cross", "wipe_z", "wipe_z_cross", "slide_z", "slide_z_cross"], required: true, label: "Fade type", description: "The cue's fade type, from crossfade (0) to slide_z_cross (14)." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetCuelistFadeType={cue}_{type:map.fade_type}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_cue_fade_time:
+    summary: "Set a cue's fade time in seconds (HTTP SetCuelistFadeTime=<cue>_<seconds>)"
+    params:
+      cue: { type: "int", min: 1, max: 65535, required: true, label: "Cue", description: "Cue list item, from 1." }
+      seconds: { type: "float", min: 0.0, max: 3600.0, required: true, label: "Fade time", description: "Fade time in seconds, to the millisecond." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetCuelistFadeTime={cue}_{seconds:.3f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_cue_duration:
+    summary: "Set a cue's duration in MADRIX's cue list time format, such as 2m1s (HTTP SetCuelistDuration=<cue>_<time>)"
+    params:
+      cue: { type: "int", min: 1, max: 65535, required: true, label: "Cue", description: "Cue list item, from 1." }
+      duration: { type: "string", max_length: 32, required: true, label: "Duration", description: "Duration in MADRIX's cue list time format, such as 2m1s.", pattern: "^[0-9hms:.]+$" }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetCuelistDuration={cue}_{duration}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_cue_timecode:
+    summary: "Set a cue's time code in MADRIX's cue list time format, such as 3h10m9s (HTTP SetCuelistTimeCode=<cue>_<time>)"
+    params:
+      cue: { type: "int", min: 1, max: 65535, required: true, label: "Cue", description: "Cue list item, from 1." }
+      timecode: { type: "string", max_length: 32, required: true, label: "Time code", description: "Time code in MADRIX's cue list time format, such as 3h10m9s.", pattern: "^[0-9hms:.]+$" }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetCuelistTimeCode={cue}_{timecode}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_cue_date:
+    summary: "Set a cue's date in MADRIX's cue list date format, such as Monday (HTTP SetCuelistDate=<cue>_<date>)"
+    params:
+      cue: { type: "int", min: 1, max: 65535, required: true, label: "Cue", description: "Cue list item, from 1." }
+      date: { type: "string", max_length: 64, required: true, label: "Date", description: "Date in MADRIX's cue list date format, such as Monday.", pattern: "^[A-Za-z0-9.,/*-]+$" }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetCuelistDate={cue}_{date}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_cue_group_preset:
+    summary: "Set a cue's group preset (HTTP SetCuelistGroupPreset=<cue>_<preset>)"
+    params:
+      cue: { type: "int", min: 1, max: 65535, required: true, label: "Cue", description: "Cue list item, from 1." }
+      preset: { type: "int", min: 1, max: 256, required: true, label: "Group preset", description: "Group preset number, 1 to 256." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetCuelistGroupPreset={cue}_{preset}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_global_color:
+    summary: "Set any channels of a global color at once, such as R150G0A200W50 (HTTP SetGlobalColor=<id>_<channels>)"
+    params:
+      id: { type: "int", min: 1, max: 65535, required: true, label: "Global color", description: "Global color ID from the Color Kit, from 1." }
+      channels: { type: "string", max_length: 32, required: true, label: "Channels", description: "Channel letters R, G, B, W or A each followed by its value 0-255, such as R150G0A200W50.", pattern: "^([RGBWA][0-9]{1,3})+$" }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "SetGlobalColor={id}_{channels}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_cue_list_name:
+    summary: "Read a cue list's name by index (HTTP GetCuelistName=<index>)"
+    params:
+      index: { type: "int", min: 0, max: 65535, required: true, label: "Cue list", description: "Cue list index, counted from 0 for the first." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "GetCuelistName={index}" }
+    expect: { status: 200, matches: "(?s)^\\s*(.*?)\\s*$" }
+    returns: value
+
+  get_timeline_name:
+    summary: "Read a timeline's name by index (HTTP GetTimelinesName=<index>)"
+    params:
+      index: { type: "int", min: 0, max: 65535, required: true, label: "Timeline", description: "Timeline index, counted from 0 for the first." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "GetTimelinesName={index}" }
+    expect: { status: 200, matches: "(?s)^\\s*(.*?)\\s*$" }
+    returns: value
+
+  get_cue_description:
+    summary: "Read a cue's description (HTTP GetCuelistDescription=<n>)"
+    params:
+      cue: { type: "int", min: 1, max: 65535, required: true, label: "Cue", description: "Cue list item, from 1." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "GetCuelistDescription={cue}" }
+    expect: { status: 200, matches: "(?s)^\\s*(.*?)\\s*$" }
+    returns: value
+
+  get_storage_place_description:
+    summary: "Read a storage place's description (HTTP GetStoragePlaceDescription=S<s>P<p>)"
+    params:
+      storage: { type: "int", min: 1, max: 256, required: true, label: "Storage", description: "Storage number, 1 to 256." }
+      place: { type: "int", min: 1, max: 256, required: true, label: "Storage place", description: "Storage place number, 1 to 256." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "GetStoragePlaceDescription=S{storage}P{place}" }
+    expect: { status: 200, matches: "(?s)^\\s*(.*?)\\s*$" }
+    returns: value
+
+  get_storage_place_filled:
+    summary: "Read whether a storage place is filled, 1 or 0 (HTTP GetStoragePlaceFullState=S<s>P<p>)"
+    params:
+      storage: { type: "int", min: 1, max: 256, required: true, label: "Storage", description: "Storage number, 1 to 256." }
+      place: { type: "int", min: 1, max: 256, required: true, label: "Storage place", description: "Storage place number, 1 to 256." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "GetStoragePlaceFullState=S{storage}P{place}" }
+    expect: { status: 200, matches: "(?s)^\\s*(.*?)\\s*$" }
+    returns: value
+
+  get_group_name:
+    summary: "Read a group's display name by group ID (HTTP GetGroupDisplayName=<id>)"
+    params:
+      id: { type: "int", min: 1, max: 65535, required: true, label: "Group ID", description: "Group ID, from 1." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "GetGroupDisplayName={id}" }
+    expect: { status: 200, matches: "(?s)^\\s*(.*?)\\s*$" }
+    returns: value
+
+  get_group_preset_description:
+    summary: "Read a group preset's description (HTTP GetGroupPresetDescription=<n>)"
+    params:
+      preset: { type: "int", min: 1, max: 256, required: true, label: "Preset", description: "Group preset number, 1 to 256." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "GetGroupPresetDescription={preset}" }
+    expect: { status: 200, matches: "(?s)^\\s*(.*?)\\s*$" }
+    returns: value
+
+  get_global_color_description:
+    summary: "Read a global color's description (HTTP GetGlobalColorDescription=<id>)"
+    params:
+      id: { type: "int", min: 1, max: 65535, required: true, label: "Global color", description: "Global color ID from the Color Kit, from 1." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "GetGlobalColorDescription={id}" }
+    expect: { status: 200, matches: "(?s)^\\s*(.*?)\\s*$" }
+    returns: value
+
+  get_setup_register_description:
+    summary: "Read a registered setup's description (HTTP GetSetupRegisterDescription=<id>)"
+    params:
+      id: { type: "int", min: 1, max: 65535, required: true, label: "Setup", description: "Registered setup ID, from 1." }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "GetSetupRegisterDescription={id}" }
+    expect: { status: 200, matches: "(?s)^\\s*(.*?)\\s*$" }
+    returns: value
+
+  get_value:
+    summary: "Read any value the HTTP Remote lists by its Get function, such as GetSoundLevel=0 (HTTP <function>)"
+    params:
+      function: { type: "string", max_length: 128, required: true, label: "Function", description: "A Get function from MADRIX's HTTP Remote Control list, with its argument after = where it takes one, such as GetFadeTime or GetCuelistDuration=1.", pattern: "^Get[A-Za-z0-9]+(=[A-Za-z0-9_]+)?$" }
+    send: { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: "{function}" }
+    expect: { status: 200, matches: "(?s)^\\s*(.*?)\\s*$" }
+    returns: value
+
+state:
+  audio.input.level: { type: int, unit: percent, description: "Audio input level, 0 to 100" }
+  audio.input.muted: { type: bool, description: "Whether the audio input is muted" }
+  audio.output.level: { type: int, unit: percent, description: "Audio output level, 0 to 100" }
+  audio.output.muted: { type: bool, description: "Whether the audio output is muted" }
+  audio.input.agc: { type: bool, description: "Whether automatic gain control of the audio input is on" }
+  decks.*.paused: { type: bool, description: "Whether the deck's effects are paused" }
+  decks.*.speed_master: { type: float, description: "Deck speed master, -20.0 to 20.0" }
+  decks.*.submaster: { type: int, description: "Deck submaster, 0 to 255" }
+  decks.*.filter: { type: int, description: "Deck filter number, 0 (None) to 102" }
+  decks.*.filter_color.mode: { type: int, description: "Deck filter color mode, 0 (Thru) to 3 (Ignore)" }
+  decks.*.filter_color.global_id: { type: int, description: "Global color ID of the deck's filter color, 0 when it is not a global color" }
+  decks.*.filter_color.red: { type: int, description: "Red of the deck's filter color, 0 to 255" }
+  decks.*.filter_color.green: { type: int, description: "Green of the deck's filter color, 0 to 255" }
+  decks.*.filter_color.blue: { type: int, description: "Blue of the deck's filter color, 0 to 255" }
+  decks.*.filter_color.white: { type: int, description: "White of the deck's filter color, 0 to 255" }
+  decks.*.storage_index: { type: int, description: "Selected storage index, from 0" }
+  decks.*.place_index: { type: int, description: "Selected storage place index, from 0" }
+  decks.*.place.speed_pitch: { type: float, description: "Speed pitch of the current storage place, -10.0 to 10.0" }
+  decks.*.place.submaster: { type: int, description: "Submaster of the current storage place, 0 to 255" }
+  decks.*.place.filter: { type: int, description: "Filter of the current storage place, 0 to 102" }
+  decks.*.place.chaser.state: { type: string, description: "Chaser of the current storage place: stopped, paused or playing" }
+  decks.*.place.chaser.speed_pitch: { type: float, description: "Chaser speed pitch of the current storage place, -10.0 to 10.0" }
+  decks.*.place.chaser.step: { type: int, description: "Chaser step of the current storage place, from 0" }
+  decks.*.layers.*.submaster: { type: int, description: "Layer submaster, 0 to 255" }
+  decks.*.layers.*.opacity: { type: int, description: "Layer opacity, 0 to 255" }
+  decks.*.layers.*.blind: { type: bool, description: "Whether the layer is blind" }
+  decks.*.layers.*.solo: { type: bool, description: "Whether the layer is soloed" }
+  decks.*.layers.*.filter: { type: int, description: "Layer filter, 0 to 102" }
+  decks.*.layers.*.mix_mode: { type: int, description: "Layer mix mode, 0 (Normal) to 21 (NegativeMask)" }
+  decks.*.layers.*.chaser.state: { type: string, description: "Layer chaser: stopped, paused or playing" }
+  decks.*.layers.*.chaser.speed_pitch: { type: float, description: "Layer chaser speed pitch, -10.0 to 10.0" }
+  decks.*.layers.*.chaser.step: { type: int, description: "Layer chaser step, from 0" }
+  output.frozen: { type: bool, description: "Whether the output is frozen" }
+  output.master: { type: int, description: "Master fader, 0 to 255" }
+  output.blackout: { type: bool, description: "Whether the blackout is on" }
+  output.filter: { type: int, description: "Main output filter, 0 to 102" }
+  output.filter_color.mode: { type: int, description: "Main output filter color mode, 0 (Thru) to 3 (Ignore)" }
+  output.filter_color.global_id: { type: int, description: "Global color ID of the main output's filter color, 0 when not global" }
+  output.filter_color.red: { type: int, description: "Red of the main output's filter color" }
+  output.filter_color.green: { type: int, description: "Green of the main output's filter color" }
+  output.filter_color.blue: { type: int, description: "Blue of the main output's filter color" }
+  output.filter_color.white: { type: int, description: "White of the main output's filter color" }
+  output.strobe_color.mode: { type: string, description: "Strobe mode: output_and_color, output_and_black or black_and_color" }
+  output.strobe_color.global_id: { type: int, description: "Global color ID of the strobe color, 0 when not global" }
+  output.strobe_color.red: { type: int, description: "Red of the strobe color" }
+  output.strobe_color.green: { type: int, description: "Green of the strobe color" }
+  output.strobe_color.blue: { type: int, description: "Blue of the strobe color" }
+  output.strobe_color.white: { type: int, description: "White of the strobe color" }
+  output.strobe: { type: int, description: "Main output strobe, 0 (off) to 9" }
+  fade.time: { type: float, description: "Crossfade time in seconds" }
+  fade.type: { type: string, description: "Crossfade type, crossfade to slide_z_cross" }
+  fade.value: { type: int, description: "Crossfader position, 0 (deck A) to 255 (deck B)" }
+  global_colors.*.red: { type: int, description: "Red of the global color, 0 to 255" }
+  global_colors.*.green: { type: int, description: "Green of the global color, 0 to 255" }
+  global_colors.*.blue: { type: int, description: "Blue of the global color, 0 to 255" }
+  global_colors.*.white: { type: int, description: "White of the global color, 0 to 255" }
+  global_colors.*.alpha: { type: int, description: "Alpha of the global color, 0 to 255" }
+  groups.*.value: { type: int, description: "Group value, 0 to 255" }
+  groups.*.flash: { type: bool, description: "Whether the group's flash mode is on" }
+  group_control.chaser.state: { type: string, description: "Group Control chaser: stopped, paused or playing" }
+  group_control.chaser.speed_pitch: { type: float, description: "Group Control chaser speed pitch, -10.0 to 10.0" }
+  group_control.chaser.step: { type: int, description: "Group Control chaser step, from 0" }
+  group_control.fade_time: { type: float, description: "Group fade time in seconds" }
+  dmx_faders.*.enabled: { type: bool, description: "Whether the DMX Fader Tool fader is on" }
+  dmx_faders.*.value: { type: int, description: "DMX Fader Tool fader value, 0 to 255" }
+  cue_list.index: { type: int, description: "Selected cue list index, from 0" }
+  cue_list.state: { type: string, description: "Cue list playback: stopped, paused or playing" }
+  cue_list.mode: { type: string, description: "Cue list playback mode: loop or shuffle" }
+  cue_list.timecode_source: { type: string, description: "Cue list time code source: none, system_time, midi, artnet or smpte" }
+  cue_list.cue_index: { type: int, description: "Current cue index in the selected cue list, from 0" }
+  timeline.index: { type: int, description: "Selected timeline index, from 0" }
+  timeline.state: { type: string, description: "Timeline playback: stopped, paused or playing" }
+  timeline.audio_segment: { type: int, description: "Current audio segment index, from 0" }
+  timeline.cue_segment: { type: int, description: "Current cue segment index, from 0" }
+  timeline.marker: { type: int, description: "Current marker ID" }
+  setup_register.id: { type: int, description: "ID of the loaded registered setup" }
+  main.view: { type: int, description: "Main view, 0 (Layers) to 5 (Scheduling)" }
+  artnet.timecode_stream: { type: int, description: "Art-Net time code stream ID received" }
+  info.product: { type: string, description: "Product name of the running MADRIX, read over the HTTP Remote" }
+  info.version: { type: string, description: "MADRIX version, such as 5.8a, read over the HTTP Remote" }
+  info.version_number: { type: string, description: "MADRIX version number, such as 5.8.1.0, read over the HTTP Remote" }
+  info.host_name: { type: string, description: "Host name of the computer running MADRIX, read over the HTTP Remote" }
+  info.host_label: { type: string, description: "Host label of this MADRIX instance, read over the HTTP Remote" }
+  matrix.size_x: { type: int, description: "Matrix width in pixels, read over the HTTP Remote" }
+  matrix.size_y: { type: int, description: "Matrix height in pixels, read over the HTTP Remote" }
+  matrix.size_z: { type: int, description: "Matrix depth in pixels, read over the HTTP Remote" }
+  cue_list.count: { type: int, description: "Number of items in the cue list, read over the HTTP Remote" }
+  timeline.count: { type: int, description: "Number of timelines, read over the HTTP Remote" }
+  group_control.count: { type: int, description: "Number of groups in Group Control, read over the HTTP Remote" }
+  setup_register.current: { type: int, description: "ID of the active registered setup, 0 when none is, read over the HTTP Remote" }
+  decks.*.storage: { type: int, description: "Current storage on the deck, from 1, read over the HTTP Remote" }
+  decks.*.place: { type: int, description: "Current storage place on the deck, from 1, read over the HTTP Remote" }
+  decks.*.current_layer: { type: int, description: "Current layer on the deck, from 1, read over the HTTP Remote" }
+  decks.*.layer_count: { type: int, description: "Number of layers on the deck's current storage place, read over the HTTP Remote" }
+  decks.*.layer_name: { type: string, description: "Name of the current layer on the deck, read over the HTTP Remote" }
+  decks.*.effect_name: { type: string, description: "Effect of the current layer on the deck, read over the HTTP Remote" }
+  decks.*.ticker_text: { type: string, description: "Ticker text of the current layer on the deck, when a ticker effect runs, read over the HTTP Remote" }
+  cue_list.current_cue: { type: int, description: "Current active cue of the cue list, read over the HTTP Remote" }
+  timeline.duration: { type: string, description: "Duration of the selected timeline, as MADRIX writes it, read over the HTTP Remote" }
+
+telemetry:
+  # MADRIX sends its feedback to the sender's address, on its Destination
+  # Network Port, once a client has sent to it; FeedbackAll asks for every
+  # value again. What OSC does not report is read over the HTTP Remote.
+  subscribe:
+    send: [ { address: /Main/FeedbackAll } ]
+    every_ms: 60000
+  poll:
+    - every_ms: 2000
+      send:
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetStorageDeckA }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetStoragePlaceDeckA }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetStorageDeckB }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetStoragePlaceDeckB }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetLayerDeckA }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetLayerDeckB }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetLayerCountDeckA }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetLayerCountDeckB }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetLayerNameDeckA }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetLayerNameDeckB }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetLayerEffectNameDeckA }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetLayerEffectNameDeckB }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetLayerTickerTextDeckA }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetLayerTickerTextDeckB }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetCuelistCueCurrent }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetTimelinesDuration }
+    - every_ms: 60000
+      send:
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetProduct }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetVersion }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetVersionNumber }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetHostName }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetHostLabel }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetMatrixSizeX }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetMatrixSizeY }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetMatrixSizeZ }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetCuelistCount }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetTimelinesCount }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetGroupCount }
+        - { endpoint: http, method: GET, path: /RemoteCommands/, raw_query: GetSetupRegisterCurrentId }
+  updates:
+    - address: "^/Audio/Input/Level$"
+      state: { "audio.input.level": "{arg0}" }
+    - address: "^/Audio/Input/Mute$"
+      state:
+        "audio.input.muted": { value: "{arg0}", map: { "0": false, "1": true } }
+    - address: "^/Audio/Output/Level$"
+      state: { "audio.output.level": "{arg0}" }
+    - address: "^/Audio/Output/Mute$"
+      state:
+        "audio.output.muted": { value: "{arg0}", map: { "0": false, "1": true } }
+    - address: "^/Audio/Input/Agc$"
+      state:
+        "audio.input.agc": { value: "{arg0}", map: { "0": false, "1": true } }
+    - address: "^/(DeckA|DeckB)/Pause$"
+      state:
+        "decks.{1}.paused": { value: "{arg0}", map: { "0": false, "1": true } }
+    - address: "^/(DeckA|DeckB)/SpeedMaster$"
+      state: { "decks.{1}.speed_master": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/Submaster$"
+      state: { "decks.{1}.submaster": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/Filter$"
+      state: { "decks.{1}.filter": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/FilterColor/Mode$"
+      state: { "decks.{1}.filter_color.mode": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/FilterColor/GlobalId$"
+      state: { "decks.{1}.filter_color.global_id": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/FilterColor/Red$"
+      state: { "decks.{1}.filter_color.red": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/FilterColor/Green$"
+      state: { "decks.{1}.filter_color.green": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/FilterColor/Blue$"
+      state: { "decks.{1}.filter_color.blue": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/FilterColor/White$"
+      state: { "decks.{1}.filter_color.white": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/Storages/Index$"
+      state: { "decks.{1}.storage_index": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/Places/Index$"
+      state: { "decks.{1}.place_index": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/StoragePlace/SpeedPitch$"
+      state: { "decks.{1}.place.speed_pitch": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/StoragePlace/Submaster$"
+      state: { "decks.{1}.place.submaster": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/StoragePlace/Filter$"
+      state: { "decks.{1}.place.filter": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/StoragePlace/Chaser/PlaybackState$"
+      state:
+        "decks.{1}.place.chaser.state": { value: "{arg0}", map: { "0": "stopped", "1": "paused", "2": "playing" } }
+    - address: "^/(DeckA|DeckB)/StoragePlace/Chaser/SpeedPitch$"
+      state: { "decks.{1}.place.chaser.speed_pitch": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/StoragePlace/Chaser/Steps/Index$"
+      state: { "decks.{1}.place.chaser.step": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/StoragePlace/Layers/(\\d+)/Submaster$"
+      state: { "decks.{1}.layers.{2}.submaster": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/StoragePlace/Layers/(\\d+)/Opacity$"
+      state: { "decks.{1}.layers.{2}.opacity": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/StoragePlace/Layers/(\\d+)/Blind$"
+      state:
+        "decks.{1}.layers.{2}.blind": { value: "{arg0}", map: { "0": false, "1": true } }
+    - address: "^/(DeckA|DeckB)/StoragePlace/Layers/(\\d+)/Solo$"
+      state:
+        "decks.{1}.layers.{2}.solo": { value: "{arg0}", map: { "0": false, "1": true } }
+    - address: "^/(DeckA|DeckB)/StoragePlace/Layers/(\\d+)/Filter$"
+      state: { "decks.{1}.layers.{2}.filter": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/StoragePlace/Layers/(\\d+)/MixMode$"
+      state: { "decks.{1}.layers.{2}.mix_mode": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/StoragePlace/Layers/(\\d+)/Chaser/PlaybackState$"
+      state:
+        "decks.{1}.layers.{2}.chaser.state": { value: "{arg0}", map: { "0": "stopped", "1": "paused", "2": "playing" } }
+    - address: "^/(DeckA|DeckB)/StoragePlace/Layers/(\\d+)/Chaser/SpeedPitch$"
+      state: { "decks.{1}.layers.{2}.chaser.speed_pitch": "{arg0}" }
+    - address: "^/(DeckA|DeckB)/StoragePlace/Layers/(\\d+)/Chaser/Steps/Index$"
+      state: { "decks.{1}.layers.{2}.chaser.step": "{arg0}" }
+    - address: "^/Output/Freeze$"
+      state:
+        "output.frozen": { value: "{arg0}", map: { "0": false, "1": true } }
+    - address: "^/Output/Master$"
+      state: { "output.master": "{arg0}" }
+    - address: "^/Output/Blackout$"
+      state:
+        "output.blackout": { value: "{arg0}", map: { "0": false, "1": true } }
+    - address: "^/Output/Filter$"
+      state: { "output.filter": "{arg0}" }
+    - address: "^/Output/FilterColor/Mode$"
+      state: { "output.filter_color.mode": "{arg0}" }
+    - address: "^/Output/FilterColor/GlobalId$"
+      state: { "output.filter_color.global_id": "{arg0}" }
+    - address: "^/Output/FilterColor/Red$"
+      state: { "output.filter_color.red": "{arg0}" }
+    - address: "^/Output/FilterColor/Green$"
+      state: { "output.filter_color.green": "{arg0}" }
+    - address: "^/Output/FilterColor/Blue$"
+      state: { "output.filter_color.blue": "{arg0}" }
+    - address: "^/Output/FilterColor/White$"
+      state: { "output.filter_color.white": "{arg0}" }
+    - address: "^/Output/StrobeColor/Mode$"
+      state:
+        "output.strobe_color.mode": { value: "{arg0}", map: { "0": "output_and_color", "1": "output_and_black", "2": "black_and_color" } }
+    - address: "^/Output/StrobeColor/GlobalId$"
+      state: { "output.strobe_color.global_id": "{arg0}" }
+    - address: "^/Output/StrobeColor/Red$"
+      state: { "output.strobe_color.red": "{arg0}" }
+    - address: "^/Output/StrobeColor/Green$"
+      state: { "output.strobe_color.green": "{arg0}" }
+    - address: "^/Output/StrobeColor/Blue$"
+      state: { "output.strobe_color.blue": "{arg0}" }
+    - address: "^/Output/StrobeColor/White$"
+      state: { "output.strobe_color.white": "{arg0}" }
+    - address: "^/Output/Strobe$"
+      state: { "output.strobe": "{arg0}" }
+    - address: "^/Fade/Time$"
+      state: { "fade.time": "{arg0}" }
+    - address: "^/Fade/Type$"
+      state:
+        "fade.type": { value: "{arg0}", map: { "0": "crossfade", "1": "white_fade", "2": "black_fade", "3": "wipe_x", "4": "wipe_y", "5": "wipe_x_cross", "6": "wipe_y_cross", "7": "slide_x", "8": "slide_y", "9": "slide_x_cross", "10": "slide_y_cross", "11": "wipe_z", "12": "wipe_z_cross", "13": "slide_z", "14": "slide_z_cross" } }
+    - address: "^/Fade/Value$"
+      state: { "fade.value": "{arg0}" }
+    - address: "^/ColorKit/GlobalColors/(\\d+)/Red$"
+      state: { "global_colors.{1}.red": "{arg0}" }
+    - address: "^/ColorKit/GlobalColors/(\\d+)/Green$"
+      state: { "global_colors.{1}.green": "{arg0}" }
+    - address: "^/ColorKit/GlobalColors/(\\d+)/Blue$"
+      state: { "global_colors.{1}.blue": "{arg0}" }
+    - address: "^/ColorKit/GlobalColors/(\\d+)/White$"
+      state: { "global_colors.{1}.white": "{arg0}" }
+    - address: "^/ColorKit/GlobalColors/(\\d+)/Alpha$"
+      state: { "global_colors.{1}.alpha": "{arg0}" }
+    - address: "^/GroupControl/Groups/(\\d+)/Value$"
+      state: { "groups.{1}.value": "{arg0}" }
+    - address: "^/GroupControl/Groups/(\\d+)/Flash$"
+      state:
+        "groups.{1}.flash": { value: "{arg0}", map: { "0": false, "1": true } }
+    - address: "^/GroupControl/Chaser/PlaybackState$"
+      state:
+        "group_control.chaser.state": { value: "{arg0}", map: { "0": "stopped", "1": "paused", "2": "playing" } }
+    - address: "^/GroupControl/Chaser/SpeedPitch$"
+      state: { "group_control.chaser.speed_pitch": "{arg0}" }
+    - address: "^/GroupControl/Chaser/Steps/Index$"
+      state: { "group_control.chaser.step": "{arg0}" }
+    - address: "^/GroupControl/FadeTime$"
+      state: { "group_control.fade_time": "{arg0}" }
+    - address: "^/DmxFaderTool/Faders/(\\d+)/State$"
+      state:
+        "dmx_faders.{1}.enabled": { value: "{arg0}", map: { "0": false, "1": true } }
+    - address: "^/DmxFaderTool/Faders/(\\d+)/Value$"
+      state: { "dmx_faders.{1}.value": "{arg0}" }
+    - address: "^/CueLists/Index$"
+      state: { "cue_list.index": "{arg0}" }
+    - address: "^/CueLists/PlaybackState$"
+      state:
+        "cue_list.state": { value: "{arg0}", map: { "0": "stopped", "1": "paused", "2": "playing" } }
+    - address: "^/CueLists/PlaybackMode$"
+      state:
+        "cue_list.mode": { value: "{arg0}", map: { "0": "loop", "1": "shuffle" } }
+    - address: "^/CueLists/TimeCodeSource$"
+      state:
+        "cue_list.timecode_source": { value: "{arg0}", map: { "0": "none", "1": "system_time", "2": "midi", "3": "artnet", "4": "smpte" } }
+    - address: "^/CueLists/Cues/Index$"
+      state: { "cue_list.cue_index": "{arg0}" }
+    - address: "^/Timelines/Index$"
+      state: { "timeline.index": "{arg0}" }
+    - address: "^/Timelines/PlaybackState$"
+      state:
+        "timeline.state": { value: "{arg0}", map: { "0": "stopped", "1": "paused", "2": "playing" } }
+    - address: "^/Timelines/AudioSegments/Index$"
+      state: { "timeline.audio_segment": "{arg0}" }
+    - address: "^/Timelines/CueSegments/Index$"
+      state: { "timeline.cue_segment": "{arg0}" }
+    - address: "^/Timelines/Markers/Id$"
+      state: { "timeline.marker": "{arg0}" }
+    - address: "^/SetupRegisters/Id$"
+      state: { "setup_register.id": "{arg0}" }
+    - address: "^/Main/View$"
+      state: { "main.view": "{arg0}" }
+    - address: "^/ArtNet/Input/TimeCode/StreamId$"
+      state: { "artnet.timecode_stream": "{arg0}" }
+    - path: "^/RemoteCommands/\\?GetProduct$"
+      match: "(?s)^\\s*(.*?)\\s*$"
+      state: { "info.product": "{1}" }
+    - path: "^/RemoteCommands/\\?GetVersion$"
+      match: "(?s)^\\s*(.*?)\\s*$"
+      state: { "info.version": "{1}" }
+    - path: "^/RemoteCommands/\\?GetVersionNumber$"
+      match: "(?s)^\\s*(.*?)\\s*$"
+      state: { "info.version_number": "{1}" }
+    - path: "^/RemoteCommands/\\?GetHostName$"
+      match: "(?s)^\\s*(.*?)\\s*$"
+      state: { "info.host_name": "{1}" }
+    - path: "^/RemoteCommands/\\?GetHostLabel$"
+      match: "(?s)^\\s*(.*?)\\s*$"
+      state: { "info.host_label": "{1}" }
+    - path: "^/RemoteCommands/\\?GetMatrixSizeX$"
+      match: "(?s)^\\s*(-?\\d+)\\s*$"
+      state: { "matrix.size_x": "{1}" }
+    - path: "^/RemoteCommands/\\?GetMatrixSizeY$"
+      match: "(?s)^\\s*(-?\\d+)\\s*$"
+      state: { "matrix.size_y": "{1}" }
+    - path: "^/RemoteCommands/\\?GetMatrixSizeZ$"
+      match: "(?s)^\\s*(-?\\d+)\\s*$"
+      state: { "matrix.size_z": "{1}" }
+    - path: "^/RemoteCommands/\\?GetCuelistCount$"
+      match: "(?s)^\\s*(-?\\d+)\\s*$"
+      state: { "cue_list.count": "{1}" }
+    - path: "^/RemoteCommands/\\?GetTimelinesCount$"
+      match: "(?s)^\\s*(-?\\d+)\\s*$"
+      state: { "timeline.count": "{1}" }
+    - path: "^/RemoteCommands/\\?GetGroupCount$"
+      match: "(?s)^\\s*(-?\\d+)\\s*$"
+      state: { "group_control.count": "{1}" }
+    - path: "^/RemoteCommands/\\?GetSetupRegisterCurrentId$"
+      match: "(?s)^\\s*(-?\\d+)\\s*$"
+      state: { "setup_register.current": "{1}" }
+    - path: "^/RemoteCommands/\\?GetStorageDeckA$"
+      match: "(?s)^\\s*(-?\\d+)\\s*$"
+      state: { "decks.DeckA.storage": "{1}" }
+    - path: "^/RemoteCommands/\\?GetStoragePlaceDeckA$"
+      match: "(?s)^\\s*(-?\\d+)\\s*$"
+      state: { "decks.DeckA.place": "{1}" }
+    - path: "^/RemoteCommands/\\?GetStorageDeckB$"
+      match: "(?s)^\\s*(-?\\d+)\\s*$"
+      state: { "decks.DeckB.storage": "{1}" }
+    - path: "^/RemoteCommands/\\?GetStoragePlaceDeckB$"
+      match: "(?s)^\\s*(-?\\d+)\\s*$"
+      state: { "decks.DeckB.place": "{1}" }
+    - path: "^/RemoteCommands/\\?GetLayerDeckA$"
+      match: "(?s)^\\s*(-?\\d+)\\s*$"
+      state: { "decks.DeckA.current_layer": "{1}" }
+    - path: "^/RemoteCommands/\\?GetLayerDeckB$"
+      match: "(?s)^\\s*(-?\\d+)\\s*$"
+      state: { "decks.DeckB.current_layer": "{1}" }
+    - path: "^/RemoteCommands/\\?GetLayerCountDeckA$"
+      match: "(?s)^\\s*(-?\\d+)\\s*$"
+      state: { "decks.DeckA.layer_count": "{1}" }
+    - path: "^/RemoteCommands/\\?GetLayerCountDeckB$"
+      match: "(?s)^\\s*(-?\\d+)\\s*$"
+      state: { "decks.DeckB.layer_count": "{1}" }
+    - path: "^/RemoteCommands/\\?GetLayerNameDeckA$"
+      match: "(?s)^\\s*(.*?)\\s*$"
+      state: { "decks.DeckA.layer_name": "{1}" }
+    - path: "^/RemoteCommands/\\?GetLayerNameDeckB$"
+      match: "(?s)^\\s*(.*?)\\s*$"
+      state: { "decks.DeckB.layer_name": "{1}" }
+    - path: "^/RemoteCommands/\\?GetLayerEffectNameDeckA$"
+      match: "(?s)^\\s*(.*?)\\s*$"
+      state: { "decks.DeckA.effect_name": "{1}" }
+    - path: "^/RemoteCommands/\\?GetLayerEffectNameDeckB$"
+      match: "(?s)^\\s*(.*?)\\s*$"
+      state: { "decks.DeckB.effect_name": "{1}" }
+    - path: "^/RemoteCommands/\\?GetLayerTickerTextDeckA$"
+      match: "(?s)^\\s*(.*?)\\s*$"
+      state: { "decks.DeckA.ticker_text": "{1}" }
+    - path: "^/RemoteCommands/\\?GetLayerTickerTextDeckB$"
+      match: "(?s)^\\s*(.*?)\\s*$"
+      state: { "decks.DeckB.ticker_text": "{1}" }
+    - path: "^/RemoteCommands/\\?GetCuelistCueCurrent$"
+      match: "(?s)^\\s*(-?\\d+)\\s*$"
+      state: { "cue_list.current_cue": "{1}" }
+    - path: "^/RemoteCommands/\\?GetTimelinesDuration$"
+      match: "(?s)^\\s*(.*?)\\s*$"
+      state: { "timeline.duration": "{1}" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      OSC needs Enable Server, and state needs Enable Feedback, under Preferences > Remote Control
+      > OSC; the HTTP commands and reads need the web server enabled under Preferences > Remote
+      Control > HTTP. MADRIX sends feedback to the address that sends to it, on its Destination
+      Network Port (the feedback_port setting, 9002 by default). Feedback is sent when a value
+      changes and for /Main/FeedbackAll, which the session sends on connecting and every 60 s.
+      OSC commands are not acknowledged and report unverified.
+  - models: [all]
+    severity: warning
+    text: >
+      The help lists the address space but not the feedback messages: the rules read each
+      address's first argument, as the address takes it. Methods with no listed argument (Up,
+      Down, Automatic, ToLeft, ToRight, ToCenter, Defaults, FeedbackAll) are sent without one.
+      Layer, group, fader and trigger port numbers are placed in the address as plain decimals
+      (/DeckA/StoragePlace/Layers/0/Opacity), the help writing them as [0 ... N-1]. State keys
+      for decks are DeckA and DeckB, as the addresses name them.
+  - models: [all]
+    severity: info
+    text: >
+      Indexes over OSC start at 0 (cue lists, cues, timelines, segments, layers, groups,
+      storages and places), IDs at 1 (global colors, markers, setup registers), and HTTP Remote
+      numbers at 1 (storages, places, cue list items, layers). Group presets over OSC have "No
+      Feedback Wanted". Ranges the help leaves open (indexes, offsets, BPM) are bounded here.
+  - models: [all]
+    severity: info
+    text: >
+      HTTP Remote Get functions answer the value as text; that the body is the value alone is
+      inferred from the documentation's examples. The HTTP reads are polled every 2 s (current
+      storages, places, layers, effect names, ticker texts, current cue, timeline duration) and
+      every 60 s (version, host, matrix size, counts); names and descriptions are read on demand
+      with the get_ commands. Sound levels, previews and thumbnails are left to get_value or are
+      images this spec does not read. The JavaScript array functions are not parsed.
+  - models: [all]
+    severity: critical
+    text: >
+      load_setup_register loads another setup, and cue_list_delete_cue, cue_list_delete_all and
+      the set_cue_ commands change the show's cue list; neither can be undone remotely.
+      set_blackout and set_freeze act on the whole output at once.

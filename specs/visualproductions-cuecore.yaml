@@ -1,0 +1,552 @@
+spec: 1
+id: visualproductions-cuecore
+name: Visual Productions CueCore, QuadCore, B-Station2, IoCore2, TimeCore and KioscTouch2 (UDP API)
+vendor: Visual Productions
+category: lighting
+
+# Written from the API appendix of each unit's user manual. Every unit takes
+# the same text API: "<prefix>-<subsystem>-<index>-<command>[=<value>]", one
+# message per UDP datagram to port 7000, with "core" as the default prefix
+# ("kiosc" on the KioscTouch2). The units remember the last four UDP clients
+# (eight on the KioscTouch2) and push a few changes back to them.
+source:
+  - title: CueCore3 Manual, Appendix E "API"
+    author: Visual Productions BV
+    url: https://api.visualproductions.nl/api/download/6332f4f7ae10192bdec2bd0c
+    note: >
+      Document revision 8, 15.09.2025 (download dated 2026-03-11). Settings: General (API prefix
+      "core" by default, used against feedback loops), TCP UDP ("By default both ports are set to
+      7000"), OSC. Appendix E: OSC, "TCP & UDP" string table (playback 1-16, track 1-128,
+      internal timecode, action list 1-16 and action 1-48, timer 1-4, variable 1-20, dmx, blink,
+      hello), HTTP (/ajax/pb/XX/...), Feedback (last four OSC and last four UDP clients; table of
+      pb intensity, rate, active, cue, master intensity, rate and fade, action list enable, gpi
+      "=ON/OFF" and "=50%", hello; core-goodbye removes a client).
+  - title: CueCore2 User Manual, Appendix D "API"
+    author: Visual Productions BV
+    url: https://api.visualproductions.nl/api/download/633ae916812af574aa075201
+    note: >
+      Document revision 13, 27.09.2026. D.2 TCP & UDP (playback 1-6, track 1-128, internal
+      timecode, action list 1-8 and action 1-48, timer 1-4, variable 1-10, dmx, blink, hello);
+      D.3 HTTP (jump [1, 32], intensity [0.0, 1.0], rate [-1.0, 1.0], fade as text such as 3s,
+      solo [1, 6]); D.5 Feedback table. TCP/UDP ports default 7000 (section 6).
+  - title: QuadCore User Manual, Appendix D "API"
+    author: Visual Productions BV
+    url: https://api.visualproductions.nl/api/download/633af23b812af574aa0752e3
+    note: >
+      Document revision 10, 14.08.2026. D.2 TCP & UDP: the CueCore2's table (playback 1-6, action
+      list 1-8, variable 1-10). D.4 Feedback describes the client lists without a message table.
+  - title: B-Station2 User Manual, Appendix D "API"
+    author: Visual Productions BV
+    url: https://api.visualproductions.nl/api/download/633af468812af574aa0758fc
+    note: >
+      Document revision 5, 05.07.2023 (download dated 2026-02-13). D.2 TCP & UDP: playback 1-6
+      (go+, go-, jump, release, intensity), release all, master intensity, blackout=<bool>, solo,
+      action list 1-8, timer 1-4, variable 1-8, core-bu-1=<bool>, core-ld-1=<float>,
+      core-ld-1=<colour> ("core-ld-3=#ff0000"; "core-ld=#0000ff" for all LEDs), dmx, blink,
+      hello. D.4 Feedback adds core-bu-1. TCP/UDP ports default 7000.
+  - title: IoCore2 User Manual, Appendix D "API"
+    author: Visual Productions BV
+    url: https://api.visualproductions.nl/api/download/6763ec7f5aaf91d36674c9e4
+    note: >
+      Document revision 8, 30.08.2026. D.2 UDP and TCP: core-gpo-1=<0/1> (GPO 1-6), action list
+      1-8, dmx channel 1-512, timer 1-4, variable 1-10, blink, hello. D.3 Feedback:
+      core-gpi-<pin>=ON/OFF and =50%, action list enable, hello. Ports default 7000.
+  - title: TimeCore User Manual, Appendix D "API"
+    author: Visual Productions BV
+    url: https://api.visualproductions.nl/api/download/6762f3e65aaf91d36672e771
+    note: >
+      Document revision 6, 10.08.2026. D.2 TCP & UDP: action list 1-8, timecode start, stop,
+      restart, pause and set ("23:59:59.24"), timer 1-4, variable 1-8, blink. D.3 Feedback:
+      action list enable and hello. Ports default 7000.
+  - title: KioscTouch2 User Manual, Appendix B "API"
+    author: Visual Productions BV
+    url: https://api.visualproductions.nl/api/download/6a359b8c2a77a616ff0e8a6b
+    note: >
+      Document revision 1, 06.07.2026. API prefix "kiosc" by default; UDP and TCP incoming port
+      7000, OSC 8000. B.2: prefix-hello, prefix-goodbye, prefix-blink, prefix-page-select=
+      <integer>; UDP messages need no terminator. B.3: last eight clients per protocol, feedback
+      only to the protocol's own list; prefix-hello.
+
+# One ASCII message per datagram, nothing appended. Every command is
+# fire-and-forget except hello, which the unit echoes; only the echo is taken
+# as a reply, so pushed feedback goes to the rules alone.
+transport:
+  type: line-udp
+  port: 7000
+  terminator: none
+  encoding: ascii
+  reply: to-source
+  reply_match: "-hello\\s*$"
+  probe: "{settings.prefix}-hello"
+
+ports:
+  - { port: 7000, protocol: udp, role: control, note: "The unit's UDP port (Settings, TCP UDP); feedback comes back to the sender's address and port" }
+
+settings:
+  prefix:
+    type: string
+    default: core
+    pattern: "^[A-Za-z0-9_]+$"
+    max_length: 32
+    label: API prefix
+    description: The unit's API prefix from its General settings, "core" by default and "kiosc" on a KioscTouch2.
+
+models:
+  - id: cuecore3
+    name: CueCore3
+    supports: &cuecore [playback_go_forward, playback_go_back, playback_jump, playback_release,
+      playback_intensity, playback_rate, release_all_playbacks, master_intensity, master_rate,
+      master_fade, solo_playback, select_track, erase_selected_track, record_selected_track,
+      stop_recording, erase_track, record_track, snapshot_dmx, snapshot_artnet, snapshot_sacn,
+      timecode_start, timecode_stop, timecode_restart, timecode_pause, timecode_set,
+      execute_action, set_action_list_enabled, timer_start, timer_stop, timer_restart,
+      timer_pause, timer_set, set_variable, refresh_variable, refresh_variables, set_dmx_channel,
+      blink, hello, goodbye]
+    verification: none
+  - id: cuecore2
+    name: CueCore2
+    supports: *cuecore
+    verification: none
+  - id: quadcore
+    name: QuadCore
+    supports: *cuecore
+    verification: none
+  - id: b-station2
+    name: B-Station2
+    supports: [playback_go_forward, playback_go_back, playback_jump, playback_release,
+      playback_intensity, release_all_playbacks, master_intensity, set_blackout, solo_playback,
+      execute_action, set_action_list_enabled, timer_start, timer_stop, timer_restart,
+      timer_pause, timer_set, set_variable, refresh_variable, refresh_variables, set_button,
+      set_led_intensity, set_led_color, set_all_leds_intensity, set_all_leds_color,
+      set_dmx_channel, blink, hello, goodbye]
+    verification: none
+  - id: iocore2
+    name: IoCore2
+    supports: [set_gpo, execute_action, set_action_list_enabled, set_dmx_channel, timer_start,
+      timer_stop, timer_restart, timer_pause, timer_set, set_variable, refresh_variable,
+      refresh_variables, blink, hello, goodbye]
+    verification: none
+  - id: timecore
+    name: TimeCore
+    supports: [execute_action, set_action_list_enabled, timecode_start, timecode_stop,
+      timecode_restart, timecode_pause, timecode_set, timer_start, timer_stop, timer_restart,
+      timer_pause, timer_set, set_variable, refresh_variable, refresh_variables, blink, hello,
+      goodbye]
+    verification: none
+  - id: kiosctouch2
+    name: KioscTouch2
+    supports: [select_page, blink, hello, goodbye]
+    verification: none
+
+commands:
+  playback_go_forward:
+    summary: "Jump to the next cue of a playback (\"<prefix>-pb-<n>-go+\")"
+    params:
+      playback: &playback { type: int, min: 1, max: 16, required: true, label: Playback, description: "Playback number from 1: 1-16 on a CueCore3, 1-6 on the other units." }
+    send: "{settings.prefix}-pb-{playback}-go+"
+    returns: none
+
+  playback_go_back:
+    summary: "Jump to the previous cue of a playback (\"<prefix>-pb-<n>-go-\")"
+    params: { playback: *playback }
+    send: "{settings.prefix}-pb-{playback}-go-"
+    returns: none
+
+  playback_jump:
+    summary: "Jump to a cue of a playback (\"<prefix>-pb-<n>-jump=<cue>\")"
+    params:
+      playback: *playback
+      cue: { type: int, min: 1, max: 32, required: true, label: Cue, description: "Cue number in the playback, from 1; the HTTP table gives the range 1 to 32." }
+    send: "{settings.prefix}-pb-{playback}-jump={cue}"
+    returns: none
+
+  playback_release:
+    summary: "Release a playback (\"<prefix>-pb-<n>-release\")"
+    params: { playback: *playback }
+    send: "{settings.prefix}-pb-{playback}-release"
+    returns: none
+
+  playback_intensity:
+    summary: "Set a playback's intensity, 0.0 to 1.0 (\"<prefix>-pb-<n>-intensity=<float>\")"
+    params:
+      playback: *playback
+      level: &level { type: float, min: 0.0, max: 1.0, required: true, label: Intensity, description: "Intensity from 0.0 (off) to 1.0 (full)." }
+    send: "{settings.prefix}-pb-{playback}-intensity={level:.3f}"
+    returns: none
+
+  playback_rate:
+    summary: "Set a playback's rate, -1.0 to 1.0 (\"<prefix>-pb-<n>-rate=<float>\")"
+    params:
+      playback: *playback
+      rate: &rate { type: float, min: -1.0, max: 1.0, required: true, label: Rate, description: "Playback rate from -1.0 to 1.0, as the HTTP table gives it." }
+    send: "{settings.prefix}-pb-{playback}-rate={rate:.3f}"
+    returns: none
+
+  release_all_playbacks:
+    summary: "Release every playback (\"<prefix>-pb-release\")"
+    send: "{settings.prefix}-pb-release"
+    returns: none
+
+  master_intensity:
+    summary: "Set the playback master intensity, 0.0 to 1.0 (\"<prefix>-pb-intensity=<float>\")"
+    params: { level: *level }
+    send: "{settings.prefix}-pb-intensity={level:.3f}"
+    returns: none
+
+  master_rate:
+    summary: "Set the playback master rate, -1.0 to 1.0 (\"<prefix>-pb-rate=<float>\")"
+    params: { rate: *rate }
+    send: "{settings.prefix}-pb-rate={rate:.3f}"
+    returns: none
+
+  master_fade:
+    summary: "Set the master fade time as text, such as 3s (\"<prefix>-pb-fade=<text>\")"
+    params:
+      fade: { type: string, pattern: "^[0-9][0-9:.]*[a-z]*$", max_length: 16, required: true, label: Fade time, description: "Fade time in the unit's own notation, such as 3s, as the HTTP example writes it." }
+    send: "{settings.prefix}-pb-fade={fade}"
+    returns: none
+
+  solo_playback:
+    summary: "Start a playback solo, releasing the others (\"<prefix>-pb-solo=<n>\")"
+    params: { playback: *playback }
+    send: "{settings.prefix}-pb-solo={playback}"
+    returns: none
+
+  set_blackout:
+    summary: "Turn the blackout on or off (\"<prefix>-pb-blackout=<bool>\")"
+    params:
+      enabled: { type: bool, required: true, label: Blackout, description: "On blacks out the output, off restores it." }
+    send: "{settings.prefix}-pb-blackout={enabled}"
+    returns: none
+
+  select_track:
+    summary: "Select a track (\"<prefix>-tr-select=<n>\")"
+    params:
+      track: &track { type: int, min: 1, max: 128, required: true, label: Track, description: "Track number, 1 to 128." }
+    send: "{settings.prefix}-tr-select={track}"
+    returns: none
+
+  erase_selected_track:
+    summary: "Erase the selected track (\"<prefix>-tr-erase\")"
+    send: "{settings.prefix}-tr-erase"
+    returns: none
+
+  record_selected_track:
+    summary: "Start recording the selected track (\"<prefix>-tr-record\")"
+    send: "{settings.prefix}-tr-record"
+    returns: none
+
+  stop_recording:
+    summary: "Stop recording (\"<prefix>-tr-stop\")"
+    send: "{settings.prefix}-tr-stop"
+    returns: none
+
+  erase_track:
+    summary: "Erase a track (\"<prefix>-tr-<n>-erase\")"
+    params: { track: *track }
+    send: "{settings.prefix}-tr-{track}-erase"
+    returns: none
+
+  record_track:
+    summary: "Start recording a track (\"<prefix>-tr-<n>-record\")"
+    params: { track: *track }
+    send: "{settings.prefix}-tr-{track}-record"
+    returns: none
+
+  snapshot_dmx:
+    summary: "Record a snapshot of the current DMX input (\"<prefix>-tr-snapshot-dmx\")"
+    send: "{settings.prefix}-tr-snapshot-dmx"
+    returns: none
+
+  snapshot_artnet:
+    summary: "Record a snapshot of the current Art-Net input (\"<prefix>-tr-snapshot-artnet\")"
+    send: "{settings.prefix}-tr-snapshot-artnet"
+    returns: none
+
+  snapshot_sacn:
+    summary: "Record a snapshot of the current sACN input (\"<prefix>-tr-snapshot-sacn\")"
+    send: "{settings.prefix}-tr-snapshot-sacn"
+    returns: none
+
+  timecode_start:
+    summary: "Start the internal timecode (\"<prefix>-tc-start\")"
+    send: "{settings.prefix}-tc-start"
+    returns: none
+
+  timecode_stop:
+    summary: "Stop the internal timecode (\"<prefix>-tc-stop\")"
+    send: "{settings.prefix}-tc-stop"
+    returns: none
+
+  timecode_restart:
+    summary: "Restart the internal timecode (\"<prefix>-tc-restart\")"
+    send: "{settings.prefix}-tc-restart"
+    returns: none
+
+  timecode_pause:
+    summary: "Pause the internal timecode (\"<prefix>-tc-pause\")"
+    send: "{settings.prefix}-tc-pause"
+    returns: none
+
+  timecode_set:
+    summary: "Set the internal timecode, such as 23:59:59.24 (\"<prefix>-tc-set=<string>\")"
+    params:
+      timecode: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}([.:][0-9]{2})?$", max_length: 11, required: true, label: Timecode, description: "Timecode as hours:minutes:seconds.frames, such as 23:59:59.24." }
+    send: "{settings.prefix}-tc-set={timecode}"
+    returns: none
+
+  execute_action:
+    summary: "Execute an action inside an action list with a value (\"<prefix>-al-<list>-<action>-execute=<arg>\")"
+    params:
+      action_list: &action_list { type: int, min: 1, max: 16, required: true, label: Action list, description: "Action list number from 1: 1-16 on a CueCore3, 1-8 on the other units." }
+      action: { type: int, min: 1, max: 48, required: true, label: Action, description: "Action number inside the action list, 1 to 48." }
+      value: { type: string, pattern: "^(true|false|-?[0-9]+(\\.[0-9]+)?)$", max_length: 16, default: "true", label: Value, description: "The value the action is executed with: true or false, an integer or a decimal number." }
+    send: "{settings.prefix}-al-{action_list}-{action}-execute={value}"
+    returns: none
+
+  set_action_list_enabled:
+    summary: "Set an action list's enable checkbox (\"<prefix>-al-<n>-enable=<bool>\")"
+    params:
+      action_list: *action_list
+      enabled: { type: bool, required: true, label: Enabled, description: "On enables the action list, off disables it." }
+    send: "{settings.prefix}-al-{action_list}-enable={enabled}"
+    returns: none
+
+  timer_start:
+    summary: "Start a timer (\"<prefix>-tm-<n>-start\")"
+    params:
+      timer: &timer { type: int, min: 1, max: 4, required: true, label: Timer, description: "Timer number, 1 to 4." }
+    send: "{settings.prefix}-tm-{timer}-start"
+    returns: none
+
+  timer_stop:
+    summary: "Stop a timer (\"<prefix>-tm-<n>-stop\")"
+    params: { timer: *timer }
+    send: "{settings.prefix}-tm-{timer}-stop"
+    returns: none
+
+  timer_restart:
+    summary: "Restart a timer (\"<prefix>-tm-<n>-restart\")"
+    params: { timer: *timer }
+    send: "{settings.prefix}-tm-{timer}-restart"
+    returns: none
+
+  timer_pause:
+    summary: "Pause a timer (\"<prefix>-tm-<n>-pause\")"
+    params: { timer: *timer }
+    send: "{settings.prefix}-tm-{timer}-pause"
+    returns: none
+
+  timer_set:
+    summary: "Set a timer to a time string (\"<prefix>-tm-<n>-set=<text>\")"
+    params:
+      timer: *timer
+      time: { type: string, pattern: "^[0-9]{1,2}:[0-9]{2}:[0-9]{2}([.:][0-9]{1,3})?$", max_length: 12, required: true, label: Time, description: "Time as hours:minutes:seconds, such as 01:02:03, as the HTTP example writes it." }
+    send: "{settings.prefix}-tm-{timer}-set={time}"
+    returns: none
+
+  set_variable:
+    summary: "Set a variable (\"<prefix>-va-<n>-set=<integer>\")"
+    params:
+      variable: &variable { type: int, min: 1, max: 20, required: true, label: Variable, description: "Variable number from 1: 1-20 on a CueCore3, 1-10 on a CueCore2, QuadCore and IoCore2, 1-8 on a B-Station2 and TimeCore." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The variable's new integer value." }
+    send: "{settings.prefix}-va-{variable}-set={value}"
+    returns: none
+
+  refresh_variable:
+    summary: "Refresh a variable, triggering as if it changed (\"<prefix>-va-<n>-refresh\")"
+    params: { variable: *variable }
+    send: "{settings.prefix}-va-{variable}-refresh"
+    returns: none
+
+  refresh_variables:
+    summary: "Refresh every variable, triggering as if each changed (\"<prefix>-va-refresh\")"
+    send: "{settings.prefix}-va-refresh"
+    returns: none
+
+  set_dmx_channel:
+    summary: "Set a DMX channel's value (\"<prefix>-dmx-<channel>=<value>\")"
+    params:
+      channel: { type: int, min: 1, max: 512, required: true, label: Channel, description: "DMX channel, 1 to 512, as the IoCore2 table gives it." }
+      value: { type: int, min: 0, max: 255, required: true, label: Value, description: "DMX value, 0 to 255." }
+    send: "{settings.prefix}-dmx-{channel}={value}"
+    returns: none
+
+  set_button:
+    summary: "Set a button's state (\"<prefix>-bu-<n>=<bool>\")"
+    params:
+      button: &button { type: int, min: 1, max: 8, required: true, label: Button, description: "Button number on the B-Station2, from 1." }
+      pressed: { type: bool, required: true, label: State, description: "On sets the button's state on, off sets it off." }
+    send: "{settings.prefix}-bu-{button}={pressed}"
+    returns: none
+
+  set_led_intensity:
+    summary: "Set a button LED's intensity, 0.0 to 1.0 (\"<prefix>-ld-<n>=<float>\")"
+    params:
+      button: *button
+      level: *level
+    send: "{settings.prefix}-ld-{button}={level:.3f}"
+    returns: none
+
+  set_led_color:
+    summary: "Set a button LED's color as #RRGGBB (\"<prefix>-ld-<n>=#rrggbb\")"
+    params:
+      button: *button
+      color: &color { type: string, pattern: "^#[0-9a-fA-F]{6}$", max_length: 7, required: true, label: Color, description: "Color as #RRGGBB, such as #ff0000 for red." }
+    send: "{settings.prefix}-ld-{button}={color}"
+    returns: none
+
+  set_all_leds_intensity:
+    summary: "Set every button LED's intensity, 0.0 to 1.0 (\"<prefix>-ld=<float>\")"
+    params: { level: *level }
+    send: "{settings.prefix}-ld={level:.3f}"
+    returns: none
+
+  set_all_leds_color:
+    summary: "Set every button LED's color as #RRGGBB (\"<prefix>-ld=#rrggbb\")"
+    params: { color: *color }
+    send: "{settings.prefix}-ld={color}"
+    returns: none
+
+  set_gpo:
+    summary: "Switch a GPO relay (\"<prefix>-gpo-<n>=<0/1>\")"
+    params:
+      gpo: { type: int, min: 1, max: 6, required: true, label: GPO, description: "GPO port number, 1 to 6 as the IoCore2 table gives it." }
+      closed: { type: bool, required: true, label: Relay, description: "On closes the relay, off opens it." }
+    send: "{settings.prefix}-gpo-{gpo}={closed:bool01}"
+    returns: none
+
+  select_page:
+    summary: "Switch the KioscTouch2 to a page of its layout (\"<prefix>-page-select=<index>\")"
+    params:
+      page: { type: int, min: 0, max: 255, required: true, label: Page, description: "Page index in the layout, as the KioscTouch2 numbers it." }
+    send: "{settings.prefix}-page-select={page}"
+    returns: none
+
+  blink:
+    summary: "Momentarily flash the unit's LED or the KioscTouch2's header (\"<prefix>-blink\")"
+    send: "{settings.prefix}-blink"
+    returns: none
+
+  hello:
+    summary: "Ask the unit to echo its hello message (\"<prefix>-hello\"), which also makes this session a feedback client"
+    send: "{settings.prefix}-hello"
+    expect: { matches: "^(\\S+-hello)\\s*$" }
+    returns: value
+
+  goodbye:
+    summary: "Remove this session from the unit's feedback client list (\"<prefix>-goodbye\")"
+    send: "{settings.prefix}-goodbye"
+    returns: none
+
+state:
+  playbacks.*.intensity: { type: float, description: "Playback intensity, 0.0 to 1.0, from the unit's feedback" }
+  playbacks.*.rate: { type: float, description: "Playback rate, -1.0 to 1.0, from the unit's feedback" }
+  playbacks.*.active: { type: bool, description: "Whether the playback is active, from the unit's feedback" }
+  playbacks.*.cue: { type: int, description: "Current cue number of the playback, from the unit's feedback" }
+  master.intensity: { type: float, description: "Playback master intensity, 0.0 to 1.0" }
+  master.rate: { type: float, description: "Playback master rate, -1.0 to 1.0" }
+  master.fade: { type: string, description: "Master fade time as the unit writes it, such as 3s" }
+  action_lists.*.enabled: { type: bool, description: "Whether the action list's enable checkbox is set" }
+  gpi.*.closed: { type: bool, description: "Digital GPI input state: true when the unit reports ON" }
+  gpi.*.level: { type: int, unit: percent, description: "Analog GPI input level in percent, 0 to 100" }
+  buttons.*.pressed: { type: bool, description: "B-Station2 button state, from the unit's feedback" }
+
+telemetry:
+  # The units push changes to their last four UDP clients. Saying hello
+  # makes this session one, and keeps it on the list after a power cycle.
+  subscribe:
+    send: ["{settings.prefix}-hello"]
+    every_ms: 30000
+  updates:
+    - match: '^[A-Za-z0-9_]+-pb-(\d+)-intensity=(-?[0-9.]+)\s*$'
+      state: { "playbacks.{1}.intensity": "{2}" }
+    - match: '^[A-Za-z0-9_]+-pb-(\d+)-rate=(-?[0-9.]+)\s*$'
+      state: { "playbacks.{1}.rate": "{2}" }
+    - match: '^[A-Za-z0-9_]+-pb-(\d+)-active=(\S+)\s*$'
+      state:
+        "playbacks.{1}.active": { value: "{2}", map: { "1": true, "0": false, "true": true, "false": false, "ON": true, "OFF": false } }
+    - match: '^[A-Za-z0-9_]+-pb-(\d+)-cue=(\d+)\s*$'
+      state: { "playbacks.{1}.cue": "{2}" }
+    - match: '^[A-Za-z0-9_]+-pb-intensity=(-?[0-9.]+)\s*$'
+      state: { master.intensity: "{1}" }
+    - match: '^[A-Za-z0-9_]+-pb-rate=(-?[0-9.]+)\s*$'
+      state: { master.rate: "{1}" }
+    - match: '^[A-Za-z0-9_]+-pb-fade=(\S+)\s*$'
+      state: { master.fade: "{1}" }
+    - match: '^[A-Za-z0-9_]+-al-(\d+)-enable=(\S+)\s*$'
+      state:
+        "action_lists.{1}.enabled": { value: "{2}", map: { "1": true, "0": false, "true": true, "false": false, "ON": true, "OFF": false } }
+    - match: '^[A-Za-z0-9_]+-gpi-(\d+)=(ON|OFF)\s*$'
+      state:
+        "gpi.{1}.closed": { value: "{2}", map: { "ON": true, "OFF": false } }
+    - match: '^[A-Za-z0-9_]+-gpi-(\d+)=(\d+)%\s*$'
+      state: { "gpi.{1}.level": "{2}" }
+    - match: '^[A-Za-z0-9_]+-bu-(\d+)=(\S+)\s*$'
+      state:
+        "buttons.{1}.pressed": { value: "{2}", map: { "1": true, "0": false, "true": true, "false": false, "ON": true, "OFF": false } }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The API has no queries: nothing reads a playback, timer, variable or output back. State
+      comes only from the feedback the unit pushes to its last four UDP clients (eight on the
+      KioscTouch2) when a value changes, so it stays unknown until something changes after
+      connecting. Timer values, variables, track contents, the timecode position and the DMX
+      output are never reported. A power cycle clears the client list; the session says hello
+      every 30 s to stay on it, and goodbye removes it.
+  - models: [all]
+    severity: warning
+    text: >
+      The feedback tables name each message ("core-pb-1-intensity") without its value. The rules
+      read the value after "=", as the GPI messages show it ("core-gpi-1=ON", "=50%"), and accept
+      true/false, 1/0 and ON/OFF for on/off values. The value format of the playback, master,
+      action list and button feedback is inferred, not documented. The rules accept any API
+      prefix of letters, digits and underscores; feedback from another unit with the same
+      prefix sent to this session's address is read as this unit's.
+  - models: [all]
+    severity: info
+    text: >
+      Commands are sent over UDP to port 7000 without a terminator and are not acknowledged, so
+      every command but hello reports unverified. The same strings are accepted over TCP on port
+      7000 (ending in CR LF on the KioscTouch2), which this spec does not use because feedback is
+      sent to UDP and OSC clients only. Feedback can loop between Visual Productions units that
+      share a prefix; give each unit a unique API prefix.
+  - models: [all]
+    severity: info
+    text: >
+      Ranges differ by unit and the parameters take the largest: playbacks 1-16 and action
+      lists 1-16 on the CueCore3, 1-6 and 1-8 on the others; variables 1-20 (CueCore3), 1-10
+      (CueCore2, QuadCore, IoCore2) or 1-8 (B-Station2, TimeCore). A number above the unit's
+      range is sent and ignored by the unit. Cue numbers are bounded to 1-32 as the HTTP tables
+      give them; DMX channels to 1-512 as the IoCore2 table gives them, the other units naming
+      no range. Floats are sent with three decimals.
+  - models: [cuecore3, cuecore2, quadcore, timecore]
+    severity: info
+    text: >
+      The timecode commands apply only when the timecode source is set to Internal on the
+      settings page.
+  - models: [cuecore3, cuecore2, quadcore]
+    severity: critical
+    text: >
+      erase_track and erase_selected_track delete a recorded track, and record_track,
+      record_selected_track and the snapshot commands overwrite one; neither can be undone from
+      the API.
+  - models: [b-station2]
+    severity: info
+    text: >
+      The B-Station2's playbacks have no rate, and the manual's table has no track or timecode
+      commands. Buttons and LEDs are numbered as on the panel; the manual gives no range, so 1-8
+      is assumed.
+  - models: [kiosctouch2]
+    severity: warning
+    text: >
+      The KioscTouch2's default API prefix is "kiosc": set the prefix setting to it. Its only
+      API commands are hello, goodbye, blink and page select, and its only feedback is hello.
+      The page index base (0 or 1) is not documented.
+  - models: [iocore2]
+    severity: info
+    text: >
+      The GPO table gives ports 1-6. The digital or analog mode of each GPI is set on the unit;
+      digital inputs report ON/OFF and analog inputs a percentage.

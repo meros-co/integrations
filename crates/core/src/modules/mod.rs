@@ -40,6 +40,8 @@ mod allenheath_sq;
     feature = "analogway-midra4k"
 ))]
 mod analogway;
+#[cfg(feature = "artnet")]
+mod artnet;
 #[cfg(feature = "blackmagic-atem")]
 mod atem;
 #[cfg(feature = "barco-projection-protocol")]
@@ -139,6 +141,8 @@ mod pandorasbox_commands;
 mod philips_sicp;
 #[cfg(feature = "pjlink")]
 mod pjlink;
+#[cfg(feature = "posistagenet")]
+mod posistagenet;
 #[cfg(feature = "qsys")]
 mod qsys;
 #[cfg(feature = "resolume")]
@@ -147,6 +151,8 @@ mod resolume_push;
 mod rtp_journal;
 #[cfg(any(feature = "generic-midi", feature = "midi-show-control"))]
 mod rtp_midi;
+#[cfg(feature = "sacn")]
+mod sacn;
 #[cfg(feature = "samsung-mdc")]
 mod samsung_mdc;
 #[cfg(feature = "samsung-mdc")]
@@ -298,6 +304,12 @@ pub(crate) fn construct(
             Some(port) => Ok(Box::new(tsl::Listener::new(port, &context.model))),
             None => Err("TSL UMD has no standard port: give the port to listen on".into()),
         },
+        #[cfg(feature = "artnet")]
+        "artnet" => Ok(Box::new(artnet::ArtNet::new(context)?)),
+        #[cfg(feature = "sacn")]
+        "sacn" => Ok(Box::new(sacn::Sacn::new(context)?)),
+        #[cfg(feature = "posistagenet")]
+        "posistagenet" => Ok(Box::new(posistagenet::Psn::new(context)?)),
         #[cfg(feature = "osc-listener")]
         "osc-listener" => Ok(Box::new(osc_listener::OscListener::new(context)?)),
         #[cfg(feature = "tsl-umd-display")]
@@ -531,8 +543,11 @@ mod tests {
                     let used = first_port(&cx.take());
                     // These send nothing until asked (a request, a watched
                     // stream), so there is nothing to compare on starting.
+                    // An sACN source sends nothing before it holds a
+                    // universe, nor a PSN server before it has a tracker.
                     if used.is_none()
-                        && ["generic-http", "http-snapshot"].contains(&spec.id.as_str())
+                        && ["generic-http", "http-snapshot", "posistagenet", "sacn"]
+                            .contains(&spec.id.as_str())
                     {
                         continue;
                     }

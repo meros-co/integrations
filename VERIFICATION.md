@@ -250,6 +250,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether the service ever answers (an acknowledgement or an error), and whether the cue player's state can be read in any way. ([specs/arkaos-mediamaster.yaml:12](specs/arkaos-mediamaster.yaml#L12))
 - [ ] Check what Controller:Final15 and Controller:Final30 do. ([specs/arkaos-mediamaster.yaml:161](specs/arkaos-mediamaster.yaml#L161))
 
+## artnet — Art-Net 4 network
+
+- [ ] Check that nodes ignore ArtAddress fields sent as 0x7F (no change) and act on those with bit 7 set, and that 0 resets a field to the physical switch. ([specs/artnet.yaml:433](specs/artnet.yaml#L433))
+- [ ] Check which universes a node expects ArtDmx for when a port's SwIn and SwOut differ, and that nodes answer an ArtPoll unicast to them without targeted mode. ([specs/artnet.yaml:433](specs/artnet.yaml#L433))
+- [ ] Check that ArtCommand receivers read the ESTA code high byte first (SwoutText, SwinText with 0xFFFF are unaffected). ([specs/artnet.yaml:433](specs/artnet.yaml#L433))
+- [ ] Check that consoles and DMX-Workshop list the core's own ArtPollReply (OEM 0x00FF, IP 0.0.0.0 without a bind address) without complaint. ([specs/artnet.yaml:410](specs/artnet.yaml#L410))
+- [ ] On a node, check that set_node_input_enabled, node_command and the set_node_* commands are each answered with an ArtPollReply within 3 s. ([specs/artnet.yaml:394](specs/artnet.yaml#L394))
+
 ## atlona-matrix — Atlona matrix switchers and switchers
 
 - [ ] Record the Telnet login prompts (Username:, Password:) and what a wrong login answers. ([specs/atlona-matrix.yaml:203](specs/atlona-matrix.yaml#L203))
@@ -2222,6 +2230,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the equalizer byte (band in bits 7-5, step in bits 4-0) on a commercial TV. ([specs/lg-display.yaml:814](specs/lg-display.yaml#L814))
 - [ ] Drive an LG display on its RS-232C port (link serial) and confirm the acknowledgements are those of TCP 9761; confirm a commercial TV (UV340C, UL3E) runs at 9600 bps, 8N1, no flow control as the signage guides state. ([specs/lg-display.yaml:107](specs/lg-display.yaml#L107))
 
+## lightkey — Lightkey (OSC)
+
+- [ ] Confirm Lightkey sends nothing back over OSC (no feedback or replies), so no state can be read. ([specs/lightkey.yaml:288](specs/lightkey.yaml#L288))
+- [ ] Check that commands sent over UDP to 21600 act, and how Lightkey frames OSC over TCP on the same port. ([specs/lightkey.yaml:295](specs/lightkey.yaml#L295))
+- [ ] Check the value ranges Lightkey accepts for modifiers, fixture properties, fade times and tempo. ([specs/lightkey.yaml:302](specs/lightkey.yaml#L302))
+
 ## lightware-lw2 — Lightware LW2 (bracket protocol) matrices and switchers
 
 - [ ] Confirm that a CR LF after the closing bracket is accepted (Companion's module sends it; the manuals give no terminator). ([specs/lightware-lw2.yaml:696](specs/lightware-lw2.yaml#L696))
@@ -2267,6 +2281,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record /onair/session's answer on air and off air (an id as plain text, and an empty body, are assumed). ([specs/logos-proclaim.yaml:347](specs/logos-proclaim.yaml#L347))
 - [ ] Record what /appCommand/perform answers for a command done, an unknown command name and an index out of range (status and body; the text success is assumed for done). ([specs/logos-proclaim.yaml:327](specs/logos-proclaim.yaml#L327))
 - [ ] Check what a song part command does with an index past the song's parts, and that a part without a number is shown when the index is left out. ([specs/logos-proclaim.yaml:340](specs/logos-proclaim.yaml#L340))
+
+## madrix — MADRIX 5 (OSC and HTTP Remote)
+
+- [ ] Record the OSC feedback MADRIX sends: its addresses, argument types, and that it goes to the sender's address on the Destination Network Port. ([specs/madrix.yaml:1491](specs/madrix.yaml#L1491))
+- [ ] Check whether /Main/FeedbackAll resends every value when sent by a client, and whether methods with no listed argument (Up, Down, Automatic, ToLeft, ToRight, ToCenter, Defaults, FeedbackAll) need one. ([specs/madrix.yaml:1500](specs/madrix.yaml#L1500))
+- [ ] Check that layer, group, fader and trigger port indexes are written as plain decimals in the address (/DeckA/StoragePlace/Layers/0/Opacity). ([specs/madrix.yaml:1500](specs/madrix.yaml#L1500))
+- [ ] Check the index bases (OSC 0-based, HTTP 1-based) and the bounds chosen where the help is silent (indexes, offsets, BPM). ([specs/madrix.yaml:1509](specs/madrix.yaml#L1509))
+- [ ] Confirm an HTTP Remote Get function answers the value alone as the body (GET /RemoteCommands/?GetMaster), and what a Set function answers. ([specs/madrix.yaml:1516](specs/madrix.yaml#L1516))
 
 ## magewell-director — Magewell Director Mini, Director One and Director Plus
 
@@ -2850,6 +2872,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the older section-per-command lists against a projector where their titles and bytes disagree (GMFI2 printed GMFI1, QJB as QJK, QFI as QEI, and value conflicts such as SHIFT -327 and -127). ([specs/panasonic-projector.yaml:16353](specs/panasonic-projector.yaml#L16353))
 - [ ] Confirm QPW codes other than 000 and 001 that some series may return (warm-up, cooling). ([specs/panasonic-projector.yaml:9094](specs/panasonic-projector.yaml#L9094))
 
+## pharos-designer — Pharos Designer controllers (HTTP and WebSocket API)
+
+- [ ] With security enabled, check that POST /authenticate?original_url=/ answers with a token cookie (status 302 or 200), that an expired token is answered 401, and what wrong credentials produce. ([specs/pharos-designer.yaml:1138](specs/pharos-designer.yaml#L1138))
+- [ ] Check whether resending the subscriptions every 10 s with the {} keep-alive duplicates broadcasts, and that the timeline broadcast is labeled "timeline". ([specs/pharos-designer.yaml:1149](specs/pharos-designer.yaml#L1149))
+- [ ] Check that sending fade 0, delay 0, path Default and conditions true when not asked for behaves as leaving them out, and the endpoint the Ping API really uses. ([specs/pharos-designer.yaml:1159](specs/pharos-designer.yaml#L1159))
+- [ ] On an LPC or TPC, check whether subscribing to content_target is refused harmlessly. ([specs/pharos-designer.yaml:1171](specs/pharos-designer.yaml#L1171))
+- [ ] Check the HTTPS certificate controllers present, and the status codes of the POST/PUT/DELETE endpoints (200, 202 or 204). ([specs/pharos-designer.yaml:1176](specs/pharos-designer.yaml#L1176))
+
 ## philips-sicp — Philips professional displays (SICP)
 
 - [ ] Confirm the command set of current models (Q, D, C, E and T Line, 55BDL4107X video walls) against SICP V2.03, the newest public version; record get_platform and get_sicp_version on each. ([specs/philips-sicp.yaml:947](specs/philips-sicp.yaml#L947))
@@ -2902,6 +2932,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a plan time created with an ISO 8601 time and offset is answered in the organization's time zone. ([specs/planningcenter-services.yaml:621](specs/planningcenter-services.yaml#L621))
 - [ ] Confirm the where[title] query on songs matches part of a title or only the whole of it. ([specs/planningcenter-services.yaml:686](specs/planningcenter-services.yaml#L686))
 - [ ] Confirm Attachment open works under an item's attachments path as under media's, and how long the attachment_url lasts. ([specs/planningcenter-services.yaml:823](specs/planningcenter-services.yaml#L823))
+
+## posistagenet — PosiStageNet
+
+- [ ] Check that consoles and media servers take the core's trackers with version 2.03 (high 2, low 3) in the packet header, and with every tracker's position sent even when only other fields were set. ([specs/posistagenet.yaml:139](specs/posistagenet.yaml#L139))
+- [ ] With a tracking server, check that its trackers appear under its address, that a tracker removed on the server leaves state after the next PSN_INFO, and that frames split over several packets are read whole. ([specs/posistagenet.yaml:131](specs/posistagenet.yaml#L131))
 
 ## probel-swp02 — Probel / Grass Valley SW-P-02 routers
 
@@ -2981,6 +3016,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that /workspace/{id}/fullScreen, lightDashboard and dashboard/mode answer a read without an argument. ([specs/qlab.yaml:13036](specs/qlab.yaml#L13036))
 - [ ] Check that the rootless /selectedCues/shallow is answered once per open workspace with its workspace_id and an empty array when nothing is selected, whether a QLab 5 workspace answers with the current cue list's selection only, and whether a selection change sends any /update message. ([specs/qlab.yaml:14455](specs/qlab.yaml#L14455))
 - [ ] Check whether QLab pushes anything when an override or a window changes; they are re-read only with the workspace. ([specs/qlab.yaml:13806](specs/qlab.yaml#L13806))
+
+## qlcplus — QLC+ (Web API)
+
+- [ ] Check that QLC+ without -wa accepts a WebSocket opened with an empty Basic credential. ([specs/qlcplus.yaml:462](specs/qlcplus.yaml#L462))
+- [ ] Record the messages QLC+ pushes for widget and function changes, so they can be read into state. ([specs/qlcplus.yaml:462](specs/qlcplus.yaml#L462))
+- [ ] Check the value ranges widgets take (sliders, XY pads, speed dial factors, page and step numbers) and what sdResetChannel and sdResetUniverse answer. ([specs/qlcplus.yaml:473](specs/qlcplus.yaml#L473))
+- [ ] On QLC+ 4, check that each documented QLC+API command and widget message works as on version 5. ([specs/qlcplus.yaml:481](specs/qlcplus.yaml#L481))
 
 ## qsys — Q-SYS
 
@@ -3195,6 +3237,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what a delete answers (status and body) and whether the event stream reports deletions of mentions and text variables (it is read every minute). ([specs/rundown-studio.yaml:910](specs/rundown-studio.yaml#L910))
 - [ ] Check how often a restricted-tier token is refused with 429 at the core's pacing and polls. ([specs/rundown-studio.yaml:64](specs/rundown-studio.yaml#L64))
 - [ ] Confirm the cue order's children carry {id} as the shallow rundown example shows (the reorder body names them cue_id). ([specs/rundown-studio.yaml:720](specs/rundown-studio.yaml#L720))
+
+## sacn — sACN (ANSI E1.31)
+
+- [ ] Check that receivers take the core's universes, keep-alives and Stream_Terminated packets (multicast and unicast), and list it from its Universe Discovery. ([specs/sacn.yaml:150](specs/sacn.yaml#L150))
+- [ ] With two consoles at one priority, compare the received levels (merged highest takes precedence) with what the fixtures do, and check that a source is dropped 2.5 s after it stops. ([specs/sacn.yaml:159](specs/sacn.yaml#L159))
+- [ ] Check that multicast is received on each interface the core joins on, with several programs on the host listening on port 5568. ([specs/sacn.yaml:142](specs/sacn.yaml#L142))
+- [ ] Check what changed in the current edition of E1.31 against the 2016 edition this follows. ([specs/sacn.yaml:174](specs/sacn.yaml#L174))
 
 ## samsung-mdc — Samsung displays (MDC)
 
@@ -3866,6 +3915,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a camera answers commands right after Address Set and IF_Clear broadcast on opening, and whether one that already has its address needs them. ([specs/visca.yaml:130](specs/visca.yaml#L130))
 - [ ] On Sony, confirm the 200 ms before a cancel counts from the pan/tilt drive's ACK (the core's reading of "after executing"); on the other vendors' cameras, which document no such gap and get none, check whether a cancel sent within 200 ms of a drive starting still stops it. ([specs/visca.yaml:1194](specs/visca.yaml#L1194))
 
+## visualproductions-cuecore — Visual Productions CueCore, QuadCore, B-Station2, IoCore2, TimeCore and KioscTouch2 (UDP API)
+
+- [ ] Record the UDP feedback messages with their values (playback intensity, rate, active, cue; master intensity, rate, fade; action list enable; buttons), and check the "=value" form and the on/off words. ([specs/visualproductions-cuecore.yaml:499](specs/visualproductions-cuecore.yaml#L499))
+- [ ] Confirm hello makes the session a feedback client and that the unit echoes "<prefix>-hello". ([specs/visualproductions-cuecore.yaml:490](specs/visualproductions-cuecore.yaml#L490))
+- [ ] Check the cue range (1-32 per the HTTP tables), the DMX channel range on units other than the IoCore2, and the float precision accepted. ([specs/visualproductions-cuecore.yaml:516](specs/visualproductions-cuecore.yaml#L516))
+- [ ] On a B-Station2, check the button and LED numbering (1-8 assumed). ([specs/visualproductions-cuecore.yaml:536](specs/visualproductions-cuecore.yaml#L536))
+- [ ] On a KioscTouch2, check whether page select counts from 0 or 1. ([specs/visualproductions-cuecore.yaml:542](specs/visualproductions-cuecore.yaml#L542))
+
 ## vizrt-trio — Vizrt Viz Trio
 
 - [ ] Record what Viz Trio sends back for a command with no result (nothing, an empty line, or an acknowledgement); the spec waits for nothing. ([specs/vizrt-trio.yaml:910](specs/vizrt-trio.yaml#L910))
@@ -3899,6 +3956,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the replay activators: ReplayPlaying, ReplayLive, ReplayRecording, ReplayQuadMode, ReplayPlayForward, ReplayPlayBackward, ReplayChannelAB/A/B, ReplayCameraN (current channel), ReplayACameraN and ReplayBCameraN. ([specs/vmix.yaml:5208](specs/vmix.yaml#L5208))
 - [ ] Confirm the dynamic element's input1 to input4 and value1 to value4 children. ([specs/vmix.yaml:5196](specs/vmix.yaml#L5196))
 - [ ] Confirm the video call attributes (callPassword, callConnected, callVideoSource, callAudioSource) and the VideoCallAudioSourceX and VideoCallSourceOutputN activators. ([specs/vmix.yaml:5141](specs/vmix.yaml#L5141))
+
+## workpro-lightshark — Work Pro LightShark LS-1 / LS-Core (OSC)
+
+- [ ] Check the default OSC input and output ports (8000 and 9000 per Companion) and where the console sends its output. ([specs/workpro-lightshark.yaml:265](specs/workpro-lightshark.yaml#L265))
+- [ ] Record the console's feedback after /LS/Sync (grand master, master levels, playback levels, executors) and the executor value format. ([specs/workpro-lightshark.yaml:272](specs/workpro-lightshark.yaml#L272))
+- [ ] Check that a release-only message (0.0) triggers keys, playbacks and executors as the manual's hexadecimal table shows. ([specs/workpro-lightshark.yaml:279](specs/workpro-lightshark.yaml#L279))
+- [ ] Check /LS/Color against /LS/Colour, /LS/Fx, the /LS/ExecutorLine form, and the Companion-only addresses (Tap, FxTap, TAP/PB, ChaseValue/PB, Level/Sm*, Reset/Sm*). ([specs/workpro-lightshark.yaml:286](specs/workpro-lightshark.yaml#L286))
 
 ## wyrestorm-matrix — WyreStorm matrix switchers
 
