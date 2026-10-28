@@ -188,7 +188,8 @@ mod shure;
     feature = "apc-rack-pdu",
     feature = "apc-ups",
     feature = "cyberpower-pdu",
-    feature = "cyberpower-ups"
+    feature = "cyberpower-ups",
+    feature = "ups-mib"
 ))]
 mod snmp;
 #[cfg(any(
@@ -196,14 +197,16 @@ mod snmp;
     feature = "apc-rack-pdu",
     feature = "apc-ups",
     feature = "cyberpower-pdu",
-    feature = "cyberpower-ups"
+    feature = "cyberpower-ups",
+    feature = "ups-mib"
 ))]
 mod snmp_ber;
 #[cfg(any(
     feature = "apc-rack-pdu",
     feature = "apc-ups",
     feature = "cyberpower-pdu",
-    feature = "cyberpower-ups"
+    feature = "cyberpower-ups",
+    feature = "ups-mib"
 ))]
 mod snmp_device;
 #[cfg(any(
@@ -211,7 +214,8 @@ mod snmp_device;
     feature = "apc-rack-pdu",
     feature = "apc-ups",
     feature = "cyberpower-pdu",
-    feature = "cyberpower-ups"
+    feature = "cyberpower-ups",
+    feature = "ups-mib"
 ))]
 mod snmp_usm;
 #[cfg(feature = "sony-bravia-serial")]
@@ -246,6 +250,8 @@ mod tsl;
 mod ultimatte_presets;
 #[cfg(feature = "blackmagic-ultimatte")]
 mod ultimatte_zip;
+#[cfg(feature = "ups-mib")]
+mod ups_mib_profile;
 #[cfg(feature = "vdcp")]
 mod vdcp;
 #[cfg(feature = "visca")]
@@ -478,6 +484,11 @@ pub(crate) fn construct(
         #[cfg(feature = "cyberpower-ups")]
         "cyberpower-ups" => Ok(Box::new(snmp_device::SnmpDevice::new(
             &cyberpower_ups_profile::PROFILE,
+            context,
+        )?)),
+        #[cfg(feature = "ups-mib")]
+        "ups-mib" => Ok(Box::new(snmp_device::SnmpDevice::new(
+            &ups_mib_profile::PROFILE,
             context,
         )?)),
         #[cfg(feature = "generic-http")]

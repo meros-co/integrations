@@ -175,6 +175,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "http-snapshot",
             "midi-show-control",
             "osc-listener",
+            "ups-mib",
         ],
     ),
     ("vendor-google", &["youtube-live"]),

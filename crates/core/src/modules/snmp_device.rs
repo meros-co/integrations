@@ -1215,6 +1215,8 @@ mod tests {
     /// Every profile built in, and the spec it serves.
     fn profiles() -> Vec<(&'static str, &'static Profile)> {
         vec![
+            #[cfg(feature = "ups-mib")]
+            ("ups-mib", &crate::modules::ups_mib_profile::PROFILE),
             #[cfg(feature = "cyberpower-ups")]
             (
                 "cyberpower-ups",

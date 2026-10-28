@@ -1,0 +1,314 @@
+spec: 1
+id: ups-mib
+name: UPS over SNMP (UPS-MIB, RFC 1628)
+vendor: Generic (any UPS whose network card implements RFC 1628's UPS-MIB, such as Eaton's)
+category: other
+implementation: native
+reason: >
+  SNMP: BER-encoded requests over UDP, matched to their responses, retransmitted, walked with GETBULK, and on v3
+  authenticated and encrypted with keys derived from passwords (see generic-snmp). The UPS's input, output, bypass
+  and alarm tables are rows the agent lists only when walked, a test is started by writing a lock read first in
+  the same SET, and its traps arrive on a port of the core's. The integration is the SNMP manager with the
+  standard UPS-MIB's objects named.
+
+source:
+  - title: "RFC 1628: UPS Management Information Base (May 1994)"
+    author: "J. Case, Ed., IETF"
+    url: "https://www.rfc-editor.org/rfc/rfc1628"
+    note: >
+      UPS-MIB (mib-2 33): identification, battery, input, output, bypass, alarm, test, control and configuration
+      groups, their tables (upsInputTable, upsOutputTable, upsBypassTable, upsAlarmTable), the well-known alarms
+      and tests (upsWellKnownAlarms, upsWellKnownTests) as OBJECT-IDENTITYs, the test procedure (read
+      upsTestSpinLock, then SET it with upsTestId in one request), and the notifications upsTrapOnBattery,
+      upsTrapTestCompleted, upsTrapAlarmEntryAdded and upsTrapAlarmEntryRemoved.
+  - title: "Eaton Gigabit Network Card (Network-M2), specifications"
+    author: Eaton
+    url: "https://www.eaton.com/ma/en-gb/catalog/backup-power-ups-surge-it-power-distribution/eaton-gigabit-network-card-emea.html"
+    note: "Lists RFC 1628's standard UPS MIB among the card's SNMP MIBs, beside Eaton's own xUPS MIB, for the 5P, 5PX, 9PX, 9SX and 9E families and others."
+  - title: "CyberPower RMCARD205 specification sheet"
+    author: CyberPower Systems
+    url: "https://micom.mx/storage/recursos/RMCARD205.pdf"
+    note: "Lists RFC 1213 and RFC 1628 among the card's supported MIBs."
+  - title: "RFC 3416, RFC 3418 and the SNMP RFCs generic-snmp cites"
+    author: IETF
+    url: "https://www.rfc-editor.org/rfc/rfc3416"
+    note: "The protocol (GETBULK walks, SET, traps); the system group (sysDescr, sysUpTime...)."
+
+models:
+  - id: ups
+    name: "Any UPS implementing RFC 1628 (Eaton Network-M2 and Network-M3 cards, CyberPower RMCARDs and others)"
+    supports: [get, walk, set, refresh, set_config_audible_status, set_config_high_voltage_transfer_point, set_config_input_freq, set_config_input_voltage, set_config_low_batt_time, set_config_low_voltage_transfer_point, set_config_output_freq, set_config_output_voltage, set_control_auto_restart, set_control_reboot_with_duration, set_control_shutdown_after_delay, set_control_shutdown_type, set_control_startup_after_delay, set_ident_attached_devices, set_ident_name, set_test_id, set_test_spin_lock]
+    verification: none
+    notes: Walks UPS-MIB's objects (mib-2 33.1); a UPS fills the groups it implements.
+
+settings:
+  version: { type: enum, values: [v1, v2c, v3], default: v2c, label: SNMP version,
+             description: "The SNMP version the agent is asked with: v1 and v2c use a community string, v3 a user with authentication and privacy." }
+  community: { type: string, secret: true, max_length: 255, default: public, label: Community,
+               description: "v1 and v2c: the community string for reads, and for SETs when no write community is set." }
+  write_community: { type: string, secret: true, max_length: 255, default: "", label: Write community,
+                     description: "v1 and v2c: the community string SETs are sent with, often private; empty uses the community." }
+  user: { type: string, max_length: 32, default: "", label: User,
+          description: "v3: the user name (securityName) the agent knows." }
+  security_level: { type: enum, values: [no_auth_no_priv, auth_no_priv, auth_priv], default: auth_priv, label: Security level,
+                    description: "v3: no_auth_no_priv sends messages unauthenticated, auth_no_priv authenticates them, auth_priv also encrypts them." }
+  auth_protocol: { type: enum, values: [md5, sha, sha224, sha256, sha384, sha512], default: sha, label: Authentication protocol,
+                   description: "v3: HMAC-MD5-96, HMAC-SHA-96 (sha) or HMAC-SHA-2 (RFC 7860), as the user is set up on the agent." }
+  auth_password: { type: string, secret: true, max_length: 256, default: "", label: Authentication password,
+                   description: "v3: the user's authentication password, at least 8 characters." }
+  priv_protocol: { type: enum, values: [des, aes, aes192, aes256], default: aes, label: Privacy protocol,
+                   description: "v3 at auth_priv: CBC-DES, AES-128 (aes, RFC 3826), or AES-192 or AES-256 as draft-blumenthal-aes-usm-04 defines them." }
+  priv_password: { type: string, secret: true, max_length: 256, default: "", label: Privacy password,
+                   description: "v3 at auth_priv: the user's privacy password, at least 8 characters." }
+  context_name: { type: string, max_length: 32, default: "", label: Context name,
+                  description: "v3: the context requests are made in, empty for the agent's default context." }
+  context_engine_id: { type: string, pattern: '^[0-9A-Fa-fxX :.-]*$', max_length: 100, default: "", label: Context engine ID,
+                       description: "v3: the contextEngineID in hex, for an agent proxying another engine; empty uses the agent's own snmpEngineID." }
+  timeout_ms: { type: int, min: 1, max: 60000, default: 1500, label: Timeout,
+                description: "Milliseconds to wait for each response before sending the request again." }
+  retries: { type: int, min: 0, max: 10, default: 2, label: Retries,
+             description: "How many times an unanswered request is sent again before it fails with timeout." }
+  max_repetitions: { type: int, min: 1, max: 1000, default: 20, label: GETBULK repetitions,
+                     description: "Objects asked for per GETBULK request while walking." }
+  poll_interval_ms: { type: int, min: 100, max: 86400000, default: 10000, label: Poll interval,
+                      description: "Milliseconds between walks of the device's objects, and reads of sysUpTime.0, the liveness check." }
+  trap_port: { type: int, min: 1, max: 65535, label: Notification port,
+               description: "The UDP port traps and informs are received on, 162 as standard; unset receives none." }
+  trap_bind_address: { type: string, pattern: '^[0-9A-Fa-f.:]*$', max_length: 45, default: "", label: Notification bind address,
+                       description: "The local address to receive notifications on with a port of this device's own; empty shares the port with every SNMP device of the core, each hearing its own agent." }
+  trap_community: { type: string, secret: true, max_length: 255, default: "", label: Notification community,
+                    description: "v1 and v2c notifications: accept only this community; empty accepts any." }
+  local_engine_id: { type: string, pattern: '^[0-9A-Fa-fxX :.-]*$', max_length: 100, default: "", label: Local engine ID,
+                     description: "v3 informs: this receiver's snmpEngineID in hex, 5 to 32 bytes, as configured on the agent; empty uses a random one for each opening." }
+
+ports:
+  - { port: 161, protocol: udp, role: control, note: "the agent; requests go from an ephemeral port of the core's" }
+  - { port: null, protocol: udp, role: notification, listener: core, setting: trap_port, note: "traps and informs, when trap_port is set (162 as standard)" }
+
+commands:
+  get:
+    summary: >
+      GET objects by OID and return {varbinds: [{oid, type, value, hex}]}, for objects the named commands and state
+      do not cover; an object state holds is updated from the answer too
+    params:
+      oids: { type: string, pattern: '^[0-9., ;]+$', max_length: 65536, required: true, label: OIDs,
+              description: "One or more OIDs in dotted decimal, separated by commas or spaces, such as 1.3.6.1.2.1.1.3.0." }
+    returns: value
+  walk:
+    summary: Every object under an OID, in order, as {varbinds}
+    params:
+      oid: { type: string, pattern: '^\.?[0-9]+(\.[0-9]+)+$', max_length: 1024, required: true, label: OID,
+             description: "The subtree's root in dotted decimal." }
+      limit: { type: int, min: 1, max: 100000000, label: Object limit,
+               description: "Stop after this many objects; unset walks the whole subtree." }
+    returns: value
+  set:
+    summary: >
+      SET one object by OID to a typed value and return the agent's response as {varbinds}; fails with the agent's
+      error-status (notWritable, wrongValue...) as the code
+    params:
+      oid: { type: string, pattern: '^\.?[0-9]+(\.[0-9]+)+$', max_length: 1024, required: true, label: OID,
+             description: "The object instance to set, in dotted decimal." }
+      type: { type: enum, values: [integer, string, hex, oid, ip_address, counter32, gauge32, timeticks, counter64, opaque], required: true, label: Type,
+              description: "The value's SNMP type: string is UTF-8 text and hex is bytes for an OCTET STRING; gauge32 is also Unsigned32." }
+      value: { type: string, max_length: 65536, required: true, label: Value,
+               description: "The value as text: a decimal number, text, hex bytes, a dotted OID or an IPv4 address, as the type asks." }
+    returns: value
+  refresh:
+    summary: Read the system group and walk every object now; answered when they have been read
+    returns: ack
+  set_ident_name:
+    summary: "Set upsIdentName, then read its group back"
+    params:
+      value: { type: string, max_length: 63, required: true, label: Value, description: The new ident name. }
+    returns: ack
+  set_ident_attached_devices:
+    summary: "Set upsIdentAttachedDevices, then read its group back"
+    params:
+      value: { type: string, max_length: 63, required: true, label: Value, description: The new ident attached devices. }
+    returns: ack
+  set_test_id:
+    summary: "Set upsTestId, then read its group back"
+    params:
+      value: { type: enum, values: [no_tests_initiated, abort_test_in_progress, general_systems_test, quick_battery_test, deep_battery_calibration], required: true, label: Value, description: "The new test id, as UPS-MIB names its values." }
+    returns: ack
+  set_test_spin_lock:
+    summary: "Set upsTestSpinLock, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new test spin lock, as the MIB counts it." }
+    returns: ack
+  set_control_shutdown_type:
+    summary: "Set upsShutdownType, then read its group back"
+    params:
+      value: { type: enum, values: [output, system], required: true, label: Value, description: "The new shutdown type, as UPS-MIB names its values." }
+    returns: ack
+  set_control_shutdown_after_delay:
+    summary: "Set upsShutdownAfterDelay, then read its group back"
+    params:
+      value: { type: int, min: -1, max: 2147483648, required: true, label: Value, description: "The new shutdown after delay, in seconds." }
+    returns: ack
+  set_control_startup_after_delay:
+    summary: "Set upsStartupAfterDelay, then read its group back"
+    params:
+      value: { type: int, min: -1, max: 2147483648, required: true, label: Value, description: "The new startup after delay, in seconds." }
+    returns: ack
+  set_control_reboot_with_duration:
+    summary: "Set upsRebootWithDuration, then read its group back"
+    params:
+      value: { type: int, min: -1, max: 300, required: true, label: Value, description: "The new reboot with duration, in seconds." }
+    returns: ack
+  set_control_auto_restart:
+    summary: "Set upsAutoRestart, then read its group back"
+    params:
+      value: { type: enum, values: ["on", "off"], required: true, label: Value, description: "The new auto restart, as UPS-MIB names its values." }
+    returns: ack
+  set_config_input_voltage:
+    summary: "Set upsConfigInputVoltage, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 2147483647, required: true, label: Value, description: "The new config input voltage, in RMS Volts." }
+    returns: ack
+  set_config_input_freq:
+    summary: "Set upsConfigInputFreq, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 2147483647, required: true, label: Value, description: "The new config input freq, in 0.1 Hertz." }
+    returns: ack
+  set_config_output_voltage:
+    summary: "Set upsConfigOutputVoltage, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 2147483647, required: true, label: Value, description: "The new config output voltage, in RMS Volts." }
+    returns: ack
+  set_config_output_freq:
+    summary: "Set upsConfigOutputFreq, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 2147483647, required: true, label: Value, description: "The new config output freq, in 0.1 Hertz." }
+    returns: ack
+  set_config_low_batt_time:
+    summary: "Set upsConfigLowBattTime, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 2147483647, required: true, label: Value, description: "The new config low batt time, in minutes." }
+    returns: ack
+  set_config_audible_status:
+    summary: "Set upsConfigAudibleStatus, then read its group back"
+    params:
+      value: { type: enum, values: [disabled, enabled, muted], required: true, label: Value, description: "The new config audible status, as UPS-MIB names its values." }
+    returns: ack
+  set_config_low_voltage_transfer_point:
+    summary: "Set upsConfigLowVoltageTransferPoint, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 2147483647, required: true, label: Value, description: "The new config low voltage transfer point, in RMS Volts." }
+    returns: ack
+  set_config_high_voltage_transfer_point:
+    summary: "Set upsConfigHighVoltageTransferPoint, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 2147483647, required: true, label: Value, description: "The new config high voltage transfer point, in RMS Volts." }
+    returns: ack
+
+state:
+  version: { type: string, description: "The SNMP version used: v1, v2c or v3" }
+  system.description: { type: string, description: "sysDescr.0: the agent's description of the device" }
+  system.object_id: { type: string, description: "sysObjectID.0: the vendor's OID for the device type" }
+  system.uptime: { type: int, unit: "1/100 s", description: "sysUpTime.0, in hundredths of a second (TimeTicks)" }
+  system.contact: { type: string, description: "sysContact.0" }
+  system.name: { type: string, description: "sysName.0" }
+  system.location: { type: string, description: "sysLocation.0" }
+  engine.id: { type: string, description: "v3: the agent's snmpEngineID in hex" }
+  engine.boots: { type: int, description: "v3: the agent's snmpEngineBoots" }
+  engine.time: { type: int, unit: s, description: "v3: the agent's snmpEngineTime when last heard" }
+  local_engine_id: { type: string, description: "With trap_port: this receiver's snmpEngineID in hex, to configure on agents sending v3 informs" }
+  traps.count: { type: int, description: "Notifications received since opening" }
+  traps.last: { type: object, description: "The last notification: {kind (trap or inform), version, source, trap_oid, name (the MIB's name for it, or null), uptime, varbinds, and for v1 enterprise, agent_address, generic_trap, specific_trap, and for v3 user}" }
+  ident.manufacturer: { type: string, description: upsIdentManufacturer (UPS-MIB) }
+  ident.model: { type: string, description: upsIdentModel (UPS-MIB) }
+  ident.ups_software_version: { type: string, description: upsIdentUPSSoftwareVersion (UPS-MIB) }
+  ident.agent_software_version: { type: string, description: upsIdentAgentSoftwareVersion (UPS-MIB) }
+  ident.name: { type: string, description: upsIdentName (UPS-MIB) }
+  ident.attached_devices: { type: string, description: upsIdentAttachedDevices (UPS-MIB) }
+  battery.status: { type: string, description: "upsBatteryStatus (UPS-MIB): unknown, battery_normal, battery_low, battery_depleted" }
+  battery.seconds_on_battery: { type: int, unit: seconds, description: upsSecondsOnBattery (UPS-MIB) }
+  battery.estimated_minutes_remaining: { type: int, unit: minutes, description: upsEstimatedMinutesRemaining (UPS-MIB) }
+  battery.estimated_charge_remaining: { type: int, unit: percent, description: upsEstimatedChargeRemaining (UPS-MIB) }
+  battery.voltage: { type: int, unit: "0.1 Volt DC", description: upsBatteryVoltage (UPS-MIB) }
+  battery.current: { type: int, unit: "0.1 Amp DC", description: upsBatteryCurrent (UPS-MIB) }
+  battery.temperature: { type: int, unit: degrees Centigrade, description: upsBatteryTemperature (UPS-MIB) }
+  input_line_bads: { type: int, description: upsInputLineBads (UPS-MIB) }
+  input_num_lines: { type: int, description: upsInputNumLines (UPS-MIB) }
+  input.*.frequency: { type: int, unit: "0.1 Hertz", description: upsInputFrequency (UPS-MIB) }
+  input.*.voltage: { type: int, unit: RMS Volts, description: upsInputVoltage (UPS-MIB) }
+  input.*.current: { type: int, unit: "0.1 RMS Amp", description: upsInputCurrent (UPS-MIB) }
+  input.*.true_power: { type: int, unit: Watts, description: upsInputTruePower (UPS-MIB) }
+  output_source: { type: string, description: "upsOutputSource (UPS-MIB): other, none, normal, bypass, battery, booster, reducer" }
+  output_frequency: { type: int, unit: "0.1 Hertz", description: upsOutputFrequency (UPS-MIB) }
+  output_num_lines: { type: int, description: upsOutputNumLines (UPS-MIB) }
+  output.*.voltage: { type: int, unit: RMS Volts, description: upsOutputVoltage (UPS-MIB) }
+  output.*.current: { type: int, unit: "0.1 RMS Amp", description: upsOutputCurrent (UPS-MIB) }
+  output.*.power: { type: int, unit: Watts, description: upsOutputPower (UPS-MIB) }
+  output.*.percent_load: { type: int, unit: percent, description: upsOutputPercentLoad (UPS-MIB) }
+  bypass_frequency: { type: int, unit: "0.1 Hertz", description: upsBypassFrequency (UPS-MIB) }
+  bypass_num_lines: { type: int, description: upsBypassNumLines (UPS-MIB) }
+  bypass.*.voltage: { type: int, unit: RMS Volts, description: upsBypassVoltage (UPS-MIB) }
+  bypass.*.current: { type: int, unit: "0.1 RMS Amp", description: upsBypassCurrent (UPS-MIB) }
+  bypass.*.power: { type: int, unit: Watts, description: upsBypassPower (UPS-MIB) }
+  alarm_alarms_present: { type: int, description: upsAlarmsPresent (UPS-MIB) }
+  alarm.*.descr: { type: string, description: "upsAlarmDescr (UPS-MIB): battery_bad, on_battery, low_battery, depleted_battery, temp_bad, input_bad, output_bad, output_overload, on_bypass, bypass_bad, output_off_as_requested, ups_off_as_requested, charger_failed, ups_output_off, ups_system_off, fan_failure, fuse_failure, general_fault, diagnostic_test_failed, communications_lost, awaiting_power, shutdown_pending, shutdown_imminent, test_in_progress" }
+  alarm.*.time: { type: int, unit: "1/100 s", description: upsAlarmTime (UPS-MIB) }
+  test.id: { type: string, description: "upsTestId (UPS-MIB): no_tests_initiated, abort_test_in_progress, general_systems_test, quick_battery_test, deep_battery_calibration" }
+  test.spin_lock: { type: int, description: upsTestSpinLock (UPS-MIB) }
+  test.results_summary: { type: string, description: "upsTestResultsSummary (UPS-MIB): done_pass, done_warning, done_error, aborted, in_progress, no_tests_initiated" }
+  test.results_detail: { type: string, description: upsTestResultsDetail (UPS-MIB) }
+  test.start_time: { type: int, unit: "1/100 s", description: upsTestStartTime (UPS-MIB) }
+  test.elapsed_time: { type: int, unit: "1/100 s", description: upsTestElapsedTime (UPS-MIB) }
+  control.shutdown_type: { type: string, description: "upsShutdownType (UPS-MIB): output, system" }
+  control.shutdown_after_delay: { type: int, unit: seconds, description: upsShutdownAfterDelay (UPS-MIB) }
+  control.startup_after_delay: { type: int, unit: seconds, description: upsStartupAfterDelay (UPS-MIB) }
+  control.reboot_with_duration: { type: int, unit: seconds, description: upsRebootWithDuration (UPS-MIB) }
+  control.auto_restart: { type: string, description: "upsAutoRestart (UPS-MIB): on, off" }
+  config.input_voltage: { type: int, unit: RMS Volts, description: upsConfigInputVoltage (UPS-MIB) }
+  config.input_freq: { type: int, unit: "0.1 Hertz", description: upsConfigInputFreq (UPS-MIB) }
+  config.output_voltage: { type: int, unit: RMS Volts, description: upsConfigOutputVoltage (UPS-MIB) }
+  config.output_freq: { type: int, unit: "0.1 Hertz", description: upsConfigOutputFreq (UPS-MIB) }
+  config.output_va: { type: int, unit: Volt-Amps, description: upsConfigOutputVA (UPS-MIB) }
+  config.output_power: { type: int, unit: Watts, description: upsConfigOutputPower (UPS-MIB) }
+  config.low_batt_time: { type: int, unit: minutes, description: upsConfigLowBattTime (UPS-MIB) }
+  config.audible_status: { type: string, description: "upsConfigAudibleStatus (UPS-MIB): disabled, enabled, muted" }
+  config.low_voltage_transfer_point: { type: int, unit: RMS Volts, description: upsConfigLowVoltageTransferPoint (UPS-MIB) }
+  config.high_voltage_transfer_point: { type: int, unit: RMS Volts, description: upsConfigHighVoltageTransferPoint (UPS-MIB) }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      set_control_shutdown_after_delay, set_control_startup_after_delay and set_control_reboot_with_duration turn
+      the UPS's output off, on or off and on after the seconds given (RFC 1628 upsControl), whatever the load;
+      set_control_shutdown_type says whether the output alone or the whole UPS goes off. A shutdown counting down
+      is cancelled by writing -1. set_test_id with deep_battery_calibration discharges the battery.
+  - models: [all]
+    severity: info
+    text: >
+      set_test_id reads upsTestSpinLock first and writes it back with upsTestId in one SET, as RFC 1628 asks, so
+      two managers cannot start tests over each other; an agent that changed the lock in between refuses the SET
+      (inconsistentValue). test.id and the alarm table's descr name RFC 1628's well-known tests and alarms (an OID
+      the RFC does not list stays in dotted decimal).
+  - models: [all]
+    severity: info
+    text: >
+      State and commands are named after UPS-MIB, the "ups" prefix left off: tables are keyed by the row index the
+      agent gives (upsInputLineIndex, upsOutputLineIndex, upsBypassLineIndex, upsAlarmId), enumerations are the
+      RFC's labels in snake case, and numbers are as the RFC counts them (RMS volts, 0.1 Hz, 0.1 A, watts, minutes
+      and seconds), with the unit in each key's description. The alarm table is replaced as alarms come and go.
+  - models: [all]
+    severity: info
+    text: >
+      Each notification received is a message event, {event: message, address, args, source}: address is its
+      snmpTrapOID (upsTraps 1 to 4: on battery, test completed, alarm entry added and removed), args is the same
+      object as traps.last with the RFC's name, and a notification starts a poll half a second later.
+  - models: [all]
+    severity: info
+    text: >
+      v1 and v2c agents drop requests with a wrong community without answering, so a wrong community looks like an
+      agent that is not there (disconnected, commands time out). SETs need the write community the card is
+      configured with (write_community), or a v3 user with write access.
+  - models: [all]
+    severity: info
+    text: >
+      Opening for commands only walks nothing; a GET of sysUpTime.0 each interval stays as the liveness check, and
+      notifications are still received.

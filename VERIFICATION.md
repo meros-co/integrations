@@ -4172,6 +4172,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm Update Channel Stream Schedule takes its vacation fields as query parameters, not a body, and answers 204. ([specs/twitch.yaml:1073](specs/twitch.yaml#L1073))
 - [ ] Confirm Delete Videos answers 200 with the deleted ids, and what it answers for a video that is not the channel's. ([specs/twitch.yaml:1160](specs/twitch.yaml#L1160))
 
+## ups-mib — UPS over SNMP (UPS-MIB, RFC 1628)
+
+- [ ] Walk an Eaton Network-M2 or Network-M3 card and a CyberPower RMCARD and check which UPS-MIB groups each fills. ([specs/ups-mib.yaml:39](specs/ups-mib.yaml#L39))
+- [ ] Start a quick battery test with set_test_id and check the card accepts upsTestSpinLock written back with upsTestId, and refuses it when the lock changed. ([specs/ups-mib.yaml:287](specs/ups-mib.yaml#L287))
+- [ ] Check that a UPS cancels a counting-down shutdown when -1 is written to upsShutdownAfterDelay. ([specs/ups-mib.yaml:283](specs/ups-mib.yaml#L283))
+- [ ] Receive upsTrapOnBattery and upsTrapAlarmEntryAdded from a card, and check the alarm table is replaced as alarms come and go. ([specs/ups-mib.yaml:302](specs/ups-mib.yaml#L302))
+
 ## vaddio-roboshot — Vaddio RoboSHOT PTZ cameras (Telnet API)
 
 - [ ] Record the login exchange from connection to the first ">" (the exact login and password prompts, any Telnet option bytes, the "Welcome" line) and what a wrong password produces. ([specs/vaddio-roboshot.yaml:86](specs/vaddio-roboshot.yaml#L86))
