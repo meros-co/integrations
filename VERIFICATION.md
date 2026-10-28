@@ -2358,7 +2358,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Find out the operating modes set_card_mode takes besides encode. ([specs/kiloview-rf02.yaml:655](specs/kiloview-rf02.yaml#L655))
 - [ ] Find out the dashboard type values. ([specs/kiloview-rf02.yaml:758](specs/kiloview-rf02.yaml#L758))
 - [ ] Check that lcd_factory_reset's password is kiloview. ([specs/kiloview-rf02.yaml:583](specs/kiloview-rf02.yaml#L583))
-- [ ] Check that the users and roles lists accept pageSize 1000. ([specs/kiloview-rf02.yaml:966](specs/kiloview-rf02.yaml#L966))
+- [ ] Check that the users and roles lists accept pageSize 1000. ([specs/kiloview-rf02.yaml:970](specs/kiloview-rf02.yaml#L970))
 - [ ] Find out the user status codes besides 2 (enabled), and the gateway device status codes. ([specs/kiloview-rf02.yaml:871](specs/kiloview-rf02.yaml#L871))
 - [ ] Find the units of the gateway device CPU, memory, uptime and disk values. ([specs/kiloview-rf02.yaml:912](specs/kiloview-rf02.yaml#L912))
 - [ ] Check that delete_gateway_channel's single-entry list body is accepted. ([specs/kiloview-rf02.yaml:389](specs/kiloview-rf02.yaml#L389))
