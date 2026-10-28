@@ -400,6 +400,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm MPTS start takes an empty <mux></mux> body (the guide gives no body for POST /mpts/<id>/mux). ([specs/aws-elemental-live.yaml:950](specs/aws-elemental-live.yaml#L950))
 - [ ] Confirm system_status.json is served under /api like the other endpoints, and that cpu.pct may be a string ("1.46" in the guide's example). ([specs/aws-elemental-live.yaml:74](specs/aws-elemental-live.yaml#L74))
 - [ ] Confirm the time signal descriptors element may be empty when there are no descriptors. ([specs/aws-elemental-live.yaml:509](specs/aws-elemental-live.yaml#L509))
+- [ ] Confirm a page of live events holds its live_event elements directly inside the document's root element, and that a page past the last is empty or short, so the core can join the pages. ([specs/aws-elemental-live.yaml:1386](specs/aws-elemental-live.yaml#L1386))
 
 ## axia-lwrp — Axia Livewire devices
 
