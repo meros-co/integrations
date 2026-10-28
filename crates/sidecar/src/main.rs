@@ -26,7 +26,7 @@
 //! | GET  /v1/serial_ports        |                                       | {ok: [{name}]} or {error}  |
 //! | GET  /v1/midi_ports          |                                       | {ok: [{name, input, output}]} or {error} |
 //! | POST /v1/open                | an OpenRequest                        | {device} or {error}        |
-//! | POST /v1/discover            | {action, protocols?, hints?}          | {ok} or {error}            |
+//! | POST /v1/discover            | {action, protocols?, hints?, dns_servers?, dns_domains?} | {ok} or {error} |
 //! | POST /v1/execute             | {device, command, params}             | {ok} or {error}            |
 //! | POST /v1/settings            | {device, settings}                    | {ok: true} or {error}      |
 //! | GET  /v1/snapshot/{device}   |                                       | snapshot, or null          |
@@ -46,9 +46,11 @@
 //! `/v1/discover` takes `protocols` among `mcp` (Sennheiser G3/G4), `ssdp`
 //! (Sony cameras), `pjlink` (PJLink projectors) and `mdns` (Blackmagic ATEM,
 //! Videohub, HyperDeck, SmartView and MultiView, Meros Cameras, and RTP-MIDI
-//! sessions); none
+//! sessions) and `dns-sd` (NMOS registries advertised in unicast DNS); none
 //! means every protocol that finds a device in the service's catalogue.
-//! `hints` are addresses where devices were last seen.
+//! `hints` are addresses where devices were last seen; `dns_servers` and
+//! `dns_domains` replace the host's own DNS servers and domains for a
+//! `dns-sd` scan.
 //!
 //! `/v1/serial_ports` lists the serial ports of the machine running the
 //! service, by the name a device's `serial_port` setting takes (`COM3`,
