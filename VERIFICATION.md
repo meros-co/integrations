@@ -2576,6 +2576,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the websocket path is / on port 8081 and the units of cpuTemperature, motherboardTemperature, upTime and serverTime. ([specs/modulopi-spydog.yaml:31](specs/modulopi-spydog.yaml#L31))
 - [ ] Confirm doaction.computer answers false (not an error) when an action fails. ([specs/modulopi-spydog.yaml:47](specs/modulopi-spydog.yaml#L47))
 
+## motu-avb — MOTU AVB interfaces
+
+- [ ] Measure the size of a full GET /datastore on a 1248 or 16A with the mixer and whether reading it every 5 s burdens the device. ([specs/motu-avb.yaml:1419](specs/motu-avb.yaml#L1419))
+- [ ] Confirm that PATCH with the form field json={"value": v} answers 200 or 204, and record the answer to a path the device lacks and to a wrong type. ([specs/motu-avb.yaml:189](specs/motu-avb.yaml#L189))
+- [ ] Confirm the src pair is the input bank index and channel index, both from 0 (the document's placeholders are lost). ([specs/motu-avb.yaml:1212](specs/motu-avb.yaml#L1212))
+
 ## nec-display — NEC (Sharp NEC) large-format displays
 
 - [ ] Confirm a reply timeout of 5 s suits every command (NEC gives none for the controller; the display's own is 10 s), and that a display answers the power status in standby. ([specs/nec-display.yaml:670](specs/nec-display.yaml#L670))

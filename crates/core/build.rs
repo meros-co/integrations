@@ -230,6 +230,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-modulopi",
         &["modulopi-kinetic", "modulopi-player", "modulopi-spydog"],
     ),
+    ("vendor-motu", &["motu-avb"]),
     (
         "vendor-nec",
         &["nec-display", "nec-projector", "nec-projector-ascii"],
