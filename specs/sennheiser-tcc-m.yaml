@@ -1,0 +1,991 @@
+spec: 1
+id: sennheiser-tcc-m
+name: Sennheiser TeamConnect Ceiling Medium (Sound Control Protocol v2)
+vendor: Sennheiser
+category: other
+
+# The TeamConnect Ceiling Medium speaks SSCv2: an HTTPS REST API on port 443
+# (Basic authentication as user api with the third-party password set in
+# Sennheiser Control Cockpit) and a server-sent event stream for changes. The
+# stream's first event names a session, to which the core then adds every
+# readable resource with one PUT; the device sends each one's value at once
+# and again whenever it changes. Writes are PUTs of the fields that change.
+source:
+  - title: "Sennheiser Sound Control Protocol v2 (SSCv2), TeamConnect Ceiling Medium, v1.1 (06/2023)"
+    author: Sennheiser
+    url: https://assets.sennheiser.com/download/assets/06_2023_Sennheiser_Sound_Control_Protocol_v2_TCCM_EN.pdf/64399174e7b411f0b959ce3d75c40f07
+    note: >
+      Manufacturer document. HTTPS on 443, Basic authentication as api, access
+      enabled and its password set in Control Cockpit §2; status codes;
+      subscriptions §3.4: the event stream, its open event with the session,
+      PUT of resource lists to the session (replace, add, remove), initial
+      values, close on reboot.
+  - title: "SSCv2 Schema for TCCM, OpenAPI 1.9 (released 2026-02-25)"
+    author: Sennheiser
+    url: https://assets.sennheiser.com/download/assets/api_1.9.0.json/18b31510118311f186a21e752e7f194a
+    note: >
+      Manufacturer document, the API reference (Swagger at
+      https://docs.cloud.sennheiser.com/en-us/api-docs/api-docs/open-api-tc-ceiling-medium.html).
+      Every resource, its methods, fields, ranges, enumerations and defaults.
+  - title: "Sennheiser Sound Control (SSCv2) Specification, Version 2.3; Subscribing to real-time updates"
+    author: Sennheiser
+    url: https://docs.cloud.sennheiser.com/en-us/api-docs/api-docs/sscv2-specification-2.3.html
+    note: >
+      Manufacturer documents. The event format (event and data lines, data an
+      object keyed by resource path), sessions and their management.
+
+transport:
+  type: http
+  port: 443
+  scheme: https
+  accept_invalid_certs: true
+  auth: basic
+  timeout_ms: 4000
+  probe: { method: GET, path: /api/ssc/version }
+
+settings:
+  username: { type: string, default: api, max_length: 32, label: User, description: "The SSCv2 user; api for third-party access." }
+  password: { type: string, secret: true, default: "", max_length: 128, label: Password, description: "The third-party access password set in Sennheiser Control Cockpit, where third-party access must also be enabled." }
+
+ports:
+  - { port: 443, protocol: https, role: control }
+  - { port: 443, protocol: https, role: push, note: "The event stream, on the same server" }
+
+models:
+  - id: tcc-m
+    name: Sennheiser TeamConnect Ceiling Medium
+    supports:
+      - get_ssc_version
+      - get_device_identity
+      - get_device_identification
+      - identify
+      - get_device_site
+      - get_device_state
+      - get_firmware_update_state
+      - get_audio_outputs_global_mute
+      - set_mute
+      - get_audio_inputs_microphone_beam
+      - set_beam_installation_type
+      - set_beam_source_detection_threshold
+      - set_beam_offset
+      - get_audio_inputs_microphone_beam_direction
+      - get_audio_inputs_microphone_level
+      - get_audio_inputs_reference_level
+      - get_audio_room_in_use
+      - get_audio_room_in_use_activity_level
+      - get_audio_room_in_use_config
+      - get_audio_outputs_analog
+      - set_analog_out_gain
+      - set_analog_out_source
+      - get_audio_outputs_dante_far_end
+      - set_dante_far_end_gain
+      - set_dante_far_end_noise_gate_enabled
+      - set_dante_far_end_equalizer_enabled
+      - set_dante_far_end_delay
+      - get_audio_outputs_dante_local
+      - set_dante_local_gain
+      - set_dante_local_noise_gate_enabled
+      - set_dante_local_equalizer_enabled
+      - set_dante_local_voice_lift_enabled
+      - set_dante_local_delay
+      - get_audio_voice_lift
+      - set_voice_lift_emergency_mute_threshold
+      - set_voice_lift_emergency_mute_time
+      - get_audio_inputs_dante_reference
+      - set_reference_gain
+      - set_reference_far_end_auto_adjust_enabled
+      - get_audio_noise_gate
+      - set_noise_gate_threshold
+      - set_noise_gate_hold_time
+      - get_device_leds_ring
+      - set_led_brightness
+      - set_led_show_farend_activity
+      - set_led_mic_on_color
+      - set_led_mic_mute_color
+      - set_led_mic_custom_color
+      - set_led_mic_custom_enabled
+      - get_device_power_poe_daisychain
+      - get_audio_inputs_microphone_exclusion_zones
+      - set_exclusion_zone_active
+      - set_exclusion_zone_elevation_min
+      - set_exclusion_zone_elevation_max
+      - set_exclusion_zone_azimuth_min
+      - set_exclusion_zone_azimuth_max
+      - get_audio_inputs_microphone_priority_zones
+      - set_priority_zone_active
+      - set_priority_zone_elevation_min
+      - set_priority_zone_elevation_max
+      - set_priority_zone_azimuth_min
+      - set_priority_zone_azimuth_max
+      - set_priority_zone_weight
+      - get_audio_inputs_microphone_denoiser
+      - set_denoiser
+      - get_device_license_agreements_hash
+      - get_audio_inputs_microphone_input_lowcuts
+      - set_input_lowcuts
+      - get_audio_inputs_microphone_single_capsule_mode
+      - set_single_capsule_mode
+      - get_audio_inputs_microphone_beam_beamfreeze_auto_hold
+      - set_beam_freeze_enabled
+      - set_beam_freeze_hold_time
+      - get_equalizer
+      - set_equalizer
+    verification: none
+
+commands:
+  get_ssc_version:
+    summary: "Read the SSC version (GET /api/ssc/version)"
+    send: { method: GET, path: "/api/ssc/version" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_device_identity:
+    summary: "Read the device identity (GET /api/device/identity)"
+    send: { method: GET, path: "/api/device/identity" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_device_identification:
+    summary: "Read the identification (GET /api/device/identification)"
+    send: { method: GET, path: "/api/device/identification" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  identify:
+    summary: "Set the identification: identifying: the LED ring flashes (PUT /api/device/identification)"
+    params:
+      value: { type: bool, required: true, label: "Visual", description: "Identifying: the LED ring flashes." }
+    send: { method: PUT, path: "/api/device/identification", body: '{"visual":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_device_site:
+    summary: "Read the site (GET /api/device/site)"
+    send: { method: GET, path: "/api/device/site" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_device_state:
+    summary: "Read the device state (GET /api/device/state)"
+    send: { method: GET, path: "/api/device/state" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_firmware_update_state:
+    summary: "Read the firmware update state (GET /api/firmware/update/state)"
+    send: { method: GET, path: "/api/firmware/update/state" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_outputs_global_mute:
+    summary: "Read the global mute (GET /api/audio/outputs/global/mute)"
+    send: { method: GET, path: "/api/audio/outputs/global/mute" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_mute:
+    summary: "Set the global mute: all outputs muted (PUT /api/audio/outputs/global/mute)"
+    params:
+      value: { type: bool, required: true, label: "Enabled", description: "All outputs muted." }
+    send: { method: PUT, path: "/api/audio/outputs/global/mute", body: '{"enabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_inputs_microphone_beam:
+    summary: "Read the microphone beam (GET /api/audio/inputs/microphone/beam)"
+    send: { method: GET, path: "/api/audio/inputs/microphone/beam" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_beam_installation_type:
+    summary: "Set the microphone beam: installation: FlushMounted, SurfaceMounted or Suspended (PUT /api/audio/inputs/microphone/beam)"
+    params:
+      value: { type: enum, values: ["FlushMounted", "SurfaceMounted", "Suspended"], required: true, label: "Installation type", description: "Installation: FlushMounted, SurfaceMounted or Suspended." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/beam", body: '{"installationType":{value:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_beam_source_detection_threshold:
+    summary: "Set the microphone beam: source detection threshold: QuietRoom, NormalRoom or LoudRoom (PUT /api/audio/inputs/microphone/beam)"
+    params:
+      value: { type: enum, values: ["QuietRoom", "NormalRoom", "LoudRoom"], required: true, label: "Source detection threshold", description: "Source detection threshold: QuietRoom, NormalRoom or LoudRoom." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/beam", body: '{"sourceDetectionThreshold":{value:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_beam_offset:
+    summary: "Set the microphone beam: orientation offset in degrees, 0 to 330 in steps of 30 (PUT /api/audio/inputs/microphone/beam)"
+    params:
+      value: { type: int, min: 0, max: 330, required: true, label: "Offset", description: "Orientation offset in degrees, 0 to 330 in steps of 30." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/beam", body: '{"offset":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_inputs_microphone_beam_direction:
+    summary: "Read the beam direction (GET /api/audio/inputs/microphone/beam/direction)"
+    send: { method: GET, path: "/api/audio/inputs/microphone/beam/direction" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_inputs_microphone_level:
+    summary: "Read the microphone level (GET /api/audio/inputs/microphone/level)"
+    send: { method: GET, path: "/api/audio/inputs/microphone/level" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_inputs_reference_level:
+    summary: "Read the reference level (GET /api/audio/inputs/reference/level)"
+    send: { method: GET, path: "/api/audio/inputs/reference/level" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_room_in_use:
+    summary: "Read the room in use (GET /api/audio/roomInUse)"
+    send: { method: GET, path: "/api/audio/roomInUse" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_room_in_use_activity_level:
+    summary: "Read the room activity level (GET /api/audio/roomInUse/activityLevel)"
+    send: { method: GET, path: "/api/audio/roomInUse/activityLevel" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_room_in_use_config:
+    summary: "Read the room-in-use settings (GET /api/audio/roomInUse/config)"
+    send: { method: GET, path: "/api/audio/roomInUse/config" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_outputs_analog:
+    summary: "Read the analog output (GET /api/audio/outputs/analog)"
+    send: { method: GET, path: "/api/audio/outputs/analog" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_analog_out_gain:
+    summary: "Set the analog output: analog output gain in dB, -18 to 0 (PUT /api/audio/outputs/analog)"
+    params:
+      value: { type: int, min: -18, max: 0, required: true, label: "Gain", description: "Analog output gain in dB, -18 to 0." }
+    send: { method: PUT, path: "/api/audio/outputs/analog", body: '{"gain":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_analog_out_source:
+    summary: "Set the analog output: signal on the analog output: FarendOutput or LocalOutput (PUT /api/audio/outputs/analog)"
+    params:
+      value: { type: enum, values: ["FarendOutput", "LocalOutput"], required: true, label: "Switch", description: "Signal on the analog output: FarendOutput or LocalOutput." }
+    send: { method: PUT, path: "/api/audio/outputs/analog", body: '{"switch":{value:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_outputs_dante_far_end:
+    summary: "Read the Dante far-end output (GET /api/audio/outputs/dante/farEnd)"
+    send: { method: GET, path: "/api/audio/outputs/dante/farEnd" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_dante_far_end_gain:
+    summary: "Set the Dante far-end output: gain in dB, 0 to 24 (PUT /api/audio/outputs/dante/farEnd)"
+    params:
+      value: { type: int, min: 0, max: 24, required: true, label: "Gain", description: "Gain in dB, 0 to 24." }
+    send: { method: PUT, path: "/api/audio/outputs/dante/farEnd", body: '{"gain":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_dante_far_end_noise_gate_enabled:
+    summary: "Set the Dante far-end output: noise gate on (PUT /api/audio/outputs/dante/farEnd)"
+    params:
+      value: { type: bool, required: true, label: "Noise gate enabled", description: "Noise gate on." }
+    send: { method: PUT, path: "/api/audio/outputs/dante/farEnd", body: '{"noiseGateEnabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_dante_far_end_equalizer_enabled:
+    summary: "Set the Dante far-end output: equalizer on (PUT /api/audio/outputs/dante/farEnd)"
+    params:
+      value: { type: bool, required: true, label: "Equalizer enabled", description: "Equalizer on." }
+    send: { method: PUT, path: "/api/audio/outputs/dante/farEnd", body: '{"equalizerEnabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_dante_far_end_delay:
+    summary: "Set the Dante far-end output: delay in ms, 0 to 100 (PUT /api/audio/outputs/dante/farEnd)"
+    params:
+      value: { type: int, min: 0, max: 100, required: true, label: "Delay", description: "Delay in ms, 0 to 100." }
+    send: { method: PUT, path: "/api/audio/outputs/dante/farEnd", body: '{"delay":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_outputs_dante_local:
+    summary: "Read the Dante local output (GET /api/audio/outputs/dante/local)"
+    send: { method: GET, path: "/api/audio/outputs/dante/local" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_dante_local_gain:
+    summary: "Set the Dante local output: gain in dB, 0 to 24 (PUT /api/audio/outputs/dante/local)"
+    params:
+      value: { type: int, min: 0, max: 24, required: true, label: "Gain", description: "Gain in dB, 0 to 24." }
+    send: { method: PUT, path: "/api/audio/outputs/dante/local", body: '{"gain":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_dante_local_noise_gate_enabled:
+    summary: "Set the Dante local output: noise gate on (PUT /api/audio/outputs/dante/local)"
+    params:
+      value: { type: bool, required: true, label: "Noise gate enabled", description: "Noise gate on." }
+    send: { method: PUT, path: "/api/audio/outputs/dante/local", body: '{"noiseGateEnabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_dante_local_equalizer_enabled:
+    summary: "Set the Dante local output: equalizer on (PUT /api/audio/outputs/dante/local)"
+    params:
+      value: { type: bool, required: true, label: "Equalizer enabled", description: "Equalizer on." }
+    send: { method: PUT, path: "/api/audio/outputs/dante/local", body: '{"equalizerEnabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_dante_local_voice_lift_enabled:
+    summary: "Set the Dante local output: voice lift on (PUT /api/audio/outputs/dante/local)"
+    params:
+      value: { type: bool, required: true, label: "Voice lift enabled", description: "Voice lift on." }
+    send: { method: PUT, path: "/api/audio/outputs/dante/local", body: '{"voiceLiftEnabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_dante_local_delay:
+    summary: "Set the Dante local output: delay in ms, 0 to 100 (PUT /api/audio/outputs/dante/local)"
+    params:
+      value: { type: int, min: 0, max: 100, required: true, label: "Delay", description: "Delay in ms, 0 to 100." }
+    send: { method: PUT, path: "/api/audio/outputs/dante/local", body: '{"delay":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_voice_lift:
+    summary: "Read the voice lift (GET /api/audio/voiceLift)"
+    send: { method: GET, path: "/api/audio/voiceLift" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_voice_lift_emergency_mute_threshold:
+    summary: "Set the voice lift: emergency mute threshold in dB, -50 to -3 (PUT /api/audio/voiceLift)"
+    params:
+      value: { type: int, min: -50, max: -3, required: true, label: "Emergency mute threshold", description: "Emergency mute threshold in dB, -50 to -3." }
+    send: { method: PUT, path: "/api/audio/voiceLift", body: '{"emergencyMuteThreshold":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_voice_lift_emergency_mute_time:
+    summary: "Set the voice lift: emergency mute time in s, 1 to 30 (PUT /api/audio/voiceLift)"
+    params:
+      value: { type: int, min: 1, max: 30, required: true, label: "Emergency mute time", description: "Emergency mute time in s, 1 to 30." }
+    send: { method: PUT, path: "/api/audio/voiceLift", body: '{"emergencyMuteTime":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_inputs_dante_reference:
+    summary: "Read the Dante far-end reference (GET /api/audio/inputs/dante/reference)"
+    send: { method: GET, path: "/api/audio/inputs/dante/reference" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_reference_gain:
+    summary: "Set the Dante far-end reference: manual far-end detection gain in dB, -60 to +10 (only with auto adjustment off) (PUT /api/audio/inputs/dante/reference)"
+    params:
+      value: { type: int, min: -60, max: 10, required: true, label: "Gain", description: "Manual far-end detection gain in dB, -60 to +10 (only with auto adjustment off)." }
+    send: { method: PUT, path: "/api/audio/inputs/dante/reference", body: '{"gain":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reference_far_end_auto_adjust_enabled:
+    summary: "Set the Dante far-end reference: far-end level adjusted automatically (PUT /api/audio/inputs/dante/reference)"
+    params:
+      value: { type: bool, required: true, label: "Far end auto adjust enabled", description: "Far-end level adjusted automatically." }
+    send: { method: PUT, path: "/api/audio/inputs/dante/reference", body: '{"farEndAutoAdjustEnabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_noise_gate:
+    summary: "Read the noise gate (GET /api/audio/noiseGate)"
+    send: { method: GET, path: "/api/audio/noiseGate" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_noise_gate_threshold:
+    summary: "Set the noise gate: threshold in dB, -90 to -40 (PUT /api/audio/noiseGate)"
+    params:
+      value: { type: int, min: -90, max: -40, required: true, label: "Threshold", description: "Threshold in dB, -90 to -40." }
+    send: { method: PUT, path: "/api/audio/noiseGate", body: '{"threshold":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_noise_gate_hold_time:
+    summary: "Set the noise gate: hold time in ms, 50 to 1000 (PUT /api/audio/noiseGate)"
+    params:
+      value: { type: int, min: 50, max: 1000, required: true, label: "Hold time", description: "Hold time in ms, 50 to 1000." }
+    send: { method: PUT, path: "/api/audio/noiseGate", body: '{"holdTime":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_device_leds_ring:
+    summary: "Read the LED ring (GET /api/device/leds/ring)"
+    send: { method: GET, path: "/api/device/leds/ring" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_led_brightness:
+    summary: "Set the LED ring: brightness, 0 (off) to 5 (PUT /api/device/leds/ring)"
+    params:
+      value: { type: int, min: 0, max: 5, required: true, label: "Brightness", description: "Brightness, 0 (off) to 5." }
+    send: { method: PUT, path: "/api/device/leds/ring", body: '{"brightness":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_led_show_farend_activity:
+    summary: "Set the LED ring: lEDs show far-end activity (PUT /api/device/leds/ring)"
+    params:
+      value: { type: bool, required: true, label: "Show farend activity", description: "LEDs show far-end activity." }
+    send: { method: PUT, path: "/api/device/leds/ring", body: '{"showFarendActivity":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_led_mic_on_color:
+    summary: "Set the LED ring: color while the microphone is on (PUT /api/device/leds/ring)"
+    params:
+      value: { type: enum, values: ["LightGreen", "Green", "Blue", "Red", "Yellow", "Orange", "Cyan", "Pink"], required: true, label: "Color", description: "Color while the microphone is on." }
+    send: { method: PUT, path: "/api/device/leds/ring", body: '{"micOn":{"color":{value:json}}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_led_mic_mute_color:
+    summary: "Set the LED ring: color while muted (PUT /api/device/leds/ring)"
+    params:
+      value: { type: enum, values: ["LightGreen", "Green", "Blue", "Red", "Yellow", "Orange", "Cyan", "Pink"], required: true, label: "Color", description: "Color while muted." }
+    send: { method: PUT, path: "/api/device/leds/ring", body: '{"micMute":{"color":{value:json}}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_led_mic_custom_color:
+    summary: "Set the LED ring: custom color (PUT /api/device/leds/ring)"
+    params:
+      value: { type: enum, values: ["LightGreen", "Green", "Blue", "Red", "Yellow", "Orange", "Cyan", "Pink"], required: true, label: "Color", description: "Custom color." }
+    send: { method: PUT, path: "/api/device/leds/ring", body: '{"micCustom":{"color":{value:json}}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_led_mic_custom_enabled:
+    summary: "Set the LED ring: custom color shown (PUT /api/device/leds/ring)"
+    params:
+      value: { type: bool, required: true, label: "Enabled", description: "Custom color shown." }
+    send: { method: PUT, path: "/api/device/leds/ring", body: '{"micCustom":{"enabled":{value}}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_device_power_poe_daisychain:
+    summary: "Read the PoE daisy chain (GET /api/device/power/poe/daisychain)"
+    send: { method: GET, path: "/api/device/power/poe/daisychain" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_inputs_microphone_exclusion_zones:
+    summary: "Read the exclusion zones (GET /api/audio/inputs/microphone/exclusionZones)"
+    send: { method: GET, path: "/api/audio/inputs/microphone/exclusionZones" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_exclusion_zone_active:
+    summary: "Set the exclusion zone: zone active (PUT /api/audio/inputs/microphone/exclusionZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 4, required: true, label: "Exclusion number", description: "The exclusion zone number, 0 to 4, as the API numbers it." }
+      value: { type: bool, required: true, label: "Enabled", description: "Zone active." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/exclusionZones/{id}", body: '{"enabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_exclusion_zone_elevation_min:
+    summary: "Set the exclusion zone: lowest elevation in degrees, 0 to 90 in 5 degree steps (PUT /api/audio/inputs/microphone/exclusionZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 4, required: true, label: "Exclusion number", description: "The exclusion zone number, 0 to 4, as the API numbers it." }
+      value: { type: int, min: 0, max: 90, required: true, label: "Min", description: "Lowest elevation in degrees, 0 to 90 in 5 degree steps." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/exclusionZones/{id}", body: '{"elevation":{"min":{value}}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_exclusion_zone_elevation_max:
+    summary: "Set the exclusion zone: highest elevation in degrees, 0 to 90 in 5 degree steps (PUT /api/audio/inputs/microphone/exclusionZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 4, required: true, label: "Exclusion number", description: "The exclusion zone number, 0 to 4, as the API numbers it." }
+      value: { type: int, min: 0, max: 90, required: true, label: "Max", description: "Highest elevation in degrees, 0 to 90 in 5 degree steps." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/exclusionZones/{id}", body: '{"elevation":{"max":{value}}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_exclusion_zone_azimuth_min:
+    summary: "Set the exclusion zone: start azimuth in degrees, 0 to 360 in 5 degree steps (PUT /api/audio/inputs/microphone/exclusionZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 4, required: true, label: "Exclusion number", description: "The exclusion zone number, 0 to 4, as the API numbers it." }
+      value: { type: int, min: 0, max: 360, required: true, label: "Min", description: "Start azimuth in degrees, 0 to 360 in 5 degree steps." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/exclusionZones/{id}", body: '{"azimuth":{"min":{value}}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_exclusion_zone_azimuth_max:
+    summary: "Set the exclusion zone: end azimuth in degrees, 0 to 360 in 5 degree steps (PUT /api/audio/inputs/microphone/exclusionZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 4, required: true, label: "Exclusion number", description: "The exclusion zone number, 0 to 4, as the API numbers it." }
+      value: { type: int, min: 0, max: 360, required: true, label: "Max", description: "End azimuth in degrees, 0 to 360 in 5 degree steps." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/exclusionZones/{id}", body: '{"azimuth":{"max":{value}}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_inputs_microphone_priority_zones:
+    summary: "Read the priority zones (GET /api/audio/inputs/microphone/priorityZones)"
+    send: { method: GET, path: "/api/audio/inputs/microphone/priorityZones" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_priority_zone_active:
+    summary: "Set the priority zone: zone active (PUT /api/audio/inputs/microphone/priorityZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 0, required: true, label: "Priority number", description: "The priority zone number, 0 to 0, as the API numbers it." }
+      value: { type: bool, required: true, label: "Enabled", description: "Zone active." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/priorityZones/{id}", body: '{"enabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_priority_zone_elevation_min:
+    summary: "Set the priority zone: lowest elevation in degrees, 0 to 90 in 5 degree steps (PUT /api/audio/inputs/microphone/priorityZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 0, required: true, label: "Priority number", description: "The priority zone number, 0 to 0, as the API numbers it." }
+      value: { type: int, min: 0, max: 90, required: true, label: "Min", description: "Lowest elevation in degrees, 0 to 90 in 5 degree steps." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/priorityZones/{id}", body: '{"elevation":{"min":{value}}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_priority_zone_elevation_max:
+    summary: "Set the priority zone: highest elevation in degrees, 0 to 90 in 5 degree steps (PUT /api/audio/inputs/microphone/priorityZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 0, required: true, label: "Priority number", description: "The priority zone number, 0 to 0, as the API numbers it." }
+      value: { type: int, min: 0, max: 90, required: true, label: "Max", description: "Highest elevation in degrees, 0 to 90 in 5 degree steps." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/priorityZones/{id}", body: '{"elevation":{"max":{value}}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_priority_zone_azimuth_min:
+    summary: "Set the priority zone: start azimuth in degrees, 0 to 360 in 5 degree steps (PUT /api/audio/inputs/microphone/priorityZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 0, required: true, label: "Priority number", description: "The priority zone number, 0 to 0, as the API numbers it." }
+      value: { type: int, min: 0, max: 360, required: true, label: "Min", description: "Start azimuth in degrees, 0 to 360 in 5 degree steps." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/priorityZones/{id}", body: '{"azimuth":{"min":{value}}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_priority_zone_azimuth_max:
+    summary: "Set the priority zone: end azimuth in degrees, 0 to 360 in 5 degree steps (PUT /api/audio/inputs/microphone/priorityZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 0, required: true, label: "Priority number", description: "The priority zone number, 0 to 0, as the API numbers it." }
+      value: { type: int, min: 0, max: 360, required: true, label: "Max", description: "End azimuth in degrees, 0 to 360 in 5 degree steps." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/priorityZones/{id}", body: '{"azimuth":{"max":{value}}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_priority_zone_weight:
+    summary: "Set the priority zone: weight, 1.0 (neutral) to 4.0 in 0.1 steps (PUT /api/audio/inputs/microphone/priorityZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 0, required: true, label: "Priority number", description: "The priority zone number, 0 to 0, as the API numbers it." }
+      value: { type: float, min: 1.0, max: 4.0, required: true, label: "Weight", description: "Weight, 1.0 (neutral) to 4.0 in 0.1 steps." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/priorityZones/{id}", body: '{"weight":{value:.1f}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_inputs_microphone_denoiser:
+    summary: "Read the denoiser (GET /api/audio/inputs/microphone/denoiser)"
+    send: { method: GET, path: "/api/audio/inputs/microphone/denoiser" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_denoiser:
+    summary: "Set the denoiser: denoiser: Off, Low, Medium or High (PUT /api/audio/inputs/microphone/denoiser)"
+    params:
+      value: { type: enum, values: ["Off", "Low", "Medium", "High"], required: true, label: "Setting", description: "Denoiser: Off, Low, Medium or High." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/denoiser", body: '{"setting":{value:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_device_license_agreements_hash:
+    summary: "Read the license agreements hash (GET /api/device/licenseAgreements/hash)"
+    send: { method: GET, path: "/api/device/licenseAgreements/hash" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_inputs_microphone_input_lowcuts:
+    summary: "Read the input low cuts (GET /api/audio/inputs/microphone/inputLowcuts)"
+    send: { method: GET, path: "/api/audio/inputs/microphone/inputLowcuts" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_input_lowcuts:
+    summary: "Set the input low cuts: microphone low-cut filters on (PUT /api/audio/inputs/microphone/inputLowcuts)"
+    params:
+      value: { type: bool, required: true, label: "Enabled", description: "Microphone low-cut filters on." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/inputLowcuts", body: '{"enabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_inputs_microphone_single_capsule_mode:
+    summary: "Read the single capsule mode (GET /api/audio/inputs/microphone/singleCapsuleMode)"
+    send: { method: GET, path: "/api/audio/inputs/microphone/singleCapsuleMode" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_single_capsule_mode:
+    summary: "Set the single capsule mode: single capsule mode: one raw capsule to the output, for calibration (PUT /api/audio/inputs/microphone/singleCapsuleMode)"
+    params:
+      value: { type: bool, required: true, label: "Enabled", description: "Single capsule mode: one raw capsule to the output, for calibration." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/singleCapsuleMode", body: '{"enabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_inputs_microphone_beam_beamfreeze_auto_hold:
+    summary: "Read the beam freeze auto hold (GET /api/audio/inputs/microphone/beam/beamfreeze/autoHold)"
+    send: { method: GET, path: "/api/audio/inputs/microphone/beam/beamfreeze/autoHold" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_beam_freeze_enabled:
+    summary: "Set the beam freeze auto hold: beam freeze auto hold on (PUT /api/audio/inputs/microphone/beam/beamfreeze/autoHold)"
+    params:
+      value: { type: bool, required: true, label: "Enabled", description: "Beam freeze auto hold on." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/beam/beamfreeze/autoHold", body: '{"enabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_beam_freeze_hold_time:
+    summary: "Set the beam freeze auto hold: hold time in ms, 50 to 500 (PUT /api/audio/inputs/microphone/beam/beamfreeze/autoHold)"
+    params:
+      value: { type: int, min: 50, max: 500, required: true, label: "Hold time", description: "Hold time in ms, 50 to 500." }
+    send: { method: PUT, path: "/api/audio/inputs/microphone/beam/beamfreeze/autoHold", body: '{"holdTime":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_equalizer:
+    summary: "Read the equalizer's seven gains (GET /api/audio/equalizer)"
+    send: { method: GET, path: /api/audio/equalizer }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_equalizer:
+    summary: "Set the equalizer's seven gains, shared by the outputs (PUT /api/audio/equalizer)"
+    params:
+      band1: { type: int, min: -8, max: 8, required: true, label: "125 Hz gain", description: "Gain at 125 Hz in dB, -8 to +8." }
+      band2: { type: int, min: -8, max: 8, required: true, label: "250 Hz gain", description: "Gain at 250 Hz in dB, -8 to +8." }
+      band3: { type: int, min: -8, max: 8, required: true, label: "500 Hz gain", description: "Gain at 500 Hz in dB, -8 to +8." }
+      band4: { type: int, min: -8, max: 8, required: true, label: "1000 Hz gain", description: "Gain at 1000 Hz in dB, -8 to +8." }
+      band5: { type: int, min: -8, max: 8, required: true, label: "2000 Hz gain", description: "Gain at 2000 Hz in dB, -8 to +8." }
+      band6: { type: int, min: -8, max: 8, required: true, label: "4000 Hz gain", description: "Gain at 4000 Hz in dB, -8 to +8." }
+      band7: { type: int, min: -8, max: 8, required: true, label: "8000 Hz gain", description: "Gain at 8000 Hz in dB, -8 to +8." }
+    send: { method: PUT, path: /api/audio/equalizer, body: '{"gains":[{band1},{band2},{band3},{band4},{band5},{band6},{band7}]}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      On connecting the core opens the event stream; its open event gives the
+      session, to which every readable resource is added with one PUT (a
+      resource the device does not have refuses the whole list). The device
+      sends each resource's value at once and on every change, so nothing is
+      polled but the version and the license hash, read once. Opened for
+      commands only, no stream is opened and nothing is read.
+  - models: [all]
+    severity: info
+    text: >
+      Third-party access is off until enabled, with a password, in Sennheiser
+      Control Cockpit; the user is api. A 401 or 403 is a refusal of the
+      password. The device's certificate is self-signed and accepted as such.
+  - models: [all]
+    severity: info
+    text: >
+      The API offers no write for the device name, location and position, the
+      network settings, restart, factory reset, firmware update or the
+      room-in-use settings: they are set in Control Cockpit. The equalizer and
+      the noise gate are shared by the outputs; each output turns them on or
+      off. The reference gain can be set only with automatic adjustment off
+      (409 or 422 otherwise). Zones narrower than 10 degrees (15 for the
+      priority zone) are refused.
+  - models: [all]
+    severity: warning
+    text: >
+      Each write is a PUT of the one field it changes (partial bodies, as the
+      schema's requests have no required fields); the new value arrives on
+      the event stream.
+
+state:
+  ssc.protocol: { type: string, description: "SSC protocol version (/api/ssc/version)" }
+  ssc.schema: { type: string, description: "Schema version (/api/ssc/version)" }
+  device.product: { type: string, description: "Product (TCCM) (/api/device/identity)" }
+  device.hardware_revision: { type: string, description: "Hardware revision (/api/device/identity)" }
+  device.serial: { type: string, description: "Serial number (/api/device/identity)" }
+  device.vendor: { type: string, description: "Vendor (/api/device/identity)" }
+  device.identifying: { type: bool, description: "Identifying: the LED ring flashes (/api/device/identification)" }
+  device.device_name: { type: string, description: "Device name (set in Control Cockpit) (/api/device/site)" }
+  device.location: { type: string, description: "Location (/api/device/site)" }
+  device.position: { type: string, description: "Position (/api/device/site)" }
+  device.state: { type: string, description: "Device state: Normal, Identifying or FirmwareUpdate (/api/device/state)" }
+  firmware.device_version: { type: string, description: "Firmware version (/api/firmware/update/state)" }
+  firmware.dante_version: { type: string, description: "Dante version (/api/firmware/update/state)" }
+  firmware.state: { type: string, description: "Update state: Updating or Idle (/api/firmware/update/state)" }
+  firmware.progress: { type: int, unit: "%", description: "Update progress, 0-100 (/api/firmware/update/state)" }
+  firmware.last_status: { type: string, description: "Last update result: None or ChecksumError (/api/firmware/update/state)" }
+  audio.muted: { type: bool, description: "All outputs muted (/api/audio/outputs/global/mute)" }
+  beam.installation_type: { type: string, description: "Installation: FlushMounted, SurfaceMounted or Suspended (/api/audio/inputs/microphone/beam)" }
+  beam.source_detection_threshold: { type: string, description: "Source detection threshold: QuietRoom, NormalRoom or LoudRoom (/api/audio/inputs/microphone/beam)" }
+  beam.offset: { type: int, unit: "deg", description: "Orientation offset in degrees, 0 to 330 in steps of 30 (/api/audio/inputs/microphone/beam)" }
+  beam.direction.azimuth: { type: int, unit: "deg", description: "Beam azimuth in degrees, 0-360 (/api/audio/inputs/microphone/beam/direction)" }
+  beam.direction.elevation: { type: int, unit: "deg", description: "Beam elevation in degrees, 0-90 (/api/audio/inputs/microphone/beam/direction)" }
+  beam.direction.beam_freeze_active: { type: bool, description: "Beam frozen while the far end talks (/api/audio/inputs/microphone/beam/direction)" }
+  levels.microphone_peak: { type: int, unit: "dB", description: "Microphone peak level, -90 to 0 dB (/api/audio/inputs/microphone/level)" }
+  levels.reference_rms: { type: int, unit: "dBFS", description: "Far-end reference RMS level, -120 to 0 dBFS (/api/audio/inputs/reference/level)" }
+  room_in_use.active: { type: bool, description: "Room in use (speech detected) (/api/audio/roomInUse)" }
+  room_in_use.activity_peak: { type: int, unit: "dB", description: "Room activity peak level, 0 to 90 dB (/api/audio/roomInUse/activityLevel)" }
+  room_in_use.trigger_time: { type: int, unit: "s", description: "Trigger time, 1-20 s (/api/audio/roomInUse/config)" }
+  room_in_use.release_time: { type: int, unit: "s", description: "Release time, 5-600 s (/api/audio/roomInUse/config)" }
+  room_in_use.threshold: { type: int, unit: "dB", description: "Threshold, 0-36 dB (/api/audio/roomInUse/config)" }
+  analog_out.gain: { type: int, unit: "dB", description: "Analog output gain in dB, -18 to 0 (/api/audio/outputs/analog)" }
+  analog_out.source: { type: string, description: "Signal on the analog output: FarendOutput or LocalOutput (/api/audio/outputs/analog)" }
+  dante_far_end.gain: { type: int, unit: "dB", description: "Gain in dB, 0 to 24 (/api/audio/outputs/dante/farEnd)" }
+  dante_far_end.noise_gate_enabled: { type: bool, description: "Noise gate on (/api/audio/outputs/dante/farEnd)" }
+  dante_far_end.equalizer_enabled: { type: bool, description: "Equalizer on (/api/audio/outputs/dante/farEnd)" }
+  dante_far_end.delay: { type: int, unit: "ms", description: "Delay in ms, 0 to 100 (/api/audio/outputs/dante/farEnd)" }
+  dante_local.gain: { type: int, unit: "dB", description: "Gain in dB, 0 to 24 (/api/audio/outputs/dante/local)" }
+  dante_local.noise_gate_enabled: { type: bool, description: "Noise gate on (/api/audio/outputs/dante/local)" }
+  dante_local.equalizer_enabled: { type: bool, description: "Equalizer on (/api/audio/outputs/dante/local)" }
+  dante_local.voice_lift_enabled: { type: bool, description: "Voice lift on (/api/audio/outputs/dante/local)" }
+  dante_local.delay: { type: int, unit: "ms", description: "Delay in ms, 0 to 100 (/api/audio/outputs/dante/local)" }
+  voice_lift.emergency_mute_threshold: { type: int, unit: "dB", description: "Emergency mute threshold in dB, -50 to -3 (/api/audio/voiceLift)" }
+  voice_lift.emergency_mute_time: { type: int, unit: "s", description: "Emergency mute time in s, 1 to 30 (/api/audio/voiceLift)" }
+  reference.gain: { type: int, unit: "dB", description: "Manual far-end detection gain in dB, -60 to +10 (only with auto adjustment off) (/api/audio/inputs/dante/reference)" }
+  reference.far_end_auto_adjust_enabled: { type: bool, description: "Far-end level adjusted automatically (/api/audio/inputs/dante/reference)" }
+  noise_gate.threshold: { type: int, unit: "dB", description: "Threshold in dB, -90 to -40 (/api/audio/noiseGate)" }
+  noise_gate.hold_time: { type: int, unit: "ms", description: "Hold time in ms, 50 to 1000 (/api/audio/noiseGate)" }
+  led.brightness: { type: int, description: "Brightness, 0 (off) to 5 (/api/device/leds/ring)" }
+  led.show_farend_activity: { type: bool, description: "LEDs show far-end activity (/api/device/leds/ring)" }
+  led.mic_on_color: { type: string, description: "Color while the microphone is on (/api/device/leds/ring)" }
+  led.mic_mute_color: { type: string, description: "Color while muted (/api/device/leds/ring)" }
+  led.mic_custom_color: { type: string, description: "Custom color (/api/device/leds/ring)" }
+  led.mic_custom_enabled: { type: bool, description: "Custom color shown (/api/device/leds/ring)" }
+  poe_daisy_chain.sufficient_power: { type: bool, description: "Enough power for a daisy-chained device (/api/device/power/poe/daisychain)" }
+  poe_daisy_chain.in_use: { type: bool, description: "Daisy chain port in use (/api/device/power/poe/daisychain)" }
+  exclusion_zones.*.enabled: { type: bool, description: "Zone active (/api/audio/inputs/microphone/exclusionZones)" }
+  exclusion_zones.*.elevation_min: { type: int, unit: "deg", description: "Lowest elevation in degrees, 0 to 90 in 5 degree steps (/api/audio/inputs/microphone/exclusionZones)" }
+  exclusion_zones.*.elevation_max: { type: int, unit: "deg", description: "Highest elevation in degrees, 0 to 90 in 5 degree steps (/api/audio/inputs/microphone/exclusionZones)" }
+  exclusion_zones.*.azimuth_min: { type: int, unit: "deg", description: "Start azimuth in degrees, 0 to 360 in 5 degree steps (/api/audio/inputs/microphone/exclusionZones)" }
+  exclusion_zones.*.azimuth_max: { type: int, unit: "deg", description: "End azimuth in degrees, 0 to 360 in 5 degree steps (/api/audio/inputs/microphone/exclusionZones)" }
+  priority_zones.*.enabled: { type: bool, description: "Zone active (/api/audio/inputs/microphone/priorityZones)" }
+  priority_zones.*.elevation_min: { type: int, unit: "deg", description: "Lowest elevation in degrees, 0 to 90 in 5 degree steps (/api/audio/inputs/microphone/priorityZones)" }
+  priority_zones.*.elevation_max: { type: int, unit: "deg", description: "Highest elevation in degrees, 0 to 90 in 5 degree steps (/api/audio/inputs/microphone/priorityZones)" }
+  priority_zones.*.azimuth_min: { type: int, unit: "deg", description: "Start azimuth in degrees, 0 to 360 in 5 degree steps (/api/audio/inputs/microphone/priorityZones)" }
+  priority_zones.*.azimuth_max: { type: int, unit: "deg", description: "End azimuth in degrees, 0 to 360 in 5 degree steps (/api/audio/inputs/microphone/priorityZones)" }
+  priority_zones.*.weight: { type: float, description: "Weight, 1.0 (neutral) to 4.0 in 0.1 steps (/api/audio/inputs/microphone/priorityZones)" }
+  denoiser.level: { type: string, description: "Denoiser: Off, Low, Medium or High (/api/audio/inputs/microphone/denoiser)" }
+  licenses.hash: { type: string, description: "SHA-256 of the license agreements (/api/device/licenseAgreements/hash)" }
+  input_lowcuts.enabled: { type: bool, description: "Microphone low-cut filters on (/api/audio/inputs/microphone/inputLowcuts)" }
+  single_capsule_mode.enabled: { type: bool, description: "Single capsule mode: one raw capsule to the output, for calibration (/api/audio/inputs/microphone/singleCapsuleMode)" }
+  beam_freeze.enabled: { type: bool, description: "Beam freeze auto hold on (/api/audio/inputs/microphone/beam/beamfreeze/autoHold)" }
+  beam_freeze.hold_time: { type: int, unit: "ms", description: "Hold time in ms, 50 to 500 (/api/audio/inputs/microphone/beam/beamfreeze/autoHold)" }
+  equalizer.*: { type: int, unit: dB, description: "Equalizer gain in dB, -8 to +8, keyed by band in Hz (125-8000), shared by the outputs (/api/audio/equalizer)" }
+  session.id: { type: string, description: "The event stream's session, to which the subscriptions are added" }
+
+telemetry:
+  sse:
+    path: /api/ssc/state/subscriptions
+  poll:
+    send:
+      - { method: GET, path: /api/ssc/version }
+      - { method: GET, path: /api/device/licenseAgreements/hash }
+  updates:
+    - json_match: { "$.event": "^open$", "$.data.sessionUUID": "^([0-9A-Za-z-]+)$" }
+      state: { session.id: "{1}" }
+      then_send:
+        - { method: PUT, path: "/api/ssc/state/subscriptions/{1}", body: '["/api/device/identity","/api/device/identification","/api/device/site","/api/device/state","/api/firmware/update/state","/api/audio/outputs/global/mute","/api/audio/inputs/microphone/beam","/api/audio/inputs/microphone/beam/direction","/api/audio/inputs/microphone/level","/api/audio/inputs/reference/level","/api/audio/roomInUse","/api/audio/roomInUse/activityLevel","/api/audio/roomInUse/config","/api/audio/outputs/analog","/api/audio/outputs/dante/farEnd","/api/audio/outputs/dante/local","/api/audio/voiceLift","/api/audio/inputs/dante/reference","/api/audio/noiseGate","/api/device/leds/ring","/api/device/power/poe/daisychain","/api/audio/inputs/microphone/exclusionZones","/api/audio/inputs/microphone/priorityZones","/api/audio/inputs/microphone/denoiser","/api/audio/inputs/microphone/inputLowcuts","/api/audio/inputs/microphone/singleCapsuleMode","/api/audio/inputs/microphone/beam/beamfreeze/autoHold","/api/audio/equalizer"]', content_type: application/json }
+    - path: "^/api/ssc/version$"
+      json: { protocol: "$.protocol", schema: "$.schema" }
+      state: { "ssc.protocol": "{protocol}", "ssc.schema": "{schema}" }
+    - path: "^/api/device/identity$"
+      json: { product: "$.product", hardware_revision: "$.hardwareRevision", serial: "$.serial", vendor: "$.vendor" }
+      state: { "device.product": "{product}", "device.hardware_revision": "{hardware_revision}", "device.serial": "{serial}", "device.vendor": "{vendor}" }
+    - json_match: { "$.data./api/device/identity": '^\{' }
+      json: { product: "$.data./api/device/identity.product", hardware_revision: "$.data./api/device/identity.hardwareRevision", serial: "$.data./api/device/identity.serial", vendor: "$.data./api/device/identity.vendor" }
+      state: { "device.product": "{product}", "device.hardware_revision": "{hardware_revision}", "device.serial": "{serial}", "device.vendor": "{vendor}" }
+    - path: "^/api/device/identification$"
+      json: { identifying: "$.visual" }
+      state: { "device.identifying": "{identifying}" }
+    - json_match: { "$.data./api/device/identification": '^\{' }
+      json: { identifying: "$.data./api/device/identification.visual" }
+      state: { "device.identifying": "{identifying}" }
+    - path: "^/api/device/site$"
+      json: { device_name: "$.deviceName", location: "$.location", position: "$.position" }
+      state: { "device.device_name": "{device_name}", "device.location": "{location}", "device.position": "{position}" }
+    - json_match: { "$.data./api/device/site": '^\{' }
+      json: { device_name: "$.data./api/device/site.deviceName", location: "$.data./api/device/site.location", position: "$.data./api/device/site.position" }
+      state: { "device.device_name": "{device_name}", "device.location": "{location}", "device.position": "{position}" }
+    - path: "^/api/device/state$"
+      json: { state: "$.state" }
+      state: { "device.state": "{state}" }
+    - json_match: { "$.data./api/device/state": '^\{' }
+      json: { state: "$.data./api/device/state.state" }
+      state: { "device.state": "{state}" }
+    - path: "^/api/firmware/update/state$"
+      json: { device_version: "$.deviceVersion", dante_version: "$.danteVersion", state: "$.state", progress: "$.progress", last_status: "$.lastStatus" }
+      state: { "firmware.device_version": "{device_version}", "firmware.dante_version": "{dante_version}", "firmware.state": "{state}", "firmware.progress": "{progress}", "firmware.last_status": "{last_status}" }
+    - json_match: { "$.data./api/firmware/update/state": '^\{' }
+      json: { device_version: "$.data./api/firmware/update/state.deviceVersion", dante_version: "$.data./api/firmware/update/state.danteVersion", state: "$.data./api/firmware/update/state.state", progress: "$.data./api/firmware/update/state.progress", last_status: "$.data./api/firmware/update/state.lastStatus" }
+      state: { "firmware.device_version": "{device_version}", "firmware.dante_version": "{dante_version}", "firmware.state": "{state}", "firmware.progress": "{progress}", "firmware.last_status": "{last_status}" }
+    - path: "^/api/audio/outputs/global/mute$"
+      json: { muted: "$.enabled" }
+      state: { "audio.muted": "{muted}" }
+    - json_match: { "$.data./api/audio/outputs/global/mute": '^\{' }
+      json: { muted: "$.data./api/audio/outputs/global/mute.enabled" }
+      state: { "audio.muted": "{muted}" }
+    - path: "^/api/audio/inputs/microphone/beam$"
+      json: { installation_type: "$.installationType", source_detection_threshold: "$.sourceDetectionThreshold", offset: "$.offset" }
+      state: { "beam.installation_type": "{installation_type}", "beam.source_detection_threshold": "{source_detection_threshold}", "beam.offset": "{offset}" }
+    - json_match: { "$.data./api/audio/inputs/microphone/beam": '^\{' }
+      json: { installation_type: "$.data./api/audio/inputs/microphone/beam.installationType", source_detection_threshold: "$.data./api/audio/inputs/microphone/beam.sourceDetectionThreshold", offset: "$.data./api/audio/inputs/microphone/beam.offset" }
+      state: { "beam.installation_type": "{installation_type}", "beam.source_detection_threshold": "{source_detection_threshold}", "beam.offset": "{offset}" }
+    - path: "^/api/audio/inputs/microphone/beam/direction$"
+      json: { azimuth: "$.azimuth", elevation: "$.elevation", beam_freeze_active: "$.beamFreezeActive" }
+      state: { "beam.direction.azimuth": "{azimuth}", "beam.direction.elevation": "{elevation}", "beam.direction.beam_freeze_active": "{beam_freeze_active}" }
+    - json_match: { "$.data./api/audio/inputs/microphone/beam/direction": '^\{' }
+      json: { azimuth: "$.data./api/audio/inputs/microphone/beam/direction.azimuth", elevation: "$.data./api/audio/inputs/microphone/beam/direction.elevation", beam_freeze_active: "$.data./api/audio/inputs/microphone/beam/direction.beamFreezeActive" }
+      state: { "beam.direction.azimuth": "{azimuth}", "beam.direction.elevation": "{elevation}", "beam.direction.beam_freeze_active": "{beam_freeze_active}" }
+    - path: "^/api/audio/inputs/microphone/level$"
+      json: { microphone_peak: "$.peak" }
+      state: { "levels.microphone_peak": "{microphone_peak}" }
+    - json_match: { "$.data./api/audio/inputs/microphone/level": '^\{' }
+      json: { microphone_peak: "$.data./api/audio/inputs/microphone/level.peak" }
+      state: { "levels.microphone_peak": "{microphone_peak}" }
+    - path: "^/api/audio/inputs/reference/level$"
+      json: { reference_rms: "$.rms" }
+      state: { "levels.reference_rms": "{reference_rms}" }
+    - json_match: { "$.data./api/audio/inputs/reference/level": '^\{' }
+      json: { reference_rms: "$.data./api/audio/inputs/reference/level.rms" }
+      state: { "levels.reference_rms": "{reference_rms}" }
+    - path: "^/api/audio/roomInUse$"
+      json: { active: "$.active" }
+      state: { "room_in_use.active": "{active}" }
+    - json_match: { "$.data./api/audio/roomInUse": '^\{' }
+      json: { active: "$.data./api/audio/roomInUse.active" }
+      state: { "room_in_use.active": "{active}" }
+    - path: "^/api/audio/roomInUse/activityLevel$"
+      json: { activity_peak: "$.peak" }
+      state: { "room_in_use.activity_peak": "{activity_peak}" }
+    - json_match: { "$.data./api/audio/roomInUse/activityLevel": '^\{' }
+      json: { activity_peak: "$.data./api/audio/roomInUse/activityLevel.peak" }
+      state: { "room_in_use.activity_peak": "{activity_peak}" }
+    - path: "^/api/audio/roomInUse/config$"
+      json: { trigger_time: "$.triggerTime", release_time: "$.releaseTime", threshold: "$.threshold" }
+      state: { "room_in_use.trigger_time": "{trigger_time}", "room_in_use.release_time": "{release_time}", "room_in_use.threshold": "{threshold}" }
+    - json_match: { "$.data./api/audio/roomInUse/config": '^\{' }
+      json: { trigger_time: "$.data./api/audio/roomInUse/config.triggerTime", release_time: "$.data./api/audio/roomInUse/config.releaseTime", threshold: "$.data./api/audio/roomInUse/config.threshold" }
+      state: { "room_in_use.trigger_time": "{trigger_time}", "room_in_use.release_time": "{release_time}", "room_in_use.threshold": "{threshold}" }
+    - path: "^/api/audio/outputs/analog$"
+      json: { gain: "$.gain", source: "$.switch" }
+      state: { "analog_out.gain": "{gain}", "analog_out.source": "{source}" }
+    - json_match: { "$.data./api/audio/outputs/analog": '^\{' }
+      json: { gain: "$.data./api/audio/outputs/analog.gain", source: "$.data./api/audio/outputs/analog.switch" }
+      state: { "analog_out.gain": "{gain}", "analog_out.source": "{source}" }
+    - path: "^/api/audio/outputs/dante/farEnd$"
+      json: { gain: "$.gain", noise_gate_enabled: "$.noiseGateEnabled", equalizer_enabled: "$.equalizerEnabled", delay: "$.delay" }
+      state: { "dante_far_end.gain": "{gain}", "dante_far_end.noise_gate_enabled": "{noise_gate_enabled}", "dante_far_end.equalizer_enabled": "{equalizer_enabled}", "dante_far_end.delay": "{delay}" }
+    - json_match: { "$.data./api/audio/outputs/dante/farEnd": '^\{' }
+      json: { gain: "$.data./api/audio/outputs/dante/farEnd.gain", noise_gate_enabled: "$.data./api/audio/outputs/dante/farEnd.noiseGateEnabled", equalizer_enabled: "$.data./api/audio/outputs/dante/farEnd.equalizerEnabled", delay: "$.data./api/audio/outputs/dante/farEnd.delay" }
+      state: { "dante_far_end.gain": "{gain}", "dante_far_end.noise_gate_enabled": "{noise_gate_enabled}", "dante_far_end.equalizer_enabled": "{equalizer_enabled}", "dante_far_end.delay": "{delay}" }
+    - path: "^/api/audio/outputs/dante/local$"
+      json: { gain: "$.gain", noise_gate_enabled: "$.noiseGateEnabled", equalizer_enabled: "$.equalizerEnabled", voice_lift_enabled: "$.voiceLiftEnabled", delay: "$.delay" }
+      state: { "dante_local.gain": "{gain}", "dante_local.noise_gate_enabled": "{noise_gate_enabled}", "dante_local.equalizer_enabled": "{equalizer_enabled}", "dante_local.voice_lift_enabled": "{voice_lift_enabled}", "dante_local.delay": "{delay}" }
+    - json_match: { "$.data./api/audio/outputs/dante/local": '^\{' }
+      json: { gain: "$.data./api/audio/outputs/dante/local.gain", noise_gate_enabled: "$.data./api/audio/outputs/dante/local.noiseGateEnabled", equalizer_enabled: "$.data./api/audio/outputs/dante/local.equalizerEnabled", voice_lift_enabled: "$.data./api/audio/outputs/dante/local.voiceLiftEnabled", delay: "$.data./api/audio/outputs/dante/local.delay" }
+      state: { "dante_local.gain": "{gain}", "dante_local.noise_gate_enabled": "{noise_gate_enabled}", "dante_local.equalizer_enabled": "{equalizer_enabled}", "dante_local.voice_lift_enabled": "{voice_lift_enabled}", "dante_local.delay": "{delay}" }
+    - path: "^/api/audio/voiceLift$"
+      json: { emergency_mute_threshold: "$.emergencyMuteThreshold", emergency_mute_time: "$.emergencyMuteTime" }
+      state: { "voice_lift.emergency_mute_threshold": "{emergency_mute_threshold}", "voice_lift.emergency_mute_time": "{emergency_mute_time}" }
+    - json_match: { "$.data./api/audio/voiceLift": '^\{' }
+      json: { emergency_mute_threshold: "$.data./api/audio/voiceLift.emergencyMuteThreshold", emergency_mute_time: "$.data./api/audio/voiceLift.emergencyMuteTime" }
+      state: { "voice_lift.emergency_mute_threshold": "{emergency_mute_threshold}", "voice_lift.emergency_mute_time": "{emergency_mute_time}" }
+    - path: "^/api/audio/inputs/dante/reference$"
+      json: { gain: "$.gain", far_end_auto_adjust_enabled: "$.farEndAutoAdjustEnabled" }
+      state: { "reference.gain": "{gain}", "reference.far_end_auto_adjust_enabled": "{far_end_auto_adjust_enabled}" }
+    - json_match: { "$.data./api/audio/inputs/dante/reference": '^\{' }
+      json: { gain: "$.data./api/audio/inputs/dante/reference.gain", far_end_auto_adjust_enabled: "$.data./api/audio/inputs/dante/reference.farEndAutoAdjustEnabled" }
+      state: { "reference.gain": "{gain}", "reference.far_end_auto_adjust_enabled": "{far_end_auto_adjust_enabled}" }
+    - path: "^/api/audio/noiseGate$"
+      json: { threshold: "$.threshold", hold_time: "$.holdTime" }
+      state: { "noise_gate.threshold": "{threshold}", "noise_gate.hold_time": "{hold_time}" }
+    - json_match: { "$.data./api/audio/noiseGate": '^\{' }
+      json: { threshold: "$.data./api/audio/noiseGate.threshold", hold_time: "$.data./api/audio/noiseGate.holdTime" }
+      state: { "noise_gate.threshold": "{threshold}", "noise_gate.hold_time": "{hold_time}" }
+    - path: "^/api/device/leds/ring$"
+      json: { brightness: "$.brightness", show_farend_activity: "$.showFarendActivity", mic_on_color: "$.micOn.color", mic_mute_color: "$.micMute.color", mic_custom_color: "$.micCustom.color", mic_custom_enabled: "$.micCustom.enabled" }
+      state: { "led.brightness": "{brightness}", "led.show_farend_activity": "{show_farend_activity}", "led.mic_on_color": "{mic_on_color}", "led.mic_mute_color": "{mic_mute_color}", "led.mic_custom_color": "{mic_custom_color}", "led.mic_custom_enabled": "{mic_custom_enabled}" }
+    - json_match: { "$.data./api/device/leds/ring": '^\{' }
+      json: { brightness: "$.data./api/device/leds/ring.brightness", show_farend_activity: "$.data./api/device/leds/ring.showFarendActivity", mic_on_color: "$.data./api/device/leds/ring.micOn.color", mic_mute_color: "$.data./api/device/leds/ring.micMute.color", mic_custom_color: "$.data./api/device/leds/ring.micCustom.color", mic_custom_enabled: "$.data./api/device/leds/ring.micCustom.enabled" }
+      state: { "led.brightness": "{brightness}", "led.show_farend_activity": "{show_farend_activity}", "led.mic_on_color": "{mic_on_color}", "led.mic_mute_color": "{mic_mute_color}", "led.mic_custom_color": "{mic_custom_color}", "led.mic_custom_enabled": "{mic_custom_enabled}" }
+    - path: "^/api/device/power/poe/daisychain$"
+      json: { sufficient_power: "$.sufficientPower", in_use: "$.inUse" }
+      state: { "poe_daisy_chain.sufficient_power": "{sufficient_power}", "poe_daisy_chain.in_use": "{in_use}" }
+    - json_match: { "$.data./api/device/power/poe/daisychain": '^\{' }
+      json: { sufficient_power: "$.data./api/device/power/poe/daisychain.sufficientPower", in_use: "$.data./api/device/power/poe/daisychain.inUse" }
+      state: { "poe_daisy_chain.sufficient_power": "{sufficient_power}", "poe_daisy_chain.in_use": "{in_use}" }
+    - path: "^/api/audio/inputs/microphone/exclusionZones$"
+      json_each: "$"
+      json: { id: "$.id", enabled: "$.enabled", elevation_min: "$.elevation.min", elevation_max: "$.elevation.max", azimuth_min: "$.azimuth.min", azimuth_max: "$.azimuth.max" }
+      state: { "exclusion_zones.{id}.enabled": "{enabled}", "exclusion_zones.{id}.elevation_min": "{elevation_min}", "exclusion_zones.{id}.elevation_max": "{elevation_max}", "exclusion_zones.{id}.azimuth_min": "{azimuth_min}", "exclusion_zones.{id}.azimuth_max": "{azimuth_max}" }
+    - json_match: { "$.data./api/audio/inputs/microphone/exclusionZones": '^\[' }
+      json_each: "$.data./api/audio/inputs/microphone/exclusionZones"
+      json: { id: "$.id", enabled: "$.enabled", elevation_min: "$.elevation.min", elevation_max: "$.elevation.max", azimuth_min: "$.azimuth.min", azimuth_max: "$.azimuth.max" }
+      state: { "exclusion_zones.{id}.enabled": "{enabled}", "exclusion_zones.{id}.elevation_min": "{elevation_min}", "exclusion_zones.{id}.elevation_max": "{elevation_max}", "exclusion_zones.{id}.azimuth_min": "{azimuth_min}", "exclusion_zones.{id}.azimuth_max": "{azimuth_max}" }
+    - path: "^/api/audio/inputs/microphone/priorityZones$"
+      json_each: "$"
+      json: { id: "$.id", enabled: "$.enabled", elevation_min: "$.elevation.min", elevation_max: "$.elevation.max", azimuth_min: "$.azimuth.min", azimuth_max: "$.azimuth.max", weight: "$.weight" }
+      state: { "priority_zones.{id}.enabled": "{enabled}", "priority_zones.{id}.elevation_min": "{elevation_min}", "priority_zones.{id}.elevation_max": "{elevation_max}", "priority_zones.{id}.azimuth_min": "{azimuth_min}", "priority_zones.{id}.azimuth_max": "{azimuth_max}", "priority_zones.{id}.weight": "{weight}" }
+    - json_match: { "$.data./api/audio/inputs/microphone/priorityZones": '^\[' }
+      json_each: "$.data./api/audio/inputs/microphone/priorityZones"
+      json: { id: "$.id", enabled: "$.enabled", elevation_min: "$.elevation.min", elevation_max: "$.elevation.max", azimuth_min: "$.azimuth.min", azimuth_max: "$.azimuth.max", weight: "$.weight" }
+      state: { "priority_zones.{id}.enabled": "{enabled}", "priority_zones.{id}.elevation_min": "{elevation_min}", "priority_zones.{id}.elevation_max": "{elevation_max}", "priority_zones.{id}.azimuth_min": "{azimuth_min}", "priority_zones.{id}.azimuth_max": "{azimuth_max}", "priority_zones.{id}.weight": "{weight}" }
+    - path: "^/api/audio/inputs/microphone/denoiser$"
+      json: { level: "$.setting" }
+      state: { "denoiser.level": "{level}" }
+    - json_match: { "$.data./api/audio/inputs/microphone/denoiser": '^\{' }
+      json: { level: "$.data./api/audio/inputs/microphone/denoiser.setting" }
+      state: { "denoiser.level": "{level}" }
+    - path: "^/api/device/licenseAgreements/hash$"
+      json: { hash: "$.value" }
+      state: { "licenses.hash": "{hash}" }
+    - path: "^/api/audio/inputs/microphone/inputLowcuts$"
+      json: { enabled: "$.enabled" }
+      state: { "input_lowcuts.enabled": "{enabled}" }
+    - json_match: { "$.data./api/audio/inputs/microphone/inputLowcuts": '^\{' }
+      json: { enabled: "$.data./api/audio/inputs/microphone/inputLowcuts.enabled" }
+      state: { "input_lowcuts.enabled": "{enabled}" }
+    - path: "^/api/audio/inputs/microphone/singleCapsuleMode$"
+      json: { enabled: "$.enabled" }
+      state: { "single_capsule_mode.enabled": "{enabled}" }
+    - json_match: { "$.data./api/audio/inputs/microphone/singleCapsuleMode": '^\{' }
+      json: { enabled: "$.data./api/audio/inputs/microphone/singleCapsuleMode.enabled" }
+      state: { "single_capsule_mode.enabled": "{enabled}" }
+    - path: "^/api/audio/inputs/microphone/beam/beamfreeze/autoHold$"
+      json: { enabled: "$.enabled", hold_time: "$.holdTime" }
+      state: { "beam_freeze.enabled": "{enabled}", "beam_freeze.hold_time": "{hold_time}" }
+    - json_match: { "$.data./api/audio/inputs/microphone/beam/beamfreeze/autoHold": '^\{' }
+      json: { enabled: "$.data./api/audio/inputs/microphone/beam/beamfreeze/autoHold.enabled", hold_time: "$.data./api/audio/inputs/microphone/beam/beamfreeze/autoHold.holdTime" }
+      state: { "beam_freeze.enabled": "{enabled}", "beam_freeze.hold_time": "{hold_time}" }
+    - path: "^/api/audio/equalizer$"
+      json: { g0: "$.gains[0]", g1: "$.gains[1]", g2: "$.gains[2]", g3: "$.gains[3]", g4: "$.gains[4]", g5: "$.gains[5]", g6: "$.gains[6]" }
+      state: { "equalizer.125": "{g0}", "equalizer.250": "{g1}", "equalizer.500": "{g2}", "equalizer.1000": "{g3}", "equalizer.2000": "{g4}", "equalizer.4000": "{g5}", "equalizer.8000": "{g6}" }
+    - json_match: { "$.data./api/audio/equalizer": '^\{' }
+      json: { g0: "$.data./api/audio/equalizer.gains[0]", g1: "$.data./api/audio/equalizer.gains[1]", g2: "$.data./api/audio/equalizer.gains[2]", g3: "$.data./api/audio/equalizer.gains[3]", g4: "$.data./api/audio/equalizer.gains[4]", g5: "$.data./api/audio/equalizer.gains[5]", g6: "$.data./api/audio/equalizer.gains[6]" }
+      state: { "equalizer.125": "{g0}", "equalizer.250": "{g1}", "equalizer.500": "{g2}", "equalizer.1000": "{g3}", "equalizer.2000": "{g4}", "equalizer.4000": "{g5}", "equalizer.8000": "{g6}" }

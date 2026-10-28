@@ -3356,6 +3356,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On firmware 1.3.x (API 17.0), check which subscriptions are refused (the aoip status, metering) and whether the rest still subscribe in their batch. ([specs/sennheiser-spectera.yaml:619](specs/sennheiser-spectera.yaml#L619))
 - [ ] Confirm bandwidthMode 10000 is accepted but never transmits, as the release notes say, which is why set_rf_bandwidth offers 6000 and 8000 only. ([specs/sennheiser-spectera.yaml:559](specs/sennheiser-spectera.yaml#L559))
 
+## sennheiser-tcc-m — Sennheiser TeamConnect Ceiling Medium
+
+- [ ] Confirm that one PUT of every readable resource to the session is accepted (a refused entry refuses the whole list) and that the initial values arrive on the stream. ([specs/sennheiser-tcc-m.yaml:812](specs/sennheiser-tcc-m.yaml#L812))
+- [ ] Confirm that a PUT of one field leaves the resource's other fields as they were. ([specs/sennheiser-tcc-m.yaml:722](specs/sennheiser-tcc-m.yaml#L722))
+- [ ] Confirm the device's certificate is self-signed (accepted here) and that the event stream needs the same Basic credentials. ([specs/sennheiser-tcc-m.yaml:41](specs/sennheiser-tcc-m.yaml#L41))
+- [ ] Record what a reference gain write answers while automatic adjustment is on (409 or 422 documented). ([specs/sennheiser-tcc-m.yaml:395](specs/sennheiser-tcc-m.yaml#L395))
+
 ## sennheiser-tcc2 — Sennheiser TeamConnect Ceiling 2
 
 - [ ] Confirm the three subscriptions (device and beam, audio, meters limited to 250 ms) are accepted with a 60 s lifetime, renewed every 20 s, and that their notifications fit a datagram. ([specs/sennheiser-tcc2.yaml:597](specs/sennheiser-tcc2.yaml#L597))
