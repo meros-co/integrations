@@ -224,6 +224,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-lg", &["lg-display"]),
     ("vendor-lightkey", &["lightkey"]),
     ("vendor-lightware", &["lightware-lw2", "lightware-lw3"]),
+    ("vendor-luminex", &["luminex-gigacore"]),
     ("vendor-lyntec", &["lyntec-rpc"]),
     ("vendor-ma-lighting", &["grandma2", "grandma3"]),
     (

@@ -2521,6 +2521,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what /appCommand/perform answers for a command done, an unknown command name and an index out of range (status and body; the text success is assumed for done). ([specs/logos-proclaim.yaml:327](specs/logos-proclaim.yaml#L327))
 - [ ] Check what a song part command does with an index past the song's parts, and that a part without a number is shown when the index is left out. ([specs/logos-proclaim.yaml:340](specs/logos-proclaim.yaml#L340))
 
+## luminex-gigacore — Luminex GigaCore Gen2 switches (web API)
+
+- [ ] Check the websocket API's notifications for a section subscription: that path is the subscribed path and new_value the whole section, and whether it needs the Basic login. ([specs/luminex-gigacore.yaml:4912](specs/luminex-gigacore.yaml#L4912))
+- [ ] Check the write-only actions' bodies where the reference gives no default (reboot's wait) and what the switch answers to an empty one. ([specs/luminex-gigacore.yaml:77](specs/luminex-gigacore.yaml#L77))
+- [ ] Check leaf PUT bodies (a bare JSON value such as "Port 3" or true) on firmware 1.9.2 and earlier. ([specs/luminex-gigacore.yaml:951](specs/luminex-gigacore.yaml#L951))
+- [ ] Check every section's GET on models without the feature (PoE, SFP, Milan, display, extension board). ([specs/luminex-gigacore.yaml:59](specs/luminex-gigacore.yaml#L59))
+
 ## lyntec-rpc — LynTec RPC remote power control panels (TCP/IP protocol)
 
 - [ ] Record the exact /p2.rpc answer (line breaks, spacing, the order of breakers=, zones= and events=), and what a control GET returns. ([specs/lyntec-rpc.yaml:43](specs/lyntec-rpc.yaml#L43))
