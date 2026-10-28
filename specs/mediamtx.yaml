@@ -12,8 +12,9 @@ category: other
 # and kicks each protocol's clients, and lists and deletes recordings.
 # MediaMTX pushes nothing to an API client: live paths are polled every
 # 3 seconds, and every protocol's sessions, the configuration and the
-# server's version every 10 seconds. Lists are read whole (1000 items a page)
-# and replace what state held, so removed paths and closed sessions leave it.
+# server's version every 10 seconds. Lists are read whole (every page of 1000
+# items, joined) and replace what state held, so removed paths and closed
+# sessions leave it.
 # Recorded time spans are listed from the playback server, a second HTTP
 # server on port 9996 (playback: yes).
 #
@@ -924,10 +925,10 @@ quirks:
       server). Live paths are polled every 3 seconds; every protocol's
       sessions and connections, the global configuration, the path defaults,
       the configured paths and the server's version every 10 seconds. Each
-      list is asked for whole (itemsPerPage 1000) and replaces what state
-      held only when the answer has a single page (pageCount 0 or 1); a
-      longer list updates the entries it holds and leaves stale ones until
-      it fits a page. A configuration change or kick this integration makes
+      list is read whole, 1000 items a page, every page asked for in turn
+      (pageCount says how many) and joined into one list that replaces what
+      state held, so a removed entry leaves it whatever the list's length;
+      the list commands read one page. A configuration change or kick this integration makes
       reads the affected list again at once, on 1.15.5 and later, whose
       answers say {"status": "ok"}. RTSP and RTSPS connections are not
       polled (their sessions are). Recordings are listed every 30 seconds,
@@ -1144,39 +1145,39 @@ telemetry:
   poll:
     - every_ms: 3000
       send:
-        - { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1000" } }
+        - { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1000", page: "0" }, pages: &pages { items: "$.items", page: page, page_count: "$.pageCount" } }
     # Sessions, connections and configuration every 10 seconds (sent on
     # connecting too), each under the model's endpoint names.
     - every_ms: 10000
       send:
-        - { models: [mediamtx-1-21], method: GET, path: /v3/rtsp/sessions/list, query: { itemsPerPage: "1000" } }
-        - { models: [mediamtx-1-21], method: GET, path: /v3/rtsps/sessions/list, query: { itemsPerPage: "1000" } }
-        - { models: [mediamtx-1-21], method: GET, path: /v3/rtmp/conns/list, query: { itemsPerPage: "1000" } }
-        - { models: [mediamtx-1-21], method: GET, path: /v3/rtmps/conns/list, query: { itemsPerPage: "1000" } }
-        - { models: [mediamtx-1-21], method: GET, path: /v3/srt/conns/list, query: { itemsPerPage: "1000" } }
-        - { models: [mediamtx-1-21], method: GET, path: /v3/webrtc/sessions/list, query: { itemsPerPage: "1000" } }
-        - { models: [mediamtx-1-21], method: GET, path: /v3/hls/muxers/list, query: { itemsPerPage: "1000" } }
-        - { models: [mediamtx-1-21], method: GET, path: /v3/hls/sessions/list, query: { itemsPerPage: "1000" } }
-        - { models: [mediamtx-1-21], method: GET, path: /v3/moq/sessions/list, query: { itemsPerPage: "1000" } }
+        - { models: [mediamtx-1-21], method: GET, path: /v3/rtsp/sessions/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { models: [mediamtx-1-21], method: GET, path: /v3/rtsps/sessions/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { models: [mediamtx-1-21], method: GET, path: /v3/rtmp/conns/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { models: [mediamtx-1-21], method: GET, path: /v3/rtmps/conns/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { models: [mediamtx-1-21], method: GET, path: /v3/srt/conns/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { models: [mediamtx-1-21], method: GET, path: /v3/webrtc/sessions/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { models: [mediamtx-1-21], method: GET, path: /v3/hls/muxers/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { models: [mediamtx-1-21], method: GET, path: /v3/hls/sessions/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { models: [mediamtx-1-21], method: GET, path: /v3/moq/sessions/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
         - { models: [mediamtx-1-21], method: GET, path: /v3/config/path-defaults/get }
-        - { models: [mediamtx-1-2], method: GET, path: /v3/rtspsessions/list, query: { itemsPerPage: "1000" } }
-        - { models: [mediamtx-1-2], method: GET, path: /v3/rtspssessions/list, query: { itemsPerPage: "1000" } }
-        - { models: [mediamtx-1-2], method: GET, path: /v3/rtmpconns/list, query: { itemsPerPage: "1000" } }
-        - { models: [mediamtx-1-2], method: GET, path: /v3/rtmpsconns/list, query: { itemsPerPage: "1000" } }
-        - { models: [mediamtx-1-2], method: GET, path: /v3/srtconns/list, query: { itemsPerPage: "1000" } }
-        - { models: [mediamtx-1-2], method: GET, path: /v3/webrtcsessions/list, query: { itemsPerPage: "1000" } }
-        - { models: [mediamtx-1-2], method: GET, path: /v3/hlsmuxers/list, query: { itemsPerPage: "1000" } }
-        - { models: [mediamtx-1-2], method: GET, path: /v3/hlssessions/list, query: { itemsPerPage: "1000" } }
-        - { models: [mediamtx-1-2], method: GET, path: /v3/moqsessions/list, query: { itemsPerPage: "1000" } }
+        - { models: [mediamtx-1-2], method: GET, path: /v3/rtspsessions/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { models: [mediamtx-1-2], method: GET, path: /v3/rtspssessions/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { models: [mediamtx-1-2], method: GET, path: /v3/rtmpconns/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { models: [mediamtx-1-2], method: GET, path: /v3/rtmpsconns/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { models: [mediamtx-1-2], method: GET, path: /v3/srtconns/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { models: [mediamtx-1-2], method: GET, path: /v3/webrtcsessions/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { models: [mediamtx-1-2], method: GET, path: /v3/hlsmuxers/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { models: [mediamtx-1-2], method: GET, path: /v3/hlssessions/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { models: [mediamtx-1-2], method: GET, path: /v3/moqsessions/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
         - { models: [mediamtx-1-2], method: GET, path: /v3/config/pathdefaults/get }
         - { method: GET, path: /v3/config/global/get }
-        - { method: GET, path: /v3/config/paths/list, query: { itemsPerPage: "1000" } }
+        - { method: GET, path: /v3/config/paths/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
         - { method: GET, path: /v3/info }
     # Recordings on disk every 30 seconds (1.5.1 and later); each one's
     # recorded time spans are then asked of the playback server.
     - every_ms: 30000
       send:
-        - { method: GET, path: /v3/recordings/list, query: { itemsPerPage: "1000" } }
+        - { method: GET, path: /v3/recordings/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
   updates:
     # ── Server and configuration ────────────────────────────────────────────
     - path: '^/v3/info$'
@@ -1276,8 +1277,7 @@ telemetry:
         path_configs.{name:key}.max_readers: "{max_readers}"
         path_configs.{name:key}.override_publisher: "{override}"
         path_configs.{name:key}.always_available: "{always}"
-    - path: '^/v3/config/paths/list\?(?:page=0&)?itemsPerPage=\d+$'
-      json_match: { "$.pageCount": "^[01]$" }
+    - path: '^/v3/config/paths/list\?itemsPerPage=1000&page=0$'
       json: {}
       replace: path_configs
 
@@ -1295,8 +1295,7 @@ telemetry:
       replace: "recordings.{name:key}.segments"
       then_send:
         - { endpoint: playback, method: GET, path: /list, query: { path: "{name}" } }
-    - path: '^/v3/recordings/list\?(?:page=0&)?itemsPerPage=\d+$'
-      json_match: { "$.pageCount": "^[01]$" }
+    - path: '^/v3/recordings/list\?itemsPerPage=1000&page=0$'
       json: {}
       replace: recordings
     - path: '^/v3/recordings/list(?:\?|$)'
@@ -1365,8 +1364,7 @@ telemetry:
         paths.{name:key}.inbound_bytes: "{inbound}"
         paths.{name:key}.outbound_bytes: "{outbound}"
         paths.{name:key}.inbound_frames_in_error: "{frames_in_error}"
-    - path: '^/v3/paths/list\?(?:page=0&)?itemsPerPage=\d+$'
-      json_match: { "$.pageCount": "^[01]$" }
+    - path: '^/v3/paths/list\?itemsPerPage=1000&page=0$'
       json: {}
       replace: paths
     - path: '^/v3/paths/list(?:\?|$)'
@@ -1418,8 +1416,7 @@ telemetry:
         "{1}.sessions.{id}.peer_connection_established": "{established}"
         "{1}.sessions.{id}.inbound_bytes": "{inbound}"
         "{1}.sessions.{id}.outbound_bytes": "{outbound}"
-    - path: '^/v3/(rtsp|rtsps|webrtc|hls|moq)/?sessions/list\?(?:page=0&)?itemsPerPage=\d+$'
-      json_match: { "$.pageCount": "^[01]$" }
+    - path: '^/v3/(rtsp|rtsps|webrtc|hls|moq)/?sessions/list\?itemsPerPage=1000&page=0$'
       json: {}
       replace: "{1}.sessions"
     # The earlier names, whose counters are bytesReceived and bytesSent
@@ -1471,8 +1468,7 @@ telemetry:
         "{1}.conns.{id}.created": "{created}"
         "{1}.conns.{id}.inbound_bytes": "{inbound}"
         "{1}.conns.{id}.outbound_bytes": "{outbound}"
-    - path: '^/v3/(rtmp|rtmps|srt)/?conns/list\?(?:page=0&)?itemsPerPage=\d+$'
-      json_match: { "$.pageCount": "^[01]$" }
+    - path: '^/v3/(rtmp|rtmps|srt)/?conns/list\?itemsPerPage=1000&page=0$'
       json: {}
       replace: "{1}.conns"
     - path: '^/v3/(rtmp|rtmps)conns/list(?:\?|$)'
@@ -1545,8 +1541,7 @@ telemetry:
         hls.muxers.{path:key}.created: "{created}"
         hls.muxers.{path:key}.last_request: "{last}"
         hls.muxers.{path:key}.outbound_bytes: "{outbound}"
-    - path: '^/v3/hls/?muxers/list\?(?:page=0&)?itemsPerPage=\d+$'
-      json_match: { "$.pageCount": "^[01]$" }
+    - path: '^/v3/hls/?muxers/list\?itemsPerPage=1000&page=0$'
       json: {}
       replace: hls.muxers
     - path: '^/v3/hlsmuxers/list(?:\?|$)'
@@ -1562,30 +1557,30 @@ telemetry:
       json_match: { "$.status": "^ok$" }
       json: {}
       then_send:
-        - { method: GET, path: /v3/config/paths/list, query: { itemsPerPage: "1000" } }
+        - { method: GET, path: /v3/config/paths/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
         - { method: GET, path: /v3/config/global/get }
-        - { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1000" } }
+        - { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
     - path: '^/v3/(rtsp|rtsps|webrtc|hls|moq)/sessions/kick/'
       json_match: { "$.status": "^ok$" }
       json: {}
       then_send:
-        - { method: GET, path: "/v3/{1}/sessions/list", query: { itemsPerPage: "1000" } }
-        - { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1000" } }
+        - { method: GET, path: "/v3/{1}/sessions/list", query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
     - path: '^/v3/(rtsp|rtsps|webrtc|hls|moq)sessions/kick/'
       json_match: { "$.status": "^ok$" }
       json: {}
       then_send:
-        - { method: GET, path: "/v3/{1}sessions/list", query: { itemsPerPage: "1000" } }
-        - { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1000" } }
+        - { method: GET, path: "/v3/{1}sessions/list", query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
     - path: '^/v3/(rtmp|rtmps|srt)/conns/kick/'
       json_match: { "$.status": "^ok$" }
       json: {}
       then_send:
-        - { method: GET, path: "/v3/{1}/conns/list", query: { itemsPerPage: "1000" } }
-        - { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1000" } }
+        - { method: GET, path: "/v3/{1}/conns/list", query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
     - path: '^/v3/(rtmp|rtmps|srt)conns/kick/'
       json_match: { "$.status": "^ok$" }
       json: {}
       then_send:
-        - { method: GET, path: "/v3/{1}conns/list", query: { itemsPerPage: "1000" } }
-        - { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1000" } }
+        - { method: GET, path: "/v3/{1}conns/list", query: { itemsPerPage: "1000", page: "0" }, pages: *pages }
+        - { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1000", page: "0" }, pages: *pages }

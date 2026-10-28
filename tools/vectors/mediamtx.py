@@ -206,14 +206,14 @@ _PATHSTATE = {
                        "source_type": "srtConn", "source_id": _MXID2, "readers": "[]", "codecs": "[]",
                        "inbound_bytes": 0, "outbound_bytes": 0, "inbound_frames_in_error": 0}}}
 telemetry(MX, "paths", inbound_http={
-    "path": "/v3/paths/list?itemsPerPage=1000",
+    "path": "/v3/paths/list?itemsPerPage=1000&page=0",
     "body": _MXJ({"itemCount": 2, "pageCount": 1, "items": [_PATH1, _PATH2]})},
     # A path that has gone leaves: the whole list replaces it.
     state_before={"paths": {"old": {"ready": True}, "cam1": {"tracks": {"2": {"codec": "Opus"}}}}},
     expect_state=_PATHSTATE)
 # Before 1.16: ready only, counters as bytesReceived and bytesSent, codec names only.
 telemetry(MX, "paths-1-5", inbound_http={
-    "path": "/v3/paths/list?itemsPerPage=1000",
+    "path": "/v3/paths/list?itemsPerPage=1000&page=0",
     "body": _MXJ({"itemCount": 1, "pageCount": 1, "items": [{
         "name": "cam1", "confName": "cam1", "source": {"type": "rtmpConn", "id": _MXID},
         "ready": True, "readyTime": "2026-10-06T08:00:01Z", "tracks": ["H264"],
@@ -221,13 +221,21 @@ telemetry(MX, "paths-1-5", inbound_http={
     expect_state={"path_count": 1, "paths": {"cam1": {
         "conf_name": "cam1", "ready": True, "ready_time": "2026-10-06T08:00:01Z", "source_type": "rtmpConn",
         "source_id": _MXID, "readers": "[]", "codecs": '["H264"]', "inbound_bytes": 1000, "outbound_bytes": 2000}}})
-# A list longer than a page: the entries it holds are updated, nothing is removed.
+# One page of a longer list (a command's): the entries it holds are updated,
+# nothing is removed.
 telemetry(MX, "paths-paged", inbound_http={
-    "path": "/v3/paths/list?itemsPerPage=1000",
+    "path": "/v3/paths/list?page=1&itemsPerPage=1000",
     "body": _MXJ({"itemCount": 1001, "pageCount": 2, "items": [_PATH2]})},
     state_before={"paths": {"old": {"ready": True}}},
     expect_state={"path_count": 1001, "paths": {"old": {"ready": True},
                                                 "live/stage": _PATHSTATE["paths"]["live/stage"]}})
+# The poll's pages joined (the last page's counts, every page's items): the
+# whole list replaces state.
+telemetry(MX, "paths-joined", inbound_http={
+    "path": "/v3/paths/list?itemsPerPage=1000&page=0",
+    "body": _MXJ({"itemCount": 2, "pageCount": 2, "items": [_PATH1, _PATH2]})},
+    state_before={"paths": {"old": {"ready": True}}},
+    expect_state=_PATHSTATE)
 telemetry(MX, "info", inbound_http={"path": "/v3/info",
                                     "body": _MXJ({"version": "v1.21.1", "started": "2026-10-06T08:00:00Z"})},
           expect_state={"server": {"version": "v1.21.1", "started": "2026-10-06T08:00:00Z"}})
@@ -251,7 +259,7 @@ telemetry(MX, "path-defaults", inbound_http={"path": "/v3/config/path-defaults/g
           expect_state=_DEFSTATE)
 telemetry(MX, "path-defaults-1-2", inbound_http={"path": "/v3/config/pathdefaults/get", "body": _MXJ(_DEF)},
           expect_state=_DEFSTATE)
-telemetry(MX, "path-configs", inbound_http={"path": "/v3/config/paths/list?itemsPerPage=1000", "body": _MXJ({
+telemetry(MX, "path-configs", inbound_http={"path": "/v3/config/paths/list?itemsPerPage=1000&page=0", "body": _MXJ({
     "itemCount": 2, "pageCount": 1, "items": [
         dict(_DEF, name="cam1", source="rtsp://10.0.0.20/main", sourceOnDemand=True, record=True,
              overridePublisher=True, alwaysAvailable=False),
@@ -267,7 +275,7 @@ telemetry(MX, "path-configs", inbound_http={"path": "/v3/config/paths/list?items
 
 # Every PathConf field kept: source, fallback, forward (JSON text), the
 # recording's path and durations, playback.
-telemetry(MX, "path-config-fields", inbound_http={"path": "/v3/config/paths/list?itemsPerPage=1000", "body": _MXJ({
+telemetry(MX, "path-config-fields", inbound_http={"path": "/v3/config/paths/list?itemsPerPage=1000&page=0", "body": _MXJ({
     "itemCount": 1, "pageCount": 1, "items": [
         dict(_DEF, name="stage", source="srt://10.0.0.30:9000?streamid=read:stage", fallback="/standby",
              forward=[{"dest": "rtmp://203.0.113.5/live/stage"}],
@@ -285,7 +293,7 @@ telemetry(MX, "path-config-fields", inbound_http={"path": "/v3/config/paths/list
 # position, and each one's spans asked of the playback server.
 _SEG1 = "2026-10-06T08:00:00.000123+01:00"
 _SEG2 = "2026-10-06T09:00:00.000456+01:00"
-telemetry(MX, "recordings", inbound_http={"path": "/v3/recordings/list?itemsPerPage=1000", "body": _MXJ({
+telemetry(MX, "recordings", inbound_http={"path": "/v3/recordings/list?itemsPerPage=1000&page=0", "body": _MXJ({
     "itemCount": 2, "pageCount": 1, "items": [
         {"name": "cam1", "segments": [{"start": _SEG1}, {"start": _SEG2}]},
         {"name": "live/stage", "segments": [{"start": _SEG1}]}]})},
@@ -311,7 +319,7 @@ telemetry(MX, "playback-spans-between-not-kept",
 
 # A path name holding dots is one state key.
 telemetry(MX, "paths-dotted-name", inbound_http={
-    "path": "/v3/paths/list?itemsPerPage=1000",
+    "path": "/v3/paths/list?itemsPerPage=1000&page=0",
     "body": _MXJ({"itemCount": 1, "pageCount": 1, "items": [{
         "name": "studio.cam1", "confName": "all_others", "source": None,
         "ready": False, "readyTime": None, "tracks": [], "bytesReceived": 0, "bytesSent": 0, "readers": []}]})},
@@ -319,13 +327,13 @@ telemetry(MX, "paths-dotted-name", inbound_http={
         "conf_name": "all_others", "ready": False, "readers": "[]", "codecs": "[]",
         "inbound_bytes": 0, "outbound_bytes": 0}}})
 telemetry(MX, "path-configs-dotted-name", inbound_http={
-    "path": "/v3/config/paths/list?itemsPerPage=1000", "body": _MXJ({
+    "path": "/v3/config/paths/list?itemsPerPage=1000&page=0", "body": _MXJ({
         "itemCount": 1, "pageCount": 1, "items": [dict(_DEF, name="studio.cam1", overridePublisher=True,
                                                          alwaysAvailable=False)]})},
     expect_state={"path_config_count": 1, "path_configs": {"studio.cam1": {
         "source": "publisher", "record": False, "record_format": "fmp4", "record_delete_after": "1d", "source_on_demand": False,
         "max_readers": 0, "override_publisher": True, "always_available": False}}})
-telemetry(MX, "hls-muxers-dotted-name", inbound_http={"path": "/v3/hls/muxers/list?itemsPerPage=1000", "body": _MXJ({
+telemetry(MX, "hls-muxers-dotted-name", inbound_http={"path": "/v3/hls/muxers/list?itemsPerPage=1000&page=0", "body": _MXJ({
     "itemCount": 1, "pageCount": 1, "items": [{
         "path": "studio.cam1", "created": "2026-10-06T08:06:00Z", "lastRequest": "2026-10-06T08:07:00Z",
         "outboundBytes": 7}]})},
@@ -337,19 +345,19 @@ _RTSP = {"id": _MXID, "created": "2026-10-06T08:01:00Z", "remoteAddr": "10.0.0.5
          "bytesReceived": 1000, "bytesSent": 20, "inboundBytes": 1000, "outboundBytes": 20, "conns": []}
 _RTSPSTATE = {"path": "cam1", "state": "publish", "remote_addr": "10.0.0.50:51234", "transport": "TCP",
               "user": "operator", "created": "2026-10-06T08:01:00Z", "inbound_bytes": 1000, "outbound_bytes": 20}
-telemetry(MX, "rtsp-sessions", inbound_http={"path": "/v3/rtsp/sessions/list?itemsPerPage=1000",
+telemetry(MX, "rtsp-sessions", inbound_http={"path": "/v3/rtsp/sessions/list?itemsPerPage=1000&page=0",
                                              "body": _MXJ({"itemCount": 1, "pageCount": 1, "items": [_RTSP]})},
           # A closed session leaves.
           state_before={"rtsp": {"sessions": {_MXID2: {"path": "cam2"}}}},
           expect_state={"rtsp": {"session_count": 1, "sessions": {_MXID: _RTSPSTATE}}})
 # 1.2-1.16: the earlier name and counters only as bytesReceived and bytesSent.
 _RTSPOLD = {k: v for k, v in _RTSP.items() if k not in ("inboundBytes", "outboundBytes", "user", "conns")}
-telemetry(MX, "rtsps-sessions-1-2", inbound_http={"path": "/v3/rtspssessions/list?itemsPerPage=1000",
+telemetry(MX, "rtsps-sessions-1-2", inbound_http={"path": "/v3/rtspssessions/list?itemsPerPage=1000&page=0",
                                                   "body": _MXJ({"itemCount": 1, "pageCount": 1, "items": [_RTSPOLD]})},
           state_before={"rtsps": {"sessions": {_MXID2: {"path": "cam2"}}}},
           expect_state={"rtsps": {"session_count": 1, "sessions": {
               _MXID: {k: v for k, v in _RTSPSTATE.items() if k != "user"}}}})
-telemetry(MX, "webrtc-sessions", inbound_http={"path": "/v3/webrtc/sessions/list?itemsPerPage=1000", "body": _MXJ({
+telemetry(MX, "webrtc-sessions", inbound_http={"path": "/v3/webrtc/sessions/list?itemsPerPage=1000&page=0", "body": _MXJ({
     "itemCount": 1, "pageCount": 1, "items": [{
         "id": _MXID2, "created": "2026-10-06T08:02:00Z", "remoteAddr": "10.0.0.60:50000",
         "peerConnectionEstablished": True, "localCandidate": "host/udp/10.0.0.2/8189",
@@ -360,7 +368,7 @@ telemetry(MX, "webrtc-sessions", inbound_http={"path": "/v3/webrtc/sessions/list
         "created": "2026-10-06T08:02:00Z", "peer_connection_established": True, "inbound_bytes": 3000,
         "outbound_bytes": 9000000}}}})
 # HLS sessions have no state or inbound counter; MoQ sessions no user.
-telemetry(MX, "hls-sessions", inbound_http={"path": "/v3/hls/sessions/list?itemsPerPage=1000", "body": _MXJ({
+telemetry(MX, "hls-sessions", inbound_http={"path": "/v3/hls/sessions/list?itemsPerPage=1000&page=0", "body": _MXJ({
     "itemCount": 1, "pageCount": 1, "items": [{
         "id": _MXID, "created": "2026-10-06T08:03:00Z", "isCDN": False, "remoteAddr": "10.0.0.70:40000",
         "path": "live/stage", "query": "", "user": "viewer", "userAgent": "AppleCoreMedia", "outboundBytes": 4096}]})},
@@ -368,7 +376,7 @@ telemetry(MX, "hls-sessions", inbound_http={"path": "/v3/hls/sessions/list?items
         "path": "live/stage", "remote_addr": "10.0.0.70:40000", "user": "viewer", "created": "2026-10-06T08:03:00Z",
         "outbound_bytes": 4096}}}})
 # No MoQ session: the list empties.
-telemetry(MX, "moq-sessions-empty", inbound_http={"path": "/v3/moq/sessions/list?itemsPerPage=1000",
+telemetry(MX, "moq-sessions-empty", inbound_http={"path": "/v3/moq/sessions/list?itemsPerPage=1000&page=0",
                                                   "body": _MXJ({"itemCount": 0, "pageCount": 0, "items": []})},
           state_before={"moq": {"session_count": 1, "sessions": {_MXID: {"path": "cam1"}}}},
           expect_state={"moq": {"session_count": 0}})
@@ -377,14 +385,14 @@ _RTMP = {"id": _MXID, "created": "2026-10-06T08:04:00Z", "remoteAddr": "10.0.0.8
          "inboundBytes": 77, "outboundBytes": 3, "outboundFramesDiscarded": 0}
 _RTMPSTATE = {"path": "obs", "state": "publish", "remote_addr": "10.0.0.80:60000", "user": "",
               "created": "2026-10-06T08:04:00Z", "inbound_bytes": 77, "outbound_bytes": 3}
-telemetry(MX, "rtmp-conns", inbound_http={"path": "/v3/rtmp/conns/list?itemsPerPage=1000",
+telemetry(MX, "rtmp-conns", inbound_http={"path": "/v3/rtmp/conns/list?itemsPerPage=1000&page=0",
                                           "body": _MXJ({"itemCount": 1, "pageCount": 1, "items": [_RTMP]})},
           state_before={"rtmp": {"conns": {_MXID2: {"path": "gone"}}}},
           expect_state={"rtmp": {"conn_count": 1, "conns": {_MXID: _RTMPSTATE}}})
-telemetry(MX, "rtmps-conns-1-2", inbound_http={"path": "/v3/rtmpsconns/list?itemsPerPage=1000",
+telemetry(MX, "rtmps-conns-1-2", inbound_http={"path": "/v3/rtmpsconns/list?itemsPerPage=1000&page=0",
                                                "body": _MXJ({"itemCount": 1, "pageCount": 1, "items": [_RTMP]})},
           expect_state={"rtmps": {"conn_count": 1, "conns": {_MXID: _RTMPSTATE}}})
-telemetry(MX, "srt-conns", inbound_http={"path": "/v3/srt/conns/list?itemsPerPage=1000", "body": _MXJ({
+telemetry(MX, "srt-conns", inbound_http={"path": "/v3/srt/conns/list?itemsPerPage=1000&page=0", "body": _MXJ({
     "itemCount": 1, "pageCount": 1, "items": [{
         "id": _MXID2, "created": "2026-10-06T08:05:00Z", "remoteAddr": "10.0.0.90:9000", "state": "publish",
         "path": "live/stage", "query": "", "user": "", "bytesReceived": 123456, "bytesSent": 789,
@@ -396,14 +404,14 @@ telemetry(MX, "srt-conns", inbound_http={"path": "/v3/srt/conns/list?itemsPerPag
         "created": "2026-10-06T08:05:00Z", "inbound_bytes": 123456, "outbound_bytes": 789, "rtt": 12.5,
         "receive_rate": 6.25, "send_rate": 0.01, "link_capacity": 940.0, "packets_received_loss": 3,
         "packets_received_drop": 1, "packets_retrans": 0, "packets_send_drop": 0, "receive_latency": 120}}}})
-telemetry(MX, "hls-muxers", inbound_http={"path": "/v3/hls/muxers/list?itemsPerPage=1000", "body": _MXJ({
+telemetry(MX, "hls-muxers", inbound_http={"path": "/v3/hls/muxers/list?itemsPerPage=1000&page=0", "body": _MXJ({
     "itemCount": 1, "pageCount": 1, "items": [{
         "path": "live/stage", "created": "2026-10-06T08:06:00Z", "lastRequest": "2026-10-06T08:07:00Z",
         "bytesSent": 5000, "outboundBytes": 5000, "outboundFramesDiscarded": 0}]})},
     state_before={"hls": {"muxers": {"cam1": {"outbound_bytes": 1}}}},
     expect_state={"hls": {"muxer_count": 1, "muxers": {"live/stage": {
         "created": "2026-10-06T08:06:00Z", "last_request": "2026-10-06T08:07:00Z", "outbound_bytes": 5000}}}})
-telemetry(MX, "hls-muxers-1-2", inbound_http={"path": "/v3/hlsmuxers/list?itemsPerPage=1000", "body": _MXJ({
+telemetry(MX, "hls-muxers-1-2", inbound_http={"path": "/v3/hlsmuxers/list?itemsPerPage=1000&page=0", "body": _MXJ({
     "itemCount": 1, "pageCount": 1, "items": [{
         "path": "cam1", "created": "2026-10-06T08:06:00Z", "lastRequest": "2026-10-06T08:07:00Z", "bytesSent": 42}]})},
     expect_state={"hls": {"muxer_count": 1, "muxers": {"cam1": {
@@ -411,14 +419,14 @@ telemetry(MX, "hls-muxers-1-2", inbound_http={"path": "/v3/hlsmuxers/list?itemsP
 # This integration's own changes are read back at once.
 telemetry(MX, "config-changed", inbound_http={"path": "/v3/config/paths/patch/cam1", "body": _MXJ({"status": "ok"})},
           expect_state={},
-          expect_then_send=[{"method": "GET", "target": "/v3/config/paths/list?itemsPerPage=1000"},
+          expect_then_send=[{"method": "GET", "target": "/v3/config/paths/list?itemsPerPage=1000&page=0"},
                             {"method": "GET", "target": "/v3/config/global/get"},
-                            {"method": "GET", "target": "/v3/paths/list?itemsPerPage=1000"}])
+                            {"method": "GET", "target": "/v3/paths/list?itemsPerPage=1000&page=0"}])
 telemetry(MX, "kicked", inbound_http={"path": "/v3/srt/conns/kick/" + _MXID2, "body": _MXJ({"status": "ok"})},
           expect_state={},
-          expect_then_send=[{"method": "GET", "target": "/v3/srt/conns/list?itemsPerPage=1000"},
-                            {"method": "GET", "target": "/v3/paths/list?itemsPerPage=1000"}])
+          expect_then_send=[{"method": "GET", "target": "/v3/srt/conns/list?itemsPerPage=1000&page=0"},
+                            {"method": "GET", "target": "/v3/paths/list?itemsPerPage=1000&page=0"}])
 telemetry(MX, "kicked-1-2", inbound_http={"path": "/v3/rtspsessions/kick/" + _MXID, "body": _MXJ({"status": "ok"})},
           expect_state={},
-          expect_then_send=[{"method": "GET", "target": "/v3/rtspsessions/list?itemsPerPage=1000"},
-                            {"method": "GET", "target": "/v3/paths/list?itemsPerPage=1000"}])
+          expect_then_send=[{"method": "GET", "target": "/v3/rtspsessions/list?itemsPerPage=1000&page=0"},
+                            {"method": "GET", "target": "/v3/paths/list?itemsPerPage=1000&page=0"}])
