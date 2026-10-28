@@ -55,6 +55,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the value ranges Live accepts for tempo, song and scene signatures, clip transposition and detune, groove amount (the Live Object Model says 0 to 1), and what Live does with a value outside them. ([specs/ableton-live.yaml:3097](specs/ableton-live.yaml#L3097))
 - [ ] Confirm /live/startup is sent when Live loads another Set, so the rule registering everything again runs then. ([specs/ableton-live.yaml:3112](specs/ableton-live.yaml#L3112))
 
+## aes67-sap — AES67 stream discovery (SAP and SDP)
+
+- [ ] Check that Dante devices in AES67 mode, RAVENNA devices and other AES67 senders announce on 239.255.255.255:9875 and appear as streams, with their names, channels, multicast addresses and PTP grandmaster. ([specs/aes67-sap.yaml:58](specs/aes67-sap.yaml#L58))
+- [ ] Check how often real AES67 announcers repeat (about 30 s is commonly seen, not taken from a read standard), and that Dante Controller and a RAVENNA receiver keep a stream this integration announces every 30 s. ([specs/aes67-sap.yaml:60](specs/aes67-sap.yaml#L60))
+- [ ] Check whether Dante and RAVENNA devices send a SAP deletion when a stream is removed, and that it removes the stream here; and how long a stream lingers in state when its device is unplugged. ([specs/aes67-sap.yaml:140](specs/aes67-sap.yaml#L140))
+- [ ] Check the a=ts-refclk forms real devices write (RFC 7273's domain-nmbr= or the bare domain number in Audinate's sample) and that both read into grandmaster and domain. ([specs/aes67-sap.yaml:116](specs/aes67-sap.yaml#L116))
+- [ ] Check whether current announcers still send a=framecount, and the encodings (L16, L24, AM824) and packet times they announce. ([specs/aes67-sap.yaml:122](specs/aes67-sap.yaml#L122))
+- [ ] Check on a host with several network interfaces that the group is joined on each, and which interface this integration's announcements leave by. ([specs/aes67-sap.yaml:129](specs/aes67-sap.yaml#L129))
+
 ## aes70 — AES70 / OCA devices
 
 - [ ] Check the device's OCP.1 port (AES70 assigns none) and which transports it accepts: TCP, UDP, WebSocket (and its path), or only secure OCP.1. ([specs/aes70.yaml:401](specs/aes70.yaml#L401))

@@ -6,6 +6,8 @@
 //! A module shared by several integrations (one protocol, several product
 //! lines) is compiled when any of them is.
 
+#[cfg(feature = "aes67-sap")]
+mod aes67_sap;
 #[cfg(any(feature = "aes70", feature = "focusrite-rednet", feature = "dbaudio"))]
 mod aes70;
 #[cfg(any(feature = "aja-helo", feature = "aja-kipro", feature = "aja-kumo"))]
@@ -298,6 +300,8 @@ pub(crate) fn construct(
             Some(port) => Ok(Box::new(tsl::Listener::new(port, &context.model))),
             None => Err("TSL UMD has no standard port: give the port to listen on".into()),
         },
+        #[cfg(feature = "aes67-sap")]
+        "aes67-sap" => Ok(Box::new(aes67_sap::Aes67Sap::new(context)?)),
         #[cfg(feature = "osc-listener")]
         "osc-listener" => Ok(Box::new(osc_listener::OscListener::new(context)?)),
         #[cfg(feature = "tsl-umd-display")]
@@ -530,9 +534,11 @@ mod tests {
                     module.start(&mut cx);
                     let used = first_port(&cx.take());
                     // These send nothing until asked (a request, a watched
-                    // stream), so there is nothing to compare on starting.
+                    // stream, a stream to announce), so there is nothing to
+                    // compare on starting.
                     if used.is_none()
-                        && ["generic-http", "http-snapshot"].contains(&spec.id.as_str())
+                        && ["aes67-sap", "generic-http", "http-snapshot"]
+                            .contains(&spec.id.as_str())
                     {
                         continue;
                     }

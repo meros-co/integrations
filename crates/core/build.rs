@@ -161,6 +161,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     (
         "vendor-generic",
         &[
+            "aes67-sap",
             "generic-http",
             "generic-midi",
             "generic-osc",

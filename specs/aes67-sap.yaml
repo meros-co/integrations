@@ -1,0 +1,161 @@
+spec: 1
+id: aes67-sap
+name: AES67 stream discovery (SAP and SDP)
+vendor: Generic (AES67 senders, Dante devices in AES67 mode, RAVENNA devices and any SAP announcer)
+category: other
+implementation: native
+reason: >
+  SAP is a binary header on multicast UDP that the core joins on every
+  interface, carrying SDP text that becomes one stream per session with its
+  media, clocks and whole description; streams expire by their announcement
+  period and stop time, and announcing repeats on a randomized timer. The
+  listener is the core itself, not one device's address.
+
+source:
+  - title: "RFC 2974: Session Announcement Protocol"
+    author: "M. Handley, C. Perkins, E. Whelan (IETF, October 2000)"
+    url: "https://www.rfc-editor.org/rfc/rfc2974"
+    note: >
+      UDP port 9875 and the scope's highest address as the group (section 3),
+      the announcement interval and its random offset (3.1), deletion and
+      the timeouts (4: the t= stop time, 10 periods or one hour, a deletion
+      packet), modification by a new message identifier hash (5), the packet
+      layout: V=1, A, R, T, E, C, authentication length, hash, originating
+      source, payload type and payload (6), TTL 255 (3).
+  - title: "RFC 2365: Administratively Scoped IP Multicast (BCP 23)"
+    author: "D. Meyer (IETF, July 1998)"
+    url: "https://www.rfc-editor.org/rfc/rfc2365"
+    note: "The IPv4 Local Scope 239.255.0.0/16 (6.1), whose SAP address is therefore 239.255.255.255."
+  - title: "RFC 8866: SDP: Session Description Protocol"
+    author: "A. Begen, P. Kyzivat, C. Perkins, M. Handley (IETF, January 2021)"
+    url: "https://www.rfc-editor.org/rfc/rfc8866"
+    note: >
+      Line order and types (5), the origin and the session identity without
+      its version (5.2), c=, b=, t= in NTP seconds, m=, and the attributes
+      ptime, maxptime, rtpmap, fmtp, recvonly/sendonly/sendrecv/inactive,
+      tool and keywds (6).
+  - title: "RFC 7273: RTP Clock Source Signalling"
+    author: "A. Williams, K. Gross, R. van Brandenburg, H. Stokking (IETF, June 2014)"
+    url: "https://www.rfc-editor.org/rfc/rfc7273"
+    note: "a=ts-refclk (ptp, ntp, local, private; grandmaster, domain-nmbr, domain-name, traceable) and a=mediaclk (direct with offset and rate, sender, IEEE1722)."
+  - title: "RFC 4570: SDP Source Filters; RFC 7104: Duplication Grouping Semantics in SDP"
+    author: "B. Quinn, R. Finlayson (2006); A. Begen, Y. Cai, H. Ou (2014) (IETF)"
+    url: "https://www.rfc-editor.org/rfc/rfc4570"
+    note: "a=source-filter incl/excl with destination and sources; a=group:DUP with a=mid naming the two legs of a redundant stream (https://www.rfc-editor.org/rfc/rfc7104)."
+  - title: "Sample SDP Specification (Dante Domain Manager user guide 1.8)"
+    author: Audinate
+    url: "https://dev.audinate.com/GA/ddm/userguide/1.8/webhelp/content/appendix/sample_sdp_specification.htm"
+    note: >
+      A multicast AES67 description as Dante reads it: t=0 0, c= at session
+      or media level, ts-refclk and mediaclk:direct=0 at media level, and the
+      PTP domain written as a bare number after the grandmaster.
+  - title: "RAVENNA Operating Principles, Draft 1.0 (section 3.3.3)"
+    author: ALC NetworX
+    url: "https://ravenna-network.com/wp-content/uploads/2020/02/RAVENNA_Operating_Principles_-_Draft_1.0_final.pdf"
+    note: "Session-level a=clock-domain:PTPv2 <domain>, media-level a=sync-time and a=clock-deviation."
+
+settings:
+  group: { type: string, default: "239.255.255.255", pattern: '^[0-9.]+$', max_length: 15, label: SAP group, description: "The multicast group heard and announced to: 239.255.255.255 for the IPv4 Local Scope that AES67 and Dante use; 224.2.127.254 for global-scope announcers (open a second integration for both)." }
+  timeout: { type: float, default: 3600, min: 1, label: Timeout (s), description: "A stream not heard for this long, or for ten of its announcement periods if that is longer, is removed. RFC 2974 sets one hour." }
+  announce_interval: { type: float, default: 30, min: 1, label: Announcement interval (s), description: "How often this integration repeats its own announcements, each time a third earlier or later at random." }
+
+ports:
+  - { port: 9875, protocol: udp, role: control, listener: core, note: "SAP, on the group setting's multicast address (239.255.255.255 by default); the port given when opening overrides it" }
+
+models:
+  - id: generic
+    name: "SAP announcements on the network (open with no host)"
+    supports: [announce, withdraw]
+    verification: none
+
+commands:
+  announce:
+    summary: >
+      Announce a stream: send its SDP description now and every announcement
+      interval until withdrawn or the integration is closed, which sends its
+      deletion. The o= line must give the sender's IP address, the SAP
+      originating source. Announcing the same origin again replaces the
+      description. Returns the stream's key
+    params:
+      sdp: { type: string, required: true, max_length: 8192, label: SDP description, description: "The session description, v=0 first, such as an AES67 multicast stream's; line ends may be LF or CRLF and are sent as CRLF." }
+    returns: value
+  withdraw:
+    summary: Stop announcing a stream this integration announced and send its SAP deletion. Returns unverified
+    params:
+      stream: { type: string, required: true, max_length: 300, label: Stream, description: "The stream's key, as announce returned it." }
+    returns: none
+
+state:
+  group: { type: string, description: "The SAP group heard" }
+  port: { type: int, description: "The SAP port heard" }
+  stream_count: { type: int, description: "Streams known now" }
+  announced: { type: array, description: "Keys of the streams this integration announces" }
+  streams.*.name: { type: string, description: "The session name (s=), keyed by the stream: its origin's address and session id, address:session_id, with username@ before it when the origin names a user" }
+  streams.*.info: { type: string, description: "The session information (i=), where Dante lists channel labels" }
+  streams.*.channels: { type: int, description: "Audio channels in the stream, a redundant pair's counted once" }
+  streams.*.origin.username: { type: string, description: "o= username, - when none" }
+  streams.*.origin.session_id: { type: string, description: "o= session id" }
+  streams.*.origin.version: { type: string, description: "o= session version, raised by the sender on each change" }
+  streams.*.origin.network_type: { type: string, description: "o= network type (IN)" }
+  streams.*.origin.address_type: { type: string, description: "o= address type (IP4 or IP6)" }
+  streams.*.origin.address: { type: string, description: "o= unicast address of the sender" }
+  streams.*.announcer: { type: string, description: "The SAP originating source" }
+  streams.*.sender: { type: string, description: "The IP address the announcement came from" }
+  streams.*.message_hash: { type: int, description: "The SAP message identifier hash, changed by the announcer on each change" }
+  streams.*.local: { type: bool, description: "Whether this integration announces it" }
+  streams.*.uri: { type: string, description: "u=" }
+  streams.*.emails: { type: array, description: "e= lines" }
+  streams.*.phones: { type: array, description: "p= lines" }
+  streams.*.times: { type: array, description: "t= lines as {start, stop} in NTP seconds; 0 0 is permanent" }
+  streams.*.repeats: { type: array, description: "r= lines as written" }
+  streams.*.connection: { type: object, description: "Session-level c=: {address_type, address, ttl (IPv4), count}" }
+  streams.*.bandwidths: { type: object, description: "Session-level b= by type, such as AS" }
+  streams.*.direction: { type: string, description: "Session-level recvonly, sendonly, sendrecv or inactive" }
+  streams.*.tool: { type: string, description: "a=tool" }
+  streams.*.keywords: { type: string, description: "a=keywds" }
+  streams.*.clocks: { type: array, description: "Session-level a=ts-refclk: {source (ptp, ntp, local, private), version, grandmaster, domain or domain_name, traceable, server}" }
+  streams.*.media_clock: { type: object, description: "Session-level a=mediaclk: {source (direct, sender, ...), offset, rate, id}" }
+  streams.*.clock_domain: { type: object, description: "RAVENNA a=clock-domain: {protocol, domain}" }
+  streams.*.groups: { type: array, description: "a=group lines as {semantics, mids}, such as DUP for a redundant pair" }
+  streams.*.source_filters: { type: array, description: "Session-level a=source-filter: {mode, address_type, destination, sources}" }
+  streams.*.attributes: { type: array, description: "Every session-level a= line's value as written, recognized or not" }
+  streams.*.media: { type: array, description: "One entry per m= line: media, port, port_count, protocol, formats, and from its first format's rtpmap encoding (L16, L24, AM824), clock_rate and channels; ptime_ms, maxptime_ms, framecount, connection (its own or the session's), direction, clocks, media_clock, source_filters, mid, sync_time, clock_deviation, bandwidths, rtpmap and fmtp by payload type, info, and attributes as written" }
+  streams.*.sdp: { type: string, description: "The whole description as announced" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Opened with no host. The core joins the group on every IPv4 interface
+      it uses (only the one it is bound to, when started with a bind
+      address) and shares the port with other programs listening to it.
+      Connected means listening; a port that cannot be had is reported
+      disconnected and tried again after 1 s, doubling to 30 s. Opening for
+      commands only changes nothing.
+  - models: [all]
+    severity: info
+    text: >
+      A stream leaves state when its announcer deletes it, when its t= stop
+      time passes, or when it is not heard for ten of its announcement
+      periods or the timeout setting, whichever is longer. A deletion is
+      accepted from the stream's own originating source without checking
+      authentication, which RFC 2974 says should be present; most AES67
+      announcers send none. Authentication data is skipped, not checked.
+  - models: [all]
+    severity: info
+    text: >
+      Encrypted announcements and payload types other than application/sdp
+      are skipped; zlib-compressed ones are inflated up to 64 KiB. Up to
+      1,024 streams are kept at once. A repeat of the same announcement
+      (same hash and originating source) only renews its stream; a changed
+      one replaces the whole entry. Descriptions are kept as written and
+      read leniently: lines out of order or of unknown types are passed over.
+  - models: [all]
+    severity: info
+    text: >
+      Announcements go to the group with a TTL of 255, out of the interface
+      the system routes the group to (the bind address's, when the core has
+      one), and loop back, so this integration's own streams appear in state
+      marked local. The default interval of 30 s is shorter than RFC 2974's
+      300 s minimum for a busy group, as AES67 announcers are commonly seen
+      to use; set it to 300 where the group carries many announcements.
