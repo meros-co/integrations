@@ -277,6 +277,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the units taken from the MIB's descriptions (tenths of volts in the high-precision objects, TimeTicks runtimes) against the UPS's display. ([specs/apc-ups.yaml:1624](specs/apc-ups.yaml#L1624))
 - [ ] Receive a v1 trap (on battery, then back on line) and check it is named and that the poll after it shows the change. ([specs/apc-ups.yaml:1636](specs/apc-ups.yaml#L1636))
 
+## apple-keynote — Apple Keynote (AppleScript)
+
+- [ ] Confirm the hidden playing and slide switcher visible properties still answer on current Keynote releases (the dictionary pages show Keynote 6.2). ([specs/apple-keynote.yaml:353](specs/apple-keynote.yaml#L353))
+- [ ] Confirm a document's modified and file properties (Standard Suite) answer for a Keynote document, and that file is missing value until it is saved. ([specs/apple-keynote.yaml:359](specs/apple-keynote.yaml#L359))
+- [ ] Check that slide number of current slide is the slide a playing slideshow shows, and how it reads while editing a skipped slide (-1 is assumed). ([specs/apple-keynote.yaml:361](specs/apple-keynote.yaml#L361))
+- [ ] Confirm that comparing slide k of a document with its current slide finds the current slide's place (the dictionary gives no index property). ([specs/apple-keynote.yaml:362](specs/apple-keynote.yaml#L362))
+- [ ] Check that setting current slide while a slideshow plays moves the slideshow to it, and not only the editing selection. ([specs/apple-keynote.yaml:192](specs/apple-keynote.yaml#L192))
+- [ ] Confirm start from slide N of a document starts at that place, skipped slides counted, as the dictionary page's subroutine uses it. ([specs/apple-keynote.yaml:174](specs/apple-keynote.yaml#L174))
+- [ ] Confirm make new slide at before slide N and at end of slides, and the base slide property in its with properties record. ([specs/apple-keynote.yaml:268](specs/apple-keynote.yaml#L268))
+- [ ] Confirm duplicate slide N to after slide N puts the copy after the original, and move slide N to before slide M or to end of slides moves it. ([specs/apple-keynote.yaml:277](specs/apple-keynote.yaml#L277))
+- [ ] Check that width and height of a document, and document theme, can be set after it is made (the dictionary pages show them without r/o). ([specs/apple-keynote.yaml:253](specs/apple-keynote.yaml#L253))
+- [ ] Confirm object text of default title item and default body item of every slide answer for slides whose layout has no title or body (an error is assumed, read as empty text). ([specs/apple-keynote.yaml:311](specs/apple-keynote.yaml#L311))
+- [ ] Check the export options record on current Keynote (PDF image quality, password, password hint, movie format, image format, compression factor) and whether export as Keynote 09 still exists. ([specs/apple-keynote.yaml:121](specs/apple-keynote.yaml#L121))
+- [ ] Check what quit saving yes does with an unsaved document (a save dialog is assumed, which waits for someone at the Mac). ([specs/apple-keynote.yaml:72](specs/apple-keynote.yaml#L72))
+- [ ] Confirm the error number macOS gives when the program running the core is not allowed to control Keynote (-1743 is assumed) and that osascript reports it on standard error. ([specs/apple-keynote.yaml:395](specs/apple-keynote.yaml#L395))
+
 ## arkaos-mediamaster — ArKaos MediaMaster
 
 - [ ] Confirm the Remote Command Service listens on TCP 45678 and takes each command as a line ended by CR LF; the user guide does not say. ([specs/arkaos-mediamaster.yaml:49](specs/arkaos-mediamaster.yaml#L49))

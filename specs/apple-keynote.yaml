@@ -1,0 +1,416 @@
+spec: 1
+id: apple-keynote
+name: Apple Keynote (AppleScript, on the core's Mac)
+vendor: Apple
+category: playback
+implementation: native
+reason: >
+  Keynote has no network control: it is scripted through its AppleScript dictionary, with Apple events to the
+  application on the same Mac. The core runs fixed scripts with osascript, every value a caller gives escaped
+  as an AppleScript string, and reads the application's and its documents' state by polling, which the spec
+  format's network transports cannot express.
+
+source:
+  - title: "iWork Automation: Keynote (Application, Document, Playing, Opening, Making, Saving, Closing and Exporting Documents, Slide, Theme)"
+    author: MacOSXAutomation.com (Sal Soghoian)
+    url: https://iworkautomation.com/keynote/index.html
+    note: >
+      Read 2026-10-28. The pages reproduce Keynote's scripting dictionary (Keynote 6.2 to 7.1): the application
+      by bundle identifier com.apple.iWork.Keynote, running, frontmost, version, and the hidden playing and
+      slide switcher visible properties; the Compatibility Suite's start (document, from slide), stop, show
+      next, show previous, show slide switcher, cancel, accept, move slide switcher forward and backward;
+      open with a POSIX path; make new document with document theme, width and height; save in a file; close
+      with saving yes or no; export to a file as HTML, QuickTime movie, PDF, slide images, Microsoft
+      PowerPoint or Keynote 09 with export options (all stages, borders, compression factor, date, image
+      format JPEG, PNG or TIFF, movie format small, medium or large, password, password hint, PDF image
+      quality good, better or best, skipped slides, slide numbers); the document's auto loop, auto play,
+      auto restart, current slide (settable from Keynote 7.1), document theme, height, maximum idle duration,
+      slide numbers showing and width; the slide's base slide, body showing, default body and title items,
+      presenter notes, skipped, slide number (-1 for a skipped slide) and title showing, and its delete,
+      make, move and duplicate; themes' id and name; going to a slide by slide number.
+  - title: AppleScript Language Guide, Class Reference (text, Special String Characters)
+    author: Apple
+    url: https://developer.apple.com/library/archive/documentation/AppleScript/Conceptual/AppleScriptLangGuide/reference/ASLR_classes.html
+    note: >
+      A backslash and a double quote are each written after a backslash inside a string; return, linefeed and tab are
+      constants joined with &. The scripts quote every caller value this way.
+  - title: osascript(1) manual page
+    author: Apple
+    url: https://ss64.com/mac/osascript.html
+    note: >
+      osascript runs the script given with -e and prints its result on standard output, and an error on
+      standard error with a non-zero exit status.
+
+settings:
+  poll_ms: { type: int, min: 250, max: 60000, default: 1000, label: Status interval,
+             description: "Milliseconds between reads of whether Keynote runs and plays, and of each open document's settings and current slide." }
+  slides_poll_ms: { type: int, min: 1000, max: 600000, default: 5000, label: Slides interval,
+                    description: "Milliseconds between reads of every open document's slides (titles, bodies, presenter notes, layouts) and the installed themes." }
+
+ports:
+  - { port: null, protocol: applescript, role: control, note: "Apple events to Keynote on the Mac the core runs on, through osascript: open the device with an empty host" }
+
+models:
+  - id: keynote
+    name: Apple Keynote 7.1 and later (macOS)
+    supports: [activate, quit, open_document, new_document, new_document_with_theme, close_document,
+               close_all_documents, save_document, save_document_as, export_pdf, export_powerpoint, export_movie,
+               export_images, export_html, export_keynote09, start_slideshow, stop_slideshow, show_next,
+               show_previous, go_to_slide, go_to_slide_index, show_slide_switcher, cancel_slide_switcher,
+               accept_slide_switcher, move_slide_switcher_forward, move_slide_switcher_backward, set_auto_loop,
+               set_auto_play, set_auto_restart, set_maximum_idle_duration, set_slide_numbers_showing,
+               set_slide_size, set_document_theme, new_slide, duplicate_slide, move_slide, delete_slide,
+               set_slide_skipped, set_presenter_notes, set_slide_title, set_slide_body, set_title_showing,
+               set_body_showing, set_slide_layout, refresh]
+    verification: none
+
+commands:
+  # ── Application ─────────────────────────────────────────────────────────
+  activate:
+    summary: Bring Keynote to the front, starting it when it is not running (activate)
+    returns: ack
+  quit:
+    summary: Quit Keynote (quit saving)
+    params:
+      saving: &saving { type: enum, values: ["no", "yes"], default: "no", label: Save changes,
+                        description: "yes saves each changed document first (an unsaved one asks where on the Mac), no discards the changes." }
+    returns: ack
+
+  # ── Documents ───────────────────────────────────────────────────────────
+  open_document:
+    summary: Open a Keynote, PowerPoint or Keynote-compatible file on the Mac (open)
+    params:
+      path: { type: string, max_length: 1024, required: true, pattern: '^/', label: File,
+              description: "Absolute path of the file on the Mac running the core, such as /Users/me/Show.key." }
+    returns: ack
+  new_document:
+    summary: Make a new document with the default theme and size (make new document)
+    returns: ack
+  new_document_with_theme:
+    summary: Make a new document with a theme and a slide size (make new document with properties)
+    params:
+      theme: &theme { type: string, max_length: 256, required: true, label: Theme,
+                      description: "A theme's name as Keynote's theme chooser shows it, such as Basic Black; themes.<n>.name lists them." }
+      width: { type: int, min: 1, max: 16384, default: 1920, label: Width, description: "Slide width in points: 1920 for widescreen, 1024 for standard." }
+      height: { type: int, min: 1, max: 16384, default: 1080, label: Height, description: "Slide height in points: 1080 for widescreen, 768 for standard." }
+    returns: ack
+  close_document:
+    summary: Close a document (close saving)
+    params:
+      document: &document { type: string, max_length: 1024, default: "", label: Document,
+                            description: "The document's name as its window shows it (documents.<name>), or empty for the front document." }
+      saving: *saving
+    returns: ack
+  close_all_documents:
+    summary: Close every document (close every document saving)
+    params:
+      saving: *saving
+    returns: ack
+  save_document:
+    summary: Save a document to its file (save)
+    params:
+      document: *document
+    returns: ack
+  save_document_as:
+    summary: Save a document to a new file (save in)
+    params:
+      document: *document
+      path: &newfile { type: string, max_length: 1024, required: true, pattern: '^/', label: File,
+                       description: "Absolute path of the file to write on the Mac running the core, with its extension (.key)." }
+    returns: ack
+  export_pdf:
+    summary: Export a document as PDF; answers at once with the transfer's number (export as PDF)
+    params:
+      document: *document
+      path: &exportfile { type: string, max_length: 1024, required: true, pattern: '^/', label: File,
+                          description: "Absolute path of the file to write on the Mac running the core; a folder for slide images and HTML." }
+      skipped_slides: &skipped_slides { type: bool, default: false, label: Skipped slides, description: "Include the slides marked skipped." }
+      all_stages: &all_stages { type: bool, default: false, label: Build stages, description: "Include each stage of the builds as its own page or image." }
+      slide_numbers: { type: bool, default: false, label: Slide numbers, description: "Print slide numbers on the pages." }
+      date: { type: bool, default: false, label: Date, description: "Print the current date on the pages." }
+      borders: { type: bool, default: false, label: Borders, description: "Draw borders around the slides." }
+      image_quality: { type: enum, values: [good, better, best], default: best, label: Image quality, description: "Quality of the images in the PDF (Keynote 6.6 and later)." }
+      password: { type: string, max_length: 256, default: "", secret: true, label: Password, description: "Password that opens the PDF, or empty for none." }
+      password_hint: { type: string, max_length: 256, default: "", label: Password hint, description: "Hint shown for the password; ignored without one." }
+    returns: value
+  export_powerpoint:
+    summary: Export a document as a PowerPoint file; answers at once with the transfer's number (export as Microsoft PowerPoint)
+    params:
+      document: *document
+      path: *exportfile
+    returns: value
+  export_movie:
+    summary: Export a document as a movie; answers at once with the transfer's number (export as QuickTime movie)
+    params:
+      document: *document
+      path: *exportfile
+      movie_format: { type: enum, values: [small, medium, large], default: large, label: Size, description: "small is 360p, medium 540p, large 720p." }
+    returns: value
+  export_images:
+    summary: Export every slide as an image into a folder; answers at once with the transfer's number (export as slide images)
+    params:
+      document: *document
+      path: *exportfile
+      image_format: { type: enum, values: [png, jpeg, tiff], default: png, label: Format, description: "File format of the images." }
+      compression_factor: { type: float, min: 0, max: 1, default: 1, label: JPEG quality,
+                            description: "JPEG quality from 0 (smallest) to 1 (lossless); other formats ignore it." }
+      skipped_slides: *skipped_slides
+      all_stages: *all_stages
+    returns: value
+  export_html:
+    summary: Export a document as a web page in a folder; answers at once with the transfer's number (export as HTML)
+    params:
+      document: *document
+      path: *exportfile
+    returns: value
+  export_keynote09:
+    summary: Export a document in the Keynote '09 format; answers at once with the transfer's number (export as Keynote 09)
+    params:
+      document: *document
+      path: *exportfile
+    returns: value
+
+  # ── Playing ─────────────────────────────────────────────────────────────
+  start_slideshow:
+    summary: Play a document, from its current slide or a given one (start, from slide)
+    params:
+      document: *document
+      slide: { type: int, min: 0, max: 100000, default: 0, label: From slide,
+               description: "Slide to start from, numbered from 1 in the document's order counting skipped slides; 0 for the current slide." }
+    returns: ack
+  stop_slideshow:
+    summary: Stop playing a document (stop)
+    params:
+      document: *document
+    returns: ack
+  show_next:
+    summary: Advance one build or slide in the playing slideshow (show next)
+    returns: ack
+  show_previous:
+    summary: Go back to the previous slide in the playing slideshow (show previous)
+    returns: ack
+  go_to_slide:
+    summary: Make the slide with a slide number current, which a playing slideshow shows (set current slide)
+    params:
+      document: *document
+      slide_number: { type: int, min: 1, max: 100000, required: true, label: Slide number,
+                      description: "The slide number Keynote shows, which leaves out skipped slides." }
+    returns: ack
+  go_to_slide_index:
+    summary: Make a slide current by its place in the document, skipped slides counted (set current slide)
+    params:
+      document: *document
+      slide: &slide { type: int, min: 1, max: 100000, required: true, label: Slide,
+                      description: "The slide's place in the document, numbered from 1, skipped slides counted (documents.<name>.slides.<n>)." }
+    returns: ack
+  show_slide_switcher:
+    summary: Show the slide switcher in the playing slideshow (show slide switcher)
+    returns: ack
+  cancel_slide_switcher:
+    summary: Hide the slide switcher without changing slides (cancel slide switcher)
+    returns: ack
+  accept_slide_switcher:
+    summary: Go to the slide the switcher has selected and hide it (accept slide switcher)
+    returns: ack
+  move_slide_switcher_forward:
+    summary: Select the next slide in the slide switcher (move slide switcher forward)
+    returns: ack
+  move_slide_switcher_backward:
+    summary: Select the previous slide in the slide switcher (move slide switcher backward)
+    returns: ack
+
+  # ── Document settings ───────────────────────────────────────────────────
+  set_auto_loop:
+    summary: Make the slideshow play repeatedly, or not (auto loop)
+    params:
+      document: *document
+      enabled: &enabled { type: bool, required: true, label: Enabled, description: "true turns it on, false off." }
+    returns: ack
+  set_auto_play:
+    summary: Make the document play when it is opened, or not (auto play)
+    params:
+      document: *document
+      enabled: *enabled
+    returns: ack
+  set_auto_restart:
+    summary: Make a playing slideshow start over after the idle time, or not (auto restart)
+    params:
+      document: *document
+      enabled: *enabled
+    returns: ack
+  set_maximum_idle_duration:
+    summary: Set the idle time after which a playing slideshow starts over, with auto restart on (maximum idle duration)
+    params:
+      document: *document
+      minutes: { type: int, min: 1, max: 1440, required: true, label: Idle time, description: "Minutes without input before the slideshow restarts." }
+    returns: ack
+  set_slide_numbers_showing:
+    summary: Show or hide slide numbers on the slides (slide numbers showing)
+    params:
+      document: *document
+      showing: &showing { type: bool, required: true, label: Shown, description: "true shows it, false hides it." }
+    returns: ack
+  set_slide_size:
+    summary: Set the slide size (width and height)
+    params:
+      document: *document
+      width: { type: int, min: 1, max: 16384, required: true, label: Width, description: "Slide width in points." }
+      height: { type: int, min: 1, max: 16384, required: true, label: Height, description: "Slide height in points." }
+    returns: ack
+  set_document_theme:
+    summary: Change the document's theme (document theme)
+    params:
+      document: *document
+      theme: *theme
+    returns: ack
+
+  # ── Slides ──────────────────────────────────────────────────────────────
+  new_slide:
+    summary: Add a slide, at the end or before another, with a layout (make new slide)
+    params:
+      document: *document
+      layout: &layout_opt { type: string, max_length: 256, default: "", label: Layout,
+                            description: "A layout (master slide) name of the document (documents.<name>.layouts), or empty for Keynote's default." }
+      before: { type: int, min: 0, max: 100000, default: 0, label: Before slide,
+                description: "Place of the slide to put it before, numbered from 1; 0 adds it at the end." }
+    returns: ack
+  duplicate_slide:
+    summary: Duplicate a slide, the copy put after it (duplicate)
+    params:
+      document: *document
+      slide: *slide
+    returns: ack
+  move_slide:
+    summary: Move a slide before another or to the end (move)
+    params:
+      document: *document
+      slide: *slide
+      before: { type: int, min: 0, max: 100000, default: 0, label: Before slide,
+                description: "Place of the slide to move it before, numbered from 1; 0 moves it to the end." }
+    returns: ack
+  delete_slide:
+    summary: Delete a slide (delete)
+    params:
+      document: *document
+      slide: *slide
+    returns: ack
+  set_slide_skipped:
+    summary: Skip or unskip a slide (skipped)
+    params:
+      document: *document
+      slide: *slide
+      skipped: { type: bool, required: true, label: Skipped, description: "true skips the slide when playing, false shows it." }
+    returns: ack
+  set_presenter_notes:
+    summary: Replace a slide's presenter notes (presenter notes)
+    params:
+      document: *document
+      slide: *slide
+      notes: { type: string, multiline: true, required: true, label: Notes, description: "The notes' text; line breaks are kept." }
+    returns: ack
+  set_slide_title:
+    summary: Replace the text of a slide's title placeholder (object text of default title item)
+    params:
+      document: *document
+      slide: *slide
+      text: &slidetext { type: string, multiline: true, required: true, label: Text, description: "The text; line breaks are kept." }
+    returns: ack
+  set_slide_body:
+    summary: Replace the text of a slide's body placeholder (object text of default body item)
+    params:
+      document: *document
+      slide: *slide
+      text: *slidetext
+    returns: ack
+  set_title_showing:
+    summary: Show or hide a slide's title placeholder (title showing)
+    params:
+      document: *document
+      slide: *slide
+      showing: *showing
+    returns: ack
+  set_body_showing:
+    summary: Show or hide a slide's body placeholder (body showing)
+    params:
+      document: *document
+      slide: *slide
+      showing: *showing
+    returns: ack
+  set_slide_layout:
+    summary: Change a slide's layout (base slide)
+    params:
+      document: *document
+      slide: *slide
+      layout: { type: string, max_length: 256, required: true, label: Layout,
+                description: "A layout (master slide) name of the document, as documents.<name>.layouts lists them." }
+    returns: ack
+  refresh:
+    summary: Read the application, the documents and their slides again now
+    returns: ack
+
+state:
+  running: { type: bool, description: "Keynote is running on the core's Mac" }
+  playing: { type: bool, description: "Keynote is playing a slideshow; false while it is not running" }
+  slide_switcher_visible: { type: bool, description: "The slide switcher shows over the playing slideshow" }
+  frontmost: { type: bool, description: "Keynote is the active application" }
+  version: { type: string, description: "Keynote's version, such as 14.4" }
+  front_document: { type: string, description: "The front document's name, which commands with an empty document address; empty when none is open" }
+  documents.*.file: { type: string, description: "The document's file on the Mac as a POSIX path, keyed by the document's name; empty until it is saved" }
+  documents.*.modified: { type: bool, description: "The document has changes not saved" }
+  documents.*.slide_count: { type: int, description: "Number of slides, skipped ones counted" }
+  documents.*.current_slide_number: { type: int, description: "Slide number of the current slide (the one a playing slideshow shows, or selected while editing); -1 when it is a skipped slide" }
+  documents.*.current_slide: { type: int, description: "The current slide's place in the document, numbered from 1, skipped slides counted; read with the slides" }
+  documents.*.auto_loop: { type: bool, description: "The slideshow plays repeatedly (set_auto_loop writes it)" }
+  documents.*.auto_play: { type: bool, description: "The slideshow plays when the document opens (set_auto_play writes it)" }
+  documents.*.auto_restart: { type: bool, description: "A playing slideshow starts over after the idle time (set_auto_restart writes it)" }
+  documents.*.maximum_idle_duration: { type: int, unit: min, description: "Idle time before the slideshow restarts (set_maximum_idle_duration writes it)" }
+  documents.*.slide_numbers_showing: { type: bool, description: "Slide numbers show on the slides (set_slide_numbers_showing writes it)" }
+  documents.*.width: { type: int, unit: pt, description: "Slide width (set_slide_size writes it)" }
+  documents.*.height: { type: int, unit: pt, description: "Slide height (set_slide_size writes it)" }
+  documents.*.theme: { type: string, description: "The document theme's name (set_document_theme writes it)" }
+  documents.*.layouts.*: { type: string, description: "A layout (master slide) name, keyed by its place from 1" }
+  documents.*.slides.*.slide_number: { type: int, description: "The slide number Keynote shows, keyed by the slide's place from 1; -1 for a skipped slide" }
+  documents.*.slides.*.skipped: { type: bool, description: "The slide is skipped when playing (set_slide_skipped writes it)" }
+  documents.*.slides.*.title: { type: string, description: "Text of the slide's title placeholder (set_slide_title writes it); empty when it has none" }
+  documents.*.slides.*.body: { type: string, description: "Text of the slide's body placeholder (set_slide_body writes it); empty when it has none" }
+  documents.*.slides.*.presenter_notes: { type: string, description: "The slide's presenter notes as plain text (set_presenter_notes writes them)" }
+  documents.*.slides.*.title_showing: { type: bool, description: "The title placeholder shows (set_title_showing writes it)" }
+  documents.*.slides.*.body_showing: { type: bool, description: "The body placeholder shows (set_body_showing writes it)" }
+  documents.*.slides.*.layout: { type: string, description: "Name of the slide's layout (set_slide_layout writes it)" }
+  themes.*.name: { type: string, description: "An installed theme's name, keyed by its place from 1" }
+  themes.*.id: { type: string, description: "The theme's identifier, Application/... for Keynote's own, User/... for one the user saved" }
+  transfers.*.kind: { type: string, description: "The export command (export_pdf, export_movie, ...), keyed by the transfer's number" }
+  transfers.*.status: { type: string, description: "queued, exporting, then done or failed" }
+  transfers.*.path: { type: string, description: "The file or folder written on the Mac" }
+  transfers.*.document: { type: string, description: "The document exported, empty for the front document" }
+  transfers.*.error: { type: string, description: "Why it failed; null otherwise" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Keynote is scripted on the Mac the core runs on: open the device with an empty host. On any other system
+      it stays disconnected and every command fails. macOS asks once whether the program running the core may
+      control Keynote (System Settings, Privacy & Security, Automation); until it is allowed, every script
+      fails with error -1743 and the device is disconnected saying so.
+  - models: [all]
+    severity: info
+    text: >
+      State is read by polling: the application and documents every poll_ms, the slides and themes every
+      slides_poll_ms, and at once after a command that changes them. Neither read starts Keynote. Documents are
+      keyed by their name; commands address one by name, or the front document when the name is empty. A
+      slide is addressed by its place in the document, skipped slides counted; go_to_slide takes the slide
+      number Keynote shows instead. Exports answer at once with a transfer number and run beside the other
+      scripts; reads made while Keynote is busy exporting may fail and are tried again.
+  - models: [all]
+    severity: info
+    text: >
+      What the dictionary does not offer cannot be done: slide transitions and builds (the transition
+      properties record names no effects the core could offer), the content of other text boxes, shapes,
+      images, tables and charts, rehearsing, and the presenter display's layout.
+  - models: [all]
+    severity: critical
+    text: >
+      close_document, close_all_documents and quit with saving no discard unsaved changes; delete_slide,
+      set_document_theme and set_slide_size change the document and cannot be undone through the dictionary.
+      start_slideshow and go_to_slide change what the audience sees.
