@@ -1,0 +1,633 @@
+spec: 1
+id: nimble-streamer
+name: Nimble Streamer (native API)
+vendor: Softvelum
+category: other
+
+# A Nimble Streamer media server's built-in management API, on the server
+# (TCP 8082 unless nimble.conf's management_port moves it), turned on by
+# management_listen_interfaces. It reports the server, its live streams,
+# re-publishing, SRT and RIST, DVR, playout and publish control, and takes
+# the live actions; the server's configuration is made in WMSPanel (see the
+# wmspanel integration).
+
+source:
+  - title: Nimble Streamer Native API Reference
+    author: Softvelum
+    url: https://wmspanel.com/nimble/api
+    note: >
+      Manufacturer document, retrieved 2026-10-28. HTTP GET, POST and DELETE
+      calls answered with JSON (or raw data for MP4 export). nimble.conf:
+      management_listen_interfaces (none by default: the API is off),
+      management_port (8082 by default), management_token (no
+      authorization by default; with it, requests carry salt and hash,
+      base64 of the raw MD5 of salt/token). Calls: /manage/server_status
+      (Connections and OutRate when registered in WMSPanel; SysInfo ap,
+      scl, tpms, fpms, tsss, fsss; cache sizes), POST
+      /manage/sync_panel_settings, POST /manage/reload_config[?drm=true],
+      POST /manage/reload_ssl_certificates, /manage/live_streams_status
+      (app, streams with strm, bandwidth, resolution, vcodec, acodec,
+      protocol, source_url, publisher_ip, publisher_port, publish_time),
+      /manage/sessions and POST /manage/sessions/delete (an array of ids),
+      /manage/rtmp_settings, /manage/rtmp/republish/stats,
+      /manage/rtmp/republish (GET, POST; rules not persistent) and
+      /manage/rtmp/republish/<id> (GET, DELETE), /manage/mpeg2ts_status,
+      /manage/mpeg2ts_settings, /manage/srt_sender_stats,
+      /manage/srt_receiver_stats, /manage/rist_sender_stats,
+      /manage/rist_receiver_stats, /manage/ndi/list,
+      /manage/dvr_status[/app/stream][?timeline=true],
+      /manage/dvr/export_mp4/app/stream (start, end),
+      /manage/dvr/export_srt/app/stream (start, end, track or lang), POST
+      /manage/dvr/reload/app/stream, POST /manage/dvr/cleanup_archive/app/stream
+      (target_depth, from, to), POST
+      /manage/advertizer/scte35_out/<app>/<stream> (duration,
+      unique_program_id), scte35_in, scte35_time_signal (seg_type
+      0x22, 0x23, 0x30, 0x31, 0x34, 0x35, upid_type, upid, duration),
+      /manage/icecast_stream_info/app/stream, POST
+      /manage/icecast_metadata/<app>/<stream> (streamtitle, streamurl),
+      /manage/server_playlist_status, /manage/publish_control/status, POST
+      /manage/publish_control/deny (PublishControlDenyRequest),
+      /manage/data_cache/get_key (url), POST /manage/data_cache/delete (key,
+      dry_run), /manage/sdi/list, /manage/sdi/sink-list, /manage/aja/list.
+
+transport:
+  type: http
+  port: 8082
+  scheme: http
+  auth: none
+  timeout_ms: 5000
+  probe: { method: GET, path: /manage/server_status }
+
+ports:
+  - { port: 8082, protocol: http, role: control, note: "nimble.conf management_port; the API answers only on management_listen_interfaces" }
+
+models:
+  - id: native
+    name: Nimble Streamer native API
+    supports: [get_server_status, sync_panel_settings, reload_config, reload_config_with_drm, reload_ssl_certificates, get_live_streams_status, list_sessions, delete_sessions, get_rtmp_settings, get_rtmp_republish_stats, list_rtmp_republish_rules, get_rtmp_republish_rule, create_rtmp_republish_rule, create_rtmp_republish_rule_custom, delete_rtmp_republish_rule, get_mpegts_status, get_mpegts_settings, get_srt_sender_stats, get_srt_receiver_stats, get_rist_sender_stats, get_rist_receiver_stats, list_ndi_streams, get_dvr_status, get_dvr_timeline, get_stream_dvr_status, get_stream_dvr_timeline, export_dvr_subtitles, export_dvr_subtitles_language, reload_dvr_archive, cleanup_dvr_archive, cleanup_dvr_archive_keep, cleanup_dvr_archive_span, insert_scte35_out, insert_scte35_out_for, insert_scte35_out_program, insert_scte35_in, insert_scte35_in_program, insert_scte35_time_signal, insert_scte35_time_signal_for, get_icecast_stream_info, insert_icecast_metadata, get_server_playlist_status, get_publish_control_status, deny_publishers, get_cache_key, delete_cache_item, list_sdi_sources, list_sdi_sinks, list_aja_devices]
+    verification: none
+    notes: >
+      A server with management_token set cannot be reached (see quirks);
+      the Advertizer SCTE-35 calls need an Addenda license.
+
+commands:
+  get_server_status:
+    summary: "The server's connections, outgoing rate, processors, CPU load, memory, swap and caches (server_status)"
+    send: {"method": "GET", "path": "/manage/server_status"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  sync_panel_settings:
+    summary: "Make the server load its configuration from WMSPanel again (sync_panel_settings)"
+    send: {"method": "POST", "path": "/manage/sync_panel_settings"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  reload_config:
+    summary: "Reload rules.conf without restarting the server (reload_config)"
+    send: {"method": "POST", "path": "/manage/reload_config"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  reload_config_with_drm:
+    summary: "Reload rules.conf and drm.conf without restarting the server (reload_config?drm=true)"
+    send: {"method": "POST", "path": "/manage/reload_config", "query": {"drm": "true"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  reload_ssl_certificates:
+    summary: "Reload the SSL certificates (reload_ssl_certificates)"
+    send: {"method": "POST", "path": "/manage/reload_ssl_certificates"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_live_streams_status:
+    summary: "Every outgoing live stream by application, with bandwidth, resolution, codecs, protocol and publisher (live_streams_status)"
+    send: {"method": "GET", "path": "/manage/live_streams_status"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_sessions:
+    summary: "Every viewer session: application, stream, protocol, bytes, times, client address and user agent (sessions)"
+    send: {"method": "GET", "path": "/manage/sessions"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  delete_sessions:
+    summary: "Disconnect viewer sessions by id; HLS and DASH viewers get 403 from then on (sessions/delete)"
+    params:
+      ids: {"type": "json", "required": true, "label": "Session IDs", "description": "A JSON array of session ids from list_sessions, such as [4, 5]."}
+    send: {"method": "POST", "path": "/manage/sessions/delete", "body": "{ids}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_rtmp_settings:
+    summary: "The RTMP settings: interfaces, publishing login, chunk duration, output protocols, applications and ABR streams (rtmp_settings)"
+    send: {"method": "GET", "path": "/manage/rtmp_settings"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_rtmp_republish_stats:
+    summary: "Each RTMP re-publishing session's state, bandwidth, bytes, duration and retries (rtmp/republish/stats)"
+    send: {"method": "GET", "path": "/manage/rtmp/republish/stats"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_rtmp_republish_rules:
+    summary: "The RTMP re-publishing rules made through this API (rtmp/republish)"
+    send: {"method": "GET", "path": "/manage/rtmp/republish"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_rtmp_republish_rule:
+    summary: "One RTMP re-publishing rule (rtmp/republish/<id>)"
+    params:
+      rule: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 64, "required": true, "label": "Rule ID", "description": "The re-publishing rule's id."}
+    send: {"method": "GET", "path": "/manage/rtmp/republish/{rule}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_rtmp_republish_rule:
+    summary: "Re-publish a stream to an RTMP destination until the server reloads; answers the rule with its id (POST rtmp/republish)"
+    params:
+      src_app: {"type": "string", "pattern": "^[^\"\\\\]+$", "max_length": 256, "required": true, "label": "Source application", "description": "The application whose stream is re-published."}
+      src_stream: {"type": "string", "pattern": "^[^\"\\\\]+$", "max_length": 256, "required": true, "label": "Source stream", "description": "The stream re-published."}
+      dest_addr: {"type": "string", "pattern": "^[^\"\\\\\\s]+$", "max_length": 1024, "required": true, "label": "Destination", "description": "The destination's address or URL."}
+      dest_port: {"type": "int", "min": 1, "max": 65535, "required": true, "label": "Destination port", "description": "The destination's port, such as 1935 (443 with ssl)."}
+      dest_app: {"type": "string", "pattern": "^[^\"\\\\]+$", "max_length": 256, "required": true, "label": "Destination application", "description": "The destination's application name."}
+      dest_stream: {"type": "string", "pattern": "^[^\"\\\\]+$", "max_length": 1024, "required": true, "label": "Destination stream", "description": "The stream name at the destination."}
+    send: {"method": "POST", "path": "/manage/rtmp/republish", "body": "{\"src_app\":{src_app:json},\"src_stream\":{src_stream:json},\"dest_addr\":{dest_addr:json},\"dest_port\":{dest_port},\"dest_app\":{dest_app:json},\"dest_stream\":{dest_stream:json}}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_rtmp_republish_rule_custom:
+    summary: "Re-publish with a full rule body (src_app, src_stream, dest_addr, dest_port, dest_app, dest_stream, dest_app_params, dest_stream_params, auth_schema NONE, NIMBLE, AKAMAI, LIMELIGHT or PERISCOPE, dest_login, dest_password, keep_src_stream_params, ssl) (POST rtmp/republish)"
+    params:
+      rule: {"type": "json", "required": true, "label": "Rule", "description": "A JSON object with the request parameters the native API reference gives for the rule."}
+    send: {"method": "POST", "path": "/manage/rtmp/republish", "body": "{rule}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  delete_rtmp_republish_rule:
+    summary: "Delete an RTMP re-publishing rule made through this API (DELETE rtmp/republish/<id>)"
+    params:
+      rule: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 64, "required": true, "label": "Rule ID", "description": "The re-publishing rule's id."}
+    send: {"method": "DELETE", "path": "/manage/rtmp/republish/{rule}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_mpegts_status:
+    summary: "The incoming MPEG-TS streams' status (mpeg2ts_status)"
+    send: {"method": "GET", "path": "/manage/mpeg2ts_status"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_mpegts_settings:
+    summary: "The MPEG-TS, SRT and RIST inputs configured (mpeg2ts_settings)"
+    send: {"method": "GET", "path": "/manage/mpeg2ts_settings"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_srt_sender_stats:
+    summary: "Statistics of each SRT sender, as SRT defines them (srt_sender_stats)"
+    send: {"method": "GET", "path": "/manage/srt_sender_stats"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_srt_receiver_stats:
+    summary: "Statistics of each SRT receiver, as SRT defines them (srt_receiver_stats)"
+    send: {"method": "GET", "path": "/manage/srt_receiver_stats"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_rist_sender_stats:
+    summary: "Statistics of each RIST sender with rist-stats-interval set (rist_sender_stats)"
+    send: {"method": "GET", "path": "/manage/rist_sender_stats"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_rist_receiver_stats:
+    summary: "Statistics of each RIST receiver with rist-stats-interval set (rist_receiver_stats)"
+    send: {"method": "GET", "path": "/manage/rist_receiver_stats"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_ndi_streams:
+    summary: "The NDI streams the server sees (ndi/list)"
+    send: {"method": "GET", "path": "/manage/ndi/list"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_dvr_status:
+    summary: "Every DVR archive with its size, duration, periods, path, free space and stream details (dvr_status)"
+    send: {"method": "GET", "path": "/manage/dvr_status"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_dvr_timeline:
+    summary: "Every DVR archive with each period's start, end and duration (dvr_status?timeline=true)"
+    send: {"method": "GET", "path": "/manage/dvr_status", "query": {"timeline": "true"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_stream_dvr_status:
+    summary: "One stream's DVR archive (dvr_status/<app>/<stream>)"
+    params:
+      app: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Application", "description": "The application's name, such as live."}
+      stream: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Stream", "description": "The stream's name within the application."}
+    send: {"method": "GET", "path": "/manage/dvr_status/{app}/{stream}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_stream_dvr_timeline:
+    summary: "One stream's DVR archive with its periods (dvr_status/<app>/<stream>?timeline=true)"
+    params:
+      app: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Application", "description": "The application's name, such as live."}
+      stream: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Stream", "description": "The stream's name within the application."}
+    send: {"method": "GET", "path": "/manage/dvr_status/{app}/{stream}", "query": {"timeline": "true"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  export_dvr_subtitles:
+    summary: "One stream's recorded WebVTT subtitles as an SRT file's text, for a time span (dvr/export_srt)"
+    params:
+      app: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Application", "description": "The application's name, such as live."}
+      stream: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Stream", "description": "The stream's name within the application."}
+      start: {"type": "int", "min": 0, "max": 4102444800, "required": true, "label": "From", "description": "Unix time in seconds of the first content to include."}
+      end: {"type": "int", "min": 0, "max": 4102444800, "required": true, "label": "To", "description": "Unix time in seconds of the last content to include."}
+    send: {"method": "GET", "path": "/manage/dvr/export_srt/{app}/{stream}", "query": {"start": "{start}", "end": "{end}"}}
+    expect: { status: 200 }
+    returns: text
+
+  export_dvr_subtitles_language:
+    summary: "One stream's recorded subtitles in one language as SRT text, for a time span (dvr/export_srt with lang)"
+    params:
+      app: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Application", "description": "The application's name, such as live."}
+      stream: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Stream", "description": "The stream's name within the application."}
+      start: {"type": "int", "min": 0, "max": 4102444800, "required": true, "label": "From", "description": "Unix time in seconds of the first content to include."}
+      end: {"type": "int", "min": 0, "max": 4102444800, "required": true, "label": "To", "description": "Unix time in seconds of the last content to include."}
+      lang: {"type": "string", "pattern": "^[a-z]{3}$", "max_length": 3, "required": true, "label": "Language", "description": "The 3-letter language code, as get_dvr_status lists them, such as eng."}
+    send: {"method": "GET", "path": "/manage/dvr/export_srt/{app}/{stream}", "query": {"start": "{start}", "end": "{end}", "lang": "{lang}"}}
+    expect: { status: 200 }
+    returns: text
+
+  reload_dvr_archive:
+    summary: "Reload one stream's DVR archive (dvr/reload)"
+    params:
+      app: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Application", "description": "The application's name, such as live."}
+      stream: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Stream", "description": "The stream's name within the application."}
+    send: {"method": "POST", "path": "/manage/dvr/reload/{app}/{stream}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  cleanup_dvr_archive:
+    summary: "Delete one stream's whole DVR archive (dvr/cleanup_archive)"
+    params:
+      app: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Application", "description": "The application's name, such as live."}
+      stream: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Stream", "description": "The stream's name within the application."}
+    send: {"method": "POST", "path": "/manage/dvr/cleanup_archive/{app}/{stream}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  cleanup_dvr_archive_keep:
+    summary: "Delete one stream's DVR archive except its last minutes (dvr/cleanup_archive?target_depth)"
+    params:
+      app: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Application", "description": "The application's name, such as live."}
+      stream: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Stream", "description": "The stream's name within the application."}
+      minutes: {"type": "int", "min": 0, "max": 5256000, "required": true, "label": "Keep", "description": "Minutes of the latest recording to keep."}
+    send: {"method": "POST", "path": "/manage/dvr/cleanup_archive/{app}/{stream}", "query": {"target_depth": "{minutes}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  cleanup_dvr_archive_span:
+    summary: "Delete one stream's DVR content recorded between two times (dvr/cleanup_archive?from&to)"
+    params:
+      app: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Application", "description": "The application's name, such as live."}
+      stream: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Stream", "description": "The stream's name within the application."}
+      from: {"type": "int", "min": 0, "max": 4102444800, "required": true, "label": "From", "description": "Unix time in seconds; content recorded after it is deleted."}
+      to: {"type": "int", "min": 0, "max": 4102444800, "required": true, "label": "To", "description": "Unix time in seconds; content recorded before it is deleted."}
+    send: {"method": "POST", "path": "/manage/dvr/cleanup_archive/{app}/{stream}", "query": {"from": "{from}", "to": "{to}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  insert_scte35_out:
+    summary: "Insert an SCTE-35 Out marker (go to ads) in a stream set up with time_sync scte35 in Advertizer (advertizer/scte35_out)"
+    params:
+      app: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Application", "description": "The application's name, such as live."}
+      stream: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Stream", "description": "The stream's name within the application."}
+    send: {"method": "POST", "path": "/manage/advertizer/scte35_out/{app}/{stream}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  insert_scte35_out_for:
+    summary: "Insert an SCTE-35 Out marker with the time until returning from ads (advertizer/scte35_out?duration)"
+    params:
+      app: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Application", "description": "The application's name, such as live."}
+      stream: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Stream", "description": "The stream's name within the application."}
+      duration: {"type": "int", "min": 1, "max": 86400, "required": true, "label": "Duration", "description": "Seconds until the return from ads."}
+    send: {"method": "POST", "path": "/manage/advertizer/scte35_out/{app}/{stream}", "query": {"duration": "{duration}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  insert_scte35_out_program:
+    summary: "Insert an SCTE-35 Out marker with its duration and unique program id (advertizer/scte35_out?duration&unique_program_id)"
+    params:
+      app: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Application", "description": "The application's name, such as live."}
+      stream: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Stream", "description": "The stream's name within the application."}
+      duration: {"type": "int", "min": 1, "max": 86400, "required": true, "label": "Duration", "description": "Seconds until the return from ads."}
+      program: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 64, "required": true, "label": "Program ID", "description": "The unique program id of the viewing event."}
+    send: {"method": "POST", "path": "/manage/advertizer/scte35_out/{app}/{stream}", "query": {"duration": "{duration}", "unique_program_id": "{program}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  insert_scte35_in:
+    summary: "Insert an SCTE-35 In marker (back from ads) (advertizer/scte35_in)"
+    params:
+      app: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Application", "description": "The application's name, such as live."}
+      stream: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Stream", "description": "The stream's name within the application."}
+    send: {"method": "POST", "path": "/manage/advertizer/scte35_in/{app}/{stream}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  insert_scte35_in_program:
+    summary: "Insert an SCTE-35 In marker with its unique program id (advertizer/scte35_in?unique_program_id)"
+    params:
+      app: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Application", "description": "The application's name, such as live."}
+      stream: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Stream", "description": "The stream's name within the application."}
+      program: {"type": "string", "pattern": "^[A-Za-z0-9_-]+$", "max_length": 64, "required": true, "label": "Program ID", "description": "The unique program id of the viewing event."}
+    send: {"method": "POST", "path": "/manage/advertizer/scte35_in/{app}/{stream}", "query": {"unique_program_id": "{program}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  insert_scte35_time_signal:
+    summary: "Insert an SCTE-35 time signal marker (advertizer/scte35_time_signal)"
+    params:
+      app: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Application", "description": "The application's name, such as live."}
+      stream: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Stream", "description": "The stream's name within the application."}
+      seg_type: {"type": "enum", "values": ["0x22", "0x23", "0x30", "0x31", "0x34", "0x35"], "required": true, "label": "Segmentation type", "description": "segmentation_type_id: 0x22, 0x23, 0x30, 0x31, 0x34 or 0x35."}
+      upid_type: {"type": "string", "pattern": "^0x[0-9A-Fa-f]{1,2}$", "max_length": 4, "required": true, "label": "UPID type", "description": "The segmentation_upid_type, in hexadecimal such as 0x8."}
+      upid: {"type": "string", "pattern": "^[A-Za-z0-9_.:-]+$", "max_length": 256, "required": true, "label": "UPID", "description": "The segmentation_upid value."}
+    send: {"method": "POST", "path": "/manage/advertizer/scte35_time_signal/{app}/{stream}", "query": {"seg_type": "{seg_type}", "upid_type": "{upid_type}", "upid": "{upid}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  insert_scte35_time_signal_for:
+    summary: "Insert an SCTE-35 time signal marker with a duration (advertizer/scte35_time_signal with duration)"
+    params:
+      app: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Application", "description": "The application's name, such as live."}
+      stream: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Stream", "description": "The stream's name within the application."}
+      seg_type: {"type": "enum", "values": ["0x22", "0x23", "0x30", "0x31", "0x34", "0x35"], "required": true, "label": "Segmentation type", "description": "segmentation_type_id: 0x22, 0x23, 0x30, 0x31, 0x34 or 0x35."}
+      upid_type: {"type": "string", "pattern": "^0x[0-9A-Fa-f]{1,2}$", "max_length": 4, "required": true, "label": "UPID type", "description": "The segmentation_upid_type, in hexadecimal such as 0x8."}
+      upid: {"type": "string", "pattern": "^[A-Za-z0-9_.:-]+$", "max_length": 256, "required": true, "label": "UPID", "description": "The segmentation_upid value."}
+      duration: {"type": "int", "min": 1, "max": 86400, "required": true, "label": "Duration", "description": "The segment's duration in seconds."}
+    send: {"method": "POST", "path": "/manage/advertizer/scte35_time_signal/{app}/{stream}", "query": {"seg_type": "{seg_type}", "upid_type": "{upid_type}", "upid": "{upid}", "duration": "{duration}"}}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_icecast_stream_info:
+    summary: "An Icecast stream's name, description, genre, bitrate and current title (icecast_stream_info)"
+    params:
+      app: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Application", "description": "The application's name, such as live."}
+      stream: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Stream", "description": "The stream's name within the application."}
+    send: {"method": "GET", "path": "/manage/icecast_stream_info/{app}/{stream}"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  insert_icecast_metadata:
+    summary: "Inject Icecast metadata (title and URL) into an RTMP stream (icecast_metadata)"
+    params:
+      app: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Application", "description": "The application's name, such as live."}
+      stream: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Stream", "description": "The stream's name within the application."}
+      title: {"type": "string", "max_length": 1024, "required": true, "label": "Title", "description": "The stream title, such as the track playing."}
+      url: {"type": "string", "max_length": 2048, "default": "", "label": "URL", "description": "The stream URL; empty for none."}
+    send: {"method": "POST", "path": "/manage/icecast_metadata/{app}/{stream}", "body": "{\"streamtitle\":{title:json},\"streamurl\":{url:json}}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_server_playlist_status:
+    summary: "Each Server Playout output stream's current and next block and the source playing (server_playlist_status)"
+    send: {"method": "GET", "path": "/manage/server_playlist_status"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_publish_control_status:
+    summary: "The streams published under publish control: session key, publisher id, address and stream (publish_control/status)"
+    send: {"method": "GET", "path": "/manage/publish_control/status"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  deny_publishers:
+    summary: "Block published sessions by publisher id under publish control (publish_control/deny)"
+    params:
+      ids: {"type": "json", "required": true, "label": "Publisher IDs", "description": "A JSON array of publisher ids, such as [\"ID_1\"]."}
+    send: {"method": "POST", "path": "/manage/publish_control/deny", "body": "{\"PublishControlDenyRequest\":{ids}}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_cache_key:
+    summary: "The cache key of a cached file or playlist, for deleting it (data_cache/get_key)"
+    params:
+      url: {"type": "string", "pattern": "^https?://\\S+$", "max_length": 2048, "required": true, "label": "URL", "description": "The URL of the cached file or playlist."}
+    send: {"method": "POST", "path": "/manage/data_cache/get_key", "body": "{\"url\":{url:json}}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  delete_cache_item:
+    summary: "Delete a cached item (an HLS playlist with its chunk lists and chunks) by its key; with dry_run, list what would go (data_cache/delete)"
+    params:
+      key: {"type": "string", "max_length": 2048, "required": true, "label": "Key", "description": "The cache key, from get_cache_key."}
+      dry_run: {"type": "bool", "default": false, "label": "Dry run", "description": "On to list the items without deleting them."}
+    send: {"method": "POST", "path": "/manage/data_cache/delete", "body": "{\"key\":{key:json},\"dry_run\":{dry_run}}", "content_type": "application/json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_sdi_sources:
+    summary: "The DeckLink SDI input devices (sdi/list)"
+    send: {"method": "GET", "path": "/manage/sdi/list"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_sdi_sinks:
+    summary: "The DeckLink SDI output devices (sdi/sink-list)"
+    send: {"method": "GET", "path": "/manage/sdi/sink-list"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_aja_devices:
+    summary: "The AJA SDI devices (aja/list)"
+    send: {"method": "GET", "path": "/manage/aja/list"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      A server with management_token set wants each request to carry a salt
+      and the base64 of the raw MD5 of salt/token, which the spec format
+      cannot compute (its md5 directive gives hexadecimal of one value), so
+      such a server answers every request with a refusal; keep the API on
+      a trusted interface without a token (management_listen_interfaces),
+      as Softvelum's default leaves it.
+
+  - models: [all]
+    severity: info
+    text: >
+      Nimble pushes nothing to this API. The server status, live streams,
+      RTMP re-publishing statistics, playout status and publish control
+      status are polled every 5 seconds (5 requests), each list replaced
+      whole. Server status reports Connections and OutRate only when the
+      server is registered in WMSPanel.
+
+  - models: [all]
+    severity: info
+    text: >
+      Configuration (applications, inputs, outputs, transcoder, DVR
+      settings) is WMSPanel's; this API reloads it (sync_panel_settings,
+      reload_config) but does not change it. RTMP re-publishing rules made
+      here last only until the server reloads. DVR export to MP4 answers
+      the file itself and is not offered (the core keeps no file from an
+      HTTP answer); the SRT subtitle export answers text. Field values of
+      the SRT and RIST statistics are those of their protocols' libraries.
+
+  - models: [all]
+    severity: critical
+    text: >
+      cleanup_dvr_archive and its variants delete recorded content,
+      delete_sessions disconnects viewers, deny_publishers cuts publishers
+      off, and delete_rtmp_republish_rule stops a re-published stream; none
+      can be undone.
+
+state:
+  server.connections:        { type: int, description: "Active connections (reported when registered in WMSPanel)" }
+  server.out_rate:           { type: int, unit: bit/s, description: "Outgoing rate (reported when registered in WMSPanel)" }
+  server.processors:         { type: int, description: "Available processors" }
+  server.cpu_load:           { type: float, description: "System CPU load (scl)" }
+  server.total_memory:       { type: int, unit: B, description: "Total physical memory" }
+  server.free_memory:        { type: int, unit: B, description: "Free physical memory" }
+  server.total_swap:         { type: int, unit: B, description: "Total swap space" }
+  server.free_swap:          { type: int, unit: B, description: "Free swap space" }
+  server.ram_cache_size:     { type: int, unit: B, description: "RAM cache in use" }
+  server.file_cache_size:    { type: int, unit: B, description: "File cache in use" }
+  server.max_ram_cache_size: { type: int, unit: B, description: "RAM cache limit" }
+  server.max_file_cache_size: { type: int, unit: B, description: "File cache limit" }
+  live.*.*.protocol:         { type: string, description: "An outgoing live stream, keyed by application and stream name: its protocol, such as RTMP, SRT, RTSP or ENCODER" }
+  live.*.*.bandwidth:        { type: int, unit: bit/s, description: "Its encoding bandwidth" }
+  live.*.*.resolution:       { type: string, description: "Its video resolution, such as 1280x720" }
+  live.*.*.vcodec:           { type: string, description: "Its video codec, such as avc1.42c01f" }
+  live.*.*.acodec:           { type: string, description: "Its audio codec, such as mp4a.40.2" }
+  live.*.*.publish_time:     { type: int, unit: s, description: "When it was published, Unix seconds" }
+  live.*.*.source_url:       { type: string, description: "Where a pulled stream comes from" }
+  live.*.*.publisher_ip:     { type: string, description: "The address of a pushed stream's publisher" }
+  live.*.*.publisher_port:   { type: int, description: "That publisher's port" }
+  republish.*.state:         { type: string, description: "An RTMP re-publishing session, keyed by rule id: connected or not" }
+  republish.*.bandwidth:     { type: int, unit: bit/s, description: "Its bandwidth" }
+  republish.*.bytes_sent:    { type: int, unit: B, description: "Bytes sent" }
+  republish.*.bytes_recv:    { type: int, unit: B, description: "Bytes received" }
+  republish.*.session_duration: { type: int, unit: s, description: "Its session's duration" }
+  republish.*.retry_count:   { type: int, description: "How often it reconnected" }
+  republish.*.owner:         { type: int, description: "Who set the rule: 0 WMSPanel, 1 this API" }
+  republish.*.source:        { type: string, description: "The source, application/stream" }
+  republish.*.destination:   { type: string, description: "The destination, address:port/application/stream" }
+  playout.*.block_id:        { type: string, description: "A Server Playout output, keyed by application/stream: the block playing" }
+  playout.*.block_name:      { type: string, description: "That block's name" }
+  playout.*.block_duration:  { type: int, unit: s, description: "How long that block has played" }
+  playout.*.next_block_id:   { type: string, description: "The next block" }
+  playout.*.next_block_name: { type: string, description: "The next block's name" }
+  playout.*.main_stream:     { type: string, description: "The source stream playing, application/stream" }
+  playout.*.main_stream_type: { type: string, description: "Its type, such as live or vod" }
+  playout.*.main_stream_duration: { type: int, unit: s, description: "How long it has played" }
+  playout.*.default_stream:  { type: string, description: "The default stream standing in for the source, empty when none" }
+  playout.*.default_stream_type: { type: string, description: "Its type" }
+  playout.*.default_stream_duration: { type: int, unit: s, description: "How long it has played" }
+  publishers.*.id:           { type: string, description: "A stream published under publish control, keyed by session key: the publisher's id" }
+  publishers.*.ip:           { type: string, description: "The publisher's address" }
+  publishers.*.stream:       { type: string, description: "The stream published, application/stream" }
+
+telemetry:
+  poll:
+    every_ms: 5000
+    send:
+      - { method: GET, path: /manage/server_status }
+      - { method: GET, path: /manage/live_streams_status }
+      - { method: GET, path: /manage/rtmp/republish/stats }
+      - { method: GET, path: /manage/server_playlist_status }
+      - { method: GET, path: /manage/publish_control/status }
+  updates:
+    - path: "^/manage/server_status$"
+      json: { connections: "$.Connections", rate: "$.OutRate", ap: "$.SysInfo.ap", scl: "$.SysInfo.scl", tpms: "$.SysInfo.tpms",
+              fpms: "$.SysInfo.fpms", tsss: "$.SysInfo.tsss", fsss: "$.SysInfo.fsss", ram: "$.RamCacheSize", file: "$.FileCacheSize",
+              max_ram: "$.MaxRamCacheSize", max_file: "$.MaxFileCacheSize" }
+      state:
+        server.connections: "{connections}"
+        server.out_rate: "{rate}"
+        server.processors: "{ap}"
+        server.cpu_load: "{scl}"
+        server.total_memory: "{tpms}"
+        server.free_memory: "{fpms}"
+        server.total_swap: "{tsss}"
+        server.free_swap: "{fsss}"
+        server.ram_cache_size: "{ram}"
+        server.file_cache_size: "{file}"
+        server.max_ram_cache_size: "{max_ram}"
+        server.max_file_cache_size: "{max_file}"
+    - path: "^/manage/live_streams_status$"
+      json_each: "$[*].streams"
+      replace: live
+      json: { app: "$^.app", stream: "$.strm", protocol: "$.protocol", bandwidth: "$.bandwidth", resolution: "$.resolution",
+              vcodec: "$.vcodec", acodec: "$.acodec", time: "$.publish_time", source: "$.source_url", ip: "$.publisher_ip",
+              port: "$.publisher_port" }
+      state:
+        "live.{app:key}.{stream:key}.protocol": "{protocol}"
+        "live.{app:key}.{stream:key}.bandwidth": "{bandwidth}"
+        "live.{app:key}.{stream:key}.resolution": "{resolution}"
+        "live.{app:key}.{stream:key}.vcodec": "{vcodec}"
+        "live.{app:key}.{stream:key}.acodec": "{acodec}"
+        "live.{app:key}.{stream:key}.publish_time": "{time}"
+        "live.{app:key}.{stream:key}.source_url": "{source}"
+        "live.{app:key}.{stream:key}.publisher_ip": "{ip}"
+        "live.{app:key}.{stream:key}.publisher_port": "{port}"
+    - path: "^/manage/rtmp/republish/stats$"
+      json_each: "$.stats"
+      replace: republish
+      json: { id: "$.rule_id", state: "$.state", bandwidth: "$.bandwidth", sent: "$.bytes_sent", recv: "$.bytes_recv",
+              duration: "$.session_duration", retries: "$.retry_count", owner: "$.owner", src_app: "$.src_app",
+              src_stream: "$.src_stream", dest_addr: "$.dest_addr", dest_port: "$.dest_port", dest_app: "$.dest_app",
+              dest_stream: "$.dest_stream" }
+      state:
+        "republish.{id:key}.state": "{state}"
+        "republish.{id:key}.bandwidth": "{bandwidth}"
+        "republish.{id:key}.bytes_sent": "{sent}"
+        "republish.{id:key}.bytes_recv": "{recv}"
+        "republish.{id:key}.session_duration": "{duration}"
+        "republish.{id:key}.retry_count": "{retries}"
+        "republish.{id:key}.owner": "{owner}"
+        "republish.{id:key}.source": "{src_app}/{src_stream}"
+        "republish.{id:key}.destination": "{dest_addr}:{dest_port}/{dest_app}/{dest_stream}"
+    - path: "^/manage/server_playlist_status$"
+      json_each: "$"
+      replace: playout
+      json: { stream: "$.stream", block: "$.block_id", name: "$.block_name", duration: "$.block_duration", next: "$.next_block_id",
+              next_name: "$.next_block_name", main: "$.main_stream", main_type: "$.main_stream_type",
+              main_duration: "$.main_stream_duration", default: "$.default_stream", default_type: "$.default_stream_type",
+              default_duration: "$.default_stream_duration" }
+      state:
+        "playout.{stream:key}.block_id": "{block}"
+        "playout.{stream:key}.block_name": "{name}"
+        "playout.{stream:key}.block_duration": "{duration}"
+        "playout.{stream:key}.next_block_id": "{next}"
+        "playout.{stream:key}.next_block_name": "{next_name}"
+        "playout.{stream:key}.main_stream": "{main}"
+        "playout.{stream:key}.main_stream_type": "{main_type}"
+        "playout.{stream:key}.main_stream_duration": "{main_duration}"
+        "playout.{stream:key}.default_stream": "{default}"
+        "playout.{stream:key}.default_stream_type": "{default_type}"
+        "playout.{stream:key}.default_stream_duration": "{default_duration}"
+    - path: "^/manage/publish_control/status$"
+      json_each: "$.PublishControlStatus"
+      replace: publishers
+      json: { key: "$.key", id: "$.id", ip: "$.ip", stream: "$.stream" }
+      state:
+        "publishers.{key:key}.id": "{id}"
+        "publishers.{key:key}.ip": "{ip}"
+        "publishers.{key:key}.stream": "{stream}"
