@@ -4629,7 +4629,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the live endpoints accept Accept application/vnd.vimeo.*+json;version=3.4 and JSON request bodies with Content-Type application/json. ([specs/vimeo-live.yaml:86](specs/vimeo-live.yaml#L86))
 - [ ] Confirm GET /me?fields=uri as the idle probe, and record the X-RateLimit figures against the 30-second poll of three requests. ([specs/vimeo-live.yaml:94](specs/vimeo-live.yaml#L94))
 - [ ] Confirm GET /me/live_events answers a page object with data (the reference shows an array), and that type, sort, direction, per_page and page are honoured. ([specs/vimeo-live.yaml:127](specs/vimeo-live.yaml#L127))
-- [ ] Confirm GET /me/live_events/{id}/destinations answers a page object with data or a plain array, as the two rules expect. ([specs/vimeo-live.yaml:666](specs/vimeo-live.yaml#L666))
+- [ ] Confirm GET /me/live_events/{id}/destinations answers a page object with data or a plain array, as the two rules expect. ([specs/vimeo-live.yaml:667](specs/vimeo-live.yaml#L667))
 - [ ] Confirm fields= filtering works on GET /me/live_events/{id} for stream_key, backup_stream_key, rtmp_link, rtmps_link, srt_link and srt_passphrase. ([specs/vimeo-live.yaml:154](specs/vimeo-live.yaml#L154))
 - [ ] Confirm Create an event answers 200 (not 201) with the event, its uri /live_events/{id}. ([specs/vimeo-live.yaml:196](specs/vimeo-live.yaml#L196))
 - [ ] Confirm Activate an event accepts an empty JSON body, answers 200, and what it answers once already activated (400 error 2428). ([specs/vimeo-live.yaml:373](specs/vimeo-live.yaml#L373))
@@ -4638,10 +4638,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the low_latency PATCH answers {"lowLatency": ...} and whether it is the same setting as latency low. ([specs/vimeo-live.yaml:312](specs/vimeo-live.yaml#L312))
 - [ ] Confirm the Update an event body's auto_cc_language takes de-DE, en-US, es-ES, fr-FR and pt-BR (the auto_cc endpoint lists other codes). ([specs/vimeo-live.yaml:348](specs/vimeo-live.yaml#L348))
 - [ ] Confirm set_stream_title's automatically_title_stream false with stream_title is accepted in one PATCH. ([specs/vimeo-live.yaml:264](specs/vimeo-live.yaml#L264))
-- [ ] Confirm PATCH /destination/{id} with is_enabled alone toggles a simulcast destination while live. ([specs/vimeo-live.yaml:465](specs/vimeo-live.yaml#L465))
+- [ ] Confirm PATCH /destination/{id} with is_enabled alone toggles a simulcast destination while live. ([specs/vimeo-live.yaml:466](specs/vimeo-live.yaml#L466))
 - [ ] Record what Get an M3U8 playback URL answers (the reference gives no schema). ([specs/vimeo-live.yaml:401](specs/vimeo-live.yaml#L401))
-- [ ] Record which ingest.status values occur in practice through a stream's life (0 to 5 documented). ([specs/vimeo-live.yaml:578](specs/vimeo-live.yaml#L578))
-- [ ] Record whether GET /me/live_events/{id}/destinations answers a bare array or a page {total, page, per_page, data}: a bare array, or a first page of 25 whose total fits on it, replaces the event's destinations. ([specs/vimeo-live.yaml:664](specs/vimeo-live.yaml#L664))
+- [ ] Record which ingest.status values occur in practice through a stream's life (0 to 5 documented). ([specs/vimeo-live.yaml:579](specs/vimeo-live.yaml#L579))
+- [ ] Record whether GET /me/live_events/{id}/destinations answers a bare array or a page {total, page, per_page, data}: a bare array, or a first page of 25 whose total fits on it, replaces the event's destinations. ([specs/vimeo-live.yaml:665](specs/vimeo-live.yaml#L665))
 
 ## vioso-exaplay — VIOSO EXAPLAY
 

@@ -146,12 +146,12 @@ telemetry(VM, "destinations", settings=_VMS, inbound_http={
 telemetry(VM, "destinations-paged", settings=_VMS, inbound_http={
     "path": _VME + "/destinations", "body": json.dumps({"total": 1, "page": 1, "per_page": 25, "data": _VMD})},
     state_before=_VMGONE, expect_state=_VMKEPT)
-# More destinations than one page holds: the page adds, nothing leaves.
-telemetry(VM, "destinations-page-of-several", settings=_VMS, inbound_http={
-    "path": _VME + "/destinations", "body": json.dumps({"total": 30, "page": 1, "per_page": 25, "data": _VMD})},
-    state_before=_VMGONE,
-    expect_state={"events": {"12345": {"title": "Sunday", "destinations": {
-        "99": {"name": "Deleted", "enabled": False}, **_VMDS["events"]["12345"]["destinations"]}}}})
+# More destinations than one page holds: the pages are read and joined (the
+# last page's counts, every page's items), and the whole list replaces.
+telemetry(VM, "destinations-pages-joined", settings=_VMS, inbound_http={
+    "path": _VME + "/destinations",
+    "body": json.dumps({"total": 30, "page": 2, "per_page": 25, "paging": {"next": None}, "data": _VMD})},
+    state_before=_VMGONE, expect_state=_VMKEPT)
 # Adding a destination answers it alone, not a list: nothing leaves (it
 # shows at the next poll).
 telemetry(VM, "destination-added", settings=_VMS, inbound_http={
