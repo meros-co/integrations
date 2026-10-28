@@ -170,8 +170,10 @@ fn block(data: &[u8]) -> Option<Value> {
         return None;
     }
     let mut words = data[4..]
-        .chunks_exact(2)
-        .map(|w| f64::from(i16::from_be_bytes([w[0], w[1]])) / 256.0);
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|w| f64::from(i16::from_be_bytes(*w)) / 256.0);
     let mut patch = Map::new();
     'all: for s in SECTIONS {
         let mut strips = Map::new();
