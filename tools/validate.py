@@ -410,6 +410,17 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
 
     conversions: dict = doc.get("conversions") or {}
     for cname, conv in conversions.items():
+        if "law" in conv:
+            # A level law (SPEC.md §4, Conversions): db20 with a floor in dB.
+            if conv["law"] != "db20":
+                errors.append(f"conversions.{cname}: law is db20")
+            if not isinstance(conv.get("floor"), (int, float)) or isinstance(conv.get("floor"), bool):
+                errors.append(f"conversions.{cname}: law db20 needs a floor in dB")
+            if "points" in conv:
+                errors.append(f"conversions.{cname}: a law has no points")
+            continue
+        if "floor" in conv:
+            errors.append(f"conversions.{cname}: floor goes with a law")
         points = conv.get("points", [])
         wires = [p[0] for p in points]
         values = [p[1] for p in points]
@@ -799,6 +810,11 @@ def per_model_checks(doc: dict, model_ids: set) -> list[str]:
                 errors.append(f"{where}[{i}]: {{models, message}} is for line and websocket transports")
             if isinstance(item, dict) and "session" in item and transport.get("type") != "http":
                 errors.append(f"{where}[{i}]: session applies to http requests")
+            if isinstance(item, dict) and "when_set" in item and where != "on_connect":
+                if not where.startswith(("telemetry.poll", "telemetry.subscribe")):
+                    errors.append(f"{where}[{i}]: when_set applies to on_connect steps and telemetry poll and subscribe items")
+                elif item["when_set"] not in (doc.get("settings") or {}):
+                    errors.append(f"{where}[{i}]: when_set names unknown setting '{item['when_set']}'")
     for model in doc.get("models", []):
         for name in model.get("supports", []):
             send = ((doc.get("commands") or {}).get(name) or {}).get("send")
@@ -991,6 +1007,26 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                     errors.append(f"{where}.then_send: '{{{name}}}' is not one of the rule's captures")
         if "arg_types" in rule and "address" not in rule:
             errors.append(f"{where}: arg_types applies to an address rule")
+        if "blob_each" in rule:
+            # Numbers packed in an OSC blob (SPEC.md §8, Numbers in a blob).
+            blob = rule["blob_each"]
+            if "address" not in rule:
+                errors.append(f"{where}: blob_each applies to an address rule")
+            if any(k in rule for k in ("match_each", "json", "json_each", "json_match")):
+                errors.append(f"{where}: blob_each goes without match_each or json")
+            if not isinstance(blob, dict):
+                errors.append(f"{where}: blob_each is a mapping")
+            else:
+                for k in blob:
+                    if k not in ("arg", "offset", "count", "format"):
+                        errors.append(f"{where}: blob_each.{k} is not a blob_each key")
+                if blob.get("format") not in ("i8", "u8", "i16le", "i16be", "u16le", "u16be",
+                                              "i32le", "i32be", "u32le", "u32be", "f32le", "f32be"):
+                    errors.append(f"{where}: blob_each.format is not a known number format")
+                for k in ("arg", "offset", "count"):
+                    v = blob.get(k)
+                    if v is not None and (not isinstance(v, int) or isinstance(v, bool) or v < (1 if k == "count" else 0)):
+                        errors.append(f"{where}: blob_each.{k} is a whole number{' from 1' if k == 'count' else ''}")
         # A null in a state patch is a removal (SPEC.md §1, state):
         # a rule removes with {delete: true}, and a state meaning "none" is
         # written as an explicit value, never as null.

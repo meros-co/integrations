@@ -256,15 +256,12 @@
     },
     "conversions": {
       "type": "object",
-      "description": "Named piecewise-linear conversions between a wire value and the value an operator uses (a fader law). Used in templates as {x:to.<name>} (value to wire) and {x:from.<name>} (wire to value), and by expect.convert (SPEC.md §4).",
+      "description": "Named conversions between a wire value and the value an operator uses: piecewise-linear points (a fader law), or a level law (db20 with a floor). Used in templates as {x:to.<name>} (value to wire) and {x:from.<name>} (wire to value), and by expect.convert (SPEC.md §4).",
       "propertyNames": {
         "pattern": "^[a-z0-9]+(_[a-z0-9]+)*$"
       },
       "additionalProperties": {
         "type": "object",
-        "required": [
-          "points"
-        ],
         "additionalProperties": false,
         "properties": {
           "points": {
@@ -279,8 +276,31 @@
                 "type": "number"
               }
             }
+          },
+          "law": {
+            "enum": [
+              "db20"
+            ],
+            "description": "In place of points: a level law. db20 is 20·log10 of a linear amplitude (1.0 full scale), exact both ways (SPEC.md §4, Conversions)."
+          },
+          "floor": {
+            "type": "number",
+            "description": "With law: the lowest value in dB; silence and any quieter wire value read as it, and a value below it does not convert to the wire."
           }
-        }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "points"
+            ]
+          },
+          {
+            "required": [
+              "law",
+              "floor"
+            ]
+          }
+        ]
       }
     },
     "maps": {
@@ -670,6 +690,48 @@
                     }
                   }
                 ]
+              },
+              "blob_each": {
+                "type": "object",
+                "required": [
+                  "format"
+                ],
+                "additionalProperties": false,
+                "description": "With address: the rule matches once for each number packed in a blob argument (a console's meter block), {value} the number and {index} its place from 0 (SPEC.md §8, Numbers in a blob).",
+                "properties": {
+                  "arg": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The argument holding the blob, from 0 (default 0)."
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Bytes skipped at the blob's start (default 0)."
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "At most this many numbers; as many as the blob holds whole when absent."
+                  },
+                  "format": {
+                    "enum": [
+                      "i8",
+                      "u8",
+                      "i16le",
+                      "i16be",
+                      "u16le",
+                      "u16be",
+                      "i32le",
+                      "i32be",
+                      "u32le",
+                      "u32be",
+                      "f32le",
+                      "f32be"
+                    ],
+                    "description": "Each number's type and byte order."
+                  }
+                }
               }
             },
             "oneOf": [
@@ -1164,7 +1226,8 @@
         "resolume-push",
         "ultimatte-preset-archive",
         "hyperdeck-ftp",
-        "nmos-query-websocket"
+        "nmos-query-websocket",
+        "wing-meters"
       ],
       "description": "A native addition to a spec-driven device, for what the format cannot express. Named here so it is never hidden."
     },
@@ -2301,7 +2364,11 @@
                 },
                 "login_status": {
                   "type": "array",
-                  "items": { "type": "integer", "minimum": 100, "maximum": 599 },
+                  "items": {
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 599
+                  },
                   "description": "Statuses besides 2xx a login answer holding the session may have, such as a 302 that sets the session cookie."
                 },
                 "relogin": {
@@ -2748,6 +2815,10 @@
             "type": "string"
           },
           "description": "The model ids this message is for; it is skipped for any other model (SPEC.md §4, Messages per model)."
+        },
+        "when_set": {
+          "type": "string",
+          "description": "Telemetry poll and subscribe items only: the message is sent only while this setting is set (not empty, and not false), decided from the settings current when it would go (SPEC.md §8, Telemetry)."
         }
       }
     },
@@ -2798,17 +2869,20 @@
             "type": "string"
           },
           "description": "The model ids this message is for; it is skipped for any other model (SPEC.md §4, Messages per model)."
+        },
+        "when_set": {
+          "type": "string",
+          "description": "Telemetry poll and subscribe items only: the message is sent only while this setting is set (not empty, and not false), decided from the settings current when it would go (SPEC.md §8, Telemetry)."
         }
       }
     },
     "lineSend": {
       "type": "object",
       "required": [
-        "message",
-        "models"
+        "message"
       ],
       "additionalProperties": false,
-      "description": "Line and websocket transports: a text message sent to some models only (SPEC.md §4, Messages per model).",
+      "description": "Line and websocket transports: a text message sent to some models only (SPEC.md §4, Messages per model), or, in telemetry, only while a setting is set.",
       "properties": {
         "message": {
           "type": "string",
@@ -2821,6 +2895,10 @@
             "type": "string"
           },
           "description": "The model ids this message is for; it is skipped for any other model."
+        },
+        "when_set": {
+          "type": "string",
+          "description": "Telemetry poll and subscribe items only: the message is sent only while this setting is set (not empty, and not false), decided from the settings current when it would go (SPEC.md §8, Telemetry)."
         }
       }
     },
@@ -2948,6 +3026,10 @@
         "endpoint": {
           "type": "string",
           "description": "Sent to this endpoint of transport.endpoints (another port of the same host) instead of the transport's port. Not on the probe or the session login (SPEC.md §2, Endpoints)."
+        },
+        "when_set": {
+          "type": "string",
+          "description": "Telemetry poll and subscribe items only: the message is sent only while this setting is set (not empty, and not false), decided from the settings current when it would go (SPEC.md §8, Telemetry)."
         }
       },
       "not": {

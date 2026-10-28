@@ -3599,12 +3599,24 @@ impl SpecEngine {
         self.send_items(cx, items, poll);
     }
 
+    /// `when_set` on a telemetry message: sent only while that setting is
+    /// set (not empty, and not `false`), decided from the settings current
+    /// when it would go, so `update_settings` turns it on and off.
+    fn wanted(&self, item: &Value) -> bool {
+        match item.get("when_set").and_then(Value::as_str) {
+            None => true,
+            Some(setting) => self.settings.get(setting).is_some_and(|v| {
+                !v.is_null() && v.as_str() != Some("") && v.as_bool() != Some(false)
+            }),
+        }
+    }
+
     /// Telemetry messages, each rendered from its own values: none for a
     /// subscription or a poll, a rule's captures for `then_send`.
     fn send_items(&mut self, cx: &mut Cx, items: Vec<telemetry::Triggered>, poll: bool) {
         let items: Vec<telemetry::Triggered> = items
             .into_iter()
-            .filter(|t| for_model(&t.item, &self.ctx.model))
+            .filter(|t| for_model(&t.item, &self.ctx.model) && self.wanted(&t.item))
             .collect();
         // HTTP requests are always queued: each reply is matched to its
         // request. Poll items are queries, so on any transport that answers
