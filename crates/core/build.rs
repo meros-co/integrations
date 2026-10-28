@@ -309,6 +309,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "sennheiser-ew-g3-g4",
             "sennheiser-l-6000",
             "sennheiser-spectera",
+            "sennheiser-tc-bar",
             "sennheiser-tcc-m",
             "sennheiser-tcc2",
         ],

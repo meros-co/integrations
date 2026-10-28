@@ -3356,6 +3356,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On firmware 1.3.x (API 17.0), check which subscriptions are refused (the aoip status, metering) and whether the rest still subscribe in their batch. ([specs/sennheiser-spectera.yaml:619](specs/sennheiser-spectera.yaml#L619))
 - [ ] Confirm bandwidthMode 10000 is accepted but never transmits, as the release notes say, which is why set_rf_bandwidth offers 6000 and 8000 only. ([specs/sennheiser-spectera.yaml:559](specs/sennheiser-spectera.yaml#L559))
 
+## sennheiser-tc-bar — Sennheiser TeamConnect Bar S / Bar M
+
+- [ ] Confirm that one PUT of every readable resource to the session is accepted on both bars, and that the initial values arrive on the stream. ([specs/sennheiser-tc-bar.yaml:1292](specs/sennheiser-tc-bar.yaml#L1292))
+- [ ] Confirm that restart, the camera full-view and preset PUTs take no body. ([specs/sennheiser-tc-bar.yaml:954](specs/sennheiser-tc-bar.yaml#L954))
+- [ ] Confirm that a PUT of one field leaves the resource's other fields as they were. ([specs/sennheiser-tc-bar.yaml:1146](specs/sennheiser-tc-bar.yaml#L1146))
+- [ ] Record a full 802.1X configuration exchange (both methods), the error codes for bad PEM files, and how the bar answers while it re-authenticates. ([specs/sennheiser-tc-bar.yaml:1061](specs/sennheiser-tc-bar.yaml#L1061))
+
 ## sennheiser-tcc-m — Sennheiser TeamConnect Ceiling Medium
 
 - [ ] Confirm that one PUT of every readable resource to the session is accepted (a refused entry refuses the whole list) and that the initial values arrive on the stream. ([specs/sennheiser-tcc-m.yaml:812](specs/sennheiser-tcc-m.yaml#L812))

@@ -1,0 +1,1604 @@
+spec: 1
+id: sennheiser-tc-bar
+name: Sennheiser TeamConnect Bar S / Bar M (Sound Control Protocol v2)
+vendor: Sennheiser
+category: other
+
+# The TeamConnect Bar speaks SSCv2: an HTTPS REST API on port 443 (Basic
+# authentication as user api with the third-party password set in Sennheiser
+# Control Cockpit) and a server-sent event stream for changes, whose first
+# event names a session to which the core adds every readable resource with
+# one PUT. Writes are PUTs of the fields that change.
+source:
+  - title: "TCBar 3rd-party API, OpenAPI 3.1.0, version 1.16 (released 2026-07-06)"
+    author: Sennheiser
+    url: https://assets.sennheiser.com/download/assets/TCBar_openapi_3rdparty_release_1.16.yaml/6f93e9ae001711f19429727585c0d31f
+    note: >
+      Manufacturer document, the API reference (Swagger at
+      https://docs.cloud.sennheiser.com/en-us/api-docs/api-docs/open-api-tc-bar.html):
+      every resource, its methods, fields, ranges, enumerations and defaults;
+      Basic authentication as a user without rights to vital settings; the
+      subscription resources.
+  - title: "TC Bar known issues"
+    author: Sennheiser
+    url: https://docs.cloud.sennheiser.com/en-us/api-docs/api-docs/known-issues-tc-bar.html
+    note: >
+      Manufacturer document. No PUT for the Dante network or the camera's
+      video parameters; HDMI output and camera enable writes out of function
+      or deprecated.
+  - title: "Sennheiser Sound Control (SSCv2) Specification, Version 2.3"
+    author: Sennheiser
+    url: https://docs.cloud.sennheiser.com/en-us/api-docs/api-docs/sscv2-specification-2.3.html
+    note: >
+      Manufacturer document. The event stream's format, sessions and their
+      management, status codes.
+
+transport:
+  type: http
+  port: 443
+  scheme: https
+  accept_invalid_certs: true
+  auth: basic
+  timeout_ms: 4000
+  probe: { method: GET, path: /api/ssc/version }
+
+settings:
+  username: { type: string, default: api, max_length: 32, label: User, description: "The SSCv2 user; api for third-party access." }
+  password: { type: string, secret: true, default: "", max_length: 128, label: Password, description: "The third-party access password set in Sennheiser Control Cockpit, where third-party access must also be enabled." }
+
+ports:
+  - { port: 443, protocol: https, role: control }
+  - { port: 443, protocol: https, role: push, note: "The event stream, on the same server" }
+
+models:
+  - id: tc-bar-s
+    name: Sennheiser TeamConnect Bar S
+    supports:
+      - get_ssc_version
+      - get_device_license_agreements_hash
+      - get_device_identity
+      - get_device_identification
+      - identify
+      - get_device_site
+      - get_interfaces_network
+      - get_device_state
+      - get_firmware_update_state
+      - get_device_power_poe_output
+      - set_poe_output
+      - get_video_input_internal_camera_ai_access
+      - set_camera_ai_auto_framing_access_enabled
+      - set_camera_ai_auto_framing_enabled
+      - set_camera_ai_person_tiling_access_enabled
+      - set_camera_ai_person_tiling_enabled
+      - get_audio_inputs_internal_mic
+      - set_mic_gain
+      - set_mic_enabled
+      - get_audio_inputs_internal_mic_mute
+      - set_mic_mute
+      - get_audio_inputs_mute
+      - set_input_mute
+      - get_audio_inputs_internal_mic_noise_gate
+      - set_mic_noise_gate_enabled
+      - set_mic_noise_gate_threshold
+      - set_mic_noise_gate_hold_time
+      - set_mic_noise_gate_range
+      - get_audio_inputs_noise_suppression
+      - set_noise_suppression
+      - get_interfaces_network_dante_settings
+      - set_dante_continuous_dante_stream
+      - set_dante_dante_speaker_output
+      - get_audio_outputs_speaker
+      - set_speaker_volume
+      - set_speaker_level_limiter
+      - get_video_input_internal_camera_video_parameters
+      - get_device_allowed_standby_mode
+      - set_standby_mode
+      - get_device_has_user_interaction
+      - get_audio_inputs_max_level
+      - get_interfaces_bluetooth
+      - set_bluetooth_enabled
+      - set_bluetooth_pairing
+      - get_interfaces_bluetooth_devices_list
+      - get_device_leds_ring
+      - set_led_brightness
+      - get_device_feedback
+      - set_sound_prompts
+      - get_interfaces_network_wifi
+      - get_video_input_internal_camera_movement
+      - set_camera_pan
+      - set_camera_tilt
+      - set_camera_zoom
+      - set_camera_zoom_speed
+      - set_camera_pan_tilt_speed
+      - set_camera_auto_framing_speed
+      - get_video_input_internal_camera
+      - get_video_output_hdmi
+      - get_device_profile
+      - set_profile
+      - get_audio_sound_profile
+      - set_sound_profile
+      - get_audio_inputs_internal_mic_priority_zones
+      - get_audio_inputs_internal_mic_priority_zones_by_id
+      - set_priority_zone_enabled
+      - set_priority_zone_gain
+      - set_priority_zone_left
+      - set_priority_zone_right
+      - get_audio_inputs_internal_mic_exclusion_zones
+      - get_audio_inputs_internal_mic_exclusion_zones_by_id
+      - set_exclusion_zone_enabled
+      - set_exclusion_zone_left
+      - set_exclusion_zone_right
+      - get_audio_inputs_internal_mic_beam
+      - get_interfaces_network_port_configuration
+      - get_audio_inputs_mixer
+      - set_mixer_fade
+      - get_audio_outputs_conference_output
+      - set_conference_output_far_end_gain
+      - set_conference_output_near_end_gain
+      - get_audio_inputs_internal_mic_level
+      - get_audio_inputs_bluetooth
+      - get_audio_inputs_usb
+      - get_audio_inputs_dante_levels
+      - get_audio_inputs_mixer_activity
+      - get_audio_inputs_dante
+      - get_audio_inputs_dante_by_id
+      - set_dante_input_gain
+      - get_audio_outputs_dante
+      - get_audio_outputs_dante_by_id
+      - set_dante_output_name
+      - get_interfaces_network_dante
+      - restart
+      - camera_full_view
+      - camera_store_preset
+      - camera_load_preset
+      - camera_move
+      - speaker_volume_step
+      - get_mic_eq
+      - set_mic_eq
+      - get_speaker_eq
+      - set_speaker_eq
+      - get_network_interface
+      - get_8021x
+      - set_8021x_enabled
+      - configure_8021x_eap_tls
+      - configure_8021x_peap
+      - clear_8021x
+      - verify_8021x_file
+      - get_8021x_certificates
+      - get_8021x_certificate
+      - get_dante_input_level
+    verification: none
+  - id: tc-bar-m
+    name: Sennheiser TeamConnect Bar M
+    supports:
+      - get_ssc_version
+      - get_device_license_agreements_hash
+      - get_device_identity
+      - get_device_identification
+      - identify
+      - get_device_site
+      - get_interfaces_network
+      - get_device_state
+      - get_firmware_update_state
+      - get_device_power_poe_output
+      - set_poe_output
+      - get_video_input_internal_camera_ai_access
+      - set_camera_ai_auto_framing_access_enabled
+      - set_camera_ai_auto_framing_enabled
+      - set_camera_ai_person_tiling_access_enabled
+      - set_camera_ai_person_tiling_enabled
+      - get_audio_inputs_internal_mic
+      - set_mic_gain
+      - set_mic_enabled
+      - get_audio_inputs_internal_mic_mute
+      - set_mic_mute
+      - get_audio_inputs_mute
+      - set_input_mute
+      - get_audio_inputs_internal_mic_noise_gate
+      - set_mic_noise_gate_enabled
+      - set_mic_noise_gate_threshold
+      - set_mic_noise_gate_hold_time
+      - set_mic_noise_gate_range
+      - get_audio_inputs_noise_suppression
+      - set_noise_suppression
+      - get_interfaces_network_dante_settings
+      - set_dante_continuous_dante_stream
+      - set_dante_dante_speaker_output
+      - get_audio_outputs_speaker
+      - set_speaker_volume
+      - set_speaker_level_limiter
+      - get_video_input_internal_camera_video_parameters
+      - get_device_allowed_standby_mode
+      - set_standby_mode
+      - get_device_has_user_interaction
+      - get_audio_inputs_max_level
+      - get_interfaces_bluetooth
+      - set_bluetooth_enabled
+      - set_bluetooth_pairing
+      - get_interfaces_bluetooth_devices_list
+      - get_device_leds_ring
+      - set_led_brightness
+      - get_device_feedback
+      - set_sound_prompts
+      - get_interfaces_network_wifi
+      - get_video_input_internal_camera_movement
+      - set_camera_pan
+      - set_camera_tilt
+      - set_camera_zoom
+      - set_camera_zoom_speed
+      - set_camera_pan_tilt_speed
+      - set_camera_auto_framing_speed
+      - get_video_input_internal_camera
+      - get_video_output_hdmi
+      - get_device_profile
+      - set_profile
+      - get_audio_sound_profile
+      - set_sound_profile
+      - get_audio_inputs_internal_mic_priority_zones
+      - get_audio_inputs_internal_mic_priority_zones_by_id
+      - set_priority_zone_enabled
+      - set_priority_zone_gain
+      - set_priority_zone_left
+      - set_priority_zone_right
+      - get_audio_inputs_internal_mic_exclusion_zones
+      - get_audio_inputs_internal_mic_exclusion_zones_by_id
+      - set_exclusion_zone_enabled
+      - set_exclusion_zone_left
+      - set_exclusion_zone_right
+      - get_audio_inputs_internal_mic_beam
+      - get_interfaces_network_port_configuration
+      - get_audio_inputs_mixer
+      - set_mixer_fade
+      - get_audio_outputs_conference_output
+      - set_conference_output_far_end_gain
+      - set_conference_output_near_end_gain
+      - get_audio_inputs_internal_mic_level
+      - get_audio_inputs_bluetooth
+      - get_audio_inputs_usb
+      - get_audio_inputs_dante_levels
+      - get_audio_inputs_mixer_activity
+      - get_audio_inputs_dante
+      - get_audio_inputs_dante_by_id
+      - set_dante_input_gain
+      - get_audio_outputs_dante
+      - get_audio_outputs_dante_by_id
+      - set_dante_output_name
+      - get_interfaces_network_dante
+      - restart
+      - camera_full_view
+      - camera_store_preset
+      - camera_load_preset
+      - camera_move
+      - speaker_volume_step
+      - get_mic_eq
+      - set_mic_eq
+      - get_speaker_eq
+      - set_speaker_eq
+      - get_network_interface
+      - get_8021x
+      - set_8021x_enabled
+      - configure_8021x_eap_tls
+      - configure_8021x_peap
+      - clear_8021x
+      - verify_8021x_file
+      - get_8021x_certificates
+      - get_8021x_certificate
+      - get_dante_input_level
+    verification: none
+
+commands:
+  get_ssc_version:
+    summary: "Read the SSC version (GET /api/ssc/version)"
+    send: { method: GET, path: "/api/ssc/version" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_device_license_agreements_hash:
+    summary: "Read the license agreements hash (GET /api/device/licenseAgreements/hash)"
+    send: { method: GET, path: "/api/device/licenseAgreements/hash" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_device_identity:
+    summary: "Read the device identity (GET /api/device/identity)"
+    send: { method: GET, path: "/api/device/identity" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_device_identification:
+    summary: "Read the identification (GET /api/device/identification)"
+    send: { method: GET, path: "/api/device/identification" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  identify:
+    summary: "Set the identification: identifying: the LEDs flash (PUT /api/device/identification)"
+    params:
+      value: { type: bool, required: true, label: "Visual", description: "Identifying: the LEDs flash." }
+    send: { method: PUT, path: "/api/device/identification", body: '{"visual":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_device_site:
+    summary: "Read the site (GET /api/device/site)"
+    send: { method: GET, path: "/api/device/site" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_interfaces_network:
+    summary: "Read the network interfaces (GET /api/interfaces/network)"
+    send: { method: GET, path: "/api/interfaces/network" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_device_state:
+    summary: "Read the device state (GET /api/device/state)"
+    send: { method: GET, path: "/api/device/state" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_firmware_update_state:
+    summary: "Read the firmware update state (GET /api/firmware/update/state)"
+    send: { method: GET, path: "/api/firmware/update/state" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_device_power_poe_output:
+    summary: "Read the PoE output (GET /api/device/power/poe/output)"
+    send: { method: GET, path: "/api/device/power/poe/output" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_poe_output:
+    summary: "Set the PoE output: poE output port powered (PUT /api/device/power/poe/output)"
+    params:
+      value: { type: bool, required: true, label: "Enabled", description: "PoE output port powered." }
+    send: { method: PUT, path: "/api/device/power/poe/output", body: '{"enabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_video_input_internal_camera_ai_access:
+    summary: "Read the camera AI functions (GET /api/video/input/internalCamera/aiAccess)"
+    send: { method: GET, path: "/api/video/input/internalCamera/aiAccess" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_camera_ai_auto_framing_access_enabled:
+    summary: "Set the camera AI functions: auto framing offered to the remote side (PUT /api/video/input/internalCamera/aiAccess)"
+    params:
+      value: { type: bool, required: true, label: "Auto framing access enabled", description: "Auto framing offered to the remote side." }
+    send: { method: PUT, path: "/api/video/input/internalCamera/aiAccess", body: '{"autoFramingAccessEnabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_camera_ai_auto_framing_enabled:
+    summary: "Set the camera AI functions: auto framing on (PUT /api/video/input/internalCamera/aiAccess)"
+    params:
+      value: { type: bool, required: true, label: "Auto framing enabled", description: "Auto framing on." }
+    send: { method: PUT, path: "/api/video/input/internalCamera/aiAccess", body: '{"autoFramingEnabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_camera_ai_person_tiling_access_enabled:
+    summary: "Set the camera AI functions: person tiling offered to the remote side (PUT /api/video/input/internalCamera/aiAccess)"
+    params:
+      value: { type: bool, required: true, label: "Person tiling access enabled", description: "Person tiling offered to the remote side." }
+    send: { method: PUT, path: "/api/video/input/internalCamera/aiAccess", body: '{"personTilingAccessEnabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_camera_ai_person_tiling_enabled:
+    summary: "Set the camera AI functions: person tiling on (PUT /api/video/input/internalCamera/aiAccess)"
+    params:
+      value: { type: bool, required: true, label: "Person tiling enabled", description: "Person tiling on." }
+    send: { method: PUT, path: "/api/video/input/internalCamera/aiAccess", body: '{"personTilingEnabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_inputs_internal_mic:
+    summary: "Read the internal microphones (GET /api/audio/inputs/internalMic)"
+    send: { method: GET, path: "/api/audio/inputs/internalMic" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_mic_gain:
+    summary: "Set the internal microphones: gain in dB, -60 to 0 (PUT /api/audio/inputs/internalMic)"
+    params:
+      value: { type: int, min: -60, max: 0, required: true, label: "Gain", description: "Gain in dB, -60 to 0." }
+    send: { method: PUT, path: "/api/audio/inputs/internalMic", body: '{"gain":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_mic_enabled:
+    summary: "Set the internal microphones: internal microphones on (PUT /api/audio/inputs/internalMic)"
+    params:
+      value: { type: bool, required: true, label: "Enabled", description: "Internal microphones on." }
+    send: { method: PUT, path: "/api/audio/inputs/internalMic", body: '{"enabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_inputs_internal_mic_mute:
+    summary: "Read the internal microphone mute (GET /api/audio/inputs/internalMic/mute)"
+    send: { method: GET, path: "/api/audio/inputs/internalMic/mute" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_mic_mute:
+    summary: "Set the internal microphone mute: internal microphones muted (PUT /api/audio/inputs/internalMic/mute)"
+    params:
+      value: { type: bool, required: true, label: "Enabled", description: "Internal microphones muted." }
+    send: { method: PUT, path: "/api/audio/inputs/internalMic/mute", body: '{"enabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_inputs_mute:
+    summary: "Read the input mute (GET /api/audio/inputs/mute)"
+    send: { method: GET, path: "/api/audio/inputs/mute" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_input_mute:
+    summary: "Set the input mute: internal and external microphones muted after the mixer (PUT /api/audio/inputs/mute)"
+    params:
+      value: { type: bool, required: true, label: "Enabled", description: "Internal and external microphones muted after the mixer." }
+    send: { method: PUT, path: "/api/audio/inputs/mute", body: '{"enabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_inputs_internal_mic_noise_gate:
+    summary: "Read the microphone noise gate (GET /api/audio/inputs/internalMic/noiseGate)"
+    send: { method: GET, path: "/api/audio/inputs/internalMic/noiseGate" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_mic_noise_gate_enabled:
+    summary: "Set the microphone noise gate: noise gate on (PUT /api/audio/inputs/internalMic/noiseGate)"
+    params:
+      value: { type: bool, required: true, label: "Enabled", description: "Noise gate on." }
+    send: { method: PUT, path: "/api/audio/inputs/internalMic/noiseGate", body: '{"enabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_mic_noise_gate_threshold:
+    summary: "Set the microphone noise gate: threshold in dB, -70 to -30 (PUT /api/audio/inputs/internalMic/noiseGate)"
+    params:
+      value: { type: int, min: -70, max: -30, required: true, label: "Threshold", description: "Threshold in dB, -70 to -30." }
+    send: { method: PUT, path: "/api/audio/inputs/internalMic/noiseGate", body: '{"threshold":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_mic_noise_gate_hold_time:
+    summary: "Set the microphone noise gate: hold time in ms, 100 to 500 (PUT /api/audio/inputs/internalMic/noiseGate)"
+    params:
+      value: { type: int, min: 100, max: 500, required: true, label: "Hold time", description: "Hold time in ms, 100 to 500." }
+    send: { method: PUT, path: "/api/audio/inputs/internalMic/noiseGate", body: '{"holdTime":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_mic_noise_gate_range:
+    summary: "Set the microphone noise gate: range in dB, -80 to 0 (PUT /api/audio/inputs/internalMic/noiseGate)"
+    params:
+      value: { type: int, min: -80, max: 0, required: true, label: "Range", description: "Range in dB, -80 to 0." }
+    send: { method: PUT, path: "/api/audio/inputs/internalMic/noiseGate", body: '{"range":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_inputs_noise_suppression:
+    summary: "Read the noise suppression (GET /api/audio/inputs/noiseSuppression)"
+    send: { method: GET, path: "/api/audio/inputs/noiseSuppression" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_noise_suppression:
+    summary: "Set the noise suppression: noise suppression: Low, Medium or High (PUT /api/audio/inputs/noiseSuppression)"
+    params:
+      value: { type: enum, values: ["Low", "Medium", "High"], required: true, label: "Weighting", description: "Noise suppression: Low, Medium or High." }
+    send: { method: PUT, path: "/api/audio/inputs/noiseSuppression", body: '{"weighting":{value:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_interfaces_network_dante_settings:
+    summary: "Read the Dante settings (GET /api/interfaces/network/dante/settings)"
+    send: { method: GET, path: "/api/interfaces/network/dante/settings" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_dante_continuous_dante_stream:
+    summary: "Set the Dante settings: dante streams continuously, not only in calls (PUT /api/interfaces/network/dante/settings)"
+    params:
+      value: { type: bool, required: true, label: "Continuous dante stream", description: "Dante streams continuously, not only in calls." }
+    send: { method: PUT, path: "/api/interfaces/network/dante/settings", body: '{"continuousDanteStream":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_dante_dante_speaker_output:
+    summary: "Set the Dante settings: dante feeds the speaker (PUT /api/interfaces/network/dante/settings)"
+    params:
+      value: { type: bool, required: true, label: "Dante speaker output", description: "Dante feeds the speaker." }
+    send: { method: PUT, path: "/api/interfaces/network/dante/settings", body: '{"danteSpeakerOutput":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_outputs_speaker:
+    summary: "Read the speaker (GET /api/audio/outputs/speaker)"
+    send: { method: GET, path: "/api/audio/outputs/speaker" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_speaker_volume:
+    summary: "Set the speaker: volume in percent, 0 to 100 (PUT /api/audio/outputs/speaker)"
+    params:
+      value: { type: int, min: 0, max: 100, required: true, label: "Volume", description: "Volume in percent, 0 to 100." }
+    send: { method: PUT, path: "/api/audio/outputs/speaker", body: '{"volume":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_speaker_level_limiter:
+    summary: "Set the speaker: level limiter in percent, 0 to 100 (PUT /api/audio/outputs/speaker)"
+    params:
+      value: { type: int, min: 0, max: 100, required: true, label: "Level limiter", description: "Level limiter in percent, 0 to 100." }
+    send: { method: PUT, path: "/api/audio/outputs/speaker", body: '{"levelLimiter":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_video_input_internal_camera_video_parameters:
+    summary: "Read the camera video parameters (GET /api/video/input/internalCamera/videoParameters)"
+    send: { method: GET, path: "/api/video/input/internalCamera/videoParameters" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_device_allowed_standby_mode:
+    summary: "Read the standby mode (GET /api/device/allowedStandbyMode)"
+    send: { method: GET, path: "/api/device/allowedStandbyMode" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_standby_mode:
+    summary: "Set the standby mode: standby allowed: AlwaysOn, EcoMode or LowPowerMode (PUT /api/device/allowedStandbyMode)"
+    params:
+      value: { type: enum, values: ["AlwaysOn", "EcoMode", "LowPowerMode"], required: true, label: "Mode", description: "Standby allowed: AlwaysOn, EcoMode or LowPowerMode." }
+    send: { method: PUT, path: "/api/device/allowedStandbyMode", body: '{"mode":{value:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_device_has_user_interaction:
+    summary: "Read the user interaction (GET /api/device/hasUserInteraction)"
+    send: { method: GET, path: "/api/device/hasUserInteraction" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_inputs_max_level:
+    summary: "Read the loudest input level (GET /api/audio/inputs/maxLevel)"
+    send: { method: GET, path: "/api/audio/inputs/maxLevel" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_interfaces_bluetooth:
+    summary: "Read the Bluetooth (GET /api/interfaces/bluetooth)"
+    send: { method: GET, path: "/api/interfaces/bluetooth" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_bluetooth_enabled:
+    summary: "Set the Bluetooth: bluetooth on (off also clears the pairings) (PUT /api/interfaces/bluetooth)"
+    params:
+      value: { type: bool, required: true, label: "Enabled", description: "Bluetooth on (off also clears the pairings)." }
+    send: { method: PUT, path: "/api/interfaces/bluetooth", body: '{"enabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_bluetooth_pairing:
+    summary: "Set the Bluetooth: pairing window open (3 minutes) (PUT /api/interfaces/bluetooth)"
+    params:
+      value: { type: bool, required: true, label: "Pairing", description: "Pairing window open (3 minutes)." }
+    send: { method: PUT, path: "/api/interfaces/bluetooth", body: '{"pairing":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_interfaces_bluetooth_devices_list:
+    summary: "Read the Bluetooth devices (GET /api/interfaces/bluetooth/devicesList)"
+    send: { method: GET, path: "/api/interfaces/bluetooth/devicesList" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_device_leds_ring:
+    summary: "Read the LED ring (GET /api/device/leds/ring)"
+    send: { method: GET, path: "/api/device/leds/ring" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_led_brightness:
+    summary: "Set the LED ring: brightness, 0 (off) to 5 (PUT /api/device/leds/ring)"
+    params:
+      value: { type: int, min: 0, max: 5, required: true, label: "Brightness", description: "Brightness, 0 (off) to 5." }
+    send: { method: PUT, path: "/api/device/leds/ring", body: '{"brightness":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_device_feedback:
+    summary: "Read the sound prompts (GET /api/device/feedback)"
+    send: { method: GET, path: "/api/device/feedback" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_sound_prompts:
+    summary: "Set the sound prompts: sound prompts on (PUT /api/device/feedback)"
+    params:
+      value: { type: bool, required: true, label: "Sound prompts", description: "Sound prompts on." }
+    send: { method: PUT, path: "/api/device/feedback", body: '{"soundPrompts":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_interfaces_network_wifi:
+    summary: "Read the Wi-Fi (GET /api/interfaces/network/wifi)"
+    send: { method: GET, path: "/api/interfaces/network/wifi" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_video_input_internal_camera_movement:
+    summary: "Read the camera position (GET /api/video/input/internalCamera/movement)"
+    send: { method: GET, path: "/api/video/input/internalCamera/movement" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_camera_pan:
+    summary: "Set the camera position: pan position, -25 to 25 (PUT /api/video/input/internalCamera/movement)"
+    params:
+      value: { type: int, min: -25, max: 25, required: true, label: "Pan position", description: "Pan position, -25 to 25." }
+    send: { method: PUT, path: "/api/video/input/internalCamera/movement", body: '{"panPosition":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_camera_tilt:
+    summary: "Set the camera position: tilt position, -25 to 25 (PUT /api/video/input/internalCamera/movement)"
+    params:
+      value: { type: int, min: -25, max: 25, required: true, label: "Tilt position", description: "Tilt position, -25 to 25." }
+    send: { method: PUT, path: "/api/video/input/internalCamera/movement", body: '{"tiltPosition":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_camera_zoom:
+    summary: "Set the camera position: zoom position, 100 to 500 (the most depends on the bar and the profile) (PUT /api/video/input/internalCamera/movement)"
+    params:
+      value: { type: int, min: 100, max: 500, required: true, label: "Zoom position", description: "Zoom position, 100 to 500 (the most depends on the bar and the profile)." }
+    send: { method: PUT, path: "/api/video/input/internalCamera/movement", body: '{"zoomPosition":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_camera_zoom_speed:
+    summary: "Set the camera position: zoom speed: Slow, Medium or Fast (PUT /api/video/input/internalCamera/movement)"
+    params:
+      value: { type: enum, values: ["Slow", "Medium", "Fast"], required: true, label: "Zoom speed", description: "Zoom speed: Slow, Medium or Fast." }
+    send: { method: PUT, path: "/api/video/input/internalCamera/movement", body: '{"zoomSpeed":{value:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_camera_pan_tilt_speed:
+    summary: "Set the camera position: pan and tilt speed: Slow, Medium or Fast (PUT /api/video/input/internalCamera/movement)"
+    params:
+      value: { type: enum, values: ["Slow", "Medium", "Fast"], required: true, label: "Pan tilt speed", description: "Pan and tilt speed: Slow, Medium or Fast." }
+    send: { method: PUT, path: "/api/video/input/internalCamera/movement", body: '{"panTiltSpeed":{value:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_camera_auto_framing_speed:
+    summary: "Set the camera position: auto framing speed: Slow, Medium or Fast (PUT /api/video/input/internalCamera/movement)"
+    params:
+      value: { type: enum, values: ["Slow", "Medium", "Fast"], required: true, label: "Auto framing speed", description: "Auto framing speed: Slow, Medium or Fast." }
+    send: { method: PUT, path: "/api/video/input/internalCamera/movement", body: '{"autoFramingSpeed":{value:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_video_input_internal_camera:
+    summary: "Read the camera activity (GET /api/video/input/internalCamera)"
+    send: { method: GET, path: "/api/video/input/internalCamera" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_video_output_hdmi:
+    summary: "Read the HDMI output (GET /api/video/output/hdmi)"
+    send: { method: GET, path: "/api/video/output/hdmi" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_device_profile:
+    summary: "Read the profile (GET /api/device/profile)"
+    send: { method: GET, path: "/api/device/profile" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_profile:
+    summary: "Set the profile: profile: Custom, Zoom or MicrosoftTeams (PUT /api/device/profile)"
+    params:
+      value: { type: enum, values: ["Custom", "Zoom", "MicrosoftTeams"], required: true, label: "Configuration", description: "Profile: Custom, Zoom or MicrosoftTeams." }
+    send: { method: PUT, path: "/api/device/profile", body: '{"configuration":{value:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_sound_profile:
+    summary: "Read the sound profile (GET /api/audio/soundProfile)"
+    send: { method: GET, path: "/api/audio/soundProfile" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_sound_profile:
+    summary: "Set the sound profile: placement preset: Wallmount, TableTop, AboveDisplay, UnderDisplay, FreeStanding or Custom (PUT /api/audio/soundProfile)"
+    params:
+      value: { type: enum, values: ["Wallmount", "TableTop", "AboveDisplay", "UnderDisplay", "FreeStanding", "Custom"], required: true, label: "Preset", description: "Placement preset: Wallmount, TableTop, AboveDisplay, UnderDisplay, FreeStanding or Custom." }
+    send: { method: PUT, path: "/api/audio/soundProfile", body: '{"preset":{value:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_inputs_internal_mic_priority_zones:
+    summary: "Read the priority zones (GET /api/audio/inputs/internalMic/priorityZones)"
+    send: { method: GET, path: "/api/audio/inputs/internalMic/priorityZones" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_inputs_internal_mic_priority_zones_by_id:
+    summary: "Read the priority zone (GET /api/audio/inputs/internalMic/priorityZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 0, required: true, label: "Priority number", description: "The priority zone number, 0 to 0, as the API numbers it." }
+    send: { method: GET, path: "/api/audio/inputs/internalMic/priorityZones/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_priority_zone_enabled:
+    summary: "Set the priority zone: zone enabled (PUT /api/audio/inputs/internalMic/priorityZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 0, required: true, label: "Priority number", description: "The priority zone number, 0 to 0, as the API numbers it." }
+      value: { type: bool, required: true, label: "Enabled", description: "Zone enabled." }
+    send: { method: PUT, path: "/api/audio/inputs/internalMic/priorityZones/{id}", body: '{"enabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_priority_zone_gain:
+    summary: "Set the priority zone: priority gain: Low, Medium or High (PUT /api/audio/inputs/internalMic/priorityZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 0, required: true, label: "Priority number", description: "The priority zone number, 0 to 0, as the API numbers it." }
+      value: { type: enum, values: ["Low", "Medium", "High"], required: true, label: "Gain", description: "Priority gain: Low, Medium or High." }
+    send: { method: PUT, path: "/api/audio/inputs/internalMic/priorityZones/{id}", body: '{"gain":{value:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_priority_zone_left:
+    summary: "Set the priority zone: left edge in degrees, 15 to 165 (PUT /api/audio/inputs/internalMic/priorityZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 0, required: true, label: "Priority number", description: "The priority zone number, 0 to 0, as the API numbers it." }
+      value: { type: int, min: 15, max: 165, required: true, label: "Left", description: "Left edge in degrees, 15 to 165." }
+    send: { method: PUT, path: "/api/audio/inputs/internalMic/priorityZones/{id}", body: '{"left":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_priority_zone_right:
+    summary: "Set the priority zone: right edge in degrees, 15 to 165 (PUT /api/audio/inputs/internalMic/priorityZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 0, required: true, label: "Priority number", description: "The priority zone number, 0 to 0, as the API numbers it." }
+      value: { type: int, min: 15, max: 165, required: true, label: "Right", description: "Right edge in degrees, 15 to 165." }
+    send: { method: PUT, path: "/api/audio/inputs/internalMic/priorityZones/{id}", body: '{"right":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_inputs_internal_mic_exclusion_zones:
+    summary: "Read the exclusion zones (GET /api/audio/inputs/internalMic/exclusionZones)"
+    send: { method: GET, path: "/api/audio/inputs/internalMic/exclusionZones" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_inputs_internal_mic_exclusion_zones_by_id:
+    summary: "Read the exclusion zone (GET /api/audio/inputs/internalMic/exclusionZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 2, required: true, label: "Exclusion number", description: "The exclusion zone number, 0 to 2, as the API numbers it." }
+    send: { method: GET, path: "/api/audio/inputs/internalMic/exclusionZones/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_exclusion_zone_enabled:
+    summary: "Set the exclusion zone: zone enabled (PUT /api/audio/inputs/internalMic/exclusionZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 2, required: true, label: "Exclusion number", description: "The exclusion zone number, 0 to 2, as the API numbers it." }
+      value: { type: bool, required: true, label: "Enabled", description: "Zone enabled." }
+    send: { method: PUT, path: "/api/audio/inputs/internalMic/exclusionZones/{id}", body: '{"enabled":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_exclusion_zone_left:
+    summary: "Set the exclusion zone: left edge in degrees, 15 to 165 (PUT /api/audio/inputs/internalMic/exclusionZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 2, required: true, label: "Exclusion number", description: "The exclusion zone number, 0 to 2, as the API numbers it." }
+      value: { type: int, min: 15, max: 165, required: true, label: "Left", description: "Left edge in degrees, 15 to 165." }
+    send: { method: PUT, path: "/api/audio/inputs/internalMic/exclusionZones/{id}", body: '{"left":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_exclusion_zone_right:
+    summary: "Set the exclusion zone: right edge in degrees, 15 to 165 (PUT /api/audio/inputs/internalMic/exclusionZones/{id})"
+    params:
+      id: { type: int, min: 0, max: 2, required: true, label: "Exclusion number", description: "The exclusion zone number, 0 to 2, as the API numbers it." }
+      value: { type: int, min: 15, max: 165, required: true, label: "Right", description: "Right edge in degrees, 15 to 165." }
+    send: { method: PUT, path: "/api/audio/inputs/internalMic/exclusionZones/{id}", body: '{"right":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_inputs_internal_mic_beam:
+    summary: "Read the microphone beam (GET /api/audio/inputs/internalMic/beam)"
+    send: { method: GET, path: "/api/audio/inputs/internalMic/beam" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_interfaces_network_port_configuration:
+    summary: "Read the port configuration (GET /api/interfaces/network/portConfiguration)"
+    send: { method: GET, path: "/api/interfaces/network/portConfiguration" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_inputs_mixer:
+    summary: "Read the input mixer (GET /api/audio/inputs/mixer)"
+    send: { method: GET, path: "/api/audio/inputs/mixer" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_mixer_fade:
+    summary: "Set the input mixer: fading between microphones: Slow, Medium or Fast (PUT /api/audio/inputs/mixer)"
+    params:
+      value: { type: enum, values: ["Slow", "Medium", "Fast"], required: true, label: "Fade behavior", description: "Fading between microphones: Slow, Medium or Fast." }
+    send: { method: PUT, path: "/api/audio/inputs/mixer", body: '{"fadeBehavior":{value:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_outputs_conference_output:
+    summary: "Read the conference output (GET /api/audio/outputs/conferenceOutput)"
+    send: { method: GET, path: "/api/audio/outputs/conferenceOutput" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_conference_output_far_end_gain:
+    summary: "Set the conference output: far-end gain in dB, -60 to 0 (PUT /api/audio/outputs/conferenceOutput)"
+    params:
+      value: { type: int, min: -60, max: 0, required: true, label: "Far end gain", description: "Far-end gain in dB, -60 to 0." }
+    send: { method: PUT, path: "/api/audio/outputs/conferenceOutput", body: '{"farEndGain":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_conference_output_near_end_gain:
+    summary: "Set the conference output: near-end gain in dB, -60 to 0 (PUT /api/audio/outputs/conferenceOutput)"
+    params:
+      value: { type: int, min: -60, max: 0, required: true, label: "Near end gain", description: "Near-end gain in dB, -60 to 0." }
+    send: { method: PUT, path: "/api/audio/outputs/conferenceOutput", body: '{"nearEndGain":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_inputs_internal_mic_level:
+    summary: "Read the microphone level (GET /api/audio/inputs/internalMic/level)"
+    send: { method: GET, path: "/api/audio/inputs/internalMic/level" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_inputs_bluetooth:
+    summary: "Read the Bluetooth input level (GET /api/audio/inputs/bluetooth)"
+    send: { method: GET, path: "/api/audio/inputs/bluetooth" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_inputs_usb:
+    summary: "Read the USB input level (GET /api/audio/inputs/usb)"
+    send: { method: GET, path: "/api/audio/inputs/usb" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_inputs_dante_levels:
+    summary: "Read the Dante input levels (GET /api/audio/inputs/dante/levels)"
+    send: { method: GET, path: "/api/audio/inputs/dante/levels" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_inputs_mixer_activity:
+    summary: "Read the mixer activity (GET /api/audio/inputs/mixer/activity)"
+    send: { method: GET, path: "/api/audio/inputs/mixer/activity" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_inputs_dante:
+    summary: "Read the Dante inputs (GET /api/audio/inputs/dante)"
+    send: { method: GET, path: "/api/audio/inputs/dante" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_inputs_dante_by_id:
+    summary: "Read the Dante input (GET /api/audio/inputs/dante/{id})"
+    params:
+      id: { type: int, min: 0, max: 1, required: true, label: "Dante number", description: "The Dante input number, 0 to 1, as the API numbers it." }
+    send: { method: GET, path: "/api/audio/inputs/dante/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_dante_input_gain:
+    summary: "Set the Dante input: extension microphone gain in dB, -60 to 0 (PUT /api/audio/inputs/dante/{id})"
+    params:
+      id: { type: int, min: 0, max: 1, required: true, label: "Dante number", description: "The Dante input number, 0 to 1, as the API numbers it." }
+      value: { type: int, min: -60, max: 0, required: true, label: "Gain", description: "Extension microphone gain in dB, -60 to 0." }
+    send: { method: PUT, path: "/api/audio/inputs/dante/{id}", body: '{"gain":{value}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_audio_outputs_dante:
+    summary: "Read the Dante outputs (GET /api/audio/outputs/dante)"
+    send: { method: GET, path: "/api/audio/outputs/dante" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_audio_outputs_dante_by_id:
+    summary: "Read the Dante output (GET /api/audio/outputs/dante/{id})"
+    params:
+      id: { type: int, min: 0, max: 3, required: true, label: "Dante number", description: "The Dante output number, 0 to 3, as the API numbers it." }
+    send: { method: GET, path: "/api/audio/outputs/dante/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_dante_output_name:
+    summary: "Set the Dante output: output name, up to 31 characters (PUT /api/audio/outputs/dante/{id})"
+    params:
+      id: { type: int, min: 0, max: 3, required: true, label: "Dante number", description: "The Dante output number, 0 to 3, as the API numbers it." }
+      value: { type: string, required: true, max_length: 31, label: "Name", description: "Output name, up to 31 characters." }
+    send: { method: PUT, path: "/api/audio/outputs/dante/{id}", body: '{"name":{value:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_interfaces_network_dante:
+    summary: "Read the Dante interface (GET /api/interfaces/network/dante)"
+    send: { method: GET, path: "/api/interfaces/network/dante" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  restart:
+    summary: "Restart the bar (PUT /api/device/restart)"
+    send: { method: PUT, path: /api/device/restart }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  camera_full_view:
+    summary: "Show the camera's full field of view (PUT /api/video/input/internalCamera/ffov)"
+    send: { method: PUT, path: /api/video/input/internalCamera/ffov }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  camera_store_preset:
+    summary: "Store the camera's view as its preset (PUT /api/video/input/internalCamera/preset/store)"
+    send: { method: PUT, path: /api/video/input/internalCamera/preset/store }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  camera_load_preset:
+    summary: "Recall the camera's preset view (PUT /api/video/input/internalCamera/preset/load)"
+    send: { method: PUT, path: /api/video/input/internalCamera/preset/load }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  camera_move:
+    summary: "Move or zoom the camera by steps (PUT /api/video/input/internalCamera/movement/relative); steps beyond the end are clamped"
+    params:
+      direction: { type: enum, values: [up, down, left, right, zoomIn, zoomOut], required: true, label: "Direction", description: "up, down, left, right, zoomIn or zoomOut." }
+      steps: { type: int, min: 1, max: 255, required: true, label: "Steps", description: "Steps to move, 1 to 255." }
+    send: { method: PUT, path: /api/video/input/internalCamera/movement/relative, body: '{"{direction}":{steps}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  speaker_volume_step:
+    summary: "Raise or lower the speaker volume by steps (PUT /api/audio/outputs/speaker/relative); clamped at the ends"
+    params:
+      direction: { type: enum, values: [volumeUp, volumeDown], required: true, label: "Direction", description: "volumeUp or volumeDown." }
+      steps: { type: int, min: 1, max: 255, required: true, label: "Steps", description: "Steps to change the volume by, 1 to 255." }
+    send: { method: PUT, path: /api/audio/outputs/speaker/relative, body: '{"{direction}":{steps}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_mic_eq:
+    summary: "Read the internal microphones' custom equalizer (GET /api/audio/inputs/internalMic/customEq)"
+    send: { method: GET, path: /api/audio/inputs/internalMic/customEq }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_mic_eq:
+    summary: "Set the internal microphones' custom equalizer's seven gains (PUT /api/audio/inputs/internalMic/customEq)"
+    params:
+      band1: { type: int, min: -8, max: 8, required: true, label: "125 Hz gain", description: "Gain at 125 Hz in dB, -8 to +8." }
+      band2: { type: int, min: -8, max: 8, required: true, label: "250 Hz gain", description: "Gain at 250 Hz in dB, -8 to +8." }
+      band3: { type: int, min: -8, max: 8, required: true, label: "500 Hz gain", description: "Gain at 500 Hz in dB, -8 to +8." }
+      band4: { type: int, min: -8, max: 8, required: true, label: "1000 Hz gain", description: "Gain at 1000 Hz in dB, -8 to +8." }
+      band5: { type: int, min: -8, max: 8, required: true, label: "2000 Hz gain", description: "Gain at 2000 Hz in dB, -8 to +8." }
+      band6: { type: int, min: -8, max: 8, required: true, label: "4000 Hz gain", description: "Gain at 4000 Hz in dB, -8 to +8." }
+      band7: { type: int, min: -8, max: 8, required: true, label: "8000 Hz gain", description: "Gain at 8000 Hz in dB, -8 to +8." }
+    send: { method: PUT, path: /api/audio/inputs/internalMic/customEq, body: '[{band1},{band2},{band3},{band4},{band5},{band6},{band7}]', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_speaker_eq:
+    summary: "Read the speaker's custom equalizer (GET /api/audio/outputs/speaker/customEq)"
+    send: { method: GET, path: /api/audio/outputs/speaker/customEq }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_speaker_eq:
+    summary: "Set the speaker's custom equalizer's seven gains (PUT /api/audio/outputs/speaker/customEq)"
+    params:
+      band1: { type: int, min: -8, max: 8, required: true, label: "125 Hz gain", description: "Gain at 125 Hz in dB, -8 to +8." }
+      band2: { type: int, min: -8, max: 8, required: true, label: "250 Hz gain", description: "Gain at 250 Hz in dB, -8 to +8." }
+      band3: { type: int, min: -8, max: 8, required: true, label: "500 Hz gain", description: "Gain at 500 Hz in dB, -8 to +8." }
+      band4: { type: int, min: -8, max: 8, required: true, label: "1000 Hz gain", description: "Gain at 1000 Hz in dB, -8 to +8." }
+      band5: { type: int, min: -8, max: 8, required: true, label: "2000 Hz gain", description: "Gain at 2000 Hz in dB, -8 to +8." }
+      band6: { type: int, min: -8, max: 8, required: true, label: "4000 Hz gain", description: "Gain at 4000 Hz in dB, -8 to +8." }
+      band7: { type: int, min: -8, max: 8, required: true, label: "8000 Hz gain", description: "Gain at 8000 Hz in dB, -8 to +8." }
+    send: { method: PUT, path: /api/audio/outputs/speaker/customEq, body: '[{band1},{band2},{band3},{band4},{band5},{band6},{band7}]', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_network_interface:
+    summary: "Read one network interface's settings (GET /api/interfaces/network/{name})"
+    params:
+      interface: { type: enum, values: [Port1, Port2, Port1_2, Wifi1, VlanDante], required: true, label: "Interface", description: "Port1, Port2 (Bar M), Port1_2, Wifi1 or VlanDante." }
+    send: { method: GET, path: "/api/interfaces/network/{interface}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_8021x:
+    summary: "Read an interface's 802.1X settings and status (GET /api/interfaces/network/{name}/8021x)"
+    params:
+      interface: { type: enum, values: [Port1, Port2, Port1_2, Wifi1, VlanDante], required: true, label: "Interface", description: "Port1, Port2 (Bar M), Port1_2, Wifi1 or VlanDante." }
+    send: { method: GET, path: "/api/interfaces/network/{interface}/8021x" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_8021x_enabled:
+    summary: "Turn 802.1X on or off on an interface (PUT /api/interfaces/network/{name}/8021x)"
+    params:
+      interface: { type: enum, values: [Port1, Port2, Port1_2, Wifi1, VlanDante], required: true, label: "Interface", description: "Port1, Port2 (Bar M), Port1_2, Wifi1 or VlanDante." }
+      enabled: { type: bool, required: true, label: "802.1X", description: "On authenticates the port with 802.1X, off turns it off." }
+    send: { method: PUT, path: "/api/interfaces/network/{interface}/8021x", body: '{"enabled":{enabled}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  configure_8021x_eap_tls:
+    summary: "Configure EAP-TLS 802.1X on an interface with PEM certificates and key (PUT /api/interfaces/network/{name}/8021x)"
+    params:
+      interface: { type: enum, values: [Port1, Port2, Port1_2, Wifi1, VlanDante], required: true, label: "Interface", description: "Port1, Port2 (Bar M), Port1_2, Wifi1 or VlanDante." }
+      enabled: { type: bool, required: true, label: "802.1X", description: "On turns 802.1X on with these credentials." }
+      client_certificate: { type: string, max_length: 8000, multiline: true, required: true, label: "Client certificate", description: "The client certificate in PEM, up to 8000 characters." }
+      client_private_key: { type: string, max_length: 4000, multiline: true, required: true, label: "Client private key", description: "The client's private key in PEM, up to 4000 characters." }
+      passphrase: { type: string, max_length: 256, secret: true, required: true, label: "Key passphrase", description: "The private key's passphrase, empty for none." }
+      ca_certificate: { type: string, max_length: 16000, multiline: true, required: true, label: "CA certificate", description: "The CA certificate in PEM, up to 16000 characters." }
+      identity: { type: string, max_length: 60, required: true, label: "Identity", description: "The EAP identity, up to 60 characters." }
+    send: { method: PUT, path: "/api/interfaces/network/{interface}/8021x", body: '{"enabled":{enabled},"auth":{"authType":"EapTls","clientCertificatePem":{client_certificate:json},"clientPrivatekeyPem":{client_private_key:json},"clientPrivatekeyPassphrase":{passphrase:json},"caCertificatePem":{ca_certificate:json},"identity":{identity:json}}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  configure_8021x_peap:
+    summary: "Configure PEAPv0/MSCHAPv2 802.1X on an interface (PUT /api/interfaces/network/{name}/8021x)"
+    params:
+      interface: { type: enum, values: [Port1, Port2, Port1_2, Wifi1, VlanDante], required: true, label: "Interface", description: "Port1, Port2 (Bar M), Port1_2, Wifi1 or VlanDante." }
+      enabled: { type: bool, required: true, label: "802.1X", description: "On turns 802.1X on with these credentials." }
+      username: { type: string, max_length: 256, required: true, label: "User name", description: "The PEAP user name." }
+      password: { type: string, max_length: 256, secret: true, required: true, label: "Password", description: "The PEAP password." }
+      ca_certificate: { type: string, max_length: 16000, multiline: true, required: true, label: "CA certificate", description: "The CA certificate in PEM, up to 16000 characters." }
+    send: { method: PUT, path: "/api/interfaces/network/{interface}/8021x", body: '{"enabled":{enabled},"auth":{"authType":"Peapv0MsChapv2","username":{username:json},"password":{password:json},"caCertificatePem":{ca_certificate:json}}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  clear_8021x:
+    summary: "Remove an interface's 802.1X configuration (DELETE /api/interfaces/network/{name}/8021x)"
+    params:
+      interface: { type: enum, values: [Port1, Port2, Port1_2, Wifi1, VlanDante], required: true, label: "Interface", description: "Port1, Port2 (Bar M), Port1_2, Wifi1 or VlanDante." }
+    send: { method: DELETE, path: "/api/interfaces/network/{interface}/8021x" }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  verify_8021x_file:
+    summary: "Check a PEM file before use: its type (CA certificate, client certificate or private key) and validity (PUT /api/device/8021x/verify)"
+    params:
+      pem: { type: string, max_length: 16000, multiline: true, required: true, label: "PEM file", description: "The PEM file's text, up to 16000 characters." }
+    send: { method: PUT, path: /api/device/8021x/verify, body: '{"pemFile":{pem:json}}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_8021x_certificates:
+    summary: "List the ids of the 802.1X certificates stored on the bar (GET /api/device/8021x/certificates)"
+    send: { method: GET, path: /api/device/8021x/certificates }
+    expect: { status: 200, json_path: "$.certificates" }
+    returns: value
+
+  get_8021x_certificate:
+    summary: "Read a stored 802.1X certificate in PEM (GET /api/device/8021x/certificates/{uuid})"
+    params:
+      certificate: { type: string, max_length: 36, pattern: "^[0-9a-fA-F-]{36}$", required: true, label: "Certificate", description: "The certificate's id, as get_8021x_certificates lists it." }
+    send: { method: GET, path: "/api/device/8021x/certificates/{certificate}" }
+    expect: { status: 200, json_path: "$.certificate" }
+    returns: value
+
+  get_dante_input_level:
+    summary: "Read one Dante input's level (GET /api/audio/inputs/dante/{id}/level)"
+    params:
+      id: { type: int, min: 0, max: 1, required: true, label: "Dante input", description: "Dante input, 0 or 1." }
+    send: { method: GET, path: "/api/audio/inputs/dante/{id}/level" }
+    expect: { status: 200, json_path: "$.value" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      restart reboots the bar; the 802.1X commands can cut the bar off the
+      network if the credentials are wrong; set_profile MicrosoftTeams
+      restricts the HDMI output and camera parameters. None can be undone
+      from here once the bar is unreachable.
+  - models: [all]
+    severity: info
+    text: >
+      On connecting the core opens the event stream; its open event gives the
+      session, to which every readable resource is added with one PUT (a
+      resource the bar does not have refuses the whole list). The bar sends
+      each resource's value at once and on every change. The 802.1X settings,
+      single interfaces and certificates are read on demand only. Opened for
+      commands only, no stream is opened and nothing is read.
+  - models: [all]
+    severity: info
+    text: >
+      Third-party access is off until enabled, with a password, in Sennheiser
+      Control Cockpit; the user is api. The bar's certificate is self-signed
+      and accepted as such. Each write is a PUT of the one field it changes;
+      the new value arrives on the event stream.
+  - models: [all]
+    severity: info
+    text: >
+      The API cannot write the device name, location, network addressing, the
+      Dante network, the camera's video parameters or the HDMI output (known
+      issues); they are set in Control Cockpit. The camera's zoom limit depends
+      on the bar and the profile (Bar M 500, 150 with Microsoft Teams; Bar S
+      400, 200 with Microsoft Teams, 300 custom). Port2 and the Split port
+      configuration exist on the Bar M only. Turning Bluetooth off also clears
+      its pairings. Auto framing and person tiling are mutually exclusive (409).
+
+state:
+  ssc.protocol: { type: string, description: "SSC protocol version (/api/ssc/version)" }
+  ssc.schema: { type: string, description: "Schema version (/api/ssc/version)" }
+  licenses.hash: { type: string, description: "SHA-256 of the license agreements (/api/device/licenseAgreements/hash)" }
+  device.article_number: { type: string, description: "Article number (/api/device/identity)" }
+  device.hardware_revision: { type: string, description: "Hardware revision (/api/device/identity)" }
+  device.product: { type: string, description: "Product: TCBarS or TCBarM (/api/device/identity)" }
+  device.serial: { type: string, description: "Serial number (/api/device/identity)" }
+  device.vendor: { type: string, description: "Vendor (/api/device/identity)" }
+  device.identifying: { type: bool, description: "Identifying: the LEDs flash (/api/device/identification)" }
+  device.device_name: { type: string, description: "Device name (/api/device/site)" }
+  device.dante_name: { type: string, description: "Dante name (/api/device/site)" }
+  device.location: { type: string, description: "Location (/api/device/site)" }
+  device.position: { type: string, description: "Position (/api/device/site)" }
+  device.language: { type: string, description: "Language (/api/device/site)" }
+  network.interfaces.*.type: { type: string, description: "Interface type: Ethernet, Wifi or Vlan (/api/interfaces/network)" }
+  network.interfaces.*.mac: { type: string, description: "MAC address (/api/interfaces/network)" }
+  network.interfaces.*.auto_discovery: { type: bool, description: "mDNS-SD announcement (/api/interfaces/network)" }
+  network.interfaces.*.ip_mode: { type: string, description: "IP mode (DualStack) (/api/interfaces/network)" }
+  network.interfaces.*.ipv4_method: { type: string, description: "IPv4 addressing: Fixed or Auto (/api/interfaces/network)" }
+  network.interfaces.*.ipv4_address: { type: string, description: "IPv4 address (/api/interfaces/network)" }
+  network.interfaces.*.ipv4_netmask: { type: string, description: "IPv4 netmask (/api/interfaces/network)" }
+  network.interfaces.*.ipv4_gateway: { type: string, description: "IPv4 gateway (/api/interfaces/network)" }
+  network.interfaces.*.vlan_tag: { type: int, description: "VLAN tag (/api/interfaces/network)" }
+  device.state: { type: string, description: "Device state: Normal, Identifying, BluetoothPairing, FirmwareUpdate, Standby or CriticalFailure (/api/device/state)" }
+  firmware.device_version: { type: string, description: "Firmware version (/api/firmware/update/state)" }
+  firmware.state: { type: string, description: "Update state: Updating or Idle (/api/firmware/update/state)" }
+  firmware.progress: { type: int, unit: "%", description: "Update progress, 0-100 (/api/firmware/update/state)" }
+  firmware.last_status: { type: string, description: "Last update result: None, ServerUnreachable, DownloadFailed, SignatureFailed, DowngradeProhibited or UpdateFailed (/api/firmware/update/state)" }
+  poe_output.enabled: { type: bool, description: "PoE output port powered (/api/device/power/poe/output)" }
+  camera.ai.auto_framing_access_enabled: { type: bool, description: "Auto framing offered to the remote side (/api/video/input/internalCamera/aiAccess)" }
+  camera.ai.auto_framing_enabled: { type: bool, description: "Auto framing on (/api/video/input/internalCamera/aiAccess)" }
+  camera.ai.person_tiling_access_enabled: { type: bool, description: "Person tiling offered to the remote side (/api/video/input/internalCamera/aiAccess)" }
+  camera.ai.person_tiling_enabled: { type: bool, description: "Person tiling on (/api/video/input/internalCamera/aiAccess)" }
+  mic.gain: { type: int, unit: "dB", description: "Gain in dB, -60 to 0 (/api/audio/inputs/internalMic)" }
+  mic.enabled: { type: bool, description: "Internal microphones on (/api/audio/inputs/internalMic)" }
+  mic.muted: { type: bool, description: "Internal microphones muted (/api/audio/inputs/internalMic/mute)" }
+  inputs.muted: { type: bool, description: "Internal and external microphones muted after the mixer (/api/audio/inputs/mute)" }
+  mic.noise_gate.enabled: { type: bool, description: "Noise gate on (/api/audio/inputs/internalMic/noiseGate)" }
+  mic.noise_gate.threshold: { type: int, unit: "dB", description: "Threshold in dB, -70 to -30 (/api/audio/inputs/internalMic/noiseGate)" }
+  mic.noise_gate.hold_time: { type: int, unit: "ms", description: "Hold time in ms, 100 to 500 (/api/audio/inputs/internalMic/noiseGate)" }
+  mic.noise_gate.range: { type: int, unit: "dB", description: "Range in dB, -80 to 0 (/api/audio/inputs/internalMic/noiseGate)" }
+  inputs.noise_suppression: { type: string, description: "Noise suppression: Low, Medium or High (/api/audio/inputs/noiseSuppression)" }
+  dante.continuous_dante_stream: { type: bool, description: "Dante streams continuously, not only in calls (/api/interfaces/network/dante/settings)" }
+  dante.dante_speaker_output: { type: bool, description: "Dante feeds the speaker (/api/interfaces/network/dante/settings)" }
+  speaker.volume: { type: int, unit: "%", description: "Volume in percent, 0 to 100 (/api/audio/outputs/speaker)" }
+  speaker.level_limiter: { type: int, unit: "%", description: "Level limiter in percent, 0 to 100 (/api/audio/outputs/speaker)" }
+  camera.video.lowlight_compensation_enabled: { type: bool, description: "Low-light compensation (/api/video/input/internalCamera/videoParameters)" }
+  camera.video.backlight_compensation_enabled: { type: bool, description: "Backlight compensation (/api/video/input/internalCamera/videoParameters)" }
+  camera.video.compensation: { type: string, description: "Compensation: Off, Backlight or Lowlight (/api/video/input/internalCamera/videoParameters)" }
+  camera.video.anti_flicker_frequency: { type: string, description: "Anti-flicker: Auto, 50Hz, 60Hz or Off (/api/video/input/internalCamera/videoParameters)" }
+  camera.video.brightness: { type: int, description: "Brightness, -12 to 12 (/api/video/input/internalCamera/videoParameters)" }
+  camera.video.auto_exposure_enabled: { type: bool, description: "Automatic exposure (/api/video/input/internalCamera/videoParameters)" }
+  camera.video.exposure: { type: int, description: "Exposure, -5 to 3 (/api/video/input/internalCamera/videoParameters)" }
+  camera.video.contrast: { type: int, description: "Contrast, 1 to 10 (/api/video/input/internalCamera/videoParameters)" }
+  camera.video.saturation: { type: int, description: "Saturation, 0 to 10 (/api/video/input/internalCamera/videoParameters)" }
+  camera.video.sharpness: { type: int, description: "Sharpness, 0 to 6 (/api/video/input/internalCamera/videoParameters)" }
+  camera.video.auto_whitebalance_enabled: { type: bool, description: "Automatic white balance (/api/video/input/internalCamera/videoParameters)" }
+  camera.video.whitebalance: { type: int, unit: "K", description: "White balance in K, 2800 to 6500 (/api/video/input/internalCamera/videoParameters)" }
+  camera.video.default_camera_mode: { type: string, description: "Camera mode at start: ResumeLastView, FullFieldOfView, AutoFraming, PersonTiling or UserPreset (/api/video/input/internalCamera/videoParameters)" }
+  device.standby_mode: { type: string, description: "Standby allowed: AlwaysOn, EcoMode or LowPowerMode (/api/device/allowedStandbyMode)" }
+  device.user_interaction: { type: bool, description: "Someone is using the bar (/api/device/hasUserInteraction)" }
+  levels.max_peak: { type: int, unit: "dB", description: "Loudest input's peak level, -60 to +10 dB (/api/audio/inputs/maxLevel)" }
+  bluetooth.enabled: { type: bool, description: "Bluetooth on (off also clears the pairings) (/api/interfaces/bluetooth)" }
+  bluetooth.pairing: { type: bool, description: "Pairing window open (3 minutes) (/api/interfaces/bluetooth)" }
+  bluetooth.mac: { type: string, description: "Bluetooth MAC address (/api/interfaces/bluetooth)" }
+  bluetooth.devices.*.name: { type: string, description: "Device name (/api/interfaces/bluetooth/devicesList)" }
+  bluetooth.devices.*.status: { type: string, description: "Disconnected, Connected or Active (/api/interfaces/bluetooth/devicesList)" }
+  bluetooth.devices.*.profile: { type: string, description: "Profile: A2DP or HFP (/api/interfaces/bluetooth/devicesList)" }
+  led.brightness: { type: int, description: "Brightness, 0 (off) to 5 (/api/device/leds/ring)" }
+  device.sound_prompts: { type: bool, description: "Sound prompts on (/api/device/feedback)" }
+  wifi.enabled: { type: bool, description: "Wi-Fi on (/api/interfaces/network/wifi)" }
+  wifi.state: { type: string, description: "Connected or Disconnected (/api/interfaces/network/wifi)" }
+  wifi.connection_ssid: { type: string, description: "Network name (/api/interfaces/network/wifi)" }
+  wifi.connection_security: { type: string, description: "Security: None, WEP or WPA/WPA2-Personal (/api/interfaces/network/wifi)" }
+  wifi.connection_signal: { type: int, unit: "%", description: "Signal, 0-100 (/api/interfaces/network/wifi)" }
+  wifi.connection_frequency: { type: string, description: "Band: 2.4GHz, 5GHz or 2.4GHz+5GHz (/api/interfaces/network/wifi)" }
+  wifi.connection_channel: { type: int, description: "Channel (/api/interfaces/network/wifi)" }
+  camera.pan: { type: int, description: "Pan position, -25 to 25 (/api/video/input/internalCamera/movement)" }
+  camera.tilt: { type: int, description: "Tilt position, -25 to 25 (/api/video/input/internalCamera/movement)" }
+  camera.zoom: { type: int, description: "Zoom position, 100 to 500 (the most depends on the bar and the profile) (/api/video/input/internalCamera/movement)" }
+  camera.zoom_speed: { type: string, description: "Zoom speed: Slow, Medium or Fast (/api/video/input/internalCamera/movement)" }
+  camera.pan_tilt_speed: { type: string, description: "Pan and tilt speed: Slow, Medium or Fast (/api/video/input/internalCamera/movement)" }
+  camera.auto_framing_speed: { type: string, description: "Auto framing speed: Slow, Medium or Fast (/api/video/input/internalCamera/movement)" }
+  camera.active: { type: bool, description: "Camera streaming (/api/video/input/internalCamera)" }
+  hdmi.enabled: { type: bool, description: "HDMI output on (/api/video/output/hdmi)" }
+  device.profile: { type: string, description: "Profile: Custom, Zoom or MicrosoftTeams (/api/device/profile)" }
+  speaker.sound_profile: { type: string, description: "Placement preset: Wallmount, TableTop, AboveDisplay, UnderDisplay, FreeStanding or Custom (/api/audio/soundProfile)" }
+  mic.priority_zones.*.active: { type: bool, description: "Zone in use now (/api/audio/inputs/internalMic/priorityZones/{id})" }
+  mic.priority_zones.*.enabled: { type: bool, description: "Zone enabled (/api/audio/inputs/internalMic/priorityZones/{id})" }
+  mic.priority_zones.*.gain: { type: string, description: "Priority gain: Low, Medium or High (/api/audio/inputs/internalMic/priorityZones/{id})" }
+  mic.priority_zones.*.left: { type: int, unit: "deg", description: "Left edge in degrees, 15 to 165 (/api/audio/inputs/internalMic/priorityZones/{id})" }
+  mic.priority_zones.*.right: { type: int, unit: "deg", description: "Right edge in degrees, 15 to 165 (/api/audio/inputs/internalMic/priorityZones/{id})" }
+  mic.exclusion_zones.*.active: { type: bool, description: "Zone in use now (/api/audio/inputs/internalMic/exclusionZones/{id})" }
+  mic.exclusion_zones.*.enabled: { type: bool, description: "Zone enabled (/api/audio/inputs/internalMic/exclusionZones/{id})" }
+  mic.exclusion_zones.*.left: { type: int, unit: "deg", description: "Left edge in degrees, 15 to 165 (/api/audio/inputs/internalMic/exclusionZones/{id})" }
+  mic.exclusion_zones.*.right: { type: int, unit: "deg", description: "Right edge in degrees, 15 to 165 (/api/audio/inputs/internalMic/exclusionZones/{id})" }
+  mic.beam: { type: int, unit: "deg", description: "Beam direction in degrees, 15 to 165 (/api/audio/inputs/internalMic/beam)" }
+  network.port_configuration: { type: string, description: "Ports: SingleDomain, Split (Bar M) or DualDomain (/api/interfaces/network/portConfiguration)" }
+  mixer.fade_behavior: { type: string, description: "Fading between microphones: Slow, Medium or Fast (/api/audio/inputs/mixer)" }
+  conference_output.far_end_gain: { type: int, unit: "dB", description: "Far-end gain in dB, -60 to 0 (/api/audio/outputs/conferenceOutput)" }
+  conference_output.near_end_gain: { type: int, unit: "dB", description: "Near-end gain in dB, -60 to 0 (/api/audio/outputs/conferenceOutput)" }
+  levels.mic_peak: { type: int, unit: "dB", description: "Internal microphone peak level, -60 to +10 dB (/api/audio/inputs/internalMic/level)" }
+  levels.bluetooth: { type: int, unit: "dB", description: "Bluetooth input level, -60 to +10 dB (/api/audio/inputs/bluetooth)" }
+  levels.usb: { type: int, unit: "dB", description: "USB input level, -60 to +10 dB (/api/audio/inputs/usb)" }
+  levels.dante.*.level: { type: int, unit: "dB", description: "Dante input level, -60 to +10 dB (/api/audio/inputs/dante/levels)" }
+  mixer.active_channel: { type: string, description: "Microphone the mixer favours: InternalMic, ExternalMic1 or ExternalMic2 (/api/audio/inputs/mixer/activity)" }
+  dante.inputs.*.gain: { type: int, unit: "dB", description: "Extension microphone gain in dB, -60 to 0 (/api/audio/inputs/dante/{id})" }
+  dante.outputs.*.name: { type: string, description: "Output name, up to 31 characters (/api/audio/outputs/dante/{id})" }
+  dante.enabled: { type: bool, description: "Dante interface on (/api/interfaces/network/dante)" }
+  mic_eq.*: { type: int, unit: dB, description: "Gain in dB, -8 to +8, of the internal microphones' custom equalizer, keyed by band in Hz (/api/audio/inputs/internalMic/customEq)" }
+  speaker_eq.*: { type: int, unit: dB, description: "Gain in dB, -8 to +8, of the speaker's custom equalizer, keyed by band in Hz (/api/audio/outputs/speaker/customEq)" }
+  network.interfaces.*.dot1x.enabled: { type: bool, description: "802.1X on, read by get_8021x (/api/interfaces/network/{name}/8021x)" }
+  network.interfaces.*.dot1x.status: { type: string, description: "802.1X status: Disabled, PeerCertificateValidationError, PeerCertificateTimeError, AuthenticationFailure, Authenticating or Authenticated, read by get_8021x (/api/interfaces/network/{name}/8021x)" }
+  network.interfaces.*.dot1x.auth_type: { type: string, description: "Authentication: EapTls, Peapv0MsChapv2 or Unconfigured, read by get_8021x (/api/interfaces/network/{name}/8021x)" }
+  network.interfaces.*.dot1x.identity: { type: string, description: "EAP-TLS identity, read by get_8021x (/api/interfaces/network/{name}/8021x)" }
+  network.interfaces.*.dot1x.username: { type: string, description: "PEAP user name, read by get_8021x (/api/interfaces/network/{name}/8021x)" }
+  network.interfaces.*.dot1x.client_certificate: { type: string, description: "Client certificate id, read by get_8021x (/api/interfaces/network/{name}/8021x)" }
+  network.interfaces.*.dot1x.client_certificate_not_after: { type: string, description: "Client certificate expiry (UTC), read by get_8021x (/api/interfaces/network/{name}/8021x)" }
+  network.interfaces.*.dot1x.ca_certificate: { type: string, description: "CA certificate id, read by get_8021x (/api/interfaces/network/{name}/8021x)" }
+  network.interfaces.*.dot1x.ca_certificate_not_after: { type: string, description: "CA certificate expiry (UTC), read by get_8021x (/api/interfaces/network/{name}/8021x)" }
+  session.id: { type: string, description: "The event stream's session, to which the subscriptions are added" }
+
+telemetry:
+  sse:
+    path: /api/ssc/state/subscriptions
+  poll:
+    send:
+      - { method: GET, path: /api/ssc/version }
+      - { method: GET, path: /api/device/licenseAgreements/hash }
+  updates:
+    - json_match: { "$.event": "^open$", "$.data.sessionUUID": "^([0-9A-Za-z-]+)$" }
+      state: { session.id: "{1}" }
+      then_send:
+        - { method: PUT, path: "/api/ssc/state/subscriptions/{1}", body: '["/api/device/identity","/api/device/identification","/api/device/site","/api/interfaces/network","/api/device/state","/api/firmware/update/state","/api/device/power/poe/output","/api/video/input/internalCamera/aiAccess","/api/audio/inputs/internalMic","/api/audio/inputs/internalMic/mute","/api/audio/inputs/mute","/api/audio/inputs/internalMic/noiseGate","/api/audio/inputs/noiseSuppression","/api/interfaces/network/dante/settings","/api/audio/outputs/speaker","/api/video/input/internalCamera/videoParameters","/api/device/allowedStandbyMode","/api/device/hasUserInteraction","/api/audio/inputs/maxLevel","/api/interfaces/bluetooth","/api/interfaces/bluetooth/devicesList","/api/device/leds/ring","/api/device/feedback","/api/interfaces/network/wifi","/api/video/input/internalCamera/movement","/api/video/input/internalCamera","/api/video/output/hdmi","/api/device/profile","/api/audio/soundProfile","/api/audio/inputs/internalMic/priorityZones","/api/audio/inputs/internalMic/exclusionZones","/api/audio/inputs/internalMic/beam","/api/interfaces/network/portConfiguration","/api/audio/inputs/mixer","/api/audio/outputs/conferenceOutput","/api/audio/inputs/internalMic/level","/api/audio/inputs/bluetooth","/api/audio/inputs/usb","/api/audio/inputs/dante/levels","/api/audio/inputs/mixer/activity","/api/audio/inputs/dante","/api/audio/outputs/dante","/api/interfaces/network/dante","/api/audio/inputs/internalMic/customEq","/api/audio/outputs/speaker/customEq"]', content_type: application/json }
+    - path: "^/api/ssc/version$"
+      json: { protocol: "$.protocol", schema: "$.schema" }
+      state: { "ssc.protocol": "{protocol}", "ssc.schema": "{schema}" }
+    - path: "^/api/device/licenseAgreements/hash$"
+      json: { hash: "$.value" }
+      state: { "licenses.hash": "{hash}" }
+    - path: "^/api/device/identity$"
+      json: { article_number: "$.articleNumber", hardware_revision: "$.hardwareRevision", product: "$.product", serial: "$.serial", vendor: "$.vendor" }
+      state: { "device.article_number": "{article_number}", "device.hardware_revision": "{hardware_revision}", "device.product": "{product}", "device.serial": "{serial}", "device.vendor": "{vendor}" }
+    - json_match: { "$.data./api/device/identity": '^\{' }
+      json: { article_number: "$.data./api/device/identity.articleNumber", hardware_revision: "$.data./api/device/identity.hardwareRevision", product: "$.data./api/device/identity.product", serial: "$.data./api/device/identity.serial", vendor: "$.data./api/device/identity.vendor" }
+      state: { "device.article_number": "{article_number}", "device.hardware_revision": "{hardware_revision}", "device.product": "{product}", "device.serial": "{serial}", "device.vendor": "{vendor}" }
+    - path: "^/api/device/identification$"
+      json: { identifying: "$.visual" }
+      state: { "device.identifying": "{identifying}" }
+    - json_match: { "$.data./api/device/identification": '^\{' }
+      json: { identifying: "$.data./api/device/identification.visual" }
+      state: { "device.identifying": "{identifying}" }
+    - path: "^/api/device/site$"
+      json: { device_name: "$.deviceName", dante_name: "$.danteName", location: "$.location", position: "$.position", language: "$.language" }
+      state: { "device.device_name": "{device_name}", "device.dante_name": "{dante_name}", "device.location": "{location}", "device.position": "{position}", "device.language": "{language}" }
+    - json_match: { "$.data./api/device/site": '^\{' }
+      json: { device_name: "$.data./api/device/site.deviceName", dante_name: "$.data./api/device/site.danteName", location: "$.data./api/device/site.location", position: "$.data./api/device/site.position", language: "$.data./api/device/site.language" }
+      state: { "device.device_name": "{device_name}", "device.dante_name": "{dante_name}", "device.location": "{location}", "device.position": "{position}", "device.language": "{language}" }
+    - path: "^/api/interfaces/network$"
+      json_each: "$"
+      json: { id: "$.name", type: "$.type", mac: "$.mac", auto_discovery: "$.autoDiscovery", ip_mode: "$.ipMode", ipv4_method: "$.ipv4.method", ipv4_address: "$.ipv4.address", ipv4_netmask: "$.ipv4.netmask", ipv4_gateway: "$.ipv4.gateway", vlan_tag: "$.vlanTag" }
+      state: { "network.interfaces.{id}.type": "{type}", "network.interfaces.{id}.mac": "{mac}", "network.interfaces.{id}.auto_discovery": "{auto_discovery}", "network.interfaces.{id}.ip_mode": "{ip_mode}", "network.interfaces.{id}.ipv4_method": "{ipv4_method}", "network.interfaces.{id}.ipv4_address": "{ipv4_address}", "network.interfaces.{id}.ipv4_netmask": "{ipv4_netmask}", "network.interfaces.{id}.ipv4_gateway": "{ipv4_gateway}", "network.interfaces.{id}.vlan_tag": "{vlan_tag}" }
+    - json_match: { "$.data./api/interfaces/network": '^\[' }
+      json_each: "$.data./api/interfaces/network"
+      json: { id: "$.name", type: "$.type", mac: "$.mac", auto_discovery: "$.autoDiscovery", ip_mode: "$.ipMode", ipv4_method: "$.ipv4.method", ipv4_address: "$.ipv4.address", ipv4_netmask: "$.ipv4.netmask", ipv4_gateway: "$.ipv4.gateway", vlan_tag: "$.vlanTag" }
+      state: { "network.interfaces.{id}.type": "{type}", "network.interfaces.{id}.mac": "{mac}", "network.interfaces.{id}.auto_discovery": "{auto_discovery}", "network.interfaces.{id}.ip_mode": "{ip_mode}", "network.interfaces.{id}.ipv4_method": "{ipv4_method}", "network.interfaces.{id}.ipv4_address": "{ipv4_address}", "network.interfaces.{id}.ipv4_netmask": "{ipv4_netmask}", "network.interfaces.{id}.ipv4_gateway": "{ipv4_gateway}", "network.interfaces.{id}.vlan_tag": "{vlan_tag}" }
+    - path: "^/api/device/state$"
+      json: { state: "$.state" }
+      state: { "device.state": "{state}" }
+    - json_match: { "$.data./api/device/state": '^\{' }
+      json: { state: "$.data./api/device/state.state" }
+      state: { "device.state": "{state}" }
+    - path: "^/api/firmware/update/state$"
+      json: { device_version: "$.deviceVersion", state: "$.state", progress: "$.progress", last_status: "$.lastStatus" }
+      state: { "firmware.device_version": "{device_version}", "firmware.state": "{state}", "firmware.progress": "{progress}", "firmware.last_status": "{last_status}" }
+    - json_match: { "$.data./api/firmware/update/state": '^\{' }
+      json: { device_version: "$.data./api/firmware/update/state.deviceVersion", state: "$.data./api/firmware/update/state.state", progress: "$.data./api/firmware/update/state.progress", last_status: "$.data./api/firmware/update/state.lastStatus" }
+      state: { "firmware.device_version": "{device_version}", "firmware.state": "{state}", "firmware.progress": "{progress}", "firmware.last_status": "{last_status}" }
+    - path: "^/api/device/power/poe/output$"
+      json: { enabled: "$.enabled" }
+      state: { "poe_output.enabled": "{enabled}" }
+    - json_match: { "$.data./api/device/power/poe/output": '^\{' }
+      json: { enabled: "$.data./api/device/power/poe/output.enabled" }
+      state: { "poe_output.enabled": "{enabled}" }
+    - path: "^/api/video/input/internalCamera/aiAccess$"
+      json: { auto_framing_access_enabled: "$.autoFramingAccessEnabled", auto_framing_enabled: "$.autoFramingEnabled", person_tiling_access_enabled: "$.personTilingAccessEnabled", person_tiling_enabled: "$.personTilingEnabled" }
+      state: { "camera.ai.auto_framing_access_enabled": "{auto_framing_access_enabled}", "camera.ai.auto_framing_enabled": "{auto_framing_enabled}", "camera.ai.person_tiling_access_enabled": "{person_tiling_access_enabled}", "camera.ai.person_tiling_enabled": "{person_tiling_enabled}" }
+    - json_match: { "$.data./api/video/input/internalCamera/aiAccess": '^\{' }
+      json: { auto_framing_access_enabled: "$.data./api/video/input/internalCamera/aiAccess.autoFramingAccessEnabled", auto_framing_enabled: "$.data./api/video/input/internalCamera/aiAccess.autoFramingEnabled", person_tiling_access_enabled: "$.data./api/video/input/internalCamera/aiAccess.personTilingAccessEnabled", person_tiling_enabled: "$.data./api/video/input/internalCamera/aiAccess.personTilingEnabled" }
+      state: { "camera.ai.auto_framing_access_enabled": "{auto_framing_access_enabled}", "camera.ai.auto_framing_enabled": "{auto_framing_enabled}", "camera.ai.person_tiling_access_enabled": "{person_tiling_access_enabled}", "camera.ai.person_tiling_enabled": "{person_tiling_enabled}" }
+    - path: "^/api/audio/inputs/internalMic$"
+      json: { gain: "$.gain", enabled: "$.enabled" }
+      state: { "mic.gain": "{gain}", "mic.enabled": "{enabled}" }
+    - json_match: { "$.data./api/audio/inputs/internalMic": '^\{' }
+      json: { gain: "$.data./api/audio/inputs/internalMic.gain", enabled: "$.data./api/audio/inputs/internalMic.enabled" }
+      state: { "mic.gain": "{gain}", "mic.enabled": "{enabled}" }
+    - path: "^/api/audio/inputs/internalMic/mute$"
+      json: { muted: "$.enabled" }
+      state: { "mic.muted": "{muted}" }
+    - json_match: { "$.data./api/audio/inputs/internalMic/mute": '^\{' }
+      json: { muted: "$.data./api/audio/inputs/internalMic/mute.enabled" }
+      state: { "mic.muted": "{muted}" }
+    - path: "^/api/audio/inputs/mute$"
+      json: { muted: "$.enabled" }
+      state: { "inputs.muted": "{muted}" }
+    - json_match: { "$.data./api/audio/inputs/mute": '^\{' }
+      json: { muted: "$.data./api/audio/inputs/mute.enabled" }
+      state: { "inputs.muted": "{muted}" }
+    - path: "^/api/audio/inputs/internalMic/noiseGate$"
+      json: { enabled: "$.enabled", threshold: "$.threshold", hold_time: "$.holdTime", range: "$.range" }
+      state: { "mic.noise_gate.enabled": "{enabled}", "mic.noise_gate.threshold": "{threshold}", "mic.noise_gate.hold_time": "{hold_time}", "mic.noise_gate.range": "{range}" }
+    - json_match: { "$.data./api/audio/inputs/internalMic/noiseGate": '^\{' }
+      json: { enabled: "$.data./api/audio/inputs/internalMic/noiseGate.enabled", threshold: "$.data./api/audio/inputs/internalMic/noiseGate.threshold", hold_time: "$.data./api/audio/inputs/internalMic/noiseGate.holdTime", range: "$.data./api/audio/inputs/internalMic/noiseGate.range" }
+      state: { "mic.noise_gate.enabled": "{enabled}", "mic.noise_gate.threshold": "{threshold}", "mic.noise_gate.hold_time": "{hold_time}", "mic.noise_gate.range": "{range}" }
+    - path: "^/api/audio/inputs/noiseSuppression$"
+      json: { noise_suppression: "$.weighting" }
+      state: { "inputs.noise_suppression": "{noise_suppression}" }
+    - json_match: { "$.data./api/audio/inputs/noiseSuppression": '^\{' }
+      json: { noise_suppression: "$.data./api/audio/inputs/noiseSuppression.weighting" }
+      state: { "inputs.noise_suppression": "{noise_suppression}" }
+    - path: "^/api/interfaces/network/dante/settings$"
+      json: { continuous_dante_stream: "$.continuousDanteStream", dante_speaker_output: "$.danteSpeakerOutput" }
+      state: { "dante.continuous_dante_stream": "{continuous_dante_stream}", "dante.dante_speaker_output": "{dante_speaker_output}" }
+    - json_match: { "$.data./api/interfaces/network/dante/settings": '^\{' }
+      json: { continuous_dante_stream: "$.data./api/interfaces/network/dante/settings.continuousDanteStream", dante_speaker_output: "$.data./api/interfaces/network/dante/settings.danteSpeakerOutput" }
+      state: { "dante.continuous_dante_stream": "{continuous_dante_stream}", "dante.dante_speaker_output": "{dante_speaker_output}" }
+    - path: "^/api/audio/outputs/speaker$"
+      json: { volume: "$.volume", level_limiter: "$.levelLimiter" }
+      state: { "speaker.volume": "{volume}", "speaker.level_limiter": "{level_limiter}" }
+    - json_match: { "$.data./api/audio/outputs/speaker": '^\{' }
+      json: { volume: "$.data./api/audio/outputs/speaker.volume", level_limiter: "$.data./api/audio/outputs/speaker.levelLimiter" }
+      state: { "speaker.volume": "{volume}", "speaker.level_limiter": "{level_limiter}" }
+    - path: "^/api/video/input/internalCamera/videoParameters$"
+      json: { lowlight_compensation_enabled: "$.lowlightCompensationEnabled", backlight_compensation_enabled: "$.backlightCompensationEnabled", compensation: "$.compensation", anti_flicker_frequency: "$.antiFlickerFrequency", brightness: "$.brightness", auto_exposure_enabled: "$.autoExposureEnabled", exposure: "$.exposure", contrast: "$.contrast", saturation: "$.saturation", sharpness: "$.sharpness", auto_whitebalance_enabled: "$.autoWhitebalanceEnabled", whitebalance: "$.whitebalance", default_camera_mode: "$.defaultCameraMode" }
+      state: { "camera.video.lowlight_compensation_enabled": "{lowlight_compensation_enabled}", "camera.video.backlight_compensation_enabled": "{backlight_compensation_enabled}", "camera.video.compensation": "{compensation}", "camera.video.anti_flicker_frequency": "{anti_flicker_frequency}", "camera.video.brightness": "{brightness}", "camera.video.auto_exposure_enabled": "{auto_exposure_enabled}", "camera.video.exposure": "{exposure}", "camera.video.contrast": "{contrast}", "camera.video.saturation": "{saturation}", "camera.video.sharpness": "{sharpness}", "camera.video.auto_whitebalance_enabled": "{auto_whitebalance_enabled}", "camera.video.whitebalance": "{whitebalance}", "camera.video.default_camera_mode": "{default_camera_mode}" }
+    - json_match: { "$.data./api/video/input/internalCamera/videoParameters": '^\{' }
+      json: { lowlight_compensation_enabled: "$.data./api/video/input/internalCamera/videoParameters.lowlightCompensationEnabled", backlight_compensation_enabled: "$.data./api/video/input/internalCamera/videoParameters.backlightCompensationEnabled", compensation: "$.data./api/video/input/internalCamera/videoParameters.compensation", anti_flicker_frequency: "$.data./api/video/input/internalCamera/videoParameters.antiFlickerFrequency", brightness: "$.data./api/video/input/internalCamera/videoParameters.brightness", auto_exposure_enabled: "$.data./api/video/input/internalCamera/videoParameters.autoExposureEnabled", exposure: "$.data./api/video/input/internalCamera/videoParameters.exposure", contrast: "$.data./api/video/input/internalCamera/videoParameters.contrast", saturation: "$.data./api/video/input/internalCamera/videoParameters.saturation", sharpness: "$.data./api/video/input/internalCamera/videoParameters.sharpness", auto_whitebalance_enabled: "$.data./api/video/input/internalCamera/videoParameters.autoWhitebalanceEnabled", whitebalance: "$.data./api/video/input/internalCamera/videoParameters.whitebalance", default_camera_mode: "$.data./api/video/input/internalCamera/videoParameters.defaultCameraMode" }
+      state: { "camera.video.lowlight_compensation_enabled": "{lowlight_compensation_enabled}", "camera.video.backlight_compensation_enabled": "{backlight_compensation_enabled}", "camera.video.compensation": "{compensation}", "camera.video.anti_flicker_frequency": "{anti_flicker_frequency}", "camera.video.brightness": "{brightness}", "camera.video.auto_exposure_enabled": "{auto_exposure_enabled}", "camera.video.exposure": "{exposure}", "camera.video.contrast": "{contrast}", "camera.video.saturation": "{saturation}", "camera.video.sharpness": "{sharpness}", "camera.video.auto_whitebalance_enabled": "{auto_whitebalance_enabled}", "camera.video.whitebalance": "{whitebalance}", "camera.video.default_camera_mode": "{default_camera_mode}" }
+    - path: "^/api/device/allowedStandbyMode$"
+      json: { standby_mode: "$.mode" }
+      state: { "device.standby_mode": "{standby_mode}" }
+    - json_match: { "$.data./api/device/allowedStandbyMode": '^\{' }
+      json: { standby_mode: "$.data./api/device/allowedStandbyMode.mode" }
+      state: { "device.standby_mode": "{standby_mode}" }
+    - path: "^/api/device/hasUserInteraction$"
+      json: { user_interaction: "$.interaction" }
+      state: { "device.user_interaction": "{user_interaction}" }
+    - json_match: { "$.data./api/device/hasUserInteraction": '^\{' }
+      json: { user_interaction: "$.data./api/device/hasUserInteraction.interaction" }
+      state: { "device.user_interaction": "{user_interaction}" }
+    - path: "^/api/audio/inputs/maxLevel$"
+      json: { max_peak: "$.peak" }
+      state: { "levels.max_peak": "{max_peak}" }
+    - json_match: { "$.data./api/audio/inputs/maxLevel": '^\{' }
+      json: { max_peak: "$.data./api/audio/inputs/maxLevel.peak" }
+      state: { "levels.max_peak": "{max_peak}" }
+    - path: "^/api/interfaces/bluetooth$"
+      json: { enabled: "$.enabled", pairing: "$.pairing", mac: "$.mac" }
+      state: { "bluetooth.enabled": "{enabled}", "bluetooth.pairing": "{pairing}", "bluetooth.mac": "{mac}" }
+    - json_match: { "$.data./api/interfaces/bluetooth": '^\{' }
+      json: { enabled: "$.data./api/interfaces/bluetooth.enabled", pairing: "$.data./api/interfaces/bluetooth.pairing", mac: "$.data./api/interfaces/bluetooth.mac" }
+      state: { "bluetooth.enabled": "{enabled}", "bluetooth.pairing": "{pairing}", "bluetooth.mac": "{mac}" }
+    - path: "^/api/interfaces/bluetooth/devicesList$"
+      json_each: "$"
+      json: { id: "$.mac", name: "$.name", status: "$.status", profile: "$.profile" }
+      state: { "bluetooth.devices.{id}.name": "{name}", "bluetooth.devices.{id}.status": "{status}", "bluetooth.devices.{id}.profile": "{profile}" }
+    - json_match: { "$.data./api/interfaces/bluetooth/devicesList": '^\[' }
+      json_each: "$.data./api/interfaces/bluetooth/devicesList"
+      json: { id: "$.mac", name: "$.name", status: "$.status", profile: "$.profile" }
+      state: { "bluetooth.devices.{id}.name": "{name}", "bluetooth.devices.{id}.status": "{status}", "bluetooth.devices.{id}.profile": "{profile}" }
+    - path: "^/api/device/leds/ring$"
+      json: { brightness: "$.brightness" }
+      state: { "led.brightness": "{brightness}" }
+    - json_match: { "$.data./api/device/leds/ring": '^\{' }
+      json: { brightness: "$.data./api/device/leds/ring.brightness" }
+      state: { "led.brightness": "{brightness}" }
+    - path: "^/api/device/feedback$"
+      json: { sound_prompts: "$.soundPrompts" }
+      state: { "device.sound_prompts": "{sound_prompts}" }
+    - json_match: { "$.data./api/device/feedback": '^\{' }
+      json: { sound_prompts: "$.data./api/device/feedback.soundPrompts" }
+      state: { "device.sound_prompts": "{sound_prompts}" }
+    - path: "^/api/interfaces/network/wifi$"
+      json: { enabled: "$.enabled", state: "$.state", connection_ssid: "$.connection.ssid", connection_security: "$.connection.security", connection_signal: "$.connection.signal", connection_frequency: "$.connection.frequency", connection_channel: "$.connection.channel" }
+      state: { "wifi.enabled": "{enabled}", "wifi.state": "{state}", "wifi.connection_ssid": "{connection_ssid}", "wifi.connection_security": "{connection_security}", "wifi.connection_signal": "{connection_signal}", "wifi.connection_frequency": "{connection_frequency}", "wifi.connection_channel": "{connection_channel}" }
+    - json_match: { "$.data./api/interfaces/network/wifi": '^\{' }
+      json: { enabled: "$.data./api/interfaces/network/wifi.enabled", state: "$.data./api/interfaces/network/wifi.state", connection_ssid: "$.data./api/interfaces/network/wifi.connection.ssid", connection_security: "$.data./api/interfaces/network/wifi.connection.security", connection_signal: "$.data./api/interfaces/network/wifi.connection.signal", connection_frequency: "$.data./api/interfaces/network/wifi.connection.frequency", connection_channel: "$.data./api/interfaces/network/wifi.connection.channel" }
+      state: { "wifi.enabled": "{enabled}", "wifi.state": "{state}", "wifi.connection_ssid": "{connection_ssid}", "wifi.connection_security": "{connection_security}", "wifi.connection_signal": "{connection_signal}", "wifi.connection_frequency": "{connection_frequency}", "wifi.connection_channel": "{connection_channel}" }
+    - path: "^/api/video/input/internalCamera/movement$"
+      json: { pan: "$.panPosition", tilt: "$.tiltPosition", zoom: "$.zoomPosition", zoom_speed: "$.zoomSpeed", pan_tilt_speed: "$.panTiltSpeed", auto_framing_speed: "$.autoFramingSpeed" }
+      state: { "camera.pan": "{pan}", "camera.tilt": "{tilt}", "camera.zoom": "{zoom}", "camera.zoom_speed": "{zoom_speed}", "camera.pan_tilt_speed": "{pan_tilt_speed}", "camera.auto_framing_speed": "{auto_framing_speed}" }
+    - json_match: { "$.data./api/video/input/internalCamera/movement": '^\{' }
+      json: { pan: "$.data./api/video/input/internalCamera/movement.panPosition", tilt: "$.data./api/video/input/internalCamera/movement.tiltPosition", zoom: "$.data./api/video/input/internalCamera/movement.zoomPosition", zoom_speed: "$.data./api/video/input/internalCamera/movement.zoomSpeed", pan_tilt_speed: "$.data./api/video/input/internalCamera/movement.panTiltSpeed", auto_framing_speed: "$.data./api/video/input/internalCamera/movement.autoFramingSpeed" }
+      state: { "camera.pan": "{pan}", "camera.tilt": "{tilt}", "camera.zoom": "{zoom}", "camera.zoom_speed": "{zoom_speed}", "camera.pan_tilt_speed": "{pan_tilt_speed}", "camera.auto_framing_speed": "{auto_framing_speed}" }
+    - path: "^/api/video/input/internalCamera$"
+      json: { active: "$.active" }
+      state: { "camera.active": "{active}" }
+    - json_match: { "$.data./api/video/input/internalCamera": '^\{' }
+      json: { active: "$.data./api/video/input/internalCamera.active" }
+      state: { "camera.active": "{active}" }
+    - path: "^/api/video/output/hdmi$"
+      json: { enabled: "$.enabled" }
+      state: { "hdmi.enabled": "{enabled}" }
+    - json_match: { "$.data./api/video/output/hdmi": '^\{' }
+      json: { enabled: "$.data./api/video/output/hdmi.enabled" }
+      state: { "hdmi.enabled": "{enabled}" }
+    - path: "^/api/device/profile$"
+      json: { profile: "$.configuration" }
+      state: { "device.profile": "{profile}" }
+    - json_match: { "$.data./api/device/profile": '^\{' }
+      json: { profile: "$.data./api/device/profile.configuration" }
+      state: { "device.profile": "{profile}" }
+    - path: "^/api/audio/soundProfile$"
+      json: { sound_profile: "$.preset" }
+      state: { "speaker.sound_profile": "{sound_profile}" }
+    - json_match: { "$.data./api/audio/soundProfile": '^\{' }
+      json: { sound_profile: "$.data./api/audio/soundProfile.preset" }
+      state: { "speaker.sound_profile": "{sound_profile}" }
+    - path: "^/api/audio/inputs/internalMic/priorityZones$"
+      json_each: "$"
+      json: { id: "$.id", active: "$.active", enabled: "$.enabled", gain: "$.gain", left: "$.left", right: "$.right" }
+      state: { "mic.priority_zones.{id}.active": "{active}", "mic.priority_zones.{id}.enabled": "{enabled}", "mic.priority_zones.{id}.gain": "{gain}", "mic.priority_zones.{id}.left": "{left}", "mic.priority_zones.{id}.right": "{right}" }
+    - json_match: { "$.data./api/audio/inputs/internalMic/priorityZones": '^\[' }
+      json_each: "$.data./api/audio/inputs/internalMic/priorityZones"
+      json: { id: "$.id", active: "$.active", enabled: "$.enabled", gain: "$.gain", left: "$.left", right: "$.right" }
+      state: { "mic.priority_zones.{id}.active": "{active}", "mic.priority_zones.{id}.enabled": "{enabled}", "mic.priority_zones.{id}.gain": "{gain}", "mic.priority_zones.{id}.left": "{left}", "mic.priority_zones.{id}.right": "{right}" }
+    - path: "^/api/audio/inputs/internalMic/priorityZones/([0-9]+)$"
+      json: { active: "$.active", enabled: "$.enabled", gain: "$.gain", left: "$.left", right: "$.right" }
+      state: { "mic.priority_zones.{1}.active": "{active}", "mic.priority_zones.{1}.enabled": "{enabled}", "mic.priority_zones.{1}.gain": "{gain}", "mic.priority_zones.{1}.left": "{left}", "mic.priority_zones.{1}.right": "{right}" }
+    - path: "^/api/audio/inputs/internalMic/exclusionZones$"
+      json_each: "$"
+      json: { id: "$.id", active: "$.active", enabled: "$.enabled", left: "$.left", right: "$.right" }
+      state: { "mic.exclusion_zones.{id}.active": "{active}", "mic.exclusion_zones.{id}.enabled": "{enabled}", "mic.exclusion_zones.{id}.left": "{left}", "mic.exclusion_zones.{id}.right": "{right}" }
+    - json_match: { "$.data./api/audio/inputs/internalMic/exclusionZones": '^\[' }
+      json_each: "$.data./api/audio/inputs/internalMic/exclusionZones"
+      json: { id: "$.id", active: "$.active", enabled: "$.enabled", left: "$.left", right: "$.right" }
+      state: { "mic.exclusion_zones.{id}.active": "{active}", "mic.exclusion_zones.{id}.enabled": "{enabled}", "mic.exclusion_zones.{id}.left": "{left}", "mic.exclusion_zones.{id}.right": "{right}" }
+    - path: "^/api/audio/inputs/internalMic/exclusionZones/([0-9]+)$"
+      json: { active: "$.active", enabled: "$.enabled", left: "$.left", right: "$.right" }
+      state: { "mic.exclusion_zones.{1}.active": "{active}", "mic.exclusion_zones.{1}.enabled": "{enabled}", "mic.exclusion_zones.{1}.left": "{left}", "mic.exclusion_zones.{1}.right": "{right}" }
+    - path: "^/api/audio/inputs/internalMic/beam$"
+      json: { beam: "$.position" }
+      state: { "mic.beam": "{beam}" }
+    - json_match: { "$.data./api/audio/inputs/internalMic/beam": '^\{' }
+      json: { beam: "$.data./api/audio/inputs/internalMic/beam.position" }
+      state: { "mic.beam": "{beam}" }
+    - path: "^/api/interfaces/network/portConfiguration$"
+      json: { port_configuration: "$.configuration" }
+      state: { "network.port_configuration": "{port_configuration}" }
+    - json_match: { "$.data./api/interfaces/network/portConfiguration": '^\{' }
+      json: { port_configuration: "$.data./api/interfaces/network/portConfiguration.configuration" }
+      state: { "network.port_configuration": "{port_configuration}" }
+    - path: "^/api/audio/inputs/mixer$"
+      json: { fade_behavior: "$.fadeBehavior" }
+      state: { "mixer.fade_behavior": "{fade_behavior}" }
+    - json_match: { "$.data./api/audio/inputs/mixer": '^\{' }
+      json: { fade_behavior: "$.data./api/audio/inputs/mixer.fadeBehavior" }
+      state: { "mixer.fade_behavior": "{fade_behavior}" }
+    - path: "^/api/audio/outputs/conferenceOutput$"
+      json: { far_end_gain: "$.farEndGain", near_end_gain: "$.nearEndGain" }
+      state: { "conference_output.far_end_gain": "{far_end_gain}", "conference_output.near_end_gain": "{near_end_gain}" }
+    - json_match: { "$.data./api/audio/outputs/conferenceOutput": '^\{' }
+      json: { far_end_gain: "$.data./api/audio/outputs/conferenceOutput.farEndGain", near_end_gain: "$.data./api/audio/outputs/conferenceOutput.nearEndGain" }
+      state: { "conference_output.far_end_gain": "{far_end_gain}", "conference_output.near_end_gain": "{near_end_gain}" }
+    - path: "^/api/audio/inputs/internalMic/level$"
+      json: { mic_peak: "$.peak" }
+      state: { "levels.mic_peak": "{mic_peak}" }
+    - json_match: { "$.data./api/audio/inputs/internalMic/level": '^\{' }
+      json: { mic_peak: "$.data./api/audio/inputs/internalMic/level.peak" }
+      state: { "levels.mic_peak": "{mic_peak}" }
+    - path: "^/api/audio/inputs/bluetooth$"
+      json: { bluetooth: "$.level" }
+      state: { "levels.bluetooth": "{bluetooth}" }
+    - json_match: { "$.data./api/audio/inputs/bluetooth": '^\{' }
+      json: { bluetooth: "$.data./api/audio/inputs/bluetooth.level" }
+      state: { "levels.bluetooth": "{bluetooth}" }
+    - path: "^/api/audio/inputs/usb$"
+      json: { usb: "$.level" }
+      state: { "levels.usb": "{usb}" }
+    - json_match: { "$.data./api/audio/inputs/usb": '^\{' }
+      json: { usb: "$.data./api/audio/inputs/usb.level" }
+      state: { "levels.usb": "{usb}" }
+    - path: "^/api/audio/inputs/dante/levels$"
+      json_each: "$"
+      json: { id: "$.id", level: "$.value" }
+      state: { "levels.dante.{id}.level": "{level}" }
+    - json_match: { "$.data./api/audio/inputs/dante/levels": '^\[' }
+      json_each: "$.data./api/audio/inputs/dante/levels"
+      json: { id: "$.id", level: "$.value" }
+      state: { "levels.dante.{id}.level": "{level}" }
+    - path: "^/api/audio/inputs/mixer/activity$"
+      json: { active_channel: "$.activeChannel" }
+      state: { "mixer.active_channel": "{active_channel}" }
+    - json_match: { "$.data./api/audio/inputs/mixer/activity": '^\{' }
+      json: { active_channel: "$.data./api/audio/inputs/mixer/activity.activeChannel" }
+      state: { "mixer.active_channel": "{active_channel}" }
+    - path: "^/api/audio/inputs/dante$"
+      json_each: "$"
+      json: { id: "$.id", gain: "$.gain" }
+      state: { "dante.inputs.{id}.gain": "{gain}" }
+    - json_match: { "$.data./api/audio/inputs/dante": '^\[' }
+      json_each: "$.data./api/audio/inputs/dante"
+      json: { id: "$.id", gain: "$.gain" }
+      state: { "dante.inputs.{id}.gain": "{gain}" }
+    - path: "^/api/audio/inputs/dante/([0-9]+)$"
+      json: { gain: "$.gain" }
+      state: { "dante.inputs.{1}.gain": "{gain}" }
+    - path: "^/api/audio/outputs/dante$"
+      json_each: "$"
+      json: { id: "$.id", name: "$.name" }
+      state: { "dante.outputs.{id}.name": "{name}" }
+    - json_match: { "$.data./api/audio/outputs/dante": '^\[' }
+      json_each: "$.data./api/audio/outputs/dante"
+      json: { id: "$.id", name: "$.name" }
+      state: { "dante.outputs.{id}.name": "{name}" }
+    - path: "^/api/audio/outputs/dante/([0-9]+)$"
+      json: { name: "$.name" }
+      state: { "dante.outputs.{1}.name": "{name}" }
+    - path: "^/api/interfaces/network/dante$"
+      json: { enabled: "$.enabled" }
+      state: { "dante.enabled": "{enabled}" }
+    - json_match: { "$.data./api/interfaces/network/dante": '^\{' }
+      json: { enabled: "$.data./api/interfaces/network/dante.enabled" }
+      state: { "dante.enabled": "{enabled}" }
+    - path: "^/api/audio/inputs/internalMic/customEq$"
+      json: { g0: "$[0]", g1: "$[1]", g2: "$[2]", g3: "$[3]", g4: "$[4]", g5: "$[5]", g6: "$[6]" }
+      state: { "mic_eq.125": "{g0}", "mic_eq.250": "{g1}", "mic_eq.500": "{g2}", "mic_eq.1000": "{g3}", "mic_eq.2000": "{g4}", "mic_eq.4000": "{g5}", "mic_eq.8000": "{g6}" }
+    - json_match: { "$.data./api/audio/inputs/internalMic/customEq": '^\[' }
+      json: { g0: "$.data./api/audio/inputs/internalMic/customEq[0]", g1: "$.data./api/audio/inputs/internalMic/customEq[1]", g2: "$.data./api/audio/inputs/internalMic/customEq[2]", g3: "$.data./api/audio/inputs/internalMic/customEq[3]", g4: "$.data./api/audio/inputs/internalMic/customEq[4]", g5: "$.data./api/audio/inputs/internalMic/customEq[5]", g6: "$.data./api/audio/inputs/internalMic/customEq[6]" }
+      state: { "mic_eq.125": "{g0}", "mic_eq.250": "{g1}", "mic_eq.500": "{g2}", "mic_eq.1000": "{g3}", "mic_eq.2000": "{g4}", "mic_eq.4000": "{g5}", "mic_eq.8000": "{g6}" }
+    - path: "^/api/audio/outputs/speaker/customEq$"
+      json: { g0: "$[0]", g1: "$[1]", g2: "$[2]", g3: "$[3]", g4: "$[4]", g5: "$[5]", g6: "$[6]" }
+      state: { "speaker_eq.125": "{g0}", "speaker_eq.250": "{g1}", "speaker_eq.500": "{g2}", "speaker_eq.1000": "{g3}", "speaker_eq.2000": "{g4}", "speaker_eq.4000": "{g5}", "speaker_eq.8000": "{g6}" }
+    - json_match: { "$.data./api/audio/outputs/speaker/customEq": '^\[' }
+      json: { g0: "$.data./api/audio/outputs/speaker/customEq[0]", g1: "$.data./api/audio/outputs/speaker/customEq[1]", g2: "$.data./api/audio/outputs/speaker/customEq[2]", g3: "$.data./api/audio/outputs/speaker/customEq[3]", g4: "$.data./api/audio/outputs/speaker/customEq[4]", g5: "$.data./api/audio/outputs/speaker/customEq[5]", g6: "$.data./api/audio/outputs/speaker/customEq[6]" }
+      state: { "speaker_eq.125": "{g0}", "speaker_eq.250": "{g1}", "speaker_eq.500": "{g2}", "speaker_eq.1000": "{g3}", "speaker_eq.2000": "{g4}", "speaker_eq.4000": "{g5}", "speaker_eq.8000": "{g6}" }
+    - path: "^/api/interfaces/network/(Port1|Port2|Port1_2|Wifi1|VlanDante)$"
+      json: { type: "$.type", mac: "$.mac", auto_discovery: "$.autoDiscovery", ip_mode: "$.ipMode", ipv4_method: "$.ipv4.method", ipv4_address: "$.ipv4.address", ipv4_netmask: "$.ipv4.netmask", ipv4_gateway: "$.ipv4.gateway", vlan_tag: "$.vlanTag" }
+      state: { "network.interfaces.{1}.type": "{type}", "network.interfaces.{1}.mac": "{mac}", "network.interfaces.{1}.auto_discovery": "{auto_discovery}", "network.interfaces.{1}.ip_mode": "{ip_mode}", "network.interfaces.{1}.ipv4_method": "{ipv4_method}", "network.interfaces.{1}.ipv4_address": "{ipv4_address}", "network.interfaces.{1}.ipv4_netmask": "{ipv4_netmask}", "network.interfaces.{1}.ipv4_gateway": "{ipv4_gateway}", "network.interfaces.{1}.vlan_tag": "{vlan_tag}" }
+    - path: "^/api/interfaces/network/(Port1|Port2|Port1_2|Wifi1|VlanDante)/8021x$"
+      json: { enabled: "$.enabled", status: "$.status", auth_type: "$.auth.authType", identity: "$.auth.identity", username: "$.auth.username", client_certificate: "$.auth.clientCertificatePem.certificateId", client_certificate_not_after: "$.auth.clientCertificatePem.notAfter", ca_certificate: "$.auth.caCertificatePem.certificateId", ca_certificate_not_after: "$.auth.caCertificatePem.notAfter" }
+      state: { "network.interfaces.{1}.dot1x.enabled": "{enabled}", "network.interfaces.{1}.dot1x.status": "{status}", "network.interfaces.{1}.dot1x.auth_type": "{auth_type}", "network.interfaces.{1}.dot1x.identity": "{identity}", "network.interfaces.{1}.dot1x.username": "{username}", "network.interfaces.{1}.dot1x.client_certificate": "{client_certificate}", "network.interfaces.{1}.dot1x.client_certificate_not_after": "{client_certificate_not_after}", "network.interfaces.{1}.dot1x.ca_certificate": "{ca_certificate}", "network.interfaces.{1}.dot1x.ca_certificate_not_after": "{ca_certificate_not_after}" }
+    - path: "^/api/audio/inputs/dante/([0-9]+)/level$"
+      json: { level: "$.value" }
+      state: { "levels.dante.{1}.level": "{level}" }
