@@ -64,6 +64,8 @@ mod datavideo_switcher_table;
 mod dbaudio;
 #[cfg(feature = "dhd-ecp")]
 mod dhd_ecp;
+#[cfg(feature = "digitalprojection-insight-laser")]
+mod dp_insight;
 #[cfg(feature = "softouch-easyworship")]
 mod easyworship;
 #[cfg(feature = "emberplus")]
@@ -80,6 +82,8 @@ mod ftp;
 mod generic_http;
 #[cfg(feature = "generic-midi")]
 mod generic_midi;
+#[cfg(feature = "generic-ntp")]
+mod generic_ntp;
 #[cfg(any(feature = "generic-osc", feature = "osc-listener"))]
 mod generic_osc;
 #[cfg(feature = "generic-ping")]
@@ -153,6 +157,8 @@ mod panasonic_projector_commands;
 mod pandorasbox_commands;
 #[cfg(feature = "philips-sicp")]
 mod philips_sicp;
+#[cfg(feature = "piclock")]
+mod piclock;
 #[cfg(feature = "pigpio")]
 mod pigpio;
 #[cfg(feature = "pjlink")]
@@ -219,6 +225,8 @@ mod swp08;
 mod tally_arbiter;
 #[cfg(feature = "biamp-tesira")]
 mod tesira;
+#[cfg(feature = "timemachines-clock")]
+mod timemachines;
 #[cfg(any(feature = "tsl-umd-display", feature = "tsl-umd-listener"))]
 mod tsl;
 #[cfg(feature = "blackmagic-ultimatte")]
@@ -413,6 +421,8 @@ pub(crate) fn construct(
         )?)),
         #[cfg(feature = "dhd-ecp")]
         "dhd-ecp" => Ok(Box::new(dhd_ecp::DhdEcp::new(spec, context)?)),
+        #[cfg(feature = "digitalprojection-insight-laser")]
+        "digitalprojection-insight-laser" => Ok(Box::new(dp_insight::DpInsight::new(context)?)),
         #[cfg(feature = "nec-display")]
         "nec-display" => Ok(Box::new(nec_display::NecDisplay::new(context)?)),
         #[cfg(feature = "philips-sicp")]
@@ -423,6 +433,9 @@ pub(crate) fn construct(
         "probel-swp02" => Ok(Box::new(swp02::Swp02::new(context)?)),
         #[cfg(feature = "probel-swp08")]
         "probel-swp08" => Ok(Box::new(swp08::Swp08::new(spec, context)?)),
+        // The clock connects to the core, told apart by its address.
+        #[cfg(feature = "piclock")]
+        "piclock" => Ok(Box::new(piclock::PiClock::new(context)?)),
         #[cfg(feature = "pjlink")]
         "pjlink" => Ok(Box::new(pjlink::PjLink::new(context)?)),
         #[cfg(feature = "epson-projector")]
@@ -447,6 +460,10 @@ pub(crate) fn construct(
         "generic-modbus" => Ok(Box::new(modbus::Modbus::new(context)?)),
         #[cfg(feature = "generic-mqtt")]
         "generic-mqtt" => Ok(Box::new(mqtt::Mqtt::new(context)?)),
+        #[cfg(feature = "generic-ntp")]
+        "generic-ntp" => Ok(Box::new(generic_ntp::GenericNtp::new(context)?)),
+        #[cfg(feature = "timemachines-clock")]
+        "timemachines-clock" => Ok(Box::new(timemachines::TimeMachines::new(context)?)),
         #[cfg(feature = "generic-osc")]
         "generic-osc" => Ok(Box::new(generic_osc::GenericOsc::new(context)?)),
         #[cfg(feature = "generic-tcp-udp")]
@@ -508,6 +525,8 @@ mod tests {
         };
         actions.iter().find_map(|a| match a {
             Action::TcpOpen { to, .. } | Action::UdpSend { to, .. } => Some(to.port()),
+            // A device that connects to the core: the port listened on.
+            Action::TcpListen { port, .. } => Some(*port),
             Action::TcpOpenTls { target, .. } => Some(target.to.port()),
             Action::TcpOpenSsh { tunnel, .. } => Some(tunnel.ssh.port()),
             Action::Http { request, .. } | Action::SseOpen { request, .. } => {

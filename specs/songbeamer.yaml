@@ -1,0 +1,351 @@
+spec: 1
+id: songbeamer
+name: SongBeamer (OSC remote control)
+vendor: SongBeamer
+category: playback
+
+# SongBeamer's OSC interface (5.16c and later), modelled on the Behringer X32's:
+# UDP to port 10023 once OSC is enabled in Extras > Midi / OSC Setup. A value
+# is set by sending its address with an argument, and read by sending the
+# address alone, answered on the same address; /xremote subscribes to every
+# change for 10 seconds. The document lists, as a known bug, that a change made
+# by an OSC command is not reported back, so the main values are also polled.
+source:
+  - title: "SongBeamer OSC (SongBeamer_OSC.docx, in SongBeamer-OSC.zip)"
+    author: SongBeamer (Sebastian Dellit)
+    url: https://download.songbeamer.de/SongBeamer-OSC.zip
+    note: >
+      Manufacturer document (retrieved 2026-10-28; only the document and the two .sbpas scripts were read, the
+      test application was not run). Enabling OSC in Extras > Midi / OSC Setup or by script, the default port
+      10023; the address table with types, ranges, read-only and write-only marks and the version each needs
+      (/presentation/state, page, pagecount, pages/**/caption, nextpage, prevpage, pagecaption, text,
+      copyrighttext, filename, primarylanguage, languages, message/text, message/visible, permanentblack;
+      /stage/layoutname, timerinit, message/text; /playlist/itemindex, filename, next, previous, count,
+      items/**/caption, filename, streamclass and color, changed; /video/state, position, length, filename;
+      /livevideo/state); the X32-style /info, /xinfo, /xremote, /subscribe, /renew, /unsubscribe, /node; the
+      data types (bool, enum, byte and word as ints, enums also as strings, timecode as a double with 1.0 = 24 h
+      or a string, rgbacolor); and the known bug that OSC-caused changes are not reported.
+  - title: "SongBeamer 5.16c release notes (SongBeamer forum)"
+    author: SongBeamer
+    url: https://forum.songbeamer.de/viewtopic.php?t=4277
+    note: "Manufacturer post (2022-02-22): remote control by OSC (beta), with the download above."
+
+transport:
+  type: osc-udp
+  port: 10023
+  timeout_ms: 1000
+  reply: to-source
+  probe: /info
+
+ports:
+  - { port: 10023, protocol: udp, role: control, note: "SongBeamer's OSC port, 10023 unless changed by script (IniSFS.OSC.Port)" }
+
+conversions:
+  # A timecode travels as a double where 1.0 is 24 hours.
+  day_fraction: { points: [[0.0, 0.0], [1.0, 86400.0]] }
+
+models:
+  - id: songbeamer
+    name: SongBeamer 5.16c and later (6.13a for every address)
+    supports: [set_presentation_state, go_to_page, next_page, previous_page, set_page_caption, set_primary_language,
+      set_languages, set_message_text, set_message_visible, set_permanent_black, set_stage_layout, set_stage_timer,
+      set_stage_message, select_playlist_item, next_playlist_item, previous_playlist_item, set_video_state,
+      set_video_position, set_live_video, get_page_caption, get_playlist_item_caption, get_playlist_item_filename,
+      get_playlist_item_type, get_playlist_item_color, get_info, get]
+    verification: none
+    notes: >
+      Addresses arrived over versions: /video/state in 5.18 (changed in 6.04c), /presentation/pagecaption 6.04,
+      /livevideo/state and /video/length 6.04c, /video/position and /video/filename 6.09g, languages, primary
+      language and permanent black 6.09i, the messages 6.10a, the stage addresses 6.13, playlist item types and
+      colors 6.13a.
+
+commands:
+  # ── Presentation ─────────────────────────────────────────────────────────
+  set_presentation_state:
+    summary: Show black, the background, the page or the logo (/presentation/state)
+    params:
+      state: { type: enum, values: [black, background, page, logo], required: true, label: Output, description: "What the presentation shows." }
+    send: { address: /presentation/state, args: [ { value: "{state}", type: string } ] }
+    returns: none
+  go_to_page:
+    summary: Go to a page of the current presentation (/presentation/page)
+    params:
+      page: { type: int, min: 1, max: 32767, required: true, label: Page, description: "The page, numbered from 1." }
+    send: { address: /presentation/page, args: [ { value: "{page}", type: int } ] }
+    returns: none
+  next_page:
+    summary: Go to the next page (/presentation/nextpage 1)
+    send: { address: /presentation/nextpage, args: [ { value: "1", type: int } ] }
+    returns: none
+  previous_page:
+    summary: Go to the previous page (/presentation/prevpage 1)
+    send: { address: /presentation/prevpage, args: [ { value: "1", type: int } ] }
+    returns: none
+  set_page_caption:
+    summary: Set the current page's caption, such as its verse marker (/presentation/pagecaption, 6.04)
+    params:
+      caption: { type: string, max_length: 256, required: true, label: Caption, description: "The caption, such as Vers 1." }
+    send: { address: /presentation/pagecaption, args: [ { value: "{caption}", type: string } ] }
+    returns: none
+  set_primary_language:
+    summary: Choose the language shown first (/presentation/primarylanguage, 6.09i)
+    params:
+      language: { type: int, min: 1, max: 4, required: true, label: Language, description: "The song language shown first, 1 to 4." }
+    send: { address: /presentation/primarylanguage, args: [ { value: "{language}", type: int } ] }
+    returns: none
+  set_languages:
+    summary: Choose the languages shown (/presentation/languages, 6.09i)
+    params:
+      languages: { type: string, pattern: "^[1-4]{0,4}$", default: "", label: Languages, description: "Any combination of 1, 2, 3 and 4, such as 13; empty for all." }
+    send: { address: /presentation/languages, args: [ { value: "{languages}", type: string } ] }
+    returns: none
+  set_message_text:
+    summary: Set the message to the congregation (/presentation/message/text, 6.10a)
+    params:
+      text: { type: string, max_length: 1024, required: true, label: Message, description: "The message text." }
+    send: { address: /presentation/message/text, args: [ { value: "{text}", type: string } ] }
+    returns: none
+  set_message_visible:
+    summary: Show or hide the message to the congregation (/presentation/message/visible, 6.10a)
+    params:
+      visible: &visible { type: bool, required: true, label: Visible, description: "True shows it, false hides it." }
+    send: { address: /presentation/message/visible, args: [ { value: "{visible:bool01}", type: int } ] }
+    returns: none
+  set_permanent_black:
+    summary: Hold the presentation on black, or release it (/presentation/permanentblack, 6.09i)
+    params:
+      black: { type: bool, required: true, label: Permanent black, description: "True holds the output black until released." }
+    send: { address: /presentation/permanentblack, args: [ { value: "{black:bool01}", type: int } ] }
+    returns: none
+
+  # ── Stage monitor (6.13) ────────────────────────────────────────────────
+  set_stage_layout:
+    summary: Load a stage monitor layout (/stage/layoutname)
+    params:
+      layout: { type: string, max_length: 256, required: true, label: Layout, description: "The layout's file name without extension; StageMonitor for the default layout." }
+    send: { address: /stage/layoutname, args: [ { value: "{layout}", type: string } ] }
+    returns: none
+  set_stage_timer:
+    summary: Set the stage countdown's starting value (/stage/timerinit)
+    params:
+      time: { type: string, pattern: "^([0-9]{1,2}:)?[0-9]{1,2}:[0-9]{2}$|^[+-][0-9]+$", required: true, label: Time, description: "hh:mm:ss or mm:ss, or +seconds or -seconds relative to the current value." }
+    send: { address: /stage/timerinit, args: [ { value: "{time}", type: string } ] }
+    returns: none
+  set_stage_message:
+    summary: Show a message on the stage monitor, or clear it with an empty text (/stage/message/text)
+    params:
+      text: { type: string, max_length: 1024, default: "", label: Message, description: "The text; empty clears it. The layout needs a text box for it." }
+    send: { address: /stage/message/text, args: [ { value: "{text}", type: string } ] }
+    returns: none
+
+  # ── Playlist ─────────────────────────────────────────────────────────────
+  select_playlist_item:
+    summary: Select an item of the playlist (/playlist/itemindex)
+    params:
+      index: &index { type: int, min: 0, max: 32767, required: true, label: Item, description: "The item's place in the playlist, from 0." }
+    send: { address: /playlist/itemindex, args: [ { value: "{index}", type: int } ] }
+    returns: none
+  next_playlist_item:
+    summary: Go to the next playlist item (/playlist/next 1)
+    send: { address: /playlist/next, args: [ { value: "1", type: int } ] }
+    returns: none
+  previous_playlist_item:
+    summary: Go to the previous playlist item (/playlist/previous 1)
+    send: { address: /playlist/previous, args: [ { value: "1", type: int } ] }
+    returns: none
+  get_playlist_item_caption:
+    summary: Read a playlist item's title (/playlist/items/<n>/caption); kept in state
+    params: { index: *index }
+    send: { address: "/playlist/items/{index}/caption" }
+    expect: { address: "/playlist/items/{index}/caption", arg: 0 }
+    returns: value
+  get_playlist_item_filename:
+    summary: Read a playlist item's file name (/playlist/items/<n>/filename); kept in state
+    params: { index: *index }
+    send: { address: "/playlist/items/{index}/filename" }
+    expect: { address: "/playlist/items/{index}/filename", arg: 0 }
+    returns: value
+  get_playlist_item_type:
+    summary: Read a playlist item's object type (/playlist/items/<n>/streamclass, 6.13a); kept in state
+    params: { index: *index }
+    send: { address: "/playlist/items/{index}/streamclass" }
+    expect: { address: "/playlist/items/{index}/streamclass", arg: 0 }
+    returns: value
+  get_playlist_item_color:
+    summary: Read a playlist item's color (/playlist/items/<n>/color, 6.13a)
+    params: { index: *index }
+    send: { address: "/playlist/items/{index}/color" }
+    expect: { address: "/playlist/items/{index}/color", arg: 0 }
+    returns: value
+  get_page_caption:
+    summary: Read a page's caption of the current presentation (/presentation/pages/<n>/caption); kept in state
+    params:
+      index: { type: int, min: 0, max: 32767, required: true, label: Page, description: "The page's place in the presentation, from 0." }
+    send: { address: "/presentation/pages/{index}/caption" }
+    expect: { address: "/presentation/pages/{index}/caption", arg: 0 }
+    returns: value
+
+  # ── Video ────────────────────────────────────────────────────────────────
+  set_video_state:
+    summary: Play, pause or stop the video (/video/state)
+    params:
+      state: { type: enum, values: [stop, play, pause], required: true, label: Video, description: "What the video does." }
+    send: { address: /video/state, args: [ { value: "{state}", type: string } ] }
+    returns: none
+  set_video_position:
+    summary: Move the video to a time, or by seconds (/video/position, 6.09g)
+    params:
+      position: { type: string, pattern: "^([0-9]{1,2}:)?[0-9]{1,2}:[0-9]{2}$|^[+-][0-9]+$", required: true, label: Position, description: "hh:mm:ss or mm:ss, or +seconds or -seconds from the current position." }
+    send: { address: /video/position, args: [ { value: "{position}", type: string } ] }
+    returns: none
+  set_live_video:
+    summary: Start or stop the live video (/livevideo/state, 6.04c)
+    params:
+      state: { type: enum, values: [stop, play], required: true, label: Live video, description: "Play starts the live video, stop ends it." }
+    send: { address: /livevideo/state, args: [ { value: "{state}", type: string } ] }
+    returns: none
+
+  # ── General ──────────────────────────────────────────────────────────────
+  get_info:
+    summary: Read SongBeamer's and its OSC interface's versions (/info)
+    send: { address: /info }
+    expect: { address: /info, arg: 0 }
+    returns: value
+  get:
+    summary: Read any address; the answer also updates state
+    params:
+      address: { type: string, pattern: "^[A-Za-z0-9]+(/[A-Za-z0-9]+)*$", max_length: 128, required: true, label: Address, description: "An OSC address of the document without its leading slash, such as presentation/text." }
+    send: { address: "/{address}" }
+    expect: { address: "/{address}", arg: 0 }
+    returns: value
+
+state:
+  info:                      { type: string, description: "SongBeamer's and its OSC interface's versions, as /info answers" }
+  presentation.state:        { type: string, description: "What the presentation shows: black, background, page or logo" }
+  presentation.page:         { type: int, description: "The current page, from 1" }
+  presentation.page_count:   { type: int, description: "Pages in the current presentation" }
+  presentation.page_caption: { type: string, description: "The current page's caption (verse marker or title)" }
+  presentation.text:         { type: string, description: "The (song) text shown" }
+  presentation.copyright:    { type: string, description: "The copyright text shown" }
+  presentation.filename:     { type: string, description: "The presentation's file name" }
+  presentation.primary_language: { type: int, description: "The language shown first, 1 to 4" }
+  presentation.languages:    { type: string, description: "The languages shown, a combination of 1 to 4, or \"\" for all" }
+  presentation.message.text: { type: string, description: "The message to the congregation" }
+  presentation.message.visible: { type: bool, description: "The message to the congregation is shown" }
+  presentation.permanent_black: { type: bool, description: "The presentation is held on black" }
+  pages.*.caption:           { type: string, description: "A page's caption, keyed by its place from 0, as last read" }
+  stage.layout:              { type: string, description: "The stage monitor layout" }
+  stage.message:             { type: string, description: "The stage message, \"\" for none" }
+  playlist.item:             { type: int, description: "The selected playlist item, from 0" }
+  playlist.count:            { type: int, description: "Items in the playlist" }
+  playlist.filename:         { type: string, description: "The playlist's file name" }
+  playlist.items.*.caption:  { type: string, description: "A playlist item's title, keyed by its place from 0, as last read" }
+  playlist.items.*.filename: { type: string, description: "A playlist item's file name, as last read" }
+  playlist.items.*.type:     { type: string, description: "A playlist item's object type, as last read" }
+  playlist.items.*.color:    { type: string, description: "A playlist item's color, RRGGBBAA, as last read" }
+  video.state:               { type: string, description: "The video: stop, play or pause" }
+  video.position_s:          { type: float, unit: s, description: "The video's position" }
+  video.length_s:            { type: float, unit: s, description: "The video's length" }
+  video.filename:            { type: string, description: "The video's file name" }
+  live_video:                { type: string, description: "The live video: stop or play" }
+
+telemetry:
+  # Every change for 10 s, renewed every 9; the main values are also read every
+  # 5 s, since a change made over OSC is not reported back.
+  subscribe:
+    send: ["/xremote"]
+    every_ms: 9000
+  poll:
+    - every_ms: 5000
+      send: ["/presentation/state", "/presentation/page", "/presentation/pagecount", "/presentation/pagecaption",
+             "/presentation/filename", "/playlist/itemindex", "/playlist/count", "/video/state", "/video/position",
+             "/livevideo/state", "/presentation/message/visible", "/presentation/permanentblack"]
+    - every_ms: 30000
+      send: ["/info", "/presentation/text", "/presentation/copyrighttext", "/presentation/primarylanguage",
+             "/presentation/languages", "/presentation/message/text", "/stage/layoutname", "/stage/message/text",
+             "/playlist/filename", "/video/length", "/video/filename"]
+  updates:
+    - address: "^/info$"
+      state: { info: "{arg0}" }
+    - address: "^/presentation/state$"
+      state: { presentation.state: { value: "{arg0}", map: { "0": black, "1": background, "2": page, "3": logo, black: black, background: background, page: page, logo: logo } } }
+    - address: "^/presentation/page$"
+      state: { presentation.page: "{arg0}" }
+    - address: "^/presentation/pagecount$"
+      state: { presentation.page_count: "{arg0}" }
+    - address: "^/presentation/pagecaption$"
+      state: { presentation.page_caption: "{arg0}" }
+    - address: "^/presentation/text$"
+      state: { presentation.text: "{arg0}" }
+    - address: "^/presentation/copyrighttext$"
+      state: { presentation.copyright: "{arg0}" }
+    - address: "^/presentation/filename$"
+      state: { presentation.filename: "{arg0}" }
+    - address: "^/presentation/primarylanguage$"
+      state: { presentation.primary_language: "{arg0}" }
+    - address: "^/presentation/languages$"
+      state: { presentation.languages: "{arg0}" }
+    - address: "^/presentation/message/text$"
+      state: { presentation.message.text: "{arg0}" }
+    - address: "^/presentation/message/visible$"
+      state: { presentation.message.visible: { value: "{arg0}", map: { "0": false, "1": true, "false": false, "true": true } } }
+    - address: "^/presentation/permanentblack$"
+      state: { presentation.permanent_black: { value: "{arg0}", map: { "0": false, "1": true, "false": false, "true": true } } }
+    - address: "^/presentation/pages/(\\d+)/caption$"
+      state: { "pages.{1}.caption": "{arg0}" }
+    - address: "^/stage/layoutname$"
+      state: { stage.layout: "{arg0}" }
+    - address: "^/stage/message/text$"
+      state: { stage.message: "{arg0}" }
+    - address: "^/playlist/itemindex$"
+      state: { playlist.item: "{arg0}" }
+    - address: "^/playlist/count$"
+      state: { playlist.count: "{arg0}" }
+    - address: "^/playlist/filename$"
+      state: { playlist.filename: "{arg0}" }
+    - address: "^/playlist/items/(\\d+)/caption$"
+      state: { "playlist.items.{1}.caption": "{arg0}" }
+    - address: "^/playlist/items/(\\d+)/filename$"
+      state: { "playlist.items.{1}.filename": "{arg0}" }
+    - address: "^/playlist/items/(\\d+)/streamclass$"
+      state: { "playlist.items.{1}.type": "{arg0}" }
+    - address: "^/playlist/items/(\\d+)/color$"
+      state: { "playlist.items.{1}.color": "{arg0}" }
+    # The playlist changed: its count and file name are read again; its items'
+    # old reads are dropped.
+    - address: "^/playlist/changed$"
+      replace: playlist.items
+      then_send: ["/playlist/count", "/playlist/filename", "/playlist/itemindex"]
+    - address: "^/video/state$"
+      state: { video.state: { value: "{arg0}", map: { "0": stop, "1": play, "2": pause, stop: stop, play: play, pause: pause } } }
+    - address: "^/video/position$"
+      arg_types: d
+      state: { video.position_s: "{arg0:from.day_fraction}" }
+    - address: "^/video/length$"
+      arg_types: d
+      state: { video.length_s: "{arg0:from.day_fraction}" }
+    - address: "^/video/filename$"
+      state: { video.filename: "{arg0}" }
+    - address: "^/livevideo/state$"
+      state: { live_video: { value: "{arg0}", map: { "0": stop, "1": play, stop: stop, play: play } } }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      OSC must be enabled in SongBeamer (Extras > Midi / OSC Setup, or the script IniSFS.OSC.Enabled := True),
+      and, by the document's list of known bugs, a change made through OSC is not reported back, directly or
+      indirectly: commands report unverified, and the main values are read every 5 s so state catches up.
+  - models: [all]
+    severity: info
+    text: >
+      Enums are sent as their names (the document accepts strings for enums); the order of their integer
+      values is not documented, so an integer answer is read as the order the document lists them (state:
+      black, background, page, logo; video: stop, play, pause), which is inferred. Booleans travel as 0 and 1.
+  - models: [all]
+    severity: info
+    text: >
+      The playlist's and the presentation's items are read one at a time by their place (the format cannot
+      loop over a count); /playlist/changed, sent to subscribers, clears what was read and reads the count
+      again. Page previews (/presentation/pages/**/preview) are not available over OSC/UDP, as the document
+      says.

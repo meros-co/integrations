@@ -1,0 +1,1774 @@
+spec: 1
+id: digitalprojection-dvision
+name: Digital Projection dVision 35 and dVision Scope (ASCII protocol)
+vendor: Digital Projection
+category: display
+
+# The ASCII protocol of Digital Projection's dVision 35 and dVision Scope
+# displays, the same on the LAN (TCP 1025) and on RS-232 (19200 8N1): ":" +
+# a four-character mnemonic + an optional modifier (R for a relative change,
+# ?, ?M, ?N, ?D, ?S to read) + a value, ended by CR. Every command is
+# acknowledged "%" + the projector's three-digit address + the mnemonic + a
+# six-character value, ended by CR; an error puts !0000n in the value, a
+# string "e00001" and the text. The protocol pushes nothing: state is polled
+# and follows each acknowledge.
+source:
+  - title: "Communication Protocol, dVision 35 and dVision Scope displays"
+    author: Digital Projection Ltd
+    url: https://digitalprojection.co.uk/dpdownloads/Protocol/dVision35%20and%20Scope%20External%20Control%20Protocol.pdf
+    note: >
+      Manufacturer document (retrieved 2026-10-28). LAN defaults and TCP/UDP
+      port 1025 (p.3); RS-232 19200 N 8 1, no flow control, straight 9-pin
+      cable (p.4); timing (30 s after power on, wait for each response, 2 s
+      before resending, 500 ms between commands, 5 s after 20 commands), the
+      message structure, modifiers, the acknowledge and its error codes
+      (p.5-6); examples (p.6-7); the command table (p.9-14) and value tables
+      (p.15-17).
+
+transport:
+  type: line-tcp
+  port: 1025
+  framing: terminated
+  terminator: cr
+  encoding: ascii
+  timeout_ms: 3000
+  reply: expected
+  reply_match: "^%"
+  probe: ":POST ?"
+  pacing:
+    min_interval_ms: 500
+    groups:
+      power_on:
+        match: "^:POWR ?1$"
+        after_ms: 30000
+  serial:
+    baud_rate: 19200
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
+
+ports:
+  - { port: 1025, protocol: tcp, role: control, when: "link tcp" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232, 9-pin D-sub, straight cable" }
+
+maps:
+  iabs: { "vga1": "0", "vga2": "1", "dvi1": "2", "component": "7", "hdmi1": "8", "dvi2": "10", "hdmi2": "11", "dual_head_dvi": "12", "dual_head_hdmi": "13", "dual_head_xp2": "14", "xp2_a": "15", "xp2_b": "16" }
+  sabs: { "1_1": "0", "fill_all": "1", "fill_aspect_ratio": "2", "fill_16_9": "3", "fill_4_3": "4", "fill_2_35_1": "5", "anamorphic_lens": "11" }
+  gabs: { "film_2_2": "0", "film_2_8": "1", "video_1": "2", "video_2": "3", "computer_1": "7", "computer_2": "8" }
+  bccr: { "off": "0", "computer_balanced": "1", "video_balanced": "2", "computer_native": "3", "video_native": "4" }
+  dscr: { "off": "0", "rgb": "1", "rgbcmy": "2" }
+  dcsp: { "auto": "0", "rgb": "1", "rec709": "2", "rec601": "3" }
+  dvst: { "auto": "0", "computer": "1", "video": "2" }
+  ctyp: { "disabled": "0", "auto": "1", "2_35_1": "2", "manual": "3" }
+  orie: { "desktop_front": "0", "ceiling_rear": "1", "desktop_rear": "2", "ceiling_front": "3" }
+  osdc: { "off": "0", "warnings_only": "1", "on": "2" }
+  lmod: { "single_lamp_1": "0", "single_lamp_2": "1", "dual_lamps": "2", "auto_lamp_switch": "3" }
+  trg: { "on": "1", "off": "2", "screen": "3", "aspect": "4" }
+  flot: { "auto": "0", "ttl": "1", "75_ohm": "2" }
+  baud: { "4800": "4800", "9600": "9600", "19200": "19200", "38400": "38400", "57600": "57600", "115200": "115200" }
+  tdgt: { "dlp_link": "0", "ir": "1", "ir_high_brightness": "2" }
+  lens_speed: { "slow": "1", "medium": "2", "fast": "3" }
+  tatb_target: { "4_3": "0", "5_4": "1", "16_9": "2", "16_10": "3", "no_source": "4", "standby": "5" }
+  tatb_value: { "on": "0", "off": "1", "no_change": "2" }
+  edid_input: { "vga1": "0", "vga2": "1", "dvi1": "2", "hdmi1": "3", "dvi2": "12", "hdmi2": "14" }
+  edir_value: { "auto": "0", "custom": "1", "vga": "2", "svga": "3", "xga": "4", "720p50": "5", "720p60": "6", "wxga_1366": "7", "sxga": "8", "sxga_plus": "9", "1080_deep_color": "10", "1080_standard": "11", "wuxga": "12", "wqxga": "13" }
+  edit_value: { "dvi": "1", "hdmi": "2" }
+  limit: { "maximum": "M", "minimum": "N", "default": "D", "step": "S" }
+
+models:
+  - id: dvision-35
+    name: Digital Projection dVision 35 (lamp and LED models)
+    supports: [set_power, set_source, set_brightness, set_contrast, set_saturation, picture_reset, set_picture_mute, set_scaling, set_gamma, set_brilliant_color, set_color_management, set_cm_white, set_cm_x, set_cm_y, set_cm_temperature, reset_to_d65, set_desired_coords_mode, set_desired_red_x, set_desired_red_y, set_desired_red_gain, set_desired_green_x, set_desired_green_y, set_desired_green_gain, set_desired_blue_x, set_desired_blue_y, set_desired_blue_gain, set_desired_cyan_x, set_desired_cyan_y, set_desired_cyan_gain, set_desired_magenta_x, set_desired_magenta_y, set_desired_magenta_gain, set_desired_yellow_x, set_desired_yellow_y, set_desired_yellow_gain, set_desired_white_gain, set_measured_red_x, set_measured_red_y, set_measured_red_luminance, set_measured_green_x, set_measured_green_y, set_measured_green_luminance, set_measured_blue_x, set_measured_blue_y, set_measured_blue_luminance, set_measured_white_x, set_measured_white_y, set_measured_white_luminance, set_measured_bc1_x, set_measured_bc1_y, set_measured_bc1_luminance, set_measured_bc2_x, set_measured_bc2_y, set_measured_bc2_luminance, set_factory_measured_bc2_luminance, set_cm_test_pattern, reset_color_to_native, reset_white_to_native, set_h_position, set_v_position, set_frequency, set_phase, set_color_space, set_input_level, set_crop_mode, set_crop_top, set_crop_bottom, set_orientation, set_source_scan, set_ir1, set_ir2, set_ir3, set_osd, set_test_image, set_dual_head, set_vga_sync_75_ohm, set_vga_sync_level, set_sog_sync_level, set_infitec_filter, set_infitec_csc, set_eco_mode, set_lamp1_power, set_lamp2_power, set_lamp_mode, set_lamp_switch_delay, set_led_dim_mode, set_led_dim_red, set_led_dim_green, set_led_dim_blue, set_trigger1, set_trigger2, set_framelock_external, set_framelock_input_75_ohm, set_framelock_output_regenerated, set_framelock_output_termination, factory_reset, set_factory_reset_full, set_remote_id, set_dpms, set_dpms_timeout, set_backlight_timeout, set_menu_timeout, set_background_color, set_splash, set_led_indicators_mute, set_baud_rate, set_clock_hour, set_clock_minute, set_clock_second, set_clock_day, set_clock_month, set_clock_year, set_stereo_mode, set_glass_type, set_genlock_phase_delay, set_swap_eyes, focus_in, focus_out, zoom_in, zoom_out, iris_open, iris_close, lens_shift_down, lens_shift_up, lens_shift_left, lens_shift_right, set_shutter, set_lens_monitoring, menu, menu_up, menu_down, menu_left, menu_right, menu_ok, set_echo, set_language, show_info, set_aspect_trigger, get_aspect_trigger, set_edid_resolution, get_edid_resolution, set_edid_type, get_edid_type, set_pin_code, enter_service_code, step, get, get_limit]
+    verification: none
+  - id: dvision-scope
+    name: Digital Projection dVision Scope
+    supports: [set_power, set_source, set_brightness, set_contrast, set_saturation, picture_reset, set_picture_mute, set_scaling, set_gamma, set_brilliant_color, set_color_management, set_cm_white, set_cm_x, set_cm_y, set_cm_temperature, reset_to_d65, set_desired_coords_mode, set_desired_red_x, set_desired_red_y, set_desired_red_gain, set_desired_green_x, set_desired_green_y, set_desired_green_gain, set_desired_blue_x, set_desired_blue_y, set_desired_blue_gain, set_desired_cyan_x, set_desired_cyan_y, set_desired_cyan_gain, set_desired_magenta_x, set_desired_magenta_y, set_desired_magenta_gain, set_desired_yellow_x, set_desired_yellow_y, set_desired_yellow_gain, set_desired_white_gain, set_measured_red_x, set_measured_red_y, set_measured_red_luminance, set_measured_green_x, set_measured_green_y, set_measured_green_luminance, set_measured_blue_x, set_measured_blue_y, set_measured_blue_luminance, set_measured_white_x, set_measured_white_y, set_measured_white_luminance, set_measured_bc1_x, set_measured_bc1_y, set_measured_bc1_luminance, set_measured_bc2_x, set_measured_bc2_y, set_measured_bc2_luminance, set_factory_measured_bc2_luminance, set_cm_test_pattern, reset_color_to_native, reset_white_to_native, set_h_position, set_v_position, set_frequency, set_phase, set_color_space, set_input_level, set_crop_mode, set_crop_top, set_crop_bottom, set_orientation, set_source_scan, set_ir1, set_ir2, set_ir3, set_osd, set_test_image, set_dual_head, set_vga_sync_75_ohm, set_vga_sync_level, set_sog_sync_level, set_infitec_filter, set_infitec_csc, set_eco_mode, set_lamp1_power, set_lamp2_power, set_lamp_mode, set_lamp_switch_delay, set_led_dim_mode, set_led_dim_red, set_led_dim_green, set_led_dim_blue, set_trigger1, set_trigger2, set_framelock_external, set_framelock_input_75_ohm, set_framelock_output_regenerated, set_framelock_output_termination, factory_reset, set_factory_reset_full, set_remote_id, set_dpms, set_dpms_timeout, set_backlight_timeout, set_menu_timeout, set_background_color, set_splash, set_led_indicators_mute, set_baud_rate, set_clock_hour, set_clock_minute, set_clock_second, set_clock_day, set_clock_month, set_clock_year, set_stereo_mode, set_glass_type, set_genlock_phase_delay, set_swap_eyes, focus_in, focus_out, zoom_in, zoom_out, iris_open, iris_close, lens_shift_down, lens_shift_up, lens_shift_left, lens_shift_right, set_shutter, set_lens_monitoring, menu, menu_up, menu_down, menu_left, menu_right, menu_ok, set_echo, set_language, show_info, set_aspect_trigger, get_aspect_trigger, set_edid_resolution, get_edid_resolution, set_edid_type, get_edid_type, set_pin_code, enter_service_code, step, get, get_limit]
+    verification: none
+
+commands:
+  set_power:
+    summary: "Set power (POWR)"
+    params:
+      value: { type: bool, required: true, label: "Power", description: "1 to power on, 0 to power off (standby)." }
+    send: ":POWR {value:bool01}"
+    expect: { matches: "^%\\d{3} ?POWR " }
+    returns: ack
+  set_source:
+    summary: "Set source (IABS)"
+    params:
+      value: { type: enum, values: ["vga1", "vga2", "dvi1", "component", "hdmi1", "dvi2", "hdmi2", "dual_head_dvi", "dual_head_hdmi", "dual_head_xp2", "xp2_a", "xp2_b"], required: true, label: "Source", description: "Source, as the projector names it." }
+    send: ":IABS {value:map.iabs}"
+    expect: { matches: "^%\\d{3} ?IABS " }
+    returns: ack
+  set_brightness:
+    summary: "Set brightness (BRIG)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Brightness", description: "Picture brightness." }
+    send: ":BRIG {value}"
+    expect: { matches: "^%\\d{3} ?BRIG " }
+    returns: ack
+  set_contrast:
+    summary: "Set contrast (CNTR)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Contrast", description: "Picture contrast." }
+    send: ":CNTR {value}"
+    expect: { matches: "^%\\d{3} ?CNTR " }
+    returns: ack
+  set_saturation:
+    summary: "Set saturation (CSAT)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Saturation", description: "Color saturation." }
+    send: ":CSAT {value}"
+    expect: { matches: "^%\\d{3} ?CSAT " }
+    returns: ack
+  picture_reset:
+    summary: "Reset the picture settings (PRST)"
+    send: ":PRST"
+    expect: { matches: "^%\\d{3} ?PRST " }
+    returns: ack
+  set_picture_mute:
+    summary: "Set picture mute (PMUT)"
+    params:
+      value: { type: bool, required: true, label: "Picture mute", description: "True blanks the picture." }
+    send: ":PMUT {value:bool01}"
+    expect: { matches: "^%\\d{3} ?PMUT " }
+    returns: ack
+  set_scaling:
+    summary: "Set scaling (SABS)"
+    params:
+      value: { type: enum, values: ["1_1", "fill_all", "fill_aspect_ratio", "fill_16_9", "fill_4_3", "fill_2_35_1", "anamorphic_lens"], required: true, label: "Scaling", description: "Scaling, as the projector names it." }
+    send: ":SABS {value:map.sabs}"
+    expect: { matches: "^%\\d{3} ?SABS " }
+    returns: ack
+  set_gamma:
+    summary: "Set gamma (GABS)"
+    params:
+      value: { type: enum, values: ["film_2_2", "film_2_8", "video_1", "video_2", "computer_1", "computer_2"], required: true, label: "Gamma", description: "Gamma, as the projector names it." }
+    send: ":GABS {value:map.gabs}"
+    expect: { matches: "^%\\d{3} ?GABS " }
+    returns: ack
+  set_brilliant_color:
+    summary: "Set brilliantColor (BCCR)"
+    params:
+      value: { type: enum, values: ["off", "computer_balanced", "video_balanced", "computer_native", "video_native"], required: true, label: "BrilliantColor", description: "BrilliantColor, as the projector names it." }
+    send: ":BCCR {value:map.bccr}"
+    expect: { matches: "^%\\d{3} ?BCCR " }
+    returns: ack
+  set_color_management:
+    summary: "Set color management (CMOD)"
+    params:
+      value: { type: bool, required: true, label: "Color management", description: "True turns color management on." }
+    send: ":CMOD {value:bool01}"
+    expect: { matches: "^%\\d{3} ?CMOD " }
+    returns: ack
+  set_cm_white:
+    summary: "Set color management white (CMWH)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Color management white", description: "Color management white point setting." }
+    send: ":CMWH {value}"
+    expect: { matches: "^%\\d{3} ?CMWH " }
+    returns: ack
+  set_cm_x:
+    summary: "Set color management X coordinate (CMXV)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Color management X coordinate", description: "Color management white X coordinate." }
+    send: ":CMXV {value}"
+    expect: { matches: "^%\\d{3} ?CMXV " }
+    returns: ack
+  set_cm_y:
+    summary: "Set color management Y coordinate (CMYV)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Color management Y coordinate", description: "Color management white Y coordinate." }
+    send: ":CMYV {value}"
+    expect: { matches: "^%\\d{3} ?CMYV " }
+    returns: ack
+  set_cm_temperature:
+    summary: "Set color management temperature (CMTV)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Color management temperature", description: "Color temperature in kelvin, 3200 to 9300." }
+    send: ":CMTV {value}"
+    expect: { matches: "^%\\d{3} ?CMTV " }
+    returns: ack
+  reset_to_d65:
+    summary: "Reset the color management white point to D65 (RD65)"
+    send: ":RD65"
+    expect: { matches: "^%\\d{3} ?RD65 " }
+    returns: ack
+  set_desired_coords_mode:
+    summary: "Set desired coordinates mode (DSCR)"
+    params:
+      value: { type: enum, values: ["off", "rgb", "rgbcmy"], required: true, label: "Desired coordinates mode", description: "Desired coordinates mode, as the projector names it." }
+    send: ":DSCR {value:map.dscr}"
+    expect: { matches: "^%\\d{3} ?DSCR " }
+    returns: ack
+  set_desired_red_x:
+    summary: "Set desired red X (DSRX)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired red X", description: "Desired red X for color management." }
+    send: ":DSRX {value}"
+    expect: { matches: "^%\\d{3} ?DSRX " }
+    returns: ack
+  set_desired_red_y:
+    summary: "Set desired red Y (DSRY)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired red Y", description: "Desired red Y for color management." }
+    send: ":DSRY {value}"
+    expect: { matches: "^%\\d{3} ?DSRY " }
+    returns: ack
+  set_desired_red_gain:
+    summary: "Set desired red gain (DSRG)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired red gain", description: "Desired red gain for color management." }
+    send: ":DSRG {value}"
+    expect: { matches: "^%\\d{3} ?DSRG " }
+    returns: ack
+  set_desired_green_x:
+    summary: "Set desired green X (DSGX)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired green X", description: "Desired green X for color management." }
+    send: ":DSGX {value}"
+    expect: { matches: "^%\\d{3} ?DSGX " }
+    returns: ack
+  set_desired_green_y:
+    summary: "Set desired green Y (DSGY)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired green Y", description: "Desired green Y for color management." }
+    send: ":DSGY {value}"
+    expect: { matches: "^%\\d{3} ?DSGY " }
+    returns: ack
+  set_desired_green_gain:
+    summary: "Set desired green gain (DSGG)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired green gain", description: "Desired green gain for color management." }
+    send: ":DSGG {value}"
+    expect: { matches: "^%\\d{3} ?DSGG " }
+    returns: ack
+  set_desired_blue_x:
+    summary: "Set desired blue X (DSBX)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired blue X", description: "Desired blue X for color management." }
+    send: ":DSBX {value}"
+    expect: { matches: "^%\\d{3} ?DSBX " }
+    returns: ack
+  set_desired_blue_y:
+    summary: "Set desired blue Y (DSBY)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired blue Y", description: "Desired blue Y for color management." }
+    send: ":DSBY {value}"
+    expect: { matches: "^%\\d{3} ?DSBY " }
+    returns: ack
+  set_desired_blue_gain:
+    summary: "Set desired blue gain (DSBG)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired blue gain", description: "Desired blue gain for color management." }
+    send: ":DSBG {value}"
+    expect: { matches: "^%\\d{3} ?DSBG " }
+    returns: ack
+  set_desired_cyan_x:
+    summary: "Set desired cyan X (DSCX)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired cyan X", description: "Desired cyan X for color management." }
+    send: ":DSCX {value}"
+    expect: { matches: "^%\\d{3} ?DSCX " }
+    returns: ack
+  set_desired_cyan_y:
+    summary: "Set desired cyan Y (DSCY)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired cyan Y", description: "Desired cyan Y for color management." }
+    send: ":DSCY {value}"
+    expect: { matches: "^%\\d{3} ?DSCY " }
+    returns: ack
+  set_desired_cyan_gain:
+    summary: "Set desired cyan gain (DSCG)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired cyan gain", description: "Desired cyan gain for color management." }
+    send: ":DSCG {value}"
+    expect: { matches: "^%\\d{3} ?DSCG " }
+    returns: ack
+  set_desired_magenta_x:
+    summary: "Set desired magenta X (DSMX)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired magenta X", description: "Desired magenta X for color management." }
+    send: ":DSMX {value}"
+    expect: { matches: "^%\\d{3} ?DSMX " }
+    returns: ack
+  set_desired_magenta_y:
+    summary: "Set desired magenta Y (DSMY)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired magenta Y", description: "Desired magenta Y for color management." }
+    send: ":DSMY {value}"
+    expect: { matches: "^%\\d{3} ?DSMY " }
+    returns: ack
+  set_desired_magenta_gain:
+    summary: "Set desired magenta gain (DSMG)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired magenta gain", description: "Desired magenta gain for color management." }
+    send: ":DSMG {value}"
+    expect: { matches: "^%\\d{3} ?DSMG " }
+    returns: ack
+  set_desired_yellow_x:
+    summary: "Set desired yellow X (DSYX)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired yellow X", description: "Desired yellow X for color management." }
+    send: ":DSYX {value}"
+    expect: { matches: "^%\\d{3} ?DSYX " }
+    returns: ack
+  set_desired_yellow_y:
+    summary: "Set desired yellow Y (DSYY)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired yellow Y", description: "Desired yellow Y for color management." }
+    send: ":DSYY {value}"
+    expect: { matches: "^%\\d{3} ?DSYY " }
+    returns: ack
+  set_desired_yellow_gain:
+    summary: "Set desired yellow gain (DSYG)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired yellow gain", description: "Desired yellow gain for color management." }
+    send: ":DSYG {value}"
+    expect: { matches: "^%\\d{3} ?DSYG " }
+    returns: ack
+  set_desired_white_gain:
+    summary: "Set desired white gain (DSWG)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Desired white gain", description: "Desired white gain for color management." }
+    send: ":DSWG {value}"
+    expect: { matches: "^%\\d{3} ?DSWG " }
+    returns: ack
+  set_measured_red_x:
+    summary: "Set measured red X (MSRX)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Measured red X", description: "Measured red X entered for color management." }
+    send: ":MSRX {value}"
+    expect: { matches: "^%\\d{3} ?MSRX " }
+    returns: ack
+  set_measured_red_y:
+    summary: "Set measured red Y (MSRY)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Measured red Y", description: "Measured red Y entered for color management." }
+    send: ":MSRY {value}"
+    expect: { matches: "^%\\d{3} ?MSRY " }
+    returns: ack
+  set_measured_red_luminance:
+    summary: "Set measured red luminance (MSRL)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Measured red luminance", description: "Measured red luminance entered for color management." }
+    send: ":MSRL {value}"
+    expect: { matches: "^%\\d{3} ?MSRL " }
+    returns: ack
+  set_measured_green_x:
+    summary: "Set measured green X (MSGX)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Measured green X", description: "Measured green X entered for color management." }
+    send: ":MSGX {value}"
+    expect: { matches: "^%\\d{3} ?MSGX " }
+    returns: ack
+  set_measured_green_y:
+    summary: "Set measured green Y (MSGY)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Measured green Y", description: "Measured green Y entered for color management." }
+    send: ":MSGY {value}"
+    expect: { matches: "^%\\d{3} ?MSGY " }
+    returns: ack
+  set_measured_green_luminance:
+    summary: "Set measured green luminance (MSGL)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Measured green luminance", description: "Measured green luminance entered for color management." }
+    send: ":MSGL {value}"
+    expect: { matches: "^%\\d{3} ?MSGL " }
+    returns: ack
+  set_measured_blue_x:
+    summary: "Set measured blue X (MSBX)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Measured blue X", description: "Measured blue X entered for color management." }
+    send: ":MSBX {value}"
+    expect: { matches: "^%\\d{3} ?MSBX " }
+    returns: ack
+  set_measured_blue_y:
+    summary: "Set measured blue Y (MSBY)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Measured blue Y", description: "Measured blue Y entered for color management." }
+    send: ":MSBY {value}"
+    expect: { matches: "^%\\d{3} ?MSBY " }
+    returns: ack
+  set_measured_blue_luminance:
+    summary: "Set measured blue luminance (MSBL)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Measured blue luminance", description: "Measured blue luminance entered for color management." }
+    send: ":MSBL {value}"
+    expect: { matches: "^%\\d{3} ?MSBL " }
+    returns: ack
+  set_measured_white_x:
+    summary: "Set measured white X (MSWX)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Measured white X", description: "Measured white X entered for color management." }
+    send: ":MSWX {value}"
+    expect: { matches: "^%\\d{3} ?MSWX " }
+    returns: ack
+  set_measured_white_y:
+    summary: "Set measured white Y (MSWY)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Measured white Y", description: "Measured white Y entered for color management." }
+    send: ":MSWY {value}"
+    expect: { matches: "^%\\d{3} ?MSWY " }
+    returns: ack
+  set_measured_white_luminance:
+    summary: "Set measured white luminance (MSWL)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Measured white luminance", description: "Measured white luminance entered for color management." }
+    send: ":MSWL {value}"
+    expect: { matches: "^%\\d{3} ?MSWL " }
+    returns: ack
+  set_measured_bc1_x:
+    summary: "Set measured bc1 X (MSDX)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Measured bc1 X", description: "Measured bc1 X entered for color management." }
+    send: ":MSDX {value}"
+    expect: { matches: "^%\\d{3} ?MSDX " }
+    returns: ack
+  set_measured_bc1_y:
+    summary: "Set measured bc1 Y (MSDY)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Measured bc1 Y", description: "Measured bc1 Y entered for color management." }
+    send: ":MSDY {value}"
+    expect: { matches: "^%\\d{3} ?MSDY " }
+    returns: ack
+  set_measured_bc1_luminance:
+    summary: "Set measured bc1 luminance (MSDL)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Measured bc1 luminance", description: "Measured bc1 luminance entered for color management." }
+    send: ":MSDL {value}"
+    expect: { matches: "^%\\d{3} ?MSDL " }
+    returns: ack
+  set_measured_bc2_x:
+    summary: "Set measured bc2 X (MSEX)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Measured bc2 X", description: "Measured bc2 X entered for color management." }
+    send: ":MSEX {value}"
+    expect: { matches: "^%\\d{3} ?MSEX " }
+    returns: ack
+  set_measured_bc2_y:
+    summary: "Set measured bc2 Y (MSEY)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Measured bc2 Y", description: "Measured bc2 Y entered for color management." }
+    send: ":MSEY {value}"
+    expect: { matches: "^%\\d{3} ?MSEY " }
+    returns: ack
+  set_measured_bc2_luminance:
+    summary: "Set measured bc2 luminance (MSEL)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Measured bc2 luminance", description: "Measured bc2 luminance entered for color management." }
+    send: ":MSEL {value}"
+    expect: { matches: "^%\\d{3} ?MSEL " }
+    returns: ack
+  set_factory_measured_bc2_luminance:
+    summary: "Set factory measured BC2 luminance (MFEL)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Factory measured BC2 luminance", description: "Factory measured BC2 luminance." }
+    send: ":MFEL {value}"
+    expect: { matches: "^%\\d{3} ?MFEL " }
+    returns: ack
+  set_cm_test_pattern:
+    summary: "Set color management test pattern (CMTP)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Color management test pattern", description: "Color management test pattern number." }
+    send: ":CMTP {value}"
+    expect: { matches: "^%\\d{3} ?CMTP " }
+    returns: ack
+  reset_color_to_native:
+    summary: "Reset color management to native (RCMN)"
+    send: ":RCMN"
+    expect: { matches: "^%\\d{3} ?RCMN " }
+    returns: ack
+  reset_white_to_native:
+    summary: "Reset the color management white to native (RWHN)"
+    send: ":RWHN"
+    expect: { matches: "^%\\d{3} ?RWHN " }
+    returns: ack
+  set_h_position:
+    summary: "Set horizontal position (HPOS)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Horizontal position", description: "Horizontal position, for analog sources only." }
+    send: ":HPOS {value}"
+    expect: { matches: "^%\\d{3} ?HPOS " }
+    returns: ack
+  set_v_position:
+    summary: "Set vertical position (VPOS)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Vertical position", description: "Vertical position, for analog sources only." }
+    send: ":VPOS {value}"
+    expect: { matches: "^%\\d{3} ?VPOS " }
+    returns: ack
+  set_frequency:
+    summary: "Set frequency (FREQ)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Frequency", description: "Sampling frequency, for analog sources only." }
+    send: ":FREQ {value}"
+    expect: { matches: "^%\\d{3} ?FREQ " }
+    returns: ack
+  set_phase:
+    summary: "Set phase (PHSE)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Phase", description: "Sampling phase, for analog sources only." }
+    send: ":PHSE {value}"
+    expect: { matches: "^%\\d{3} ?PHSE " }
+    returns: ack
+  set_color_space:
+    summary: "Set color space (DCSP)"
+    params:
+      value: { type: enum, values: ["auto", "rgb", "rec709", "rec601"], required: true, label: "Color space", description: "Color space, as the projector names it." }
+    send: ":DCSP {value:map.dcsp}"
+    expect: { matches: "^%\\d{3} ?DCSP " }
+    returns: ack
+  set_input_level:
+    summary: "Set input level (DVST)"
+    params:
+      value: { type: enum, values: ["auto", "computer", "video"], required: true, label: "Input level", description: "Input level, as the projector names it." }
+    send: ":DVST {value:map.dvst}"
+    expect: { matches: "^%\\d{3} ?DVST " }
+    returns: ack
+  set_crop_mode:
+    summary: "Set input cropping mode (CTYP)"
+    params:
+      value: { type: enum, values: ["disabled", "auto", "2_35_1", "manual"], required: true, label: "Input cropping mode", description: "Input cropping mode, as the projector names it." }
+    send: ":CTYP {value:map.ctyp}"
+    expect: { matches: "^%\\d{3} ?CTYP " }
+    returns: ack
+  set_crop_top:
+    summary: "Set input cropping top (CTOP)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Input cropping top", description: "Lines cropped at the top of the input image." }
+    send: ":CTOP {value}"
+    expect: { matches: "^%\\d{3} ?CTOP " }
+    returns: ack
+  set_crop_bottom:
+    summary: "Set input cropping bottom (CBTM)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Input cropping bottom", description: "Lines cropped at the bottom of the input image." }
+    send: ":CBTM {value}"
+    expect: { matches: "^%\\d{3} ?CBTM " }
+    returns: ack
+  set_orientation:
+    summary: "Set orientation (ORIE)"
+    params:
+      value: { type: enum, values: ["desktop_front", "ceiling_rear", "desktop_rear", "ceiling_front"], required: true, label: "Orientation", description: "Orientation, as the projector names it." }
+    send: ":ORIE {value:map.orie}"
+    expect: { matches: "^%\\d{3} ?ORIE " }
+    returns: ack
+  set_source_scan:
+    summary: "Set source scan (SCAN)"
+    params:
+      value: { type: bool, required: true, label: "Source scan", description: "True scans for a source when the signal is lost." }
+    send: ":SCAN {value:bool01}"
+    expect: { matches: "^%\\d{3} ?SCAN " }
+    returns: ack
+  set_ir1:
+    summary: "Set iR receiver 1 (IR01)"
+    params:
+      value: { type: bool, required: true, label: "IR receiver 1", description: "True enables IR receiver 1." }
+    send: ":IR01 {value:bool01}"
+    expect: { matches: "^%\\d{3} ?IR01 " }
+    returns: ack
+  set_ir2:
+    summary: "Set iR receiver 2 (IR02)"
+    params:
+      value: { type: bool, required: true, label: "IR receiver 2", description: "True enables IR receiver 2." }
+    send: ":IR02 {value:bool01}"
+    expect: { matches: "^%\\d{3} ?IR02 " }
+    returns: ack
+  set_ir3:
+    summary: "Set iR receiver 3 (IR03)"
+    params:
+      value: { type: bool, required: true, label: "IR receiver 3", description: "True enables IR receiver 3." }
+    send: ":IR03 {value:bool01}"
+    expect: { matches: "^%\\d{3} ?IR03 " }
+    returns: ack
+  set_osd:
+    summary: "Set oSD (OSDC)"
+    params:
+      value: { type: enum, values: ["off", "warnings_only", "on"], required: true, label: "OSD", description: "OSD, as the projector names it." }
+    send: ":OSDC {value:map.osdc}"
+    expect: { matches: "^%\\d{3} ?OSDC " }
+    returns: ack
+  set_test_image:
+    summary: "Set test image (TEST)"
+    params:
+      value: { type: int, min: 0, max: 7, required: true, label: "Test image", description: "Test image, 0 to 7 (0 for none)." }
+    send: ":TEST {value}"
+    expect: { matches: "^%\\d{3} ?TEST " }
+    returns: ack
+  set_dual_head:
+    summary: "Set dual head setup (DHED)"
+    params:
+      value: { type: bool, required: true, label: "Dual head setup", description: "True sets up dual head side by side." }
+    send: ":DHED {value:bool01}"
+    expect: { matches: "^%\\d{3} ?DHED " }
+    returns: ack
+  set_vga_sync_75_ohm:
+    summary: "Set vGA sync termination 75 ohm (SVGA)"
+    params:
+      value: { type: bool, required: true, label: "VGA sync termination 75 ohm", description: "True terminates VGA sync with 75 ohm, false with 2.2 kohm." }
+    send: ":SVGA {value:bool01}"
+    expect: { matches: "^%\\d{3} ?SVGA " }
+    returns: ack
+  set_vga_sync_level:
+    summary: "Set vGA sync level (SNCL)"
+    params:
+      value: { type: int, min: 0, max: 255, required: true, label: "VGA sync level", description: "VGA sync level, 0 to 255." }
+    send: ":SNCL {value}"
+    expect: { matches: "^%\\d{3} ?SNCL " }
+    returns: ack
+  set_sog_sync_level:
+    summary: "Set sync-on-green level (SNCS)"
+    params:
+      value: { type: int, min: 0, max: 31, required: true, label: "Sync-on-green level", description: "Sync-on-green level, 0 to 31." }
+    send: ":SNCS {value}"
+    expect: { matches: "^%\\d{3} ?SNCS " }
+    returns: ack
+  set_infitec_filter:
+    summary: "Set infitec filter (OPFI)"
+    params:
+      value: { type: bool, required: true, label: "Infitec filter", description: "True enables the Infitec filter." }
+    send: ":OPFI {value:bool01}"
+    expect: { matches: "^%\\d{3} ?OPFI " }
+    returns: ack
+  set_infitec_csc:
+    summary: "Set infitec color space conversion (CSCC)"
+    params:
+      value: { type: bool, required: true, label: "Infitec color space conversion", description: "True enables the Infitec color space conversion." }
+    send: ":CSCC {value:bool01}"
+    expect: { matches: "^%\\d{3} ?CSCC " }
+    returns: ack
+  set_eco_mode:
+    summary: "Set eco mode (ECOM)"
+    params:
+      value: { type: bool, required: true, label: "Eco mode", description: "True turns eco mode on." }
+    send: ":ECOM {value:bool01}"
+    expect: { matches: "^%\\d{3} ?ECOM " }
+    returns: ack
+  set_lamp1_power:
+    summary: "Set lamp 1 or LED power (LPW1)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Lamp 1 or LED power", description: "Power of lamp 1, or of the LED light source on LED models." }
+    send: ":LPW1 {value}"
+    expect: { matches: "^%\\d{3} ?LPW1 " }
+    returns: ack
+  set_lamp2_power:
+    summary: "Set lamp 2 power (LPW2)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Lamp 2 power", description: "Power of lamp 2." }
+    send: ":LPW2 {value}"
+    expect: { matches: "^%\\d{3} ?LPW2 " }
+    returns: ack
+  set_lamp_mode:
+    summary: "Set lamp mode (LMOD)"
+    params:
+      value: { type: enum, values: ["single_lamp_1", "single_lamp_2", "dual_lamps", "auto_lamp_switch"], required: true, label: "Lamp mode", description: "Lamp mode, as the projector names it." }
+    send: ":LMOD {value:map.lmod}"
+    expect: { matches: "^%\\d{3} ?LMOD " }
+    returns: ack
+  set_lamp_switch_delay:
+    summary: "Set lamp auto switch delay (LDLY)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Lamp auto switch delay", description: "Delay before the automatic lamp switch." }
+    send: ":LDLY {value}"
+    expect: { matches: "^%\\d{3} ?LDLY " }
+    returns: ack
+  set_led_dim_mode:
+    summary: "Set lED dim mode (LDMM)"
+    params:
+      value: { type: bool, required: true, label: "LED dim mode", description: "True turns the custom LED dim mode on (LED models)." }
+    send: ":LDMM {value:bool01}"
+    expect: { matches: "^%\\d{3} ?LDMM " }
+    returns: ack
+  set_led_dim_red:
+    summary: "Set lED dim custom red (LDCR)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "LED dim custom red", description: "Custom dimming of the red LED (LED models)." }
+    send: ":LDCR {value}"
+    expect: { matches: "^%\\d{3} ?LDCR " }
+    returns: ack
+  set_led_dim_green:
+    summary: "Set lED dim custom green (LDCG)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "LED dim custom green", description: "Custom dimming of the green LED (LED models)." }
+    send: ":LDCG {value}"
+    expect: { matches: "^%\\d{3} ?LDCG " }
+    returns: ack
+  set_led_dim_blue:
+    summary: "Set lED dim custom blue (LDCB)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "LED dim custom blue", description: "Custom dimming of the blue LED (LED models)." }
+    send: ":LDCB {value}"
+    expect: { matches: "^%\\d{3} ?LDCB " }
+    returns: ack
+  set_trigger1:
+    summary: "Set trigger 1 mode (TRG1)"
+    params:
+      value: { type: enum, values: ["on", "off", "screen", "aspect"], required: true, label: "Trigger 1 mode", description: "Trigger 1 mode, as the projector names it." }
+    send: ":TRG1 {value:map.trg}"
+    expect: { matches: "^%\\d{3} ?TRG1 " }
+    returns: ack
+  set_trigger2:
+    summary: "Set trigger 2 mode (TRG2)"
+    params:
+      value: { type: enum, values: ["on", "off", "screen", "aspect"], required: true, label: "Trigger 2 mode", description: "Trigger 2 mode, as the projector names it." }
+    send: ":TRG2 {value:map.trg}"
+    expect: { matches: "^%\\d{3} ?TRG2 " }
+    returns: ack
+  set_framelock_external:
+    summary: "Set frame lock source external (FLSO)"
+    params:
+      value: { type: bool, required: true, label: "Frame lock source external", description: "True locks to the external frame lock input, false to internal." }
+    send: ":FLSO {value:bool01}"
+    expect: { matches: "^%\\d{3} ?FLSO " }
+    returns: ack
+  set_framelock_input_75_ohm:
+    summary: "Set frame lock input 75 ohm (FLIT)"
+    params:
+      value: { type: bool, required: true, label: "Frame lock input 75 ohm", description: "True terminates the frame lock input with 75 ohm, false TTL." }
+    send: ":FLIT {value:bool01}"
+    expect: { matches: "^%\\d{3} ?FLIT " }
+    returns: ack
+  set_framelock_output_regenerated:
+    summary: "Set frame lock output regenerated (FLOS)"
+    params:
+      value: { type: bool, required: true, label: "Frame lock output regenerated", description: "True regenerates the frame lock output, false passes the input through." }
+    send: ":FLOS {value:bool01}"
+    expect: { matches: "^%\\d{3} ?FLOS " }
+    returns: ack
+  set_framelock_output_termination:
+    summary: "Set frame lock output termination (FLOT)"
+    params:
+      value: { type: enum, values: ["auto", "ttl", "75_ohm"], required: true, label: "Frame lock output termination", description: "Frame lock output termination, as the projector names it." }
+    send: ":FLOT {value:map.flot}"
+    expect: { matches: "^%\\d{3} ?FLOT " }
+    returns: ack
+  factory_reset:
+    summary: "Reset the projector to factory settings, at the factory reset level (FCRE)"
+    send: ":FCRE"
+    expect: { matches: "^%\\d{3} ?FCRE " }
+    returns: ack
+  set_factory_reset_full:
+    summary: "Set full factory reset (FCRL)"
+    params:
+      value: { type: bool, required: true, label: "Full factory reset", description: "True makes factory_reset a full reset, false a limited one." }
+    send: ":FCRL {value:bool01}"
+    expect: { matches: "^%\\d{3} ?FCRL " }
+    returns: ack
+  set_remote_id:
+    summary: "Set remote control ID (RCID)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Remote control ID", description: "The projector's remote control (RC) ID." }
+    send: ":RCID {value}"
+    expect: { matches: "^%\\d{3} ?RCID " }
+    returns: ack
+  set_dpms:
+    summary: "Set dPMS (DPMS)"
+    params:
+      value: { type: bool, required: true, label: "DPMS", description: "True turns display power management (standby without signal) on." }
+    send: ":DPMS {value:bool01}"
+    expect: { matches: "^%\\d{3} ?DPMS " }
+    returns: ack
+  set_dpms_timeout:
+    summary: "Set dPMS timeout (DPMT)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "DPMS timeout", description: "Time without signal before DPMS standby." }
+    send: ":DPMT {value}"
+    expect: { matches: "^%\\d{3} ?DPMT " }
+    returns: ack
+  set_backlight_timeout:
+    summary: "Set keypad backlight timeout (KEYB)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Keypad backlight timeout", description: "Keypad backlight timeout." }
+    send: ":KEYB {value}"
+    expect: { matches: "^%\\d{3} ?KEYB " }
+    returns: ack
+  set_menu_timeout:
+    summary: "Set menu timeout (MNUT)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Menu timeout", description: "OSD menu timeout." }
+    send: ":MNUT {value}"
+    expect: { matches: "^%\\d{3} ?MNUT " }
+    returns: ack
+  set_background_color:
+    summary: "Set background color (BACK)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Background color", description: "Background color shown without signal." }
+    send: ":BACK {value}"
+    expect: { matches: "^%\\d{3} ?BACK " }
+    returns: ack
+  set_splash:
+    summary: "Set splash screen (SPLH)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Splash screen", description: "Splash screen setting." }
+    send: ":SPLH {value}"
+    expect: { matches: "^%\\d{3} ?SPLH " }
+    returns: ack
+  set_led_indicators_mute:
+    summary: "Set lED indicators mute (LMUT)"
+    params:
+      value: { type: bool, required: true, label: "LED indicators mute", description: "True turns the status LED indicators off." }
+    send: ":LMUT {value:bool01}"
+    expect: { matches: "^%\\d{3} ?LMUT " }
+    returns: ack
+  set_baud_rate:
+    summary: "Set rS-232 baud rate (BAUD)"
+    params:
+      value: { type: enum, values: ["4800", "9600", "19200", "38400", "57600", "115200"], required: true, label: "RS-232 baud rate", description: "RS-232 baud rate, as the projector names it." }
+    send: ":BAUD {value:map.baud}"
+    expect: { matches: "^%\\d{3} ?BAUD " }
+    returns: ack
+  set_clock_hour:
+    summary: "Set clock hour (RTCH)"
+    params:
+      value: { type: int, min: 0, max: 23, required: true, label: "Clock hour", description: "Real-time clock hour, 0 to 23." }
+    send: ":RTCH {value}"
+    expect: { matches: "^%\\d{3} ?RTCH " }
+    returns: ack
+  set_clock_minute:
+    summary: "Set clock minute (RTCM)"
+    params:
+      value: { type: int, min: 0, max: 59, required: true, label: "Clock minute", description: "Real-time clock minute, 0 to 59." }
+    send: ":RTCM {value}"
+    expect: { matches: "^%\\d{3} ?RTCM " }
+    returns: ack
+  set_clock_second:
+    summary: "Set clock second (RTCS)"
+    params:
+      value: { type: int, min: 0, max: 59, required: true, label: "Clock second", description: "Real-time clock second, 0 to 59." }
+    send: ":RTCS {value}"
+    expect: { matches: "^%\\d{3} ?RTCS " }
+    returns: ack
+  set_clock_day:
+    summary: "Set clock day (RTCD)"
+    params:
+      value: { type: int, min: 1, max: 31, required: true, label: "Clock day", description: "Real-time clock day of the month, 1 to 31." }
+    send: ":RTCD {value}"
+    expect: { matches: "^%\\d{3} ?RTCD " }
+    returns: ack
+  set_clock_month:
+    summary: "Set clock month (RTCN)"
+    params:
+      value: { type: int, min: 1, max: 12, required: true, label: "Clock month", description: "Real-time clock month, 1 to 12." }
+    send: ":RTCN {value}"
+    expect: { matches: "^%\\d{3} ?RTCN " }
+    returns: ack
+  set_clock_year:
+    summary: "Set clock year (RTCY)"
+    params:
+      value: { type: int, min: 2000, max: 2099, required: true, label: "Clock year", description: "Real-time clock year." }
+    send: ":RTCY {value}"
+    expect: { matches: "^%\\d{3} ?RTCY " }
+    returns: ack
+  set_stereo_mode:
+    summary: "Set stereo mode (TDSM)"
+    params:
+      value: { type: bool, required: true, label: "Stereo mode", description: "True turns 3D stereo mode on (120 Hz only)." }
+    send: ":TDSM {value:bool01}"
+    expect: { matches: "^%\\d{3} ?TDSM " }
+    returns: ack
+  set_glass_type:
+    summary: "Set glass type (TDGT)"
+    params:
+      value: { type: enum, values: ["dlp_link", "ir", "ir_high_brightness"], required: true, label: "Glass type", description: "Glass type, as the projector names it." }
+    send: ":TDGT {value:map.tdgt}"
+    expect: { matches: "^%\\d{3} ?TDGT " }
+    returns: ack
+  set_genlock_phase_delay:
+    summary: "Set genlock phase delay (TDGD)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Genlock phase delay", description: "Stereo genlock phase delay." }
+    send: ":TDGD {value}"
+    expect: { matches: "^%\\d{3} ?TDGD " }
+    returns: ack
+  set_swap_eyes:
+    summary: "Set swap eyes (TDSE)"
+    params:
+      value: { type: bool, required: true, label: "Swap eyes", description: "True swaps the left and right eyes." }
+    send: ":TDSE {value:bool01}"
+    expect: { matches: "^%\\d{3} ?TDSE " }
+    returns: ack
+  focus_in:
+    summary: "Move focus in (FOIN)"
+    params:
+      speed: { type: enum, values: [slow, medium, fast], default: medium, label: Speed, description: "How fast the lens moves." }
+    send: ":FOIN {speed:map.lens_speed}"
+    expect: { matches: "^%\\d{3} ?FOIN " }
+    returns: ack
+  focus_out:
+    summary: "Move focus out (FOUT)"
+    params:
+      speed: { type: enum, values: [slow, medium, fast], default: medium, label: Speed, description: "How fast the lens moves." }
+    send: ":FOUT {speed:map.lens_speed}"
+    expect: { matches: "^%\\d{3} ?FOUT " }
+    returns: ack
+  zoom_in:
+    summary: "Zoom in (ZOIN)"
+    params:
+      speed: { type: enum, values: [slow, medium, fast], default: medium, label: Speed, description: "How fast the lens moves." }
+    send: ":ZOIN {speed:map.lens_speed}"
+    expect: { matches: "^%\\d{3} ?ZOIN " }
+    returns: ack
+  zoom_out:
+    summary: "Zoom out (ZOUT)"
+    params:
+      speed: { type: enum, values: [slow, medium, fast], default: medium, label: Speed, description: "How fast the lens moves." }
+    send: ":ZOUT {speed:map.lens_speed}"
+    expect: { matches: "^%\\d{3} ?ZOUT " }
+    returns: ack
+  iris_open:
+    summary: "Open the iris (IROP)"
+    params:
+      speed: { type: enum, values: [slow, medium, fast], default: medium, label: Speed, description: "How fast the lens moves." }
+    send: ":IROP {speed:map.lens_speed}"
+    expect: { matches: "^%\\d{3} ?IROP " }
+    returns: ack
+  iris_close:
+    summary: "Close the iris (IRCL)"
+    params:
+      speed: { type: enum, values: [slow, medium, fast], default: medium, label: Speed, description: "How fast the lens moves." }
+    send: ":IRCL {speed:map.lens_speed}"
+    expect: { matches: "^%\\d{3} ?IRCL " }
+    returns: ack
+  lens_shift_down:
+    summary: "Shift the lens down (LSDW)"
+    params:
+      speed: { type: enum, values: [slow, medium, fast], default: medium, label: Speed, description: "How fast the lens moves." }
+    send: ":LSDW {speed:map.lens_speed}"
+    expect: { matches: "^%\\d{3} ?LSDW " }
+    returns: ack
+  lens_shift_up:
+    summary: "Shift the lens up (LSUP)"
+    params:
+      speed: { type: enum, values: [slow, medium, fast], default: medium, label: Speed, description: "How fast the lens moves." }
+    send: ":LSUP {speed:map.lens_speed}"
+    expect: { matches: "^%\\d{3} ?LSUP " }
+    returns: ack
+  lens_shift_left:
+    summary: "Shift the lens left (LSLF)"
+    params:
+      speed: { type: enum, values: [slow, medium, fast], default: medium, label: Speed, description: "How fast the lens moves." }
+    send: ":LSLF {speed:map.lens_speed}"
+    expect: { matches: "^%\\d{3} ?LSLF " }
+    returns: ack
+  lens_shift_right:
+    summary: "Shift the lens right (LSRH)"
+    params:
+      speed: { type: enum, values: [slow, medium, fast], default: medium, label: Speed, description: "How fast the lens moves." }
+    send: ":LSRH {speed:map.lens_speed}"
+    expect: { matches: "^%\\d{3} ?LSRH " }
+    returns: ack
+  set_shutter:
+    summary: "Set shutter (SHUT)"
+    params:
+      value: { type: bool, required: true, label: "Shutter", description: "True closes the shutter, false opens it." }
+    send: ":SHUT {value:bool01}"
+    expect: { matches: "^%\\d{3} ?SHUT " }
+    returns: ack
+  set_lens_monitoring:
+    summary: "Set lens monitoring (LMON)"
+    params:
+      value: { type: bool, required: true, label: "Lens monitoring", description: "True turns lens monitoring on." }
+    send: ":LMON {value:bool01}"
+    expect: { matches: "^%\\d{3} ?LMON " }
+    returns: ack
+  menu:
+    summary: "Toggle the OSD menu (MENU)"
+    send: ":MENU"
+    expect: { matches: "^%\\d{3} ?MENU " }
+    returns: ack
+  menu_up:
+    summary: "Navigate up in the OSD menu (NVUP)"
+    send: ":NVUP"
+    expect: { matches: "^%\\d{3} ?NVUP " }
+    returns: ack
+  menu_down:
+    summary: "Navigate down in the OSD menu (NVDW)"
+    send: ":NVDW"
+    expect: { matches: "^%\\d{3} ?NVDW " }
+    returns: ack
+  menu_left:
+    summary: "Navigate left in the OSD menu (NVLF)"
+    send: ":NVLF"
+    expect: { matches: "^%\\d{3} ?NVLF " }
+    returns: ack
+  menu_right:
+    summary: "Navigate right in the OSD menu (NVRH)"
+    send: ":NVRH"
+    expect: { matches: "^%\\d{3} ?NVRH " }
+    returns: ack
+  menu_ok:
+    summary: "Press OK in the OSD menu (NVOK)"
+    send: ":NVOK"
+    expect: { matches: "^%\\d{3} ?NVOK " }
+    returns: ack
+  set_echo:
+    summary: "Set acknowledges (ECHO)"
+    params:
+      value: { type: bool, required: true, label: "Acknowledges", description: "True makes the projector acknowledge every command (the default); false turns acknowledges off." }
+    send: ":ECHO {value:bool01}"
+    expect: { matches: "^%\\d{3} ?ECHO " }
+    returns: ack
+  set_language:
+    summary: "Set language (LANG)"
+    params:
+      value: { type: int, min: -99999, max: 999999, required: true, label: "Language", description: "OSD language number." }
+    send: ":LANG {value}"
+    expect: { matches: "^%\\d{3} ?LANG " }
+    returns: ack
+  show_info:
+    summary: "Show the information OSD (SINF)"
+    send: ":SINF"
+    expect: { matches: "^%\\d{3} ?SINF " }
+    returns: ack
+  set_aspect_trigger:
+    summary: Set what a trigger output does for an input aspect ratio or state (TATB target value)
+    params:
+      target: { type: enum, values: ["4_3", "5_4", "16_9", "16_10", no_source, standby], required: true, label: Aspect or state, description: "The input aspect ratio, or no source or standby, whose trigger behavior is set." }
+      behavior: { type: enum, values: ["on", "off", no_change], required: true, label: Behavior, description: "Whether the trigger is on, off or left unchanged then." }
+    send: ":TATB {behavior:map.tatb_value} {target:map.tatb_target}"
+    expect: { matches: "^%\\d{3} ?TATB " }
+    returns: ack
+  get_aspect_trigger:
+    summary: Read what a trigger output does for an input aspect ratio or state (TATB ? target)
+    params:
+      target: { type: enum, values: ["4_3", "5_4", "16_9", "16_10", no_source, standby], required: true, label: Aspect or state, description: "The input aspect ratio, or no source or standby, whose trigger behavior is read." }
+    send: ":TATB ? {target:map.tatb_target}"
+    expect: { matches: "^%\\d{3} ?TATB ?0*(\\d+)" }
+    returns: value
+  set_edid_resolution:
+    summary: Set the EDID resolution an input announces (EDIR value target)
+    params:
+      input: { type: enum, values: [vga1, vga2, dvi1, hdmi1, dvi2, hdmi2], required: true, label: Input, description: "The input whose EDID is set." }
+      resolution: { type: enum, values: [auto, custom, vga, svga, xga, 720p50, 720p60, wxga_1366, sxga, sxga_plus, 1080_deep_color, 1080_standard, wuxga, wqxga], required: true, label: Resolution, description: "The EDID resolution; WQXGA on the DVI inputs only, custom not implemented." }
+    send: ":EDIR {resolution:map.edir_value} {input:map.edid_input}"
+    expect: { matches: "^%\\d{3} ?EDIR " }
+    returns: ack
+  get_edid_resolution:
+    summary: Read the EDID resolution an input announces (EDIR ? target)
+    params:
+      input: { type: enum, values: [vga1, vga2, dvi1, hdmi1, dvi2, hdmi2], required: true, label: Input, description: "The input whose EDID is read." }
+    send: ":EDIR ? {input:map.edid_input}"
+    expect: { matches: "^%\\d{3} ?EDIR ?0*(\\d+)" }
+    returns: value
+  set_edid_type:
+    summary: Set whether an HDMI input announces a DVI or an HDMI EDID (EDIT value target)
+    params:
+      input: { type: enum, values: [hdmi1, hdmi2], required: true, label: Input, description: "The HDMI input whose EDID type is set." }
+      type: { type: enum, values: [dvi, hdmi], required: true, label: EDID type, description: "DVI or HDMI." }
+    send: ":EDIT {type:map.edit_value} {input:map.edid_input}"
+    expect: { matches: "^%\\d{3} ?EDIT " }
+    returns: ack
+  get_edid_type:
+    summary: Read whether an HDMI input announces a DVI or an HDMI EDID (EDIT ? target)
+    params:
+      input: { type: enum, values: [hdmi1, hdmi2], required: true, label: Input, description: "The HDMI input whose EDID type is read." }
+    send: ":EDIT ? {input:map.edid_input}"
+    expect: { matches: "^%\\d{3} ?EDIT ?0*(\\d+)" }
+    returns: value
+  set_pin_code:
+    summary: Enter the PIN code (PINC)
+    params:
+      code: { type: int, min: 0, max: 999999, required: true, secret: true, label: PIN code, description: "The projector's PIN code." }
+    send: ":PINC {code}"
+    expect: { matches: "^%\\d{3} ?PINC " }
+    returns: ack
+  enter_service_code:
+    summary: Enter a service code for a higher access level (CODE)
+    params:
+      code: { type: int, min: 0, max: 999999, required: true, secret: true, label: Service code, description: "The service code Digital Projection gives." }
+    send: ":CODE {code}"
+    expect: { matches: "^%\\d{3} ?CODE " }
+    returns: ack
+  step:
+    summary: Change a setting relative to its value (mnemonic R step)
+    params:
+      setting: &mnemonic { type: string, pattern: "^[A-Za-z0-9]{4}$", required: true, label: Setting, description: "The protocol's four-character mnemonic, such as BRIG or CNTR." }
+      amount: { type: int, min: -99999, max: 99999, required: true, label: Steps, description: "Steps to add, negative to subtract." }
+    send: ":{setting:upper} R{amount}"
+    expect: { matches: "^%\\d{3} ?[A-Z0-9]{4} ?(-?\\d+)" }
+    returns: value
+  get:
+    summary: Read any setting's current value by its mnemonic (mnemonic ?); the reply also updates state
+    params:
+      setting: *mnemonic
+    send: ":{setting:upper} ?"
+    expect: { matches: "^%\\d{3} ?[A-Z0-9]{4} ?(.*?)\\s*$" }
+    returns: value
+  get_limit:
+    summary: Read a setting's maximum, minimum, default or step value (mnemonic ?M, ?N, ?D or ?S)
+    params:
+      setting: *mnemonic
+      limit: { type: enum, values: [maximum, minimum, default, step], required: true, label: Limit, description: "Which limit of the setting is read." }
+    send: ":{setting:upper} ?{limit:map.limit}"
+    expect: { matches: "^%\\d{3} ?[A-Z0-9]{4} ?(-?\\d+)" }
+    returns: value
+
+state:
+  power: { type: bool, description: "Power (POWR)" }
+  power_state: { type: string, description: "Power state (POST): deep_sleep, off, powering_up, on, powering_down, critical_powering_down, critical_off" }
+  source: { type: string, description: "Source (IABS): vga1, vga2, dvi1, component, hdmi1, dvi2, hdmi2, dual_head_dvi, dual_head_hdmi, dual_head_xp2, xp2_a, xp2_b" }
+  signal_locked: { type: bool, description: "Signal locked (ISTS)" }
+  brightness: { type: int, description: "Brightness (BRIG)" }
+  contrast: { type: int, description: "Contrast (CNTR)" }
+  saturation: { type: int, description: "Saturation (CSAT)" }
+  picture_mute: { type: bool, description: "Picture mute (PMUT)" }
+  scaling: { type: string, description: "Scaling (SABS): 1_1, fill_all, fill_aspect_ratio, fill_16_9, fill_4_3, fill_2_35_1, anamorphic_lens" }
+  gamma: { type: string, description: "Gamma (GABS): film_2_2, film_2_8, video_1, video_2, computer_1, computer_2" }
+  brilliant_color: { type: string, description: "BrilliantColor (BCCR): off, computer_balanced, video_balanced, computer_native, video_native" }
+  color_management: { type: bool, description: "Color management (CMOD)" }
+  cm_white: { type: int, description: "Color management white (CMWH)" }
+  cm_x: { type: int, description: "Color management X coordinate (CMXV)" }
+  cm_y: { type: int, description: "Color management Y coordinate (CMYV)" }
+  cm_temperature: { type: int, description: "Color management temperature (CMTV)" }
+  desired_coords_mode: { type: string, description: "Desired coordinates mode (DSCR): off, rgb, rgbcmy" }
+  desired_red_x: { type: int, description: "Desired red X (DSRX)" }
+  desired_red_y: { type: int, description: "Desired red Y (DSRY)" }
+  desired_red_gain: { type: int, description: "Desired red gain (DSRG)" }
+  desired_green_x: { type: int, description: "Desired green X (DSGX)" }
+  desired_green_y: { type: int, description: "Desired green Y (DSGY)" }
+  desired_green_gain: { type: int, description: "Desired green gain (DSGG)" }
+  desired_blue_x: { type: int, description: "Desired blue X (DSBX)" }
+  desired_blue_y: { type: int, description: "Desired blue Y (DSBY)" }
+  desired_blue_gain: { type: int, description: "Desired blue gain (DSBG)" }
+  desired_cyan_x: { type: int, description: "Desired cyan X (DSCX)" }
+  desired_cyan_y: { type: int, description: "Desired cyan Y (DSCY)" }
+  desired_cyan_gain: { type: int, description: "Desired cyan gain (DSCG)" }
+  desired_magenta_x: { type: int, description: "Desired magenta X (DSMX)" }
+  desired_magenta_y: { type: int, description: "Desired magenta Y (DSMY)" }
+  desired_magenta_gain: { type: int, description: "Desired magenta gain (DSMG)" }
+  desired_yellow_x: { type: int, description: "Desired yellow X (DSYX)" }
+  desired_yellow_y: { type: int, description: "Desired yellow Y (DSYY)" }
+  desired_yellow_gain: { type: int, description: "Desired yellow gain (DSYG)" }
+  desired_white_gain: { type: int, description: "Desired white gain (DSWG)" }
+  measured_red_x: { type: int, description: "Measured red X (MSRX)" }
+  measured_red_y: { type: int, description: "Measured red Y (MSRY)" }
+  measured_red_luminance: { type: int, description: "Measured red luminance (MSRL)" }
+  measured_green_x: { type: int, description: "Measured green X (MSGX)" }
+  measured_green_y: { type: int, description: "Measured green Y (MSGY)" }
+  measured_green_luminance: { type: int, description: "Measured green luminance (MSGL)" }
+  measured_blue_x: { type: int, description: "Measured blue X (MSBX)" }
+  measured_blue_y: { type: int, description: "Measured blue Y (MSBY)" }
+  measured_blue_luminance: { type: int, description: "Measured blue luminance (MSBL)" }
+  measured_white_x: { type: int, description: "Measured white X (MSWX)" }
+  measured_white_y: { type: int, description: "Measured white Y (MSWY)" }
+  measured_white_luminance: { type: int, description: "Measured white luminance (MSWL)" }
+  measured_bc1_x: { type: int, description: "Measured bc1 X (MSDX)" }
+  measured_bc1_y: { type: int, description: "Measured bc1 Y (MSDY)" }
+  measured_bc1_luminance: { type: int, description: "Measured bc1 luminance (MSDL)" }
+  measured_bc2_x: { type: int, description: "Measured bc2 X (MSEX)" }
+  measured_bc2_y: { type: int, description: "Measured bc2 Y (MSEY)" }
+  measured_bc2_luminance: { type: int, description: "Measured bc2 luminance (MSEL)" }
+  factory_measured_bc2_luminance: { type: int, description: "Factory measured BC2 luminance (MFEL)" }
+  cm_test_pattern: { type: int, description: "Color management test pattern (CMTP)" }
+  h_position: { type: int, description: "Horizontal position (HPOS)" }
+  v_position: { type: int, description: "Vertical position (VPOS)" }
+  frequency: { type: int, description: "Frequency (FREQ)" }
+  phase: { type: int, description: "Phase (PHSE)" }
+  color_space: { type: string, description: "Color space (DCSP): auto, rgb, rec709, rec601" }
+  input_level: { type: string, description: "Input level (DVST): auto, computer, video" }
+  crop_mode: { type: string, description: "Input cropping mode (CTYP): disabled, auto, 2_35_1, manual" }
+  crop_top: { type: int, description: "Input cropping top (CTOP)" }
+  crop_bottom: { type: int, description: "Input cropping bottom (CBTM)" }
+  orientation: { type: string, description: "Orientation (ORIE): desktop_front, ceiling_rear, desktop_rear, ceiling_front" }
+  source_scan: { type: bool, description: "Source scan (SCAN)" }
+  ir1: { type: bool, description: "IR receiver 1 (IR01)" }
+  ir2: { type: bool, description: "IR receiver 2 (IR02)" }
+  ir3: { type: bool, description: "IR receiver 3 (IR03)" }
+  osd: { type: string, description: "OSD (OSDC): off, warnings_only, on" }
+  test_image: { type: int, description: "Test image (TEST)" }
+  dual_head: { type: bool, description: "Dual head setup (DHED)" }
+  vga_sync_75_ohm: { type: bool, description: "VGA sync termination 75 ohm (SVGA)" }
+  vga_sync_level: { type: int, description: "VGA sync level (SNCL)" }
+  sog_sync_level: { type: int, description: "Sync-on-green level (SNCS)" }
+  infitec_filter: { type: bool, description: "Infitec filter (OPFI)" }
+  infitec_csc: { type: bool, description: "Infitec color space conversion (CSCC)" }
+  eco_mode: { type: bool, description: "Eco mode (ECOM)" }
+  lamp1_power: { type: int, description: "Lamp 1 or LED power (LPW1)" }
+  lamp2_power: { type: int, description: "Lamp 2 power (LPW2)" }
+  lamp_mode: { type: string, description: "Lamp mode (LMOD): single_lamp_1, single_lamp_2, dual_lamps, auto_lamp_switch" }
+  lamp_switch_delay: { type: int, description: "Lamp auto switch delay (LDLY)" }
+  led_dim_mode: { type: bool, description: "LED dim mode (LDMM)" }
+  led_dim_red: { type: int, description: "LED dim custom red (LDCR)" }
+  led_dim_green: { type: int, description: "LED dim custom green (LDCG)" }
+  led_dim_blue: { type: int, description: "LED dim custom blue (LDCB)" }
+  trigger1: { type: string, description: "Trigger 1 mode (TRG1): on, off, screen, aspect" }
+  trigger2: { type: string, description: "Trigger 2 mode (TRG2): on, off, screen, aspect" }
+  framelock_external: { type: bool, description: "Frame lock source external (FLSO)" }
+  framelock_input_75_ohm: { type: bool, description: "Frame lock input 75 ohm (FLIT)" }
+  framelock_output_regenerated: { type: bool, description: "Frame lock output regenerated (FLOS)" }
+  framelock_output_termination: { type: string, description: "Frame lock output termination (FLOT): auto, ttl, 75_ohm" }
+  framelock_status: { type: int, description: "Frame lock status (FLST)" }
+  factory_reset_full: { type: bool, description: "Full factory reset (FCRL)" }
+  remote_id: { type: int, description: "Remote control ID (RCID)" }
+  dpms: { type: bool, description: "DPMS (DPMS)" }
+  dpms_timeout: { type: int, description: "DPMS timeout (DPMT)" }
+  backlight_timeout: { type: int, description: "Keypad backlight timeout (KEYB)" }
+  menu_timeout: { type: int, description: "Menu timeout (MNUT)" }
+  background_color: { type: int, description: "Background color (BACK)" }
+  splash: { type: int, description: "Splash screen (SPLH)" }
+  led_indicators_mute: { type: bool, description: "LED indicators mute (LMUT)" }
+  baud_rate: { type: string, description: "RS-232 baud rate (BAUD): 4800, 9600, 19200, 38400, 57600, 115200" }
+  clock_hour: { type: int, description: "Clock hour (RTCH)" }
+  clock_minute: { type: int, description: "Clock minute (RTCM)" }
+  clock_second: { type: int, description: "Clock second (RTCS)" }
+  clock_day: { type: int, description: "Clock day (RTCD)" }
+  clock_month: { type: int, description: "Clock month (RTCN)" }
+  clock_year: { type: int, description: "Clock year (RTCY)" }
+  clock_weekday: { type: int, description: "Clock day of week (RTCW)" }
+  stereo_mode: { type: bool, description: "Stereo mode (TDSM)" }
+  glass_type: { type: string, description: "Glass type (TDGT): dlp_link, ir, ir_high_brightness" }
+  genlock_phase_delay: { type: int, description: "Genlock phase delay (TDGD)" }
+  swap_eyes: { type: bool, description: "Swap eyes (TDSE)" }
+  lens_id: { type: int, description: "Lens ID (LENS)" }
+  lens_monitoring: { type: bool, description: "Lens monitoring (LMON)" }
+  lamp1_remaining: { type: int, description: "Lamp 1 remaining time (LRM1)" }
+  lamp1_runtime: { type: int, description: "Lamp 1 runtime (LTR1)" }
+  lamp_channel1_total: { type: int, description: "Lamp channel 1 total time (LHO1)" }
+  lamp1_status: { type: string, description: "Lamp 1 status (LST1): defect, warming_up, on, off, cooling_down, not_present" }
+  lamp2_remaining: { type: int, description: "Lamp 2 remaining time (LRM2)" }
+  lamp2_runtime: { type: int, description: "Lamp 2 runtime (LTR2)" }
+  lamp_channel2_total: { type: int, description: "Lamp channel 2 total time (LHO2)" }
+  lamp2_status: { type: string, description: "Lamp 2 status (LST2): defect, warming_up, on, off, cooling_down, not_present" }
+  unit_total_time: { type: int, description: "Unit total time (UTOT)" }
+  language: { type: int, description: "Language (LANG)" }
+  thermal_status: { type: int, description: "Thermal status (THRM)" }
+  fan1_speed: { type: int, description: "Fan 1 speed (FAN1)" }
+  fan2_speed: { type: int, description: "Fan 2 speed (FAN2)" }
+  fan3_speed: { type: int, description: "Fan 3 speed (FAN3)" }
+  fan4_speed: { type: int, description: "Fan 4 speed (FAN4)" }
+  fan5_speed: { type: int, description: "Fan 5 speed (FAN5)" }
+  fan6_speed: { type: int, description: "Fan 6 speed (FAN6)" }
+  fan7_speed: { type: int, description: "Fan 7 speed (FAN7)" }
+  fan8_speed: { type: int, description: "Fan 8 speed (FAN8)" }
+  sensor1: { type: int, description: "Sensor 1 (SNS1)" }
+  sensor2: { type: int, description: "Sensor 2 (SNS2)" }
+  sensor3: { type: int, description: "Sensor 3 (SNS3)" }
+  sensor4: { type: int, description: "Sensor 4 (SNS4)" }
+  sensor5: { type: int, description: "Sensor 5 (SNS5)" }
+  sensor6: { type: int, description: "Sensor 6 (SNS6)" }
+  sensor7: { type: int, description: "Sensor 7 (SNS7)" }
+  sensor8: { type: int, description: "Sensor 8 (SNS8)" }
+  platform: { type: string, description: "Platform name (PLAT)" }
+  serial_number: { type: string, description: "Serial number (SERI)" }
+  model_name: { type: string, description: "Model name (MODL)" }
+  part_number: { type: string, description: "Part number (PART)" }
+  software_version: { type: string, description: "Software version (SVER)" }
+  access_level: { type: int, description: "Access level (ACSS)" }
+  mac_address: { type: string, description: "MAC address (MACA)" }
+  ip_address: { type: string, description: "IP address (IPAD)" }
+  status_led: { type: string, description: "Status LED (LEST): green_blue_on, green_blue_flash, yellow_on, yellow_flash, red_on, red_flash" }
+  software_revision: { type: string, description: "Software revision (SWSN)" }
+
+telemetry:
+  # Status every 10 s, settings every 2 min (the projector wants 500 ms between
+  # commands), identity on connecting and every 10 min.
+  poll:
+    - every_ms: 10000
+      send:
+        - ":POST ?"
+        - ":POWR ?"
+        - ":IABS ?"
+        - ":ISTS ?"
+        - ":PMUT ?"
+        - ":LST1 ?"
+        - ":LST2 ?"
+        - ":LEST ?"
+        - ":THRM ?"
+    - every_ms: 120000
+      send:
+        - ":BRIG ?"
+        - ":CNTR ?"
+        - ":CSAT ?"
+        - ":SABS ?"
+        - ":GABS ?"
+        - ":BCCR ?"
+        - ":CMOD ?"
+        - ":CMWH ?"
+        - ":CMXV ?"
+        - ":CMYV ?"
+        - ":CMTV ?"
+        - ":DSCR ?"
+        - ":DSRX ?"
+        - ":DSRY ?"
+        - ":DSRG ?"
+        - ":DSGX ?"
+        - ":DSGY ?"
+        - ":DSGG ?"
+        - ":DSBX ?"
+        - ":DSBY ?"
+        - ":DSBG ?"
+        - ":DSCX ?"
+        - ":DSCY ?"
+        - ":DSCG ?"
+        - ":DSMX ?"
+        - ":DSMY ?"
+        - ":DSMG ?"
+        - ":DSYX ?"
+        - ":DSYY ?"
+        - ":DSYG ?"
+        - ":DSWG ?"
+        - ":MSRX ?"
+        - ":MSRY ?"
+        - ":MSRL ?"
+        - ":MSGX ?"
+        - ":MSGY ?"
+        - ":MSGL ?"
+        - ":MSBX ?"
+        - ":MSBY ?"
+        - ":MSBL ?"
+        - ":MSWX ?"
+        - ":MSWY ?"
+        - ":MSWL ?"
+        - ":MSDX ?"
+        - ":MSDY ?"
+        - ":MSDL ?"
+        - ":MSEX ?"
+        - ":MSEY ?"
+        - ":MSEL ?"
+        - ":MFEL ?"
+        - ":CMTP ?"
+        - ":HPOS ?"
+        - ":VPOS ?"
+        - ":FREQ ?"
+        - ":PHSE ?"
+        - ":DCSP ?"
+        - ":DVST ?"
+        - ":CTYP ?"
+        - ":CTOP ?"
+        - ":CBTM ?"
+        - ":ORIE ?"
+        - ":SCAN ?"
+        - ":IR01 ?"
+        - ":IR02 ?"
+        - ":IR03 ?"
+        - ":OSDC ?"
+        - ":TEST ?"
+        - ":DHED ?"
+        - ":SVGA ?"
+        - ":SNCL ?"
+        - ":SNCS ?"
+        - ":OPFI ?"
+        - ":CSCC ?"
+        - ":ECOM ?"
+        - ":LPW1 ?"
+        - ":LPW2 ?"
+        - ":LMOD ?"
+        - ":LDLY ?"
+        - ":LDMM ?"
+        - ":LDCR ?"
+        - ":LDCG ?"
+        - ":LDCB ?"
+        - ":TRG1 ?"
+        - ":TRG2 ?"
+        - ":FLSO ?"
+        - ":FLIT ?"
+        - ":FLOS ?"
+        - ":FLOT ?"
+        - ":FLST ?"
+        - ":FCRL ?"
+        - ":RCID ?"
+        - ":DPMS ?"
+        - ":DPMT ?"
+        - ":KEYB ?"
+        - ":MNUT ?"
+        - ":BACK ?"
+        - ":SPLH ?"
+        - ":LMUT ?"
+        - ":BAUD ?"
+        - ":RTCH ?"
+        - ":RTCM ?"
+        - ":RTCS ?"
+        - ":RTCD ?"
+        - ":RTCN ?"
+        - ":RTCY ?"
+        - ":RTCW ?"
+        - ":TDSM ?"
+        - ":TDGT ?"
+        - ":TDGD ?"
+        - ":TDSE ?"
+        - ":LMON ?"
+        - ":LRM1 ?"
+        - ":LTR1 ?"
+        - ":LHO1 ?"
+        - ":LRM2 ?"
+        - ":LTR2 ?"
+        - ":LHO2 ?"
+        - ":UTOT ?"
+        - ":LANG ?"
+        - ":FAN1 ?"
+        - ":FAN2 ?"
+        - ":FAN3 ?"
+        - ":FAN4 ?"
+        - ":FAN5 ?"
+        - ":FAN6 ?"
+        - ":FAN7 ?"
+        - ":FAN8 ?"
+        - ":SNS1 ?"
+        - ":SNS2 ?"
+        - ":SNS3 ?"
+        - ":SNS4 ?"
+        - ":SNS5 ?"
+        - ":SNS6 ?"
+        - ":SNS7 ?"
+        - ":SNS8 ?"
+        - ":ACSS ?"
+    - every_ms: 600000
+      send:
+        - ":PLAT ?"
+        - ":SERI ?"
+        - ":MODL ?"
+        - ":PART ?"
+        - ":SVER ?"
+        - ":MACA ?"
+        - ":IPAD ?"
+        - ":SWSN ?"
+        - ":LENS ?"
+  updates:
+    - match: "^%\\d{3} ?POWR ?0*([01])\\s*$"
+      state: { power: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?POST ?0*(\\d+)\\s*$"
+      state: { power_state: { value: "{1}", map: { "0": "deep_sleep", "1": "off", "2": "powering_up", "3": "on", "4": "powering_down", "5": "critical_powering_down", "6": "critical_off" } } }
+    - match: "^%\\d{3} ?IABS ?0*(\\d+)\\s*$"
+      state: { source: { value: "{1}", map: { "0": "vga1", "1": "vga2", "2": "dvi1", "7": "component", "8": "hdmi1", "10": "dvi2", "11": "hdmi2", "12": "dual_head_dvi", "13": "dual_head_hdmi", "14": "dual_head_xp2", "15": "xp2_a", "16": "xp2_b" } } }
+    - match: "^%\\d{3} ?ISTS ?0*([01])\\s*$"
+      state: { signal_locked: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?BRIG ?(-?\\d+)\\s*$"
+      state: { brightness: "{1}" }
+    - match: "^%\\d{3} ?CNTR ?(-?\\d+)\\s*$"
+      state: { contrast: "{1}" }
+    - match: "^%\\d{3} ?CSAT ?(-?\\d+)\\s*$"
+      state: { saturation: "{1}" }
+    - match: "^%\\d{3} ?PMUT ?0*([01])\\s*$"
+      state: { picture_mute: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?SABS ?0*(\\d+)\\s*$"
+      state: { scaling: { value: "{1}", map: { "0": "1_1", "1": "fill_all", "2": "fill_aspect_ratio", "3": "fill_16_9", "4": "fill_4_3", "5": "fill_2_35_1", "11": "anamorphic_lens" } } }
+    - match: "^%\\d{3} ?GABS ?0*(\\d+)\\s*$"
+      state: { gamma: { value: "{1}", map: { "0": "film_2_2", "1": "film_2_8", "2": "video_1", "3": "video_2", "7": "computer_1", "8": "computer_2" } } }
+    - match: "^%\\d{3} ?BCCR ?0*(\\d+)\\s*$"
+      state: { brilliant_color: { value: "{1}", map: { "0": "off", "1": "computer_balanced", "2": "video_balanced", "3": "computer_native", "4": "video_native" } } }
+    - match: "^%\\d{3} ?CMOD ?0*([01])\\s*$"
+      state: { color_management: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?CMWH ?(-?\\d+)\\s*$"
+      state: { cm_white: "{1}" }
+    - match: "^%\\d{3} ?CMXV ?(-?\\d+)\\s*$"
+      state: { cm_x: "{1}" }
+    - match: "^%\\d{3} ?CMYV ?(-?\\d+)\\s*$"
+      state: { cm_y: "{1}" }
+    - match: "^%\\d{3} ?CMTV ?(-?\\d+)\\s*$"
+      state: { cm_temperature: "{1}" }
+    - match: "^%\\d{3} ?DSCR ?0*(\\d+)\\s*$"
+      state: { desired_coords_mode: { value: "{1}", map: { "0": "off", "1": "rgb", "2": "rgbcmy" } } }
+    - match: "^%\\d{3} ?DSRX ?(-?\\d+)\\s*$"
+      state: { desired_red_x: "{1}" }
+    - match: "^%\\d{3} ?DSRY ?(-?\\d+)\\s*$"
+      state: { desired_red_y: "{1}" }
+    - match: "^%\\d{3} ?DSRG ?(-?\\d+)\\s*$"
+      state: { desired_red_gain: "{1}" }
+    - match: "^%\\d{3} ?DSGX ?(-?\\d+)\\s*$"
+      state: { desired_green_x: "{1}" }
+    - match: "^%\\d{3} ?DSGY ?(-?\\d+)\\s*$"
+      state: { desired_green_y: "{1}" }
+    - match: "^%\\d{3} ?DSGG ?(-?\\d+)\\s*$"
+      state: { desired_green_gain: "{1}" }
+    - match: "^%\\d{3} ?DSBX ?(-?\\d+)\\s*$"
+      state: { desired_blue_x: "{1}" }
+    - match: "^%\\d{3} ?DSBY ?(-?\\d+)\\s*$"
+      state: { desired_blue_y: "{1}" }
+    - match: "^%\\d{3} ?DSBG ?(-?\\d+)\\s*$"
+      state: { desired_blue_gain: "{1}" }
+    - match: "^%\\d{3} ?DSCX ?(-?\\d+)\\s*$"
+      state: { desired_cyan_x: "{1}" }
+    - match: "^%\\d{3} ?DSCY ?(-?\\d+)\\s*$"
+      state: { desired_cyan_y: "{1}" }
+    - match: "^%\\d{3} ?DSCG ?(-?\\d+)\\s*$"
+      state: { desired_cyan_gain: "{1}" }
+    - match: "^%\\d{3} ?DSMX ?(-?\\d+)\\s*$"
+      state: { desired_magenta_x: "{1}" }
+    - match: "^%\\d{3} ?DSMY ?(-?\\d+)\\s*$"
+      state: { desired_magenta_y: "{1}" }
+    - match: "^%\\d{3} ?DSMG ?(-?\\d+)\\s*$"
+      state: { desired_magenta_gain: "{1}" }
+    - match: "^%\\d{3} ?DSYX ?(-?\\d+)\\s*$"
+      state: { desired_yellow_x: "{1}" }
+    - match: "^%\\d{3} ?DSYY ?(-?\\d+)\\s*$"
+      state: { desired_yellow_y: "{1}" }
+    - match: "^%\\d{3} ?DSYG ?(-?\\d+)\\s*$"
+      state: { desired_yellow_gain: "{1}" }
+    - match: "^%\\d{3} ?DSWG ?(-?\\d+)\\s*$"
+      state: { desired_white_gain: "{1}" }
+    - match: "^%\\d{3} ?MSRX ?(-?\\d+)\\s*$"
+      state: { measured_red_x: "{1}" }
+    - match: "^%\\d{3} ?MSRY ?(-?\\d+)\\s*$"
+      state: { measured_red_y: "{1}" }
+    - match: "^%\\d{3} ?MSRL ?(-?\\d+)\\s*$"
+      state: { measured_red_luminance: "{1}" }
+    - match: "^%\\d{3} ?MSGX ?(-?\\d+)\\s*$"
+      state: { measured_green_x: "{1}" }
+    - match: "^%\\d{3} ?MSGY ?(-?\\d+)\\s*$"
+      state: { measured_green_y: "{1}" }
+    - match: "^%\\d{3} ?MSGL ?(-?\\d+)\\s*$"
+      state: { measured_green_luminance: "{1}" }
+    - match: "^%\\d{3} ?MSBX ?(-?\\d+)\\s*$"
+      state: { measured_blue_x: "{1}" }
+    - match: "^%\\d{3} ?MSBY ?(-?\\d+)\\s*$"
+      state: { measured_blue_y: "{1}" }
+    - match: "^%\\d{3} ?MSBL ?(-?\\d+)\\s*$"
+      state: { measured_blue_luminance: "{1}" }
+    - match: "^%\\d{3} ?MSWX ?(-?\\d+)\\s*$"
+      state: { measured_white_x: "{1}" }
+    - match: "^%\\d{3} ?MSWY ?(-?\\d+)\\s*$"
+      state: { measured_white_y: "{1}" }
+    - match: "^%\\d{3} ?MSWL ?(-?\\d+)\\s*$"
+      state: { measured_white_luminance: "{1}" }
+    - match: "^%\\d{3} ?MSDX ?(-?\\d+)\\s*$"
+      state: { measured_bc1_x: "{1}" }
+    - match: "^%\\d{3} ?MSDY ?(-?\\d+)\\s*$"
+      state: { measured_bc1_y: "{1}" }
+    - match: "^%\\d{3} ?MSDL ?(-?\\d+)\\s*$"
+      state: { measured_bc1_luminance: "{1}" }
+    - match: "^%\\d{3} ?MSEX ?(-?\\d+)\\s*$"
+      state: { measured_bc2_x: "{1}" }
+    - match: "^%\\d{3} ?MSEY ?(-?\\d+)\\s*$"
+      state: { measured_bc2_y: "{1}" }
+    - match: "^%\\d{3} ?MSEL ?(-?\\d+)\\s*$"
+      state: { measured_bc2_luminance: "{1}" }
+    - match: "^%\\d{3} ?MFEL ?(-?\\d+)\\s*$"
+      state: { factory_measured_bc2_luminance: "{1}" }
+    - match: "^%\\d{3} ?CMTP ?(-?\\d+)\\s*$"
+      state: { cm_test_pattern: "{1}" }
+    - match: "^%\\d{3} ?HPOS ?(-?\\d+)\\s*$"
+      state: { h_position: "{1}" }
+    - match: "^%\\d{3} ?VPOS ?(-?\\d+)\\s*$"
+      state: { v_position: "{1}" }
+    - match: "^%\\d{3} ?FREQ ?(-?\\d+)\\s*$"
+      state: { frequency: "{1}" }
+    - match: "^%\\d{3} ?PHSE ?(-?\\d+)\\s*$"
+      state: { phase: "{1}" }
+    - match: "^%\\d{3} ?DCSP ?0*(\\d+)\\s*$"
+      state: { color_space: { value: "{1}", map: { "0": "auto", "1": "rgb", "2": "rec709", "3": "rec601" } } }
+    - match: "^%\\d{3} ?DVST ?0*(\\d+)\\s*$"
+      state: { input_level: { value: "{1}", map: { "0": "auto", "1": "computer", "2": "video" } } }
+    - match: "^%\\d{3} ?CTYP ?0*(\\d+)\\s*$"
+      state: { crop_mode: { value: "{1}", map: { "0": "disabled", "1": "auto", "2": "2_35_1", "3": "manual" } } }
+    - match: "^%\\d{3} ?CTOP ?(-?\\d+)\\s*$"
+      state: { crop_top: "{1}" }
+    - match: "^%\\d{3} ?CBTM ?(-?\\d+)\\s*$"
+      state: { crop_bottom: "{1}" }
+    - match: "^%\\d{3} ?ORIE ?0*(\\d+)\\s*$"
+      state: { orientation: { value: "{1}", map: { "0": "desktop_front", "1": "ceiling_rear", "2": "desktop_rear", "3": "ceiling_front" } } }
+    - match: "^%\\d{3} ?SCAN ?0*([01])\\s*$"
+      state: { source_scan: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?IR01 ?0*([01])\\s*$"
+      state: { ir1: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?IR02 ?0*([01])\\s*$"
+      state: { ir2: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?IR03 ?0*([01])\\s*$"
+      state: { ir3: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?OSDC ?0*(\\d+)\\s*$"
+      state: { osd: { value: "{1}", map: { "0": "off", "1": "warnings_only", "2": "on" } } }
+    - match: "^%\\d{3} ?TEST ?(-?\\d+)\\s*$"
+      state: { test_image: "{1}" }
+    - match: "^%\\d{3} ?DHED ?0*([01])\\s*$"
+      state: { dual_head: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?SVGA ?0*([01])\\s*$"
+      state: { vga_sync_75_ohm: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?SNCL ?(-?\\d+)\\s*$"
+      state: { vga_sync_level: "{1}" }
+    - match: "^%\\d{3} ?SNCS ?(-?\\d+)\\s*$"
+      state: { sog_sync_level: "{1}" }
+    - match: "^%\\d{3} ?OPFI ?0*([01])\\s*$"
+      state: { infitec_filter: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?CSCC ?0*([01])\\s*$"
+      state: { infitec_csc: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?ECOM ?0*([01])\\s*$"
+      state: { eco_mode: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?LPW1 ?(-?\\d+)\\s*$"
+      state: { lamp1_power: "{1}" }
+    - match: "^%\\d{3} ?LPW2 ?(-?\\d+)\\s*$"
+      state: { lamp2_power: "{1}" }
+    - match: "^%\\d{3} ?LMOD ?0*(\\d+)\\s*$"
+      state: { lamp_mode: { value: "{1}", map: { "0": "single_lamp_1", "1": "single_lamp_2", "2": "dual_lamps", "3": "auto_lamp_switch" } } }
+    - match: "^%\\d{3} ?LDLY ?(-?\\d+)\\s*$"
+      state: { lamp_switch_delay: "{1}" }
+    - match: "^%\\d{3} ?LDMM ?0*([01])\\s*$"
+      state: { led_dim_mode: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?LDCR ?(-?\\d+)\\s*$"
+      state: { led_dim_red: "{1}" }
+    - match: "^%\\d{3} ?LDCG ?(-?\\d+)\\s*$"
+      state: { led_dim_green: "{1}" }
+    - match: "^%\\d{3} ?LDCB ?(-?\\d+)\\s*$"
+      state: { led_dim_blue: "{1}" }
+    - match: "^%\\d{3} ?TRG1 ?0*(\\d+)\\s*$"
+      state: { trigger1: { value: "{1}", map: { "1": "on", "2": "off", "3": "screen", "4": "aspect" } } }
+    - match: "^%\\d{3} ?TRG2 ?0*(\\d+)\\s*$"
+      state: { trigger2: { value: "{1}", map: { "1": "on", "2": "off", "3": "screen", "4": "aspect" } } }
+    - match: "^%\\d{3} ?FLSO ?0*([01])\\s*$"
+      state: { framelock_external: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?FLIT ?0*([01])\\s*$"
+      state: { framelock_input_75_ohm: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?FLOS ?0*([01])\\s*$"
+      state: { framelock_output_regenerated: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?FLOT ?0*(\\d+)\\s*$"
+      state: { framelock_output_termination: { value: "{1}", map: { "0": "auto", "1": "ttl", "2": "75_ohm" } } }
+    - match: "^%\\d{3} ?FLST ?(-?\\d+)\\s*$"
+      state: { framelock_status: "{1}" }
+    - match: "^%\\d{3} ?FCRL ?0*([01])\\s*$"
+      state: { factory_reset_full: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?RCID ?(-?\\d+)\\s*$"
+      state: { remote_id: "{1}" }
+    - match: "^%\\d{3} ?DPMS ?0*([01])\\s*$"
+      state: { dpms: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?DPMT ?(-?\\d+)\\s*$"
+      state: { dpms_timeout: "{1}" }
+    - match: "^%\\d{3} ?KEYB ?(-?\\d+)\\s*$"
+      state: { backlight_timeout: "{1}" }
+    - match: "^%\\d{3} ?MNUT ?(-?\\d+)\\s*$"
+      state: { menu_timeout: "{1}" }
+    - match: "^%\\d{3} ?BACK ?(-?\\d+)\\s*$"
+      state: { background_color: "{1}" }
+    - match: "^%\\d{3} ?SPLH ?(-?\\d+)\\s*$"
+      state: { splash: "{1}" }
+    - match: "^%\\d{3} ?LMUT ?0*([01])\\s*$"
+      state: { led_indicators_mute: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?BAUD ?0*(\\d+)\\s*$"
+      state: { baud_rate: { value: "{1}", map: { "4800": "4800", "9600": "9600", "19200": "19200", "38400": "38400", "57600": "57600", "115200": "115200" } } }
+    - match: "^%\\d{3} ?RTCH ?(-?\\d+)\\s*$"
+      state: { clock_hour: "{1}" }
+    - match: "^%\\d{3} ?RTCM ?(-?\\d+)\\s*$"
+      state: { clock_minute: "{1}" }
+    - match: "^%\\d{3} ?RTCS ?(-?\\d+)\\s*$"
+      state: { clock_second: "{1}" }
+    - match: "^%\\d{3} ?RTCD ?(-?\\d+)\\s*$"
+      state: { clock_day: "{1}" }
+    - match: "^%\\d{3} ?RTCN ?(-?\\d+)\\s*$"
+      state: { clock_month: "{1}" }
+    - match: "^%\\d{3} ?RTCY ?(-?\\d+)\\s*$"
+      state: { clock_year: "{1}" }
+    - match: "^%\\d{3} ?RTCW ?(-?\\d+)\\s*$"
+      state: { clock_weekday: "{1}" }
+    - match: "^%\\d{3} ?TDSM ?0*([01])\\s*$"
+      state: { stereo_mode: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?TDGT ?0*(\\d+)\\s*$"
+      state: { glass_type: { value: "{1}", map: { "0": "dlp_link", "1": "ir", "2": "ir_high_brightness" } } }
+    - match: "^%\\d{3} ?TDGD ?(-?\\d+)\\s*$"
+      state: { genlock_phase_delay: "{1}" }
+    - match: "^%\\d{3} ?TDSE ?0*([01])\\s*$"
+      state: { swap_eyes: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?LENS ?(-?\\d+)\\s*$"
+      state: { lens_id: "{1}" }
+    - match: "^%\\d{3} ?LMON ?0*([01])\\s*$"
+      state: { lens_monitoring: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^%\\d{3} ?LRM1 ?(-?\\d+)\\s*$"
+      state: { lamp1_remaining: "{1}" }
+    - match: "^%\\d{3} ?LTR1 ?(-?\\d+)\\s*$"
+      state: { lamp1_runtime: "{1}" }
+    - match: "^%\\d{3} ?LHO1 ?(-?\\d+)\\s*$"
+      state: { lamp_channel1_total: "{1}" }
+    - match: "^%\\d{3} ?LST1 ?0*(\\d+)\\s*$"
+      state: { lamp1_status: { value: "{1}", map: { "0": "defect", "1": "warming_up", "2": "on", "3": "off", "4": "cooling_down", "5": "not_present" } } }
+    - match: "^%\\d{3} ?LRM2 ?(-?\\d+)\\s*$"
+      state: { lamp2_remaining: "{1}" }
+    - match: "^%\\d{3} ?LTR2 ?(-?\\d+)\\s*$"
+      state: { lamp2_runtime: "{1}" }
+    - match: "^%\\d{3} ?LHO2 ?(-?\\d+)\\s*$"
+      state: { lamp_channel2_total: "{1}" }
+    - match: "^%\\d{3} ?LST2 ?0*(\\d+)\\s*$"
+      state: { lamp2_status: { value: "{1}", map: { "0": "defect", "1": "warming_up", "2": "on", "3": "off", "4": "cooling_down", "5": "not_present" } } }
+    - match: "^%\\d{3} ?UTOT ?(-?\\d+)\\s*$"
+      state: { unit_total_time: "{1}" }
+    - match: "^%\\d{3} ?LANG ?(-?\\d+)\\s*$"
+      state: { language: "{1}" }
+    - match: "^%\\d{3} ?THRM ?(-?\\d+)\\s*$"
+      state: { thermal_status: "{1}" }
+    - match: "^%\\d{3} ?FAN1 ?(-?\\d+)\\s*$"
+      state: { fan1_speed: "{1}" }
+    - match: "^%\\d{3} ?FAN2 ?(-?\\d+)\\s*$"
+      state: { fan2_speed: "{1}" }
+    - match: "^%\\d{3} ?FAN3 ?(-?\\d+)\\s*$"
+      state: { fan3_speed: "{1}" }
+    - match: "^%\\d{3} ?FAN4 ?(-?\\d+)\\s*$"
+      state: { fan4_speed: "{1}" }
+    - match: "^%\\d{3} ?FAN5 ?(-?\\d+)\\s*$"
+      state: { fan5_speed: "{1}" }
+    - match: "^%\\d{3} ?FAN6 ?(-?\\d+)\\s*$"
+      state: { fan6_speed: "{1}" }
+    - match: "^%\\d{3} ?FAN7 ?(-?\\d+)\\s*$"
+      state: { fan7_speed: "{1}" }
+    - match: "^%\\d{3} ?FAN8 ?(-?\\d+)\\s*$"
+      state: { fan8_speed: "{1}" }
+    - match: "^%\\d{3} ?SNS1 ?(-?\\d+)\\s*$"
+      state: { sensor1: "{1}" }
+    - match: "^%\\d{3} ?SNS2 ?(-?\\d+)\\s*$"
+      state: { sensor2: "{1}" }
+    - match: "^%\\d{3} ?SNS3 ?(-?\\d+)\\s*$"
+      state: { sensor3: "{1}" }
+    - match: "^%\\d{3} ?SNS4 ?(-?\\d+)\\s*$"
+      state: { sensor4: "{1}" }
+    - match: "^%\\d{3} ?SNS5 ?(-?\\d+)\\s*$"
+      state: { sensor5: "{1}" }
+    - match: "^%\\d{3} ?SNS6 ?(-?\\d+)\\s*$"
+      state: { sensor6: "{1}" }
+    - match: "^%\\d{3} ?SNS7 ?(-?\\d+)\\s*$"
+      state: { sensor7: "{1}" }
+    - match: "^%\\d{3} ?SNS8 ?(-?\\d+)\\s*$"
+      state: { sensor8: "{1}" }
+    - match: "^%\\d{3} ?PLAT ?e00001 ?(.*?)\\s*$"
+      state: { platform: "{1}" }
+    - match: "^%\\d{3} ?SERI ?e00001 ?(.*?)\\s*$"
+      state: { serial_number: "{1}" }
+    - match: "^%\\d{3} ?MODL ?e00001 ?(.*?)\\s*$"
+      state: { model_name: "{1}" }
+    - match: "^%\\d{3} ?PART ?e00001 ?(.*?)\\s*$"
+      state: { part_number: "{1}" }
+    - match: "^%\\d{3} ?SVER ?e00001 ?(.*?)\\s*$"
+      state: { software_version: "{1}" }
+    - match: "^%\\d{3} ?ACSS ?(-?\\d+)\\s*$"
+      state: { access_level: "{1}" }
+    - match: "^%\\d{3} ?MACA ?e00001 ?(.*?)\\s*$"
+      state: { mac_address: "{1}" }
+    - match: "^%\\d{3} ?IPAD ?e00001 ?(.*?)\\s*$"
+      state: { ip_address: "{1}" }
+    - match: "^%\\d{3} ?LEST ?0*(\\d+)\\s*$"
+      state: { status_led: { value: "{1}", map: { "0": "green_blue_on", "1": "green_blue_flash", "2": "yellow_on", "3": "yellow_flash", "4": "red_on", "5": "red_flash" } } }
+    - match: "^%\\d{3} ?SWSN ?e00001 ?(.*?)\\s*$"
+      state: { software_revision: "{1}" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      factory_reset resets the projector at once, to the level set_factory_reset_full
+      chooses; power off (set_power false) puts the projector in standby, and it
+      takes no command for 30 s after powering on.
+  - models: [all]
+    severity: warning
+    text: >
+      The document asks for 500 ms between commands (kept by the core's pacing),
+      30 s after power on (kept), and a 5 s pause after every 20 commands, which
+      the format cannot count: the polls are spread out to stay well under it,
+      but a burst of more than 20 commands from a consumer should be paced by
+      the consumer.
+  - models: [all]
+    severity: info
+    text: >
+      Value ranges are not in the document for most settings; the projector
+      reports them through get_limit (?M, ?N, ?D, ?S), and a value out of range
+      is answered !00004. The int parameters therefore take any six-digit
+      value. The document's command table is printed with some descriptions
+      and comments one row off; the value meanings follow the value tables.
+  - models: [all]
+    severity: info
+    text: >
+      Commands with no value in the document (picture reset, the menu keys,
+      the resets, show info) are sent as the mnemonic alone, and the per-input,
+      per-scaling, per-gamma and per-orientation shortcut mnemonics (IDVI,
+      S169, GAVI, DESK and the like) are left out: the abs-value commands
+      (IABS, SABS, GABS, ORIE) and get read and set the same settings.
+  - models: [all]
+    severity: info
+    text: >
+      Lamp commands answer !00002 (not available) on LED models and the LED
+      dim commands on lamp models; LPW1 is lamp 1's power on lamp models and
+      the LED power on LED models. Shutter and ECHO are set-only.

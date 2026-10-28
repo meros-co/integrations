@@ -28,7 +28,7 @@ def _pad(b: bytes) -> bytes:
 
 
 def osc(address: str, *args) -> bytes:
-    """args: ("i", int) | ("f", float) | ("s", str) | ("b", bytes), a blob
+    """args: ("i", int) | ("f", float) | ("d", float, a double) | ("s", str) | ("b", bytes), a blob
     given as str being its UTF-8 bytes | ("T", None) | ("F", None)."""
     out = _pad(address.encode())
     out += _pad(("," + "".join(t for t, _ in args)).encode())
@@ -37,6 +37,8 @@ def osc(address: str, *args) -> bytes:
             out += struct.pack(">i", v)
         elif t == "f":
             out += struct.pack(">f", v)
+        elif t == "d":
+            out += struct.pack(">d", v)
         elif t == "s":
             out += _pad(v.encode())
         elif t == "b":

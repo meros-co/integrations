@@ -1,0 +1,71 @@
+spec: 1
+id: generic-ntp
+name: NTP server status (RFC 5905 client request)
+vendor: Generic (any NTP server)
+category: other
+implementation: native
+reason: >
+  NTP packets are binary (48 bytes of fixed-point timestamps), and a server's clock offset and the network
+  delay are computed from four timestamps, two of them this host's own send and receive times, which
+  telemetry rules cannot do.
+
+source:
+  - title: "RFC 5905: Network Time Protocol Version 4: Protocol and Algorithms Specification"
+    author: "D. Mills, J. Martin, J. Burbank, W. Kasch (IETF, 2010)"
+    url: "https://www.rfc-editor.org/rfc/rfc5905"
+    note: >
+      UDP port 123; the timestamp and short formats (§6); the packet header, its leap indicator, version,
+      mode (3 client, 4 server), stratum, poll, precision, root delay, root dispersion, reference ID and the
+      reference, origin, receive and transmit timestamps (§7.3); kiss-o'-death packets, stratum 0 with a
+      four-character code (§7.4); the offset and delay of one exchange (§8).
+  - title: "RFC 4330: Simple Network Time Protocol (SNTP) Version 4"
+    author: "D. Mills (IETF, 2006)"
+    url: "https://www.rfc-editor.org/rfc/rfc4330"
+    note: "A client's request: everything zero but the first byte and, optionally, the transmit timestamp (§5); checking that the answer's originate timestamp is the request's transmit timestamp (§5)."
+
+settings:
+  poll_ms: { type: int, min: 1000, max: 86400000, default: 64000, label: Read interval,
+             description: "Milliseconds between status reads; NTP's shortest poll interval is 16 s, and public servers may answer faster requests with a RATE kiss." }
+
+ports:
+  - { port: 123, protocol: udp, role: control, note: "the NTP server port" }
+
+models:
+  - id: ntp-server
+    name: NTP server (time servers, GPS clocks, switches and hosts serving NTP)
+    supports: [get_status]
+    verification: none
+
+commands:
+  get_status:
+    summary: Ask the server for the time and read its status into state; the status is returned
+    returns: value
+
+state:
+  leap:                 { type: string, description: "Leap indicator: none, add_second, delete_second, or unsynchronized (the server's clock is not synchronized)" }
+  version:              { type: int, description: "NTP version of the answer" }
+  stratum:              { type: int, description: "Stratum: 1 for a primary server (GPS, PTP, radio), 2 to 15 for secondary servers, 0 for a kiss-o'-death answer, 16 unsynchronized" }
+  poll_exponent:        { type: int, description: "The server's poll interval, as a power of two in seconds" }
+  precision_exponent:   { type: int, description: "The server clock's precision, as a power of two in seconds (-20 is about a microsecond)" }
+  root_delay_ms:        { type: float, unit: ms, description: "Round-trip delay to the primary reference" }
+  root_dispersion_ms:   { type: float, unit: ms, description: "Dispersion to the primary reference" }
+  reference_id:         { type: string, description: "For stratum 0 and 1, the reference or kiss code (GPS, PPS, PTP); otherwise the IPv4 address of the server's upstream (or the start of an IPv6 address's hash)" }
+  reference_time_ms:    { type: int, unit: ms, description: "When the server's clock was last set or corrected, Unix milliseconds" }
+  offset_ms:            { type: float, unit: ms, description: "The server's clock minus this host's, from the last exchange" }
+  delay_ms:             { type: float, unit: ms, description: "Round-trip network delay of the last exchange" }
+  synchronized:         { type: bool, description: "The server is synchronized: its leap indicator is not unsynchronized and its stratum is 1 to 15" }
+  kiss_code:            { type: string, description: "The kiss-o'-death code of the last answer (RATE, DENY, RSTR), or \"\" for a normal answer" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      The offset is relative to the clock of the host running the core, so it measures that host as much as the
+      server; compare servers from one host. A server answering RATE asks to be polled less often; DENY or RSTR
+      refuse this client.
+  - models: [all]
+    severity: info
+    text: >
+      Only the client exchange is used: the control queries of NTP mode 6 (ntpq's peers and variables) are
+      implementation-specific and often disabled, and are not sent. An answer whose originate timestamp is not
+      this request's transmit timestamp is ignored.

@@ -278,21 +278,50 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## atlona-matrix — Atlona matrix switchers and switchers
 
-- [ ] Record the Telnet login prompts (Username:, Password:) and what a wrong login answers. ([specs/atlona-matrix.yaml:203](specs/atlona-matrix.yaml#L203))
-- [ ] Confirm the RS-232 factory default of PRO3 matrices and the AT-HDR-H2H-88MA (115200 8N1 assumed from the CSpara example). ([specs/atlona-matrix.yaml:183](specs/atlona-matrix.yaml#L183))
-- [ ] Confirm CSpara and RS232para write parity as 0 none, 1 odd, 2 even. ([specs/atlona-matrix.yaml:214](specs/atlona-matrix.yaml#L214))
-- [ ] Check whether PRO3 matrices and the H2H need a gap between commands (none is documented; Omega asks for 500 ms). ([specs/atlona-matrix.yaml:174](specs/atlona-matrix.yaml#L174))
-- [ ] Confirm the PS62 sets the repeat count with RepeatCmd n, as its document writes RepCmdTime. ([specs/atlona-matrix.yaml:1063](specs/atlona-matrix.yaml#L1063))
-- [ ] Record Status on the PS62 and SW32: xINAVxOUT or xINVxOUT as their examples show. ([specs/atlona-matrix.yaml:1640](specs/atlona-matrix.yaml#L1640))
-- [ ] Record what a PRO3 answers to VOUTn + and VOUTn - (the new level, or the command echoed). ([specs/atlona-matrix.yaml:511](specs/atlona-matrix.yaml#L511))
-- [ ] Record the MH21 InputFormat answer: the format alone or prefixed with InputFormatN. ([specs/atlona-matrix.yaml:623](specs/atlona-matrix.yaml#L623))
-- [ ] Confirm the MH21 takes HDCPSet with a space before the input (HDCPSet 1 on). ([specs/atlona-matrix.yaml:671](specs/atlona-matrix.yaml#L671))
-- [ ] Confirm Unlock is answered Unlock (the PRO3 document shows Lock for both). ([specs/atlona-matrix.yaml:738](specs/atlona-matrix.yaml#L738))
-- [ ] Confirm show_host_name answers the bare host name. ([specs/atlona-matrix.yaml:1247](specs/atlona-matrix.yaml#L1247))
-- [ ] Record what Broadcast on sends when routing changes in the web GUI (assumed the same text as the echoes). ([specs/atlona-matrix.yaml:999](specs/atlona-matrix.yaml#L999))
-- [ ] Confirm IPChangePass takes user, old and new password (the document lists a fourth, the confirmation, but its example has three). ([specs/atlona-matrix.yaml:1220](specs/atlona-matrix.yaml#L1220))
+- [ ] Record the Telnet login prompts (Username:, Password:) and what a wrong login answers. ([specs/atlona-matrix.yaml:295](specs/atlona-matrix.yaml#L295))
+- [ ] Confirm the RS-232 factory default of PRO3 matrices and the AT-HDR-H2H-88MA (115200 8N1 assumed from the CSpara example). ([specs/atlona-matrix.yaml:275](specs/atlona-matrix.yaml#L275))
+- [ ] Confirm CSpara and RS232para write parity as 0 none, 1 odd, 2 even. ([specs/atlona-matrix.yaml:308](specs/atlona-matrix.yaml#L308))
+- [ ] Check whether PRO3 matrices and the H2H need a gap between commands (none is documented; Omega asks for 500 ms). ([specs/atlona-matrix.yaml:264](specs/atlona-matrix.yaml#L264))
+- [ ] Confirm the PS62 sets the repeat count with RepeatCmd n, as its document writes RepCmdTime. ([specs/atlona-matrix.yaml:1453](specs/atlona-matrix.yaml#L1453))
+- [ ] Record Status on the PS62 and SW32: xINAVxOUT or xINVxOUT as their examples show. ([specs/atlona-matrix.yaml:2638](specs/atlona-matrix.yaml#L2638))
+- [ ] Record what a PRO3 answers to VOUTn + and VOUTn - (the new level, or the command echoed). ([specs/atlona-matrix.yaml:751](specs/atlona-matrix.yaml#L751))
+- [ ] Record the MH21 InputFormat answer: the format alone or prefixed with InputFormatN. ([specs/atlona-matrix.yaml:944](specs/atlona-matrix.yaml#L944))
+- [ ] Confirm the MH21 takes HDCPSet with a space before the input (HDCPSet 1 on). ([specs/atlona-matrix.yaml:992](specs/atlona-matrix.yaml#L992))
+- [ ] Confirm Unlock is answered Unlock (the PRO3 document shows Lock for both). ([specs/atlona-matrix.yaml:1128](specs/atlona-matrix.yaml#L1128))
+- [ ] Confirm show_host_name answers the bare host name. ([specs/atlona-matrix.yaml:1637](specs/atlona-matrix.yaml#L1637))
+- [ ] Record what Broadcast on sends when routing changes in the web GUI (assumed the same text as the echoes). ([specs/atlona-matrix.yaml:1389](specs/atlona-matrix.yaml#L1389))
+- [ ] Confirm IPChangePass takes user, old and new password (the document lists a fourth, the confirmation, but its example has three). ([specs/atlona-matrix.yaml:1610](specs/atlona-matrix.yaml#L1610))
 - [ ] Check whether TCP 9000 on Omega switchers needs a login and answers like Telnet. ([specs/atlona-matrix.yaml:85](specs/atlona-matrix.yaml#L85))
-- [ ] Confirm All# is answered All# on PRO3 matrices and with the new routes on the H2H and PS62. ([specs/atlona-matrix.yaml:407](specs/atlona-matrix.yaml#L407))
+- [ ] Confirm All# is answered All# on PRO3 matrices and with the new routes on the H2H and PS62. ([specs/atlona-matrix.yaml:634](specs/atlona-matrix.yaml#L634))
+- [ ] AT-HDR-H2H-44M: confirm HDCPSet takes a space before the input (HDCPSet 1 on), as its document writes it, unlike the 44MA and 88MA. ([specs/atlona-matrix.yaml:407](specs/atlona-matrix.yaml#L407))
+- [ ] AT-HDR-H2H-44M and -44MA: record what EDIDOut's one number is (an output or an EDID memory), so save_output_edid can be offered. ([specs/atlona-matrix.yaml:427](specs/atlona-matrix.yaml#L427))
+- [ ] AT-HDR-H2H-44MA: confirm the longest name InNameSet, OutNameSet and PreNameSet take, whether a name may hold spaces, and that the 44MA needs 500 ms between commands as its document says. ([specs/atlona-matrix.yaml:1015](specs/atlona-matrix.yaml#L1015))
+- [ ] AT-OME-ST31: the RS-232 control port runs at 9600 8N1, as on the ST31A (its document gives no line settings) ([specs/atlona-matrix.yaml:277](specs/atlona-matrix.yaml#L277))
+- [ ] AT-OME-SR21: HDMIAUD, RelayAct, USBHostRoute and VOUT sta answer in the form of the document's examples (HDMIAUD on, RelayAct1 close, USBHostRoute local, VOUT -30) ([specs/atlona-matrix.yaml:2756](specs/atlona-matrix.yaml#L2756))
+- [ ] AT-OME-SR21: Status answers x1AVx1 or x2AVx1 (the document's example reads x3Vx1 on a two-input unit) ([specs/atlona-matrix.yaml:2981](specs/atlona-matrix.yaml#L2981))
+- [ ] AT-UHD-CLSO-840: an audio route (x6Ax2) is answered x6Ax2, not x6AVx2 as the document's example shows ([specs/atlona-matrix.yaml:646](specs/atlona-matrix.yaml#L646))
+- [ ] AT-UHD-CLSO-840: VIN + and - are answered with the new level, and HDCPSet takes the input before the mode (HDCPSet 1 on) ([specs/atlona-matrix.yaml:812](specs/atlona-matrix.yaml#L812))
+- [ ] AT-UHD-CLSO-840: Status lists the audio routes (x1Ax1) after the video routes on one line ([specs/atlona-matrix.yaml:2641](specs/atlona-matrix.yaml#L2641))
+- [ ] AT-UHD-CLSO-601: PWSTA is answered ON or OFF, not PWON or PWOFF ([specs/atlona-matrix.yaml:1098](specs/atlona-matrix.yaml#L1098))
+- [ ] AT-UHD-CLSO-601: microphone ducking is turned on and off with MICon and MICoff and read with MICsta ([specs/atlona-matrix.yaml:1942](specs/atlona-matrix.yaml#L1942))
+- [ ] AT-UHD-CLSO-601: the output resolution command is VFmtRes (the syntax line says VidOutRes) and the aspect values are full, overscan, underscan, letterbox, panscan and follow (the example answers fill) ([specs/atlona-matrix.yaml:1716](specs/atlona-matrix.yaml#L1716))
+- [ ] AT-UHD-CLSO-601: InputStatus without an input answers one digit per input, and VersionMCU and VersionVSRX answer V followed by the version ([specs/atlona-matrix.yaml:1666](specs/atlona-matrix.yaml#L1666))
+- [ ] AT-UHD-CLSO-601 and AT-UHD-CLSO-840: the RS-232 control port's factory line is 115200 8N1 (the documents give the CSpara example only) ([specs/atlona-matrix.yaml:272](specs/atlona-matrix.yaml#L272))
+
+## atlona-ms52w — Atlona AT-OME-MS52W and AT-UHD-SW-510W switchers (Telnet JSON API)
+
+- [ ] Confirm the Telnet port (23) takes the commands with no login prompt, and that OutputMode j makes every JSON answer one line. ([specs/atlona-ms52w.yaml:66](specs/atlona-ms52w.yaml#L66))
+- [ ] Record the plain-text answers of Display:Minimal:Get, GetBroadcast and SetBroadcast, and whether Platform:Restart, Reset and Shutdown answer at all. ([specs/atlona-ms52w.yaml:758](specs/atlona-ms52w.yaml#L758))
+- [ ] Record what the unit broadcasts on a change (routing, input, volume) besides the moderator event, so rules can follow it. ([specs/atlona-ms52w.yaml:714](specs/atlona-ms52w.yaml#L714))
+- [ ] Confirm the parity numbering (0 none, 1 odd, 2 even) and which relay state is closed. ([specs/atlona-ms52w.yaml:766](specs/atlona-ms52w.yaml#L766))
+- [ ] AT-UHD-SW-510W: confirm the Telnet port (23), that OutputMode j is taken, and how SetVol sta answers ([specs/atlona-ms52w.yaml:741](specs/atlona-ms52w.yaml#L741))
+- [ ] AT-UHD-SW-510W: record what Input:Set and Display:Input:Set answer (the examples set input 1 and answer activeinput 0) ([specs/atlona-ms52w.yaml:270](specs/atlona-ms52w.yaml#L270))
+
+## atlona-sw510w-rest — Atlona AT-UHD-SW-510W (REST API)
+
+- [ ] Confirm the REST API is on port 80 at /API with no login, and that the colons in method= may be percent-encoded. ([specs/atlona-sw510w-rest.yaml:30](specs/atlona-sw510w-rest.yaml#L30))
+- [ ] Record which parameters System:MaintenanceTime:Set takes (its table lists hour, minute and day; its example sends one boolean per day and a timezone) and that the Set commands answer as the Get commands do. ([specs/atlona-sw510w-rest.yaml:80](specs/atlona-sw510w-rest.yaml#L80))
+- [ ] Record the accepted ranges of the Wi-Fi fence threshold, duration and time threshold, and of the station kick timeout. ([specs/atlona-sw510w-rest.yaml:51](specs/atlona-sw510w-rest.yaml#L51))
 
 ## avolites-titan — Avolites Titan
 
@@ -1244,6 +1273,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the Model E takes the commands on TCP 23 (the guide tests with Telnet but names no port) and whether it sends a Telnet greeting. ([specs/dandugan-model-e.yaml:36](specs/dandugan-model-e.yaml#L36))
 - [ ] Record the reply forms (no spaces, value after a comma) for a name holding spaces and for every query. ([specs/dandugan-model-e.yaml:86](specs/dandugan-model-e.yaml#L86))
 
+## dashare-multiplay — MultiPlay 3 (OSC control)
+
+- [ ] Confirm MultiPlay takes OSC over UDP on its Control port, and which port a fresh install uses. ([specs/dashare-multiplay.yaml:59](specs/dashare-multiplay.yaml#L59))
+- [ ] Confirm the cue actions and /Stopwatch are matched without case: the help writes Go and /Stopwatch/Start, the Companion module sends go and /stopwatch/start. ([specs/dashare-multiplay.yaml:109](specs/dashare-multiplay.yaml#L109))
+- [ ] Record the OSC type of the status booleans (/status/go and the others): OSC true/false, the strings TRUE/FALSE, or ints. ([specs/dashare-multiplay.yaml:375](specs/dashare-multiplay.yaml#L375))
+- [ ] Confirm /status/refresh sends every status message, and that MultiPlay sends status only to the Remote target. ([specs/dashare-multiplay.yaml:369](specs/dashare-multiplay.yaml#L369))
+- [ ] Confirm the int and float argument types of Pan, Speed, Volume and their /- and /+ forms, and that Position and the jumps take a float. ([specs/dashare-multiplay.yaml:221](specs/dashare-multiplay.yaml#L221))
+- [ ] Confirm the lowest volume level bounds Volume and Volume/- (-60 dB unless changed). ([specs/dashare-multiplay.yaml:292](specs/dashare-multiplay.yaml#L292))
+
 ## dataton-watchout6 — Dataton WATCHOUT 6
 
 - [ ] Confirm that every ID-tagged command ([m]) gets a tagged reply on WATCHOUT 6 (production and display) as the guide says, including an empty [m] for a successful action; WATCHOUT 7 documents the empty tag, the 6.x guide does not. ([specs/dataton-watchout6.yaml:489](specs/dataton-watchout6.yaml#L489))
@@ -1400,6 +1438,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm Matrix_Inputs/N/Matrix_Send/M sends matrix input N to matrix output M, both numbered from 1, and how many matrix inputs each console has. ([specs/digico-sd.yaml:3900](specs/digico-sd.yaml#L3900))
 - [ ] Find what a multi is on current SD and Quantum software, how many exist, and whether Multis/N solo, fader, mute and name act on them as the list's rows read. ([specs/digico-sd.yaml:3930](specs/digico-sd.yaml#L3930))
 
+## digitalprojection-dvision — Digital Projection dVision 35 and dVision Scope (ASCII protocol)
+
+- [ ] Confirm commands without a value in the document (MENU, NVUP, PRST, RD65, FCRE, SINF) are sent as the mnemonic alone and acknowledged. ([specs/digitalprojection-dvision.yaml:978](specs/digitalprojection-dvision.yaml#L978))
+- [ ] Confirm the meaning of the table rows the document prints one row off: PMUT 0/1, SABS's value table, CMTV 3200-9300, RD65 set-only, DSCR's table. ([specs/digitalprojection-dvision.yaml:130](specs/digitalprojection-dvision.yaml#L130))
+- [ ] Record each setting's range with ?N and ?M (brightness, contrast, lamp power and the others the document gives no range for). ([specs/digitalprojection-dvision.yaml:1099](specs/digitalprojection-dvision.yaml#L1099))
+- [ ] Confirm a negative value is acknowledged as - and five digits, and how a string value (SERI) is answered. ([specs/digitalprojection-dvision.yaml:1438](specs/digitalprojection-dvision.yaml#L1438))
+- [ ] Confirm the 5 s pause after 20 commands is needed on the LAN as well as on RS-232, and whether TCP 1025 takes several commands on one connection. ([specs/digitalprojection-dvision.yaml:39](specs/digitalprojection-dvision.yaml#L39))
+- [ ] Confirm TATB, EDIR and EDIT take the value before the target (":TATB 1 3"). ([specs/digitalprojection-dvision.yaml:1025](specs/digitalprojection-dvision.yaml#L1025))
+- [ ] Confirm LPW1 is the LED power on LED models and lamp commands answer !00002 there. ([specs/digitalprojection-dvision.yaml:649](specs/digitalprojection-dvision.yaml#L649))
+
 ## digitalprojection-evision-6500 — Digital Projection E-Vision Laser 6500 II (VXX command set)
 
 - [ ] TCP 23 accepts the V commands as a raw TCP connection, with no Telnet negotiation or prompt. ([specs/digitalprojection-evision-6500.yaml:22](specs/digitalprojection-evision-6500.yaml#L22))
@@ -1421,6 +1469,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Input numbering per model (input.sel starts at 1). ([specs/digitalprojection-evision-op.yaml:740](specs/digitalprojection-evision-op.yaml#L740))
 - [ ] Lens memories 1 to 8 on the E-Vision Laser 9000 and 9100. ([specs/digitalprojection-evision-op.yaml:827](specs/digitalprojection-evision-op.yaml#L827))
 - [ ] Confirm the 200 ms between commands the manuals ask of "RS232 by Telnet" holds when counted from each answer, and that the RS-232 port itself needs no gap (none is applied there). ([specs/digitalprojection-evision-op.yaml:59](specs/digitalprojection-evision-op.yaml#L59))
+
+## digitalprojection-insight-laser — Digital Projection INSIGHT 4K Laser (binary protocol)
+
+- [ ] Confirm Get Current Title is 00 85 00 00 01 02 88 (the guide prints 02 as its first byte). ([specs/digitalprojection-insight-laser.yaml:153](specs/digitalprojection-insight-laser.yaml#L153))
+- [ ] Record the reply status byte (C0h in every example) for a refused or unsupported request, and whether a reply's length can exceed 255. ([specs/digitalprojection-insight-laser.yaml:158](specs/digitalprojection-insight-laser.yaml#L158))
+- [ ] Confirm the running status's field order (external control, power, cooling, power processing, mode at bytes 6 to 10; light status and on/off at 14 and 15). ([specs/digitalprojection-insight-laser.yaml:129](specs/digitalprojection-insight-laser.yaml#L129))
+- [ ] Confirm the light power level is at byte 12 of the Get Light Power Level reply. ([specs/digitalprojection-insight-laser.yaml:137](specs/digitalprojection-insight-laser.yaml#L137))
+- [ ] Confirm TCP 43728 takes several requests on one connection and needs no delay between them. ([specs/digitalprojection-insight-laser.yaml:39](specs/digitalprojection-insight-laser.yaml#L39))
 
 ## digitalprojection-projector — Digital Projection projectors (ASCII control protocol)
 
@@ -1826,6 +1882,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Connect to Mosquitto, EMQX and HiveMQ with versions 3.1.1 and 5 over tcp, tls and wss, and confirm CONNACK, SUBACK and version 5 properties (server keep alive, assigned client id, maximum QoS) are read as described, and that their WebSocket endpoints accept the mqtt subprotocol at the paths they document. ([specs/generic-mqtt.yaml:42](specs/generic-mqtt.yaml#L42))
 - [ ] With clean_start false and a session expiry, confirm a broker delivers the messages queued while the client was away after reconnecting, and that dropping unacknowledged QoS 1 and 2 publishes (not resent with DUP) is acceptable to it. ([specs/generic-mqtt.yaml:153](specs/generic-mqtt.yaml#L153))
 
+## generic-ntp — NTP server status (RFC 5905 client request)
+
+- [ ] Check against a GPS time server (a TimeMachines TM2000A, a Meinberg) that the stratum, reference ID and offset agree with the server's own display. ([specs/generic-ntp.yaml:47](specs/generic-ntp.yaml#L47))
+
 ## generic-ping — Network presence (ping) and Wake-on-LAN
 
 - [ ] Check that network adapters with a SecureOn password take it as 4 or 6 bytes right after the sixteen MAC repetitions (from practice, not AMD's paper). ([specs/generic-ping.yaml:66](specs/generic-ping.yaml#L66))
@@ -1879,6 +1939,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the status bits a K2 sets (the names follow the T2's AMP manual) and whether 61.20 0F returns fifteen bytes. ([specs/grassvalley-amp.yaml:354](specs/grassvalley-amp.yaml#L354))
 - [ ] Check which AMP commands Ross Tria, Mira and Kiva servers take over TCP 3811 and what their channels are called. ([specs/grassvalley-amp.yaml:87](specs/grassvalley-amp.yaml#L87))
 - [ ] Check the times a K2 answers for 61.0C 01, 04, 08 and 40, and whether 02 (VITC) is answered or 70.0D. ([specs/grassvalley-amp.yaml:199](specs/grassvalley-amp.yaml#L199))
+
+## grassvalley-kaleido — Grass Valley Kaleido multiviewers (Remote Control Protocol gateway)
+
+- [ ] Confirm `<openID></openID>` opens a session without a room as `<openID/>` does, and that a session opened with a user takes the clear password. ([specs/grassvalley-kaleido.yaml:44](specs/grassvalley-kaleido.yaml#L44))
+- [ ] Confirm a carriage return alone ends each command (the guide asks for a carriage return, and a line feed in scripts). ([specs/grassvalley-kaleido.yaml:33](specs/grassvalley-kaleido.yaml#L33))
+- [ ] Record whether getKRoom's answer arrives on one line or several. ([specs/grassvalley-kaleido.yaml:112](specs/grassvalley-kaleido.yaml#L112))
+- [ ] Confirm the -20 dB mode is written with a hyphen (the guide prints an en dash) in setKAudioOutMode and its answer. ([specs/grassvalley-kaleido.yaml:343](specs/grassvalley-kaleido.yaml#L343))
+- [ ] Confirm getKAudioOutVolume's value format (whole dB, tenths on the Kaleido-X series, with or without a unit). ([specs/grassvalley-kaleido.yaml:426](specs/grassvalley-kaleido.yaml#L426))
+- [ ] Confirm the gateway answers each command before reading the next on one connection, and that getKCurrentLayout closes it as the guide says. ([specs/grassvalley-kaleido.yaml:452](specs/grassvalley-kaleido.yaml#L452))
 
 ## greenhippo-hippotizer — Green Hippo Hippotizer
 
@@ -3279,6 +3348,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record whether the multi-window report (FD) starts with the window number. ([specs/philips-sicp.yaml:792](specs/philips-sicp.yaml#L792))
 - [ ] Confirm the operating hours report is a big-endian 16-bit count of hours. ([specs/philips-sicp.yaml:724](specs/philips-sicp.yaml#L724))
 
+## piclock — PiClock studio clock (tally server)
+
+- [ ] Confirm the AUTH digest is lowercase hexadecimal SHA-512 of the challenge followed by the secret. ([specs/piclock.yaml:202](specs/piclock.yaml#L202))
+- [ ] Confirm region commands take the region number directly before the command name (0SETTALLY:...). ([specs/piclock.yaml:208](specs/piclock.yaml#L208))
+- [ ] Confirm SETCOUNTDOWN's empty flash field and SETLAYOUT's empty legacy field are accepted. ([specs/piclock.yaml:122](specs/piclock.yaml#L122))
+- [ ] Confirm the clock sends GPI on connecting and on each change, and that a 16-bit word is read bit 0 first. ([specs/piclock.yaml:190](specs/piclock.yaml#L190))
+
 ## pigpio — Raspberry Pi GPIO (pigpio daemon)
 
 - [ ] Check against pigpiod (version 79) on a Raspberry Pi 4 that NOIB on a second connection answers the handle and then streams reports for the GPIO NB names on the first, as the C interface describes for socket notifications. ([specs/pigpio.yaml:7](specs/pigpio.yaml#L7))
@@ -3967,6 +4043,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm an empty apiKey query parameter is accepted when no apiKey is configured. ([specs/sofie-chef.yaml:175](specs/sofie-chef.yaml#L175))
 - [ ] Confirm the WebSocket API on apiPort + 1 (path /) pushes status on connecting and on each change without a request or the apiKey. ([specs/sofie-chef.yaml:186](specs/sofie-chef.yaml#L186))
 
+## sofie-core — Sofie Core (User Actions REST API and Live Status Gateway)
+
+- [ ] Confirm the API answers under /api/v1.0 on port 3000 of a production Sofie Core, and which statuses a PUT or POST answers with. ([specs/sofie-core.yaml:44](specs/sofie-core.yaml#L44))
+- [ ] Confirm the Live Status Gateway accepts the four subscriptions on one connection and sends each topic's current state when subscribed. ([specs/sofie-core.yaml:915](specs/sofie-core.yaml#L915))
+- [ ] Confirm sending false for an optional boolean (activate's rehearsal, the T-timer flags, move_next_segment's ignoreQuickLoop) behaves as leaving it out. ([specs/sofie-core.yaml:1076](specs/sofie-core.yaml#L1076))
+- [ ] Confirm an activePlaylist event with no active playlist carries id null, as the gateway's schema allows. ([specs/sofie-core.yaml:1084](specs/sofie-core.yaml#L1084))
+
 ## softouch-easyworship — Softouch EasyWorship
 
 - [ ] Confirm the whole exchange against EasyWorship 7.3 or later: the pairing request and its paired and notPaired answers, a heartbeat after each message, and status messages. ([specs/softouch-easyworship.yaml:130](specs/softouch-easyworship.yaml#L130))
@@ -4006,6 +4089,25 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the status and body Multicam Logger answers the commands with, and its answer when no document is open. ([specs/softron-multicam-logger.yaml:45](specs/softron-multicam-logger.yaml#L45))
 - [ ] Confirm GET /angle_changes answers a JSON list (the guide's example also wraps it in braces). ([specs/softron-multicam-logger.yaml:165](specs/softron-multicam-logger.yaml#L165))
 - [ ] Confirm /status gives program and preview as numbers in strings, and logging_state as a boolean. ([specs/softron-multicam-logger.yaml:105](specs/softron-multicam-logger.yaml#L105))
+
+## softron-ontheair-video — Softron OnTheAir Video (REST API and WebSocket)
+
+- [ ] Compare every call with the app's api.html: method (GET for the transport calls), path, and answer status (200, 201 or 202). ([specs/softron-ontheair-video.yaml:109](specs/softron-ontheair-video.yaml#L109))
+- [ ] Confirm how a client authenticates when Bypass authorisation is off, and what the API answers then. ([specs/softron-ontheair-video.yaml:72](specs/softron-ontheair-video.yaml#L72))
+- [ ] Confirm the playback websocket sends to a client offering playback_update_v1, and record its event fields (playback_status_changed, item_changed, playback_timing_changed, CG project property). ([specs/softron-ontheair-video.yaml:481](specs/softron-ontheair-video.yaml#L481))
+- [ ] Record /playback/playing's fields and units (seconds as numbers) and /info's available_actions. ([specs/softron-ontheair-video.yaml:529](specs/softron-ontheair-video.yaml#L529))
+- [ ] Confirm the item fields of `/playlists/<id>/items` (unique_id, name, duration) and that a playlist is found by index and by name. ([specs/softron-ontheair-video.yaml:554](specs/softron-ontheair-video.yaml#L554))
+- [ ] Confirm `POST /playlists/<p>/items[/<index>]` with clip_type 0, 3, 4 and 5 and the name, url, live_source_name and duration fields, and what it answers. ([specs/softron-ontheair-video.yaml:316](specs/softron-ontheair-video.yaml#L316))
+- [ ] Confirm GET /playback/clocked_items?enabled=0 turns the option off (only enabled=1 is in the release notes). ([specs/softron-ontheair-video.yaml:292](specs/softron-ontheair-video.yaml#L292))
+- [ ] Confirm the timecode queries position_relative_timecode and position_media_timecode take HH:MM:SS:FF, and position_relative_seconds a decimal. ([specs/softron-ontheair-video.yaml:228](specs/softron-ontheair-video.yaml#L228))
+
+## songbeamer — SongBeamer (OSC remote control)
+
+- [ ] Confirm a query (the address alone) is answered on the same address to the sender, as on the X32. ([specs/songbeamer.yaml:37](specs/songbeamer.yaml#L37))
+- [ ] Record the integer each enum answers with (presentation state, video state, live video) and confirm enums are taken as strings. ([specs/songbeamer.yaml:342](specs/songbeamer.yaml#L342))
+- [ ] Confirm /xremote subscribes for 10 s and what it sends, and whether /playlist/changed reaches subscribers. ([specs/songbeamer.yaml:256](specs/songbeamer.yaml#L256))
+- [ ] Confirm changes made over OSC are still not reported back on current versions (the document's known bug). ([specs/songbeamer.yaml:337](specs/songbeamer.yaml#L337))
+- [ ] Confirm /video/position and /video/length answer as doubles (1.0 = 24 h) and take the string forms hh:mm:ss and +seconds. ([specs/songbeamer.yaml:321](specs/songbeamer.yaml#L321))
 
 ## sony-9pin — Sony 9-pin (RS-422 VTR protocol) decks and servers
 
@@ -4214,6 +4316,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the values import_settings's type takes besides encoder. ([specs/teradek-prism.yaml:1013](specs/teradek-prism.yaml#L1013))
 - [ ] On a 2.25 unit, confirm the list, inputs and capacity endpoints answer 404 and that encoder 0, decoder 0 and streams 0-4 answer on the shared paths. ([specs/teradek-prism.yaml:2061](specs/teradek-prism.yaml#L2061))
 - [ ] Record the units of the audio delay and volume fields (encoder audio delay, audio output delay and embedded volume, channel volume). ([specs/teradek-prism.yaml:1963](specs/teradek-prism.yaml#L1963))
+
+## timemachines-clock — TimeMachines clocks, timers and time servers (Locator Protocol API)
+
+- [ ] Record a clock's 40-byte status and confirm bytes 20 to 39 (alarm, days, digits value, WiFi signal, name). ([specs/timemachines-clock.yaml:260](specs/timemachines-clock.yaml#L260))
+- [ ] Confirm the clock answers from port 7372 to the sender's port, and answers every control request with 'A'. ([specs/timemachines-clock.yaml:30](specs/timemachines-clock.yaml#L30))
+- [ ] Record what Get Program and Get Active Program answer. ([specs/timemachines-clock.yaml:168](specs/timemachines-clock.yaml#L168))
+- [ ] Confirm Load Program's second byte is 4Fh as the guide writes, and that the steps are the same 32-byte structure as Store Program's. ([specs/timemachines-clock.yaml:183](specs/timemachines-clock.yaml#L183))
+- [ ] Confirm the two-line clock's text takes a line feed for a new line, and the DotMatrix text's ESC form on the TM848. ([specs/timemachines-clock.yaml:154](specs/timemachines-clock.yaml#L154))
+- [ ] Confirm the TM1000A and TM2000A answer the locator query with the 80-byte status. ([specs/timemachines-clock.yaml:68](specs/timemachines-clock.yaml#L68))
 
 ## tractus-fullview — Tractus FullView for NDI
 

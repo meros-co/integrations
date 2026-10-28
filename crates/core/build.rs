@@ -50,7 +50,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-anomes", &["millumin"]),
     ("vendor-arkaos", &["arkaos-mediamaster"]),
     ("vendor-artisticlicence", &["artnet"]),
-    ("vendor-atlona", &["atlona-matrix"]),
+    (
+        "vendor-atlona",
+        &["atlona-matrix", "atlona-ms52w", "atlona-sw510w-rest"],
+    ),
     ("vendor-avolites", &["avolites-titan"]),
     ("vendor-avproedge", &["avproedge-matrix"]),
     ("vendor-avstumpfl", &["avstumpfl-pixera"]),
@@ -116,6 +119,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-cockos", &["cockos-reaper", "cockos-reaper-web"]),
     ("vendor-dahua", &["dahua-ptz"]),
     ("vendor-dandugan", &["dandugan-model-e"]),
+    ("vendor-dashare", &["dashare-multiplay"]),
     (
         "vendor-dataton",
         &["dataton-watchout6", "dataton-watchout7"],
@@ -137,8 +141,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     (
         "vendor-digitalprojection",
         &[
+            "digitalprojection-dvision",
             "digitalprojection-evision-6500",
             "digitalprojection-evision-op",
+            "digitalprojection-insight-laser",
             "digitalprojection-projector",
         ],
     ),
@@ -171,6 +177,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "generic-midi",
             "generic-modbus",
             "generic-mqtt",
+            "generic-ntp",
             "generic-osc",
             "generic-ping",
             "generic-snmp",
@@ -183,7 +190,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-google", &["youtube-live"]),
-    ("vendor-grassvalley", &["grassvalley-amp"]),
+    (
+        "vendor-grassvalley",
+        &["grassvalley-amp", "grassvalley-kaleido"],
+    ),
     ("vendor-greenhippo", &["greenhippo-hippotizer"]),
     ("vendor-h2r", &["h2r-graphics"]),
     ("vendor-haivision", &["haivision-kb", "haivision-makito-x4"]),
@@ -292,6 +302,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-phabrix", &["phabrix-qx"]),
     ("vendor-pharos", &["pharos-designer"]),
     ("vendor-philips", &["philips-sicp"]),
+    ("vendor-piclock", &["piclock"]),
     ("vendor-pigpio", &["pigpio"]),
     ("vendor-pikvm", &["pikvm"]),
     ("vendor-pixotope", &["pixotope"]),
@@ -376,7 +387,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-singular", &["singular-datastream", "singular-live"]),
-    ("vendor-sofie", &["sofie-chef"]),
+    ("vendor-sofie", &["sofie-chef", "sofie-core"]),
     ("vendor-softouch", &["softouch-easyworship"]),
     (
         "vendor-softron",
@@ -384,8 +395,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "softron-movierecorder",
             "softron-mreplay",
             "softron-multicam-logger",
+            "softron-ontheair-video",
         ],
     ),
+    ("vendor-songbeamer", &["songbeamer"]),
     (
         "vendor-sony",
         &[
@@ -418,6 +431,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-teradek", &["teradek-prism"]),
+    ("vendor-timemachines", &["timemachines-clock"]),
     ("vendor-tinkerlist", &["cuez-automator"]),
     (
         "vendor-tractus",

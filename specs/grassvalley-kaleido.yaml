@@ -1,0 +1,476 @@
+spec: 1
+id: grassvalley-kaleido
+name: Grass Valley Kaleido multiviewers (Remote Control Protocol gateway)
+vendor: Grass Valley
+category: other
+
+# The Kaleido gateway: XML commands over TCP 13000, each a single element
+# ended by a carriage return, answered by <ack/>, <nack/> or a reply element
+# (<kCurrentLayout>, <kLayoutList>, ...). A session is opened with <openID>
+# first. The gateway pushes nothing: lists and the audio monitoring output
+# are polled, and each change the gateway acknowledges is written to state
+# from the request it answers.
+source:
+  - title: "Kaleido Remote Control Protocol (Gateway) User's Guide, M770-0900-116, 9 January 2014"
+    author: Miranda Technologies (Grass Valley)
+    url: https://www.manualsdir.com/manuals/796238/grass-valley-kaleido-remote-control-protocol-gateway-jan09-2014.html
+    note: >
+      Manufacturer document, read from the public copy at ManualsDir (Grass Valley's own link no longer
+      resolves) on 2026-10-28. Port 13000 always on for the Kaleido-X series and Alto/Quad/Quad-Dual, the
+      Kaleido-K2 internal gateway on 13000 (p.1-2); every command followed by a carriage return (p.5); the
+      command index and the systems each applies to (p.5-6); openID and its forms, closeID,
+      getParameterInfo, getKCurrentLayout (which closes the connection), setKCurrentLayout, getKLayoutList,
+      getKRoom, getKRoomList, setKStatusMessage and its statuses, setKUnlatch, getKChannel, setKChannel,
+      setKDynamicText, getKDynamicText, getKMetaData, setKTimer, setKTimer2, setKTimerTrigger,
+      setKFireAction, getKActionList, setKEnable/DisableAlarmGroup, setKSaveLayout, the audio monitoring
+      output commands, setKVerticalOffset, setKIcontrolMode and setKMouseColorA/B/C, each with its answers
+      (p.7-24); the Kaleido-X series support history by command and model (p.31-32).
+
+transport:
+  type: line-tcp
+  port: 13000
+  framing: terminated
+  terminator: cr
+  encoding: utf-8
+  timeout_ms: 5000
+  reply: expected
+  reply_match: "^<"
+
+settings:
+  open_id: { type: string, max_length: 512, pattern: "^[^<>&]*$", default: "", label: Session,
+             description: "What openID carries: on the Kaleido-X series empty (no room), a room name, or mirandagateway://USER:PASSWORD@SYSTEM/ROOM for the audio commands; on a Kaleido-K2 or Alto/Quad the frame's IP address followed by _0_4_0_0." }
+
+on_connect:
+  - send: "<openID>{settings.open_id}</openID>"
+    await_reply: true
+    refused: "^<nack/>"
+    accepted: "^<ack/>"
+
+ports:
+  - { port: 13000, protocol: tcp, role: control, note: "the gateway port, always on" }
+
+models:
+  - id: kaleido-x
+    name: Grass Valley Kaleido-X, Kaleido-X16, Kaleido-XQUAD, Kaleido-MX and Kaleido-Modular-X
+    supports: &kx [get_software_version, get_system_name, get_current_layout, set_current_layout, get_layout_list,
+      get_room, get_room_list, set_status_message, unlatch_channel, unlatch_alarm, unlatch_gateway_alarm, get_channel,
+      set_channel, set_dynamic_text, get_dynamic_text, set_timer, set_timer2, trigger_timer, fire_action,
+      get_action_list, enable_alarm_group, disable_alarm_group, get_audio_out, monitor_no_audio, monitor_stream,
+      monitor_audio_card, monitor_embedded, get_audio_volume, set_audio_volume, get_audio_mode, set_audio_mode]
+    verification: none
+  - id: kaleido-ip
+    name: Grass Valley Kaleido-IP, KMV-3901 and KMV-3911
+    supports: [get_software_version, get_system_name, get_current_layout, set_current_layout, get_layout_list,
+      get_room, get_room_list, set_status_message, unlatch_channel, unlatch_alarm, unlatch_gateway_alarm, get_channel,
+      set_channel, set_dynamic_text, get_dynamic_text, set_timer, set_timer2, trigger_timer, fire_action,
+      get_action_list, enable_alarm_group, disable_alarm_group]
+    verification: none
+    notes: These models have no audio monitoring output; getKChannel needs the Kaleido-IP (software 6.00).
+  - id: kaleido-k2
+    name: Grass Valley Kaleido-K2
+    supports: [get_current_layout, set_current_layout, get_layout_list, set_status_message, set_channel, set_dynamic_text,
+      get_metadata, set_timer, set_timer2, trigger_timer, fire_action, enable_alarm_group, disable_alarm_group,
+      save_layout, get_audio_out, monitor_no_audio, monitor_stream, monitor_audio_card, monitor_embedded,
+      get_audio_volume, set_audio_volume, get_audio_mode, set_audio_mode]
+    verification: none
+  - id: kaleido-alto-quad
+    name: Grass Valley Kaleido-Alto, Kaleido-Quad and Kaleido-Quad-Dual
+    supports: [get_current_layout, set_current_layout, get_layout_list, set_status_message, set_channel, set_dynamic_text,
+      set_timer, trigger_timer, fire_action, save_layout, get_audio_out, monitor_no_audio, monitor_audio_card,
+      monitor_embedded, get_audio_volume, set_audio_volume, get_audio_mode, set_audio_mode, set_vertical_offset,
+      set_icontrol_mode, set_mouse_color]
+    verification: none
+
+commands:
+  get_software_version:
+    summary: Read the Kaleido-X software version (getParameterInfo softwareVersion)
+    send: '<getParameterInfo>get key="softwareVersion"</getParameterInfo>'
+    expect: { matches: 'softwareVersion="([^"]*)"' }
+    returns: value
+  get_system_name:
+    summary: Read the system name (getParameterInfo systemName)
+    send: '<getParameterInfo>get key="systemName"</getParameterInfo>'
+    expect: { matches: 'systemName="([^"]*)"' }
+    returns: value
+  get_current_layout:
+    summary: Read the layout on the monitor wall (getKCurrentLayout); the gateway then closes the connection, which reopens
+    send: "<getKCurrentLayout/>"
+    expect: { matches: '^<kCurrentLayout>(?:name=")?([^"<]*)"?</kCurrentLayout>' }
+    returns: value
+  set_current_layout:
+    summary: Load a layout on the monitor wall (setKCurrentLayout)
+    params:
+      layout: { type: string, max_length: 512, pattern: "^[^<>&\"]+$", required: true, label: Layout, description: "The layout's file name (Layout1.kg2, or Layout1.xml on an Alto/Quad), prefixed with its room and / on a Kaleido-X session without a room." }
+    send: "<setKCurrentLayout>set {layout}</setKCurrentLayout>"
+    expect: { matches: "^<ack/>" }
+    returns: ack
+  get_layout_list:
+    summary: List the layouts available (getKLayoutList)
+    send: "<getKLayoutList/>"
+    expect: { matches: "^<kLayoutList>\\s*(.*?)\\s*</kLayoutList>" }
+    returns: value
+  get_room:
+    summary: Read a room's heads and preferences as the database stores them (getKRoom)
+    params:
+      room: { type: string, max_length: 256, pattern: "^[^<>&\"]*$", default: "", label: Room, description: "The room; empty on a session opened with a room." }
+    send: "<getKRoom>{room}</getKRoom>"
+    expect: { matches: "^<room " }
+    returns: text
+  get_room_list:
+    summary: List the rooms (getKRoomList)
+    send: "<getKRoomList/>"
+    expect: { matches: "^<kRoomList>(.*)</kRoomList>" }
+    returns: value
+  set_status_message:
+    summary: Set a gateway alarm's status (setKStatusMessage)
+    params:
+      id: &alarm_id { type: string, max_length: 256, pattern: "^[^<>&\"]+$", required: true, label: Alarm, description: "The gateway alarm's ID (a number 0 to 1024 on an Alto/Quad)." }
+      status: { type: enum, values: [DISABLE, NORMAL, MINOR, MAJOR, CRITICAL, OK, WARNING, ERROR], required: true, label: Status, description: "The alarm status: DISABLE, NORMAL, MINOR, MAJOR or CRITICAL on the Kaleido-X series, DISABLE, OK, WARNING or ERROR on the K2 and Alto/Quad." }
+    send: '<setKStatusMessage>set id="{id}" status="{status}" message=""</setKStatusMessage>'
+    expect: { matches: "^<ack/>" }
+    returns: ack
+  unlatch_channel:
+    summary: Acknowledge the global alarm of a source (setKUnlatch channelName)
+    params:
+      channel: &channel { type: string, max_length: 512, pattern: "^[^<>&\"]+$", required: true, label: Source, description: "The source's full path, such as /Input A/Channel 01." }
+    send: '<setKUnlatch>set channelName="{channel}"</setKUnlatch>'
+    expect: { matches: "^<ack/>" }
+    returns: ack
+  unlatch_alarm:
+    summary: Acknowledge an alarm by its URI (setKUnlatch uri)
+    params:
+      uri: { type: string, max_length: 1024, pattern: "^[^<>&\"]+$", required: true, label: Alarm URI, description: "The alarm's URI, such as miranda.monako.daq://local/data/master/3/card/av1/..." }
+    send: '<setKUnlatch>set uri="{uri}"</setKUnlatch>'
+    expect: { matches: "^<ack/>" }
+    returns: ack
+  unlatch_gateway_alarm:
+    summary: Acknowledge a gateway alarm by its name (setKUnlatch id)
+    params: { id: *alarm_id }
+    send: '<setKUnlatch>set id="{id}"</setKUnlatch>'
+    expect: { matches: "^<ack/>" }
+    returns: ack
+  get_channel:
+    summary: Read the source on a monitor of the current layout (getKChannel); kept in state
+    params:
+      monitor: &monitor { type: string, max_length: 512, pattern: "^[^<>&\"]+$", required: true, label: Monitor, description: "The monitor's name in the layout, prefixed with its room and / on a session without a room." }
+    send: '<getKChannel>set monitor="{monitor}"</getKChannel>'
+    expect: { matches: '^<kChannel>channelname="([^"]*)"</kChannel>' }
+    returns: value
+  set_channel:
+    summary: Put a source on a monitor of the current layout (setKChannel)
+    params:
+      channel: *channel
+      monitor: *monitor
+    send: '<setKChannel>set channelname="{channel}" monitor="{monitor}"</setKChannel>'
+    expect: { matches: "^<ack/>" }
+    returns: ack
+  set_dynamic_text:
+    summary: Set the text of a UMD or text label set to Gateway dynamic text (setKDynamicText)
+    params:
+      address: &text_address { type: string, max_length: 256, pattern: "^[^<>&\"]+$", required: true, label: Text address, description: "The component's text address (0 to 1024 on an Alto/Quad)." }
+      text: { type: string, max_length: 1024, pattern: "^[^<>&\"]*$", required: true, label: Text, description: "The text to show, without quotes or angle brackets." }
+    send: '<setKDynamicText>set address="{address}" text="{text}"</setKDynamicText>'
+    expect: { matches: "^<ack/>" }
+    returns: ack
+  get_dynamic_text:
+    summary: Read the text last set on a dynamic text address (getKDynamicText); kept in state
+    params: { address: *text_address }
+    send: '<getKDynamicText>set address="{address}"</getKDynamicText>'
+    expect: { matches: "^<kDynamicText>(.*)</kDynamicText>" }
+    returns: value
+  get_metadata:
+    summary: Read a MultiData source's metadata (getKMetaData, Kaleido-K2)
+    params:
+      name: { type: string, max_length: 256, pattern: "^[^<>&\"\\s]+$", required: true, label: MultiData source, description: "The MultiData source's name, as in its configuration panel." }
+    send: "<getKMetaData>get dataname={name}</getKMetaData>"
+    expect: { matches: "^<kMetaData>" }
+    returns: text
+  set_timer:
+    summary: Configure a countdown timer component (setKTimer)
+    params:
+      id: &timer_id { type: string, max_length: 256, pattern: "^[^<>&\"]+$", required: true, label: Timer, description: "The timer component's ID." }
+      preset: { type: string, pattern: "^[0-9]{2}:[0-5][0-9]:[0-5][0-9]$", required: true, label: Preset, description: "The timer's preset, hh:mm:ss." }
+      direction: { type: enum, values: [UP, DOWN], default: DOWN, label: Direction, description: "Which way the timer counts." }
+      loop: { type: bool, default: false, label: Loop, description: "True counts continuously." }
+    send: '<setKTimer>set id="{id}" preset="{preset}" direction="{direction}" loop="{loop:on_off}" </setKTimer>'
+    expect: { matches: "^<ack/>" }
+    returns: ack
+  set_timer2:
+    summary: Configure a named timer (setKTimer2, Kaleido-X and K2)
+    params:
+      name: { type: string, max_length: 256, pattern: "^[^<>&\"]+$", required: true, label: Timer, description: "The timer's name, as in the timer configuration." }
+      start: { type: string, pattern: "^(NOW|WAIT|[0-9]{2}:[0-5][0-9]:[0-5][0-9]:[0-9]{2})$", default: NOW, label: Start, description: "HH:MM:SS:FF to start at that time (00 the previous midnight, 24 the next), NOW, or WAIT for trigger_timer." }
+      preset: { type: string, pattern: "^[0-9]{2}:[0-5][0-9]:[0-5][0-9]:[0-9]{2}$", required: true, label: Preset, description: "HH:MM:SS:FF: the count for up and down timers, the end time for a remaining timer." }
+      mode: { type: enum, values: [up, down, remaining], required: true, label: Mode, description: "Count up, count down, or count the time remaining to the preset." }
+      end: { type: enum, values: [LOOP, STOP, OVERRUN], default: STOP, label: At the end, description: "What the timer does at the end of its count." }
+    send: '<setKTimer2>set TimerName="{name}" StartTime="{start}" PresetTime="{preset}" TimerMode="{mode}" EndMode="{end}"</setKTimer2>'
+    expect: { matches: "^<ack/>" }
+    returns: ack
+  trigger_timer:
+    summary: Start, stop or reset a timer (setKTimerTrigger)
+    params:
+      id: *timer_id
+      trigger: { type: enum, values: [START, STOP, RESET], required: true, label: Trigger, description: "What the timer does." }
+    send: '<setKTimerTrigger>set id="{id}" trigger="{trigger}"</setKTimerTrigger>'
+    expect: { matches: "^<ack/>" }
+    returns: ack
+  fire_action:
+    summary: Fire an action (setKFireAction)
+    params:
+      name: { type: string, max_length: 256, pattern: "^[^<>&\"]+$", required: true, label: Action, description: "The action's friendly name." }
+    send: '<setKFireAction>set name="{name}"</setKFireAction>'
+    expect: { matches: "^<ack/>" }
+    returns: ack
+  get_action_list:
+    summary: List the actions (getKActionList)
+    send: "<getKActionList/>"
+    expect: { matches: "^<kActionList>(.*)</kActionList>" }
+    returns: value
+  enable_alarm_group:
+    summary: Enable an alarm group (K2) or virtual alarm (Kaleido-X) (setKEnableAlarmGroup)
+    params:
+      name: &alarm_group { type: string, max_length: 1024, pattern: "^[^<>&\"]+$", required: true, label: Alarm group, description: "The alarm group's name, or the virtual alarm's path/friendly name or URI." }
+    send: '<setKEnableAlarmGroup>set name="{name}"</setKEnableAlarmGroup>'
+    expect: { matches: "^<ack/>" }
+    returns: ack
+  disable_alarm_group:
+    summary: Disable an alarm group, or set a virtual alarm offline (setKDisableAlarmGroup)
+    params: { name: *alarm_group }
+    send: '<setKDisableAlarmGroup>set name="{name}"</setKDisableAlarmGroup>'
+    expect: { matches: "^<ack/>" }
+    returns: ack
+  save_layout:
+    summary: Save the current layout to a file (setKSaveLayout, K2 and Alto/Quad)
+    params:
+      name: { type: string, max_length: 256, pattern: "^[^<>&\"./\\\\]+$", required: true, label: File name, description: "The file name without extension (.kg2 or .xml is added)." }
+    send: '<setKSaveLayout>set name="{name}"</setKSaveLayout>'
+    expect: { matches: "^<ack/>" }
+    returns: ack
+  get_audio_out:
+    summary: Read what the audio monitoring output plays (getKAudioOut)
+    send: "<getKAudioOut/>"
+    expect: { matches: "^<kAudioOut>\\s*(.*?)\\s*</kAudioOut>" }
+    returns: value
+  monitor_no_audio:
+    summary: Stop audio monitoring and mute the output (setKAudioOut NONE)
+    send:
+      - '<setKAudioOut>set Type="NONE"</setKAudioOut>'
+      - "<getKAudioOut/>"
+    expect: { matches: "^<" }
+    returns: ack
+  monitor_stream:
+    summary: Monitor a streaming source (setKAudioOut STREAMING)
+    params:
+      ip: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: Stream address, description: "The IP address the stream comes from." }
+      feed: { type: int, min: 0, max: 999, required: true, label: Feed, description: "The feed's identifier." }
+    send:
+      - '<setKAudioOut>set Type="STREAMING" IP="{ip}" FeedID="{feed}"</setKAudioOut>'
+      - "<getKAudioOut/>"
+    expect: { matches: "^<" }
+    returns: ack
+  monitor_audio_card:
+    summary: Monitor an Audio Bridge Terminal input (setKAudioOut AUDIOCARD)
+    params:
+      input: { type: int, min: 1, max: 999, required: true, label: ABT input, description: "The ABT input: 1 to 64 on INPUT A's connector, 65 to 128 on INPUT B's and so on." }
+    send:
+      - '<setKAudioOut>set Type="AUDIOCARD" Input="{input}"</setKAudioOut>'
+      - "<getKAudioOut/>"
+    expect: { matches: "^<" }
+    returns: ack
+  monitor_embedded:
+    summary: Monitor embedded audio of a video input (setKAudioOut EMBEDDED)
+    params:
+      input: { type: int, min: 1, max: 999, required: true, label: Video input, description: "The video input." }
+      group: { type: int, min: 1, max: 4, required: true, label: Group, description: "The embedded audio group, 1 to 4." }
+      aes: { type: int, min: 1, max: 2, required: true, label: AES pair, description: "The AES pair in the group, 1 or 2." }
+    send:
+      - '<setKAudioOut>set Type="EMBEDDED" Input="{input}" Group="{group}" AES="{aes}"</setKAudioOut>'
+      - "<getKAudioOut/>"
+    expect: { matches: "^<" }
+    returns: ack
+  get_audio_volume:
+    summary: Read the audio monitoring volume in dB (getKAudioOutVolume)
+    send: "<getKAudioOutVolume/>"
+    expect: { matches: 'volume="([^"]*)"' }
+    returns: value
+  set_audio_volume:
+    summary: Set the audio monitoring volume (setKAudioOutVolume)
+    params:
+      db: { type: float, min: -96, max: 24, required: true, label: Volume, description: "Volume in dB: -96 to +24 on the Kaleido-X series (tenths allowed), -90 to 0 in whole dB on the K2 and Alto/Quad." }
+    send:
+      - '<setKAudioOutVolume>set volume="{db:.1f}"</setKAudioOutVolume>'
+      - "<getKAudioOutVolume/>"
+    expect: { matches: "^<" }
+    returns: ack
+  get_audio_mode:
+    summary: Read the audio monitoring mode (getKAudioOutMode)
+    send: "<getKAudioOutMode/>"
+    expect: { matches: 'mode="([^"]*)"' }
+    returns: value
+  set_audio_mode:
+    summary: Set the audio monitoring mode (setKAudioOutMode)
+    params:
+      mode: { type: enum, values: [normal, mute, minus_20_db], required: true, label: Mode, description: "Normal, muted, or 20 dB down." }
+    send:
+      - '<setKAudioOutMode>set mode="{mode:map.audio_mode}"</setKAudioOutMode>'
+      - "<getKAudioOutMode/>"
+    expect: { matches: "^<" }
+    returns: ack
+  set_vertical_offset:
+    summary: Move the graphics down within the DVI output (setKVerticalOffset, Alto/Quad)
+    params:
+      lines: { type: int, min: 0, max: 175, required: true, label: Offset, description: "Lines from the top of the output, 0 to 175." }
+    send: '<setKVerticalOffset>set offset="{lines}"</setKVerticalOffset>'
+    expect: { matches: "^<ack/>" }
+    returns: ack
+  set_icontrol_mode:
+    summary: Key the mouse pointer colors over video, or not (setKIcontrolMode, Alto/Quad)
+    params:
+      enabled: { type: bool, required: true, label: Color keying, description: "True keys the mouse colors over video." }
+    send: '<setKIcontrolMode>set mode="{enabled:bool01}"</setKIcontrolMode>'
+    expect: { matches: "^<ack/>" }
+    returns: ack
+  set_mouse_color:
+    summary: Set one of the three mouse colors keyed over video (setKMouseColorA, B or C, Alto/Quad)
+    params:
+      slot: { type: enum, values: [A, B, C], required: true, label: Color, description: "Which of the three key colors." }
+      color: { type: string, pattern: "^[0-9A-Fa-f]{6}$", required: true, label: Color, description: "The color as BBGGRR (blue, green, red), as the protocol orders it." }
+    send: '<setKMouseColor{slot}>set mouseColor{slot}="FF{color:upper}"</setKMouseColor{slot}>'
+    expect: { matches: "^<ack/>" }
+    returns: ack
+
+maps:
+  audio_mode: { normal: NORMAL, mute: MUTE, minus_20_db: "-20 dB" }
+
+state:
+  software_version:   { type: string, description: "Kaleido-X software version" }
+  system_name:        { type: string, description: "The system name set in XAdmin" }
+  current_layout:     { type: string, description: "The layout on the monitor wall, as last read or loaded" }
+  layouts.*:          { type: string, description: "An available layout, keyed by its place in the list from 0" }
+  rooms.*:            { type: string, description: "A room, keyed by its place in the list from 0" }
+  actions.*:          { type: string, description: "An action, keyed by its place in the list from 0" }
+  monitors.*.channel: { type: string, description: "The source on a monitor of the current layout, keyed by monitor name, as last read or set" }
+  dynamic_text.*:     { type: string, description: "The text of a dynamic text address, as last read or set" }
+  alarms.*:           { type: string, description: "A gateway alarm's status, keyed by ID, as last set" }
+  audio_out.type:     { type: string, description: "What the audio monitoring output plays: NONE, STREAMING, AUDIOCARD or EMBEDDED" }
+  audio_out.ip:       { type: string, description: "A streaming source's address" }
+  audio_out.feed:     { type: string, description: "A streaming source's feed ID" }
+  audio_out.input:    { type: string, description: "The ABT input, or the video input of embedded audio" }
+  audio_out.group:    { type: string, description: "Embedded audio's group" }
+  audio_out.aes:      { type: string, description: "Embedded audio's AES pair" }
+  audio_volume_db:    { type: float, unit: dB, description: "Audio monitoring volume" }
+  audio_mode:         { type: string, description: "Audio monitoring mode: normal, mute or minus_20_db" }
+
+telemetry:
+  # Lists every minute; the audio output every 10 s. getKCurrentLayout is
+  # not polled: the gateway closes the connection after answering it.
+  poll:
+    - every_ms: 10000
+      send:
+        - { models: [kaleido-x, kaleido-k2, kaleido-alto-quad], message: "<getKAudioOut/>" }
+        - { models: [kaleido-x, kaleido-k2, kaleido-alto-quad], message: "<getKAudioOutVolume/>" }
+        - { models: [kaleido-x, kaleido-k2, kaleido-alto-quad], message: "<getKAudioOutMode/>" }
+    - every_ms: 60000
+      send:
+        - "<getKLayoutList/>"
+        - { models: [kaleido-x, kaleido-ip], message: "<getKRoomList/>" }
+        - { models: [kaleido-x, kaleido-ip], message: "<getKActionList/>" }
+        - { models: [kaleido-x, kaleido-ip], message: '<getParameterInfo>get key="softwareVersion"</getParameterInfo>' }
+        - { models: [kaleido-x, kaleido-ip], message: '<getParameterInfo>get key="systemName"</getParameterInfo>' }
+  updates:
+    - match: '^<kParameterInfo>softwareVersion="([^"]*)"</kParameterInfo>'
+      state: { software_version: "{1}" }
+    - match: '^<kParameterInfo>systemName="([^"]*)"</kParameterInfo>'
+      state: { system_name: "{1}" }
+    - match: '^<kCurrentLayout>(?:name=")?([^"<]*)"?</kCurrentLayout>'
+      state: { current_layout: "{1}" }
+    - match: "^<kLayoutList>((?:\\s*[^\\s<]+)*)\\s*</kLayoutList>"
+      match_each: "([^\\s<]+)"
+      match_each_in: 1
+      replace: layouts
+      state: { "layouts.{index}": "{2}" }
+    - match: "^<kRoomList>((?:<room>[^<]*</room>)*)</kRoomList>"
+      match_each: "<room>([^<]*)</room>"
+      match_each_in: 1
+      replace: rooms
+      state: { "rooms.{index}": "{2}" }
+    - match: "^<kActionList>((?:\\s*<action>[^<]*</action>)*)\\s*</kActionList>"
+      match_each: "<action>([^<]*)</action>"
+      match_each_in: 1
+      replace: actions
+      state: { "actions.{index}": "{2}" }
+    - match: '^<kChannel>channelname="([^"]*)"</kChannel>'
+      request_match: '^<getKChannel>set monitor="([^"]+)"</getKChannel>$'
+      state: { "monitors.{2:key}.channel": "{1}" }
+    - match: "^<kDynamicText>(.*)</kDynamicText>"
+      request_match: '^<getKDynamicText>set address="([^"]+)"</getKDynamicText>$'
+      state: { "dynamic_text.{2:key}": "{1}" }
+    - match: '^<kAudioOut>\s*Type="([A-Z]+)"'
+      state:
+        audio_out.type: "{1}"
+        audio_out.ip: ""
+        audio_out.feed: ""
+        audio_out.input: ""
+        audio_out.group: ""
+        audio_out.aes: ""
+    - match: '^<kAudioOut>.*IP="([^"]*)"'
+      state: { audio_out.ip: "{1}" }
+    - match: '^<kAudioOut>.*FeedID="([^"]*)"'
+      state: { audio_out.feed: "{1}" }
+    - match: '^<kAudioOut>.*Input="([^"]*)"'
+      state: { audio_out.input: "{1}" }
+    - match: '^<kAudioOut>.*Group="([^"]*)"'
+      state: { audio_out.group: "{1}" }
+    - match: '^<kAudioOut>.*AES="([^"]*)"'
+      state: { audio_out.aes: "{1}" }
+    - match: '^<kAudioOutVolume>volume="(-?[0-9.]+)\s*(?:dB)?"</kAudioOutVolume>'
+      state: { audio_volume_db: "{1}" }
+    - match: '^<kAudioOutMode>mode="([^"]*)"</kAudioOutMode>'
+      state: { audio_mode: { value: "{1}", map: { NORMAL: normal, MUTE: mute, "-20 dB": minus_20_db, "–20 dB": minus_20_db } } }
+    # A change the gateway acknowledges is written from the request it answers.
+    - match: "^<ack/>"
+      request_match: '^<setKCurrentLayout>set (.+)</setKCurrentLayout>$'
+      state: { current_layout: "{1}" }
+    - match: "^<ack/>"
+      request_match: '^<setKChannel>set channelname="([^"]*)" monitor="([^"]+)"</setKChannel>$'
+      state: { "monitors.{2:key}.channel": "{1}" }
+    - match: "^<ack/>"
+      request_match: '^<setKDynamicText>set address="([^"]+)" text="([^"]*)"</setKDynamicText>$'
+      state: { "dynamic_text.{1:key}": "{2}" }
+    - match: "^<ack/>"
+      request_match: '^<setKStatusMessage>set id="([^"]+)" status="([A-Z]+)"'
+      state: { "alarms.{1:key}": "{2}" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      set_current_layout replaces what the monitor wall shows at once; save_layout writes a layout file.
+  - models: [all]
+    severity: warning
+    text: >
+      getKCurrentLayout closes the gateway connection after answering (guide p.8): the core reconnects and opens
+      the session again, so it is never polled; the current layout in state is what was last read or loaded
+      through this device. The gateway pushes nothing: a change made on the multiviewer itself shows only at the
+      next read.
+  - models: [all]
+    severity: warning
+    text: >
+      The session is opened on connecting with <openID>, carrying the open_id setting; an empty setting is sent
+      as <openID></openID>, which the guide writes <openID/>. A <nack/> to it (a wrong room, user or password)
+      is taken as a refused credential. On the Kaleido-X series the audio commands need a session opened with a
+      user (mirandagateway://USER:PASSWORD@SYSTEM/ROOM), and set_current_layout a room; otherwise they answer
+      <nack/>. The guide's other form, the password's MD5 hash in base 64, is not offered: the format hashes to
+      hexadecimal only.
+  - models: [all]
+    severity: info
+    text: >
+      Values are sent inside XML attribute quotes without escaping, so they may not hold quotes, angle brackets or
+      ampersands. Commands end with a carriage return, as the guide asks.
+  - models: [all]
+    severity: info
+    text: >
+      getKRoom's answer is the room's whole XML as the database stores it; when the gateway sends it over
+      several lines, only its first line is the command's result. getKMetaData (K2) answers with its own XML
+      and is returned as text. The guide documents no read of alarms, timers or dynamic text not set through
+      the gateway (an API limit).

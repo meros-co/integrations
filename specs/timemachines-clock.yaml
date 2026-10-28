@@ -1,0 +1,283 @@
+spec: 1
+id: timemachines-clock
+name: TimeMachines clocks, timers and time servers (Locator Protocol API)
+vendor: TimeMachines
+category: other
+implementation: native
+reason: >
+  The Locator Protocol is binary UDP: each request is a command byte (A1h to BEh) and raw bytes, including
+  values above 7Fh, little-endian day counts and years, null-terminated text and 334-byte timer programs; the
+  answer is a single 'A', a 40- or 80-byte binary status, or a program's bytes. None of it is text the spec
+  format's templates can send or its rules can read.
+
+source:
+  - title: "Locator Protocol API version 2.3 (July 2025), TimeMachinesControlAPI.pdf"
+    author: TimeMachines Inc.
+    url: https://timemachinescorp.com/wp-content/uploads/TimeMachinesControlAPI.pdf
+    note: >
+      Manufacturer document (retrieved 2026-10-28, linked from timemachinescorp.com/downloads). Firmware
+      supporting it (TM1000 2.6, TM2000 0.3.3, POE C series 5.4, WiFi C series 3.4); the locator query A1 04 B2
+      on UDP 7372 and the 40-byte clock and 80-byte TM1000A/TM2000A answers (§1.1); the timer control sequences
+      A2 to AB, B9, BA and BD with their bytes (§1.2); timer programs, their 32-byte step structure and the
+      get, store, active, reset, start/pause and execute requests (§1.3); relay close and toggle, revert
+      timeout, dimmer, time-zone variables and RGB colors (§1.4); every control request answered 'A' (§1.3.9).
+
+settings:
+  poll_ms: { type: int, min: 250, max: 3600000, default: 1000, label: Read interval,
+             description: "Milliseconds between reads of the clock's status (mode, displayed time or timer value, running)." }
+
+ports:
+  - { port: 7372, protocol: udp, role: control, note: "the Locator Protocol port of every TimeMachines clock and time server" }
+
+models:
+  - id: poe-display
+    name: TimeMachines PoE clock display (B and C series)
+    supports: &clock [get_status, use_up_timer, set_up_timer_running, reset_up_timer, use_down_timer,
+      set_down_timer_running, reset_down_timer, time_mode, set_up_timer_value, set_down_timer_value,
+      reset_countdown_to_date, set_countdown_to_date_running, get_program, store_program, get_active_program,
+      load_program, set_program_running, execute_program, pulse_relay, set_relay, set_revert_timeout, set_dimmer,
+      set_colors]
+    verification: none
+    notes: The API 2.3 commands need PoE firmware 5.4 or later (C series); B series firmware 4.9.
+  - id: wifi-display
+    name: TimeMachines WiFi clock display (B and C series)
+    supports: *clock
+    verification: none
+    notes: The API 2.3 commands need WiFi firmware 3.4 or later (C series); B series firmware 2.6.
+  - id: dot-matrix
+    name: TimeMachines dot matrix display (TM848)
+    supports: [get_status, use_up_timer, set_up_timer_running, reset_up_timer, use_down_timer, set_down_timer_running,
+      reset_down_timer, time_mode, set_up_timer_value, set_down_timer_value, reset_countdown_to_date,
+      set_countdown_to_date_running, get_program, store_program, get_active_program, load_program,
+      set_program_running, execute_program, pulse_relay, set_relay, set_revert_timeout, set_dimmer, set_colors,
+      set_matrix_text]
+    verification: none
+  - id: timezone-two-line
+    name: TimeMachines two-line TimeZone clock with dot matrix second line
+    supports: [get_status, use_up_timer, set_up_timer_running, reset_up_timer, use_down_timer, set_down_timer_running,
+      reset_down_timer, time_mode, set_up_timer_value, set_down_timer_value, reset_countdown_to_date,
+      set_countdown_to_date_running, get_program, store_program, get_active_program, load_program,
+      set_program_running, execute_program, pulse_relay, set_relay, set_revert_timeout, set_dimmer, set_colors,
+      set_line_text, release_line_text, set_variable]
+    verification: none
+    notes: The second-line text and variables need PoE firmware 5.4 or WiFi firmware 3.4 or later.
+  - id: tm1000a
+    name: TimeMachines TM1000A GPS time server
+    supports: [get_status]
+    verification: none
+  - id: tm2000a
+    name: TimeMachines TM2000A GPS time server
+    supports: [get_status]
+    verification: none
+
+commands:
+  get_status:
+    summary: Read the locator status (A1 04 B2) into state; it is returned too
+    returns: value
+  use_up_timer:
+    summary: Put the clock in up-timer mode (A2)
+    params:
+      format: &format { type: enum, values: [m_s_tenths, h_m_s], required: true, label: Format, description: "m_s_tenths shows MIN:SEC.tenths, h_m_s shows HH:MM:SS." }
+    returns: ack
+  set_up_timer_running:
+    summary: Run or pause the up timer (A3)
+    params:
+      running: &running { type: bool, required: true, label: Running, description: "True runs the timer, false pauses it." }
+    returns: ack
+  reset_up_timer:
+    summary: Reset the up timer to zero (A4)
+    params: { format: *format }
+    returns: ack
+  use_down_timer:
+    summary: Put the clock in down-timer mode with a starting value (A5)
+    params: &countdown
+      format: *format
+      bargraph: { type: bool, default: false, label: Bar graph, description: "True shows a bar graph of the countdown on a dot matrix clock." }
+      days: { type: int, min: 0, max: 65535, default: 0, label: Days, description: "Starting days, shown on a nine-digit display." }
+      hours: { type: int, min: 0, max: 23, default: 0, label: Hours, description: "Starting hours." }
+      minutes: { type: int, min: 0, max: 59, default: 0, label: Minutes, description: "Starting minutes." }
+      seconds: { type: int, min: 0, max: 59, default: 0, label: Seconds, description: "Starting seconds." }
+      tenths: { type: int, min: 0, max: 9, default: 0, label: Tenths, description: "Starting tenths of a second." }
+      alarm: { type: bool, default: false, label: Alarm, description: "True sounds the alarm at the end of the countdown." }
+      alarm_seconds: { type: int, min: 0, max: 255, default: 0, label: Alarm duration, description: "How long the end-of-countdown alarm lasts, in seconds." }
+    returns: ack
+  set_down_timer_running:
+    summary: Run or pause the down timer (A6)
+    params: { running: *running }
+    returns: ack
+  reset_down_timer:
+    summary: Reset the down timer to a starting value; the clock must already be in down-timer mode (A7)
+    params: *countdown
+    returns: ack
+  time_mode:
+    summary: Return the clock from a timer to the time of day (A8 01 00)
+    returns: ack
+  set_up_timer_value:
+    summary: Change the up timer's value while it runs (AA)
+    params: &timer_value
+      days: { type: int, min: 0, max: 65535, default: 0, label: Days, description: "New days value." }
+      hours: { type: int, min: 0, max: 23, default: 0, label: Hours, description: "New hours value." }
+      minutes: { type: int, min: 0, max: 59, default: 0, label: Minutes, description: "New minutes value." }
+      seconds: { type: int, min: 0, max: 59, default: 0, label: Seconds, description: "New seconds value." }
+      tenths: { type: int, min: 0, max: 9, default: 0, label: Tenths, description: "New tenths of a second." }
+      hundredths: { type: int, min: 0, max: 9, default: 0, label: Hundredths, description: "New hundredths of a second." }
+    returns: ack
+  set_down_timer_value:
+    summary: Change the down timer's value while it runs (AB)
+    params: *timer_value
+    returns: ack
+  reset_countdown_to_date:
+    summary: Set up a countdown to a date and time (B9)
+    params:
+      format: { type: enum, values: [h_m_s_tenths, d_h_m_s, d_h_m], required: true, label: Format, description: "h_m_s_tenths shows (HR):MIN:SEC.tenths, d_h_m_s (DAY):HH:MM:SS, d_h_m DD:HH:MM." }
+      year: { type: int, min: 2000, max: 2255, required: true, label: Year, description: "Year the countdown ends." }
+      month: { type: int, min: 1, max: 12, required: true, label: Month, description: "Month the countdown ends, 1 to 12." }
+      day: { type: int, min: 1, max: 31, required: true, label: Day, description: "Day of the month the countdown ends." }
+      hour: { type: int, min: 0, max: 23, default: 0, label: Hour, description: "Hour the countdown ends." }
+      minute: { type: int, min: 0, max: 59, default: 0, label: Minute, description: "Minute the countdown ends." }
+      second: { type: int, min: 0, max: 59, default: 0, label: Second, description: "Second the countdown ends." }
+      alarm: { type: bool, default: false, label: Alarm, description: "True sounds the alarm at the end of the countdown." }
+      alarm_seconds: { type: int, min: 0, max: 255, default: 0, label: Alarm duration, description: "How long the end-of-countdown alarm lasts, in seconds." }
+    returns: ack
+  set_countdown_to_date_running:
+    summary: Run or pause the countdown to a date (BA)
+    params: { running: *running }
+    returns: ack
+  set_matrix_text:
+    summary: Show text on a dot matrix display (A9 1B)
+    params:
+      text: { type: string, max_length: 249, required: true, label: Text, description: "ASCII text to show, up to 249 characters." }
+      scroll: &scroll { type: enum, values: [none, right_to_left, bottom_to_top], default: none, label: Scroll, description: "Whether and which way the text scrolls." }
+      justify: &justify { type: enum, values: [left, center, right], default: center, label: Justification, description: "How the text is aligned." }
+      speed: { type: int, min: 0, max: 255, default: 100, label: Scroll speed, description: "Scroll speed, typically 60 to 150." }
+    returns: ack
+  set_line_text:
+    summary: Show static or scrolling text on a two-line clock's dot matrix line (A9 00)
+    params:
+      text: { type: string, max_length: 249, required: true, label: Text, description: "ASCII text to show; the two characters backslash and n start a new line." }
+      scroll: *scroll
+      justify: *justify
+      speed: { type: int, min: 0, max: 255, default: 100, label: Scroll speed, description: "Scroll speed, typically 60 to 150." }
+      blink: { type: bool, default: false, label: Blink, description: "True makes the text blink." }
+      font: { type: enum, values: [standard, bold], default: standard, label: Font, description: "Standard or bold font." }
+      color: { type: int, min: 0, max: 9, default: 0, label: Color, description: "Color from the palette stored on the clock, 0 to 9." }
+    returns: ack
+  release_line_text:
+    summary: Return the dot matrix line to the clock's own display after set_line_text (BD 01 00)
+    returns: ack
+  get_program:
+    summary: Read a stored timer program; returns its bytes as hexadecimal text (B2)
+    params:
+      program: &program { type: int, min: 0, max: 9, required: true, label: Program, description: "The stored program's number, 0 to 9." }
+    returns: value
+  store_program:
+    summary: Store a timer program in the clock's flash memory, replacing the one there (B3)
+    params: &program_body
+      program: *program
+      name: { type: string, max_length: 11, required: true, label: Program name, description: "The program's name, up to 11 ASCII characters." }
+      steps: { type: string, max_length: 640, pattern: "^([0-9A-Fa-f]{64}){1,10}$", required: true, label: Steps, description: "One to ten 32-byte program steps (the guide's TIMER_PROGRAM structure) as hexadecimal; unused steps are zero." }
+    returns: ack
+  get_active_program:
+    summary: Read the program the clock is set to run; returns its bytes as hexadecimal text (AF)
+    returns: value
+  load_program:
+    summary: Take the clock out of time mode and load a program to run (AC)
+    params: *program_body
+    returns: ack
+  set_program_running:
+    summary: Start, resume or stop the clock's current program (AE)
+    params: { running: *running }
+    returns: ack
+  execute_program:
+    summary: Load a stored program and start it (B8)
+    params: { program: *program }
+    returns: ack
+  pulse_relay:
+    summary: Close the display's relay for a number of seconds (B4)
+    params:
+      seconds: { type: int, min: 1, max: 255, required: true, label: Seconds, description: "How long the relay stays closed." }
+    returns: ack
+  set_relay:
+    summary: Close or open the display's relay until changed (BC)
+    params:
+      closed: { type: bool, required: true, label: Closed, description: "True closes the relay, false opens it." }
+    returns: ack
+  set_revert_timeout:
+    summary: Set how long an idle, stopped timer waits before the clock returns to the time (BB)
+    params:
+      minutes: { type: int, min: 0, max: 65535, required: true, label: Timeout, description: "Minutes before reverting to the time; 0 never reverts." }
+    returns: ack
+  set_dimmer:
+    summary: Set the display's brightness until changed or restarted (B5)
+    params:
+      digits: { type: int, min: 0, max: 100, required: true, label: Digit brightness, description: "Brightness of the digits, 0 to 100." }
+      dots: { type: int, min: 0, max: 100, required: true, label: Dot brightness, description: "Brightness of the AM/PM and colon dots, 0 to 100." }
+    returns: ack
+  set_variable:
+    summary: Set one of a two-line TimeZone clock's five display variables (BE)
+    params:
+      variable: { type: int, min: 0, max: 4, required: true, label: Variable, description: "Which variable, 0 to 4." }
+      text: { type: string, max_length: 100, required: true, label: Text, description: "ASCII text the variable holds." }
+    returns: ack
+  set_colors:
+    summary: Set an RGB display's digit colors until changed or restarted (B6)
+    params:
+      minutes_seconds: { type: string, pattern: "^#?[0-9A-Fa-f]{6}$", required: true, label: Minutes and seconds color, description: "Color of the minutes and seconds digits as RRGGBB." }
+      hours: { type: string, pattern: "^#?[0-9A-Fa-f]{6}$", required: true, label: Hours color, description: "Color of the hours digits as RRGGBB." }
+    returns: ack
+
+state:
+  info.device_type:     { type: string, description: "poe_display, wifi_display, dot_matrix, tm1000a or tm2000a" }
+  info.ip_address:      { type: string, description: "The device's IP address as it reports it" }
+  info.mac_address:     { type: string, description: "The device's MAC address" }
+  info.firmware:        { type: string, description: "Firmware version, major.minor" }
+  info.name:            { type: string, description: "The clock's device name" }
+  info.wifi_signal_dbm: { type: int, unit: dBm, description: "WiFi signal strength; 0 on a wired clock" }
+  ntp_sync_count:       { type: int, description: "How many times the device has synchronized with NTP (a server: as an NTP server, its sync count)" }
+  display.time:         { type: string, description: "The displayed time or timer value, HH:MM:SS" }
+  display.tenths:       { type: int, description: "Tenths of a second of the displayed value" }
+  display.days:         { type: int, description: "Days of the displayed timer value" }
+  display.mode:         { type: string, description: "time, up_timer, down_timer, interval_count_up or interval_count_down" }
+  display.format:       { type: string, description: "h_m_s, m_s_tenths or d_h_m" }
+  display.running:      { type: bool, description: "The timer is running" }
+  display.digits:       { type: string, description: "4_6_digits, d_h_m_s or h_m_s_tenths (nine-digit displays)" }
+  alarm.seconds:        { type: int, unit: s, description: "Down timer alarm duration" }
+  alarm.enabled:        { type: bool, description: "The down timer alarm is set" }
+  gps_lock:             { type: string, description: "TM1000A/TM2000A GPS lock: no_lock, 2d or 3d" }
+  utc_time:             { type: string, description: "TM1000A/TM2000A current UTC time, HH:MM:SS" }
+  location:             { type: string, description: "TM1000A/TM2000A location, latitude and longitude" }
+  time_server_name:     { type: string, description: "TM1000A/TM2000A time server name" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      store_program overwrites the program stored at that number in flash; load_program and execute_program
+      take the clock out of time display at once.
+  - models: [all]
+    severity: warning
+    text: >
+      The guide's table of status bytes 20 to 39 is printed with its rows run together. This module reads byte
+      20 as the alarm (bits 0-6 its duration, bit 7 set), byte 21 as the low eight bits of the days shown, byte
+      22 as the digits value with the days' top three bits in its top bits, byte 23 as the WiFi signal strength
+      and bytes 24 to 39 as the device name.
+  - models: [all]
+    severity: info
+    text: >
+      Every control request is answered with the single character 'A', and no error is documented: a request a
+      clock does not support or cannot do is acknowledged or ignored. The status is read after each control
+      request, so state shows what changed. Dimmer, colors, variables and the revert timeout are not kept over a
+      power cycle, and the guide documents no read of them (an API limit).
+  - models: [all]
+    severity: info
+    text: >
+      Timer programs travel as bytes: steps are given as hexadecimal of the guide's 32-byte TIMER_PROGRAM
+      structure (§1.3.1, typically taken from a program made in TM-Manager), and get_program and
+      get_active_program return the clock's answer as hexadecimal; the guide does not describe the answer's
+      layout.
+  - models: [all]
+    severity: info
+    text: >
+      The clocks keep time by SNTP; TM1000A and TM2000A are the GPS time servers they and others use. This
+      integration reads a time server's locator status only; its NTP service itself is read with the
+      generic-ntp integration.

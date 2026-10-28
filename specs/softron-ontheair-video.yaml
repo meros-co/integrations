@@ -1,0 +1,629 @@
+spec: 1
+id: softron-ontheair-video
+name: Softron OnTheAir Video (REST API and WebSocket)
+vendor: Softron
+category: playback
+
+# OnTheAir Video's REST API on port 8081 (8082, 8083, ... for the further
+# instances of OnTheAir Video Multi) and its websockets, which push playback
+# changes. Softron documents the REST calls only inside the running app
+# (api.html on that port); this spec takes the calls Softron's release notes
+# and support article name, and the rest from the Bitfocus Companion module,
+# each one marked inferred. Every call is a GET unless said otherwise.
+source:
+  - title: "HOW TO: Control OnTheAir Video using the REST API, Softron support article 360011859080"
+    author: Softron Media Services
+    url: https://softron.zendesk.com/hc/en-us/articles/360011859080-HOW-TO-Control-OnTheAir-Video-using-the-REST-API
+    note: >
+      Manufacturer document (retrieved 2026-10-28). Port 8081, 8082 and on for
+      OnTheAir Video Multi's instances; basic controls from 3.8, extended in 4;
+      the documentation in the app at http://localhost:8081/api.html; HTTPS
+      with a tls_certificate.p12 in the instance's Certificates folder; the
+      websockets ws://host:8081/playback (playback and timecode) and
+      /playlists/<playlist unique ID>, each sending only to clients that offer
+      its protocol: playback_update_v1, playlist_update_v1,
+      playlists_management_v1, playlist_items_start_times_update_v1,
+      live_sources_update_v1. Its attached websocket_client_2.html opens
+      /playback with playback_update_v1 and reads event, path,
+      playlist_unique_id and item_unique_id from each JSON message.
+  - title: "OnTheAir Video release notes (softron.tv)"
+    author: Softron Media Services
+    url: https://softron.tv/support/release-notes?category=OnTheAir%20Video
+    note: >
+      Manufacturer document (retrieved 2026-10-28). 4.1: user rights levels
+      and a Bypass authorisation preference (General & HTTP Server). 4.1.3:
+      GET /playback/thumbnail; next_live_unique_id, next_live_display_name and
+      remaining_time_until_next_live in playback_timing_changed. 4.2.0:
+      /playback/current_item, /playback/skip_next?live_only=1. 4.2.2:
+      item_display_name in playback_timing_changed. 4.5.5: playlist unique IDs
+      are UUIDs, and playlists can be found by name. 4.5.7: GET
+      /playback/cg_projects/play and /playback/cg_projects/stop for every
+      project, GET /playback/clocked_items?enabled=1, GET
+      /playlists/{playlist_UIDorINDEX}/selected_items.
+  - title: "bitfocus/companion-module-softron-ontheairvideo (MIT)"
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-softron-ontheairvideo
+    note: >
+      Corroboration and the source of the inferred calls, not copied
+      (retrieved 2026-10-28; src/index.js, actions.js, variables.js,
+      choices.js): GET /playback/play, pause, resume, stop, skip_next,
+      skip_previous, join_in_progress, cue_trigger, gpi_trigger?input=;
+      /playlists/<playlist>/play, pause, resume, stop, skip_next, previous,
+      join_in_progress; /playlists/<playlist>/items/<item>/play, pause,
+      join_in_progress, with position_relative_timecode,
+      position_media_timecode or position_relative_seconds; GET
+      /playback/cg_projects/<id>/play, pause, stop; GET
+      /actions/<action>/run?parameter=; POST /playlists/<playlist>/items[/<index>]
+      with clip_type 0 (clip, url), 3 (comment), 4 (live,
+      live_source_name, duration) or 5 (stream, url, duration); GET /info,
+      /playlists, /playlists/<id>/items, /playback/playing,
+      /playback/cg_projects and their fields; the websocket events
+      playback_timing_changed, item_changed and playback_status_changed, and
+      CG "project property" messages; playback statuses Playing, Paused,
+      Stopped and Hold First Frame; CG statuses Playing, Stopping, Stopped,
+      Paused.
+
+transport:
+  type: http
+  port: 8081
+  https_port: 8081
+  scheme: { setting: scheme }
+  accept_invalid_certs: true
+  auth: none
+  timeout_ms: 5000
+  probe: { method: GET, path: /info }
+
+settings:
+  scheme: { type: enum, values: [http, https], default: http, label: Connection,
+    description: "http, or https once a tls_certificate.p12 is installed for the instance (a self-signed certificate is accepted)." }
+
+ports:
+  - { port: 8081, protocol: http, role: control, when: "scheme http", note: "8082, 8083 and on for the second and further instances of OnTheAir Video Multi" }
+  - { port: 8081, protocol: https, role: control, when: "scheme https" }
+  - { port: 8081, protocol: ws, role: push, when: "scheme http", note: "/playback, protocol playback_update_v1" }
+  - { port: 8081, protocol: wss, role: push, when: "scheme https" }
+
+maps:
+  position_key: { relative_timecode: position_relative_timecode, media_timecode: position_media_timecode }
+  bool01: { "true": "1", "false": "0" }
+
+models:
+  - id: ontheair-video-4
+    name: Softron OnTheAir Video 4 and OnTheAir Video Multi
+    supports: [play, pause, resume, stop, skip_next, skip_next_live, skip_previous, join_in_progress, cue_trigger,
+      gpi_trigger, play_playlist, pause_playlist, resume_playlist, stop_playlist, skip_next_in_playlist,
+      skip_previous_in_playlist, join_playlist_in_progress, play_item, pause_item, join_item_in_progress,
+      play_item_at_timecode, pause_item_at_timecode, play_item_at_seconds, pause_item_at_seconds,
+      play_cg_project, pause_cg_project, stop_cg_project, play_all_cg_projects, stop_all_cg_projects,
+      set_clocked_items, run_action, run_action_with_parameter, add_clip, insert_clip, add_comment, insert_comment,
+      add_live, insert_live, add_stream, insert_stream, get_info, get_playing, get_current_item, get_playlists,
+      get_playlist_items, get_selected_items, get_cg_projects]
+    verification: none
+    notes: >
+      The REST API needs OnTheAir Video 4 (full version, not Express); some
+      calls need a later release (see the sources) or an option: CG projects
+      the DGO option, join in progress the Traffic option.
+
+commands:
+  # ── The playing playlist ─────────────────────────────────────────────────
+  play:
+    summary: Play the current playlist (GET /playback/play)
+    send: { method: GET, path: /playback/play }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  pause:
+    summary: Pause playback (GET /playback/pause)
+    send: { method: GET, path: /playback/pause }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  resume:
+    summary: Resume paused playback (GET /playback/resume)
+    send: { method: GET, path: /playback/resume }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  stop:
+    summary: Stop playback (GET /playback/stop)
+    send: { method: GET, path: /playback/stop }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  skip_next:
+    summary: Skip to the next item (GET /playback/skip_next)
+    send: { method: GET, path: /playback/skip_next }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  skip_next_live:
+    summary: Skip to the next item only while a live item plays (GET /playback/skip_next?live_only=1)
+    send: { method: GET, path: /playback/skip_next, query: { live_only: "1" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  skip_previous:
+    summary: Skip to the previous item (GET /playback/skip_previous)
+    send: { method: GET, path: /playback/skip_previous }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  join_in_progress:
+    summary: Rejoin the schedule where it is now, with the Traffic option (GET /playback/join_in_progress)
+    send: { method: GET, path: /playback/join_in_progress }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  cue_trigger:
+    summary: Send a cue trigger (GET /playback/cue_trigger)
+    send: { method: GET, path: /playback/cue_trigger }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  gpi_trigger:
+    summary: Trigger a GPI input as if it had closed (GET /playback/gpi_trigger?input=)
+    params:
+      input: { type: int, min: 1, max: 64, required: true, label: GPI input, description: "The GPI input to trigger, numbered as in OnTheAir Video's GPI settings." }
+    send: { method: GET, path: /playback/gpi_trigger, query: { input: "{input}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+
+  # ── A given playlist ─────────────────────────────────────────────────────
+  play_playlist:
+    summary: Play a playlist from its current item (GET /playlists/<playlist>/play)
+    params:
+      playlist: &playlist { type: string, max_length: 256, required: true, label: Playlist, description: "The playlist's unique ID, its index among the open playlists from 0, or its name." }
+    send: { method: GET, path: "/playlists/{playlist}/play" }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  pause_playlist:
+    summary: Pause a playlist (GET /playlists/<playlist>/pause)
+    params: { playlist: *playlist }
+    send: { method: GET, path: "/playlists/{playlist}/pause" }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  resume_playlist:
+    summary: Resume a paused playlist (GET /playlists/<playlist>/resume)
+    params: { playlist: *playlist }
+    send: { method: GET, path: "/playlists/{playlist}/resume" }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  stop_playlist:
+    summary: Stop a playlist (GET /playlists/<playlist>/stop)
+    params: { playlist: *playlist }
+    send: { method: GET, path: "/playlists/{playlist}/stop" }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  skip_next_in_playlist:
+    summary: Skip a playlist to its next item (GET /playlists/<playlist>/skip_next)
+    params: { playlist: *playlist }
+    send: { method: GET, path: "/playlists/{playlist}/skip_next" }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  skip_previous_in_playlist:
+    summary: Skip a playlist to its previous item (GET /playlists/<playlist>/previous)
+    params: { playlist: *playlist }
+    send: { method: GET, path: "/playlists/{playlist}/previous" }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  join_playlist_in_progress:
+    summary: Rejoin a playlist's schedule where it is now, with the Traffic option (GET /playlists/<playlist>/join_in_progress)
+    params: { playlist: *playlist }
+    send: { method: GET, path: "/playlists/{playlist}/join_in_progress" }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+
+  # ── A given item ─────────────────────────────────────────────────────────
+  play_item:
+    summary: Play an item of a playlist (GET /playlists/<playlist>/items/<item>/play)
+    params:
+      playlist: *playlist
+      item: &item { type: string, max_length: 256, required: true, label: Item, description: "The item's unique ID, its index in the playlist from 0, or its name." }
+    send: { method: GET, path: "/playlists/{playlist}/items/{item}/play" }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  pause_item:
+    summary: Cue an item of a playlist, paused (GET /playlists/<playlist>/items/<item>/pause)
+    params: { playlist: *playlist, item: *item }
+    send: { method: GET, path: "/playlists/{playlist}/items/{item}/pause" }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  join_item_in_progress:
+    summary: Rejoin an item where its schedule is now, with the Traffic option (GET /playlists/<playlist>/items/<item>/join_in_progress)
+    params: { playlist: *playlist, item: *item }
+    send: { method: GET, path: "/playlists/{playlist}/items/{item}/join_in_progress" }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  play_item_at_timecode:
+    summary: Play an item from a timecode (GET .../items/<item>/play?position_relative_timecode= or position_media_timecode=)
+    params:
+      playlist: *playlist
+      item: *item
+      reference: &reference { type: enum, values: [relative_timecode, media_timecode], default: relative_timecode, label: Timecode reference, description: "relative_timecode counts from the item's in point at 00:00:00:00; media_timecode is the media file's own timecode." }
+      timecode: &timecode { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}[:;.][0-9]{2}$", required: true, label: Timecode, description: "Where playback starts, as HH:MM:SS:FF." }
+    send: { method: GET, path: "/playlists/{playlist}/items/{item}/play", raw_query: "{reference:map.position_key}={timecode:url}" }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  pause_item_at_timecode:
+    summary: Cue an item, paused, at a timecode (GET .../items/<item>/pause?position_relative_timecode= or position_media_timecode=)
+    params: { playlist: *playlist, item: *item, reference: *reference, timecode: *timecode }
+    send: { method: GET, path: "/playlists/{playlist}/items/{item}/pause", raw_query: "{reference:map.position_key}={timecode:url}" }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  play_item_at_seconds:
+    summary: Play an item from a number of seconds after its in point (GET .../items/<item>/play?position_relative_seconds=)
+    params:
+      playlist: *playlist
+      item: *item
+      seconds: &seconds { type: float, min: 0, max: 86400, required: true, label: Position, description: "Seconds after the item's in point, to the millisecond." }
+    send: { method: GET, path: "/playlists/{playlist}/items/{item}/play", query: { position_relative_seconds: "{seconds:.3f}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  pause_item_at_seconds:
+    summary: Cue an item, paused, a number of seconds after its in point (GET .../items/<item>/pause?position_relative_seconds=)
+    params: { playlist: *playlist, item: *item, seconds: *seconds }
+    send: { method: GET, path: "/playlists/{playlist}/items/{item}/pause", query: { position_relative_seconds: "{seconds:.3f}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+
+  # ── CG projects (DGO option) ────────────────────────────────────────────
+  play_cg_project:
+    summary: Play a CG project (GET /playback/cg_projects/<project>/play)
+    params:
+      project: &project { type: string, max_length: 256, required: true, label: CG project, description: "The CG project's unique ID, as cg_projects in state are keyed, or its index from 0." }
+    send: { method: GET, path: "/playback/cg_projects/{project}/play" }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  pause_cg_project:
+    summary: Pause a CG project (GET /playback/cg_projects/<project>/pause)
+    params: { project: *project }
+    send: { method: GET, path: "/playback/cg_projects/{project}/pause" }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  stop_cg_project:
+    summary: Stop a CG project (GET /playback/cg_projects/<project>/stop)
+    params: { project: *project }
+    send: { method: GET, path: "/playback/cg_projects/{project}/stop" }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  play_all_cg_projects:
+    summary: Play every CG project (GET /playback/cg_projects/play, 4.5.7)
+    send: { method: GET, path: /playback/cg_projects/play }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  stop_all_cg_projects:
+    summary: Stop every CG project (GET /playback/cg_projects/stop, 4.5.7)
+    send: { method: GET, path: /playback/cg_projects/stop }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+
+  # ── Other controls ──────────────────────────────────────────────────────
+  set_clocked_items:
+    summary: Turn the clock option on or off on every playlist (GET /playback/clocked_items?enabled=, 4.5.7)
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "True to turn the clocked-items option on in every playlist, false to turn it off." }
+    send: { method: GET, path: /playback/clocked_items, query: { enabled: "{enabled:bool01}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  run_action:
+    summary: Run one of OnTheAir Video's Actions (GET /actions/<action>/run)
+    params:
+      action: &action { type: string, max_length: 256, required: true, label: Action, description: "The action's name, one of the available actions get_info lists." }
+    send: { method: GET, path: "/actions/{action}/run" }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  run_action_with_parameter:
+    summary: Run one of OnTheAir Video's Actions with a parameter (GET /actions/<action>/run?parameter=)
+    params:
+      action: *action
+      parameter: { type: string, max_length: 1024, required: true, label: Parameter, description: "The text the action receives as its parameter." }
+    send: { method: GET, path: "/actions/{action}/run", query: { parameter: "{parameter}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+
+  # ── Adding items (POST, JSON) ───────────────────────────────────────────
+  add_clip:
+    summary: Add a media file at the end of a playlist (POST /playlists/<playlist>/items, clip_type 0)
+    params:
+      playlist: *playlist
+      path: &file { type: string, max_length: 4096, required: true, label: File, description: "The media file's path or URL on the Mac running OnTheAir Video." }
+      name: &item_name { type: string, max_length: 256, default: "", label: Name, description: "The item's name in the playlist; empty for the default." }
+    send:
+      - { method: POST, path: "/playlists/{playlist}/items", content_type: application/json,
+          body: '{"clip_type":"0","name":{name:json},"url":{path:json}}' }
+      - { method: GET, path: /playlists }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  insert_clip:
+    summary: Insert a media file at a place in a playlist (POST /playlists/<playlist>/items/<index>, clip_type 0)
+    params:
+      playlist: *playlist
+      index: &index { type: int, min: 0, max: 100000, required: true, label: Index, description: "Where the item goes in the playlist, numbered from 0." }
+      path: *file
+      name: *item_name
+    send:
+      - { method: POST, path: "/playlists/{playlist}/items/{index}", content_type: application/json,
+          body: '{"clip_type":"0","name":{name:json},"url":{path:json}}' }
+      - { method: GET, path: /playlists }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  add_comment:
+    summary: Add a comment at the end of a playlist (POST /playlists/<playlist>/items, clip_type 3)
+    params:
+      playlist: *playlist
+      name: &comment { type: string, max_length: 1024, required: true, label: Comment, description: "The comment's text." }
+    send:
+      - { method: POST, path: "/playlists/{playlist}/items", content_type: application/json,
+          body: '{"clip_type":"3","name":{name:json}}' }
+      - { method: GET, path: /playlists }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  insert_comment:
+    summary: Insert a comment at a place in a playlist (POST /playlists/<playlist>/items/<index>, clip_type 3)
+    params: { playlist: *playlist, index: *index, name: *comment }
+    send:
+      - { method: POST, path: "/playlists/{playlist}/items/{index}", content_type: application/json,
+          body: '{"clip_type":"3","name":{name:json}}' }
+      - { method: GET, path: /playlists }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  add_live:
+    summary: Add a live item at the end of a playlist (POST /playlists/<playlist>/items, clip_type 4)
+    params:
+      playlist: *playlist
+      source: &live_source { type: string, max_length: 256, required: true, label: Live source, description: "The live source's name, as in OnTheAir Video's live sources." }
+      duration: &duration { type: int, min: 1, max: 86400, required: true, label: Duration, description: "How long the item plays, in seconds." }
+      name: *item_name
+    send:
+      - { method: POST, path: "/playlists/{playlist}/items", content_type: application/json,
+          body: '{"clip_type":"4","name":{name:json},"live_source_name":{source:json},"duration":{duration}}' }
+      - { method: GET, path: /playlists }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  insert_live:
+    summary: Insert a live item at a place in a playlist (POST /playlists/<playlist>/items/<index>, clip_type 4)
+    params: { playlist: *playlist, index: *index, source: *live_source, duration: *duration, name: *item_name }
+    send:
+      - { method: POST, path: "/playlists/{playlist}/items/{index}", content_type: application/json,
+          body: '{"clip_type":"4","name":{name:json},"live_source_name":{source:json},"duration":{duration}}' }
+      - { method: GET, path: /playlists }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  add_stream:
+    summary: Add a stream at the end of a playlist (POST /playlists/<playlist>/items, clip_type 5)
+    params:
+      playlist: *playlist
+      url: &stream_url { type: string, max_length: 4096, required: true, label: Stream URL, description: "The stream's URL, such as an HLS .m3u8 address." }
+      duration: *duration
+      name: *item_name
+    send:
+      - { method: POST, path: "/playlists/{playlist}/items", content_type: application/json,
+          body: '{"clip_type":"5","name":{name:json},"url":{url:json},"duration":{duration}}' }
+      - { method: GET, path: /playlists }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  insert_stream:
+    summary: Insert a stream at a place in a playlist (POST /playlists/<playlist>/items/<index>, clip_type 5)
+    params: { playlist: *playlist, index: *index, url: *stream_url, duration: *duration, name: *item_name }
+    send:
+      - { method: POST, path: "/playlists/{playlist}/items/{index}", content_type: application/json,
+          body: '{"clip_type":"5","name":{name:json},"url":{url:json},"duration":{duration}}' }
+      - { method: GET, path: /playlists }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+
+  # ── Reads ───────────────────────────────────────────────────────────────
+  get_info:
+    summary: Read the application, computer and available actions (GET /info)
+    send: { method: GET, path: /info }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_playing:
+    summary: Read what is playing and its timing (GET /playback/playing)
+    send: { method: GET, path: /playback/playing }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_current_item:
+    summary: Read the playing item (GET /playback/current_item, 4.2.0)
+    send: { method: GET, path: /playback/current_item }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_playlists:
+    summary: List the open playlists (GET /playlists)
+    send: { method: GET, path: /playlists }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_playlist_items:
+    summary: List a playlist's items (GET /playlists/<playlist>/items)
+    params: { playlist: *playlist }
+    send: { method: GET, path: "/playlists/{playlist}/items" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_selected_items:
+    summary: List the items selected in a playlist (GET /playlists/<playlist>/selected_items, 4.5.7)
+    params: { playlist: *playlist }
+    send: { method: GET, path: "/playlists/{playlist}/selected_items" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_cg_projects:
+    summary: List the CG projects (GET /playback/cg_projects)
+    send: { method: GET, path: /playback/cg_projects }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+state:
+  info.application_name:    { type: string, description: "The application's name (OnTheAir Video, or an instance of OnTheAir Video Multi)" }
+  info.application_version: { type: string, description: "The application's version" }
+  info.mac_os_version:      { type: string, description: "The Mac's macOS version" }
+  info.computer_name:       { type: string, description: "The Mac's computer name" }
+  actions.*:                { type: string, description: "An action run_action can run, keyed by its place in the list from 0" }
+  playback.status:          { type: string, description: "Playing, Paused, Stopped or Hold First Frame" }
+  playback.playlist_id:     { type: string, description: "Unique ID of the playlist playing" }
+  playback.playlist_index:  { type: int, description: "Index of the playlist playing among the open playlists, from 0" }
+  playback.playlist_name:   { type: string, description: "Display name of the playlist playing" }
+  playback.item_id:         { type: string, description: "Unique ID of the item playing" }
+  playback.item_index:      { type: int, description: "Index of the item playing in its playlist, from 0" }
+  playback.item_name:       { type: string, description: "Display name of the item playing" }
+  playback.item_duration:   { type: float, unit: s, description: "Duration of the item playing" }
+  playback.item_elapsed:    { type: float, unit: s, description: "Time elapsed in the item playing" }
+  playback.item_remaining:  { type: float, unit: s, description: "Time remaining in the item playing" }
+  playback.playlist_duration:  { type: float, unit: s, description: "Duration of the playlist playing" }
+  playback.playlist_elapsed:   { type: float, unit: s, description: "Time elapsed in the playlist playing, as /playback/playing reports it" }
+  playback.playlist_remaining: { type: float, unit: s, description: "Time remaining in the playlist playing, as /playback/playing reports it" }
+  playback.next_live.id:        { type: string, description: "Unique ID of the next live item" }
+  playback.next_live.name:      { type: string, description: "Display name of the next live item" }
+  playback.next_live.remaining: { type: float, unit: s, description: "Time until the next live item starts" }
+  playlists.*.name:             { type: string, description: "An open playlist's name, keyed by its unique ID" }
+  playlists.*.index:            { type: int, description: "Its index among the open playlists, from 0" }
+  playlists.*.items.*.id:       { type: string, description: "The unique ID of the playlist's item at this index (from 0)" }
+  playlists.*.items.*.name:     { type: string, description: "The item's name" }
+  playlists.*.items.*.duration: { type: float, unit: s, description: "The item's duration" }
+  cg_projects.*.name:           { type: string, description: "A CG project's display name, keyed by its unique ID" }
+  cg_projects.*.status:         { type: string, description: "Playing, Stopping, Stopped or Paused" }
+  cg_projects.*.elapsed:        { type: float, unit: s, description: "Time elapsed in the project" }
+  cg_projects.*.duration:       { type: float, unit: s, description: "The project's duration" }
+
+telemetry:
+  websocket:
+    path: /playback
+    scheme: { setting: scheme }
+    subprotocol: playback_update_v1
+  poll:
+    - every_ms: 10000
+      send:
+        - { method: GET, path: /playback/playing }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /info }
+        - { method: GET, path: /playlists }
+        - { method: GET, path: /playback/cg_projects }
+  updates:
+    # The /playback websocket.
+    - json_match: { "$.event": "^playback_status_changed$" }
+      json: { status: "$.playback_status" }
+      state: { playback.status: "{status}" }
+    - json_match: { "$.event": "^item_changed$" }
+      json: { playlist: "$.playlist_unique_id", item: "$.item_unique_id" }
+      state: { playback.playlist_id: "{playlist}", playback.item_id: "{item}" }
+    - json_match: { "$.event": "^playback_timing_changed$" }
+      json: { item: "$.item_unique_id", name: "$.item_display_name", duration: "$.item_duration",
+              elapsed: "$.item_elapsed_time", remaining: "$.item_remaining_time", pl_duration: "$.playlist_duration",
+              live_id: "$.next_live_unique_id", live_name: "$.next_live_display_name",
+              live_remaining: "$.remaining_time_until_next_live" }
+      state:
+        playback.item_id: "{item}"
+        playback.item_name: "{name}"
+        playback.item_duration: "{duration}"
+        playback.item_elapsed: "{elapsed}"
+        playback.item_remaining: "{remaining}"
+        playback.playlist_duration: "{pl_duration}"
+        playback.next_live.id: "{live_id}"
+        playback.next_live.name: "{live_name}"
+        playback.next_live.remaining: "{live_remaining}"
+    - json_match: { "$.type": "^project property$", "$.projectUniqueID": "^(.+)$" }
+      json: { status: "$.changes.status", elapsed: "$.changes.elapsed_time", duration: "$.changes.duration" }
+      state:
+        "cg_projects.{1:key}.status": "{status}"
+        "cg_projects.{1:key}.elapsed": "{elapsed}"
+        "cg_projects.{1:key}.duration": "{duration}"
+    # The REST reads.
+    - path: "^/info$"
+      json: { name: "$.application_name", version: "$.application_version", macos: "$.mac_os_version", computer: "$.computer_name" }
+      state: { info.application_name: "{name}", info.application_version: "{version}", info.mac_os_version: "{macos}", info.computer_name: "{computer}" }
+    - path: "^/info$"
+      json_each: "$.available_actions"
+      json: { action: "$" }
+      replace: actions
+      state: { "actions.{index}": "{action}" }
+    - path: "^/playback/playing$"
+      json: { status: "$.playback_status", pl_index: "$.playlist_index", pl_name: "$.playlist_display_name",
+              item_index: "$.item_index", item_name: "$.item_display_name", duration: "$.item_duration",
+              elapsed: "$.item_elapsed", remaining: "$.item_remaining", pl_duration: "$.playlist_duration",
+              pl_elapsed: "$.playlist_elapsed", pl_remaining: "$.playlist_remaining" }
+      state:
+        playback.status: "{status}"
+        playback.playlist_index: "{pl_index}"
+        playback.playlist_name: "{pl_name}"
+        playback.item_index: "{item_index}"
+        playback.item_name: "{item_name}"
+        playback.item_duration: "{duration}"
+        playback.item_elapsed: "{elapsed}"
+        playback.item_remaining: "{remaining}"
+        playback.playlist_duration: "{pl_duration}"
+        playback.playlist_elapsed: "{pl_elapsed}"
+        playback.playlist_remaining: "{pl_remaining}"
+    # The open playlists, each one's items read in turn.
+    - path: "^/playlists$"
+      json_each: "$"
+      json: { id: "$.unique_id", name: "$.name" }
+      replace: playlists
+      state: { "playlists.{id:key}.name": "{name}", "playlists.{id:key}.index": "{index}" }
+      then_send:
+        - { method: GET, path: "/playlists/{id}/items" }
+    - path: "^/playlists/([^/?]+)/items$"
+      json_each: "$"
+      json: { id: "$.unique_id", name: "$.name", duration: "$.duration" }
+      replace: "playlists.{1:url_decode:key}.items"
+      state:
+        "playlists.{1:url_decode:key}.items.{index}.id": "{id}"
+        "playlists.{1:url_decode:key}.items.{index}.name": "{name}"
+        "playlists.{1:url_decode:key}.items.{index}.duration": "{duration}"
+    - path: "^/playback/cg_projects$"
+      json_each: "$"
+      json: { id: "$.unique_id", name: "$.display_name", status: "$.status", elapsed: "$.elapsed_time", duration: "$.duration" }
+      replace: cg_projects
+      state:
+        "cg_projects.{id:key}.name": "{name}"
+        "cg_projects.{id:key}.status": "{status}"
+        "cg_projects.{id:key}.elapsed": "{elapsed}"
+        "cg_projects.{id:key}.duration": "{duration}"
+    # A change made over REST is read back at once.
+    - path: "^/playback/(play|pause|resume|stop|skip_next|skip_previous|join_in_progress)(\\?|$)|^/playlists/.+/(play|pause|resume|stop|skip_next|previous|join_in_progress)(\\?|$)"
+      headers: {}
+      then_send: [{ method: GET, path: /playback/playing }]
+    - path: "^/playback/cg_projects/"
+      headers: {}
+      then_send: [{ method: GET, path: /playback/cg_projects }]
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Every transport command takes effect on air at once: play, stop and the
+      skips change what goes to the output, and an added or inserted item
+      changes the running playlist.
+  - models: [all]
+    severity: warning
+    text: >
+      Softron documents its REST calls only inside the running app (api.html
+      on the instance's port). The port, the websocket and its protocols, and
+      the calls the release notes name (/playback/thumbnail,
+      /playback/current_item, skip_next?live_only=1, cg_projects/play and
+      stop, clocked_items?enabled=1, selected_items) are documented; every
+      other call, the request and reply JSON fields, the answer statuses (200,
+      201 or 202), the 0 of clocked_items, and the websocket event fields are
+      taken from the Bitfocus Companion module and inferred.
+  - models: [all]
+    severity: warning
+    text: >
+      Since 4.1 the HTTP server has user rights levels and a "Bypass
+      authorisation" preference (General & HTTP Server); how a client
+      authenticates is documented only in api.html, so this spec sends no
+      credential: turn Bypass authorisation on, or requests may be refused.
+  - models: [all]
+    severity: info
+    text: >
+      OnTheAir Video Multi serves each instance on its own port, 8081 for the
+      first, 8082 for the second and on: open one device per instance, giving
+      its port. With HTTPS enabled (a tls_certificate.p12 in the instance's
+      Certificates folder) the server answers HTTPS on the same port.
+  - models: [all]
+    severity: info
+    text: >
+      The playback websocket (/playback, protocol playback_update_v1) pushes
+      the playback status, the item changing, and the item's timing several
+      times a second; /playback/playing is read every 10 s as a fallback, and
+      the open playlists, their items, the CG projects and /info every 30 s.
+      The per-playlist websockets (playlist_update_v1), the playlists
+      management, start-times and live-sources websockets are not opened (the
+      format holds one push websocket); playlist changes are seen at the next
+      read, and at once after a change made over REST.
+  - models: [all]
+    severity: info
+    text: >
+      Not covered (api.html only, not in any public source): editing or
+      deleting items, scheduler controls, live subtitling, transitions, audio
+      routing, live sources' enable and disable, DGO item updates
+      (PUT /playback/cg_projects/<p>/items/<i>), the output thumbnail
+      (GET /playback/thumbnail, a PNG) and the media browser.

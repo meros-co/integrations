@@ -708,6 +708,11 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         ":pong",
         // Visual Productions' UDP API: hello is answered "<prefix>-hello".
         "core-hello",
+        // Digital Projection dVision: "%", the projector's address, the
+        // mnemonic and a six-character value.
+        "%001 POST 000003",
+        // The Grass Valley Kaleido gateway: an XML acknowledgement.
+        "<ack/>",
     ];
     let line = match &engine.transport {
         super::Transport::LineTcp {

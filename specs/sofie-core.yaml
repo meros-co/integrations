@@ -1,0 +1,1084 @@
+spec: 1
+id: sofie-core
+name: Sofie Core (User Actions REST API and Live Status Gateway)
+vendor: Sofie
+category: other
+
+# Sofie Core's User Actions API (REST, /api/v1.0 on the Core's port 3000) for
+# every command, and the Live Status Gateway's websocket (port 8080 on the same
+# host) for what is on air: the studio's playlists, the active playlist with its
+# current and next part, segment and T-timers, the active pieces and the
+# segments. Lists the REST API gives (studios, devices, show styles, buckets,
+# blueprints) and Sofie's health are polled. Every command is generated from
+# the project's OpenAPI document, one per operation.
+source:
+  - title: "Sofie User Actions API 1.0.0 (OpenAPI 3.0.3, packages/openapi/api)"
+    author: Sofie TV Automation (MIT License)
+    url: https://github.com/Sofie-Automation/sofie-core/tree/main/packages/openapi/api
+    note: >
+      The project's own API definition (retrieved 2026-10-28, main branch): actions.yaml (every path under
+      /api/v1.0, server http://localhost:3000/api/v1.0) and definitions/blueprints, buckets, devices, ingest,
+      playlists, showstyles, snapshots, sofie and studios .yaml (each operation's method, path and query
+      parameters, request body schema and responses, including the {status, result} answer and the health
+      schema).
+  - title: "Sofie Live Status Service 2.0.1 (AsyncAPI 2.6.0, packages/live-status-gateway-api/api)"
+    author: Sofie TV Automation (MIT License)
+    url: https://github.com/Sofie-Automation/sofie-core/tree/main/packages/live-status-gateway-api/api
+    note: >
+      The gateway's message definitions (retrieved 2026-10-28): subscribe messages {event: subscribe, reqid,
+      subscription: {name}} for studio, activePlaylist, resolvedPlaylist, activePieces, segments, adLibs,
+      notifications, buckets and packages; the studio, activePlaylist (id, name, currentPart, currentSegment,
+      nextPart, timing, quickLoop, tTimers), activePieces and segments events and their fields.
+  - title: "Sofie Live Status Gateway README"
+    author: Sofie TV Automation (MIT License)
+    url: https://github.com/Sofie-Automation/sofie-core/blob/main/packages/live-status-gateway/README.md
+    note: "The gateway at ws://<host>:8080 and the subscribe message, in its example."
+
+transport:
+  type: http
+  port: 3000
+  https_port: 443
+  scheme: { setting: scheme }
+  auth: none
+  timeout_ms: 10000
+  probe: { method: GET, path: /api/v1.0/health }
+
+settings:
+  scheme: { type: enum, values: [http, https], default: http, label: Connection,
+            description: "http, or https when Sofie Core is served behind TLS." }
+  lsg_port: { type: int, min: 1, max: 65535, default: 8080, label: Live Status Gateway port,
+              description: "Port of the Live Status Gateway's websocket on the Core's host, 8080 unless the gateway is set otherwise." }
+
+ports:
+  - { port: 3000, protocol: http, role: control, when: "scheme http", note: "Sofie Core's web server; the API is under /api/v1.0" }
+  - { port: 443, protocol: https, role: control, when: "scheme https" }
+  - { port: 8080, protocol: ws, role: push, setting: lsg_port, note: "the Live Status Gateway, on the Core's host" }
+
+models:
+  - id: sofie-core
+    name: Sofie Core (User Actions API 1.0) with the Live Status Gateway
+    supports: [get_version, get_health, assign_system_blueprint, unassign_system_blueprint, get_pending_migrations, apply_pending_migrations, get_devices, get_device, device_action, get_blueprints, get_blueprint, get_playlists, activate_playlist, deactivate_playlist, activate_adlib_testing, execute_adlib, execute_bucket_adlib, execute_bucket_adlib_with_action_type, move_next_part, move_next_segment, reload_playlist, reset_playlist, set_next_part, set_next_segment, queue_next_segment, clear_source_layers, take, take_with_from_part_instance_id, clear_source_layer, recall_sticky, start_timer_countdown, start_timer_free_run, pause_timer, resume_timer, restart_timer, clear_timer_projection, set_timer_projection_anchor, set_timer_projection_time, set_timer_projection_duration, get_studios, add_studio, get_studio, put_studio, delete_studio, get_studio_config, update_studio_config, switch_route_set, get_studio_devices, attach_device, attach_device_with_config_id, detach_device, studio_action, get_show_styles, add_show_style, get_show_style, put_show_style, delete_show_style, get_show_style_config, update_show_style_config, get_show_style_variants, add_show_style_variant, get_show_style_variant, put_show_style_variant, delete_show_style_variant, show_style_action, get_buckets, add_bucket, get_bucket, delete_bucket, import_bucket_adlib, delete_bucket_adlibs, delete_bucket_adlib, store_snapshot, ingest_get_playlists, ingest_delete_playlists, ingest_get_playlist, ingest_delete_playlist, ingest_post_rundown_in_studio, ingest_get_rundowns, ingest_post_rundown, ingest_put_rundowns, ingest_delete_rundowns, ingest_get_rundown, ingest_put_rundown, ingest_delete_rundown, ingest_get_segments, ingest_post_segment, ingest_put_segments, ingest_delete_segments, ingest_get_segment, ingest_put_segment, ingest_delete_segment, ingest_get_parts, ingest_post_part, ingest_put_parts, ingest_delete_parts, ingest_get_part, ingest_put_part, ingest_delete_part]
+    verification: none
+
+commands:
+  get_version:
+    summary: "Returns the current version of Sofie (GET /)"
+    send: { method: GET, path: "/api/v1.0/" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  get_health:
+    summary: "Gets the current health status of Sofie and all its components (GET /health)"
+    send: { method: GET, path: "/api/v1.0/health" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  assign_system_blueprint:
+    summary: "Assigns a system Blueprint to Sofie core (PUT /system/blueprint)"
+    params:
+      blueprint_id: { type: string, max_length: 1024, required: true, label: "Blueprint id", description: "System blueprint to assign." }
+    send: { method: PUT, path: "/api/v1.0/system/blueprint", content_type: application/json, body: '{"blueprintId":{blueprint_id:json}}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  unassign_system_blueprint:
+    summary: "Unassigns the assigned system Blueprint, if any Blueprint is assigned (DELETE /system/blueprint)"
+    send: { method: DELETE, path: "/api/v1.0/system/blueprint" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  get_pending_migrations:
+    summary: "Gets a set of pending system-level migrations (GET /system/migrations)"
+    send: { method: GET, path: "/api/v1.0/system/migrations" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  apply_pending_migrations:
+    summary: "Apply a set of migrations with a given set of values (POST /system/migrations)"
+    params:
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Apply a set of migrations with a given set of values." }
+    send: { method: POST, path: "/api/v1.0/system/migrations", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  get_devices:
+    summary: "Gets all peripheral devices attached to Sofie (GET /devices)"
+    send: { method: GET, path: "/api/v1.0/devices" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  get_device:
+    summary: "Gets a specified peripheral device (GET /devices/{deviceId})"
+    params:
+      device: { type: string, max_length: 256, required: true, label: "Device", description: "The peripheral device's ID." }
+    send: { method: GET, path: "/api/v1.0/devices/{device}" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  device_action:
+    summary: "Sends a command to a specified peripheral device (POST /devices/{deviceId}/action)"
+    params:
+      device: { type: string, max_length: 256, required: true, label: "Device", description: "The peripheral device's ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Contains the action to perform." }
+    send: { method: POST, path: "/api/v1.0/devices/{device}/action", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  get_blueprints:
+    summary: "Returns all blueprints available in Sofie (GET /blueprints)"
+    send: { method: GET, path: "/api/v1.0/blueprints" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  get_blueprint:
+    summary: "Returns some information about the specified blueprint (GET /blueprints/{blueprintId})"
+    params:
+      blueprint: { type: string, max_length: 256, required: true, label: "Blueprint", description: "The blueprint's ID." }
+    send: { method: GET, path: "/api/v1.0/blueprints/{blueprint}" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  get_playlists:
+    summary: "Returns all playlists available in Sofie (GET /playlists)"
+    send: { method: GET, path: "/api/v1.0/playlists" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  activate_playlist:
+    summary: "Activates a Playlist (PUT /playlists/{playlistId}/activate)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rehearsal: { type: bool, default: false, label: "Rehearsal", description: "The rehearsal. Sent as false unless given." }
+    send: { method: PUT, path: "/api/v1.0/playlists/{playlist}/activate", content_type: application/json, body: '{"rehearsal":{rehearsal}}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  deactivate_playlist:
+    summary: "Deactivates a Playlist (PUT /playlists/{playlistId}/deactivate)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+    send: { method: PUT, path: "/api/v1.0/playlists/{playlist}/deactivate" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  activate_adlib_testing:
+    summary: "Activates AdLib testing mode (PUT /playlists/{playlistId}/rundowns/{rundownId}/activate-adlib-testing)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rundown: { type: string, max_length: 256, required: true, label: "Rundown", description: "The rundown's ID." }
+    send: { method: PUT, path: "/api/v1.0/playlists/{playlist}/rundowns/{rundown}/activate-adlib-testing" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  execute_adlib:
+    summary: "Executes the requested AdLib/AdLib Action. This is a \"planned\" AdLib (Action) that has been produced by the blueprints during the ingest process (POST /playlists/{playlistId}/execute-adlib)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Executes the requested AdLib/AdLib Action. This is a \"planned\" AdLib (Action) that has been produced by the blueprints during the ingest process." }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/execute-adlib", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  execute_bucket_adlib:
+    summary: "Executes the requested Bucket AdLib/AdLib Action. This is a Bucket AdLib (Action) that has been previously inserted into a Bucket (POST /playlists/{playlistId}/execute-bucket-adlib)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      bucket_id: { type: string, max_length: 1024, required: true, label: "Bucket id", description: "Bucket to execute the adlib from" }
+      external_id: { type: string, max_length: 1024, required: true, label: "External id", description: "External Id of the Bucket AdLib to execute" }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/execute-bucket-adlib", content_type: application/json, body: '{"bucketId":{bucket_id:json},"externalId":{external_id:json}}' }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  execute_bucket_adlib_with_action_type:
+    summary: "Executes the requested Bucket AdLib/AdLib Action. This is a Bucket AdLib (Action) that has been previously inserted into a Bucket, with action type (POST /playlists/{playlistId}/execute-bucket-adlib)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      bucket_id: { type: string, max_length: 1024, required: true, label: "Bucket id", description: "Bucket to execute the adlib from" }
+      external_id: { type: string, max_length: 1024, required: true, label: "External id", description: "External Id of the Bucket AdLib to execute" }
+      action_type: { type: string, max_length: 1024, required: true, label: "Action type", description: "An actionType string to specify a particular variation for the AdLibAction, valid strings are to be read from the status API" }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/execute-bucket-adlib", content_type: application/json, body: '{"bucketId":{bucket_id:json},"externalId":{external_id:json},"actionType":{action_type:json}}' }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  move_next_part:
+    summary: "Moves the next point by delta places. Negative values are allowed to move \"backwards\" in the script (POST /playlists/{playlistId}/move-next-part)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      delta: { type: int, min: -1000, max: 999999999999999, required: true, label: "Delta", description: "Amount to move next point by (+/-). If delta results in an index that is greater than the number of Parts available, no action will be taken." }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/move-next-part", content_type: application/json, body: '{"delta":{delta}}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  move_next_segment:
+    summary: "Moves the next Segment point by delta places. Negative values are allowed to move \"backwards\" in the script (POST /playlists/{playlistId}/move-next-segment)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      delta: { type: int, min: -1000, max: 999999999999999, required: true, label: "Delta", description: "Amount to move next Segment point by (+/-). If delta results in an index that is greater than the number of Segments available, no action will be taken." }
+      ignore_quick_loop: { type: bool, default: false, label: "Ignore quick loop", description: "When true, the operation will ignore any boundaries set by the QuickLoop feature when moving to the next part Sent as false unless given." }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/move-next-segment", content_type: application/json, body: '{"delta":{delta},"ignoreQuickLoop":{ignore_quick_loop}}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  reload_playlist:
+    summary: "Reloads a Playlist from its ingest source (e.g. MOS/Spreadsheet etc.) (PUT /playlists/{playlistId}/reload-playlist)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+    send: { method: PUT, path: "/api/v1.0/playlists/{playlist}/reload-playlist" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  reset_playlist:
+    summary: "Resets a Playlist back to its pre-played state (PUT /playlists/{playlistId}/reset-playlist)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+    send: { method: PUT, path: "/api/v1.0/playlists/{playlist}/reset-playlist" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  set_next_part:
+    summary: "Sets the next Part to a given PartId (PUT /playlists/{playlistId}/set-next-part)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      part_id: { type: string, max_length: 1024, required: true, label: "Part id", description: "Part to set as next." }
+    send: { method: PUT, path: "/api/v1.0/playlists/{playlist}/set-next-part", content_type: application/json, body: '{"partId":{part_id:json}}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  set_next_segment:
+    summary: "Sets the next part to the first playable Part of the Segment with given segmentId (POST /playlists/{playlistId}/set-next-segment)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      segment_id: { type: string, max_length: 1024, required: true, label: "Segment id", description: "Segment to set as next." }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/set-next-segment", content_type: application/json, body: '{"segmentId":{segment_id:json}}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  queue_next_segment:
+    summary: "Queue Segment with a given segmentId, so that the Next point will jump to that Segment when reaching the end of the currently playing Segment. If the part currently set as next is outside of the current segment, it will set the first part of the given segment as next (POST /playlists/{playlistId}/queue-next-segment)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      segment_id: { type: string, max_length: 1024, required: true, label: "Segment id", description: "Segment to queue." }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/queue-next-segment", content_type: application/json, body: '{"segmentId":{segment_id:json}}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  clear_source_layers:
+    summary: "Clears the target SourceLayers (PUT /playlists/{playlistId}/clear-sourcelayers)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Clears the target SourceLayers." }
+    send: { method: PUT, path: "/api/v1.0/playlists/{playlist}/clear-sourcelayers", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  take:
+    summary: "Performs a take in the given Playlist (POST /playlists/{playlistId}/take)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/take", content_type: application/json, body: '{}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  take_with_from_part_instance_id:
+    summary: "Performs a take in the given Playlist, with from part instance id (POST /playlists/{playlistId}/take)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      from_part_instance_id: { type: string, max_length: 1024, required: true, label: "From part instance id", description: "May be specified to ensure that multiple take requests from the same Part do not result in multiple takes." }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/take", content_type: application/json, body: '{"fromPartInstanceId":{from_part_instance_id:json}}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  clear_source_layer:
+    summary: "Clears the target SourceLayer. This endpoint is deprecated, use the clear-sourcelayers endpoint instead (DELETE /playlists/{playlistId}/sourceLayer/{sourceLayerId})"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      source_layer: { type: string, max_length: 256, required: true, label: "Source layer", description: "The source layer's ID." }
+    send: { method: DELETE, path: "/api/v1.0/playlists/{playlist}/sourceLayer/{source_layer}" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  recall_sticky:
+    summary: "Recalls the last sticky Piece on the specified SourceLayer, if there is any (POST /playlists/{playlistId}/sourceLayer/{sourceLayerId}/sticky)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      source_layer: { type: string, max_length: 256, required: true, label: "Source layer", description: "The source layer's ID." }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/sourceLayer/{source_layer}/sticky" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  start_timer_countdown:
+    summary: "Start a countdown timer (POST /playlists/{playlistId}/t-timers/{timerIndex}/countdown)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      timer: { type: int, min: 1, max: 3, required: true, label: "Timer", description: "The T-timer, 1 to 3." }
+      duration: { type: int, min: 0, max: 999999999999999, required: true, label: "Duration", description: "Duration in seconds." }
+      stop_at_zero: { type: bool, default: false, label: "Stop at zero", description: "Whether to stop the timer at zero. Sent as false unless given." }
+      start_paused: { type: bool, default: false, label: "Start paused", description: "Whether to start the timer in a paused state. Sent as false unless given." }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/t-timers/{timer}/countdown", content_type: application/json, body: '{"duration":{duration},"stopAtZero":{stop_at_zero},"startPaused":{start_paused}}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  start_timer_free_run:
+    summary: "Start a free-running timer (POST /playlists/{playlistId}/t-timers/{timerIndex}/free-run)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      timer: { type: int, min: 1, max: 3, required: true, label: "Timer", description: "The T-timer, 1 to 3." }
+      start_paused: { type: bool, default: false, label: "Start paused", description: "Whether to start the timer in a paused state. Sent as false unless given." }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/t-timers/{timer}/free-run", content_type: application/json, body: '{"startPaused":{start_paused}}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  pause_timer:
+    summary: "Pause a timer (POST /playlists/{playlistId}/t-timers/{timerIndex}/pause)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      timer: { type: int, min: 1, max: 3, required: true, label: "Timer", description: "The T-timer, 1 to 3." }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/t-timers/{timer}/pause" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  resume_timer:
+    summary: "Resume a timer (POST /playlists/{playlistId}/t-timers/{timerIndex}/resume)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      timer: { type: int, min: 1, max: 3, required: true, label: "Timer", description: "The T-timer, 1 to 3." }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/t-timers/{timer}/resume" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  restart_timer:
+    summary: "Restart a timer (POST /playlists/{playlistId}/t-timers/{timerIndex}/restart)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      timer: { type: int, min: 1, max: 3, required: true, label: "Timer", description: "The T-timer, 1 to 3." }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/t-timers/{timer}/restart" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  clear_timer_projection:
+    summary: "Clear the projection state of a timer (POST /playlists/{playlistId}/t-timers/{timerIndex}/projected/clear)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      timer: { type: int, min: 1, max: 3, required: true, label: "Timer", description: "The T-timer, 1 to 3." }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/t-timers/{timer}/projected/clear" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  set_timer_projection_anchor:
+    summary: "Set the anchor part for automatic projection calculation (POST /playlists/{playlistId}/t-timers/{timerIndex}/projected/anchor-part)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      timer: { type: int, min: 1, max: 3, required: true, label: "Timer", description: "The T-timer, 1 to 3." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Set the anchor part for automatic projection calculation." }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/t-timers/{timer}/projected/anchor-part", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  set_timer_projection_time:
+    summary: "Set the timer projection as an absolute unix timestamp (POST /playlists/{playlistId}/t-timers/{timerIndex}/projected/time)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      timer: { type: int, min: 1, max: 3, required: true, label: "Timer", description: "The T-timer, 1 to 3." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Set the timer projection as an absolute unix timestamp." }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/t-timers/{timer}/projected/time", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  set_timer_projection_duration:
+    summary: "Set the timer projection as a duration from now (POST /playlists/{playlistId}/t-timers/{timerIndex}/projected/duration)"
+    params:
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      timer: { type: int, min: 1, max: 3, required: true, label: "Timer", description: "The T-timer, 1 to 3." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Set the timer projection as a duration from now." }
+    send: { method: POST, path: "/api/v1.0/playlists/{playlist}/t-timers/{timer}/projected/duration", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  get_studios:
+    summary: "Gets all Studios (GET /studios)"
+    send: { method: GET, path: "/api/v1.0/studios" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  add_studio:
+    summary: "Adds a new Studio (POST /studios)"
+    params:
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Adds a new Studio." }
+    send: { method: POST, path: "/api/v1.0/studios", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  get_studio:
+    summary: "Gets a Studio (GET /studios/{studioId})"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+    send: { method: GET, path: "/api/v1.0/studios/{studio}" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  put_studio:
+    summary: "Updates an existing Studio or creates a new one (PUT /studios/{studioId})"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Updates an existing Studio or creates a new one." }
+    send: { method: PUT, path: "/api/v1.0/studios/{studio}", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  delete_studio:
+    summary: "Deletes a specified Studio, cleaning up any resources in use (e.g. Playlists) (DELETE /studios/{studioId})"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+    send: { method: DELETE, path: "/api/v1.0/studios/{studio}" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  get_studio_config:
+    summary: "Gets a Studio blueprint configuration (GET /studios/{studioId}/config)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+    send: { method: GET, path: "/api/v1.0/studios/{studio}/config" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  update_studio_config:
+    summary: "Updates an existing Studio blueprint configuration (PUT /studios/{studioId}/config)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      developer_mode: { type: bool, default: false, label: "Developer mode", description: "The developer mode. Sent as false unless given." }
+    send: { method: PUT, path: "/api/v1.0/studios/{studio}/config", content_type: application/json, body: '{"developerMode":{developer_mode}}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  switch_route_set:
+    summary: "Activates / Deactivates a route set (PUT /studios/{studioId}/switch-route-set)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      route_set_id: { type: string, max_length: 1024, required: true, label: "Route set id", description: "Route set to switch" }
+      active: { type: bool, default: false, label: "Active", description: "Whether the route set should be active" }
+    send: { method: PUT, path: "/api/v1.0/studios/{studio}/switch-route-set", content_type: application/json, body: '{"routeSetId":{route_set_id:json},"active":{active}}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  get_studio_devices:
+    summary: "Returns a list of all devices for a given studio (GET /studios/{studioId}/devices)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+    send: { method: GET, path: "/api/v1.0/studios/{studio}/devices" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  attach_device:
+    summary: "Attaches a device to a studio (PUT /studios/{studioId}/devices)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      device_id: { type: string, max_length: 1024, required: true, label: "Device id", description: "The device id." }
+    send: { method: PUT, path: "/api/v1.0/studios/{studio}/devices", content_type: application/json, body: '{"deviceId":{device_id:json}}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  attach_device_with_config_id:
+    summary: "Attaches a device to a studio, with config id (PUT /studios/{studioId}/devices)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      device_id: { type: string, max_length: 1024, required: true, label: "Device id", description: "The device id." }
+      config_id: { type: string, max_length: 1024, required: true, label: "Config id", description: "Id of the studio owned configuration to assign to the device. If not specified, one will be created." }
+    send: { method: PUT, path: "/api/v1.0/studios/{studio}/devices", content_type: application/json, body: '{"deviceId":{device_id:json},"configId":{config_id:json}}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  detach_device:
+    summary: "Detaches a device from a studio (DELETE /studios/{studioId}/devices/{deviceId})"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      device: { type: string, max_length: 256, required: true, label: "Device", description: "The peripheral device's ID." }
+    send: { method: DELETE, path: "/api/v1.0/studios/{studio}/devices/{device}" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  studio_action:
+    summary: "Performs an action on a studio (POST /studios/{studioId}/action)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Contains the action to perform." }
+    send: { method: POST, path: "/api/v1.0/studios/{studio}/action", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  get_show_styles:
+    summary: "Returns the Ids of all ShowStyleBases (GET /showstyles)"
+    send: { method: GET, path: "/api/v1.0/showstyles" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  add_show_style:
+    summary: "Adds a ShowStyleBase (POST /showstyles)"
+    params:
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Adds a ShowStyleBase." }
+    send: { method: POST, path: "/api/v1.0/showstyles", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  get_show_style:
+    summary: "Returns the requested ShowStyleBase (GET /showstyles/{showStyleBaseId})"
+    params:
+      show_style: { type: string, max_length: 256, required: true, label: "Show style", description: "The show style base's ID." }
+    send: { method: GET, path: "/api/v1.0/showstyles/{show_style}" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  put_show_style:
+    summary: "Updates an existing ShowStyleBase or creates a new one (PUT /showstyles/{showStyleBaseId})"
+    params:
+      show_style: { type: string, max_length: 256, required: true, label: "Show style", description: "The show style base's ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Updates an existing ShowStyleBase or creates a new one." }
+    send: { method: PUT, path: "/api/v1.0/showstyles/{show_style}", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  delete_show_style:
+    summary: "Deletes a specified ShowStyleBase (DELETE /showstyles/{showStyleBaseId})"
+    params:
+      show_style: { type: string, max_length: 256, required: true, label: "Show style", description: "The show style base's ID." }
+    send: { method: DELETE, path: "/api/v1.0/showstyles/{show_style}" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  get_show_style_config:
+    summary: "Returns the requested ShowStyle config (GET /showstyles/{showStyleBaseId}/config)"
+    params:
+      show_style: { type: string, max_length: 256, required: true, label: "Show style", description: "The show style base's ID." }
+    send: { method: GET, path: "/api/v1.0/showstyles/{show_style}/config" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  update_show_style_config:
+    summary: "Updates an existing ShowStyle config (PUT /showstyles/{showStyleBaseId}/config)"
+    params:
+      show_style: { type: string, max_length: 256, required: true, label: "Show style", description: "The show style base's ID." }
+      developer_mode: { type: bool, default: false, label: "Developer mode", description: "The developer mode. Sent as false unless given." }
+    send: { method: PUT, path: "/api/v1.0/showstyles/{show_style}/config", content_type: application/json, body: '{"developerMode":{developer_mode}}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  get_show_style_variants:
+    summary: "Returns the Ids of all ShowStyleVariants (GET /showstyles/{showStyleBaseId}/variants)"
+    params:
+      show_style: { type: string, max_length: 256, required: true, label: "Show style", description: "The show style base's ID." }
+    send: { method: GET, path: "/api/v1.0/showstyles/{show_style}/variants" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  add_show_style_variant:
+    summary: "Adds a ShowStyleVariant (POST /showstyles/{showStyleBaseId}/variants)"
+    params:
+      show_style: { type: string, max_length: 256, required: true, label: "Show style", description: "The show style base's ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Adds a ShowStyleVariant." }
+    send: { method: POST, path: "/api/v1.0/showstyles/{show_style}/variants", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  get_show_style_variant:
+    summary: "Returns the requested ShowStyleVariant (GET /showstyles/{showStyleBaseId}/variants/{showStyleVariantId})"
+    params:
+      show_style: { type: string, max_length: 256, required: true, label: "Show style", description: "The show style base's ID." }
+      variant: { type: string, max_length: 256, required: true, label: "Show style variant", description: "The show style variant's ID." }
+    send: { method: GET, path: "/api/v1.0/showstyles/{show_style}/variants/{variant}" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  put_show_style_variant:
+    summary: "Updates an existing ShowStyleVariant or creates a new one (PUT /showstyles/{showStyleBaseId}/variants/{showStyleVariantId})"
+    params:
+      show_style: { type: string, max_length: 256, required: true, label: "Show style", description: "The show style base's ID." }
+      variant: { type: string, max_length: 256, required: true, label: "Show style variant", description: "The show style variant's ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Updates an existing ShowStyleVariant or creates a new one." }
+    send: { method: PUT, path: "/api/v1.0/showstyles/{show_style}/variants/{variant}", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  delete_show_style_variant:
+    summary: "Deletes a specified ShowStyleVariant (DELETE /showstyles/{showStyleBaseId}/variants/{showStyleVariantId})"
+    params:
+      show_style: { type: string, max_length: 256, required: true, label: "Show style", description: "The show style base's ID." }
+      variant: { type: string, max_length: 256, required: true, label: "Show style variant", description: "The show style variant's ID." }
+    send: { method: DELETE, path: "/api/v1.0/showstyles/{show_style}/variants/{variant}" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  show_style_action:
+    summary: "Performs an action on a showstyle base (PUT /showstyles/{showStyleBaseId}/action)"
+    params:
+      show_style: { type: string, max_length: 256, required: true, label: "Show style", description: "The show style base's ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Contains the action to perform." }
+    send: { method: PUT, path: "/api/v1.0/showstyles/{show_style}/action", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  get_buckets:
+    summary: "Returns all buckets available in Sofie (GET /buckets)"
+    send: { method: GET, path: "/api/v1.0/buckets" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  add_bucket:
+    summary: "Adds a Bucket (POST /buckets)"
+    params:
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Adds a Bucket." }
+    send: { method: POST, path: "/api/v1.0/buckets", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  get_bucket:
+    summary: "Returns some information about the specified bucket (GET /buckets/{bucketId})"
+    params:
+      bucket: { type: string, max_length: 256, required: true, label: "Bucket", description: "The bucket's ID." }
+    send: { method: GET, path: "/api/v1.0/buckets/{bucket}" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  delete_bucket:
+    summary: "Deletes a bucket (DELETE /buckets/{bucketId})"
+    params:
+      bucket: { type: string, max_length: 256, required: true, label: "Bucket", description: "The bucket's ID." }
+    send: { method: DELETE, path: "/api/v1.0/buckets/{bucket}" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  import_bucket_adlib:
+    summary: "Imports a Bucket Adlib (PUT /buckets/{bucketId}/adlibs)"
+    params:
+      bucket: { type: string, max_length: 256, required: true, label: "Bucket", description: "The bucket's ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Imports a Bucket Adlib." }
+    send: { method: PUT, path: "/api/v1.0/buckets/{bucket}/adlibs", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  delete_bucket_adlibs:
+    summary: "Deletes all adlibs in a bucket (DELETE /buckets/{bucketId}/adlibs)"
+    params:
+      bucket: { type: string, max_length: 256, required: true, label: "Bucket", description: "The bucket's ID." }
+    send: { method: DELETE, path: "/api/v1.0/buckets/{bucket}/adlibs" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  delete_bucket_adlib:
+    summary: "Deletes a bucket adlib (DELETE /buckets/{bucketId}/adlibs/{externalId})"
+    params:
+      bucket: { type: string, max_length: 256, required: true, label: "Bucket", description: "The bucket's ID." }
+      external_id: { type: string, max_length: 256, required: true, label: "External ID", description: "The bucket AdLib's external ID." }
+    send: { method: DELETE, path: "/api/v1.0/buckets/{bucket}/adlibs/{external_id}" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  store_snapshot:
+    summary: "Stores a Snapshot (POST /snapshots)"
+    params:
+      idempotency_key: { type: string, pattern: "^[0-9A-Fa-f-]{36}$", required: true, label: Idempotency key, description: "A UUID the client makes for this request; a repeat within 5 minutes is not stored twice." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Stores a Snapshot." }
+    send: { method: POST, path: "/api/v1.0/snapshots", content_type: application/json, body: '{body}', headers: { Idempotency-Key: "{idempotency_key}" } }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  ingest_get_playlists:
+    summary: "Gets all Playlists (GET /ingest/{studioId}/playlists)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+    send: { method: GET, path: "/api/v1.0/ingest/{studio}/playlists" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  ingest_delete_playlists:
+    summary: "Deletes all Playlists. Resources under the Playlists (e.g. Rundowns) will also be removed (DELETE /ingest/{studioId}/playlists)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+    send: { method: DELETE, path: "/api/v1.0/ingest/{studio}/playlists" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  ingest_get_playlist:
+    summary: "Gets the specified Playlist (GET /ingest/{studioId}/playlists/{playlistId})"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+    send: { method: GET, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  ingest_delete_playlist:
+    summary: "Deletes a specified Playlist. Resources under the Playlist (e.g. Rundowns) will also be removed (DELETE /ingest/{studioId}/playlists/{playlistId})"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+    send: { method: DELETE, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  ingest_post_rundown_in_studio:
+    summary: "Creates a Rundown in a specified Studio. For all other rundown operations use the /ingest/{studioId}/playlists/{playlistId}/rundowns routes (POST /ingest/{studioId}/rundowns)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Rundown data to ingest. May include playlistExternalId for grouping if supported by the blueprints." }
+    send: { method: POST, path: "/api/v1.0/ingest/{studio}/rundowns", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  ingest_get_rundowns:
+    summary: "Gets all Rundowns belonging to a specified Playlist (GET /ingest/{studioId}/playlists/{playlistId}/rundowns)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+    send: { method: GET, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  ingest_post_rundown:
+    summary: "Creates a Rundown in a specified Playlist (POST /ingest/{studioId}/playlists/{playlistId}/rundowns)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Rundown data to ingest." }
+    send: { method: POST, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  ingest_put_rundowns:
+    summary: "Updates Rundowns belonging to a specified Playlist (PUT /ingest/{studioId}/playlists/{playlistId}/rundowns)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Contains the Rundown data." }
+    send: { method: PUT, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  ingest_delete_rundowns:
+    summary: "Deletes all Rundowns belonging to specified Playlist. Resources under the Rundowns (e.g. Segments) will also be removed (DELETE /ingest/{studioId}/playlists/{playlistId}/rundowns)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+    send: { method: DELETE, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  ingest_get_rundown:
+    summary: "Gets the specified Rundown (GET /ingest/{studioId}/playlists/{playlistId}/rundowns/{rundownId})"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rundown: { type: string, max_length: 256, required: true, label: "Rundown", description: "The rundown's ID." }
+    send: { method: GET, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns/{rundown}" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  ingest_put_rundown:
+    summary: "Updates an existing specified Rundown (PUT /ingest/{studioId}/playlists/{playlistId}/rundowns/{rundownId})"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rundown: { type: string, max_length: 256, required: true, label: "Rundown", description: "The rundown's ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Contains the Rundown data." }
+    send: { method: PUT, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns/{rundown}", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  ingest_delete_rundown:
+    summary: "Deletes a specified Rundown. Resources under the Rundown (e.g. Segments) will also be removed (DELETE /ingest/{studioId}/playlists/{playlistId}/rundowns/{rundownId})"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rundown: { type: string, max_length: 256, required: true, label: "Rundown", description: "The rundown's ID." }
+    send: { method: DELETE, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns/{rundown}" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  ingest_get_segments:
+    summary: "Gets all Segments belonging to a specified Rundown (GET /ingest/{studioId}/playlists/{playlistId}/rundowns/{rundownId}/segments)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rundown: { type: string, max_length: 256, required: true, label: "Rundown", description: "The rundown's ID." }
+    send: { method: GET, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns/{rundown}/segments" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  ingest_post_segment:
+    summary: "Creates a Segment in a specified Rundown (POST /ingest/{studioId}/playlists/{playlistId}/rundowns/{rundownId}/segments)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rundown: { type: string, max_length: 256, required: true, label: "Rundown", description: "The rundown's ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Contains the Segment data." }
+    send: { method: POST, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns/{rundown}/segments", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  ingest_put_segments:
+    summary: "Updates Segments belonging to a specified Rundown (PUT /ingest/{studioId}/playlists/{playlistId}/rundowns/{rundownId}/segments)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rundown: { type: string, max_length: 256, required: true, label: "Rundown", description: "The rundown's ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Contains the Segment data." }
+    send: { method: PUT, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns/{rundown}/segments", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  ingest_delete_segments:
+    summary: "Deletes all Segments belonging to specified Rundown. Resources under the Segments (e.g. Parts) will also be removed (DELETE /ingest/{studioId}/playlists/{playlistId}/rundowns/{rundownId}/segments)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rundown: { type: string, max_length: 256, required: true, label: "Rundown", description: "The rundown's ID." }
+    send: { method: DELETE, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns/{rundown}/segments" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  ingest_get_segment:
+    summary: "Gets the specified Segment (GET /ingest/{studioId}/playlists/{playlistId}/rundowns/{rundownId}/segments/{segmentId})"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rundown: { type: string, max_length: 256, required: true, label: "Rundown", description: "The rundown's ID." }
+      segment: { type: string, max_length: 256, required: true, label: "Segment", description: "The segment's ID or external ID." }
+    send: { method: GET, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns/{rundown}/segments/{segment}" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  ingest_put_segment:
+    summary: "Updates an existing specified Segment (PUT /ingest/{studioId}/playlists/{playlistId}/rundowns/{rundownId}/segments/{segmentId})"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rundown: { type: string, max_length: 256, required: true, label: "Rundown", description: "The rundown's ID." }
+      segment: { type: string, max_length: 256, required: true, label: "Segment", description: "The segment's ID or external ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Contains the Segment data." }
+    send: { method: PUT, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns/{rundown}/segments/{segment}", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  ingest_delete_segment:
+    summary: "Deletes a specified Segment. Resources under the Segment (e.g. Parts) will also be removed (DELETE /ingest/{studioId}/playlists/{playlistId}/rundowns/{rundownId}/segments/{segmentId})"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rundown: { type: string, max_length: 256, required: true, label: "Rundown", description: "The rundown's ID." }
+      segment: { type: string, max_length: 256, required: true, label: "Segment", description: "The segment's ID or external ID." }
+    send: { method: DELETE, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns/{rundown}/segments/{segment}" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  ingest_get_parts:
+    summary: "Gets all Parts belonging to a specified Segment (GET /ingest/{studioId}/playlists/{playlistId}/rundowns/{rundownId}/segments/{segmentId}/parts)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rundown: { type: string, max_length: 256, required: true, label: "Rundown", description: "The rundown's ID." }
+      segment: { type: string, max_length: 256, required: true, label: "Segment", description: "The segment's ID or external ID." }
+    send: { method: GET, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns/{rundown}/segments/{segment}/parts" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  ingest_post_part:
+    summary: "Creates a Part in a specified Segment (POST /ingest/{studioId}/playlists/{playlistId}/rundowns/{rundownId}/segments/{segmentId}/parts)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rundown: { type: string, max_length: 256, required: true, label: "Rundown", description: "The rundown's ID." }
+      segment: { type: string, max_length: 256, required: true, label: "Segment", description: "The segment's ID or external ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Contains the Parts data." }
+    send: { method: POST, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns/{rundown}/segments/{segment}/parts", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  ingest_put_parts:
+    summary: "Updates Parts belonging to a specified Segment (PUT /ingest/{studioId}/playlists/{playlistId}/rundowns/{rundownId}/segments/{segmentId}/parts)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rundown: { type: string, max_length: 256, required: true, label: "Rundown", description: "The rundown's ID." }
+      segment: { type: string, max_length: 256, required: true, label: "Segment", description: "The segment's ID or external ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Contains the Parts data." }
+    send: { method: PUT, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns/{rundown}/segments/{segment}/parts", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  ingest_delete_parts:
+    summary: "Deletes all Parts belonging to specified Segment (DELETE /ingest/{studioId}/playlists/{playlistId}/rundowns/{rundownId}/segments/{segmentId}/parts)"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rundown: { type: string, max_length: 256, required: true, label: "Rundown", description: "The rundown's ID." }
+      segment: { type: string, max_length: 256, required: true, label: "Segment", description: "The segment's ID or external ID." }
+    send: { method: DELETE, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns/{rundown}/segments/{segment}/parts" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  ingest_get_part:
+    summary: "Gets the specified Part (GET /ingest/{studioId}/playlists/{playlistId}/rundowns/{rundownId}/segments/{segmentId}/parts/{partId})"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rundown: { type: string, max_length: 256, required: true, label: "Rundown", description: "The rundown's ID." }
+      segment: { type: string, max_length: 256, required: true, label: "Segment", description: "The segment's ID or external ID." }
+      part: { type: string, max_length: 256, required: true, label: "Part", description: "The part's ID or external ID." }
+    send: { method: GET, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns/{rundown}/segments/{segment}/parts/{part}" }
+    expect: { status: [200, 201, 202], json_path: "$" }
+    returns: value
+  ingest_put_part:
+    summary: "Updates an existing specified Part (PUT /ingest/{studioId}/playlists/{playlistId}/rundowns/{rundownId}/segments/{segmentId}/parts/{partId})"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rundown: { type: string, max_length: 256, required: true, label: "Rundown", description: "The rundown's ID." }
+      segment: { type: string, max_length: 256, required: true, label: "Segment", description: "The segment's ID or external ID." }
+      part: { type: string, max_length: 256, required: true, label: "Part", description: "The part's ID or external ID." }
+      body: { type: json, required: true, label: Body, description: "The JSON body the Sofie API documents for this request: Contains the Rundown data." }
+    send: { method: PUT, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns/{rundown}/segments/{segment}/parts/{part}", content_type: application/json, body: '{body}' }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+  ingest_delete_part:
+    summary: "Deletes a specified Part (DELETE /ingest/{studioId}/playlists/{playlistId}/rundowns/{rundownId}/segments/{segmentId}/parts/{partId})"
+    params:
+      studio: { type: string, max_length: 256, required: true, label: "Studio", description: "The studio's ID." }
+      playlist: { type: string, max_length: 256, required: true, label: "Playlist", description: "The playlist's ID." }
+      rundown: { type: string, max_length: 256, required: true, label: "Rundown", description: "The rundown's ID." }
+      segment: { type: string, max_length: 256, required: true, label: "Segment", description: "The segment's ID or external ID." }
+      part: { type: string, max_length: 256, required: true, label: "Part", description: "The part's ID or external ID." }
+    send: { method: DELETE, path: "/api/v1.0/ingest/{studio}/playlists/{playlist}/rundowns/{rundown}/segments/{segment}/parts/{part}" }
+    expect: { status: [200, 201, 202, 204] }
+    returns: ack
+
+state:
+  version:                 { type: string, description: "Sofie Core's version (GET /)" }
+  health.status:           { type: string, description: "Sofie's health: OK, FAIL, WARNING or UNDEFINED" }
+  health.message:          { type: string, description: "Sofie's status and every component's, separated by semicolons" }
+  health.updated:          { type: string, description: "When the health was last updated (ISO 8601)" }
+  health.blueprints_version: { type: string, description: "The blueprints' version" }
+  health.components.*.name:    { type: string, description: "A component's name (a gateway), keyed by its place from 0" }
+  health.components.*.status:  { type: string, description: "The component's status: OK, FAIL, WARNING or UNDEFINED" }
+  health.components.*.version: { type: string, description: "The component's version" }
+  playlist_ids.*:          { type: string, description: "A playlist's ID (GET /playlists), keyed by its place from 0" }
+  studio_ids.*:            { type: string, description: "A studio's ID, keyed by its place from 0" }
+  device_ids.*:            { type: string, description: "A peripheral device's ID, keyed by its place from 0" }
+  blueprint_ids.*:         { type: string, description: "A blueprint's ID, keyed by its place from 0" }
+  show_style_ids.*:        { type: string, description: "A show style base's ID, keyed by its place from 0" }
+  buckets.*.name:          { type: string, description: "A bucket's name, keyed by its ID" }
+  buckets.*.studio:        { type: string, description: "The bucket's studio ID" }
+  studio.id:               { type: string, description: "The studio the Live Status Gateway reports" }
+  studio.name:             { type: string, description: "The studio's name" }
+  playlists.*.name:        { type: string, description: "A playlist of the studio, keyed by ID: its name" }
+  playlists.*.external_id: { type: string, description: "The playlist's ID in the ingest system" }
+  playlists.*.activation:  { type: string, description: "deactivated, rehearsal or activated" }
+  active_playlist.id:      { type: string, description: "The active playlist's ID; absent when none is active" }
+  active_playlist.name:    { type: string, description: "The active playlist's name" }
+  active_playlist.external_id: { type: string, description: "Its ID in the ingest system" }
+  active_playlist.current_part.id:    { type: string, description: "The part on air" }
+  active_playlist.current_part.name:  { type: string, description: "Its name" }
+  active_playlist.current_part.segment: { type: string, description: "Its segment's ID" }
+  active_playlist.current_part.auto_next: { type: bool, description: "It takes the next part automatically" }
+  active_playlist.current_part.start_ms: { type: int, unit: ms, description: "When it went on air, Unix milliseconds" }
+  active_playlist.current_part.duration_ms: { type: int, unit: ms, description: "Its expected duration" }
+  active_playlist.current_part.end_ms: { type: int, unit: ms, description: "When it is projected to end, Unix milliseconds" }
+  active_playlist.next_part.id:       { type: string, description: "The part set as next" }
+  active_playlist.next_part.name:     { type: string, description: "Its name" }
+  active_playlist.next_part.segment:  { type: string, description: "Its segment's ID" }
+  active_playlist.current_segment.id: { type: string, description: "The segment on air" }
+  active_playlist.current_segment.name: { type: string, description: "Its name" }
+  active_playlist.timing.mode:        { type: string, description: "Timing mode: none, forward-time or back-time" }
+  active_playlist.timing.started_ms:  { type: int, unit: ms, description: "When playback started, Unix milliseconds" }
+  active_playlist.timing.expected_start_ms: { type: int, unit: ms, description: "When the playlist is expected to start" }
+  active_playlist.timing.expected_duration_ms: { type: int, unit: ms, description: "The playlist's expected duration" }
+  active_playlist.timing.expected_end_ms: { type: int, unit: ms, description: "When the playlist is expected to end" }
+  active_playlist.quick_loop.running: { type: bool, description: "The QuickLoop runs" }
+  active_playlist.quick_loop.locked:  { type: bool, description: "The QuickLoop is locked" }
+  active_playlist.timers.*.label:     { type: string, description: "A T-timer's label, keyed by its index 1 to 3" }
+  active_playlist.timers.*.configured: { type: bool, description: "The T-timer is configured" }
+  active_playlist.timers.*.mode:      { type: string, description: "countdown, freeRun or timeOfDay" }
+  active_playlist.timers.*.paused:    { type: bool, description: "The T-timer is paused" }
+  active_playlist.timers.*.zero_time_ms: { type: int, unit: ms, description: "When a running T-timer reaches zero, Unix milliseconds" }
+  active_playlist.timers.*.duration_ms: { type: int, unit: ms, description: "A paused T-timer's remaining duration, or a countdown's duration" }
+  active_pieces.*.name:          { type: string, description: "A piece on air, keyed by ID: its name" }
+  active_pieces.*.source_layer:  { type: string, description: "Its source layer" }
+  active_pieces.*.output_layer:  { type: string, description: "Its output layer" }
+  segments.*.name:               { type: string, description: "A segment of the active playlist, keyed by ID: its name" }
+  segments.*.identifier:         { type: string, description: "Its identifier" }
+  segments.*.rundown:            { type: string, description: "Its rundown's ID" }
+  segments.*.duration_ms:        { type: int, unit: ms, description: "Its expected duration" }
+
+telemetry:
+  websocket:
+    port: { setting: lsg_port }
+    path: /
+    scheme: ws
+    send:
+      - '{"event":"subscribe","reqid":1,"subscription":{"name":"studio"}}'
+      - '{"event":"subscribe","reqid":2,"subscription":{"name":"activePlaylist"}}'
+      - '{"event":"subscribe","reqid":3,"subscription":{"name":"activePieces"}}'
+      - '{"event":"subscribe","reqid":4,"subscription":{"name":"segments"}}'
+  poll:
+    - every_ms: 10000
+      send: [{ method: GET, path: /api/v1.0/health }]
+    - every_ms: 60000
+      send:
+        - { method: GET, path: /api/v1.0/ }
+        - { method: GET, path: /api/v1.0/playlists }
+        - { method: GET, path: /api/v1.0/studios }
+        - { method: GET, path: /api/v1.0/devices }
+        - { method: GET, path: /api/v1.0/blueprints }
+        - { method: GET, path: /api/v1.0/showstyles }
+        - { method: GET, path: /api/v1.0/buckets }
+  updates:
+    # REST reads.
+    - path: "^/api/v1\\.0/$"
+      json: { version: "$.result.version" }
+      state: { version: "{version}" }
+    - path: "^/api/v1\\.0/health$"
+      json: { status: "$.status", message: "$.statusMessage", updated: "$.updated", bp: "$.blueprintsVersion", version: "$.version" }
+      state: { health.status: "{status}", health.message: "{message}", health.updated: "{updated}", health.blueprints_version: "{bp}", version: "{version}" }
+    - path: "^/api/v1\\.0/health$"
+      json_each: "$.components"
+      json: { name: "$.name", status: "$.status", version: "$.version" }
+      replace: health.components
+      state: { "health.components.{index}.name": "{name}", "health.components.{index}.status": "{status}", "health.components.{index}.version": "{version}" }
+    - path: "^/api/v1\\.0/playlists$"
+      json_each: "$.result"
+      json: { id: "$.id" }
+      replace: playlist_ids
+      state: { "playlist_ids.{index}": "{id}" }
+    - path: "^/api/v1\\.0/studios$"
+      json_each: "$.result"
+      json: { id: "$.id" }
+      replace: studio_ids
+      state: { "studio_ids.{index}": "{id}" }
+    - path: "^/api/v1\\.0/devices$"
+      json_each: "$.result"
+      json: { id: "$.id" }
+      replace: device_ids
+      state: { "device_ids.{index}": "{id}" }
+    - path: "^/api/v1\\.0/blueprints$"
+      json_each: "$.result"
+      json: { id: "$.id" }
+      replace: blueprint_ids
+      state: { "blueprint_ids.{index}": "{id}" }
+    - path: "^/api/v1\\.0/showstyles$"
+      json_each: "$.result"
+      json: { id: "$.id" }
+      replace: show_style_ids
+      state: { "show_style_ids.{index}": "{id}" }
+    - path: "^/api/v1\\.0/buckets$"
+      json_each: "$.result"
+      json: { id: "$.id", name: "$.name", studio: "$.studioId" }
+      replace: buckets
+      state: { "buckets.{id:key}.name": "{name}", "buckets.{id:key}.studio": "{studio}" }
+    # The Live Status Gateway.
+    - json_match: { "$.event": "^studio$" }
+      json: { id: "$.id", name: "$.name" }
+      state: { studio.id: "{id}", studio.name: "{name}" }
+    - json_match: { "$.event": "^studio$" }
+      json_each: "$.playlists"
+      json: { id: "$.id", name: "$.name", external: "$.externalId", activation: "$.activationStatus" }
+      replace: playlists
+      state: { "playlists.{id:key}.name": "{name}", "playlists.{id:key}.external_id": "{external}", "playlists.{id:key}.activation": "{activation}" }
+    - json_match: { "$.event": "^activePlaylist$" }
+      json:
+        id: "$.id"
+        name: "$.name"
+        external: "$.externalId"
+        cp_id: "$.currentPart.id"
+        cp_name: "$.currentPart.name"
+        cp_segment: "$.currentPart.segmentId"
+        cp_auto: "$.currentPart.autoNext"
+        cp_start: "$.currentPart.timing.startTime"
+        cp_duration: "$.currentPart.timing.expectedDurationMs"
+        cp_end: "$.currentPart.timing.projectedEndTime"
+        np_id: "$.nextPart.id"
+        np_name: "$.nextPart.name"
+        np_segment: "$.nextPart.segmentId"
+        cs_id: "$.currentSegment.id"
+        cs_name: "$.currentSegment.name"
+        t_mode: "$.timing.timingMode"
+        t_started: "$.timing.startedPlayback"
+        t_start: "$.timing.expectedStart"
+        t_duration: "$.timing.expectedDurationMs"
+        t_end: "$.timing.expectedEnd"
+        ql_running: "$.quickLoop.running"
+        ql_locked: "$.quickLoop.locked"
+      replace: active_playlist
+      state:
+        active_playlist.id: "{id}"
+        active_playlist.name: "{name}"
+        active_playlist.external_id: "{external}"
+        active_playlist.current_part.id: "{cp_id}"
+        active_playlist.current_part.name: "{cp_name}"
+        active_playlist.current_part.segment: "{cp_segment}"
+        active_playlist.current_part.auto_next: "{cp_auto}"
+        active_playlist.current_part.start_ms: "{cp_start}"
+        active_playlist.current_part.duration_ms: "{cp_duration}"
+        active_playlist.current_part.end_ms: "{cp_end}"
+        active_playlist.next_part.id: "{np_id}"
+        active_playlist.next_part.name: "{np_name}"
+        active_playlist.next_part.segment: "{np_segment}"
+        active_playlist.current_segment.id: "{cs_id}"
+        active_playlist.current_segment.name: "{cs_name}"
+        active_playlist.timing.mode: "{t_mode}"
+        active_playlist.timing.started_ms: "{t_started}"
+        active_playlist.timing.expected_start_ms: "{t_start}"
+        active_playlist.timing.expected_duration_ms: "{t_duration}"
+        active_playlist.timing.expected_end_ms: "{t_end}"
+        active_playlist.quick_loop.running: "{ql_running}"
+        active_playlist.quick_loop.locked: "{ql_locked}"
+    - json_match: { "$.event": "^activePlaylist$" }
+      json_each: "$.tTimers"
+      json: { i: "$.index", label: "$.label", configured: "$.configured", mode: "$.mode.type", paused: "$.state.paused",
+              zero: "$.state.zeroTime", duration: "$.state.duration" }
+      state:
+        "active_playlist.timers.{i}.label": "{label}"
+        "active_playlist.timers.{i}.configured": "{configured}"
+        "active_playlist.timers.{i}.mode": "{mode}"
+        "active_playlist.timers.{i}.paused": "{paused}"
+        "active_playlist.timers.{i}.zero_time_ms": "{zero}"
+        "active_playlist.timers.{i}.duration_ms": "{duration}"
+    - json_match: { "$.event": "^activePieces$" }
+      json_each: "$.activePieces"
+      json: { id: "$.id", name: "$.name", source: "$.sourceLayer", output: "$.outputLayer" }
+      replace: active_pieces
+      state: { "active_pieces.{id:key}.name": "{name}", "active_pieces.{id:key}.source_layer": "{source}", "active_pieces.{id:key}.output_layer": "{output}" }
+    - json_match: { "$.event": "^segments$" }
+      json_each: "$.segments"
+      json: { id: "$.id", name: "$.name", identifier: "$.identifier", rundown: "$.rundownId", duration: "$.timing.expectedDurationMs" }
+      replace: segments
+      state: { "segments.{id:key}.name": "{name}", "segments.{id:key}.identifier": "{identifier}", "segments.{id:key}.rundown": "{rundown}", "segments.{id:key}.duration_ms": "{duration}" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      take, activate_playlist, deactivate_playlist, reset_playlist and reload_playlist change what goes to air at
+      once; the delete commands, the put commands and apply_pending_migrations change Sofie's configuration, and
+      the ingest commands replace or delete rundowns, segments and parts.
+  - models: [all]
+    severity: warning
+    text: >
+      The OpenAPI document calls its server "for use during development only" and describes no authentication;
+      Sofie's REST API is meant for a trusted network or behind a proxy that authenticates. The Live Status
+      Gateway is a separate process: this spec reaches it on the Core's host at lsg_port.
+  - models: [all]
+    severity: info
+    text: >
+      Requests whose body is a documented object (studios, show styles, variants, buckets, AdLib imports,
+      ingest rundowns, segments and parts, snapshots, migrations, device, studio and show-style actions,
+      AdLib options and T-timer projections) take it whole as the json body parameter, as the API reference
+      describes it. Optional booleans of a typed body are sent as false unless given; optional strings have a
+      second command that sends them (take_with_from_part_instance_id and the like).
+  - models: [all]
+    severity: info
+    text: >
+      The REST lists give IDs only (buckets their names too), kept as lists; the studio's playlists with their
+      names and activation, and everything on air, come from the Live Status Gateway's events. The adLibs,
+      resolvedPlaylist, buckets, packages and notifications topics are not subscribed; their content is read
+      with the REST commands. An activePlaylist event with no active playlist clears active_playlist.

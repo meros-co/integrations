@@ -1,0 +1,211 @@
+spec: 1
+id: piclock
+name: PiClock studio clock (tally server)
+vendor: PiClock
+category: other
+implementation: native
+reason: >
+  A PiClock connects to its tally server, not the other way round: the core listens for the clock, answers its
+  connection with a random challenge, checks the SHA-512 digest of the challenge and shared secret the clock
+  returns, and must send a ping at least every five seconds or the clock drops the link. A listening,
+  challenging server is beyond the spec format's transports.
+
+source:
+  - title: "PiClock Tally Protocol (TallyProtocol.md)"
+    author: Simon Hyde
+    url: https://github.com/simonhyde/PiClock/blob/master/TallyProtocol.md
+    note: >
+      The project's protocol document (retrieved 2026-10-28; the document only, the GPL source was not read).
+      TCP to the tally server's port, 6254 by default; CRYPT and AUTH with a SHA-512 digest of the random
+      string and the shared secret, and the MAC address; something sent at least every 5 s, PING answered
+      PONG; UTF-8 lines CMD:ARG1:... ended by CR; ACK and NACK; SETGPO and GPI; SETGLOBAL, SETPROFILE,
+      SETREGIONCOUNT, STOREFONT, CLEARFONTS, SETFONTS; the region commands SETSIZE, SETROW, SETTALLY,
+      SETLABEL, SETCOUNTDOWN, SETLAYOUT, SETCLOCKS, SETLOCATION, SETFONTSIZEZONES, STOREIMAGE, CLEARIMAGES,
+      each prefixed by a region number; the argument formats (int, bool, float, color, b64, tz).
+
+settings:
+  password: { type: string, secret: true, required: true, max_length: 256, label: Shared secret,
+              description: "The shared secret configured on the clock; the clock proves it knows it before it is accepted." }
+  listen_port: { type: int, min: 1, max: 65535, default: 6254, label: Listen port,
+                 description: "Local TCP port the clock connects to, as set in its configuration (6254 by default)." }
+  ping_ms: { type: int, min: 500, max: 4500, default: 2000, label: Ping interval,
+             description: "Milliseconds between pings; the clock drops a server it hears nothing from for 5 s." }
+
+ports:
+  - { port: 6254, protocol: tcp, role: control, listener: core, setting: listen_port, note: "the clock connects here; give the clock's address as the device's host" }
+
+models:
+  - id: piclock
+    name: PiClock (Raspberry Pi or Linux studio clock)
+    supports: [set_global, set_profile, set_region_count, store_font, clear_fonts, set_fonts, store_image, clear_images,
+               set_size, set_row, set_tally, set_label, set_countdown, set_layout, set_clocks, set_location,
+               set_font_size_zones, set_gpo, send]
+    verification: none
+
+commands:
+  set_global:
+    summary: Set the display's orientation and screen saver (SETGLOBAL)
+    params:
+      landscape: { type: bool, default: true, label: Landscape, description: "True lays the display out wider than tall, false taller than wide." }
+      screensaver: { type: bool, default: true, label: Screen saver, description: "True shrinks the output by 5 % and moves it slowly to prevent burn-in." }
+    returns: ack
+  set_profile:
+    summary: Name the clock's profile, shown next to its MAC address (SETPROFILE)
+    params:
+      name: { type: string, max_length: 128, pattern: "^[^:]*$", required: true, label: Profile name, description: "The profile name to show, without a colon." }
+    returns: ack
+  set_region_count:
+    summary: Set how many regions the display has (SETREGIONCOUNT)
+    params:
+      count: { type: int, min: 1, max: 64, required: true, label: Regions, description: "Number of regions, each laid out on its own." }
+    returns: ack
+  store_font:
+    summary: Store or replace a font under a name for set_fonts (STOREFONT)
+    params:
+      name: &asset_name { type: string, max_length: 128, pattern: "^[^:#]+$", required: true, label: Name, description: "The name it is stored under, without a colon and not starting with #." }
+      data: { type: string, pattern: "^[A-Za-z0-9+/=]+$", required: true, label: Font data, description: "The font file (TrueType tested, any FreeType format) in base64." }
+    returns: ack
+  clear_fonts:
+    summary: Clear every stored font (CLEARFONTS)
+    returns: ack
+  set_fonts:
+    summary: Choose the fonts of each part of the display (SETFONTS)
+    params:
+      tally: &font { type: string, max_length: 128, pattern: "^[^:]*$", default: "", label: Tally font, description: "A stored font's name, or empty for the default." }
+      tally_label: { type: string, max_length: 128, pattern: "^[^:]*$", default: "", label: Tally label font, description: "A stored font's name for tally labels, or empty for the tally font." }
+      status: { type: string, max_length: 128, pattern: "^[^:]*$", default: "", label: Status font, description: "A stored font's name for the status line, or empty for the default." }
+      digital: { type: string, max_length: 128, pattern: "^[^:]*$", default: "", label: Digital font, description: "A stored monospaced font's name for digital clocks and countdowns, or empty for the default." }
+      date: { type: string, max_length: 128, pattern: "^[^:]*$", default: "", label: Date font, description: "A stored font's name for the date, or empty for the default." }
+      hours: { type: string, max_length: 128, pattern: "^[^:]*$", default: "", label: Hour numbers font, description: "A stored font's name for the analogue clock's numbers, or empty for the default." }
+    returns: ack
+  store_image:
+    summary: Store or replace an image shown in place of a tally's text equal to its name (STOREIMAGE)
+    params:
+      name: *asset_name
+      image: { type: string, pattern: "^[A-Za-z0-9+/=]+$", required: true, label: Image data, description: "The image file (JPEG or PNG tested) in base64." }
+    returns: ack
+  clear_images:
+    summary: Clear every stored image (CLEARIMAGES)
+    returns: ack
+  set_size:
+    summary: Set a region's rows of tally boxes and their default columns (SETSIZE)
+    params:
+      region: &region { type: int, min: 0, max: 63, default: 0, label: Region, description: "The region, numbered from 0." }
+      rows: { type: int, min: 0, max: 64, required: true, label: Rows, description: "Rows of tally boxes." }
+      columns: { type: int, min: 0, max: 64, required: true, label: Columns, description: "Columns on each row, unless set_row says otherwise." }
+    returns: ack
+  set_row:
+    summary: Set the number of columns on one row of a region (SETROW)
+    params:
+      region: *region
+      row: &row { type: int, min: 0, max: 63, required: true, label: Row, description: "The row, numbered from 0." }
+      columns: { type: int, min: 0, max: 64, required: true, label: Columns, description: "Columns on this row." }
+    returns: ack
+  set_tally:
+    summary: Show text in a tally box with its colors, ending any countdown there (SETTALLY)
+    params:
+      region: *region
+      row: *row
+      column: &column { type: int, min: 0, max: 63, required: true, label: Column, description: "The column, numbered from 0." }
+      foreground: &fg { type: string, pattern: "^#?[0-9A-Fa-f]{6}$", required: true, label: Text color, description: "Text color as RRGGBB." }
+      background: &bg { type: string, pattern: "^#?[0-9A-Fa-f]{6}$", required: true, label: Background color, description: "Background color as RRGGBB." }
+      text: { type: string, max_length: 1024, required: true, label: Text, description: "The text to show; it may hold colons, and a stored image's name shows the image." }
+    returns: ack
+  set_label:
+    summary: Set the label above a tally box's text (SETLABEL)
+    params:
+      region: *region
+      row: *row
+      column: *column
+      label: { type: string, max_length: 1024, required: true, label: Label, description: "The label text; it may hold colons." }
+    returns: ack
+  set_countdown:
+    summary: Make a tally box count down to a time (SETCOUNTDOWN)
+    params:
+      region: *region
+      row: *row
+      column: *column
+      foreground: *fg
+      background: *bg
+      target_ms: { type: int, min: 0, max: 253402300799999, required: true, label: Target time, description: "The time the countdown reaches zero, in Unix milliseconds (UTC)." }
+      flash_seconds: { type: int, min: -1, max: 86400, default: -1, label: Flash from, description: "Seconds before the target at which the box starts flashing; -1 never flashes." }
+      label: { type: string, max_length: 1024, default: "", label: Label, description: "The label shown above the countdown; it may hold colons." }
+    returns: ack
+  set_layout:
+    summary: Set a region's analogue clock style (and, until set_clocks is used, which clocks it shows) (SETLAYOUT)
+    params:
+      region: *region
+      analogue_clock: { type: bool, default: true, label: Analogue clock, description: "Legacy: show an analogue clock; ignored once set_clocks has been sent." }
+      analogue_clock_local: { type: bool, default: true, label: Analogue clock local, description: "Legacy: the analogue clock shows local time rather than UTC." }
+      digital_clock_utc: { type: bool, default: false, label: Digital UTC clock, description: "Legacy: show a digital UTC clock." }
+      digital_clock_local: { type: bool, default: true, label: Digital local clock, description: "Legacy: show a digital local clock." }
+      date: { type: bool, default: true, label: Date, description: "Legacy: show the date." }
+      date_local: { type: bool, default: true, label: Local date, description: "Legacy: the date is local rather than UTC." }
+      numbers_present: { type: bool, default: true, label: Numbers, description: "Show numbers on the analogue clock." }
+      numbers_outside: { type: bool, default: true, label: Numbers outside, description: "Put the numbers outside the dial rather than inside." }
+      seconds_sweep: { type: bool, default: false, label: Sweeping seconds, description: "Sweep the second hand continuously rather than stepping it." }
+      clock_face_image: { type: string, max_length: 128, pattern: "^[^:]*$", default: "", label: Clock face image, description: "A stored image to use as the dial, or empty for the drawn one." }
+      hour_hand: &hand { type: string, max_length: 128, pattern: "^[^:]*$", default: "", label: Hour hand, description: "A stored image for the hand, a color as #RRGGBB, or empty for the default." }
+      minute_hand: { type: string, max_length: 128, pattern: "^[^:]*$", default: "", label: Minute hand, description: "A stored image for the hand, a color as #RRGGBB, or empty for the default." }
+      second_hand: { type: string, max_length: 128, pattern: "^[^:]*$", default: "", label: Second hand, description: "A stored image for the hand, a color as #RRGGBB, or empty for the default." }
+    returns: ack
+  set_clocks:
+    summary: Set a region's date, analogue clock and digital clocks by time zone (SETCLOCKS)
+    params:
+      region: *region
+      date_timezone: { type: string, max_length: 64, pattern: "^[^:]*$", default: LOCAL, label: Date time zone, description: "LOCAL, a tz database zone (Europe/London), or empty for no date." }
+      analogue_timezone: { type: string, max_length: 64, pattern: "^[^:]*$", default: LOCAL, label: Analogue clock time zone, description: "LOCAL, a tz database zone, or empty for no analogue clock." }
+      digital_clocks: { type: string, max_length: 1024, pattern: "^[^:]*$", default: "LOCAL=", label: Digital clocks, description: "Comma-separated zone=label pairs, one per digital clock (LOCAL=, Europe/London=LON, UTC=UTC); labels are three characters." }
+    returns: ack
+  set_location:
+    summary: Place a region on the display, in fractions of its width and height from the bottom left (SETLOCATION)
+    params:
+      region: *region
+      x: { type: float, min: 0, max: 1, default: 0, label: Left edge, description: "Left edge, as a fraction of the display width." }
+      y: { type: float, min: 0, max: 1, default: 0, label: Bottom edge, description: "Bottom edge, as a fraction of the display height." }
+      width: { type: float, min: 0, max: 1, default: 1, label: Width, description: "Width, as a fraction of the display width." }
+      height: { type: float, min: 0, max: 1, default: 1, label: Height, description: "Height, as a fraction of the display height." }
+    returns: ack
+  set_font_size_zones:
+    summary: Group a region's tally boxes into zones sized together (SETFONTSIZEZONES)
+    params:
+      region: *region
+      zones: { type: string, max_length: 2048, pattern: "^[^:]*$", required: true, label: Zones, description: "Rows separated by ';', each a comma-separated list of zone names for its boxes; names starting with G are shared by every region." }
+    returns: ack
+  set_gpo:
+    summary: Turn one of the clock's general-purpose outputs on or off (SETGPO)
+    params:
+      output: { type: int, min: 0, max: 7, required: true, label: Output, description: "The output, numbered from 0 (wiringPi pin 8 for output 0)." }
+      "on": { type: bool, required: true, label: "On", description: "True turns the output on." }
+    returns: ack
+  send:
+    summary: Send one protocol line as it is, answered ACK or NACK
+    params:
+      line: { type: string, max_length: 1048576, required: true, label: Line, description: "A command line without its CR, such as 0SETTALLY:0:0:#FFFFFF:#FF0000:ON AIR." }
+    returns: ack
+
+state:
+  mac_address: { type: string, description: "The clock's MAC address, from its authentication" }
+  gpi.*:       { type: bool, description: "A general-purpose input is on, keyed 0 to 15" }
+  gpi_word:    { type: int, description: "Every input as the 16-bit word the clock sends, bit 0 for input 0" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The clock connects to the core, so the clock's configuration must name this host and the listen port as a
+      tally server, with the same shared secret; the device is opened with the clock's address as host, and
+      reports disconnected until the clock connects. Several clocks share the listen port, each its own device.
+  - models: [all]
+    severity: info
+    text: >
+      The document says the AUTH digest is SHA-512 of the random string followed by the shared secret, without
+      naming its encoding; it is compared as hexadecimal without case. A clock whose digest does not match is
+      disconnected and the device reports unauthorized.
+  - models: [all]
+    severity: info
+    text: >
+      Region commands are sent with the region's number directly before the command name (0SETTALLY:...), as
+      the document describes the prefix. The protocol has no reads: what a command sets is not read back (an
+      API limit); only the GPIs and the MAC address come from the clock. Tallies vanish 5 s after the link is
+      lost, so the clock's layout must be sent again when it reconnects.
