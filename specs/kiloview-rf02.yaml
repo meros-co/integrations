@@ -839,8 +839,8 @@ quirks:
       and devices (gateway output devices) every 5 seconds; users, roles,
       the logged-in user, network interfaces, system settings, the
       front-screen setting, port aggregation, the aggregatable ports and
-      the notification list every 30 seconds. Users and roles are read as one page of up to 1000
-      entries, since the format cannot follow pages. Every write the
+      the notification list every 30 seconds. Users and roles are read whole,
+      1000 a page, each page asked for in turn until one is short. Every write the
       platform accepts has what it changed read again.
   - models: [all]
     severity: info
@@ -967,8 +967,8 @@ telemetry:
     - every_ms: 30000
       send:
         - { method: GET, path: /api/v1/getinfo }
-        - { method: GET, path: /api/v1/sys-user, query: { pageIndex: "1", pageSize: "1000" } }
-        - { method: GET, path: /api/v1/role, query: { pageIndex: "1", pageSize: "1000" } }
+        - { method: GET, path: /api/v1/sys-user, query: { pageIndex: "1", pageSize: "1000" }, pages: &pages { items: "$.data.list", page: pageIndex, size: pageSize } }
+        - { method: GET, path: /api/v1/role, query: { pageIndex: "1", pageSize: "1000" }, pages: *pages }
         - { method: GET, path: /api/v1/netmgr }
         - { method: GET, path: /api/v1/netmgr/lcd-checkConf }
         - { method: GET, path: /api/v1/systemctrl/get }
@@ -1192,12 +1192,12 @@ telemetry:
     - path: "^/api/v1/(sys-user|sys-user/delUsers|user/pwd/reset)$"
       json: {}
       then_send:
-        - { method: GET, path: /api/v1/sys-user, query: { pageIndex: "1", pageSize: "1000" } }
-        - { method: GET, path: /api/v1/role, query: { pageIndex: "1", pageSize: "1000" } }
+        - { method: GET, path: /api/v1/sys-user, query: { pageIndex: "1", pageSize: "1000" }, pages: *pages }
+        - { method: GET, path: /api/v1/role, query: { pageIndex: "1", pageSize: "1000" }, pages: *pages }
     - path: "^/api/v1/role(/rename|/update|/\\d+)?$"
       json: {}
       then_send:
-        - { method: GET, path: /api/v1/role, query: { pageIndex: "1", pageSize: "1000" } }
+        - { method: GET, path: /api/v1/role, query: { pageIndex: "1", pageSize: "1000" }, pages: *pages }
         - { method: GET, path: /api/v1/getinfo }
     - path: "^/api/v1/netmgr(/setIP)?$"
       request_match: { "$.ifname": "." }
