@@ -1,0 +1,210 @@
+spec: 1
+id: yamaha-mcp1
+name: Yamaha MCP1 wall controller (Remote Control Protocol, TCP 49280)
+vendor: Yamaha
+category: other
+
+# The MCP1 network wall controller takes the Yamaha Remote Control Protocol
+# on TCP 49280: one LF-ended text line per command, answered OK or ERROR, and
+# NOTIFY pushes when the current preset changes or a recall starts. Over it a
+# controller recalls the MCP1's presets and reads its status.
+source:
+  - title: "MCP1 Remote Control Protocol Specifications, Version 1.0.0 (Jan. 25, 2023), for MCP1 firmware 5.0.0 and later"
+    author: Yamaha Corporation
+    url: https://uk.yamaha.com/download/files/2323669
+    note: >
+      Manufacturer document. TCP 49280 on the NETWORK connector, up to eight
+      controllers (an MCP1 recalling presets on another counts as one);
+      LF-ended ASCII lines and the LF heartbeat; the start sequence
+      (devstatus runmode until normal); notifications devstatus runmode and
+      error, sscurrent and ssrecall; commands devstatus, devmode, scpmode,
+      sscurrent, ssrecall, devinfo, ssnum and ssinfo; errors ERROR <command>
+      <code> (§3.5).
+
+transport:
+  type: line-tcp
+  port: 49280
+  framing: terminated
+  terminator: lf
+  encoding: ascii
+  timeout_ms: 3000
+  reply: expected
+  reply_match: '^(OK|ERROR) '
+  error_match: '^ERROR '
+  probe: devstatus runmode
+
+ports:
+  - { port: 49280, protocol: tcp, role: control }
+
+models:
+  - id: mcp1
+    name: Yamaha MCP1 network wall controller
+    supports: [get_run_mode, get_error_status, set_emergency_mode, set_encoding, set_keepalive, get_current_preset,
+               recall_preset, get_protocol_version, get_firmware_version, get_product_name, get_serial_number,
+               get_device_id, get_device_name, get_preset_count, get_preset_info]
+    verification: none
+
+commands:
+  get_run_mode:
+    summary: Read the run mode, normal, emergency or update (devstatus runmode)
+    send: devstatus runmode
+    expect: { matches: '^OK devstatus runmode "(\w+)"' }
+    returns: value
+  get_error_status:
+    summary: Read the alert status, none or the alert's text (devstatus error)
+    send: devstatus error
+    expect: { matches: '^OK devstatus error "(.*)"' }
+    returns: value
+  set_emergency_mode:
+    summary: Put the MCP1 into emergency mode or back to normal (devmode); presets cannot be recalled in emergency mode
+    params:
+      emergency: { type: bool, required: true, label: Emergency, description: "On enters emergency mode, off returns to normal mode." }
+    send: "devmode {emergency:map.devmode}"
+    expect: { matches: '^OK devmode ' }
+    returns: ack
+  set_encoding:
+    summary: Choose the character set of answers, ascii or utf8 (scpmode encoding)
+    params:
+      encoding: { type: enum, values: [ascii, utf8], required: true, label: Encoding, description: "ascii or utf8." }
+    send: "scpmode encoding {encoding}"
+    expect: { matches: '^OK scpmode encoding ' }
+    returns: ack
+  set_keepalive:
+    summary: Make the MCP1 drop this client after a silence of the interval plus 1 s (scpmode keepalive)
+    params:
+      interval_ms: { type: int, min: 1001, max: 3600000, required: true, label: Interval, description: "Interval in ms, over 1000." }
+    send: "scpmode keepalive {interval_ms}"
+    expect: { matches: '^OK scpmode keepalive ' }
+    returns: ack
+  get_current_preset:
+    summary: Read the current preset and whether it has been modified (sscurrent); returns the index
+    send: sscurrent
+    expect: { matches: '^OK sscurrent (\d+)' }
+    returns: value
+  recall_preset:
+    summary: Recall a preset by index (ssrecall); refused (AccessDenied) in emergency mode
+    params:
+      index: { type: int, min: 0, max: 999, required: true, label: Preset, description: "The preset's index, as ssnum and ssinfo number them." }
+    send: "ssrecall {index}"
+    expect: { matches: '^OK ssrecall ' }
+    returns: ack
+  get_protocol_version:
+    summary: Read the protocol version (devinfo protocolver)
+    send: devinfo protocolver
+    expect: { matches: '^OK devinfo protocolver "(.*)"' }
+    returns: value
+  get_firmware_version:
+    summary: Read the firmware version (devinfo version)
+    send: devinfo version
+    expect: { matches: '^OK devinfo version "(.*)"' }
+    returns: value
+  get_product_name:
+    summary: Read the product name (devinfo productname)
+    send: devinfo productname
+    expect: { matches: '^OK devinfo productname "(.*)"' }
+    returns: value
+  get_serial_number:
+    summary: Read the serial number (devinfo serialno)
+    send: devinfo serialno
+    expect: { matches: '^OK devinfo serialno "(.*)"' }
+    returns: value
+  get_device_id:
+    summary: Read the UNIT ID as three hex digits (devinfo deviceid)
+    send: devinfo deviceid
+    expect: { matches: '^OK devinfo deviceid "(.*)"' }
+    returns: value
+  get_device_name:
+    summary: Read the device name (devinfo devicename)
+    send: devinfo devicename
+    expect: { matches: '^OK devinfo devicename "(.*)"' }
+    returns: value
+  get_preset_count:
+    summary: Read the number of presets (ssnum)
+    send: ssnum
+    expect: { matches: '^OK ssnum (\d+)' }
+    returns: value
+  get_preset_info:
+    summary: Read a preset's number text, kind (preinst, reserve, user or empty) and title (ssinfo)
+    params:
+      index: { type: int, min: 0, max: 999, required: true, label: Preset, description: "The preset's index." }
+    send: "ssinfo {index}"
+    expect: { matches: '^OK ssinfo \d+ "(?:[^"\\]|\\.)*" \w+ "((?:[^"\\]|\\.)*)"' }
+    returns: value
+
+maps:
+  devmode: { "true": emergency, "false": normal }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      recall_preset changes the system the MCP1 controls at once;
+      set_emergency_mode blocks recalls until it is turned off. Communication
+      start: send devstatus runmode every second or more until it answers
+      normal, and nothing else before (the core asks it as the liveness
+      probe).
+  - models: [all]
+    severity: info
+    text: >
+      On connecting the core reads the status, device information, the
+      current preset and the preset count; the MCP1 pushes changes of the
+      current preset, recalls and alerts. Preset titles are read with
+      get_preset_info. Errors are ERROR <command> <code>: UnknownCommand,
+      WrongFormat, InvalidArgument, UnknownAddress, UnknownEventID,
+      TooLongCommand, AccessDenied, Busy, ReadOnly, NoPermission,
+      InternalError. Up to eight controllers connect at once.
+
+state:
+  device.run_mode:         { type: string, description: "Run mode: normal, emergency or update" }
+  device.error:            { type: string, description: "Alert status: none, or the alert text (flt/, err/ or wrn/ and its message, number, count, UNIT ID and time)" }
+  device.protocol_version: { type: string, description: "Protocol version" }
+  device.firmware:         { type: string, description: "Firmware version" }
+  device.product:          { type: string, description: "Product name" }
+  device.serial:           { type: string, description: "Serial number" }
+  device.device_id:        { type: string, description: "UNIT ID, three hex digits" }
+  device.name:             { type: string, description: "Device name" }
+  presets.current:         { type: int, description: "Current preset index" }
+  presets.modified:        { type: bool, description: "The current preset has been changed since it was recalled" }
+  presets.last_recalled:   { type: int, description: "Index of the last preset recall started" }
+  presets.count:           { type: int, description: "Number of presets" }
+  presets.*.number:        { type: string, description: "The preset's number as text, keyed by index" }
+  presets.*.kind:          { type: string, description: "preinst, reserve, user or empty" }
+  presets.*.title:         { type: string, description: "The preset's title" }
+  error.command:           { type: string, description: "Command of the last ERROR answer" }
+  error.code:              { type: string, description: "Code of the last ERROR answer" }
+
+telemetry:
+  poll:
+    send: ["devstatus runmode", "devstatus error", "devinfo protocolver", "devinfo version", "devinfo productname",
+           "devinfo serialno", "devinfo deviceid", "devinfo devicename", "sscurrent", "ssnum"]
+  updates:
+    - match: '^(?:OK|NOTIFY) devstatus runmode "(\w+)"$'
+      state: { device.run_mode: "{1}" }
+    - match: '^(?:OK|NOTIFY) devstatus error "(.*)"$'
+      state: { device.error: "{1}" }
+    - match: '^OK devmode (normal|emergency)$'
+      state: { device.run_mode: "{1}" }
+    - match: '^OK devinfo protocolver "(.*)"$'
+      state: { device.protocol_version: "{1}" }
+    - match: '^OK devinfo version "(.*)"$'
+      state: { device.firmware: "{1}" }
+    - match: '^OK devinfo productname "(.*)"$'
+      state: { device.product: "{1}" }
+    - match: '^OK devinfo serialno "(.*)"$'
+      state: { device.serial: "{1}" }
+    - match: '^OK devinfo deviceid "(.*)"$'
+      state: { device.device_id: "{1}" }
+    - match: '^OK devinfo devicename "(.*)"$'
+      state: { device.name: "{1}" }
+    - match: '^(?:OK|NOTIFY) sscurrent (\d+)'
+      state: { presets.current: "{1}" }
+    - match: '^OK sscurrent \d+ ((?:un)?modified)$'
+      state: { presets.modified: { value: "{1}", map: { "modified": true, "unmodified": false } } }
+    - match: '^(?:OK|NOTIFY) ssrecall (\d+)$'
+      state: { presets.last_recalled: "{1}" }
+    - match: '^OK ssnum (\d+)$'
+      state: { presets.count: "{1}" }
+    - match: '^OK ssinfo (\d+) "((?:[^"\\]|\\.)*)" (\w+) "((?:[^"\\]|\\.)*)"'
+      state: { "presets.{1}.number": "{2}", "presets.{1}.kind": "{3}", "presets.{1}.title": "{4}" }
+    - match: '^ERROR (\S+) (\w+)$'
+      state: { error.command: "{1}", error.code: "{2}" }
