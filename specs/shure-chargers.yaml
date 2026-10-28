@@ -1,0 +1,630 @@
+spec: 1
+id: shure-chargers
+name: "Shure networked battery chargers (SBC220, SBC240, SBC840, SBC840M, SBRC, MXCWNCS, SBC250, SBC450, SBC850)"
+vendor: Shure
+category: other
+
+# Shure's networked chargers answer the command strings on TCP 2202:
+# GET, SET and REP in angle brackets, a REP pushed whenever a value changes
+# (a charging battery's charge and time to full tick on their own). Bays and
+# modules are numbered from 1, 0 meaning all. SBC250, SBC450 and SBC850, the
+# ULX-D conference docking stations, have an older, smaller set.
+source:
+  - title: "SBC220 SBC240 Command Strings, Version 2.1 (2024-H)"
+    author: Shure Incorporated
+    url: "https://pubs.shure.com/command-strings/SBC220-240/en-US"
+    note: >
+      Manufacturer document (PDF docId 7301). TCP 2202, device the server, GET/SET/REP and REP on
+      change p.3; ALL, DEVICE_ID (1-8 characters set, 31 reported), FW_VER, FLASH, MODEL,
+      NET_SETTINGS (SC, AUTO or MANUAL, zero-padded addresses, no asynchronous report), REBOOT,
+      STORAGE_MODE; BATT_MODULE_TYPE (000, 129, 133, 255); bay commands BATT_BARS,
+      BATT_CAPACITY_MAX, BATT_CHARGE, BATT_CURRENT_CAPACITY, BATT_CURRENT_CAPACITY_MAX, BATT_CYCLE,
+      BATT_DETECTED, BATT_ERROR (000-007, 255), BATT_HEALTH, BATT_STATE, BATT_TEMP_C and BATT_TEMP_F
+      (offset 40), BATT_TIME_TO_FULL (65529 full, 65533-65535).
+  - title: "SBC840 SBC840M Command Strings, Version 1.2 (2024-H)"
+    author: Shure Incorporated
+    url: "https://www.shure.com/en-US/docs/commandstrings/SBC840_SBC840M"
+    note: >
+      Manufacturer document (PDF docId 7978). The same set for an 8-bay single-module charger;
+      BATT_MODULE_TYPE 128 (SBC840) and 130 (SBC840M); REP FLASH OFF when identifying ends.
+  - title: "Shure Battery Rack Mount Charger (SBRC) Command Strings, Version 1 (2020-G)"
+    author: Shure Incorporated
+    url: "https://pubs.shure.com/command-strings/SBRC/en-US"
+    note: >
+      Manufacturer document (PDF docId 7725). The same set without NET_SETTINGS and REBOOT;
+      BATT_MODULE_TYPE 001 AXT902, 002 AXT901, 003 SBC-AX, 004 SBM920, 005 SBM910, 006 SBM910M, 255
+      invalid.
+  - title: "MXCWNCS Command Strings, Version 4 (2020-B)"
+    author: Shure Incorporated
+    url: "https://pubs.shure.com/command-strings/MXCWNCS/en-US"
+    note: >
+      Manufacturer document (PDF docId 6943). Bays 1-10; GET and SET FLASH; DEVICE_ID of 1-31
+      characters; STORAGE_MODE; the bay commands with BATT_TIME_TO_FULL 65530 hot, 65531 warm, 65532
+      cold; BATT_MODULE_TYPE 001 MXCWNCS.
+  - title: "Command Strings for ULX-D Receivers, Shure Applications Engineering Technical Bulletin (RW 1/12/2018), Battery Charger Commands p.8-9"
+    author: Shure Incorporated
+    url: "https://content-files.shure.com/Pubs/ulx/ulx-d-network-string-commands.pdf"
+    note: >
+      Manufacturer document. SBC250, SBC450 and SBC850: ALL, DEVICE_ID (read only, 8 characters),
+      MODEL, FW_VER, FLASH (GET and SET, off after 60 s), TX_AVAILABLE, TX_TYPE (ULXD6, ULXD8,
+      UNAVAILABLE, OTHER), FREQUENCY (six digits, kHz), BATT_BARS, BATT_TIME_TO_FULL, BATT_CHARGE,
+      BATT_CYCLE, BATT_HEALTH; bays 0-4 (SBC450) and 0-8 (SBC850); 252-255 and 65532-65535
+      unavailable.
+
+transport:
+  type: line-tcp
+  port: 2202
+  framing: delimited
+  open: "< "
+  close: " >"
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # Answers and change reports are both REP: commands name the parameter
+  # their REP carries (expect.reply_contains).
+  reply_match: "^< REP "
+  error_match: "^< REP ERR"
+  probe: "GET MODEL"
+
+ports:
+  - { port: 2202, protocol: tcp, role: control }
+
+models:
+  - id: sbc220
+    name: "Shure SBC220 networked charging station (2 bays per unit, ganged up to 4 modules)"
+    supports:
+      - get_model
+      - get_firmware
+      - get_device_id
+      - set_device_id
+      - flash
+      - get_storage_mode
+      - set_storage_mode
+      - toggle_storage_mode
+      - get_network
+      - set_network
+      - set_network_auto
+      - reboot
+      - get_all
+      - get_module_type
+      - get_battery_bars
+      - get_battery_design_capacity
+      - get_battery_capacity
+      - get_battery_full_capacity
+      - get_battery_error
+      - get_battery_state
+      - get_battery_detected
+      - get_battery_temperature_f
+      - get_battery_charge
+      - get_battery_health
+      - get_battery_cycles
+      - get_battery_time_to_full
+      - get_battery_temperature
+    verification: none
+  - id: sbc240
+    name: "Shure SBC240 networked charging station (2 bays per unit, ganged up to 4 modules)"
+    supports:
+      - get_model
+      - get_firmware
+      - get_device_id
+      - set_device_id
+      - flash
+      - get_storage_mode
+      - set_storage_mode
+      - toggle_storage_mode
+      - get_network
+      - set_network
+      - set_network_auto
+      - reboot
+      - get_all
+      - get_module_type
+      - get_battery_bars
+      - get_battery_design_capacity
+      - get_battery_capacity
+      - get_battery_full_capacity
+      - get_battery_error
+      - get_battery_state
+      - get_battery_detected
+      - get_battery_temperature_f
+      - get_battery_charge
+      - get_battery_health
+      - get_battery_cycles
+      - get_battery_time_to_full
+      - get_battery_temperature
+    verification: none
+  - id: sbc840
+    name: "Shure SBC840 networked 8-bay charger"
+    supports:
+      - get_model
+      - get_firmware
+      - get_device_id
+      - set_device_id
+      - flash
+      - get_storage_mode
+      - set_storage_mode
+      - toggle_storage_mode
+      - get_network
+      - set_network
+      - set_network_auto
+      - reboot
+      - get_all
+      - get_module_type
+      - get_battery_bars
+      - get_battery_design_capacity
+      - get_battery_capacity
+      - get_battery_full_capacity
+      - get_battery_error
+      - get_battery_state
+      - get_battery_detected
+      - get_battery_temperature_f
+      - get_battery_charge
+      - get_battery_health
+      - get_battery_cycles
+      - get_battery_time_to_full
+      - get_battery_temperature
+    verification: none
+  - id: sbc840m
+    name: "Shure SBC840M networked 8-bay charger (SB900 series)"
+    supports:
+      - get_model
+      - get_firmware
+      - get_device_id
+      - set_device_id
+      - flash
+      - get_storage_mode
+      - set_storage_mode
+      - toggle_storage_mode
+      - get_network
+      - set_network
+      - set_network_auto
+      - reboot
+      - get_all
+      - get_module_type
+      - get_battery_bars
+      - get_battery_design_capacity
+      - get_battery_capacity
+      - get_battery_full_capacity
+      - get_battery_error
+      - get_battery_state
+      - get_battery_detected
+      - get_battery_temperature_f
+      - get_battery_charge
+      - get_battery_health
+      - get_battery_cycles
+      - get_battery_time_to_full
+      - get_battery_temperature
+    verification: none
+  - id: sbrc
+    name: "Shure SBRC rack mount charger (up to 4 modules: SBC-AX, SBM920, SBM910, SBM910M, AXT901, AXT902)"
+    supports:
+      - get_model
+      - get_firmware
+      - get_device_id
+      - set_device_id
+      - flash
+      - get_storage_mode
+      - set_storage_mode
+      - toggle_storage_mode
+      - get_all
+      - get_module_type
+      - get_battery_bars
+      - get_battery_design_capacity
+      - get_battery_capacity
+      - get_battery_full_capacity
+      - get_battery_error
+      - get_battery_state
+      - get_battery_detected
+      - get_battery_temperature_f
+      - get_battery_charge
+      - get_battery_health
+      - get_battery_cycles
+      - get_battery_time_to_full
+      - get_battery_temperature
+    verification: none
+  - id: mxcwncs
+    name: "Shure MXCWNCS networked charging station (10 bays)"
+    supports:
+      - get_model
+      - get_firmware
+      - get_device_id
+      - set_device_id
+      - flash
+      - get_flash
+      - get_storage_mode
+      - set_storage_mode
+      - toggle_storage_mode
+      - get_all
+      - get_module_type
+      - get_battery_bars
+      - get_battery_design_capacity
+      - get_battery_capacity
+      - get_battery_full_capacity
+      - get_battery_error
+      - get_battery_state
+      - get_battery_detected
+      - get_battery_temperature_f
+      - get_battery_charge
+      - get_battery_health
+      - get_battery_cycles
+      - get_battery_time_to_full
+      - get_battery_temperature
+    verification: none
+  - id: sbc250
+    name: "Shure SBC250 networked docking station (2 bays, ULXD6 and ULXD8)"
+    supports:
+      - get_model
+      - get_firmware
+      - get_device_id_dock
+      - flash
+      - get_flash
+      - get_all
+      - get_battery_charge
+      - get_battery_health
+      - get_battery_cycles
+      - get_battery_time_to_full
+      - get_transmitter_available
+      - get_transmitter_type
+      - get_transmitter_frequency
+    verification: none
+  - id: sbc450
+    name: "Shure SBC450 networked docking station (4 bays, ULXD6 and ULXD8)"
+    supports:
+      - get_model
+      - get_firmware
+      - get_device_id_dock
+      - flash
+      - get_flash
+      - get_all
+      - get_battery_charge
+      - get_battery_health
+      - get_battery_cycles
+      - get_battery_time_to_full
+      - get_transmitter_available
+      - get_transmitter_type
+      - get_transmitter_frequency
+    verification: none
+  - id: sbc850
+    name: "Shure SBC850 networked docking station (8 bays, ULXD6 and ULXD8)"
+    supports:
+      - get_model
+      - get_firmware
+      - get_device_id_dock
+      - flash
+      - get_flash
+      - get_all
+      - get_battery_charge
+      - get_battery_health
+      - get_battery_cycles
+      - get_battery_time_to_full
+      - get_transmitter_available
+      - get_transmitter_type
+      - get_transmitter_frequency
+    verification: none
+
+commands:
+  get_model:
+    summary: "Read the model (MODEL)"
+    send: "GET MODEL"
+    expect: { reply_contains: " MODEL ", matches: " MODEL \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_firmware:
+    summary: "Read the firmware version (a * after it: self test failed) (FW_VER)"
+    send: "GET FW_VER"
+    expect: { reply_contains: " FW_VER ", matches: " FW_VER \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_device_id:
+    summary: "Read the device ID (DEVICE_ID)"
+    send: "GET DEVICE_ID"
+    expect: { reply_contains: " DEVICE_ID ", matches: " DEVICE_ID \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_device_id:
+    summary: "Set the device ID (DEVICE_ID)"
+    params:
+      value: { type: string, required: true, max_length: 31, pattern: "^[\\x20-\\x3b\\x3d\\x3f-\\x7a\\x7c\\x7e]+$", label: "Device ID", description: "1 to 8 characters on the SBC chargers and SBRC, 1 to 31 letters, digits and hyphens on the MXCWNCS." }
+    send: "SET DEVICE_ID \\{{value}\\}"
+    expect: { reply_contains: " DEVICE_ID ", contains: " DEVICE_ID " }
+    returns: ack
+  get_device_id_dock:
+    summary: "Read the device ID (DEVICE_ID), 8 characters"
+    send: "GET DEVICE_ID"
+    expect: { reply_contains: " DEVICE_ID ", matches: " DEVICE_ID \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  flash:
+    summary: "Identify the charger by flashing its lights (FLASH); it stops by itself"
+    params:
+      enabled: { type: bool, required: true, label: "Flash", description: "On flashes the lights to identify the charger, off stops them." }
+    send: "SET FLASH {enabled:on_off}"
+    expect: { reply_contains: " FLASH ", contains: " FLASH " }
+    returns: ack
+  get_flash:
+    summary: "Read whether the charger is flashing to identify itself (FLASH)"
+    send: "GET FLASH"
+    expect: { reply_contains: " FLASH ", matches: " FLASH \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_storage_mode:
+    summary: "Read storage mode (charging to storage level) (STORAGE_MODE)"
+    send: "GET STORAGE_MODE"
+    expect: { reply_contains: " STORAGE_MODE ", matches: " STORAGE_MODE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  set_storage_mode:
+    summary: "Turn storage mode (charging to storage level) on or off (STORAGE_MODE)"
+    params:
+      enabled: { type: bool, required: true, label: "Storage mode", description: "On charges batteries to their storage level rather than full, off charges them full." }
+    send: "SET STORAGE_MODE {enabled:on_off}"
+    expect: { reply_contains: " STORAGE_MODE ", contains: " STORAGE_MODE " }
+    returns: ack
+  toggle_storage_mode:
+    summary: "Toggle storage mode (charging to storage level) (STORAGE_MODE TOGGLE)"
+    send: "SET STORAGE_MODE TOGGLE"
+    expect: { reply_contains: " STORAGE_MODE ", contains: " STORAGE_MODE " }
+    returns: ack
+  get_network:
+    summary: "Read the Shure Control network settings (NET_SETTINGS SC): mode, address, mask, gateway, MAC"
+    send: "GET NET_SETTINGS SC"
+    expect: { reply_contains: " NET_SETTINGS ", matches: " NET_SETTINGS SC (.*?) *>$" }
+    returns: value
+  set_network:
+    summary: "Set a fixed address for the charger (NET_SETTINGS SC MANUAL); it moves to the new address at once"
+    params:
+      address: { type: string, required: true, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: "Address", description: "IPv4 address, dotted." }
+      netmask: { type: string, required: true, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: "Netmask", description: "Subnet mask, dotted." }
+      gateway: { type: string, required: true, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: "Gateway", description: "Default gateway, dotted; 0.0.0.0 for none." }
+    send: "SET NET_SETTINGS SC MANUAL {address} {netmask} {gateway}"
+    returns: none
+  set_network_auto:
+    summary: "Let the charger take its address automatically (NET_SETTINGS SC AUTO)"
+    send: "SET NET_SETTINGS SC AUTO na na na"
+    returns: none
+  reboot:
+    summary: "Restart the charger (REBOOT); not acknowledged"
+    send: "SET REBOOT"
+    returns: none
+  get_all:
+    summary: "Ask for every parameter of the charger and a bay (0: every bay); the answers update state"
+    params:
+      bay: { type: int, min: 0, max: 10, required: true, label: "Bay", description: "Charging bay from 1 (8 on SBC840 and SBC850, 4 on SBC450, 2 on SBC250 and per SBC220 or SBC240 unit, 10 on the MXCWNCS, per module on the SBRC); 0 is every bay." }
+    send: "GET {bay} ALL"
+    returns: none
+  get_module_type:
+    summary: "Read a charging module's type (BATT_MODULE_TYPE)"
+    params:
+      module: { type: int, min: 0, max: 4, required: true, label: "Module", description: "Charging module from 1 (ganged SBC220 and SBC240 units, SBRC modules); 0 is every module." }
+    send: "GET {module} BATT_MODULE_TYPE"
+    expect: { reply_contains: " BATT_MODULE_TYPE ", matches: " BATT_MODULE_TYPE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_bars:
+    summary: "Read a bay's battery bars (0-5; 254 error, 255 unknown) (BATT_BARS)"
+    params:
+      bay: { type: int, min: 0, max: 10, required: true, label: "Bay", description: "Charging bay from 1 (8 on SBC840 and SBC850, 4 on SBC450, 2 on SBC250 and per SBC220 or SBC240 unit, 10 on the MXCWNCS, per module on the SBRC); 0 is every bay." }
+    send: "GET {bay} BATT_BARS"
+    expect: { reply_contains: " BATT_BARS ", matches: " BATT_BARS \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_design_capacity:
+    summary: "Read a battery's design capacity in mAh (65534 error, 65535 none) (BATT_CAPACITY_MAX)"
+    params:
+      bay: { type: int, min: 0, max: 10, required: true, label: "Bay", description: "Charging bay from 1 (8 on SBC840 and SBC850, 4 on SBC450, 2 on SBC250 and per SBC220 or SBC240 unit, 10 on the MXCWNCS, per module on the SBRC); 0 is every bay." }
+    send: "GET {bay} BATT_CAPACITY_MAX"
+    expect: { reply_contains: " BATT_CAPACITY_MAX ", matches: " BATT_CAPACITY_MAX \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_capacity:
+    summary: "Read a battery's present charge in mAh (65534 error, 65535 none) (BATT_CURRENT_CAPACITY)"
+    params:
+      bay: { type: int, min: 0, max: 10, required: true, label: "Bay", description: "Charging bay from 1 (8 on SBC840 and SBC850, 4 on SBC450, 2 on SBC250 and per SBC220 or SBC240 unit, 10 on the MXCWNCS, per module on the SBRC); 0 is every bay." }
+    send: "GET {bay} BATT_CURRENT_CAPACITY"
+    expect: { reply_contains: " BATT_CURRENT_CAPACITY ", matches: " BATT_CURRENT_CAPACITY \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_full_capacity:
+    summary: "Read a battery's full-charge capacity now, in mAh (65534 error, 65535 none) (BATT_CURRENT_CAPACITY_MAX)"
+    params:
+      bay: { type: int, min: 0, max: 10, required: true, label: "Bay", description: "Charging bay from 1 (8 on SBC840 and SBC850, 4 on SBC450, 2 on SBC250 and per SBC220 or SBC240 unit, 10 on the MXCWNCS, per module on the SBRC); 0 is every bay." }
+    send: "GET {bay} BATT_CURRENT_CAPACITY_MAX"
+    expect: { reply_contains: " BATT_CURRENT_CAPACITY_MAX ", matches: " BATT_CURRENT_CAPACITY_MAX \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_error:
+    summary: "Read a bay's battery error: 0 none, 1 unknown module, 2 unrecognised battery, 3 deep discharge recovery failed, 4 charge failed, 5 check battery, 6 check charger, 7 communication failure, 255 no battery (BATT_ERROR)"
+    params:
+      bay: { type: int, min: 0, max: 10, required: true, label: "Bay", description: "Charging bay from 1 (8 on SBC840 and SBC850, 4 on SBC450, 2 on SBC250 and per SBC220 or SBC240 unit, 10 on the MXCWNCS, per module on the SBRC); 0 is every bay." }
+    send: "GET {bay} BATT_ERROR"
+    expect: { reply_contains: " BATT_ERROR ", matches: " BATT_ERROR \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_state:
+    summary: "Read a bay's battery state (FULL, CALCULATING, NORMAL, WARM, WARM_FULL, HOT, COLD, PRECHARGE, READY_TO_STORE, DISCHARGE_CALC, DISCHARGING, DISCHARGING_WARM, DISCHARGING_COLD, ERROR, NO_BATT) (BATT_STATE)"
+    params:
+      bay: { type: int, min: 0, max: 10, required: true, label: "Bay", description: "Charging bay from 1 (8 on SBC840 and SBC850, 4 on SBC450, 2 on SBC250 and per SBC220 or SBC240 unit, 10 on the MXCWNCS, per module on the SBRC); 0 is every bay." }
+    send: "GET {bay} BATT_STATE"
+    expect: { reply_contains: " BATT_STATE ", matches: " BATT_STATE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_detected:
+    summary: "Read whether a bay holds a battery (YES or NO) (BATT_DETECTED)"
+    params:
+      bay: { type: int, min: 0, max: 10, required: true, label: "Bay", description: "Charging bay from 1 (8 on SBC840 and SBC850, 4 on SBC450, 2 on SBC250 and per SBC220 or SBC240 unit, 10 on the MXCWNCS, per module on the SBRC); 0 is every bay." }
+    send: "GET {bay} BATT_DETECTED"
+    expect: { reply_contains: " BATT_DETECTED ", matches: " BATT_DETECTED \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_temperature_f:
+    summary: "Read a battery's temperature in degrees Fahrenheit (BATT_TEMP_F)"
+    params:
+      bay: { type: int, min: 0, max: 10, required: true, label: "Bay", description: "Charging bay from 1 (8 on SBC840 and SBC850, 4 on SBC450, 2 on SBC250 and per SBC220 or SBC240 unit, 10 on the MXCWNCS, per module on the SBRC); 0 is every bay." }
+    send: "GET {bay} BATT_TEMP_F"
+    expect: { reply_contains: " BATT_TEMP_F ", matches: " BATT_TEMP_F \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_charge:
+    summary: "Read a battery's charge in percent (BATT_CHARGE)"
+    params:
+      bay: { type: int, min: 0, max: 10, required: true, label: "Bay", description: "Charging bay from 1 (8 on SBC840 and SBC850, 4 on SBC450, 2 on SBC250 and per SBC220 or SBC240 unit, 10 on the MXCWNCS, per module on the SBRC); 0 is every bay." }
+    send: "GET {bay} BATT_CHARGE"
+    expect: { reply_contains: " BATT_CHARGE ", matches: " BATT_CHARGE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_health:
+    summary: "Read a battery's health, percent of its design capacity (BATT_HEALTH)"
+    params:
+      bay: { type: int, min: 0, max: 10, required: true, label: "Bay", description: "Charging bay from 1 (8 on SBC840 and SBC850, 4 on SBC450, 2 on SBC250 and per SBC220 or SBC240 unit, 10 on the MXCWNCS, per module on the SBRC); 0 is every bay." }
+    send: "GET {bay} BATT_HEALTH"
+    expect: { reply_contains: " BATT_HEALTH ", matches: " BATT_HEALTH \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_cycles:
+    summary: "Read a battery's charge cycles (65534 error, 65535 unknown) (BATT_CYCLE)"
+    params:
+      bay: { type: int, min: 0, max: 10, required: true, label: "Bay", description: "Charging bay from 1 (8 on SBC840 and SBC850, 4 on SBC450, 2 on SBC250 and per SBC220 or SBC240 unit, 10 on the MXCWNCS, per module on the SBRC); 0 is every bay." }
+    send: "GET {bay} BATT_CYCLE"
+    expect: { reply_contains: " BATT_CYCLE ", matches: " BATT_CYCLE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_time_to_full:
+    summary: "Read minutes until a battery is charged (to storage level in storage mode); 65529 full, 65530-65532 hot, warm, cold (MXCWNCS), 65533 calculating, 65534 error, 65535 unknown (BATT_TIME_TO_FULL)"
+    params:
+      bay: { type: int, min: 0, max: 10, required: true, label: "Bay", description: "Charging bay from 1 (8 on SBC840 and SBC850, 4 on SBC450, 2 on SBC250 and per SBC220 or SBC240 unit, 10 on the MXCWNCS, per module on the SBRC); 0 is every bay." }
+    send: "GET {bay} BATT_TIME_TO_FULL"
+    expect: { reply_contains: " BATT_TIME_TO_FULL ", matches: " BATT_TIME_TO_FULL \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_battery_temperature:
+    summary: "Read a battery's temperature in degrees Celsius (BATT_TEMP_C)"
+    params:
+      bay: { type: int, min: 0, max: 10, required: true, label: "Bay", description: "Charging bay from 1 (8 on SBC840 and SBC850, 4 on SBC450, 2 on SBC250 and per SBC220 or SBC240 unit, 10 on the MXCWNCS, per module on the SBRC); 0 is every bay." }
+    send: "GET {bay} BATT_TEMP_C"
+    expect: { reply_contains: " BATT_TEMP_C ", matches: " BATT_TEMP_C \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_transmitter_available:
+    summary: "Read whether a docked transmitter is present and communicating (YES or NO) (TX_AVAILABLE)"
+    params:
+      bay: { type: int, min: 0, max: 10, required: true, label: "Bay", description: "Charging bay from 1 (8 on SBC840 and SBC850, 4 on SBC450, 2 on SBC250 and per SBC220 or SBC240 unit, 10 on the MXCWNCS, per module on the SBRC); 0 is every bay." }
+    send: "GET {bay} TX_AVAILABLE"
+    expect: { reply_contains: " TX_AVAILABLE ", matches: " TX_AVAILABLE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_transmitter_type:
+    summary: "Read the docked transmitter's type (ULXD6, ULXD8, UNAVAILABLE, OTHER) (TX_TYPE)"
+    params:
+      bay: { type: int, min: 0, max: 10, required: true, label: "Bay", description: "Charging bay from 1 (8 on SBC840 and SBC850, 4 on SBC450, 2 on SBC250 and per SBC220 or SBC240 unit, 10 on the MXCWNCS, per module on the SBRC); 0 is every bay." }
+    send: "GET {bay} TX_TYPE"
+    expect: { reply_contains: " TX_TYPE ", matches: " TX_TYPE \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+  get_transmitter_frequency:
+    summary: "Read the docked transmitter's frequency in kHz (FREQUENCY)"
+    params:
+      bay: { type: int, min: 0, max: 10, required: true, label: "Bay", description: "Charging bay from 1 (8 on SBC840 and SBC850, 4 on SBC450, 2 on SBC250 and per SBC220 or SBC240 unit, 10 on the MXCWNCS, per module on the SBRC); 0 is every bay." }
+    send: "GET {bay} FREQUENCY"
+    expect: { reply_contains: " FREQUENCY ", matches: " FREQUENCY \\{?(.*?) *\\}? *(?:>|\\*)$" }
+    returns: value
+
+state:
+  device.model: { type: string, description: "The model" }
+  device.firmware: { type: string, description: "The firmware version (a * after it: self test failed)" }
+  device.device_id: { type: string, description: "The device ID" }
+  device.flash: { type: bool, description: "Identifying (flashing)" }
+  device.storage_mode: { type: bool, description: "Storage mode (charging to storage level)" }
+  network.mode: { type: string, description: "AUTO or MANUAL" }
+  network.address: { type: string, description: "IPv4 address, zero-padded as the charger sends it" }
+  network.netmask: { type: string, description: "Subnet mask, zero-padded" }
+  network.gateway: { type: string, description: "Gateway, zero-padded; 000.000.000.000 for none" }
+  network.mac: { type: string, description: "MAC address" }
+  modules.*.module_type: { type: int, description: "Module type: 000 none; SBC220/SBC240 129 or 133; SBC840 128, SBC840M 130; SBRC 001 AXT902, 002 AXT901, 003 SBC-AX, 004 SBM920, 005 SBM910, 006 SBM910M; MXCWNCS 001; 255 invalid" }
+  bays.*.battery_bars: { type: int, description: "A bay's battery bars (0-5; 254 error, 255 unknown)" }
+  bays.*.battery_design_capacity: { type: int, unit: "mAh", description: "A battery's design capacity in mAh (65534 error, 65535 none)" }
+  bays.*.battery_capacity: { type: int, unit: "mAh", description: "A battery's present charge in mAh (65534 error, 65535 none)" }
+  bays.*.battery_full_capacity: { type: int, unit: "mAh", description: "A battery's full-charge capacity now, in mAh (65534 error, 65535 none)" }
+  bays.*.battery_error: { type: int, description: "A bay's battery error: 0 none, 1 unknown module, 2 unrecognised battery, 3 deep discharge recovery failed, 4 charge failed, 5 check battery, 6 check charger, 7 communication failure, 255 no battery" }
+  bays.*.battery_state: { type: string, description: "A bay's battery state (FULL, CALCULATING, NORMAL, WARM, WARM_FULL, HOT, COLD, PRECHARGE, READY_TO_STORE, DISCHARGE_CALC, DISCHARGING, DISCHARGING_WARM, DISCHARGING_COLD, ERROR, NO_BATT)" }
+  bays.*.battery_detected: { type: string, description: "Whether a bay holds a battery (YES or NO)" }
+  bays.*.battery_temperature_f: { type: int, unit: "degF", description: "A battery's temperature in degrees Fahrenheit" }
+  bays.*.battery_charge: { type: int, unit: "%", description: "A battery's charge in percent" }
+  bays.*.battery_health: { type: int, unit: "%", description: "A battery's health, percent of its design capacity" }
+  bays.*.battery_cycles: { type: int, description: "A battery's charge cycles (65534 error, 65535 unknown)" }
+  bays.*.battery_time_to_full: { type: int, unit: "min", description: "Minutes until a battery is charged (to storage level in storage mode); 65529 full, 65530-65532 hot, warm, cold (MXCWNCS), 65533 calculating, 65534 error, 65535 unknown" }
+  bays.*.battery_temperature: { type: int, unit: "degC", description: "A battery's temperature in degrees Celsius" }
+  bays.*.transmitter_available: { type: string, description: "Whether a docked transmitter is present and communicating (YES or NO)" }
+  bays.*.transmitter_type: { type: string, description: "The docked transmitter's type (ULXD6, ULXD8, UNAVAILABLE, OTHER)" }
+  bays.*.transmitter_frequency: { type: int, unit: "kHz", description: "The docked transmitter's frequency in kHz" }
+
+telemetry:
+  # One GET 0 ALL on connecting; every change is pushed after that (see the
+  # quirks). The older docking stations are asked again every minute.
+  poll:
+    - send: ["GET 0 ALL"]
+    - every_ms: 60000
+      send:
+        - { models: [sbc250, sbc450, sbc850], message: "GET 0 ALL" }
+  updates:
+    - match: "^< REP MODEL \\{?(.*?) *\\}? >$"
+      state: { "device.model": "{1}" }
+    - match: "^< REP FW_VER \\{?(.*?) *\\}? >$"
+      state: { "device.firmware": "{1}" }
+    - match: "^< REP DEVICE_ID \\{?(.*?) *\\}? >$"
+      state: { "device.device_id": "{1}" }
+    - match: "^< REP FLASH (ON|OFF) >$"
+      state: { "device.flash": { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP STORAGE_MODE (ON|OFF) >$"
+      state: { "device.storage_mode": { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: "^< REP NET_SETTINGS SC (AUTO|MANUAL) (\\S+) (\\S+) (\\S+) (\\S+) >$"
+      state: { network.mode: "{1}", network.address: "{2}", network.netmask: "{3}", network.gateway: "{4}", network.mac: "{5}" }
+    - match: "^< REP (\\d+) BATT_MODULE_TYPE (\\d+) >$"
+      state: { "modules.{1}.module_type": "{2}" }
+    - match: "^< REP (\\d+) BATT_BARS (\\d+) >$"
+      state: { "bays.{1}.battery_bars": "{2}" }
+    - match: "^< REP (\\d+) BATT_CAPACITY_MAX (\\d+) >$"
+      state: { "bays.{1}.battery_design_capacity": "{2}" }
+    - match: "^< REP (\\d+) BATT_CURRENT_CAPACITY (\\d+) >$"
+      state: { "bays.{1}.battery_capacity": "{2}" }
+    - match: "^< REP (\\d+) BATT_CURRENT_CAPACITY_MAX (\\d+) >$"
+      state: { "bays.{1}.battery_full_capacity": "{2}" }
+    - match: "^< REP (\\d+) BATT_ERROR (\\d+) >$"
+      state: { "bays.{1}.battery_error": "{2}" }
+    - match: "^< REP (\\d+) BATT_STATE ([A-Z_]+) >$"
+      state: { "bays.{1}.battery_state": "{2}" }
+    - match: "^< REP (\\d+) BATT_DETECTED (YES|NO) >$"
+      state: { "bays.{1}.battery_detected": "{2}" }
+    - match: "^< REP (\\d+) BATT_TEMP_F ([01]\\d\\d|2[0-4]\\d|25[0-3]) >$"
+      state: { "bays.{1}.battery_temperature_f": "{2:-40}" }
+    - match: "^< REP (\\d+) BATT_CHARGE (0\\d\\d|100) >$"
+      state: { "bays.{1}.battery_charge": "{2}" }
+    - match: "^< REP (\\d+) BATT_HEALTH (0\\d\\d|100) >$"
+      state: { "bays.{1}.battery_health": "{2}" }
+    - match: "^< REP (\\d+) BATT_CYCLE (\\d+) >$"
+      state: { "bays.{1}.battery_cycles": "{2}" }
+    - match: "^< REP (\\d+) BATT_TIME_TO_FULL (\\d+) >$"
+      state: { "bays.{1}.battery_time_to_full": "{2}" }
+    - match: "^< REP (\\d+) BATT_TEMP_C ([01]\\d\\d|2[0-4]\\d|25[0-3]) >$"
+      state: { "bays.{1}.battery_temperature": "{2:-40}" }
+    - match: "^< REP (\\d+) TX_AVAILABLE (YES|NO) >$"
+      state: { "bays.{1}.transmitter_available": "{2}" }
+    - match: "^< REP (\\d+) TX_TYPE ([A-Z0-9]+) >$"
+      state: { "bays.{1}.transmitter_type": "{2}" }
+    - match: "^< REP (\\d+) FREQUENCY (\\d+) >$"
+      state: { "bays.{1}.transmitter_frequency": "{2}" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Each charger reports every change unasked (a battery's charge, bars, state and time to full as
+      it charges), so after one GET 0 ALL on connecting nothing is polled; SBC250, SBC450 and SBC850
+      are asked again every minute, since their bulletin does not say they push. Opened for commands
+      only, nothing is asked.
+  - models: [all]
+    severity: info
+    text: >
+      Commands are matched to their REP by the parameter name, not by the bay: a change to the same
+      parameter on another bay arriving in the same moment could be taken for the answer. An error
+      answer is < REP ERR >.
+  - models: [all]
+    severity: info
+    text: >
+      Values 254 (error or not applicable) and 255 (unknown, no battery) of three-digit fields, and
+      65534 and 65535 of five-digit ones, are kept as the device sends them for bars, cycles,
+      capacities and time to full; a charge, health or temperature outside its range is not kept.
+      BATT_TIME_TO_FULL also uses 65529 fully charged and 65533 calculating, and on the MXCWNCS
+      65530 hot, 65531 warm and 65532 cold.
+  - models: [sbc220, sbc240, sbc840, sbc840m]
+    severity: critical
+    text: >
+      set_network moves the charger to another address (or to DHCP) at once and cannot be undone
+      from here; reboot restarts it, interrupting charging reports, and is not acknowledged.
+  - models: [all]
+    severity: warning
+    text: >
+      Shure's user guides call the charger the TCP client, the command-string documents the server;
+      the documents are followed (the core connects to TCP 2202). The SBC250, SBC450 and SBC850
+      guides ask for one controller per system.
+  - models: [sbc220, sbc240]
+    severity: info
+    text: >
+      Shure's two documents disagree on SBC220 and SBC240 module types (129 and 133); the value is
+      kept as sent.

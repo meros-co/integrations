@@ -1,0 +1,260 @@
+spec: 1
+id: shure-uhfr
+name: Shure UHF-R receivers (UR4S, UR4D) over UDP
+vendor: Shure
+category: wireless
+
+# Shure's UHF-R receivers take ASCII command strings in UDP datagrams on port
+# 2202: GET, SET and METER, each between "* " and " *", answered with REPORT
+# (bulletin p.1). They report front-panel changes only while metering or
+# updating is on (METER ... ALL), so the core turns updating on for each
+# channel on connecting.
+source:
+  - title: "Command Strings for UHF-R Receivers, Shure Applications Engineering Technical Bulletin (RW 11/17/2011)"
+    author: Shure Incorporated
+    url: https://content-files.shure.com/Pubs/UHF/UHFR_20Network_20String_20Commands.pdf
+    note: >
+      Manufacturer document. Ethernet UDP port 2202, GET/SET/REPORT and METER
+      p.1; CHAN_NAME (12 characters), MUTE with TOGGLE, AUDIO_GAIN 00-32 (32
+      the least), GAIN_UP and GAIN_DOWN by 1-5 dB p.1-2; GROUP_CHAN (the set
+      numbers one less than the group's), FREQUENCY in six digits,
+      GROUP_UP/DOWN and CHAN_UP/DOWN p.2-3; TX_BAT (1-5 or U) and TX_TYPE
+      (UR1, UR2, UR1H, UR1M, MW1, MW2, UNKNOWN) p.3; METER x ALL sss in 30 ms
+      units (over 400: updates only, no samples), METER x ALL STOP, and the
+      SAMPLE fields (antenna LEDs, RF levels A and B, battery, audio) p.3-4.
+  - title: "Shure Device IP Ports and Protocols (exported 10/2020), p.3 UR4 / MW4"
+    author: Shure Incorporated
+    url: https://content-files.shure.com/FileRepository/common-ip-ports-v2.pdf
+    note: >
+      Manufacturer document. 2202/UDP for third-party control strings on the
+      UR4 and MW4; 2200-2201 are Shure's own configuration protocol.
+
+transport:
+  type: line-udp
+  port: 2202
+  terminator: none
+  reply: to-source
+  timeout_ms: 1000
+  # Every datagram from the receiver is a REPORT (one bulletin line spells
+  # it Report) or a SAMPLE; SAMPLE is never an answer.
+  reply_match: '^\* (?:REPORT|Report) '
+  probe: "* GET 1 MUTE *"
+
+ports:
+  - { port: 2202, protocol: udp, role: control }
+
+models:
+  - id: ur4s
+    name: Shure UR4S single-channel UHF-R receiver
+    supports: &all [get_channel_name, set_channel_name, get_mute, set_mute, toggle_mute, get_audio_gain, set_audio_gain,
+                    gain_up, gain_down, get_group_channel, set_group_channel, group_up, group_down, channel_up,
+                    channel_down, get_battery, get_transmitter_type, start_metering, stop_metering]
+    verification: none
+    notes: >
+      One channel, numbered 1.
+  - id: ur4d
+    name: Shure UR4D dual-channel UHF-R receiver
+    supports: *all
+    verification: none
+    notes: >
+      Two channels: 1 left, 2 right.
+
+commands:
+  get_channel_name:
+    summary: "Read a channel's user name (CHAN_NAME), 12 characters"
+    params: { channel: &ch { type: int, min: 1, max: 2, required: true, label: Channel, description: "Receiver channel: 1 (the UR4S's only one, or the UR4D's left), 2 the UR4D's right." } }
+    send: "* GET {channel} CHAN_NAME *"
+    expect: { reply_contains: " {channel} CHAN_NAME ", matches: 'CHAN_NAME (.*?) *\*$' }
+    returns: value
+  set_channel_name:
+    summary: "Set a channel's user name (CHAN_NAME), 1-12 characters"
+    params:
+      channel: *ch
+      name: { type: string, required: true, max_length: 12, pattern: '^[\x21-\x29\x2b-\x7e][\x20-\x29\x2b-\x7e]*$', label: Name, description: "1 to 12 printable characters, without *, not starting with a space." }
+    send: "* SET {channel} CHAN_NAME {name} *"
+    expect: { reply_contains: " {channel} CHAN_NAME " }
+    returns: ack
+  get_mute:
+    summary: "Read whether a channel's audio is muted (MUTE)"
+    params: { channel: *ch }
+    send: "* GET {channel} MUTE *"
+    expect: { reply_contains: " {channel} MUTE ", matches: 'MUTE (ON|OFF) \*$' }
+    returns: value
+  set_mute:
+    summary: "Mute or unmute a channel's audio (MUTE)"
+    params:
+      channel: *ch
+      muted: { type: bool, required: true, label: Muted, description: "On mutes the channel's audio output, off unmutes it." }
+    send: "* SET {channel} MUTE {muted:on_off} *"
+    expect: { reply_contains: " {channel} MUTE " }
+    returns: ack
+  toggle_mute:
+    summary: "Toggle a channel's mute (MUTE TOGGLE)"
+    params: { channel: *ch }
+    send: "* SET {channel} MUTE TOGGLE *"
+    expect: { reply_contains: " {channel} MUTE " }
+    returns: ack
+  get_audio_gain:
+    summary: "Read a channel's audio gain as the receiver numbers it, 00 (the most) to 32 (the least) (AUDIO_GAIN)"
+    params: { channel: *ch }
+    send: "* GET {channel} AUDIO_GAIN *"
+    expect: { reply_contains: " {channel} AUDIO_GAIN ", matches: 'AUDIO_GAIN (\d+) \*$' }
+    returns: value
+  set_audio_gain:
+    summary: "Set a channel's audio gain (AUDIO_GAIN): 00 the most, 32 the least"
+    params:
+      channel: *ch
+      value: { type: int, min: 0, max: 32, required: true, label: Gain step, description: "Gain on the receiver's inverted scale: 0 the most gain, 32 the least; the bulletin gives no dB values." }
+    send: "* SET {channel} AUDIO_GAIN {value:02d} *"
+    expect: { reply_contains: " {channel} AUDIO_GAIN " }
+    returns: ack
+  gain_up:
+    summary: "Raise a channel's audio gain by 1-5 dB (GAIN_UP)"
+    params:
+      channel: *ch
+      db: &db { type: int, min: 1, max: 5, required: true, label: Step, description: "Change in dB, 1 to 5." }
+    send: "* SET {channel} GAIN_UP {db} *"
+    expect: { reply_contains: " {channel} AUDIO_GAIN " }
+    returns: ack
+  gain_down:
+    summary: "Lower a channel's audio gain by 1-5 dB (GAIN_DOWN)"
+    params: { channel: *ch, db: *db }
+    send: "* SET {channel} GAIN_DOWN {db} *"
+    expect: { reply_contains: " {channel} AUDIO_GAIN " }
+    returns: ack
+  get_group_channel:
+    summary: "Read a channel's group and channel (GROUP_CHAN), with its frequency reported too; -- -- when off the plan"
+    params: { channel: *ch }
+    send: "* GET {channel} GROUP_CHAN *"
+    expect: { reply_contains: " {channel} GROUP_CHAN ", matches: 'GROUP_CHAN (\S+ \S+) \*$' }
+    returns: value
+  set_group_channel:
+    summary: "Tune a channel to a group and channel (GROUP_CHAN), sent one less than their numbers"
+    params:
+      channel: *ch
+      group: { type: int, min: 1, max: 99, required: true, label: Group, description: "Frequency group, as the receiver numbers it from 1." }
+      group_channel: { type: int, min: 1, max: 99, required: true, label: Group channel, description: "Channel within the group, as the receiver numbers it from 1." }
+    send: "* SET {channel} GROUP_CHAN {group:-1:02d} {group_channel:-1:02d} *"
+    expect: { reply_contains: " {channel} GROUP_CHAN " }
+    returns: ack
+  group_up:
+    summary: "Move a channel to the next group (GROUP_UP)"
+    params: { channel: *ch }
+    send: "* SET {channel} GROUP_UP *"
+    expect: { reply_contains: " {channel} GROUP_CHAN " }
+    returns: ack
+  group_down:
+    summary: "Move a channel to the previous group (GROUP_DOWN)"
+    params: { channel: *ch }
+    send: "* SET {channel} GROUP_DOWN *"
+    expect: { reply_contains: " {channel} GROUP_CHAN " }
+    returns: ack
+  channel_up:
+    summary: "Move a channel to the next channel of its group (CHAN_UP)"
+    params: { channel: *ch }
+    send: "* SET {channel} CHAN_UP *"
+    expect: { reply_contains: " {channel} GROUP_CHAN " }
+    returns: ack
+  channel_down:
+    summary: "Move a channel to the previous channel of its group (CHAN_DOWN)"
+    params: { channel: *ch }
+    send: "* SET {channel} CHAN_DOWN *"
+    expect: { reply_contains: " {channel} GROUP_CHAN " }
+    returns: ack
+  get_battery:
+    summary: "Read the transmitter's battery bars, 1-5, or U when no transmitter is on (TX_BAT)"
+    params: { channel: *ch }
+    send: "* GET {channel} TX_BAT *"
+    expect: { reply_contains: " {channel} TX_BAT ", matches: 'TX_BAT ([1-5U]) \*$' }
+    returns: value
+  get_transmitter_type:
+    summary: "Read the transmitter's type (TX_TYPE): UR1, UR2, UR1H, UR1M, MW1, MW2 or UNKNOWN"
+    params: { channel: *ch }
+    send: "* GET {channel} TX_TYPE *"
+    expect: { reply_contains: " {channel} TX_TYPE ", matches: 'TX_TYPE (\S+) \*$' }
+    returns: value
+  start_metering:
+    summary: "Report a channel's settings once and then its changes, with SAMPLE meters at the interval when it is 12 s or less (METER x ALL)"
+    params:
+      channel: *ch
+      interval: { type: int, min: 1, max: 999, required: true, label: Interval, description: "Interval in units of 30 ms (40 is 1.2 s); above 400 (12 s) only changes are reported, without samples." }
+    send: "* METER {channel} ALL {interval:03d} *"
+    expect: { reply_contains: " {channel} " }
+    returns: ack
+  stop_metering:
+    summary: "Stop a channel's samples and change reports (METER x ALL STOP); not answered"
+    params: { channel: *ch }
+    send: "* METER {channel} ALL STOP *"
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The receiver reports front-panel changes only while metering or
+      updating is on for the channel. On connecting the core sends METER x
+      ALL 999 for each channel (updates without samples) and again every
+      minute, since the bulletin does not say how long it lasts; it asks for
+      the battery and transmitter type every 30 seconds, which METER does not
+      report. stop_metering stops change reports too. Opened for commands
+      only, nothing is started.
+  - models: [all]
+    severity: info
+    text: >
+      AUDIO_GAIN runs the wrong way: 00 is the most gain and 32 the least,
+      with no dB values given. GROUP_CHAN is set one less than the group (and,
+      it is assumed, the channel) number; an off-plan frequency reports -- --.
+      Frequencies are reported in kHz (six digits). The bulletin sends
+      REPORT, and once spells it Report; both are read.
+  - models: [all]
+    severity: info
+    text: >
+      SAMPLE carries the antenna LEDs (AX, XB, AB or XX), each antenna's RF
+      level as a code (20 overload, 70 strong, 75, 80, 85, 90, 100 weak), the
+      battery bars and the audio level 0-255 (no scale given); they are kept
+      as sent.
+
+state:
+  channels.*.name:            { type: string, description: "User name, keyed by channel 1-2" }
+  channels.*.muted:           { type: bool, description: "Audio muted" }
+  channels.*.audio_gain:      { type: int, description: "Audio gain step, 0 the most to 32 the least" }
+  channels.*.group:           { type: string, description: "Group as reported (one more than the set value), or -- off the plan" }
+  channels.*.group_channel:   { type: string, description: "Channel within the group as reported, or -- off the plan" }
+  channels.*.frequency_khz:   { type: int, unit: kHz, description: "Frequency" }
+  channels.*.battery:         { type: string, description: "Transmitter battery bars 1-5, or U when no transmitter is on" }
+  channels.*.transmitter:     { type: string, description: "Transmitter type: UR1, UR2, UR1H, UR1M, MW1, MW2 or UNKNOWN" }
+  channels.*.antennas:        { type: string, description: "Antenna LEDs from SAMPLE: AX (A), XB (B), AB (both) or XX (none)" }
+  channels.*.rf_a:            { type: int, description: "Antenna A RF level code from SAMPLE: 20 overload, 70 strong to 100 weak" }
+  channels.*.rf_b:            { type: int, description: "Antenna B RF level code from SAMPLE" }
+  channels.*.audio_level:     { type: int, description: "Audio level from SAMPLE, 0-255" }
+
+telemetry:
+  subscribe:
+    send:
+      - "* METER 1 ALL 999 *"
+      - { models: [ur4d], message: "* METER 2 ALL 999 *" }
+    every_ms: 60000
+  poll:
+    send:
+      - "* GET 1 TX_BAT *"
+      - "* GET 1 TX_TYPE *"
+      - { models: [ur4d], message: "* GET 2 TX_BAT *" }
+      - { models: [ur4d], message: "* GET 2 TX_TYPE *" }
+    every_ms: 30000
+  updates:
+    - match: '^\* (?:REPORT|Report) (\d) CHAN_NAME (.*?) *\*$'
+      state: { "channels.{1}.name": "{2}" }
+    - match: '^\* (?:REPORT|Report) (\d) MUTE (ON|OFF) \*$'
+      state: { "channels.{1}.muted": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^\* (?:REPORT|Report) (\d) AUDIO_GAIN (\d+) \*$'
+      state: { "channels.{1}.audio_gain": "{2}" }
+    - match: '^\* (?:REPORT|Report) (\d) GROUP_CHAN (\S+) (\S+) \*$'
+      state: { "channels.{1}.group": "{2}", "channels.{1}.group_channel": "{3}" }
+    - match: '^\* (?:REPORT|Report) (\d) FREQUENCY (\d{6}) \*$'
+      state: { "channels.{1}.frequency_khz": "{2}" }
+    - match: '^\* (?:REPORT|Report) (\d) TX_BAT ([1-5U]) \*$'
+      state: { "channels.{1}.battery": "{2}" }
+    - match: '^\* (?:REPORT|Report) (\d) TX_TYPE (\S+) \*$'
+      state: { "channels.{1}.transmitter": "{2}" }
+    - match: '^\* SAMPLE (\d) ALL ([ABX]{2}) (\d+) (\d+) ([1-5U]) (\d+) \*$'
+      state: { "channels.{1}.antennas": "{2}", "channels.{1}.rf_a": "{3}", "channels.{1}.rf_b": "{4}", "channels.{1}.battery": "{5}", "channels.{1}.audio_level": "{6}" }

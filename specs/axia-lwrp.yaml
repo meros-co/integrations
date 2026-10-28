@@ -1,0 +1,585 @@
+spec: 1
+id: axia-lwrp
+name: Axia Livewire devices (Livewire Routing Protocol, TCP 93)
+vendor: Axia
+category: router
+
+# The Livewire Routing Protocol (LWRP) every Livewire node serves on TCP 93:
+# ASCII commands ended by LF or CR LF, and "indications" from the device.
+# Indications are not answers: the device pushes each change, whoever made
+# it, to every connected client, and answers a query with the same
+# indications (LWRP 2.0.2 §1, §3.2.3). Lists come wrapped in BEGIN and END
+# lines. Each device implements the part of the protocol its hardware has
+# (an audio node SRC, DST, MTR and LVL; a GPIO node the GPIO commands) and
+# says how many of each it has in VER.
+source:
+  - title: "Livewire Routing Protocol, Version 2.0.2 (release history 2003-12-11 to 2005-10-19)"
+    author: Telos Systems / Axia Audio
+    url: http://redmine.digispot.ru/attachments/download/30138/Axia_IP-AudioDriver2.4_Windows.pdf
+    note: >
+      Manufacturer document (Telos's specification, hosted by a third party
+      under a misleading file name). TCP 93, LF or CR LF, multiple clients,
+      indications and their broadcast to every client §1-3; LOGIN and PASSWD
+      §3.1.1-2; VER and its tags §3.1.3; IP §3.1.4; SET §3.1.5; SAVE
+      §3.1.6; SRC and its tags PSNM, RTPE, RTPA, INGN, LABL, NCHN §3.2.1; DST
+      and ADDR, NAME, NCHN §3.2.2; change indications §3.2.3; MTR §3.2.5; LVL
+      §3.2.6; GPIO ports of five pins, ADD/DEL GPI/GPO, GPO with DURATION,
+      CMD messages and CFG GPO with SRCA and FUNC §3.3; BEGIN/END/EXE
+      batches; ERROR 1000-1004 §3.4.
+  - title: "Controlling the xNode mixer with LWRP (Telos Alliance docs, 2024-12-16)"
+    author: Telos Alliance
+    url: https://docs.telosalliance.com/docs/controlling-the-xnode-mixer-with-lwrp
+    note: >
+      Manufacturer document. MIX on Analog, AES/EBU, Microphone and Mixed
+      Signal xNodes from software 2.0: 24 mixes and 24 points (25 on the Mixed
+      Signal xNode), gain in tenths of a dB, a point cleared by giving no
+      gain, MIX alone listing every mix and subscribing to changes, LOGIN
+      needed on every connection, commands in capitals.
+  - title: "iP Audio Driver Installation & User's Guide, Rev 2.10 (March 2017), GPIO p.15 and Appendix C p.16"
+    author: Axia Audio
+    url: https://bgs.cc/content/TEL-300100017%20MANUAL.pdf
+    note: >
+      Manufacturer document. GPI emulated by a client on virtual GPIO
+      devices; DST ADDR as sip:<channel>@<ip> for unicast and the ;fmt=
+      suffix (L16/L24, 44100/48000, 1-8 channels).
+  - title: "Telos Alliance docs: Troubleshooting IP-Driver GPIO; Changing the Volt Input Source via Telnet; Livewire GPIO: Unicast and Multicast"
+    author: Telos Alliance
+    url: https://docs.telosalliance.com/docs/troubleshooting-ip-driver-gpio
+    note: >
+      Manufacturer documents. Commands in capitals, a Telnet client's
+      negotiation causing one "bad command" error, GPI CMD messages to Omnia
+      Volt, unicast GPIO follow by one node subscribing to another's GPI.
+
+transport:
+  type: line-tcp
+  port: 93
+  framing: terminated
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 2000
+  # Indications are not answers to commands (§1): commands are sent without
+  # waiting, and every indication goes to the telemetry rules.
+  reply: none
+
+settings:
+  password:
+    type: string
+    secret: true
+    default: ""
+    max_length: 64
+    pattern: '^[\x21-\x7e]*$'
+    label: Password
+    description: "The device's LWRP password; empty for a device without one, where LOGIN alone gives full access."
+
+# LOGIN is needed for every command that changes something, on every
+# connection (§3.1.1, xNode mixer doc). A device without a password takes
+# LOGIN alone; with one, the password follows.
+on_connect:
+  - send: "LOGIN"
+  - when_set: password
+    send: "LOGIN {settings.password}"
+    refused: "^ERROR 1004"
+
+ports:
+  - { port: 93, protocol: tcp, role: control }
+
+models:
+  - id: livewire
+    name: Axia Livewire device (xNode, audio node, GPIO node, IP-Audio Driver)
+    supports: &all
+      - login
+      - login_read_only
+      - change_password
+      - get_version
+      - get_ip
+      - set_ip
+      - get_globals
+      - set_globals
+      - save
+      - get_sources
+      - set_source_name
+      - set_source_rtp
+      - set_source_address
+      - set_source_gain
+      - set_source_label
+      - set_source_channels
+      - get_destinations
+      - set_destination_address
+      - set_destination_name
+      - set_destination_channels
+      - get_meters
+      - get_input_meters
+      - get_output_meters
+      - set_level_detector
+      - subscribe_gpi
+      - subscribe_gpi_ports
+      - unsubscribe_gpi
+      - subscribe_gpo
+      - subscribe_gpo_ports
+      - unsubscribe_gpo
+      - set_gpo
+      - set_gpo_after
+      - set_gpi
+      - send_gpi_message
+      - send_gpo_message
+      - get_gpo_config
+      - set_gpo_source
+      - set_gpo_follow
+      - set_gpo_pulse
+      - get_mixes
+      - set_mix_point
+      - clear_mix_point
+      - begin_batch
+      - end_batch
+      - execute_batch
+    verification: none
+    notes: >
+      One model for every Livewire device: each implements the commands its
+      hardware has and answers the rest with ERROR 1000. VER says how many
+      sources, destinations, GPI and GPO ports it has.
+
+commands:
+  # ── Access (§3.1.1-2)
+  login:
+    summary: "Log in with a password for full access (LOGIN); a wrong one is answered ERROR 1004"
+    params:
+      password: { type: string, required: true, max_length: 64, pattern: '^[\x21-\x7e]+$', secret: true, label: Password, description: "The device's LWRP password." }
+    send: "LOGIN {password}"
+    returns: none
+  login_read_only:
+    summary: "Send LOGIN without a password: full access on a device without one, read-only otherwise (LOGIN)"
+    send: "LOGIN"
+    returns: none
+  change_password:
+    summary: "Change the device's LWRP password (PASSWD)"
+    params:
+      old_password: { type: string, required: true, max_length: 64, pattern: '^[\x21-\x7e]+$', secret: true, label: Current password, description: "The password in use now." }
+      new_password: { type: string, required: true, max_length: 64, pattern: '^[\x21-\x7e]+$', secret: true, label: New password, description: "The password to set." }
+    send: "PASSWD {old_password} {new_password}"
+    returns: none
+
+  # ── Device (§3.1.3-6)
+  get_version:
+    summary: "Ask for the protocol and system versions, the device name and its numbers of sources, destinations and GPIO ports (VER)"
+    send: "VER"
+    returns: none
+  get_ip:
+    summary: "Ask for the network settings (IP); the IP indication goes to state"
+    send: "IP"
+    returns: none
+  set_ip:
+    summary: "Set the device's address, netmask, gateway and host name (IP)"
+    params:
+      address: &ipv4 { type: string, required: true, max_length: 15, pattern: '^[0-9]{1,3}(?:\.[0-9]{1,3}){3}$', label: Address, description: "The device's IPv4 address, dotted." }
+      netmask: { type: string, required: true, max_length: 15, pattern: '^[0-9]{1,3}(?:\.[0-9]{1,3}){3}$', label: Netmask, description: "The subnet mask, dotted." }
+      gateway: { type: string, required: true, max_length: 15, pattern: '^[0-9]{1,3}(?:\.[0-9]{1,3}){3}$', label: Gateway, description: "The default gateway, dotted." }
+      hostname: { type: string, required: true, max_length: 12, pattern: '^[A-Za-z0-9-]{1,12}$', label: Host name, description: "The host name, up to 12 letters, digits or hyphens." }
+    send: "IP address {address} netmask {netmask} gateway {gateway} hostname {hostname}"
+    returns: none
+  get_globals:
+    summary: "Ask for the device's global parameters (SET); the protocol defines none, each device its own"
+    send: "SET"
+    returns: none
+  set_globals:
+    summary: "Set device-specific global parameters as name:value pairs (SET)"
+    params:
+      values: { type: string, required: true, max_length: 1024, pattern: '^[A-Za-z0-9_.]+:\S+(?: [A-Za-z0-9_.]+:\S+)*$', label: Parameters, description: "One or more NAME:value pairs separated by spaces, as the device documents them." }
+    send: "SET {values}"
+    returns: none
+  save:
+    summary: "Save the configuration (SAVE)"
+    send: "SAVE"
+    returns: none
+
+  # ── Sources (§3.2.1)
+  get_sources:
+    summary: "Ask for every source's settings (SRC); the indications go to state"
+    send: "SRC"
+    returns: none
+  set_source_name:
+    summary: "Set a source's primary name, the name it is announced with (SRC PSNM)"
+    params:
+      port: &src_port { type: int, min: 1, max: 9999, required: true, label: Source, description: "The source (transmit stream) number on the device, from 1." }
+      name: { type: string, required: true, max_length: 16, pattern: '^[\x20\x21\x23-\x7e]+$', label: Name, description: "Up to 16 printable characters, without double quotes." }
+    send: 'SRC {port} PSNM:"{name}"'
+    returns: none
+  set_source_rtp:
+    summary: "Turn a source's RTP stream on or off (SRC RTPE)"
+    params:
+      port: *src_port
+      enabled: { type: bool, required: true, label: Stream, description: "On transmits the source's RTP stream, off stops it." }
+    send: "SRC {port} RTPE:{enabled:bool01}"
+    returns: none
+  set_source_address:
+    summary: "Set the address a source's RTP stream is sent to (SRC RTPA)"
+    params:
+      port: *src_port
+      address: { type: string, required: true, max_length: 21, pattern: '^(?:0|[0-9]{1,3}(?:\.[0-9]{1,3}){3}(?::[0-9]{1,5})?)$', label: Stream address, description: "a.b.c.d or a.b.c.d:udpport (UDP 5004 when left out), or 0 for none." }
+    send: 'SRC {port} RTPA:"{address}"'
+    returns: none
+  set_source_gain:
+    summary: "Set a source's input gain in tenths of a dB (SRC INGN)"
+    params:
+      port: *src_port
+      gain: { type: int, min: -1000, max: 1000, required: true, label: Gain, description: "Input gain in tenths of a dB (-100 is -10.0 dB); the device's own range applies." }
+    send: "SRC {port} INGN:{gain}"
+    returns: none
+  set_source_label:
+    summary: "Set a source's label for control surface displays (SRC LABL)"
+    params:
+      port: *src_port
+      label: { type: string, required: true, max_length: 10, pattern: '^[\x20\x21\x23-\x7e]+$', label: Label, description: "Up to 10 printable characters, without double quotes." }
+    send: 'SRC {port} LABL:"{label}"'
+    returns: none
+  set_source_channels:
+    summary: "Set the number of audio channels in a source's stream (SRC NCHN)"
+    params:
+      port: *src_port
+      channels: { type: int, min: 1, max: 8, required: true, label: Channels, description: "Channels in the stream, 2 (stereo) by default." }
+    send: "SRC {port} NCHN:{channels}"
+    returns: none
+
+  # ── Destinations (§3.2.2)
+  get_destinations:
+    summary: "Ask for every destination's settings (DST); the indications go to state"
+    send: "DST"
+    returns: none
+  set_destination_address:
+    summary: "Set the stream a destination receives (DST ADDR)"
+    params:
+      port: &dst_port { type: int, min: 1, max: 9999, required: true, label: Destination, description: "The destination (receive stream) number on the device, from 1." }
+      address: { type: string, required: true, max_length: 128, pattern: '^[\x20\x21\x23-\x7e]+$', label: Stream, description: "0 for none; a multicast or unicast a.b.c.d[:udpport], optionally followed by a space and <source name>; on the IP-Audio Driver also sip:<channel>@<ip>, and ;fmt=L16|L24/44100|48000/1-8 after the address." }
+    send: 'DST {port} ADDR:"{address}"'
+    returns: none
+  set_destination_name:
+    summary: "Set a destination's name (DST NAME)"
+    params:
+      port: *dst_port
+      name: { type: string, required: true, max_length: 16, pattern: '^[\x20\x21\x23-\x7e]+$', label: Name, description: "Up to 16 printable characters, without double quotes." }
+    send: 'DST {port} NAME:"{name}"'
+    returns: none
+  set_destination_channels:
+    summary: "Set the number of audio channels a destination takes (DST NCHN)"
+    params:
+      port: *dst_port
+      channels: { type: int, min: 1, max: 8, required: true, label: Channels, description: "Channels configured for the destination." }
+    send: "DST {port} NCHN:{channels}"
+    returns: none
+
+  # ── Meters and level detection (§3.2.5-6)
+  get_meters:
+    summary: "Read every input and output meter once (MTR); no login needed"
+    send: "MTR"
+    returns: none
+  get_input_meters:
+    summary: "Read the input meters once (MTR ICH)"
+    send: "MTR ICH"
+    returns: none
+  get_output_meters:
+    summary: "Read the output meters once (MTR OCH)"
+    send: "MTR OCH"
+    returns: none
+  set_level_detector:
+    summary: "Set a port's clip and silence detector (LVL); the device then pushes CLIP, NO-CLIP, LOW and NO-LOW for each side"
+    params:
+      direction: { type: enum, values: [ICH, OCH], required: true, label: Direction, description: "ICH for an input, OCH for an output." }
+      port: { type: int, min: 1, max: 9999, required: true, label: Port, description: "The input or output number, from 1." }
+      clip_level: { type: int, min: -1000, max: 0, required: true, label: Clip level, description: "Level counted as clipping, in tenths of a dBFS." }
+      clip_time: { type: int, min: 0, max: 3600000, required: true, label: Clip hold, description: "Milliseconds without clipping before NO-CLIP is sent." }
+      low_level: { type: int, min: -1000, max: 0, required: true, label: Silence level, description: "Level counted as silence, in tenths of a dBFS." }
+      low_time: { type: int, min: 0, max: 3600000, required: true, label: Silence time, description: "Milliseconds below the silence level before LOW is sent." }
+    send: "LVL {direction} {port} CLIP.LEVEL:{clip_level} CLIP.TIME:{clip_time} LOW.LEVEL:{low_level} LOW.TIME:{low_time}"
+    returns: none
+
+  # ── GPIO (§3.3)
+  subscribe_gpi:
+    summary: "Subscribe to every GPI port (ADD GPI): their states are sent at once and on each change"
+    send: "ADD GPI"
+    returns: none
+  subscribe_gpi_ports:
+    summary: "Subscribe to some GPI ports (ADD GPI with a list)"
+    params:
+      ports: &port_list { type: string, required: true, max_length: 256, pattern: '^[0-9]+(?:-[0-9]+)?(?: [0-9]+(?:-[0-9]+)?)*$', label: Ports, description: "Port numbers and ranges separated by spaces, such as 1 3 5-8." }
+    send: "ADD GPI {ports}"
+    returns: none
+  unsubscribe_gpi:
+    summary: "Unsubscribe from GPI ports (DEL GPI with a list)"
+    params:
+      ports: *port_list
+    send: "DEL GPI {ports}"
+    returns: none
+  subscribe_gpo:
+    summary: "Subscribe to every GPO port (ADD GPO)"
+    send: "ADD GPO"
+    returns: none
+  subscribe_gpo_ports:
+    summary: "Subscribe to some GPO ports (ADD GPO with a list)"
+    params:
+      ports: *port_list
+    send: "ADD GPO {ports}"
+    returns: none
+  unsubscribe_gpo:
+    summary: "Unsubscribe from GPO ports (DEL GPO with a list)"
+    params:
+      ports: *port_list
+    send: "DEL GPO {ports}"
+    returns: none
+  set_gpo:
+    summary: "Set the five pins of a GPO port (GPO)"
+    params:
+      port: &gpio_port { type: int, min: 1, max: 9999, required: true, label: Port, description: "The GPIO port, from 1; each has five pins." }
+      pins: &gpo_pins { type: string, required: true, max_length: 5, pattern: '^[hHlLxX]{5}$', label: Pins, description: "Five characters, pin 1 first: h or H high, l or L low, x or X unchanged." }
+    send: "GPO {port} {pins}"
+    returns: none
+  set_gpo_after:
+    summary: "Set a GPO port's pins a time after its previous change, for a pulse (GPO with DURATION)"
+    params:
+      port: *gpio_port
+      pins: *gpo_pins
+      duration: { type: int, min: 0, max: 3600000, required: true, label: Delay, description: "Milliseconds after the port's previous change." }
+    send: "GPO {port} {pins} DURATION:{duration}"
+    returns: none
+  set_gpi:
+    summary: "Change a virtual GPI port's pins (GPI), on devices that emulate inputs (IP-Audio Driver, Omnia Volt, iPort)"
+    params:
+      port: *gpio_port
+      pins: *gpo_pins
+    send: "GPI {port} {pins}"
+    returns: none
+  send_gpi_message:
+    summary: "Send a text message on a GPI port to the clients subscribed to it (GPI CMD)"
+    params:
+      port: *gpio_port
+      message: &gpio_message { type: string, required: true, max_length: 128, pattern: '^[\x20\x21\x23-\x7e]+$', label: Message, description: "Up to 128 printable characters without double quotes; percent-encode others (%xx)." }
+    send: 'GPI {port} CMD:"{message}"'
+    returns: none
+  send_gpo_message:
+    summary: "Send a text message on a GPO port to the clients subscribed to it (GPO CMD)"
+    params:
+      port: *gpio_port
+      message: *gpio_message
+    send: 'GPO {port} CMD:"{message}"'
+    returns: none
+  get_gpo_config:
+    summary: "Ask for a GPO port's configuration (CFG GPO)"
+    params:
+      port: *gpio_port
+    send: "CFG GPO {port}"
+    returns: none
+  set_gpo_source:
+    summary: "Make a GPO port follow a GPI port of another device (CFG GPO SRCA)"
+    params:
+      port: *gpio_port
+      source: { type: string, required: true, max_length: 32, pattern: '^[0-9]{1,3}(?:\.[0-9]{1,3}){3}(?::[0-9]{1,5})?/[0-9]+$', label: Source GPI, description: "The device and GPI port to follow, as a.b.c.d[:udpport]/port." }
+    send: "CFG GPO {port} SRCA:{source}"
+    returns: none
+  set_gpo_follow:
+    summary: "Make a GPO port follow its source's pins (CFG GPO FUNC:FOLLOW, the default)"
+    params:
+      port: *gpio_port
+    send: "CFG GPO {port} FUNC:FOLLOW"
+    returns: none
+  set_gpo_pulse:
+    summary: "Make a GPO port pulse on its source's change (CFG GPO FUNC:PULSE)"
+    params:
+      port: *gpio_port
+      change: { type: enum, values: [H, L, X], required: true, label: Trigger, description: "The source change that starts the pulse: H rising, L falling, X either." }
+      polarity: { type: enum, values: [H, L], required: true, label: Polarity, description: "H for a high pulse, L for a low one." }
+      duration: { type: int, min: 1, max: 3600000, required: true, label: Duration, description: "Pulse length in milliseconds." }
+    send: "CFG GPO {port} FUNC:PULSE/{change}/{polarity}/{duration}"
+    returns: none
+
+  # ── xNode mixer (xNode mixer doc)
+  get_mixes:
+    summary: "Ask for every mix of the xNode mixer and subscribe to their changes (MIX)"
+    send: "MIX"
+    returns: none
+  set_mix_point:
+    summary: "Add a point to a mix, or change its gain (MIX)"
+    params:
+      mix: &mix { type: int, min: 1, max: 24, required: true, label: Mix, description: "The mix (output): 1-16 Livewire sources 1-8 left and right (odd left), 17-24 physical outputs 1-4 left and right." }
+      point: &point { type: int, min: 1, max: 25, required: true, label: Point, description: "The point (input): 1-16 Livewire destinations 1-8 left and right (odd left), 17-24 physical inputs 1-4 left and right, 25 the Mixed Signal xNode's microphone." }
+      gain: { type: int, min: -1000, max: 1000, required: true, label: Gain, description: "Gain in tenths of a dB (-30 is -3.0 dB, 0 is unity)." }
+    send: "MIX {mix} {point}:{gain}"
+    returns: none
+  clear_mix_point:
+    summary: "Remove a point from a mix (MIX with no gain)"
+    params:
+      mix: *mix
+      point: *point
+    send: "MIX {mix} {point}"
+    returns: none
+
+  # ── Batches (§3)
+  begin_batch:
+    summary: "Start a batch of commands that the device may apply together (BEGIN)"
+    send: "BEGIN"
+    returns: none
+  end_batch:
+    summary: "End a batch (END)"
+    send: "END"
+    returns: none
+  execute_batch:
+    summary: "Run the batch (EXE)"
+    send: "EXE"
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      set_ip moves the device to another address at once, and set_source_address,
+      set_destination_address and the mixer and GPO commands reroute audio and
+      control on air. None can be undone from here once listeners follow.
+  - models: [all]
+    severity: info
+    text: >
+      Commands are sent without waiting: the device answers nothing but
+      indications, which it pushes to every client whoever made the change
+      (§1, §3.2.3), and ERROR <number> <message> to the offending client
+      only. Writes are reported unverified; state follows the indications.
+      ERROR 1000 bad command (also a command the device does not have, or one
+      sent without LOGIN), 1001 syntax error, 1002 bad port, 1003 bad program
+      number, 1004 invalid password (§3.4).
+  - models: [all]
+    severity: info
+    text: >
+      On connecting, the core logs in and asks for VER, IP, SET, SRC, DST and
+      MIX, and subscribes to every GPI and GPO port; meters are asked for
+      every two seconds (MTR has no subscription). Level-detector (LVL)
+      events arrive only once set_level_detector has configured a port, and
+      only to that connection.
+  - models: [all]
+    severity: warning
+    text: >
+      This is the public 2.0.2 protocol plus the xNode mixer and the
+      IP-Audio Driver's address forms. Telos keeps the current protocol
+      (newer SRC and DST tags, and commands such as BLINK) for its paid
+      Livewire partnership; tags this spec does not read are ignored.
+      Commands are in capitals.
+
+state:
+  device.lwrp_version:    { type: string, description: "LWRP protocol version (VER LWRP)" }
+  device.name:            { type: string, description: "Device name (VER DEVN)" }
+  device.system_version:  { type: string, description: "System version (VER SYSV)" }
+  device.sources:         { type: string, description: "Number of sources (VER NSRC): N, or N/c for N sources of c channels" }
+  device.destinations:    { type: string, description: "Number of destinations (VER NDST), as NSRC" }
+  device.gpi_ports:       { type: int, description: "Number of GPI ports (VER NGPI)" }
+  device.gpo_ports:       { type: int, description: "Number of GPO ports (VER NGPO)" }
+  device.globals:         { type: string, description: "The SET indication's name:value pairs as the device sends them" }
+  network.address:        { type: string, description: "IPv4 address (IP indication)" }
+  network.netmask:        { type: string, description: "Subnet mask" }
+  network.gateway:        { type: string, description: "Default gateway" }
+  network.hostname:       { type: string, description: "Host name" }
+  sources.*.name:         { type: string, description: "Primary source name (PSNM), keyed by source number" }
+  sources.*.rtp_enabled:  { type: bool, description: "RTP stream on (RTPE)" }
+  sources.*.address:      { type: string, description: "RTP stream address (RTPA), \"0\" for none" }
+  sources.*.gain:         { type: int, description: "Input gain in tenths of a dB (INGN)" }
+  sources.*.label:        { type: string, description: "Control surface label (LABL)" }
+  sources.*.channels:     { type: int, description: "Channels in the stream (NCHN)" }
+  destinations.*.address: { type: string, description: "Stream received (ADDR), \"0\" for none, keyed by destination number" }
+  destinations.*.name:    { type: string, description: "Destination name (NAME)" }
+  destinations.*.channels: { type: int, description: "Channels configured (NCHN)" }
+  meters.inputs.*.peak_left:   { type: int, description: "Input peak level, left, in tenths of a dBFS (-1000 is -100 dBFS)" }
+  meters.inputs.*.peak_right:  { type: int, description: "Input peak level, right, in tenths of a dBFS" }
+  meters.inputs.*.rms_left:    { type: int, description: "Input RMS level, left, in tenths of a dBFS" }
+  meters.inputs.*.rms_right:   { type: int, description: "Input RMS level, right, in tenths of a dBFS" }
+  meters.outputs.*.peak_left:  { type: int, description: "Output peak level, left, in tenths of a dBFS" }
+  meters.outputs.*.peak_right: { type: int, description: "Output peak level, right, in tenths of a dBFS" }
+  meters.outputs.*.rms_left:   { type: int, description: "Output RMS level, left, in tenths of a dBFS" }
+  meters.outputs.*.rms_right:  { type: int, description: "Output RMS level, right, in tenths of a dBFS" }
+  levels.inputs.*.*.clip:      { type: bool, description: "Clipping on the input's side (keyed port, then L or R), from LVL events" }
+  levels.inputs.*.*.low:       { type: bool, description: "Silence on the input's side, from LVL events" }
+  levels.outputs.*.*.clip:     { type: bool, description: "Clipping on the output's side, from LVL events" }
+  levels.outputs.*.*.low:      { type: bool, description: "Silence on the output's side, from LVL events" }
+  gpi.*.pins:             { type: string, description: "The GPI port's five pins: l low, h high, L falling, H rising" }
+  gpi.*.message:          { type: string, description: "Last CMD message on the GPI port" }
+  gpo.*.pins:             { type: string, description: "The GPO port's five pins: l low, h high, L falling, H rising" }
+  gpo.*.message:          { type: string, description: "Last CMD message on the GPO port" }
+  gpo.*.config:           { type: string, description: "The GPO port's configuration (CFG GPO) as the device sends it: SRCA and FUNC" }
+  mixes.*.points.*.gain:  { type: int, description: "Gain of a point in a mix, in tenths of a dB, keyed by mix then point; absent points are not in the mix" }
+  error.code:             { type: int, description: "Last ERROR number" }
+  error.message:          { type: string, description: "Last ERROR message" }
+
+telemetry:
+  subscribe:
+    send: ["VER", "IP", "SET", "SRC", "DST", "MIX", "ADD GPI", "ADD GPO"]
+  poll:
+    send: ["MTR"]
+    every_ms: 2000
+  updates:
+    - match: '^VER .*\bLWRP:(\S+)'
+      state: { device.lwrp_version: "{1}" }
+    - match: '^VER .*\bDEVN:"([^"]*)"'
+      state: { device.name: "{1}" }
+    - match: '^VER .*\bDEVN:([^" ]\S*)'
+      state: { device.name: "{1}" }
+    - match: '^VER .*\bSYSV:"?([^" ]+)'
+      state: { device.system_version: "{1}" }
+    - match: '^VER .*\bNSRC:(\S+)'
+      state: { device.sources: "{1}" }
+    - match: '^VER .*\bNDST:(\S+)'
+      state: { device.destinations: "{1}" }
+    - match: '^VER .*\bNGPI:([0-9]+)'
+      state: { device.gpi_ports: "{1}" }
+    - match: '^VER .*\bNGPO:([0-9]+)'
+      state: { device.gpo_ports: "{1}" }
+    - match: '^SET (.+)$'
+      state: { device.globals: "{1}" }
+    - match: '^IP .*\baddress "?([0-9.]+)'
+      state: { network.address: "{1}" }
+    - match: '^IP .*\bnetmask "?([0-9.]+)'
+      state: { network.netmask: "{1}" }
+    - match: '^IP .*\bgateway "?([0-9.]+)'
+      state: { network.gateway: "{1}" }
+    - match: '^IP .*\bhostname "?([^" ]+)'
+      state: { network.hostname: "{1}" }
+    - match: '^SRC ([0-9]+) .*\bPSNM:"([^"]*)"'
+      state: { "sources.{1}.name": "{2}" }
+    - match: '^SRC ([0-9]+) .*\bRTPE:([01])'
+      state: { "sources.{1}.rtp_enabled": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^SRC ([0-9]+) .*\bRTPA:"?([0-9.:]+)'
+      state: { "sources.{1}.address": "{2}" }
+    - match: '^SRC ([0-9]+) .*\bINGN:(-?[0-9]+)'
+      state: { "sources.{1}.gain": "{2}" }
+    - match: '^SRC ([0-9]+) .*\bLABL:"([^"]*)"'
+      state: { "sources.{1}.label": "{2}" }
+    - match: '^SRC ([0-9]+) .*\bNCHN:([0-9]+)'
+      state: { "sources.{1}.channels": "{2}" }
+    - match: '^DST ([0-9]+) .*\bADDR:"([^"]*)"'
+      state: { "destinations.{1}.address": "{2}" }
+    - match: '^DST ([0-9]+) .*\bADDR:([^" ]\S*)'
+      state: { "destinations.{1}.address": "{2}" }
+    - match: '^DST ([0-9]+) .*\bNAME:"([^"]*)"'
+      state: { "destinations.{1}.name": "{2}" }
+    - match: '^DST ([0-9]+) .*\bNCHN:([0-9]+)'
+      state: { "destinations.{1}.channels": "{2}" }
+    - match: '^MTR ICH ([0-9]+) PEEK:(-?[0-9]+):(-?[0-9]+) RMS:(-?[0-9]+):(-?[0-9]+)'
+      state: { "meters.inputs.{1}.peak_left": "{2}", "meters.inputs.{1}.peak_right": "{3}", "meters.inputs.{1}.rms_left": "{4}", "meters.inputs.{1}.rms_right": "{5}" }
+    - match: '^MTR OCH ([0-9]+) PEEK:(-?[0-9]+):(-?[0-9]+) RMS:(-?[0-9]+):(-?[0-9]+)'
+      state: { "meters.outputs.{1}.peak_left": "{2}", "meters.outputs.{1}.peak_right": "{3}", "meters.outputs.{1}.rms_left": "{4}", "meters.outputs.{1}.rms_right": "{5}" }
+    - match: '^LVL ICH ([0-9]+)\.([LR]) (CLIP|NO-CLIP)$'
+      state: { "levels.inputs.{1}.{2}.clip": { value: "{3}", map: { "CLIP": true, "NO-CLIP": false } } }
+    - match: '^LVL ICH ([0-9]+)\.([LR]) (LOW|NO-LOW)$'
+      state: { "levels.inputs.{1}.{2}.low": { value: "{3}", map: { "LOW": true, "NO-LOW": false } } }
+    - match: '^LVL OCH ([0-9]+)\.([LR]) (CLIP|NO-CLIP)$'
+      state: { "levels.outputs.{1}.{2}.clip": { value: "{3}", map: { "CLIP": true, "NO-CLIP": false } } }
+    - match: '^LVL OCH ([0-9]+)\.([LR]) (LOW|NO-LOW)$'
+      state: { "levels.outputs.{1}.{2}.low": { value: "{3}", map: { "LOW": true, "NO-LOW": false } } }
+    - match: '^GPI ([0-9]+) ([hHlL]{5})\b'
+      state: { "gpi.{1}.pins": "{2}" }
+    - match: '^GPI ([0-9]+) CMD:"([^"]*)"'
+      state: { "gpi.{1}.message": "{2}" }
+    - match: '^GPO ([0-9]+) ([hHlL]{5})\b'
+      state: { "gpo.{1}.pins": "{2}" }
+    - match: '^GPO ([0-9]+) CMD:"([^"]*)"'
+      state: { "gpo.{1}.message": "{2}" }
+    - match: '^CFG GPO ([0-9]+) (.+)$'
+      state: { "gpo.{1}.config": "{2}" }
+    - match: '^MIX ([0-9]+)((?: [0-9]+:-?[0-9]+)*)\s*$'
+      match_each: '([0-9]+):(-?[0-9]+)'
+      match_each_in: 2
+      replace: "mixes.{1}.points"
+      state: { "mixes.{1}.points.{3}.gain": "{4}" }
+    - match: '^ERROR ([0-9]+) ?(.*)$'
+      state: { error.code: "{1}", error.message: "{2}" }

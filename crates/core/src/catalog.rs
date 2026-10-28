@@ -1163,35 +1163,33 @@ mod tests {
 
     #[test]
     fn a_selection_keeps_only_its_devices_and_names_what_is_missing() {
-        let ids: Vec<String> = Catalog::embedded()
-            .devices
-            .keys()
-            .take(2)
-            .cloned()
-            .collect();
+        // Parsed once: parsing every spec for each check takes minutes.
+        let embedded = Catalog::embedded();
+        let ids: Vec<String> = embedded.devices.keys().take(2).cloned().collect();
         if let Some(first) = ids.first() {
-            let selected = Catalog::embedded().select(&ids).unwrap();
+            let selected = embedded.clone().select(&ids).unwrap();
             assert_eq!(selected.devices.keys().cloned().collect::<Vec<_>>(), ids);
             assert!(selected.device(first).is_some());
         }
-        let err = Catalog::embedded()
+        let err = embedded
+            .clone()
             .select(&["no-such-device".into()])
             .unwrap_err();
         assert!(err.contains("unknown device 'no-such-device'"), "{err}");
-        assert!(Catalog::embedded().select(&[]).is_err());
+        assert!(embedded.clone().select(&[]).is_err());
         if let Some((id, _, _)) = ALL_SPECS.iter().find(|(_, built, _)| !built) {
-            let err = Catalog::embedded().select(&[id.to_string()]).unwrap_err();
+            let err = embedded.clone().select(&[id.to_string()]).unwrap_err();
             assert!(err.contains(&format!("the '{id}' feature")), "{err}");
         }
-        let every = Catalog::embedded().select(&["all".into()]).unwrap();
+        let every = embedded.clone().select(&["all".into()]).unwrap();
         assert_eq!(every.devices.len(), EMBEDDED_SPECS.len());
         for (group, specs) in VENDOR_GROUPS {
             let built: Vec<&str> = specs
                 .iter()
                 .copied()
-                .filter(|s| Catalog::embedded().device(s).is_some())
+                .filter(|s| embedded.device(s).is_some())
                 .collect();
-            match Catalog::embedded().select(&[group.to_string()]) {
+            match embedded.clone().select(&[group.to_string()]) {
                 Ok(selected) => assert_eq!(selected.devices.keys().collect::<Vec<_>>(), built),
                 Err(err) => {
                     assert!(built.is_empty(), "{group}: {err}");

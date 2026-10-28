@@ -64,6 +64,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Check that a switch with an expired token (after a day) is answered 401, which logs in again, and that a receiver without an Access password answers the access login with 401. ([specs/adder-xdip.yaml:49](specs/adder-xdip.yaml#L49))
 
+## aes67-sap — AES67 stream discovery (SAP and SDP)
+
+- [ ] Check that Dante devices in AES67 mode, RAVENNA devices and other AES67 senders announce on 239.255.255.255:9875 and appear as streams, with their names, channels, multicast addresses and PTP grandmaster. ([specs/aes67-sap.yaml:58](specs/aes67-sap.yaml#L58))
+- [ ] Check how often real AES67 announcers repeat (about 30 s is commonly seen, not taken from a read standard), and that Dante Controller and a RAVENNA receiver keep a stream this integration announces every 30 s. ([specs/aes67-sap.yaml:60](specs/aes67-sap.yaml#L60))
+- [ ] Check whether Dante and RAVENNA devices send a SAP deletion when a stream is removed, and that it removes the stream here; and how long a stream lingers in state when its device is unplugged. ([specs/aes67-sap.yaml:140](specs/aes67-sap.yaml#L140))
+- [ ] Check the a=ts-refclk forms real devices write (RFC 7273's domain-nmbr= or the bare domain number in Audinate's sample) and that both read into grandmaster and domain. ([specs/aes67-sap.yaml:116](specs/aes67-sap.yaml#L116))
+- [ ] Check whether current announcers still send a=framecount, and the encodings (L16, L24, AM824) and packet times they announce. ([specs/aes67-sap.yaml:122](specs/aes67-sap.yaml#L122))
+- [ ] Check on a host with several network interfaces that the group is joined on each, and which interface this integration's announcements leave by. ([specs/aes67-sap.yaml:129](specs/aes67-sap.yaml#L129))
+
 ## aes70 — AES70 / OCA devices
 
 - [ ] Check the device's OCP.1 port (AES70 assigns none) and which transports it accepts: TCP, UDP, WebSocket (and its path), or only secure OCP.1. ([specs/aes70.yaml:401](specs/aes70.yaml#L401))
@@ -334,6 +343,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check how audio master channels are numbered (0 or 1 for the master) for live_system_get_audio_master_volume and mute. ([specs/avstumpfl-pixera.yaml:6805](specs/avstumpfl-pixera.yaml#L6805))
 - [ ] Check that replies to polled getters come back compact or spaced as the poll rules read them, with strings escaped as JSON. ([specs/avstumpfl-pixera.yaml:6802](specs/avstumpfl-pixera.yaml#L6802))
 - [ ] Confirm what utility_run_js_script answers for a script that throws, and whether it is subject to the allowlist. ([specs/avstumpfl-pixera.yaml:6743](specs/avstumpfl-pixera.yaml#L6743))
+
+## axia-lwrp — Axia Livewire devices
+
+- [ ] Confirm that the client that makes a change also receives its indication (the specification says changes go to every client). ([specs/axia-lwrp.yaml:62](specs/axia-lwrp.yaml#L62))
+- [ ] Check what LOGIN without a password does on a device with a password (assumed: read-only, no error) before the password is sent. ([specs/axia-lwrp.yaml:78](specs/axia-lwrp.yaml#L78))
+- [ ] Confirm INGN is in tenths of a dB (the specification's text says "10dB units" while its example is -100) and record each node's gain range. ([specs/axia-lwrp.yaml:221](specs/axia-lwrp.yaml#L221))
+- [ ] Check that NCHN can be set on SRC and DST, and the channel counts each device accepts. ([specs/axia-lwrp.yaml:235](specs/axia-lwrp.yaml#L235))
+- [ ] Confirm that CFG GPO with only a port number is answered with its CFG GPO indication. ([specs/axia-lwrp.yaml:364](specs/axia-lwrp.yaml#L364))
+- [ ] Record the IP indication's layout (assumed keyword and value pairs as in the command). ([specs/axia-lwrp.yaml:529](specs/axia-lwrp.yaml#L529))
+- [ ] Record the xNode mixer's gain range and the MIX indication sent after a change (assumed the mix's whole point list). ([specs/axia-lwrp.yaml:402](specs/axia-lwrp.yaml#L402))
+- [ ] Record a VER indication from current xNodes, the IP-Audio Driver and a GPIO node (quoting of DEVN and SYSV, tags beyond 2.0.2). ([specs/axia-lwrp.yaml:513](specs/axia-lwrp.yaml#L513))
 
 ## aximmetry — Aximmetry Composer
 
@@ -1218,6 +1238,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether ptz.cgi numbers the first channel 1 (as the public integration sends) or 0. ([specs/dahua-ptz.yaml:43](specs/dahua-ptz.yaml#L43))
 - [ ] Check which of arg1 and arg2 carry the vertical and horizontal speeds for each move code, and the speed range. ([specs/dahua-ptz.yaml:61](specs/dahua-ptz.yaml#L61))
 - [ ] Check the stop, zoom, focus and GotoPreset argument forms, and what the camera answers on success and on an unknown preset. ([specs/dahua-ptz.yaml:112](specs/dahua-ptz.yaml#L112))
+
+## dandugan-model-e — Dan Dugan Model E
+
+- [ ] Confirm the Model E takes the commands on TCP 23 (the guide tests with Telnet but names no port) and whether it sends a Telnet greeting. ([specs/dandugan-model-e.yaml:36](specs/dandugan-model-e.yaml#L36))
+- [ ] Record the reply forms (no spaces, value after a comma) for a name holding spaces and for every query. ([specs/dandugan-model-e.yaml:86](specs/dandugan-model-e.yaml#L86))
 
 ## dataton-watchout6 — Dataton WATCHOUT 6
 
@@ -2460,6 +2485,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what `Subnet.VDN<n> ?` answers for a named slot (name and serial separated by one space assumed) and an empty one (* assumed). ([specs/labgruppen-nlb60e.yaml:246](specs/labgruppen-nlb60e.yaml#L246))
 - [ ] Record an amplifier's `Status ?` answer for 2-, 4- and 8-channel models: three values, then nine per channel from A. ([specs/labgruppen-nlb60e.yaml:275](specs/labgruppen-nlb60e.yaml#L275))
 
+## lectrosonics-aspen — Lectrosonics ASPEN processors
+
+- [ ] Confirm that a verbose wildcard query is answered as OK target(*)={...} (and OK target(*,bus)={...} for crosspoints), the values in address order. ([specs/lectrosonics-aspen.yaml:4370](specs/lectrosonics-aspen.yaml#L4370))
+- [ ] Confirm that a verbose update is answered with the value read back, as OK target(address)=value, and a verbose query of a target without an address as OK target=value. ([specs/lectrosonics-aspen.yaml:10](specs/lectrosonics-aspen.yaml#L10))
+- [ ] Record the RS-232 port's default speed and line settings (8N1 without flow control assumed) and the cable wiring. ([specs/lectrosonics-aspen.yaml:61](specs/lectrosonics-aspen.yaml#L61))
+- [ ] Confirm that the device answers its first request on a new TCP connection without any greeting, and how many TCP clients it takes on each port. ([specs/lectrosonics-aspen.yaml:56](specs/lectrosonics-aspen.yaml#L56))
+- [ ] Record what the device sends for a command a model lacks and for a value out of range (ERROR assumed for both). ([specs/lectrosonics-aspen.yaml:55](specs/lectrosonics-aspen.yaml#L55))
+- [ ] Check the virtual programmable input functions on SPNConference and SPNTrio (their pages give the range 0-16 but list 0-19). ([specs/lectrosonics-aspen.yaml:3270](specs/lectrosonics-aspen.yaml#L3270))
+- [ ] Check the time array (the reference says four values and shows three). ([specs/lectrosonics-aspen.yaml:3515](specs/lectrosonics-aspen.yaml#L3515))
+
 ## lg-display — LG signage displays and commercial TVs
 
 - [ ] Confirm the display takes the protocol on TCP 9761 with no greeting or login, and answers as over RS-232C; no LG document read names the port. ([specs/lg-display.yaml:3257](specs/lg-display.yaml#L3257))
@@ -2809,6 +2844,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that settings.exposure.iso is null (absent from state) in automatic exposure, and which settings fields the camera writes as null in other modes. ([specs/meros-camera.yaml:596](specs/meros-camera.yaml#L596))
 - [ ] On a phone with talkback on, confirm that get_talkback_url's address takes a director's WebRTC offer, and that new_talkback_address cuts off a director on the old one. ([specs/meros-camera.yaml:536](specs/meros-camera.yaml#L536))
 
+## meyersound-galaxy — Meyer Sound GALAXY
+
+- [ ] Record the exact answer forms: whether get answers are quoted (path='value') or not, whether a set is answered at all, and the error text for a status point or an unknown path. ([specs/meyersound-galaxy.yaml:45](specs/meyersound-galaxy.yaml#L45))
+- [ ] Confirm that subscribing with a regular expression per subtree is accepted, sends every current value, and that the device keeps up with every point subscribed at 100 ms. ([specs/meyersound-galaxy.yaml:444](specs/meyersound-galaxy.yaml#L444))
+- [ ] Check how create_snapshot separates a name with spaces from the comment (the guide gives no quoting). ([specs/meyersound-galaxy.yaml:368](specs/meyersound-galaxy.yaml#L368))
+- [ ] Record each typed point's range, units and enumeration with describe_control_point (delay types, filter types, slopes, scales), which the guide does not tabulate. ([specs/meyersound-galaxy.yaml:107](specs/meyersound-galaxy.yaml#L107))
+
+## meyersound-spacemap-go — Meyer Sound Spacemap Go
+
+- [ ] Confirm that general purpose OSC is received over UDP on 38033, and record the argument types Spacemap Go accepts (ints, floats, a string for the trajectory are assumed). ([specs/meyersound-spacemap-go.yaml:28](specs/meyersound-spacemap-go.yaml#L28))
+- [ ] Confirm the position command takes X then Y as two arguments in one message. ([specs/meyersound-spacemap-go.yaml:50](specs/meyersound-spacemap-go.yaml#L50))
+
 ## midi-show-control — MIDI Show Control (MSC) device
 
 - [ ] Against an MSC lighting console (ETC Eos, grandMA, Chamsys), confirm GO, STOP, RESUME, TIMED_GO, SET and FIRE act as described for its device ID and command format, and whether it answers all_types and the all-call ID 127. ([specs/midi-show-control.yaml:318](specs/midi-show-control.yaml#L318))
@@ -2837,6 +2884,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which column feedback name Millumin V5 sends (launchedColumn in the Feedback section, columnLaunched in the Summary), and whether launching a column also reports the previous one stopped. ([specs/millumin.yaml:678](specs/millumin.yaml#L678))
 - [ ] Confirm /millumin/info carries the original address (layer:Name/opacity, light:Name/intensity) as its first argument and the message's values after it, for every property read from it (the legacy example shows only selection), and that a setup can send only this form. ([specs/millumin.yaml:764](specs/millumin.yaml#L764))
 
+## mixingstation — Mixing Station desktop (OSC API)
+
+- [ ] A get on /con/v/<path> or /con/n/<path> is answered on the same address with the value as its one argument (the documentation shows the get but not its answer). ([specs/mixingstation.yaml:57](specs/mixingstation.yaml#L57))
+- [ ] After /hi/v, every parameter change arrives as /con/v/<path> with the value in the parameter's own OSC type (f, i, T/F or s); the documentation does not show the update messages. ([specs/mixingstation.yaml:139](specs/mixingstation.yaml#L139))
+- [ ] /hi/v resent every 4 seconds keeps the subscription alive, and Mixing Station answers to the address and port the subscription came from. ([specs/mixingstation.yaml:137](specs/mixingstation.yaml#L137))
+- [ ] An on/off parameter takes T or F (OSC's true and false); the documentation lists bool as a data type without naming its type tag. ([specs/mixingstation.yaml:91](specs/mixingstation.yaml#L91))
+
 ## modulopi-kinetic — Modulo Pi Modulo Kinetic
 
 - [ ] Confirm the websocket path (/ is used) and whether wss uses a self-signed certificate when SSL is on. ([specs/modulopi-kinetic.yaml:45](specs/modulopi-kinetic.yaml#L45))
@@ -2857,6 +2911,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Confirm the websocket path is / on port 8081 and the units of cpuTemperature, motherboardTemperature, upTime and serverTime. ([specs/modulopi-spydog.yaml:31](specs/modulopi-spydog.yaml#L31))
 - [ ] Confirm doaction.computer answers false (not an error) when an action fails. ([specs/modulopi-spydog.yaml:47](specs/modulopi-spydog.yaml#L47))
+
+## motu-avb — MOTU AVB interfaces
+
+- [ ] Measure the size of a full GET /datastore on a 1248 or 16A with the mixer and whether reading it every 5 s burdens the device. ([specs/motu-avb.yaml:1419](specs/motu-avb.yaml#L1419))
+- [ ] Confirm that PATCH with the form field json={"value": v} answers 200 or 204, and record the answer to a path the device lacks and to a wrong type. ([specs/motu-avb.yaml:189](specs/motu-avb.yaml#L189))
+- [ ] Confirm the src pair is the input bank index and channel index, both from 0 (the document's placeholders are lost). ([specs/motu-avb.yaml:1212](specs/motu-avb.yaml#L1212))
 
 ## nec-display — NEC (Sharp NEC) large-format displays
 
@@ -3442,12 +3502,28 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record real streaming updates: that suid is stable for one encoder session, channelId matches the channel list's id, and deleteIncoming and deleteOutgoing arrive when the encoder and destinations stop. ([specs/restream.yaml:1034](specs/restream.yaml#L1034))
 - [ ] Record which updateStatuses fields each platform fills (viewers, followers, streamViews), and how often they arrive. ([specs/restream.yaml:1082](specs/restream.yaml#L1082))
 
+## rme-totalmix — RME TotalMix FX
+
+- [ ] Confirm TotalMix sends values as OSC floats and display texts as strings, and how often it sends changes (and meters with Send Peak Level Data). ([specs/rme-totalmix.yaml:1046](specs/rme-totalmix.yaml#L1046))
+- [ ] Confirm the snapshot and group button rows (snapshot 1 at /3/snapshots/8/1, group 1 at /3/muteGroups/4/1, as the chart lists them). ([specs/rme-totalmix.yaml:899](specs/rme-totalmix.yaml#L899))
+- [ ] Confirm that setSubmix, setBankStart and setOffsetInBank count from 0 and take a float, and what TotalMix sends back after each. ([specs/rme-totalmix.yaml:195](specs/rme-totalmix.yaml#L195))
+
 ## rogueamoeba-farrago — Farrago
 
 - [ ] Check Farrago's default OSC Input and Output ports (8090 and 8091 here, the Companion module's defaults; the manual gives none). ([specs/rogueamoeba-farrago.yaml:492](specs/rogueamoeba-farrago.yaml#L492))
 - [ ] Check that /ping sends every current value to the OSC Output, that changes are sent there as they happen (from the app, from MIDI and from OSC), and whether feedback also comes by tile UUID or name and for the /inspector and /list addresses. ([specs/rogueamoeba-farrago.yaml:500](specs/rogueamoeba-farrago.yaml#L500))
 - [ ] Check the argument types and ranges: an int 1 for actions, an int 1 or 0 for switches, 0/1 for A/B, layout and playback mode, floats 0.0 to 1.0 for volume and color, and the units of currentPosition (assumed a fraction) and crossfadeDuration (assumed seconds); and the types of the feedback values (play as an OSC boolean, the meters' scale). ([specs/rogueamoeba-farrago.yaml:509](specs/rogueamoeba-farrago.yaml#L509))
 - [ ] Check that play on a playing tile stops it (or pauses it with pausing allowed), and what /set/<set>/position does with its value. ([specs/rogueamoeba-farrago.yaml:520](specs/rogueamoeba-farrago.yaml#L520))
+
+## roland-m5000 — Roland M-5000 / M-5000C
+
+- [ ] Over Telnet, confirm that each reply (OK, ERR:n; and request replies) is a line ended by CR LF with no stx, and that the echo of the command arrives as its own line before the reply. ([specs/roland-m5000.yaml:47](specs/roland-m5000.yaml#L47))
+- [ ] Check whether the console sends Telnet option negotiation (IAC) bytes on connecting, and how many Telnet sessions it accepts. ([specs/roland-m5000.yaml:605](specs/roland-m5000.yaml#L605))
+- [ ] On RS-232C, confirm the reply framing (stx before reply commands, a bare 06H ack, no line ending) and that Xon/Xoff is used. ([specs/roland-m5000.yaml:59](specs/roland-m5000.yaml#L59))
+- [ ] Confirm that a request through a user fader (U1-U192) is answered with the U token, not the assigned channel's. ([specs/roland-m5000.yaml:600](specs/roland-m5000.yaml#L600))
+- [ ] Check whether channel names shorter than 12 characters are padded with spaces in CNS replies. ([specs/roland-m5000.yaml:613](specs/roland-m5000.yaml#L613))
+- [ ] Confirm the RNS reply's song name is closed by a quote (the reference's example leaves it out). ([specs/roland-m5000.yaml:951](specs/roland-m5000.yaml#L951))
+- [ ] Measure whether the console keeps up with the polls (about 830 fader and mute requests every ten seconds) without slowing its surface or answering ERR:2 busy. ([specs/roland-m5000.yaml:657](specs/roland-m5000.yaml#L657))
 
 ## roland-p20hd — Roland P-20HD
 
@@ -3490,6 +3566,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the QAL numbering (which of 11, 12 and 13 is MASTER OUT, AUX and all) and the order of the QAL:13 frame (inputs 0-10, AUX, MASTER OUT assumed). ([specs/roland-v60hd.yaml:441](specs/roland-v60hd.yaml#L441))
 - [ ] Check whether the QPL frame for PANEL INFORMATION is also sent over LAN. ([specs/roland-v60hd.yaml:516](specs/roland-v60hd.yaml#L516))
 - [ ] Drive the V-60HD on RS-232 (link serial) and confirm the same frames as over LAN, with XON/XOFF. ([specs/roland-v60hd.yaml:50](specs/roland-v60hd.yaml#L50))
+
+## roland-vmixer — Roland V-Mixer M-480 / M-400 / M-380 / M-300 / M-200i
+
+- [ ] On the M-200i over Telnet, confirm that each reply (OK, ERR:n; and request replies) is a line ended by CR LF with no stx, and that the echoed command arrives as its own line. ([specs/roland-vmixer.yaml:44](specs/roland-vmixer.yaml#L44))
+- [ ] On RS-232C, confirm that reply commands begin with stx and end at ";" with no line ending, and that ack is the bare byte 06H. ([specs/roland-vmixer.yaml:63](specs/roland-vmixer.yaml#L63))
+- [ ] Confirm the CNS name is six characters padded with spaces, quoted. ([specs/roland-vmixer.yaml:1131](specs/roland-vmixer.yaml#L1131))
+- [ ] Confirm that a request through a user fader is answered with the U token, not the assigned channel's. ([specs/roland-vmixer.yaml:1115](specs/roland-vmixer.yaml#L1115))
+- [ ] Measure whether the consoles keep up with the polls (up to about 230 fader and mute requests every ten seconds at 115200 bps) without answering ERR:2 busy. ([specs/roland-vmixer.yaml:1190](specs/roland-vmixer.yaml#L1190))
+- [ ] Check the DTS reply for a delay in milliseconds and in samples (decimal places, unit token). ([specs/roland-vmixer.yaml:788](specs/roland-vmixer.yaml#L788))
+- [ ] Check which input-patch channels and ports each model accepts (the reference lists the M-480 cascade inputs and per-model port ranges). ([specs/roland-vmixer.yaml:862](specs/roland-vmixer.yaml#L862))
 
 ## roland-vr400uhd — Roland VR-400UHD
 
@@ -3608,6 +3694,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the LED white balance, color correction, seam correction and gradation bit layouts (sub-commands 0x92, 0x93, 0x97, 0x9B, 0x9C, 0x9F, 0xA2), sent and read as hex. ([specs/samsung-mdc.yaml:2938](specs/samsung-mdc.yaml#L2938))
 - [ ] Check the menu size reply's sub-command echo (the document prints 0x83 for 0x85); any echo is taken as the reply. ([specs/samsung-mdc.yaml:2903](specs/samsung-mdc.yaml#L2903))
 
+## sennheiser-adn — Sennheiser ADN conference system
+
+- [ ] Confirm that replies and updates are "Keyword value;" with nothing between messages, or record the separator the central unit sends. ([specs/sennheiser-adn.yaml:35](specs/sennheiser-adn.yaml#L35))
+- [ ] Record how many clients the central unit accepts on 53252 and whether a new client gets anything unasked on connecting. ([specs/sennheiser-adn.yaml:42](specs/sennheiser-adn.yaml#L42))
+- [ ] Confirm the reply to MicButtonSN for a wired unit is MicStatus with its bus position. ([specs/sennheiser-adn.yaml:852](specs/sennheiser-adn.yaml#L852))
+- [ ] Confirm the direction of relative equalizer changes (#1 moves the wire value up, towards -12 dB). ([specs/sennheiser-adn.yaml:248](specs/sennheiser-adn.yaml#L248))
+
 ## sennheiser-chg-70n — Sennheiser CHG 70N
 
 - [ ] Confirm the charger answers a command datagram with the method's new value (or an /osc/error entry) to the sender's port, so each command is acknowledged by its reply. ([specs/sennheiser-chg-70n.yaml:66](specs/sennheiser-chg-70n.yaml#L66))
@@ -3705,6 +3798,29 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On firmware 1.3.x (API 17.0), check which subscriptions are refused (the aoip status, metering) and whether the rest still subscribe in their batch. ([specs/sennheiser-spectera.yaml:619](specs/sennheiser-spectera.yaml#L619))
 - [ ] Confirm bandwidthMode 10000 is accepted but never transmits, as the release notes say, which is why set_rf_bandwidth offers 6000 and 8000 only. ([specs/sennheiser-spectera.yaml:559](specs/sennheiser-spectera.yaml#L559))
 
+## sennheiser-tc-bar — Sennheiser TeamConnect Bar S / Bar M
+
+- [ ] Confirm that one PUT of every readable resource to the session is accepted on both bars, and that the initial values arrive on the stream. ([specs/sennheiser-tc-bar.yaml:1292](specs/sennheiser-tc-bar.yaml#L1292))
+- [ ] Confirm that restart, the camera full-view and preset PUTs take no body. ([specs/sennheiser-tc-bar.yaml:954](specs/sennheiser-tc-bar.yaml#L954))
+- [ ] Confirm that a PUT of one field leaves the resource's other fields as they were. ([specs/sennheiser-tc-bar.yaml:1146](specs/sennheiser-tc-bar.yaml#L1146))
+- [ ] Record a full 802.1X configuration exchange (both methods), the error codes for bad PEM files, and how the bar answers while it re-authenticates. ([specs/sennheiser-tc-bar.yaml:1061](specs/sennheiser-tc-bar.yaml#L1061))
+
+## sennheiser-tcc-m — Sennheiser TeamConnect Ceiling Medium
+
+- [ ] Confirm that one PUT of every readable resource to the session is accepted (a refused entry refuses the whole list) and that the initial values arrive on the stream. ([specs/sennheiser-tcc-m.yaml:812](specs/sennheiser-tcc-m.yaml#L812))
+- [ ] Confirm that a PUT of one field leaves the resource's other fields as they were. ([specs/sennheiser-tcc-m.yaml:722](specs/sennheiser-tcc-m.yaml#L722))
+- [ ] Confirm the device's certificate is self-signed (accepted here) and that the event stream needs the same Basic credentials. ([specs/sennheiser-tcc-m.yaml:41](specs/sennheiser-tcc-m.yaml#L41))
+- [ ] Record what a reference gain write answers while automatic adjustment is on (409 or 422 documented). ([specs/sennheiser-tcc-m.yaml:395](specs/sennheiser-tcc-m.yaml#L395))
+
+## sennheiser-tcc2 — Sennheiser TeamConnect Ceiling 2
+
+- [ ] Confirm the three subscriptions (device and beam, audio, meters limited to 250 ms) are accepted with a 60 s lifetime, renewed every 20 s, and that their notifications fit a datagram. ([specs/sennheiser-tcc2.yaml:597](specs/sennheiser-tcc2.yaml#L597))
+- [ ] Confirm that the noise gate threshold and hold time, Dante output gain, AEC reference gain, voice lift emergency mute time and installation type accept writes (the document gives examples but does not mark them writeable). ([specs/sennheiser-tcc2.yaml:220](specs/sennheiser-tcc2.yaml#L220))
+- [ ] Confirm that null elements in /audio/exclusion/zones and /audio/exclusion/active keep those zones, and what the device answers. ([specs/sennheiser-tcc2.yaml:395](specs/sennheiser-tcc2.yaml#L395))
+- [ ] Confirm that the manual addresses and auto false in one message move the device, and what it answers before moving. ([specs/sennheiser-tcc2.yaml:354](specs/sennheiser-tcc2.yaml#L354))
+- [ ] Check whether the TCC2 also takes SSC over TCP 45 (Sennheiser documents UDP only). ([specs/sennheiser-tcc2.yaml:41](specs/sennheiser-tcc2.yaml#L41))
+- [ ] Record the device time's format in answers (seconds since 2000) and whether it can be set while synchronised. ([specs/sennheiser-tcc2.yaml:172](specs/sennheiser-tcc2.yaml#L172))
+
 ## sharp-display — Sharp professional displays (S-Format)
 
 - [ ] Record the login exchange on TCP 10008: the exact `Login:` and `Password:` prompts (trailing space, any line ending), the `OK` after the password, and what a wrong user name or password is answered with (Sharp documents nothing). ([specs/sharp-display.yaml:101](specs/sharp-display.yaml#L101))
@@ -3739,6 +3855,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check LED_BRIGHTNESS's range on current firmware (0-2 documented). ([specs/shure-ani.yaml:577](specs/shure-ani.yaml#L577))
 - [ ] Capture SAMPLE with metering on, on each model, and confirm the values' order (ANI4IN's document labels its four values output 1-4; ANI22's inputs 1-2 then outputs 1-2; ANIUSB-MATRIX's ten channels) and whether the four-value form ends with two spaces before >. ([specs/shure-ani.yaml:775](specs/shure-ani.yaml#L775))
 
+## shure-chargers — Shure networked battery chargers
+
+- [ ] Check whether SBC250, SBC450 and SBC850 report changes unasked (their bulletin does not say), and how they answer GET 0 ALL. ([specs/shure-chargers.yaml:542](specs/shure-chargers.yaml#L542))
+- [ ] Confirm that each charger accepts a TCP connection on 2202 (the documents say it is the server, the user guides the client). ([specs/shure-chargers.yaml:623](specs/shure-chargers.yaml#L623))
+- [ ] Record BATT_MODULE_TYPE on an SBC220 and an SBC240, primary and secondary units. ([specs/shure-chargers.yaml:629](specs/shure-chargers.yaml#L629))
+- [ ] Record the SBC250/SBC450/SBC850 DEVICE_ID and MODEL replies (with or without braces). ([specs/shure-chargers.yaml:328](specs/shure-chargers.yaml#L328))
+- [ ] Check that SET NET_SETTINGS is answered with nothing (no asynchronous report is documented) and accepts unpadded addresses. ([specs/shure-chargers.yaml:367](specs/shure-chargers.yaml#L367))
+
 ## shure-imx-room — Shure IntelliMix Room
 
 - [ ] Check that GET 00 ALL is answered by IntelliMix Room and that its answers end. ([specs/shure-imx-room.yaml:398](specs/shure-imx-room.yaml#L398))
@@ -3758,6 +3882,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Capture SAMPLE with metering on, and confirm the values follow Channel Number Assignments for automatic coverage on and off, and that METER_RATE, METER_RATE_POSTGATE, METER_RATE_MXR_GAIN and METER_RATE_AECREF all report as plain SAMPLE (so only one should run at a time); record the MXA910, MXA710, MXA310 and MXA902/901 forms, taken here from the MXA920 document. ([specs/shure-mxa.yaml:1851](specs/shure-mxa.yaml#L1851))
 - [ ] Capture SAMPLE TALKER_POSITIONS on an MXA920 (and an MXA910 if it reports them) and confirm the six values per talker (lobe, coverage area, X, Y, Z, reserved) as the document's example gives them. ([specs/shure-mxa.yaml:1864](specs/shure-mxa.yaml#L1864))
 
+## shure-mxcw — Shure Microflex Complete Wireless
+
+- [ ] Record the ranges of MAX_TOTAL_SPEAKERS, MAX_DELEGATE_SPEAKERS, MAX_NUM_REQUESTS and MIC_PRIORITY (the document gives one digit and no range). ([specs/shure-mxcw.yaml:298](specs/shure-mxcw.yaml#L298))
+- [ ] Confirm the AUDIO_SAMPLE layout (aux input peak and RMS, then a peak and RMS per uplink slot) and how many slots it carries. ([specs/shure-mxcw.yaml:913](specs/shure-mxcw.yaml#L913))
+- [ ] Record the RSSI report's value format (RF_METER_RATE). ([specs/shure-mxcw.yaml:917](specs/shure-mxcw.yaml#L917))
+- [ ] Check whether AUX_INPUT_GAIN replies are padded to three digits (the examples show 4 and 12). ([specs/shure-mxcw.yaml:505](specs/shure-mxcw.yaml#L505))
+- [ ] Confirm START_VOTE takes the configuration number unpadded and what VOTING_CONFIGURATION reports. ([specs/shure-mxcw.yaml:700](specs/shure-mxcw.yaml#L700))
+
 ## shure-mxn5 — Shure MXN5-C
 
 - [ ] Check what an MXN5-C that is not V1 answers to GET 00 ALL. ([specs/shure-mxn5.yaml:460](specs/shure-mxn5.yaml#L460))
@@ -3765,6 +3897,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that SIG_GEN on channel 03 starts and stops the generator and what the 00 index does. ([specs/shure-mxn5.yaml:403](specs/shure-mxn5.yaml#L403))
 - [ ] Capture SAMPLE with metering on, and confirm its four values follow Channel Number Assignments (1-2 Dante inputs, 3 summed input, 4 Dante output). ([specs/shure-mxn5.yaml:468](specs/shure-mxn5.yaml#L468))
 - [ ] Check the PRESET_NAME answer for an empty preset ({empty}). ([specs/shure-mxn5.yaml:162](specs/shure-mxn5.yaml#L162))
+
+## shure-mxw — Shure Microflex Wireless and MXW neXt
+
+- [ ] Confirm the SAMPLE scales on legacy MXW access points (the neXt document's RF level minus 110 dBm and audio minus 120 dB are assumed for both). ([specs/shure-mxw.yaml:1163](specs/shure-mxw.yaml#L1163))
+- [ ] Confirm that GET 0 <parameter> on a legacy access point or charger is answered with one REP per channel or bay (used on connecting). ([specs/shure-mxw.yaml:661](specs/shure-mxw.yaml#L661))
+- [ ] Check which TX_STATUS values each generation takes (MUTE and STANDBY on legacy, MUTED on neXt) and what an MXWNDX charger does with SET TX_STATUS. ([specs/shure-mxw.yaml:677](specs/shure-mxw.yaml#L677))
+- [ ] Confirm the mute word of INPUT_CH_MUTE, OUTPUT_CH_MUTE and AUTOMIX_OUT_MUTE (MUTE in the text, MUTED in the examples) and whether AUTOMIX_OUT_MUTE takes a channel number. ([specs/shure-mxw.yaml:594](specs/shure-mxw.yaml#L594))
+- [ ] Record the Auracast sample rates the access points accept, and the AVAILABLE_CHANNELS query the document mentions. ([specs/shure-mxw.yaml:1014](specs/shure-mxw.yaml#L1014))
+- [ ] Check the LED_STATUS reply to a secondary microphone's set (the document shows it without SEC) and the neXt reply's CH prefix. ([specs/shure-mxw.yaml:1197](specs/shure-mxw.yaml#L1197))
+- [ ] Check whether UNLINK also works on MXWNCS charger bays, as the document's wording suggests. ([specs/shure-mxw.yaml:634](specs/shure-mxw.yaml#L634))
 
 ## shure-p300 — Shure P300
 
@@ -3776,27 +3918,37 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the matrix gain REP's spacing (the document shows < REP xx MATRIX_MXR_GAIN yyzzzz > once). ([specs/shure-p300.yaml:991](specs/shure-p300.yaml#L991))
 - [ ] Capture SAMPLE_IN, SAMPLE_OUT, SAMPLE_PROC, SAMPLE_ERLE and SAMPLE_AGC with metering on, and confirm each lists one value per channel in the document's order (14, 12 as the order lists, 12, 8 and 8 values), three digits each (ERLE and AGC shown as aaa too), and record the AGC value's unit and range, which the document gives only as ERLE's. ([specs/shure-p300.yaml:1110](specs/shure-p300.yaml#L1110))
 
+## shure-uhfr — Shure UHF-R receivers
+
+- [ ] Confirm the framing: a "* " before and " *" after each message (as the bulletin prints it), no line ending, and replies sent to the sender's address and port. ([specs/shure-uhfr.yaml:40](specs/shure-uhfr.yaml#L40))
+- [ ] Confirm that SET GROUP_CHAN takes the group and the channel each one less than their numbers, and its digit width. ([specs/shure-uhfr.yaml:137](specs/shure-uhfr.yaml#L137))
+- [ ] Check how long METER updating lasts and whether repeating it every minute disturbs anything; and whether REPORTs come without METER at all. ([specs/shure-uhfr.yaml:234](specs/shure-uhfr.yaml#L234))
+- [ ] Record the dB value of each AUDIO_GAIN step (00 the most, 32 the least). ([specs/shure-uhfr.yaml:98](specs/shure-uhfr.yaml#L98))
+- [ ] Record the SAMPLE field widths and the RF codes on a receiver. ([specs/shure-uhfr.yaml:227](specs/shure-uhfr.yaml#L227))
+
 ## shure-wireless — Shure wireless receivers
 
-- [ ] On AD4Q with frequency diversity combined (FD-C), check the second RF section in SAMPLE and that the first is the right one to report. ([specs/shure-wireless.yaml:658](specs/shure-wireless.yaml#L658))
-- [ ] Confirm the PSM1000 answers REPORT with string values without braces. ([specs/shure-wireless.yaml:689](specs/shure-wireless.yaml#L689))
+- [ ] On AD4Q with frequency diversity combined (FD-C), check the second RF section in SAMPLE and that the first is the right one to report. ([specs/shure-wireless.yaml:741](specs/shure-wireless.yaml#L741))
+- [ ] Confirm the PSM1000 answers REPORT with string values without braces. ([specs/shure-wireless.yaml:772](specs/shure-wireless.yaml#L772))
 - [ ] Opened for commands only, confirm a receiver that is not metering answers `GET DEVICE_ID` (`GET DEVICE_NAME` on the PSM1000) promptly enough for the 5 s liveness check. ([crates/core/src/modules/shure.rs:50](crates/core/src/modules/shure.rs#L50))
-- [ ] Confirm `< REP ERR >` carries no channel or parameter and that SETs are answered in order, so failing the oldest waiting command with it is right. ([specs/shure-wireless.yaml:608](specs/shure-wireless.yaml#L608))
-- [ ] Check that ULX-D, QLX-D and the PSM1000 accept a group and channel padded to two characters (`GROUP_CHAN 03,07`), and how a three-character channel is written. ([specs/shure-wireless.yaml:213](specs/shure-wireless.yaml#L213))
-- [ ] On Axient Digital and SLX-D, confirm a channel name SET is limited to 8 characters (the current documents) rather than 31 (the 2018 Axient Digital document). ([specs/shure-wireless.yaml:230](specs/shure-wireless.yaml#L230))
-- [ ] On the PSM1000, check whether a device or channel name with a space can be set unbraced, and whether `GET x CHAN_NAME` is answered with the channel number (the table omits it). ([specs/shure-wireless.yaml:241](specs/shure-wireless.yaml#L241))
+- [ ] Confirm `< REP ERR >` carries no channel or parameter and that SETs are answered in order, so failing the oldest waiting command with it is right. ([specs/shure-wireless.yaml:680](specs/shure-wireless.yaml#L680))
+- [ ] Check that ULX-D, QLX-D and the PSM1000 accept a group and channel padded to two characters (`GROUP_CHAN 03,07`), and how a three-character channel is written. ([specs/shure-wireless.yaml:280](specs/shure-wireless.yaml#L280))
+- [ ] On Axient Digital and SLX-D, confirm a channel name SET is limited to 8 characters (the current documents) rather than 31 (the 2018 Axient Digital document). ([specs/shure-wireless.yaml:297](specs/shure-wireless.yaml#L297))
+- [ ] On the PSM1000, check whether a device or channel name with a space can be set unbraced, and whether `GET x CHAN_NAME` is answered with the channel number (the table omits it). ([specs/shure-wireless.yaml:308](specs/shure-wireless.yaml#L308))
 - [ ] Confirm `GET x SLOT_... 0` answers every one of the channel's eight slots, and whether `GET x ALL` already includes the slots. ([crates/core/src/modules/shure.rs:62](crates/core/src/modules/shure.rs#L62))
-- [ ] Check whether `SET NET_SETTINGS` is answered before the receiver moves to its new address or restarts. ([specs/shure-wireless.yaml:274](specs/shure-wireless.yaml#L274))
-- [ ] On ULX-D, confirm the sampled audio level is dBFS + 50 (the current document; the 2018 one gives 0-50 without units). ([specs/shure-wireless.yaml:528](specs/shure-wireless.yaml#L528))
-- [ ] On ULX-D, confirm TX_OFFSET is reported offset by 12 (the current document; the 2018 one lists 000-021 as the offset itself). ([specs/shure-wireless.yaml:545](specs/shure-wireless.yaml#L545))
-- [ ] On ULX-D firmware before 1.4.8, check that the per-channel `ENCRYPTION ON/OFF` reports are the same on every channel, since they are kept as one device value. ([specs/shure-wireless.yaml:490](specs/shure-wireless.yaml#L490))
-- [ ] Check that ULX-D answers `SET HIGH_DENSITY` with a REP of the new value, and whether changing it retunes the channels. ([specs/shure-wireless.yaml:310](specs/shure-wireless.yaml#L310))
-- [ ] Check that a dual ULX-D answers an inapplicable summing or diversity mode with the mode it kept, not REP ERR. ([specs/shure-wireless.yaml:334](specs/shure-wireless.yaml#L334))
-- [ ] On the PSM1000, confirm AUDIO_IN_LVL is written and reported as signed dB from -67 to 0 and RF_TX_LVL as 10, 50 or 100 (Companion's values; Shure's page gives none), and whether the reply is RF_TX_LVL or RF_TX_LEVEL. ([specs/shure-wireless.yaml:439](specs/shure-wireless.yaml#L439))
-- [ ] On Axient Digital, confirm slot SETs for a linked, active ADX transmitter are answered with the slot's REP, and that SLOT_INPUT_PAD takes 0 and 12. ([specs/shure-wireless.yaml:355](specs/shure-wireless.yaml#L355))
-- [ ] On QLX-D, check whether FLASH, DEVICE_ID, GROUP_CHAN and METER_RATE behave as on ULX-D (Companion offers QLX-D no FLASH; Shure publishes no QLX-D document). ([specs/shure-wireless.yaml:141](specs/shure-wireless.yaml#L141))
-- [ ] On ULX-D, check that a metering interval above 65535 ms (to 99999, as documented) is accepted. ([specs/shure-wireless.yaml:260](specs/shure-wireless.yaml#L260))
-- [ ] On ULX-D, confirm set_encryption, regenerate_encryption_key and set_frequency_diversity_mode need an IR sync before audio returns, and how long a key regeneration takes. ([specs/shure-wireless.yaml:582](specs/shure-wireless.yaml#L582))
+- [ ] Check whether `SET NET_SETTINGS` is answered before the receiver moves to its new address or restarts. ([specs/shure-wireless.yaml:341](specs/shure-wireless.yaml#L341))
+- [ ] On ULX-D, confirm the sampled audio level is dBFS + 50 (the current document; the 2018 one gives 0-50 without units). ([specs/shure-wireless.yaml:600](specs/shure-wireless.yaml#L600))
+- [ ] On ULX-D, confirm TX_OFFSET is reported offset by 12 (the current document; the 2018 one lists 000-021 as the offset itself). ([specs/shure-wireless.yaml:617](specs/shure-wireless.yaml#L617))
+- [ ] On ULX-D firmware before 1.4.8, check that the per-channel `ENCRYPTION ON/OFF` reports are the same on every channel, since they are kept as one device value. ([specs/shure-wireless.yaml:557](specs/shure-wireless.yaml#L557))
+- [ ] Check that ULX-D answers `SET HIGH_DENSITY` with a REP of the new value, and whether changing it retunes the channels. ([specs/shure-wireless.yaml:377](specs/shure-wireless.yaml#L377))
+- [ ] Check that a dual ULX-D answers an inapplicable summing or diversity mode with the mode it kept, not REP ERR. ([specs/shure-wireless.yaml:401](specs/shure-wireless.yaml#L401))
+- [ ] On the PSM1000, confirm AUDIO_IN_LVL is written and reported as signed dB from -67 to 0 and RF_TX_LVL as 10, 50 or 100 (Companion's values; Shure's page gives none), and whether the reply is RF_TX_LVL or RF_TX_LEVEL. ([specs/shure-wireless.yaml:506](specs/shure-wireless.yaml#L506))
+- [ ] On Axient Digital, confirm slot SETs for a linked, active ADX transmitter are answered with the slot's REP, and that SLOT_INPUT_PAD takes 0 and 12. ([specs/shure-wireless.yaml:422](specs/shure-wireless.yaml#L422))
+- [ ] On QLX-D, check whether FLASH, DEVICE_ID, GROUP_CHAN and METER_RATE behave as on ULX-D (Companion offers QLX-D no FLASH; Shure publishes no QLX-D document). ([specs/shure-wireless.yaml:152](specs/shure-wireless.yaml#L152))
+- [ ] On ULX-D, check that a metering interval above 65535 ms (to 99999, as documented) is accepted. ([specs/shure-wireless.yaml:327](specs/shure-wireless.yaml#L327))
+- [ ] On ULX-D, confirm set_encryption, regenerate_encryption_key and set_frequency_diversity_mode need an IR sync before audio returns, and how long a key regeneration takes. ([specs/shure-wireless.yaml:654](specs/shure-wireless.yaml#L654))
+- [ ] On an SLX-D+ receiver, record the REM_PAIR messages of a whole pairing (ON, REQUEST with the name in braces, ACCEPT or REJECT, OFF on timeout) and whether GET x ALL includes the LINK_* parameters. ([specs/shure-wireless.yaml:271](specs/shure-wireless.yaml#L271))
+- [ ] On an SLX-D+ receiver, confirm the LINK_STATUS and LINK_TX_MODEL replies carry the slot 1 before the value, and what LINK_TX_REBOOT answers. ([specs/shure-wireless.yaml:92](specs/shure-wireless.yaml#L92))
 
 ## singular-datastream — Singular.live data stream
 
@@ -4389,6 +4541,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether AudioPlayerGetStatus and listitemnum need the trailing "" from the syntax tables. ([specs/yamaha-dme7.yaml:957](specs/yamaha-dme7.yaml#L957))
 - [ ] Check the scheduler time format beyond "9:00". ([specs/yamaha-dme7.yaml:962](specs/yamaha-dme7.yaml#L962))
 
+## yamaha-mcp1 — Yamaha MCP1
+
+- [ ] Confirm the preset index range (ssnum's count, numbered from 0 or 1) and the ssinfo answer layout. ([specs/yamaha-mcp1.yaml:127](specs/yamaha-mcp1.yaml#L127))
+- [ ] Confirm the NOTIFY sscurrent push carries only the index. ([specs/yamaha-mcp1.yaml:199](specs/yamaha-mcp1.yaml#L199))
+
 ## yamaha-rivage — Yamaha RIVAGE PM
 
 - [ ] Confirm the RCP command set (get, OK/OKm, ERROR, NOTIFY set, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-rivage.yaml:9668](specs/yamaha-rivage.yaml#L9668))
@@ -4424,6 +4581,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what NOTIFY sscurrent_ex looks like after a scene recall from the surface, which now triggers a re-read of the connect-time settings. ([specs/yamaha-tf.yaml:4755](specs/yamaha-tf.yaml#L4755))
 - [ ] Check whether the console answers prmnum and prminfo <index> as the DME7 document describes, and whether the list differs by firmware and model. ([specs/yamaha-tf.yaml:4764](specs/yamaha-tf.yaml#L4764))
 - [ ] Confirm store_scene: the command form ssupdate_ex scene_a|scene_b <n> comes from the Companion module, while the console's own scninfo list names MIXER:Lib/Bank/Scene/Store (two lists, 0-100); record its reply and whether scene 0 is refused. ([specs/yamaha-tf.yaml:4775](specs/yamaha-tf.yaml#L4775))
+
+## yamaha-vxl — Yamaha VXL1-16P / VXC2P
+
+- [ ] Record what the speaker answers to an unknown command or AccessID (the document has no error section; ERROR <command> <code> as on the MCP1 is assumed). ([specs/yamaha-vxl.yaml:39](specs/yamaha-vxl.yaml#L39))
+- [ ] Record the raw scale of the compressor and ducker thresholds, ranges and attack (dB as integers assumed) and that a ratio of 201 is infinity:1. ([specs/yamaha-vxl.yaml:494](specs/yamaha-vxl.yaml#L494))
+- [ ] Confirm whether NOTIFY mtr carries a level or gr word before the values (the document shows both forms). ([specs/yamaha-vxl.yaml:1697](specs/yamaha-vxl.yaml#L1697))
+- [ ] Confirm that answering devstatus runmode is all the speaker needs before other commands, and that it pushes NOTIFY set for every change. ([specs/yamaha-vxl.yaml:40](specs/yamaha-vxl.yaml#L40))
 
 ## youtube-live — YouTube Live
 

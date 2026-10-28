@@ -1,0 +1,1431 @@
+spec: 1
+id: motu-avb
+name: MOTU AVB interfaces (Datastore API)
+vendor: MOTU
+category: mixer
+
+# MOTU's AVB interfaces keep every setting in a datastore served over HTTP:
+# GET /datastore returns every path and its value, GET /datastore/<path> one
+# value or subtree, and PATCH (or POST) /datastore/<path> with a form field
+# json={"value": ...} changes it. Paths are slash-separated and every index
+# counts from 0; the commands here count from 1. Which paths exist depends on
+# the model, its firmware and its mixer: GET /datastore shows them all, and
+# state keeps every one.
+source:
+  - title: "MOTU AVB Datastore API (PDF, 2015-06-10; API 0.0.0, router 0.2.0, mixer 1.0)"
+    author: MOTU
+    url: https://cdn-data.motu.com/downloads/audio/AVB/docs/MOTU%20AVB%20Web%20API.pdf
+    note: >
+      Manufacturer document. JSON over HTTP: /apiversion, GET of the whole
+      datastore, a subtree or a path; PATCH or POST with a form-encoded json
+      field; ETags and long polling with If-None-Match and a 15 s hold;
+      client ids; types (string, real, int, semver with list, pair, opt, bool
+      and enum modifiers) and permissions; per-section versions under
+      ext/caps; placeholders that differ by model; and the path table (avb,
+      ext router, mix mixer) with ranges and units.
+  - title: "Open Sound Control Quick Reference for MOTU AVB Interfaces (PDF, 2015-06-10)"
+    author: MOTU
+    url: https://cdn-data.motu.com/downloads/audio/AVB/docs/OSC%20Quick%20Reference.pdf
+    note: >
+      Manufacturer document. The same writable paths over OSC on a UDP port
+      the device assigns; set only, with no replies. Not used here: HTTP does
+      everything OSC does and reads too.
+
+transport:
+  type: http
+  port: 80
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe: { method: GET, path: /apiversion }
+
+ports:
+  - { port: 80, protocol: http, role: control }
+
+maps:
+  shelf_mode: { shelf: "0", parametric: "1" }
+  detection: { rms: "0", peak: "1" }
+
+models:
+  - id: motu-avb
+    name: MOTU AVB interface (1248, 8M, 16A, 24Ai, 24Ao, 112D, 624, 8A, Monitor 8, UltraLite AVB, Stage-B16 and others)
+    supports:
+      - set_channel_fader
+      - set_channel_mute
+      - set_channel_enabled
+      - set_main_fader
+      - set_main_mute
+      - set_main_enabled
+      - set_aux_fader
+      - set_aux_mute
+      - set_aux_enabled
+      - set_group_fader
+      - set_group_mute
+      - set_group_enabled
+      - set_reverb_fader
+      - set_reverb_mute
+      - set_reverb_enabled
+      - set_monitor_fader
+      - set_monitor_mute
+      - set_monitor_enabled
+      - set_channel_solo
+      - set_group_solo
+      - set_reverb_solo
+      - set_channel_pan
+      - set_channel_aux_send
+      - set_channel_aux_pan
+      - set_channel_group_send
+      - set_channel_group_pan
+      - set_channel_reverb_send
+      - set_channel_reverb_pan
+      - set_group_aux_send
+      - set_group_reverb_send
+      - set_reverb_aux_send
+      - set_reverb_reverb_send
+      - set_aux_prefader
+      - set_aux_panner
+      - set_group_prefader
+      - set_group_panner
+      - set_reverb_prefader
+      - set_reverb_panner
+      - set_channel_eq_enabled
+      - set_channel_eq_frequency
+      - set_channel_eq_gain
+      - set_channel_eq_bandwidth
+      - set_channel_eq_shelf_mode
+      - set_main_eq_enabled
+      - set_main_eq_frequency
+      - set_main_eq_gain
+      - set_main_eq_bandwidth
+      - set_main_eq_shelf_mode
+      - set_aux_eq_enabled
+      - set_aux_eq_frequency
+      - set_aux_eq_gain
+      - set_aux_eq_bandwidth
+      - set_aux_eq_shelf_mode
+      - set_group_eq_enabled
+      - set_group_eq_frequency
+      - set_group_eq_gain
+      - set_group_eq_bandwidth
+      - set_group_eq_shelf_mode
+      - set_reverb_eq_enabled
+      - set_reverb_eq_frequency
+      - set_reverb_eq_gain
+      - set_reverb_eq_bandwidth
+      - set_reverb_eq_shelf_mode
+      - set_channel_hpf
+      - set_channel_hpf_frequency
+      - set_channel_gate_enabled
+      - set_channel_gate_release
+      - set_channel_gate_threshold
+      - set_channel_gate_attack
+      - set_channel_compressor_enabled
+      - set_channel_compressor_release
+      - set_channel_compressor_threshold
+      - set_channel_compressor_ratio
+      - set_channel_compressor_attack
+      - set_channel_compressor_trim
+      - set_channel_compressor_detection
+      - set_main_leveler_enabled
+      - set_main_leveler_makeup
+      - set_main_leveler_reduction
+      - set_main_leveler_limit
+      - set_group_leveler_enabled
+      - set_group_leveler_makeup
+      - set_group_leveler_reduction
+      - set_group_leveler_limit
+      - set_reverb_leveler_enabled
+      - set_reverb_leveler_makeup
+      - set_reverb_leveler_reduction
+      - set_reverb_leveler_limit
+      - set_reverb_reverbtime
+      - set_reverb_hf
+      - set_reverb_mf
+      - set_reverb_predelay
+      - set_reverb_mfratio
+      - set_reverb_hfratio
+      - set_reverb_tailspread
+      - set_reverb_mod
+      - set_reverb_effect_enabled
+      - set_monitor_assign
+      - set_monitor_override
+      - set_monitor_auto
+      - set_bank_channel_name
+      - set_bank_channel_phase
+      - set_bank_channel_pad
+      - set_bank_channel_phantom
+      - set_bank_channel_vlimit
+      - set_bank_channel_vlimit_clip
+      - set_bank_channel_trim
+      - set_bank_channel_stereo_trim
+      - route_output_channel
+      - unroute_output_channel
+      - set_bank_user_channels
+      - set_optical_format
+      - set_madi_clock
+      - set_madi_format
+      - set_word_clock_mode
+      - set_word_clock_thru
+      - set_vlimit_lookahead
+      - set_host_volume_control
+      - set_max_usb_to_host
+      - set_entity_name
+      - identify
+      - set_sample_rate
+      - set_clock_source
+      - connect_input_stream
+      - disconnect_input_stream
+      - set_master_clock
+      - set_value
+      - get_value
+    verification: none
+    notes: >
+      One model: every MOTU AVB interface serves the same API, and what it
+      has (banks, channels, mixer, vLimit, MADI, optical) shows in its
+      datastore.
+
+commands:
+  set_channel_fader:
+    summary: "Set the fader of a mixer input channel (mix/chan/<n>/matrix/fader)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      level: { type: float, min: 0.0, max: 4.0, required: true, label: "Level", description: "Level as a linear gain, 0 (-inf) to 4 (+12 dB); 1 is unity." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/matrix/fader", body: "json=%7B%22value%22%3A{level:.4f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_mute:
+    summary: "Mute or unmute a mixer input channel (mix/chan/<n>/matrix/mute)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      muted: { type: bool, required: true, label: "Muted", description: "On mutes, off unmutes." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/matrix/mute", body: "json=%7B%22value%22%3A{muted:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_enabled:
+    summary: "Turn a mixer input channel on or off in the mixer (mix/chan/<n>/matrix/enable)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      enabled: { type: bool, required: true, label: "Enabled", description: "On enables it, off disables it." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/matrix/enable", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_main_fader:
+    summary: "Set the fader of the main mix (mix/main/<n>/matrix/fader)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Main", description: "Main, from 1." }
+      level: { type: float, min: 0.0, max: 4.0, required: true, label: "Level", description: "Level as a linear gain, 0 (-inf) to 4 (+12 dB); 1 is unity." }
+    send: { method: PATCH, path: "/datastore/mix/main/{index:-1}/matrix/fader", body: "json=%7B%22value%22%3A{level:.4f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_main_mute:
+    summary: "Mute or unmute the main mix (mix/main/<n>/matrix/mute)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Main", description: "Main, from 1." }
+      muted: { type: bool, required: true, label: "Muted", description: "On mutes, off unmutes." }
+    send: { method: PATCH, path: "/datastore/mix/main/{index:-1}/matrix/mute", body: "json=%7B%22value%22%3A{muted:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_main_enabled:
+    summary: "Turn the main mix on or off in the mixer (mix/main/<n>/matrix/enable)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Main", description: "Main, from 1." }
+      enabled: { type: bool, required: true, label: "Enabled", description: "On enables it, off disables it." }
+    send: { method: PATCH, path: "/datastore/mix/main/{index:-1}/matrix/enable", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_aux_fader:
+    summary: "Set the fader of an aux mix (mix/aux/<n>/matrix/fader)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Aux", description: "Aux, from 1." }
+      level: { type: float, min: 0.0, max: 4.0, required: true, label: "Level", description: "Level as a linear gain, 0 (-inf) to 4 (+12 dB); 1 is unity." }
+    send: { method: PATCH, path: "/datastore/mix/aux/{index:-1}/matrix/fader", body: "json=%7B%22value%22%3A{level:.4f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_aux_mute:
+    summary: "Mute or unmute an aux mix (mix/aux/<n>/matrix/mute)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Aux", description: "Aux, from 1." }
+      muted: { type: bool, required: true, label: "Muted", description: "On mutes, off unmutes." }
+    send: { method: PATCH, path: "/datastore/mix/aux/{index:-1}/matrix/mute", body: "json=%7B%22value%22%3A{muted:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_aux_enabled:
+    summary: "Turn an aux mix on or off in the mixer (mix/aux/<n>/matrix/enable)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Aux", description: "Aux, from 1." }
+      enabled: { type: bool, required: true, label: "Enabled", description: "On enables it, off disables it." }
+    send: { method: PATCH, path: "/datastore/mix/aux/{index:-1}/matrix/enable", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_group_fader:
+    summary: "Set the fader of a group (mix/group/<n>/matrix/fader)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      level: { type: float, min: 0.0, max: 4.0, required: true, label: "Level", description: "Level as a linear gain, 0 (-inf) to 4 (+12 dB); 1 is unity." }
+    send: { method: PATCH, path: "/datastore/mix/group/{index:-1}/matrix/fader", body: "json=%7B%22value%22%3A{level:.4f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_group_mute:
+    summary: "Mute or unmute a group (mix/group/<n>/matrix/mute)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      muted: { type: bool, required: true, label: "Muted", description: "On mutes, off unmutes." }
+    send: { method: PATCH, path: "/datastore/mix/group/{index:-1}/matrix/mute", body: "json=%7B%22value%22%3A{muted:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_group_enabled:
+    summary: "Turn a group on or off in the mixer (mix/group/<n>/matrix/enable)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      enabled: { type: bool, required: true, label: "Enabled", description: "On enables it, off disables it." }
+    send: { method: PATCH, path: "/datastore/mix/group/{index:-1}/matrix/enable", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_fader:
+    summary: "Set the fader of a reverb return (mix/reverb/<n>/matrix/fader)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      level: { type: float, min: 0.0, max: 4.0, required: true, label: "Level", description: "Level as a linear gain, 0 (-inf) to 4 (+12 dB); 1 is unity." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/matrix/fader", body: "json=%7B%22value%22%3A{level:.4f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_mute:
+    summary: "Mute or unmute a reverb return (mix/reverb/<n>/matrix/mute)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      muted: { type: bool, required: true, label: "Muted", description: "On mutes, off unmutes." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/matrix/mute", body: "json=%7B%22value%22%3A{muted:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_enabled:
+    summary: "Turn a reverb return on or off in the mixer (mix/reverb/<n>/matrix/enable)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      enabled: { type: bool, required: true, label: "Enabled", description: "On enables it, off disables it." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/matrix/enable", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_monitor_fader:
+    summary: "Set the fader of a monitor mix (mix/monitor/<n>/matrix/fader)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Monitor", description: "Monitor, from 1." }
+      level: { type: float, min: 0.0, max: 4.0, required: true, label: "Level", description: "Level as a linear gain, 0 (-inf) to 4 (+12 dB); 1 is unity." }
+    send: { method: PATCH, path: "/datastore/mix/monitor/{index:-1}/matrix/fader", body: "json=%7B%22value%22%3A{level:.4f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_monitor_mute:
+    summary: "Mute or unmute a monitor mix (mix/monitor/<n>/matrix/mute)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Monitor", description: "Monitor, from 1." }
+      muted: { type: bool, required: true, label: "Muted", description: "On mutes, off unmutes." }
+    send: { method: PATCH, path: "/datastore/mix/monitor/{index:-1}/matrix/mute", body: "json=%7B%22value%22%3A{muted:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_monitor_enabled:
+    summary: "Turn a monitor mix on or off in the mixer (mix/monitor/<n>/matrix/enable)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Monitor", description: "Monitor, from 1." }
+      enabled: { type: bool, required: true, label: "Enabled", description: "On enables it, off disables it." }
+    send: { method: PATCH, path: "/datastore/mix/monitor/{index:-1}/matrix/enable", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_solo:
+    summary: "Solo a mixer input channel (mix/chan/<n>/matrix/solo)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      solo: { type: bool, required: true, label: "Solo", description: "On solos, off unsolos." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/matrix/solo", body: "json=%7B%22value%22%3A{solo:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_group_solo:
+    summary: "Solo a group (mix/group/<n>/matrix/solo)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      solo: { type: bool, required: true, label: "Solo", description: "On solos, off unsolos." }
+    send: { method: PATCH, path: "/datastore/mix/group/{index:-1}/matrix/solo", body: "json=%7B%22value%22%3A{solo:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_solo:
+    summary: "Solo a reverb return (mix/reverb/<n>/matrix/solo)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      solo: { type: bool, required: true, label: "Solo", description: "On solos, off unsolos." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/matrix/solo", body: "json=%7B%22value%22%3A{solo:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_pan:
+    summary: "Pan a mixer input channel (mix/chan/<n>/matrix/pan)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      pan: { type: float, min: -1.0, max: 1.0, required: true, label: "Pan", description: "Pan from -1 (left) to 1 (right)." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/matrix/pan", body: "json=%7B%22value%22%3A{pan:.3f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_aux_send:
+    summary: "Set a channel's send level to an aux (mix/chan/<n>/matrix/aux/<m>/send)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      bus: { type: int, min: 1, max: 64, required: true, label: "Aux", description: "Aux, from 1." }
+      level: { type: float, min: 0.0, max: 4.0, required: true, label: "Level", description: "Level as a linear gain, 0 (-inf) to 4 (+12 dB); 1 is unity." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/matrix/aux/{bus:-1}/send", body: "json=%7B%22value%22%3A{level:.4f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_aux_pan:
+    summary: "Set a channel's pan into an aux (mix/chan/<n>/matrix/aux/<m>/pan)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      bus: { type: int, min: 1, max: 64, required: true, label: "Aux", description: "Aux, from 1." }
+      pan: { type: float, min: -1.0, max: 1.0, required: true, label: "Pan", description: "Pan from -1 (left) to 1 (right)." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/matrix/aux/{bus:-1}/pan", body: "json=%7B%22value%22%3A{pan:.3f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_group_send:
+    summary: "Set a channel's send level to a group (mix/chan/<n>/matrix/group/<m>/send)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      bus: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      level: { type: float, min: 0.0, max: 4.0, required: true, label: "Level", description: "Level as a linear gain, 0 (-inf) to 4 (+12 dB); 1 is unity." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/matrix/group/{bus:-1}/send", body: "json=%7B%22value%22%3A{level:.4f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_group_pan:
+    summary: "Set a channel's pan into a group (mix/chan/<n>/matrix/group/<m>/pan)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      bus: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      pan: { type: float, min: -1.0, max: 1.0, required: true, label: "Pan", description: "Pan from -1 (left) to 1 (right)." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/matrix/group/{bus:-1}/pan", body: "json=%7B%22value%22%3A{pan:.3f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_reverb_send:
+    summary: "Set a channel's send level to a reverb (mix/chan/<n>/matrix/reverb/<m>/send)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      bus: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      level: { type: float, min: 0.0, max: 4.0, required: true, label: "Level", description: "Level as a linear gain, 0 (-inf) to 4 (+12 dB); 1 is unity." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/matrix/reverb/{bus:-1}/send", body: "json=%7B%22value%22%3A{level:.4f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_reverb_pan:
+    summary: "Set a channel's pan into a reverb (mix/chan/<n>/matrix/reverb/<m>/pan)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      bus: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      pan: { type: float, min: -1.0, max: 1.0, required: true, label: "Pan", description: "Pan from -1 (left) to 1 (right)." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/matrix/reverb/{bus:-1}/pan", body: "json=%7B%22value%22%3A{pan:.3f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_group_aux_send:
+    summary: "Set a group's send level to an aux (mix/group/<n>/matrix/aux/<m>/send)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      bus: { type: int, min: 1, max: 64, required: true, label: "Aux", description: "Aux, from 1." }
+      level: { type: float, min: 0.0, max: 4.0, required: true, label: "Level", description: "Level as a linear gain, 0 (-inf) to 4 (+12 dB); 1 is unity." }
+    send: { method: PATCH, path: "/datastore/mix/group/{index:-1}/matrix/aux/{bus:-1}/send", body: "json=%7B%22value%22%3A{level:.4f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_group_reverb_send:
+    summary: "Set a group's send level to a reverb (mix/group/<n>/matrix/reverb/<m>/send)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      bus: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      level: { type: float, min: 0.0, max: 4.0, required: true, label: "Level", description: "Level as a linear gain, 0 (-inf) to 4 (+12 dB); 1 is unity." }
+    send: { method: PATCH, path: "/datastore/mix/group/{index:-1}/matrix/reverb/{bus:-1}/send", body: "json=%7B%22value%22%3A{level:.4f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_aux_send:
+    summary: "Set a reverb's send level to an aux (mix/reverb/<n>/matrix/aux/<m>/send)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      bus: { type: int, min: 1, max: 64, required: true, label: "Aux", description: "Aux, from 1." }
+      level: { type: float, min: 0.0, max: 4.0, required: true, label: "Level", description: "Level as a linear gain, 0 (-inf) to 4 (+12 dB); 1 is unity." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/matrix/aux/{bus:-1}/send", body: "json=%7B%22value%22%3A{level:.4f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_reverb_send:
+    summary: "Set a reverb's send level to a reverb (mix/reverb/<n>/matrix/reverb/<m>/send)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      bus: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      level: { type: float, min: 0.0, max: 4.0, required: true, label: "Level", description: "Level as a linear gain, 0 (-inf) to 4 (+12 dB); 1 is unity." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/matrix/reverb/{bus:-1}/send", body: "json=%7B%22value%22%3A{level:.4f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_aux_prefader:
+    summary: "Turn aux pre-fader on or off (mix/aux/<n>/matrix/prefader)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Aux", description: "Aux, from 1." }
+      enabled: { type: bool, required: true, label: "Pre-fader", description: "On turns the pre-fader on." }
+    send: { method: PATCH, path: "/datastore/mix/aux/{index:-1}/matrix/prefader", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_aux_panner:
+    summary: "Turn aux panner on or off (mix/aux/<n>/matrix/panner)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Aux", description: "Aux, from 1." }
+      enabled: { type: bool, required: true, label: "Panner", description: "On turns the panner on." }
+    send: { method: PATCH, path: "/datastore/mix/aux/{index:-1}/matrix/panner", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_group_prefader:
+    summary: "Turn group pre-fader on or off (mix/group/<n>/matrix/prefader)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      enabled: { type: bool, required: true, label: "Pre-fader", description: "On turns the pre-fader on." }
+    send: { method: PATCH, path: "/datastore/mix/group/{index:-1}/matrix/prefader", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_group_panner:
+    summary: "Turn group panner on or off (mix/group/<n>/matrix/panner)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      enabled: { type: bool, required: true, label: "Panner", description: "On turns the panner on." }
+    send: { method: PATCH, path: "/datastore/mix/group/{index:-1}/matrix/panner", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_prefader:
+    summary: "Turn reverb pre-fader on or off (mix/reverb/<n>/matrix/prefader)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      enabled: { type: bool, required: true, label: "Pre-fader", description: "On turns the pre-fader on." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/matrix/prefader", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_panner:
+    summary: "Turn reverb panner on or off (mix/reverb/<n>/matrix/panner)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      enabled: { type: bool, required: true, label: "Panner", description: "On turns the panner on." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/matrix/panner", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_eq_enabled:
+    summary: "Turn an EQ band of a mixer input channel on or off (mix/chan/<n>/eq/<band>/enable)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      enabled: { type: bool, required: true, label: "Enabled", description: "On turns the band on." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/eq/{band}/enable", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_eq_frequency:
+    summary: "Set an EQ band's frequency on a mixer input channel (mix/chan/<n>/eq/<band>/freq)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      hz: { type: int, min: 20, max: 20000, required: true, label: "Frequency", description: "Frequency in Hz, 20 to 20000." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/eq/{band}/freq", body: "json=%7B%22value%22%3A{hz}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_eq_gain:
+    summary: "Set an EQ band's gain on a mixer input channel (mix/chan/<n>/eq/<band>/gain)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      db: { type: float, min: -20.0, max: 20.0, required: true, label: "Gain", description: "Gain in dB, -20 to +20." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/eq/{band}/gain", body: "json=%7B%22value%22%3A{db:.2f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_eq_bandwidth:
+    summary: "Set an EQ band's bandwidth on a mixer input channel (mix/chan/<n>/eq/<band>/bw)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      octaves: { type: float, min: 0.01, max: 3.0, required: true, label: "Bandwidth", description: "Bandwidth in octaves, 0.01 to 3." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/eq/{band}/bw", body: "json=%7B%22value%22%3A{octaves:.2f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_eq_shelf_mode:
+    summary: "Make a shelf band of a mixer input channel a shelf or a parametric band (mix/chan/<n>/eq/<shelf>/mode)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      band: { type: enum, values: [highshelf, lowshelf], required: true, label: "Band", description: "highshelf or lowshelf." }
+      mode: { type: enum, values: [shelf, parametric], required: true, label: "Mode", description: "shelf or parametric." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/eq/{band}/mode", body: "json=%7B%22value%22%3A{mode:map.shelf_mode}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_main_eq_enabled:
+    summary: "Turn an EQ band of the main mix on or off (mix/main/<n>/eq/<band>/enable)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Main", description: "Main, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      enabled: { type: bool, required: true, label: "Enabled", description: "On turns the band on." }
+    send: { method: PATCH, path: "/datastore/mix/main/{index:-1}/eq/{band}/enable", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_main_eq_frequency:
+    summary: "Set an EQ band's frequency on the main mix (mix/main/<n>/eq/<band>/freq)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Main", description: "Main, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      hz: { type: int, min: 20, max: 20000, required: true, label: "Frequency", description: "Frequency in Hz, 20 to 20000." }
+    send: { method: PATCH, path: "/datastore/mix/main/{index:-1}/eq/{band}/freq", body: "json=%7B%22value%22%3A{hz}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_main_eq_gain:
+    summary: "Set an EQ band's gain on the main mix (mix/main/<n>/eq/<band>/gain)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Main", description: "Main, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      db: { type: float, min: -20.0, max: 20.0, required: true, label: "Gain", description: "Gain in dB, -20 to +20." }
+    send: { method: PATCH, path: "/datastore/mix/main/{index:-1}/eq/{band}/gain", body: "json=%7B%22value%22%3A{db:.2f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_main_eq_bandwidth:
+    summary: "Set an EQ band's bandwidth on the main mix (mix/main/<n>/eq/<band>/bw)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Main", description: "Main, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      octaves: { type: float, min: 0.01, max: 3.0, required: true, label: "Bandwidth", description: "Bandwidth in octaves, 0.01 to 3." }
+    send: { method: PATCH, path: "/datastore/mix/main/{index:-1}/eq/{band}/bw", body: "json=%7B%22value%22%3A{octaves:.2f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_main_eq_shelf_mode:
+    summary: "Make a shelf band of the main mix a shelf or a parametric band (mix/main/<n>/eq/<shelf>/mode)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Main", description: "Main, from 1." }
+      band: { type: enum, values: [highshelf, lowshelf], required: true, label: "Band", description: "highshelf or lowshelf." }
+      mode: { type: enum, values: [shelf, parametric], required: true, label: "Mode", description: "shelf or parametric." }
+    send: { method: PATCH, path: "/datastore/mix/main/{index:-1}/eq/{band}/mode", body: "json=%7B%22value%22%3A{mode:map.shelf_mode}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_aux_eq_enabled:
+    summary: "Turn an EQ band of an aux mix on or off (mix/aux/<n>/eq/<band>/enable)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Aux", description: "Aux, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      enabled: { type: bool, required: true, label: "Enabled", description: "On turns the band on." }
+    send: { method: PATCH, path: "/datastore/mix/aux/{index:-1}/eq/{band}/enable", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_aux_eq_frequency:
+    summary: "Set an EQ band's frequency on an aux mix (mix/aux/<n>/eq/<band>/freq)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Aux", description: "Aux, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      hz: { type: int, min: 20, max: 20000, required: true, label: "Frequency", description: "Frequency in Hz, 20 to 20000." }
+    send: { method: PATCH, path: "/datastore/mix/aux/{index:-1}/eq/{band}/freq", body: "json=%7B%22value%22%3A{hz}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_aux_eq_gain:
+    summary: "Set an EQ band's gain on an aux mix (mix/aux/<n>/eq/<band>/gain)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Aux", description: "Aux, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      db: { type: float, min: -20.0, max: 20.0, required: true, label: "Gain", description: "Gain in dB, -20 to +20." }
+    send: { method: PATCH, path: "/datastore/mix/aux/{index:-1}/eq/{band}/gain", body: "json=%7B%22value%22%3A{db:.2f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_aux_eq_bandwidth:
+    summary: "Set an EQ band's bandwidth on an aux mix (mix/aux/<n>/eq/<band>/bw)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Aux", description: "Aux, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      octaves: { type: float, min: 0.01, max: 3.0, required: true, label: "Bandwidth", description: "Bandwidth in octaves, 0.01 to 3." }
+    send: { method: PATCH, path: "/datastore/mix/aux/{index:-1}/eq/{band}/bw", body: "json=%7B%22value%22%3A{octaves:.2f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_aux_eq_shelf_mode:
+    summary: "Make a shelf band of an aux mix a shelf or a parametric band (mix/aux/<n>/eq/<shelf>/mode)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Aux", description: "Aux, from 1." }
+      band: { type: enum, values: [highshelf, lowshelf], required: true, label: "Band", description: "highshelf or lowshelf." }
+      mode: { type: enum, values: [shelf, parametric], required: true, label: "Mode", description: "shelf or parametric." }
+    send: { method: PATCH, path: "/datastore/mix/aux/{index:-1}/eq/{band}/mode", body: "json=%7B%22value%22%3A{mode:map.shelf_mode}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_group_eq_enabled:
+    summary: "Turn an EQ band of a group on or off (mix/group/<n>/eq/<band>/enable)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      enabled: { type: bool, required: true, label: "Enabled", description: "On turns the band on." }
+    send: { method: PATCH, path: "/datastore/mix/group/{index:-1}/eq/{band}/enable", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_group_eq_frequency:
+    summary: "Set an EQ band's frequency on a group (mix/group/<n>/eq/<band>/freq)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      hz: { type: int, min: 20, max: 20000, required: true, label: "Frequency", description: "Frequency in Hz, 20 to 20000." }
+    send: { method: PATCH, path: "/datastore/mix/group/{index:-1}/eq/{band}/freq", body: "json=%7B%22value%22%3A{hz}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_group_eq_gain:
+    summary: "Set an EQ band's gain on a group (mix/group/<n>/eq/<band>/gain)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      db: { type: float, min: -20.0, max: 20.0, required: true, label: "Gain", description: "Gain in dB, -20 to +20." }
+    send: { method: PATCH, path: "/datastore/mix/group/{index:-1}/eq/{band}/gain", body: "json=%7B%22value%22%3A{db:.2f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_group_eq_bandwidth:
+    summary: "Set an EQ band's bandwidth on a group (mix/group/<n>/eq/<band>/bw)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      octaves: { type: float, min: 0.01, max: 3.0, required: true, label: "Bandwidth", description: "Bandwidth in octaves, 0.01 to 3." }
+    send: { method: PATCH, path: "/datastore/mix/group/{index:-1}/eq/{band}/bw", body: "json=%7B%22value%22%3A{octaves:.2f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_group_eq_shelf_mode:
+    summary: "Make a shelf band of a group a shelf or a parametric band (mix/group/<n>/eq/<shelf>/mode)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      band: { type: enum, values: [highshelf, lowshelf], required: true, label: "Band", description: "highshelf or lowshelf." }
+      mode: { type: enum, values: [shelf, parametric], required: true, label: "Mode", description: "shelf or parametric." }
+    send: { method: PATCH, path: "/datastore/mix/group/{index:-1}/eq/{band}/mode", body: "json=%7B%22value%22%3A{mode:map.shelf_mode}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_eq_enabled:
+    summary: "Turn an EQ band of a reverb return on or off (mix/reverb/<n>/eq/<band>/enable)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      enabled: { type: bool, required: true, label: "Enabled", description: "On turns the band on." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/eq/{band}/enable", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_eq_frequency:
+    summary: "Set an EQ band's frequency on a reverb return (mix/reverb/<n>/eq/<band>/freq)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      hz: { type: int, min: 20, max: 20000, required: true, label: "Frequency", description: "Frequency in Hz, 20 to 20000." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/eq/{band}/freq", body: "json=%7B%22value%22%3A{hz}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_eq_gain:
+    summary: "Set an EQ band's gain on a reverb return (mix/reverb/<n>/eq/<band>/gain)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      db: { type: float, min: -20.0, max: 20.0, required: true, label: "Gain", description: "Gain in dB, -20 to +20." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/eq/{band}/gain", body: "json=%7B%22value%22%3A{db:.2f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_eq_bandwidth:
+    summary: "Set an EQ band's bandwidth on a reverb return (mix/reverb/<n>/eq/<band>/bw)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      band: { type: enum, values: [highshelf, mid1, mid2, lowshelf], required: true, label: "Band", description: "highshelf, mid1, mid2 or lowshelf." }
+      octaves: { type: float, min: 0.01, max: 3.0, required: true, label: "Bandwidth", description: "Bandwidth in octaves, 0.01 to 3." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/eq/{band}/bw", body: "json=%7B%22value%22%3A{octaves:.2f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_eq_shelf_mode:
+    summary: "Make a shelf band of a reverb return a shelf or a parametric band (mix/reverb/<n>/eq/<shelf>/mode)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      band: { type: enum, values: [highshelf, lowshelf], required: true, label: "Band", description: "highshelf or lowshelf." }
+      mode: { type: enum, values: [shelf, parametric], required: true, label: "Mode", description: "shelf or parametric." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/eq/{band}/mode", body: "json=%7B%22value%22%3A{mode:map.shelf_mode}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_hpf:
+    summary: "Turn a channel's high-pass filter on or off (mix/chan/<n>/hpf/enable)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      enabled: { type: bool, required: true, label: "High-pass filter", description: "On turns the filter on." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/hpf/enable", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_hpf_frequency:
+    summary: "Set a channel's high-pass frequency (mix/chan/<n>/hpf/freq)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      hz: { type: int, min: 20, max: 20000, required: true, label: "Frequency", description: "Frequency in Hz, 20 to 20000." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/hpf/freq", body: "json=%7B%22value%22%3A{hz}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_gate_enabled:
+    summary: "Set the gate enable of a channel (mix/chan/<n>/gate/enable)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      value: { type: bool, required: true, label: "Gate", description: "On turns the gate on." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/gate/enable", body: "json=%7B%22value%22%3A{value:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_gate_release:
+    summary: "Set the gate release of a channel (mix/chan/<n>/gate/release)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      value: { type: float, min: 50.0, max: 2000.0, required: true, label: "Release", description: "Release in ms, 50 to 2000." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/gate/release", body: "json=%7B%22value%22%3A{value:.3f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_gate_threshold:
+    summary: "Set the gate threshold of a channel (mix/chan/<n>/gate/threshold)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Threshold", description: "Threshold as a linear level, 0 to 1." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/gate/threshold", body: "json=%7B%22value%22%3A{value:.3f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_gate_attack:
+    summary: "Set the gate attack of a channel (mix/chan/<n>/gate/attack)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      value: { type: float, min: 10.0, max: 500.0, required: true, label: "Attack", description: "Attack in ms, 10 to 500." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/gate/attack", body: "json=%7B%22value%22%3A{value:.3f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_compressor_enabled:
+    summary: "Set the compressor enable of a channel (mix/chan/<n>/comp/enable)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      value: { type: bool, required: true, label: "Compressor", description: "On turns the compressor on." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/comp/enable", body: "json=%7B%22value%22%3A{value:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_compressor_release:
+    summary: "Set the compressor release of a channel (mix/chan/<n>/comp/release)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      value: { type: float, min: 10.0, max: 2000.0, required: true, label: "Release", description: "Release in ms, 10 to 2000." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/comp/release", body: "json=%7B%22value%22%3A{value:.3f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_compressor_threshold:
+    summary: "Set the compressor threshold of a channel (mix/chan/<n>/comp/threshold)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      value: { type: float, min: -40.0, max: 0.0, required: true, label: "Threshold", description: "Threshold in dB, -40 to 0." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/comp/threshold", body: "json=%7B%22value%22%3A{value:.3f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_compressor_ratio:
+    summary: "Set the compressor ratio of a channel (mix/chan/<n>/comp/ratio)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      value: { type: float, min: 1.0, max: 10.0, required: true, label: "Ratio,", description: "Ratio, 1 to 10." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/comp/ratio", body: "json=%7B%22value%22%3A{value:.3f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_compressor_attack:
+    summary: "Set the compressor attack of a channel (mix/chan/<n>/comp/attack)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      value: { type: float, min: 10.0, max: 100.0, required: true, label: "Attack", description: "Attack in ms, 10 to 100." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/comp/attack", body: "json=%7B%22value%22%3A{value:.3f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_compressor_trim:
+    summary: "Set the compressor trim of a channel (mix/chan/<n>/comp/trim)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      value: { type: float, min: -20.0, max: 20.0, required: true, label: "Trim", description: "Trim (makeup) in dB, -20 to +20." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/comp/trim", body: "json=%7B%22value%22%3A{value:.3f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_channel_compressor_detection:
+    summary: "Set the compressor peak of a channel (mix/chan/<n>/comp/peak)"
+    params:
+      index: { type: int, min: 1, max: 128, required: true, label: "Channel", description: "Mixer input channel, from 1." }
+      value: { type: enum, values: [rms, peak], required: true, label: "Detection", description: "rms or peak." }
+    send: { method: PATCH, path: "/datastore/mix/chan/{index:-1}/comp/peak", body: "json=%7B%22value%22%3A{value:map.detection}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_main_leveler_enabled:
+    summary: "Set the leveler enable of the main mix (mix/main/<n>/leveler/enable)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Main", description: "Main, from 1." }
+      value: { type: bool, required: true, label: "Leveler", description: "On turns the leveler on." }
+    send: { method: PATCH, path: "/datastore/mix/main/{index:-1}/leveler/enable", body: "json=%7B%22value%22%3A{value:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_main_leveler_makeup:
+    summary: "Set the leveler makeup of the main mix (mix/main/<n>/leveler/makeup)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Main", description: "Main, from 1." }
+      value: { type: float, min: 0.0, max: 100.0, required: true, label: "Makeup", description: "Makeup in percent, 0 to 100." }
+    send: { method: PATCH, path: "/datastore/mix/main/{index:-1}/leveler/makeup", body: "json=%7B%22value%22%3A{value:.1f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_main_leveler_reduction:
+    summary: "Set the leveler reduction of the main mix (mix/main/<n>/leveler/reduction)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Main", description: "Main, from 1." }
+      value: { type: float, min: 0.0, max: 100.0, required: true, label: "Reduction", description: "Reduction in percent, 0 to 100." }
+    send: { method: PATCH, path: "/datastore/mix/main/{index:-1}/leveler/reduction", body: "json=%7B%22value%22%3A{value:.1f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_main_leveler_limit:
+    summary: "Set the leveler limit of the main mix (mix/main/<n>/leveler/limit)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Main", description: "Main, from 1." }
+      value: { type: bool, required: true, label: "Limit mode", description: "On turns the limit mode on." }
+    send: { method: PATCH, path: "/datastore/mix/main/{index:-1}/leveler/limit", body: "json=%7B%22value%22%3A{value:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_group_leveler_enabled:
+    summary: "Set the leveler enable of a group (mix/group/<n>/leveler/enable)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      value: { type: bool, required: true, label: "Leveler", description: "On turns the leveler on." }
+    send: { method: PATCH, path: "/datastore/mix/group/{index:-1}/leveler/enable", body: "json=%7B%22value%22%3A{value:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_group_leveler_makeup:
+    summary: "Set the leveler makeup of a group (mix/group/<n>/leveler/makeup)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      value: { type: float, min: 0.0, max: 100.0, required: true, label: "Makeup", description: "Makeup in percent, 0 to 100." }
+    send: { method: PATCH, path: "/datastore/mix/group/{index:-1}/leveler/makeup", body: "json=%7B%22value%22%3A{value:.1f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_group_leveler_reduction:
+    summary: "Set the leveler reduction of a group (mix/group/<n>/leveler/reduction)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      value: { type: float, min: 0.0, max: 100.0, required: true, label: "Reduction", description: "Reduction in percent, 0 to 100." }
+    send: { method: PATCH, path: "/datastore/mix/group/{index:-1}/leveler/reduction", body: "json=%7B%22value%22%3A{value:.1f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_group_leveler_limit:
+    summary: "Set the leveler limit of a group (mix/group/<n>/leveler/limit)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Group", description: "Group, from 1." }
+      value: { type: bool, required: true, label: "Limit mode", description: "On turns the limit mode on." }
+    send: { method: PATCH, path: "/datastore/mix/group/{index:-1}/leveler/limit", body: "json=%7B%22value%22%3A{value:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_leveler_enabled:
+    summary: "Set the leveler enable of a reverb return (mix/reverb/<n>/leveler/enable)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      value: { type: bool, required: true, label: "Leveler", description: "On turns the leveler on." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/leveler/enable", body: "json=%7B%22value%22%3A{value:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_leveler_makeup:
+    summary: "Set the leveler makeup of a reverb return (mix/reverb/<n>/leveler/makeup)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      value: { type: float, min: 0.0, max: 100.0, required: true, label: "Makeup", description: "Makeup in percent, 0 to 100." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/leveler/makeup", body: "json=%7B%22value%22%3A{value:.1f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_leveler_reduction:
+    summary: "Set the leveler reduction of a reverb return (mix/reverb/<n>/leveler/reduction)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      value: { type: float, min: 0.0, max: 100.0, required: true, label: "Reduction", description: "Reduction in percent, 0 to 100." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/leveler/reduction", body: "json=%7B%22value%22%3A{value:.1f}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_leveler_limit:
+    summary: "Set the leveler limit of a reverb return (mix/reverb/<n>/leveler/limit)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      value: { type: bool, required: true, label: "Limit mode", description: "On turns the limit mode on." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/leveler/limit", body: "json=%7B%22value%22%3A{value:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_reverbtime:
+    summary: "Set a reverb's reverbtime (mix/reverb/<n>/reverb/reverbtime)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      value: { type: int, min: 100, max: 60000, required: true, label: "Reverb time", description: "Reverb time in ms, 100 to 60000." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/reverb/reverbtime", body: "json=%7B%22value%22%3A{value}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_hf:
+    summary: "Set a reverb's hf (mix/reverb/<n>/reverb/hf)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      value: { type: int, min: 500, max: 15000, required: true, label: "High-frequency crossover", description: "High-frequency crossover in Hz, 500 to 15000." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/reverb/hf", body: "json=%7B%22value%22%3A{value}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_mf:
+    summary: "Set a reverb's mf (mix/reverb/<n>/reverb/mf)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      value: { type: int, min: 500, max: 15000, required: true, label: "Mid-frequency crossover", description: "Mid-frequency crossover in Hz, 500 to 15000." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/reverb/mf", body: "json=%7B%22value%22%3A{value}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_predelay:
+    summary: "Set a reverb's predelay (mix/reverb/<n>/reverb/predelay)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      value: { type: int, min: 0, max: 500, required: true, label: "Pre-delay", description: "Pre-delay in ms, 0 to 500." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/reverb/predelay", body: "json=%7B%22value%22%3A{value}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_mfratio:
+    summary: "Set a reverb's mfratio (mix/reverb/<n>/reverb/mfratio)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      value: { type: int, min: 1, max: 100, required: true, label: "Mid-frequency ratio", description: "Mid-frequency ratio in percent, 1 to 100." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/reverb/mfratio", body: "json=%7B%22value%22%3A{value}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_hfratio:
+    summary: "Set a reverb's hfratio (mix/reverb/<n>/reverb/hfratio)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      value: { type: int, min: 1, max: 100, required: true, label: "High-frequency ratio", description: "High-frequency ratio in percent, 1 to 100." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/reverb/hfratio", body: "json=%7B%22value%22%3A{value}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_tailspread:
+    summary: "Set a reverb's tailspread (mix/reverb/<n>/reverb/tailspread)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      value: { type: int, min: -100, max: 100, required: true, label: "Tail spread", description: "Tail spread in percent, -100 to 100." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/reverb/tailspread", body: "json=%7B%22value%22%3A{value}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_mod:
+    summary: "Set a reverb's mod (mix/reverb/<n>/reverb/mod)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      value: { type: int, min: 0, max: 100, required: true, label: "Modulation", description: "Modulation in percent, 0 to 100." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/reverb/mod", body: "json=%7B%22value%22%3A{value}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_reverb_effect_enabled:
+    summary: "Turn a reverb effect on or off (mix/reverb/<n>/reverb/enable)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Reverb", description: "Reverb, from 1." }
+      enabled: { type: bool, required: true, label: "Reverb", description: "On turns the reverb on." }
+    send: { method: PATCH, path: "/datastore/mix/reverb/{index:-1}/reverb/enable", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_monitor_assign:
+    summary: "Assign a monitor mix (mix/monitor/<n>/assign); MOTU does not describe the values"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Monitor", description: "Monitor, from 1." }
+      value: { type: int, min: -2, max: 4096, required: true, label: "Assignment", description: "Assignment, -2 to 4096, as the MOTU web app sets it." }
+    send: { method: PATCH, path: "/datastore/mix/monitor/{index:-1}/assign", body: "json=%7B%22value%22%3A{value}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_monitor_override:
+    summary: "Set a monitor mix's override (mix/monitor/<n>/override); MOTU does not describe the values"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Monitor", description: "Monitor, from 1." }
+      value: { type: int, min: -1, max: 4096, required: true, label: "Override", description: "Override, -1 to 4096, as the MOTU web app sets it." }
+    send: { method: PATCH, path: "/datastore/mix/monitor/{index:-1}/override", body: "json=%7B%22value%22%3A{value}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_monitor_auto:
+    summary: "Turn a monitor mix's automatic mode on or off (mix/monitor/<n>/auto)"
+    params:
+      index: { type: int, min: 1, max: 64, required: true, label: "Monitor", description: "Monitor, from 1." }
+      enabled: { type: bool, required: true, label: "Auto", description: "On turns automatic mode on." }
+    send: { method: PATCH, path: "/datastore/mix/monitor/{index:-1}/auto", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_bank_channel_name:
+    summary: "Name a channel of an input or output bank (ext/<bank>/<n>/ch/<m>/name)"
+    params:
+      side: { type: enum, values: [ibank, obank], required: true, label: "Bank side", description: "ibank for an input bank, obank for an output bank." }
+      bank: { type: int, min: 1, max: 64, required: true, label: "Bank", description: "Bank number from 1, as the device lists its banks." }
+      channel: { type: int, min: 1, max: 256, required: true, label: "Channel", description: "Channel of the bank, from 1." }
+      name: { type: string, max_length: 64, pattern: "^[^\\x00-\\x1f]+$", required: true, label: "Name", description: "The name." }
+    send: { method: PATCH, path: "/datastore/ext/{side}/{bank:-1}/ch/{channel:-1}/name", body: "json=%7B%22value%22%3A{name:json:url}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_bank_channel_phase:
+    summary: "Turn phase inverted on or off on a bank channel (ext/<bank>/<n>/ch/<m>/phase), where it has one"
+    params:
+      side: { type: enum, values: [ibank, obank], required: true, label: "Bank side", description: "ibank for an input bank, obank for an output bank." }
+      bank: { type: int, min: 1, max: 64, required: true, label: "Bank", description: "Bank number from 1, as the device lists its banks." }
+      channel: { type: int, min: 1, max: 256, required: true, label: "Channel", description: "Channel of the bank, from 1." }
+      enabled: { type: bool, required: true, label: "Phase inverted", description: "On turns phase inverted on." }
+    send: { method: PATCH, path: "/datastore/ext/{side}/{bank:-1}/ch/{channel:-1}/phase", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_bank_channel_pad:
+    summary: "Turn 20 db pad on or off on a bank channel (ext/<bank>/<n>/ch/<m>/pad), where it has one"
+    params:
+      side: { type: enum, values: [ibank, obank], required: true, label: "Bank side", description: "ibank for an input bank, obank for an output bank." }
+      bank: { type: int, min: 1, max: 64, required: true, label: "Bank", description: "Bank number from 1, as the device lists its banks." }
+      channel: { type: int, min: 1, max: 256, required: true, label: "Channel", description: "Channel of the bank, from 1." }
+      enabled: { type: bool, required: true, label: "20 dB pad", description: "On turns 20 db pad on." }
+    send: { method: PATCH, path: "/datastore/ext/{side}/{bank:-1}/ch/{channel:-1}/pad", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_bank_channel_phantom:
+    summary: "Turn phantom power on or off on a bank channel (ext/<bank>/<n>/ch/<m>/48V), where it has one"
+    params:
+      side: { type: enum, values: [ibank], required: true, label: "Bank side", description: "ibank (inputs only)." }
+      bank: { type: int, min: 1, max: 64, required: true, label: "Bank", description: "Bank number from 1, as the device lists its banks." }
+      channel: { type: int, min: 1, max: 256, required: true, label: "Channel", description: "Channel of the bank, from 1." }
+      enabled: { type: bool, required: true, label: "Phantom power", description: "On turns phantom power on." }
+    send: { method: PATCH, path: "/datastore/ext/{side}/{bank:-1}/ch/{channel:-1}/48V", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_bank_channel_vlimit:
+    summary: "Turn vlimit limiter on or off on a bank channel (ext/<bank>/<n>/ch/<m>/vlLimit), where it has one"
+    params:
+      side: { type: enum, values: [ibank], required: true, label: "Bank side", description: "ibank (inputs only)." }
+      bank: { type: int, min: 1, max: 64, required: true, label: "Bank", description: "Bank number from 1, as the device lists its banks." }
+      channel: { type: int, min: 1, max: 256, required: true, label: "Channel", description: "Channel of the bank, from 1." }
+      enabled: { type: bool, required: true, label: "vLimit limiter", description: "On turns vlimit limiter on." }
+    send: { method: PATCH, path: "/datastore/ext/{side}/{bank:-1}/ch/{channel:-1}/vlLimit", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_bank_channel_vlimit_clip:
+    summary: "Turn vlimit clip on or off on a bank channel (ext/<bank>/<n>/ch/<m>/vlClip), where it has one"
+    params:
+      side: { type: enum, values: [ibank], required: true, label: "Bank side", description: "ibank (inputs only)." }
+      bank: { type: int, min: 1, max: 64, required: true, label: "Bank", description: "Bank number from 1, as the device lists its banks." }
+      channel: { type: int, min: 1, max: 256, required: true, label: "Channel", description: "Channel of the bank, from 1." }
+      enabled: { type: bool, required: true, label: "vLimit clip", description: "On turns vlimit clip on." }
+    send: { method: PATCH, path: "/datastore/ext/{side}/{bank:-1}/ch/{channel:-1}/vlClip", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_bank_channel_trim:
+    summary: "Set a bank channel's trim in dB, within its trimRange (ext/<bank>/<n>/ch/<m>/trim)"
+    params:
+      side: { type: enum, values: [ibank, obank], required: true, label: "Bank side", description: "ibank for an input bank, obank for an output bank." }
+      bank: { type: int, min: 1, max: 64, required: true, label: "Bank", description: "Bank number from 1, as the device lists its banks." }
+      channel: { type: int, min: 1, max: 256, required: true, label: "Channel", description: "Channel of the bank, from 1." }
+      db: { type: int, min: -128, max: 128, required: true, label: "Trim", description: "Trim in whole dB, within the channel's trimRange." }
+    send: { method: PATCH, path: "/datastore/ext/{side}/{bank:-1}/ch/{channel:-1}/trim", body: "json=%7B%22value%22%3A{db}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_bank_channel_stereo_trim:
+    summary: "Set a stereo trim on a bank channel and the next, within its stereoTrimRange (ext/<bank>/<n>/ch/<m>/stereoTrim)"
+    params:
+      side: { type: enum, values: [ibank, obank], required: true, label: "Bank side", description: "ibank for an input bank, obank for an output bank." }
+      bank: { type: int, min: 1, max: 64, required: true, label: "Bank", description: "Bank number from 1, as the device lists its banks." }
+      channel: { type: int, min: 1, max: 256, required: true, label: "Channel", description: "Channel of the bank, from 1." }
+      db: { type: int, min: -128, max: 128, required: true, label: "Trim", description: "Trim in whole dB, within the channel's stereoTrimRange." }
+    send: { method: PATCH, path: "/datastore/ext/{side}/{bank:-1}/ch/{channel:-1}/stereoTrim", body: "json=%7B%22value%22%3A{db}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  route_output_channel:
+    summary: "Route an input bank channel to an output bank channel (ext/obank/<n>/ch/<m>/src)"
+    params:
+      bank: { type: int, min: 1, max: 64, required: true, label: "Bank", description: "Bank number from 1, as the device lists its banks." }
+      channel: { type: int, min: 1, max: 256, required: true, label: "Channel", description: "Channel of the bank, from 1." }
+      source_bank: { type: int, min: 1, max: 64, required: true, label: "Source bank", description: "Input bank number from 1." }
+      source_channel: { type: int, min: 1, max: 256, required: true, label: "Source channel", description: "Input bank channel from 1." }
+    send: { method: PATCH, path: "/datastore/ext/obank/{bank:-1}/ch/{channel:-1}/src", body: "json=%7B%22value%22%3A%22{source_bank:-1}%3A{source_channel:-1}%22%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  unroute_output_channel:
+    summary: "Clear an output bank channel's route (ext/obank/<n>/ch/<m>/src set empty)"
+    params:
+      bank: { type: int, min: 1, max: 64, required: true, label: "Bank", description: "Bank number from 1, as the device lists its banks." }
+      channel: { type: int, min: 1, max: 256, required: true, label: "Channel", description: "Channel of the bank, from 1." }
+    send: { method: PATCH, path: "/datastore/ext/obank/{bank:-1}/ch/{channel:-1}/src", body: "json=%7B%22value%22%3A%22%22%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_bank_user_channels:
+    summary: "Set how many channels of a bank are enabled (ext/<bank>/<n>/userCh)"
+    params:
+      side: { type: enum, values: [ibank, obank], required: true, label: "Bank side", description: "ibank for an input bank, obank for an output bank." }
+      bank: { type: int, min: 1, max: 64, required: true, label: "Bank", description: "Bank number from 1, as the device lists its banks." }
+      channels: { type: int, min: 0, max: 256, required: true, label: "Channels", description: "Channels to enable, up to the bank's maxCh." }
+    send: { method: PATCH, path: "/datastore/ext/{side}/{bank:-1}/userCh", body: "json=%7B%22value%22%3A{channels}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_optical_format:
+    summary: "Make an optical bank TOSLINK or ADAT (ext/<bank>/<n>/smux)"
+    params:
+      side: { type: enum, values: [ibank, obank], required: true, label: "Bank side", description: "ibank for an input bank, obank for an output bank." }
+      bank: { type: int, min: 1, max: 64, required: true, label: "Bank", description: "Bank number from 1, as the device lists its banks." }
+      format: { type: enum, values: [toslink, adat], required: true, label: "Format", description: "toslink or adat." }
+    send: { method: PATCH, path: "/datastore/ext/{side}/{bank:-1}/smux", body: "json=%7B%22value%22%3A{format:json:url}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_madi_clock:
+    summary: "Set a MADI output bank's clock, 1x or 2x (ext/obank/<n>/madiClock)"
+    params:
+      bank: { type: int, min: 1, max: 64, required: true, label: "Bank", description: "Bank number from 1, as the device lists its banks." }
+      clock: { type: enum, values: ["1x", "2x"], required: true, label: "Clock", description: "1x or 2x." }
+    send: { method: PATCH, path: "/datastore/ext/obank/{bank:-1}/madiClock", body: "json=%7B%22value%22%3A{clock:json:url}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_madi_format:
+    summary: "Set a MADI output bank's channel format, 56 or 64 (ext/obank/<n>/madiFormat)"
+    params:
+      bank: { type: int, min: 1, max: 64, required: true, label: "Bank", description: "Bank number from 1, as the device lists its banks." }
+      format: { type: enum, values: ["56", "64"], required: true, label: "Format", description: "56 or 64 channels." }
+    send: { method: PATCH, path: "/datastore/ext/obank/{bank:-1}/madiFormat", body: "json=%7B%22value%22%3A{format}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_word_clock_mode:
+    summary: "Set the word clock mode, 1x or follow (ext/wordClockMode)"
+    params:
+      value: { type: enum, values: ["1x", "follow"], required: true, label: "Mode", description: "1x or follow." }
+    send: { method: PATCH, path: "/datastore/ext/wordClockMode", body: "json=%7B%22value%22%3A{value:json:url}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_word_clock_thru:
+    summary: "Set the word clock output, thru or out (ext/wordClockThru)"
+    params:
+      value: { type: enum, values: [thru, out], required: true, label: "Mode", description: "thru or out." }
+    send: { method: PATCH, path: "/datastore/ext/wordClockThru", body: "json=%7B%22value%22%3A{value:json:url}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_vlimit_lookahead:
+    summary: "Turn vLimit lookahead on or off (ext/vlimit/lookahead)"
+    params:
+      enabled: { type: bool, required: true, label: "Lookahead", description: "On turns vLimit lookahead on." }
+    send: { method: PATCH, path: "/datastore/ext/vlimit/lookahead", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_host_volume_control:
+    summary: "Let the computer control its stream volumes (ext/enableHostVolControls)"
+    params:
+      enabled: { type: bool, required: true, label: "Host volume control", description: "On lets the computer set the volumes of its streams." }
+    send: { method: PATCH, path: "/datastore/ext/enableHostVolControls", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_max_usb_to_host:
+    summary: "Set the USB channel and sample rate trade-off (ext/maxUSBToHost); MOTU does not list the values"
+    params:
+      value: { type: int, min: 0, max: 1024, required: true, label: "Value", description: "The value as the MOTU web app sets it." }
+    send: { method: PATCH, path: "/datastore/ext/maxUSBToHost", body: "json=%7B%22value%22%3A{value}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_entity_name:
+    summary: "Name an AVB device (avb/<uid>/entity_name)"
+    params:
+      uid: { type: string, max_length: 16, pattern: "^[0-9a-fA-F]{16}$", required: true, label: "Device", description: "The AVB device's 16-hex-digit UID (uid, or one of avb/devs)." }
+      name: { type: string, max_length: 64, pattern: "^[^\\x00-\\x1f]+$", required: true, label: "Name", description: "The name." }
+    send: { method: PATCH, path: "/datastore/avb/{uid}/entity_name", body: "json=%7B%22value%22%3A{name:json:url}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  identify:
+    summary: "Flash an AVB device's front panel to identify it (avb/<uid>/cfg/0/identify)"
+    params:
+      uid: { type: string, max_length: 16, pattern: "^[0-9a-fA-F]{16}$", required: true, label: "Device", description: "The AVB device's 16-hex-digit UID (uid, or one of avb/devs)." }
+      enabled: { type: bool, required: true, label: "Identify", description: "On flashes the front panel, off stops it." }
+    send: { method: PATCH, path: "/datastore/avb/{uid}/cfg/0/identify", body: "json=%7B%22value%22%3A{enabled:bool01}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_sample_rate:
+    summary: "Set an AVB device's sample rate, one of its sample_rates (avb/<uid>/cfg/0/current_sampling_rate)"
+    params:
+      uid: { type: string, max_length: 16, pattern: "^[0-9a-fA-F]{16}$", required: true, label: "Device", description: "The AVB device's 16-hex-digit UID (uid, or one of avb/devs)." }
+      hz: { type: int, min: 8000, max: 192000, required: true, label: "Sample rate", description: "Sample rate in Hz, one the device lists." }
+    send: { method: PATCH, path: "/datastore/avb/{uid}/cfg/0/current_sampling_rate", body: "json=%7B%22value%22%3A{hz}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_clock_source:
+    summary: "Choose an AVB device's clock source by index (avb/<uid>/cfg/0/clock_source_index)"
+    params:
+      uid: { type: string, max_length: 16, pattern: "^[0-9a-fA-F]{16}$", required: true, label: "Device", description: "The AVB device's 16-hex-digit UID (uid, or one of avb/devs)." }
+      index: { type: int, min: 0, max: 64, required: true, label: "Clock source", description: "Clock source index from 0, as clock_sources lists them." }
+    send: { method: PATCH, path: "/datastore/avb/{uid}/cfg/0/clock_source_index", body: "json=%7B%22value%22%3A{index}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  connect_input_stream:
+    summary: "Connect an AVB device's input stream to a talker's stream (avb/<uid>/cfg/0/input_streams/<n>/talker)"
+    params:
+      uid: { type: string, max_length: 16, pattern: "^[0-9a-fA-F]{16}$", required: true, label: "Device", description: "The AVB device's 16-hex-digit UID (uid, or one of avb/devs)." }
+      stream: { type: int, min: 0, max: 255, required: true, label: "Input stream", description: "The device's input stream index, from 0." }
+      talker: { type: string, max_length: 16, pattern: "^[0-9a-fA-F]{16}$", required: true, label: "Talker", description: "The AVB device's 16-hex-digit UID (uid, or one of avb/devs)." }
+      talker_stream: { type: int, min: 0, max: 255, required: true, label: "Talker stream", description: "The talker's output stream index, from 0." }
+    send: { method: PATCH, path: "/datastore/avb/{uid}/cfg/0/input_streams/{stream}/talker", body: "json=%7B%22value%22%3A%22{talker}%3A{talker_stream}%22%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  disconnect_input_stream:
+    summary: "Disconnect an AVB device's input stream (talker set empty)"
+    params:
+      uid: { type: string, max_length: 16, pattern: "^[0-9a-fA-F]{16}$", required: true, label: "Device", description: "The AVB device's 16-hex-digit UID (uid, or one of avb/devs)." }
+      stream: { type: int, min: 0, max: 255, required: true, label: "Input stream", description: "The input stream index, from 0." }
+    send: { method: PATCH, path: "/datastore/avb/{uid}/cfg/0/input_streams/{stream}/talker", body: "json=%7B%22value%22%3A%22%22%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_master_clock:
+    summary: "Point an AVB device's master clock at another device (avb/<uid>/master_clock/uid), or empty for none"
+    params:
+      uid: { type: string, max_length: 16, pattern: "^[0-9a-fA-F]{16}$", required: true, label: "Device", description: "The AVB device's 16-hex-digit UID (uid, or one of avb/devs)." }
+      master: { type: string, max_length: 16, pattern: "^([0-9a-fA-F]{16})?$", required: true, label: "Master clock", description: "UID of the device to take the clock from, or empty for none." }
+    send: { method: PATCH, path: "/datastore/avb/{uid}/master_clock/uid", body: "json=%7B%22value%22%3A{master:json:url}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_value:
+    summary: "Set any writable datastore path to a JSON value (PATCH /datastore/<path>), in the path's type"
+    params:
+      path: { type: string, max_length: 256, pattern: "^[A-Za-z0-9_.]+(/[A-Za-z0-9_.]+)*$", required: true, label: "Path", description: "The datastore path without a leading slash, such as mix/chan/0/matrix/fader (indexes from 0)." }
+      value: { type: string, max_length: 1024, pattern: "^[^\\x00-\\x1f]+$", required: true, label: "Value", description: "The value as JSON text in the path's type: a number such as 0.5, or a quoted string such as 'ADAT A' or '0:3' written with double quotes." }
+    send: { method: PATCH, path: "/datastore/{path:path}", body: "json=%7B%22value%22%3A{value:url}%7D", content_type: application/x-www-form-urlencoded }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_value:
+    summary: "Read a datastore path or subtree (GET /datastore/<path>); a path returns {value}, a subtree its keys"
+    params:
+      path: { type: string, max_length: 256, pattern: "^[A-Za-z0-9_.]+(/[A-Za-z0-9_.]+)*$", required: true, label: "Path", description: "The datastore path or subtree without a leading slash, such as mix/chan/16/gate." }
+    send: { method: GET, path: "/datastore/{path:path}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      The datastore is read whole on connecting and every 5 seconds; state
+      keeps every path as the device writes it (datastore, keyed by the path
+      with its slashes), so a change made elsewhere shows within 5 s. MOTU's
+      long poll (If-None-Match, held up to 15 s) is not used, since HTTP
+      requests go one at a time and a held request would hold commands back.
+      Opened for commands only, nothing is read.
+  - models: [all]
+    severity: warning
+    text: >
+      Paths, their ranges and their presence vary by model, firmware and
+      mixer version (the document covers mixer 1.0); a path the device lacks
+      is refused. Indexes in the commands count from 1 and are sent from 0.
+      Faders and sends are linear gains from 0 to 4 (1 is unity). The values
+      of monitor assign and override and of maxUSBToHost are not described by
+      MOTU. A device acquired by another AVB controller (acquired_id) should
+      not be changed. No authentication is documented. Error answers are not
+      documented.
+
+state:
+  api_version: { type: string, description: "Datastore API version (/apiversion)" }
+  datastore.*: { type: string, description: "Every datastore path and its value as text, keyed by the path (a key holding slashes), such as mix/chan/0/matrix/fader" }
+
+telemetry:
+  poll:
+    - every_ms: 5000
+      send:
+        - { method: GET, path: /datastore }
+    - send:
+        - { method: GET, path: /apiversion }
+  updates:
+    - path: "^/apiversion$"
+      match: "^\\s*(\\S+)\\s*$"
+      state: { api_version: "{1}" }
+    - path: "^/datastore$"
+      json_each: "$.*"
+      json: { value: "$" }
+      state: { "datastore.{key:key}": "{value}" }

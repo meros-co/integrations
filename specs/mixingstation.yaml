@@ -1,0 +1,156 @@
+spec: 1
+id: mixingstation
+name: Mixing Station desktop (OSC API)
+vendor: dev-core
+category: mixer
+
+# Mixing Station, a remote-control app for many digital consoles, offers an
+# OSC API in its desktop version: a data path addresses one console
+# parameter whatever the console (ch.0.mix.lvl is channel 1's fader), /con/v/
+# reads or writes it as its plain value and /con/n/ normalized from 0 to 1,
+# and /hi/v (or /hi/n), repeated at least every 5 seconds, subscribes to
+# every parameter's changes. The OSC port is chosen in the app's global
+# settings (or with -osc=<port>); the API is off by default. The REST and
+# WebSocket API's endpoints are documented only inside the running app and
+# are not used here.
+source:
+  - title: "APIs (Mixing Station Docs, read 27 October 2026)"
+    author: dev-core
+    url: https://mixingstation.app/ms-docs/use-cases/apis
+    note: >
+      Manufacturer document. Desktop only; REST/WebSocket and OSC; enabling
+      the APIs and their ports in Global settings; data types (bool, float,
+      int, string) and value formats (plain and normalized); data paths
+      (dotted, numbered from 0, * in subscriptions); OSC: /hi/v and /hi/n
+      resent at least every 5 s, /con/v and /con/n get and set with any
+      supported type, no bundles; the WebSocket envelope, subscriptions,
+      metering and app state (not used here).
+  - title: "Mixing Station Docs, print edition: Global settings (API, Permissions) and Program arguments"
+    author: dev-core
+    url: https://mixingstation.app/ms-docs/print_page
+    note: >
+      Manufacturer document. -web=<port> and -osc=<port> (disabled by
+      default), -appSeries, -ip and -mixTarget; write access and a write
+      password in Permissions (work in progress).
+
+transport:
+  type: osc-udp
+  port: null
+  reply: to-source
+  timeout_ms: 1000
+
+ports:
+  - { port: null, protocol: udp, role: control, note: "the OSC port set in Mixing Station's global settings or with -osc=<port>; give it when opening the device" }
+
+models:
+  - id: mixingstation-desktop
+    name: Mixing Station desktop (Windows, macOS, Linux)
+    supports: [get_value, get_value_normalized, set_value, set_value_normalized, set_value_int, set_value_bool, set_value_text, subscribe, subscribe_normalized]
+    verification: none
+
+commands:
+  get_value:
+    summary: Read a parameter's plain value by data path (/con/v/<path>)
+    params:
+      path: &path { type: string, required: true, max_length: 128, pattern: '^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$', label: Data path, description: "The parameter's data path, numbered from 0, such as ch.0.mix.lvl for channel 1's fader; Mixing Station's data explorer lists them for the console." }
+    send: { address: "/con/v/{path}" }
+    expect: { address: "/con/v/{path}", arg: 0 }
+    returns: value
+  get_value_normalized:
+    summary: Read a parameter's value normalized 0 to 1 by data path (/con/n/<path>)
+    params: { path: *path }
+    send: { address: "/con/n/{path}" }
+    expect: { address: "/con/n/{path}", arg: 0 }
+    returns: value
+  set_value:
+    summary: Set a parameter to a plain number, such as a level in dB (/con/v/<path> f)
+    params:
+      path: *path
+      value: { type: float, required: true, label: Value, description: "The value in the parameter's own unit (a fader level in dB, a frequency in Hz)." }
+    send: { address: "/con/v/{path}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+  set_value_normalized:
+    summary: Set a parameter normalized from 0 to 1 (/con/n/<path> f)
+    params:
+      path: *path
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: Value, description: "The value normalized from 0 (the parameter's least) to 1 (its most)." }
+    send: { address: "/con/n/{path}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+  set_value_int:
+    summary: Set a parameter to a whole number (/con/v/<path> i)
+    params:
+      path: *path
+      value: { type: int, required: true, label: Value, description: "The whole-number value, such as an index." }
+    send: { address: "/con/v/{path}", args: [ { value: "{value}", type: int } ] }
+    returns: none
+  set_value_bool:
+    summary: Set an on/off parameter (/con/v/<path> T or F)
+    params:
+      path: *path
+      value: { type: bool, required: true, label: Value, description: "On or off." }
+    send: { address: "/con/v/{path}", args: [ { value: "{value}", type: bool } ] }
+    returns: none
+  set_value_text:
+    summary: Set a text parameter, such as a name (/con/v/<path> s)
+    params:
+      path: *path
+      value: { type: string, required: true, max_length: 256, pattern: '^[^\x00-\x1f]*$', label: Value, description: "The text." }
+    send: { address: "/con/v/{path}", args: [ { value: "{value}", type: string } ] }
+    returns: none
+  subscribe:
+    summary: Subscribe to every parameter's changes as plain values (/hi/v); the core also does so while monitoring
+    send: { address: /hi/v }
+    returns: none
+  subscribe_normalized:
+    summary: Subscribe to every parameter's changes as normalized values (/hi/n)
+    send: { address: /hi/n }
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The OSC API runs in Mixing Station's desktop app and must be enabled
+      there, with its port, in Global settings (or with -osc=<port>); open the
+      device at the computer running it, with that port. Write access can be
+      turned off in Permissions. The parameters depend on the console
+      Mixing Station is connected to; its data explorer lists the paths.
+  - models: [all]
+    severity: info
+    text: >
+      While monitoring, the core sends /hi/v every 4 seconds (Mixing Station
+      asks for at least every 5) and keeps every value that arrives by its
+      data path, under values, integers, switches or texts by its OSC type. The documentation does not show the
+      update messages; they are assumed to come on /con/v/<path> with the
+      value, as a get is answered. Writes are not acknowledged.
+
+state:
+  values.*:     { type: float, description: "A parameter's plain value Mixing Station sent as a number with a fraction (a level in dB, a frequency in Hz), keyed by its data path, such as ch.0.mix.lvl" }
+  integers.*:   { type: int, description: "A parameter's plain value Mixing Station sent as a whole number, keyed by its data path" }
+  switches.*:   { type: bool, description: "An on/off parameter's value, keyed by its data path, such as ch.0.mix.on" }
+  texts.*:      { type: string, description: "A text parameter's value, such as a name, keyed by its data path" }
+  normalized.*: { type: float, description: "A parameter's value normalized from 0 to 1, keyed by its data path" }
+
+telemetry:
+  subscribe:
+    send: ["/hi/v"]
+    every_ms: 4000
+  updates:
+    - address: '^/con/v/(.+)$'
+      arg_types: f
+      state: { "values.{1:key}": "{arg0}" }
+    - address: '^/con/v/(.+)$'
+      arg_types: i
+      state: { "integers.{1:key}": "{arg0}" }
+    - address: '^/con/v/(.+)$'
+      arg_types: T
+      state: { "switches.{1:key}": "{arg0}" }
+    - address: '^/con/v/(.+)$'
+      arg_types: F
+      state: { "switches.{1:key}": "{arg0}" }
+    - address: '^/con/v/(.+)$'
+      arg_types: s
+      state: { "texts.{1:key}": "{arg0}" }
+    - address: '^/con/n/(.+)$'
+      arg_types: f
+      state: { "normalized.{1:key}": "{arg0}" }

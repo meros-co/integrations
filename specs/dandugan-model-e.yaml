@@ -1,0 +1,327 @@
+spec: 1
+id: dandugan-model-e
+name: Dan Dugan Sound Design Model E automatic mixing controller (ASCII remote control)
+vendor: Dan Dugan Sound Design
+category: mixer
+
+# The 2007 Model E takes ASCII commands over its Ethernet port: a command, an
+# optional channel and value after a comma, ended by CR; every command is
+# answered by an echo with the current or new value and no spaces (BP2,1),
+# or "<command> Syntax error". A query leaves the value out. Commands are
+# not case-sensitive and spaces are ignored. The current Dugan models
+# (E-1 to E-3, M, N, VN16, MY16) publish no command set; see the quirks.
+source:
+  - title: "Model E Automatic Mixing Controller User Guide, Version 1.0 (July 2007), Chapter 6 ASCII Remote Control, p.33-42"
+    author: Dan Dugan Sound Design
+    url: https://www.dandugan.com/Assets/manuals/Model-E-User-Guide.pdf
+    note: >
+      Manufacturer document. Ethernet control tested with Telnet; the plain
+      form (command and CR) and the extended form (FE, the command, CR and a
+      checksum); whitespace and case ignored; replies echo the command with
+      its value; Syntax error; the commands BP, CM, CN, CO, CP, CW, NA, SM,
+      SO, SP, FP, DH, IP, GW, NM, HR, MM and VE with their values.
+
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: cr
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  error_match: 'Syntax error'
+  probe: "VE"
+
+ports:
+  - { port: 23, protocol: tcp, role: control, note: "Telnet, as the guide tests it; the port number is not stated" }
+
+models:
+  - id: model-e
+    name: Dan Dugan Model E (2007, eight channels)
+    supports: [set_bypass, get_bypass, set_mode, get_mode, set_name, get_name, set_override, get_override, set_preset_mode,
+               get_preset_mode, set_weight, get_weight, set_unit_name, get_unit_name, set_system_mute, get_system_mute,
+               set_system_override, get_system_override, recall_presets, release_presets, factory_reset, set_dhcp, get_dhcp,
+               set_ip_address, get_ip_address, set_gateway, get_gateway, set_netmask, get_netmask, get_headroom, get_master,
+               get_versions]
+    verification: none
+
+commands:
+  set_bypass:
+    summary: Bypass a channel or take it out of bypass (BP)
+    params:
+      channel: &ch { type: int, min: 1, max: 8, required: true, label: Channel, description: "Channel, 1 to 8." }
+      bypassed: { type: bool, required: true, label: Bypassed, description: "On bypasses the channel, off returns it to automixing." }
+    send: "BP {channel},{bypassed:bool01}"
+    expect: { reply_contains: "BP{channel},", not_contains: "error" }
+    returns: ack
+  get_bypass:
+    summary: Read whether a channel is bypassed (BP), 1 bypassed, 0 not
+    params: { channel: *ch }
+    send: "BP {channel}"
+    expect: { reply_contains: "BP{channel},", matches: 'BP\d+,(\d)' }
+    returns: value
+  set_mode:
+    summary: Set a channel's mode (CM)
+    params:
+      channel: *ch
+      mode: &mode { type: enum, values: [manual, auto, mute], required: true, label: Mode, description: "manual, auto (automixed) or mute." }
+    send: "CM {channel},{mode:map.mode}"
+    expect: { reply_contains: "CM{channel},", not_contains: "error" }
+    returns: ack
+  get_mode:
+    summary: Read a channel's mode (CM), 0 manual, 1 auto, 2 mute
+    params: { channel: *ch }
+    send: "CM {channel}"
+    expect: { reply_contains: "CM{channel},", matches: 'CM\d+,(\d)' }
+    returns: value
+  set_name:
+    summary: Name a channel (CN), up to 15 characters
+    params:
+      channel: *ch
+      name: { type: string, required: true, max_length: 15, pattern: '^[\x21-\x7e]+$', label: Name, description: "Up to 15 printable characters without spaces (the unit ignores spaces)." }
+    send: "CN {channel},{name}"
+    expect: { reply_contains: "CN{channel},", not_contains: "Syntax error" }
+    returns: ack
+  get_name:
+    summary: Read a channel's name (CN)
+    params: { channel: *ch }
+    send: "CN {channel}"
+    expect: { reply_contains: "CN{channel},", matches: 'CN\d+,(.*)$' }
+    returns: value
+  set_override:
+    summary: Turn a channel's override on or off (CO)
+    params:
+      channel: *ch
+      enabled: { type: bool, required: true, label: Override, description: "On overrides the channel (fully on), off releases it." }
+    send: "CO {channel},{enabled:bool01}"
+    expect: { reply_contains: "CO{channel},", not_contains: "error" }
+    returns: ack
+  get_override:
+    summary: Read whether a channel is overridden (CO)
+    params: { channel: *ch }
+    send: "CO {channel}"
+    expect: { reply_contains: "CO{channel},", matches: 'CO\d+,(\d)' }
+    returns: value
+  set_preset_mode:
+    summary: Set the mode a channel takes when presets are recalled (CP)
+    params: { channel: *ch, mode: *mode }
+    send: "CP {channel},{mode:map.mode}"
+    expect: { reply_contains: "CP{channel},", not_contains: "error" }
+    returns: ack
+  get_preset_mode:
+    summary: Read a channel's preset mode (CP), 0 manual, 1 auto, 2 mute
+    params: { channel: *ch }
+    send: "CP {channel}"
+    expect: { reply_contains: "CP{channel},", matches: 'CP\d+,(\d)' }
+    returns: value
+  set_weight:
+    summary: Set a channel's automix weight in dB (CW)
+    params:
+      channel: *ch
+      weight_db: { type: float, min: -100.0, max: 20.0, required: true, label: Weight, description: "Automix weight in dB, -100 to +20; decimals allowed." }
+    send: "CW {channel},{weight_db:.2f}"
+    expect: { reply_contains: "CW{channel},", not_contains: "error" }
+    returns: ack
+  get_weight:
+    summary: Read a channel's automix weight in dB (CW)
+    params: { channel: *ch }
+    send: "CW {channel}"
+    expect: { reply_contains: "CW{channel},", matches: 'CW\d+,(-?[0-9.]+)' }
+    returns: value
+  set_unit_name:
+    summary: Name the unit (NA), up to 15 characters
+    params:
+      name: { type: string, required: true, max_length: 15, pattern: '^[\x21-\x7e]+$', label: Name, description: "Up to 15 printable characters without spaces." }
+    send: "NA {name}"
+    expect: { reply_contains: "NA", not_contains: "Syntax error" }
+    returns: ack
+  get_unit_name:
+    summary: Read the unit's name (NA)
+    send: "NA"
+    expect: { reply_contains: "NA", matches: '^NA(.*)$' }
+    returns: value
+  set_system_mute:
+    summary: Mute or unmute every channel (SM)
+    params:
+      muted: { type: bool, required: true, label: Muted, description: "On mutes every channel, off unmutes them." }
+    send: "SM {muted:bool01}"
+    expect: { reply_contains: "SM", not_contains: "error" }
+    returns: ack
+  get_system_mute:
+    summary: Read the system mute (SM)
+    send: "SM"
+    expect: { reply_contains: "SM", matches: '^SM(\d)' }
+    returns: value
+  set_system_override:
+    summary: Override every channel, or release them (SO)
+    params:
+      enabled: { type: bool, required: true, label: Override, description: "On overrides every channel, off releases them." }
+    send: "SO {enabled:bool01}"
+    expect: { reply_contains: "SO", not_contains: "error" }
+    returns: ack
+  get_system_override:
+    summary: Read the system override (SO)
+    send: "SO"
+    expect: { reply_contains: "SO", matches: '^SO(\d)' }
+    returns: value
+  recall_presets:
+    summary: Put every channel into its preset mode (SP 1); follow it with release_presets
+    send: "SP 1"
+    expect: { reply_contains: "SP", not_contains: "error" }
+    returns: ack
+  release_presets:
+    summary: Release the preset button (SP 0), as Dugan asks after SP 1
+    send: "SP 0"
+    expect: { reply_contains: "SP", not_contains: "error" }
+    returns: ack
+  factory_reset:
+    summary: Reset the unit to factory settings, keeping its network and analog/digital settings (FP)
+    send: "FP"
+    expect: { reply_contains: "FP OK" }
+    returns: ack
+  set_dhcp:
+    summary: Turn DHCP on or off (DH)
+    params:
+      enabled: { type: bool, required: true, label: DHCP, description: "On takes the address from DHCP, off uses the fixed address." }
+    send: "DH {enabled:bool01}"
+    expect: { reply_contains: "DH", not_contains: "error" }
+    returns: ack
+  get_dhcp:
+    summary: Read whether DHCP is on (DH)
+    send: "DH"
+    expect: { reply_contains: "DH", matches: '^DH(\d)' }
+    returns: value
+  set_ip_address:
+    summary: Set the fixed IP address (IP), used after a restart
+    params:
+      address: &ip { type: string, required: true, max_length: 15, pattern: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$', label: Address, description: "IPv4 address, dotted." }
+    send: "IP {address}"
+    expect: { reply_contains: "IP", not_contains: "error" }
+    returns: ack
+  get_ip_address:
+    summary: Read the fixed IP address (IP)
+    send: "IP"
+    expect: { reply_contains: "IP", matches: '^IP([0-9.]+)' }
+    returns: value
+  set_gateway:
+    summary: Set the gateway (GW)
+    params: { address: *ip }
+    send: "GW {address}"
+    expect: { reply_contains: "GW", not_contains: "error" }
+    returns: ack
+  get_gateway:
+    summary: Read the gateway (GW)
+    send: "GW"
+    expect: { reply_contains: "GW", matches: '^GW([0-9.]+)' }
+    returns: value
+  set_netmask:
+    summary: Set the netmask (NM)
+    params: { address: *ip }
+    send: "NM {address}"
+    expect: { reply_contains: "NM", not_contains: "error" }
+    returns: ack
+  get_netmask:
+    summary: Read the netmask (NM)
+    send: "NM"
+    expect: { reply_contains: "NM", matches: '^NM([0-9.]+)' }
+    returns: value
+  get_headroom:
+    summary: Read the headroom setting (HR), 0 for -10 dBu, 1 for +4 dBu
+    send: "HR"
+    expect: { reply_contains: "HR", matches: '^HR(\d)' }
+    returns: value
+  get_master:
+    summary: Read whether the unit is the master (MM), 1 master, 0 slave
+    send: "MM"
+    expect: { reply_contains: "MM", matches: '^MM(\d)' }
+    returns: value
+  get_versions:
+    summary: Read the microcontroller and DSP firmware versions (VE)
+    send: "VE"
+    expect: { reply_contains: "VE", matches: '^VE ?(.*)$' }
+    returns: value
+
+maps:
+  mode: { manual: "0", auto: "1", mute: "2" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      factory_reset clears the unit's settings, recall_presets changes every
+      channel's mode at once, and the network setters take effect at the next
+      restart. None can be undone from here.
+  - models: [all]
+    severity: info
+    text: >
+      The unit sends nothing unasked, so the core reads every channel's
+      settings and the unit's on connecting and every 10 seconds. The plain
+      command form is used (the guide recommends its extended form with a
+      checksum for reliability, which the core does not send). Only a
+      missing parameter is documented as an error (<command> Syntax error).
+  - models: [all]
+    severity: warning
+    text: >
+      This is the 2007 Model E. The current Dugan models (E-1, E-2, E-3, M,
+      N, Dugan-VN16, Dugan-MY16) take ASCII commands over Ethernet too, but
+      Dan Dugan Sound Design gives their command set only on request; whether
+      they accept these commands is not documented.
+
+state:
+  channels.*.bypassed:    { type: bool, description: "Bypassed, keyed by channel 1-8" }
+  channels.*.mode:        { type: string, description: "Mode: manual, auto or mute" }
+  channels.*.name:        { type: string, description: "Channel name" }
+  channels.*.override:    { type: bool, description: "Overridden" }
+  channels.*.preset_mode: { type: string, description: "Mode taken on a preset recall: manual, auto or mute" }
+  channels.*.weight_db:   { type: float, unit: dB, description: "Automix weight" }
+  unit.name:              { type: string, description: "Unit name" }
+  unit.system_mute:       { type: bool, description: "Every channel muted" }
+  unit.system_override:   { type: bool, description: "Every channel overridden" }
+  unit.dhcp:              { type: bool, description: "DHCP on" }
+  unit.ip_address:        { type: string, description: "Fixed IP address" }
+  unit.gateway:           { type: string, description: "Gateway" }
+  unit.netmask:           { type: string, description: "Netmask" }
+  unit.headroom:          { type: string, description: "Headroom: -10dBu or +4dBu" }
+  unit.master:            { type: bool, description: "Master (true) or slave (false)" }
+  unit.versions:          { type: string, description: "Microcontroller and DSP firmware versions as the unit writes them" }
+
+telemetry:
+  poll:
+    every_ms: 10000
+    send: ["BP 1", "BP 2", "BP 3", "BP 4", "BP 5", "BP 6", "BP 7", "BP 8", "CM 1", "CM 2", "CM 3", "CM 4", "CM 5", "CM 6", "CM 7", "CM 8",
+           "CN 1", "CN 2", "CN 3", "CN 4", "CN 5", "CN 6", "CN 7", "CN 8", "CO 1", "CO 2", "CO 3", "CO 4", "CO 5", "CO 6", "CO 7", "CO 8",
+           "CP 1", "CP 2", "CP 3", "CP 4", "CP 5", "CP 6", "CP 7", "CP 8", "CW 1", "CW 2", "CW 3", "CW 4", "CW 5", "CW 6", "CW 7", "CW 8",
+           "NA", "SM", "SO", "DH", "IP", "GW", "NM", "HR", "MM", "VE"]
+  updates:
+    - match: '^BP(\d),([01])$'
+      state: { "channels.{1}.bypassed": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^CM(\d),([0-2])$'
+      state: { "channels.{1}.mode": { value: "{2}", map: { "0": manual, "1": auto, "2": mute } } }
+    - match: '^CN(\d),(.*)$'
+      state: { "channels.{1}.name": "{2}" }
+    - match: '^CO(\d),([01])$'
+      state: { "channels.{1}.override": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^CP(\d),([0-2])$'
+      state: { "channels.{1}.preset_mode": { value: "{2}", map: { "0": manual, "1": auto, "2": mute } } }
+    - match: '^CW(\d),(-?[0-9.]+)$'
+      state: { "channels.{1}.weight_db": "{2}" }
+    - match: '^NA(.*)$'
+      state: { unit.name: "{1}" }
+    - match: '^SM([01])$'
+      state: { unit.system_mute: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^SO([01])$'
+      state: { unit.system_override: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^DH([01])$'
+      state: { unit.dhcp: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^IP([0-9.]+)$'
+      state: { unit.ip_address: "{1}" }
+    - match: '^GW([0-9.]+)$'
+      state: { unit.gateway: "{1}" }
+    - match: '^NM([0-9.]+)$'
+      state: { unit.netmask: "{1}" }
+    - match: '^HR([01])$'
+      state: { unit.headroom: { value: "{1}", map: { "0": "-10dBu", "1": "+4dBu" } } }
+    - match: '^MM([01])$'
+      state: { unit.master: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^VE ?(.+)$'
+      state: { unit.versions: "{1}" }

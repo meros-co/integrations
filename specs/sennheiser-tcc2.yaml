@@ -1,0 +1,862 @@
+spec: 1
+id: sennheiser-tcc2
+name: Sennheiser TeamConnect Ceiling 2 (Sound Control Protocol)
+vendor: Sennheiser
+category: other
+
+# The TeamConnect Ceiling 2 speaks Sennheiser's Sound Control Protocol (SSC)
+# version 1: one JSON object per UDP datagram to port 45, the method address
+# as nested members, null to read and a value to write; the device answers
+# every message to its sender with the values it now holds (a write may be
+# adapted to the nearest allowed value), or with an /osc/error entry.
+# Subscriptions push changes and last a lifetime that is renewed. The
+# TeamConnect Ceiling Medium and the TeamConnect Bar speak SSCv2 instead and
+# are sennheiser-tcc-m and sennheiser-tc-bar.
+source:
+  - title: "Sennheiser Sound Control Protocol (SSC), TeamConnect Ceiling 2, firmware 1.8.0 (TI 1245 v1.8.0)"
+    author: Sennheiser
+    url: https://assets.sennheiser.com/download/assets/TI_1245_v1.8.0_Sennheiser_Sound_Control_Protocol_TCC2_EN.pdf/c204169ce7bb11f0a354ea55b5d2fb86
+    note: >
+      Manufacturer document. Messages, addresses, null reads and adapted
+      writes, arrays with null elements kept §4; subscriptions with lifetime,
+      min and max, renewal by re-subscribing, 310 on expiry §5; UDP on port 45,
+      one message per datagram, answered to the sender §6.1; the method list
+      §7 (meters 7.1-7.4, device 7.5-7.43, audio 7.45-7.85, beam 7.86-7.87,
+      osc 7.88-7.101); string characters §8; error codes §9. Section numbers
+      are the body's (the contents list is one off after 7.48).
+  - title: "Media Control Systems: 3rd party control of Sennheiser products (AN 1260 v1.0), p.7"
+    author: Sennheiser
+    url: https://assets.sennheiser.com/download/assets/AN_1260_v1.0_Media_Control_Systems_EN.pdf/d2d66562e7b411f08c892a34179bc91d
+    note: >
+      Manufacturer document. TeamConnect Ceiling 2: SSC on UDP 45 (TFTP 69
+      during firmware updates, mDNS).
+
+transport:
+  type: line-udp
+  port: 45
+  terminator: none
+  encoding: utf-8
+  reply: to-source
+  timeout_ms: 2000
+  probe: '{"device":{"name":null}}'
+
+ports:
+  - { port: 45, protocol: udp, role: control }
+
+maps:
+  zone_before: { "1": "", "2": "null,", "3": "null,null,", "4": "null,null,null,", "5": "null,null,null,null," }
+  zone_after: { "1": ",null,null,null,null", "2": ",null,null,null", "3": ",null,null", "4": ",null", "5": "" }
+
+models:
+  - id: tcc2
+    name: Sennheiser TeamConnect Ceiling 2 (SLCM2)
+    supports:
+      - identify
+      - start_firmware_update
+      - set_led_custom_color
+      - set_led_custom_active
+      - set_led_mute_color
+      - set_led_on_color
+      - set_led_show_far_end
+      - set_led_brightness
+      - set_network_mdns
+      - set_device_time
+      - set_system
+      - set_position
+      - set_name
+      - set_location
+      - set_equalizer
+      - set_noise_gate_threshold
+      - set_noise_gate_hold
+      - set_noise_gate
+      - set_analog_out_attenuation
+      - set_dante_interface_mapping
+      - set_dante_out_gain
+      - set_reference_gain
+      - set_far_end_auto_adjust
+      - set_source_detection
+      - set_voice_lift_emergency_mute_time
+      - set_voice_lift_emergency_mute_threshold
+      - set_voice_lift
+      - set_mute
+      - set_installation
+      - set_beam_orientation_visual
+      - set_beam_orientation_offset
+      - set_network_auto
+      - set_network_manual
+      - set_dante_network_auto
+      - set_dante_network_manual
+      - set_equalizer_bands
+      - set_exclusion_zone
+      - set_exclusion_zone_active
+      - set_priority_zone
+      - set_priority_weight
+      - set_priority_active
+      - restore_defaults
+      - restart
+      - get_limits
+    verification: none
+
+commands:
+  identify:
+    summary: "Identify the device: its LEDs blink for 10 s (/device/identification/visual, 7.5)"
+    send: '{"device":{"identification":{"visual":true}}}'
+    expect: { reply_contains: '"visual"', not_contains: '"error"' }
+    returns: ack
+
+  start_firmware_update:
+    summary: "Start a firmware update, which cannot be aborted (/device/update/enable, 7.16)"
+    params:
+      enabled: { type: bool, required: true, label: "Firmware update running", description: "On sets firmware update running on, off turns it off." }
+    send: '{"device":{"update":{"enable":{enabled}}}}'
+    expect: { reply_contains: '"enable"', not_contains: '"error"' }
+    returns: ack
+
+  set_led_custom_color:
+    summary: "Set the custom LED color (/device/led/custom/color, 7.17)"
+    params:
+      value: { type: enum, values: ["LIGHT GREEN", "GREEN", "BLUE", "RED", "YELLOW", "ORANGE", "CYAN", "PINK"], required: true, label: "Custom LED color", description: "Custom LED color." }
+    send: '{"device":{"led":{"custom":{"color":{value:json}}}}}'
+    expect: { reply_contains: '"color"', not_contains: '"error"' }
+    returns: ack
+
+  set_led_custom_active:
+    summary: "Turn on or off: custom LED color shown (resets at reboot) (/device/led/custom/active, 7.18)"
+    params:
+      enabled: { type: bool, required: true, label: "Custom LED color shown", description: "On sets custom LED color shown (resets at reboot) on, off turns it off." }
+    send: '{"device":{"led":{"custom":{"active":{enabled}}}}}'
+    expect: { reply_contains: '"active"', not_contains: '"error"' }
+    returns: ack
+
+  set_led_mute_color:
+    summary: "Set the LED color while muted (/device/led/mic_mute/color, 7.19)"
+    params:
+      value: { type: enum, values: ["LIGHT GREEN", "GREEN", "BLUE", "RED", "YELLOW", "ORANGE", "CYAN", "PINK"], required: true, label: "LED color while muted", description: "LED color while muted." }
+    send: '{"device":{"led":{"mic_mute":{"color":{value:json}}}}}'
+    expect: { reply_contains: '"color"', not_contains: '"error"' }
+    returns: ack
+
+  set_led_on_color:
+    summary: "Set the LED color while the microphone is on (/device/led/mic_on/color, 7.20)"
+    params:
+      value: { type: enum, values: ["LIGHT GREEN", "GREEN", "BLUE", "RED", "YELLOW", "ORANGE", "CYAN", "PINK"], required: true, label: "LED color while the microphone is on", description: "LED color while the microphone is on." }
+    send: '{"device":{"led":{"mic_on":{"color":{value:json}}}}}'
+    expect: { reply_contains: '"color"', not_contains: '"error"' }
+    returns: ack
+
+  set_led_show_far_end:
+    summary: "Turn on or off: LEDs show far-end activity (/device/led/show_farend_activity, 7.21)"
+    params:
+      enabled: { type: bool, required: true, label: "LEDs show far-end activity", description: "On sets LEDs show far-end activity on, off turns it off." }
+    send: '{"device":{"led":{"show_farend_activity":{enabled}}}}'
+    expect: { reply_contains: '"show_farend_activity"', not_contains: '"error"' }
+    returns: ack
+
+  set_led_brightness:
+    summary: "Set the LED brightness (/device/led/brightness, 7.22)"
+    params:
+      value: { type: int, min: 0, max: 5, required: true, label: "LED brightness", description: "LED brightness, 0 (off) to 5." }
+    send: '{"device":{"led":{"brightness":{value}}}}'
+    expect: { reply_contains: '"brightness"', not_contains: '"error"' }
+    returns: ack
+
+  set_network_mdns:
+    summary: "Turn on or off: mDNS announcement (/device/network/mdns, 7.33)"
+    params:
+      enabled: { type: bool, required: true, label: "mDNS announcement", description: "On sets mDNS announcement on, off turns it off." }
+    send: '{"device":{"network":{"mdns":{enabled}}}}'
+    expect: { reply_contains: '"mdns"', not_contains: '"error"' }
+    returns: ack
+
+  set_device_time:
+    summary: "Set the device time in seconds since 2000-01-01 UTC (/device/time, 7.35)"
+    params:
+      value: { type: int, min: 0, max: 4294967295, required: true, label: "Device time in seconds since 2000-01-01 UTC", description: "Device time in seconds since 2000-01-01 UTC s." }
+    send: '{"device":{"time":{value}}}'
+    expect: { reply_contains: '"time"', not_contains: '"error"' }
+    returns: ack
+
+  set_system:
+    summary: "Set the system name (/device/system, 7.36)"
+    params:
+      value: { type: string, max_length: 30, pattern: "^[\\x20\\x21\\x23-\\x2e\\x30-\\x5b\\x5d-\\x7e]+$", required: true, label: "System name", description: "System name, up to 30 characters." }
+    send: '{"device":{"system":{value:json}}}'
+    expect: { reply_contains: '"system"', not_contains: '"error"' }
+    returns: ack
+
+  set_position:
+    summary: "Set the position in the room (/device/position, 7.37)"
+    params:
+      value: { type: string, max_length: 30, pattern: "^[A-Za-z0-9 ]+$", required: true, label: "Position in the room", description: "Position in the room, up to 30 characters." }
+    send: '{"device":{"position":{value:json}}}'
+    expect: { reply_contains: '"position"', not_contains: '"error"' }
+    returns: ack
+
+  set_name:
+    summary: "Set the device name (/device/name, 7.38)"
+    params:
+      value: { type: string, max_length: 8, pattern: "^[A-Za-z](?:[A-Za-z0-9_-]{0,6}[A-Za-z0-9])?$", required: true, label: "Device name", description: "Device name, up to 8 characters (a letter first, a letter or digit last, letters, digits, - and _ between)." }
+    send: '{"device":{"name":{value:json}}}'
+    expect: { reply_contains: '"name"', not_contains: '"error"' }
+    returns: ack
+
+  set_location:
+    summary: "Set the location (/device/location, 7.39)"
+    params:
+      value: { type: string, max_length: 100, pattern: "^[^\"/\\\\]+$", required: true, label: "Location", description: "Location, up to 100 characters." }
+    send: '{"device":{"location":{value:json}}}'
+    expect: { reply_contains: '"location"', not_contains: '"error"' }
+    returns: ack
+
+  set_equalizer:
+    summary: "Set equalizer (/audio/equalizer/preset, 7.45)"
+    params:
+      value: { type: enum, values: ["OFF", "CUSTOM"], required: true, label: "Equalizer", description: "Equalizer: OFF (bypassed) or CUSTOM." }
+    send: '{"audio":{"equalizer":{"preset":{value:json}}}}'
+    expect: { reply_contains: '"preset"', not_contains: '"error"' }
+    returns: ack
+
+  set_noise_gate_threshold:
+    summary: "Set the noise gate threshold (/audio/noise_gate/threshold, 7.52)"
+    params:
+      value: { type: float, min: -90, max: -40, required: true, label: "Noise gate threshold", description: "Noise gate threshold, -90 to -40 dB." }
+    send: '{"audio":{"noise_gate":{"threshold":{value:.1f}}}}'
+    expect: { reply_contains: '"threshold"', not_contains: '"error"' }
+    returns: ack
+
+  set_noise_gate_hold:
+    summary: "Set the noise gate hold time (/audio/noise_gate/hold_time, 7.53)"
+    params:
+      value: { type: int, min: 50, max: 1000, required: true, label: "Noise gate hold time", description: "Noise gate hold time, 50-1000 ms." }
+    send: '{"audio":{"noise_gate":{"hold_time":{value}}}}'
+    expect: { reply_contains: '"hold_time"', not_contains: '"error"' }
+    returns: ack
+
+  set_noise_gate:
+    summary: "Turn on or off: noise gate on (/audio/noise_gate/active, 7.54)"
+    params:
+      enabled: { type: bool, required: true, label: "Noise gate on", description: "On sets noise gate on on, off turns it off." }
+    send: '{"audio":{"noise_gate":{"active":{enabled}}}}'
+    expect: { reply_contains: '"active"', not_contains: '"error"' }
+    returns: ack
+
+  set_analog_out_attenuation:
+    summary: "Set the analog output attenuation (/audio/out1/attenuation, 7.57)"
+    params:
+      value: { type: float, min: -18, max: 0, required: true, label: "Analog output attenuation", description: "Analog output attenuation, -18 to 0 dB." }
+    send: '{"audio":{"out1":{"attenuation":{value:.1f}}}}'
+    expect: { reply_contains: '"attenuation"', not_contains: '"error"' }
+    returns: ack
+
+  set_dante_interface_mapping:
+    summary: "Set dante port mode (/audio/out2/network/ether/interface_mapping, 7.61)"
+    params:
+      value: { type: enum, values: ["AUDIO_SWITCHED", "AUDIO_REDUNDANT"], required: true, label: "Dante port mode", description: "Dante port mode: AUDIO_SWITCHED or AUDIO_REDUNDANT." }
+    send: '{"audio":{"out2":{"network":{"ether":{"interface_mapping":{value:json}}}}}}'
+    expect: { reply_contains: '"interface_mapping"', not_contains: '"error"' }
+    returns: ack
+
+  set_dante_out_gain:
+    summary: "Set the dante output gain (/audio/out2/gain, 7.70)"
+    params:
+      value: { type: float, min: 0, max: 24, required: true, label: "Dante output gain", description: "Dante output gain, 0 to 24 dB." }
+    send: '{"audio":{"out2":{"gain":{value:.1f}}}}'
+    expect: { reply_contains: '"gain"', not_contains: '"error"' }
+    returns: ack
+
+  set_reference_gain:
+    summary: "Set the aEC reference gain (/audio/ref1/gain, 7.76)"
+    params:
+      value: { type: float, min: -60, max: 10, required: true, label: "AEC reference gain", description: "AEC reference gain, -60 to +10 dB." }
+    send: '{"audio":{"ref1":{"gain":{value:.1f}}}}'
+    expect: { reply_contains: '"gain"', not_contains: '"error"' }
+    returns: ack
+
+  set_far_end_auto_adjust:
+    summary: "Turn on or off: far-end automatic level adjustment on (/audio/ref1/farend_auto_adjust_enable, 7.77)"
+    params:
+      enabled: { type: bool, required: true, label: "Far-end automatic level adjustment on", description: "On sets far-end automatic level adjustment on on, off turns it off." }
+    send: '{"audio":{"ref1":{"farend_auto_adjust_enable":{enabled}}}}'
+    expect: { reply_contains: '"farend_auto_adjust_enable"', not_contains: '"error"' }
+    returns: ack
+
+  set_source_detection:
+    summary: "Set source detection threshold (/audio/source_detection/threshold, 7.79)"
+    params:
+      value: { type: enum, values: ["quiet_room", "normal_room", "loud_room"], required: true, label: "Source detection threshold", description: "Source detection threshold: quiet_room, normal_room or loud_room." }
+    send: '{"audio":{"source_detection":{"threshold":{value:json}}}}'
+    expect: { reply_contains: '"threshold"', not_contains: '"error"' }
+    returns: ack
+
+  set_voice_lift_emergency_mute_time:
+    summary: "Set the voice lift emergency mute time (/audio/voice_lift/emergency_mute_time, 7.80)"
+    params:
+      value: { type: int, min: 1, max: 30, required: true, label: "Voice lift emergency mute time", description: "Voice lift emergency mute time, 1-30 s." }
+    send: '{"audio":{"voice_lift":{"emergency_mute_time":{value}}}}'
+    expect: { reply_contains: '"emergency_mute_time"', not_contains: '"error"' }
+    returns: ack
+
+  set_voice_lift_emergency_mute_threshold:
+    summary: "Set the voice lift emergency mute threshold (/audio/voice_lift/emergency_mute_threshold, 7.81)"
+    params:
+      value: { type: float, min: -50, max: -3, required: true, label: "Voice lift emergency mute threshold", description: "Voice lift emergency mute threshold, -50 to -3 dB." }
+    send: '{"audio":{"voice_lift":{"emergency_mute_threshold":{value:.1f}}}}'
+    expect: { reply_contains: '"emergency_mute_threshold"', not_contains: '"error"' }
+    returns: ack
+
+  set_voice_lift:
+    summary: "Turn on or off: voice lift on (/audio/voice_lift/active, 7.82)"
+    params:
+      enabled: { type: bool, required: true, label: "Voice lift on", description: "On sets voice lift on on, off turns it off." }
+    send: '{"audio":{"voice_lift":{"active":{enabled}}}}'
+    expect: { reply_contains: '"active"', not_contains: '"error"' }
+    returns: ack
+
+  set_mute:
+    summary: "Turn on or off: outputs muted (/audio/mute, 7.84)"
+    params:
+      enabled: { type: bool, required: true, label: "Outputs muted", description: "On sets outputs muted on, off turns it off." }
+    send: '{"audio":{"mute":{enabled}}}'
+    expect: { reply_contains: '"mute"', not_contains: '"error"' }
+    returns: ack
+
+  set_installation:
+    summary: "Set installation (/audio/installation_type, 7.85)"
+    params:
+      value: { type: enum, values: ["flush_mount", "suspended"], required: true, label: "Installation", description: "Installation: flush_mount or suspended (30 cm or more)." }
+    send: '{"audio":{"installation_type":{value:json}}}'
+    expect: { reply_contains: '"installation_type"', not_contains: '"error"' }
+    returns: ack
+
+  set_beam_orientation_visual:
+    summary: "Turn on or off: two LEDs show the 0 degree direction (/beam/orientation/visual, 7.86)"
+    params:
+      enabled: { type: bool, required: true, label: "Two LEDs show the 0 degree direction", description: "On sets two LEDs show the 0 degree direction on, off turns it off." }
+    send: '{"beam":{"orientation":{"visual":{enabled}}}}'
+    expect: { reply_contains: '"visual"', not_contains: '"error"' }
+    returns: ack
+
+  set_beam_orientation_offset:
+    summary: "Set the beam orientation offset in degrees (/beam/orientation/offset, 7.87)"
+    params:
+      value: { type: enum, values: ["0", "90", "180", "270"], required: true, label: "Beam orientation offset in degrees", description: "Beam orientation offset in degrees: 0, 90, 180 or 270." }
+    send: '{"beam":{"orientation":{"offset":{value}}}}'
+    expect: { reply_contains: '"offset"', not_contains: '"error"' }
+    returns: ack
+
+  set_network_auto:
+    summary: "Take the control address automatically, by DHCP or link-local (/device/network/ipv4/auto, 7.32)"
+    send: '{"device":{"network":{"ipv4":{"auto":[true]}}}}'
+    expect: { reply_contains: '"auto"', not_contains: '"error"' }
+    returns: ack
+
+  set_network_manual:
+    summary: "Set a fixed control address, netmask and gateway (/device/network/ipv4 manual_* and auto false, 7.26-7.32); the device moves to it"
+    params:
+      address: { type: string, required: true, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: "Address", description: "IPv4 address, dotted." }
+      netmask: { type: string, required: true, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: "Netmask", description: "Subnet mask, dotted." }
+      gateway: { type: string, required: true, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: "Gateway", description: "Default gateway, dotted." }
+    send: '{"device":{"network":{"ipv4":{"manual_ipaddr":[{address:json}],"manual_netmask":[{netmask:json}],"manual_gateway":[{gateway:json}],"auto":[false]}}}}'
+    expect: { reply_contains: '"auto"', not_contains: '"error"' }
+    returns: ack
+
+  set_dante_network_auto:
+    summary: "Take the Dante addresses automatically (/audio/out2/network/ipv4/auto, 7.68); the device reboots"
+    send: '{"audio":{"out2":{"network":{"ipv4":{"auto":[true,true]}}}}}'
+    expect: { reply_contains: '"auto"', not_contains: '"error"' }
+    returns: ack
+
+  set_dante_network_manual:
+    summary: "Set fixed Dante addresses and gateways, primary and secondary (/audio/out2/network/ipv4 manual_* and auto, 7.63-7.68); the device reboots"
+    params:
+      primary_address: { type: string, required: true, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: "Primary address", description: "Primary Dante port's IPv4 address, dotted." }
+      primary_gateway: { type: string, required: true, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: "Primary gateway", description: "Primary Dante port's gateway, dotted." }
+      secondary_address: { type: string, required: true, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: "Secondary address", description: "Secondary Dante port's IPv4 address, dotted." }
+      secondary_gateway: { type: string, required: true, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: "Secondary gateway", description: "Secondary Dante port's gateway, dotted." }
+    send: '{"audio":{"out2":{"network":{"ipv4":{"manual_ipaddr":[{primary_address:json},{secondary_address:json}],"manual_gateway":[{primary_gateway:json},{secondary_gateway:json}],"auto":[false,false]}}}}}'
+    expect: { reply_contains: '"auto"', not_contains: '"error"' }
+    returns: ack
+
+  set_equalizer_bands:
+    summary: "Set the seven custom equalizer gains (/audio/equalizer/custom, 7.46); used when the equalizer is CUSTOM"
+    params:
+      band1: { type: float, min: -8.0, max: 8.0, required: true, label: "125 Hz gain", description: "Gain at 125 Hz in dB, -8.0 to +8.0 in 0.5 dB steps." }
+      band2: { type: float, min: -8.0, max: 8.0, required: true, label: "250 Hz gain", description: "Gain at 250 Hz in dB, -8.0 to +8.0 in 0.5 dB steps." }
+      band3: { type: float, min: -8.0, max: 8.0, required: true, label: "500 Hz gain", description: "Gain at 500 Hz in dB, -8.0 to +8.0 in 0.5 dB steps." }
+      band4: { type: float, min: -8.0, max: 8.0, required: true, label: "1 kHz gain", description: "Gain at 1 kHz in dB, -8.0 to +8.0 in 0.5 dB steps." }
+      band5: { type: float, min: -8.0, max: 8.0, required: true, label: "2 kHz gain", description: "Gain at 2 kHz in dB, -8.0 to +8.0 in 0.5 dB steps." }
+      band6: { type: float, min: -8.0, max: 8.0, required: true, label: "4 kHz gain", description: "Gain at 4 kHz in dB, -8.0 to +8.0 in 0.5 dB steps." }
+      band7: { type: float, min: -8.0, max: 8.0, required: true, label: "8 kHz gain", description: "Gain at 8 kHz in dB, -8.0 to +8.0 in 0.5 dB steps." }
+    send: '{"audio":{"equalizer":{"custom":[{band1:.1f},{band2:.1f},{band3:.1f},{band4:.1f},{band5:.1f},{band6:.1f},{band7:.1f}]}}}'
+    expect: { reply_contains: '"custom"', not_contains: '"error"' }
+    returns: ack
+
+  set_exclusion_zone:
+    summary: "Set one exclusion zone's elevation and azimuth limits, keeping the others (/audio/exclusion/zones, 7.47); the device adjusts zones narrower than 10 degrees"
+    params:
+      zone: { type: int, min: 1, max: 5, required: true, label: "Zone", description: "Exclusion zone, 1 to 5." }
+      elevation_min: { type: int, min: 0, max: 90, required: true, label: "Lowest elevation", description: "Lowest elevation in degrees, 0 to 90, in 5 degree steps." }
+      elevation_max: { type: int, min: 0, max: 90, required: true, label: "Highest elevation", description: "Highest elevation in degrees, 0 to 90, in 5 degree steps." }
+      azimuth_min: { type: int, min: 0, max: 360, required: true, label: "Start azimuth", description: "Azimuth the zone starts at in degrees, 0 to 360, in 5 degree steps." }
+      azimuth_max: { type: int, min: 0, max: 360, required: true, label: "End azimuth", description: "Azimuth the zone ends at in degrees, 0 to 360 (equal to the start, or 0 and 360, for a full circle)." }
+    send: '{"audio":{"exclusion":{"zones":[{zone:map.zone_before}[{elevation_min},{elevation_max},{azimuth_min},{azimuth_max}]{zone:map.zone_after}]}}}'
+    expect: { reply_contains: '"zones"', not_contains: '"error"' }
+    returns: ack
+
+  set_exclusion_zone_active:
+    summary: "Turn one exclusion zone on or off, keeping the others (/audio/exclusion/active, 7.48)"
+    params:
+      zone: { type: int, min: 1, max: 5, required: true, label: "Zone", description: "Exclusion zone, 1 to 5." }
+      enabled: { type: bool, required: true, label: "Active", description: "On excludes the zone from pickup, off includes it." }
+    send: '{"audio":{"exclusion":{"active":[{zone:map.zone_before}{enabled}{zone:map.zone_after}]}}}'
+    expect: { reply_contains: '"active"', not_contains: '"error"' }
+    returns: ack
+
+  set_priority_zone:
+    summary: "Set the priority zone's elevation and azimuth limits (/audio/priority/zones, 7.72)"
+    params:
+      elevation_min: { type: int, min: 0, max: 90, required: true, label: "Lowest elevation", description: "Lowest elevation in degrees, 0 to 90, in 5 degree steps." }
+      elevation_max: { type: int, min: 0, max: 90, required: true, label: "Highest elevation", description: "Highest elevation in degrees, 0 to 90, in 5 degree steps." }
+      azimuth_min: { type: int, min: 0, max: 360, required: true, label: "Start azimuth", description: "Azimuth the zone starts at in degrees, 0 to 360, in 5 degree steps." }
+      azimuth_max: { type: int, min: 0, max: 360, required: true, label: "End azimuth", description: "Azimuth the zone ends at in degrees, 0 to 360 (equal to the start, or 0 and 360, for a full circle)." }
+    send: '{"audio":{"priority":{"zones":[[{elevation_min},{elevation_max},{azimuth_min},{azimuth_max}]]}}}'
+    expect: { reply_contains: '"zones"', not_contains: '"error"' }
+    returns: ack
+
+  set_priority_weight:
+    summary: "Set the priority zone's weight (/audio/priority/weights, 7.73)"
+    params:
+      weight: { type: float, min: 1.0, max: 4.0, required: true, label: "Weight", description: "Weight from 1.0 (neutral) to 4.0 in 0.1 steps." }
+    send: '{"audio":{"priority":{"weights":[{weight:.1f}]}}}'
+    expect: { reply_contains: '"weights"', not_contains: '"error"' }
+    returns: ack
+
+  set_priority_active:
+    summary: "Turn the priority zone on or off (/audio/priority/active, 7.74)"
+    params:
+      enabled: { type: bool, required: true, label: "Active", description: "On favours talkers in the priority zone, off treats every direction alike." }
+    send: '{"audio":{"priority":{"active":[{enabled}]}}}'
+    expect: { reply_contains: '"active"', not_contains: '"error"' }
+    returns: ack
+
+  restore_defaults:
+    summary: "Restore factory, audio or Dante factory defaults (/device/restore, 7.42); factory and Dante defaults reboot the device"
+    params:
+      what: { type: enum, values: [FACTORY_DEFAULTS, AUDIO_DEFAULTS, DANTE_FACTORY_DEFAULTS], required: true, label: "Defaults", description: "FACTORY_DEFAULTS (everything, reboots), AUDIO_DEFAULTS (audio settings, no reboot) or DANTE_FACTORY_DEFAULTS (the Dante module, reboots)." }
+    send: '{"device":{"restore":{what:json}}}'
+    expect: { reply_contains: '"restore"', not_contains: '"error"' }
+    returns: ack
+
+  restart:
+    summary: "Restart the device (/device/restart, 7.43)"
+    send: '{"device":{"restart":true}}'
+    expect: { reply_contains: '"restart"', not_contains: '"error"' }
+    returns: ack
+
+  get_limits:
+    summary: "Read a method's type, range and writability from the device (/osc/limits); returns the answer's JSON"
+    params:
+      address: { type: string, max_length: 128, pattern: "^(/[a-z0-9_]+)+$", required: true, label: "Method", description: "The method's address with slashes, such as /audio/out2/gain." }
+    send: '{"osc":{"limits":[{address:json}]}}'
+    expect: { reply_contains: '"limits"', json_path: "$.osc.limits" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      restore_defaults, restart, the network commands (the device moves to its
+      new address; the Dante ones reboot it), set_dante_interface_mapping
+      (reboots) and start_firmware_update (cannot be aborted) take effect at
+      once and cannot be undone from here.
+  - models: [all]
+    severity: info
+    text: >
+      On connecting the core reads the constant methods once and subscribes to
+      every other method in three subscriptions (device and beam, audio, and
+      the meters at most every 250 ms), each with a 60 s lifetime renewed
+      every 20 s; the device pushes every change. Opened for commands only,
+      nothing is subscribed. The device time is not subscribable and is read
+      once; the deprecated /audio/exclusion_zone methods (7.49-7.51) are left
+      out in favour of /audio/exclusion.
+  - models: [all]
+    severity: info
+    text: >
+      A write is answered with the value the device kept, which may be
+      adapted to the nearest allowed one (exclusion zones to 5 degree steps
+      and a 10 degree aperture, equalizer gains to 0.5 dB); state follows the
+      answer. An error answers with /osc/error and fails the command. Strings
+      take ASCII 32-126 without the double quote, slash and backslash.
+  - models: [all]
+    severity: info
+    text: >
+      Sennheiser marks noise gate threshold and hold time, the Dante output
+      gain, the AEC reference gain, the voice lift emergency mute time and the
+      installation type as readable only, yet gives an example write for each;
+      they are offered as commands. get_limits reads a method's own limits
+      from the device.
+
+state:
+  meters.beam_elevation: { type: float, unit: "deg", description: "Beam elevation in degrees, 0-90 (/m/beam/elevation)" }
+  meters.beam_azimuth: { type: float, unit: "deg", description: "Beam azimuth in degrees, 0-359 (/m/beam/azimuth)" }
+  meters.input_peak: { type: float, unit: "dB", description: "Microphone input peak level, -90 to 0 (/m/in1/peak)" }
+  meters.reference_rms: { type: float, unit: "dBFS", description: "AEC reference (Dante) RMS level, -120 to 0 (/m/ref1/rms)" }
+  device.identifying: { type: bool, description: "Identifying (LEDs blink for 10 s) (/device/identification/visual)" }
+  device.button: { type: bool, description: "Reset button pressed (/device/button/state)" }
+  device.button_label: { type: string, description: "Reset button label (/device/button/label)" }
+  device.button_description: { type: string, description: "Reset button description (/device/button/description)" }
+  device.firmware: { type: string, description: "Firmware version (/device/identity/version)" }
+  device.vendor: { type: string, description: "Vendor (/device/identity/vendor)" }
+  device.serial: { type: string, description: "Serial number (/device/identity/serial)" }
+  device.product: { type: string, description: "Product (/device/identity/product)" }
+  device.hardware_revision: { type: string, description: "Hardware revision (/device/identity/hw_revision)" }
+  update.progress: { type: float, unit: "%", description: "Firmware update progress, 0-100 (/device/update/progress)" }
+  update.error: { type: string, description: "Firmware update error (/device/update/error)" }
+  update.running: { type: bool, description: "Firmware update running (/device/update/enable)" }
+  led.custom_color: { type: string, description: "Custom LED color (/device/led/custom/color)" }
+  led.custom_active: { type: bool, description: "Custom LED color shown (resets at reboot) (/device/led/custom/active)" }
+  led.mute_color: { type: string, description: "LED color while muted (/device/led/mic_mute/color)" }
+  led.on_color: { type: string, description: "LED color while the microphone is on (/device/led/mic_on/color)" }
+  led.show_far_end: { type: bool, description: "LEDs show far-end activity (/device/led/show_farend_activity)" }
+  led.brightness: { type: int, description: "LED brightness, 0 (off) to 5 (/device/led/brightness)" }
+  network.mac: { type: string, description: "MAC address (/device/network/ether/macs)" }
+  network.interface: { type: string, description: "Network interface name (/device/network/ether/interfaces)" }
+  network.netmask: { type: string, description: "Current netmask (/device/network/ipv4/netmask)" }
+  network.manual_netmask: { type: string, description: "Netmask used with manual addressing (/device/network/ipv4/manual_netmask)" }
+  network.manual_address: { type: string, description: "Address used with manual addressing (/device/network/ipv4/manual_ipaddr)" }
+  network.manual_gateway: { type: string, description: "Gateway used with manual addressing (/device/network/ipv4/manual_gateway)" }
+  network.address: { type: string, description: "Current IPv4 address (/device/network/ipv4/ipaddr)" }
+  network.interface_count: { type: float, description: "IPv4 interface number (/device/network/ipv4/interfaces)" }
+  network.gateway: { type: string, description: "Current gateway (/device/network/ipv4/gateway)" }
+  network.auto: { type: bool, description: "Automatic addressing (DHCP or link-local) (/device/network/ipv4/auto)" }
+  network.mdns: { type: bool, description: "mDNS announcement (/device/network/mdns)" }
+  device.time_precision: { type: float, description: "Time precision in seconds (/device/timeprecision)" }
+  device.time: { type: float, unit: "s", description: "Device time in seconds since 2000-01-01 UTC (/device/time)" }
+  device.system: { type: string, description: "System name (/device/system)" }
+  device.position: { type: string, description: "Position in the room (/device/position)" }
+  device.name: { type: string, description: "Device name (/device/name)" }
+  device.location: { type: string, description: "Location (room) (/device/location)" }
+  device.language: { type: string, description: "Language (/device/language)" }
+  device.date: { type: string, description: "Date and time as text (/device/date)" }
+  device.interface_version: { type: string, description: "SSC method tree version (/interface/version)" }
+  audio.equalizer: { type: string, description: "Equalizer: OFF (bypassed) or CUSTOM (/audio/equalizer/preset)" }
+  audio.equalizer_bands.*: { type: float, description: "Custom equalizer gains in dB at 125, 250, 500, 1k, 2k, 4k and 8k Hz, keyed 125, 250, 500, 1000, 2000, 4000, 8000 (/audio/equalizer/custom)" }
+  audio.exclusion_zones.*.elevation_min: { type: int, unit: deg, description: "Exclusion zone elevation min, keyed by zone 1-5 (/audio/exclusion/zones)" }
+  audio.exclusion_zones.*.elevation_max: { type: int, unit: deg, description: "Exclusion zone elevation max, keyed by zone 1-5 (/audio/exclusion/zones)" }
+  audio.exclusion_zones.*.azimuth_min: { type: int, unit: deg, description: "Exclusion zone azimuth min, keyed by zone 1-5 (/audio/exclusion/zones)" }
+  audio.exclusion_zones.*.azimuth_max: { type: int, unit: deg, description: "Exclusion zone azimuth max, keyed by zone 1-5 (/audio/exclusion/zones)" }
+  audio.exclusion_active.*: { type: bool, description: "Exclusion zone active, keyed 1, 2, 3, 4, 5 (/audio/exclusion/active)" }
+  audio.noise_gate_threshold: { type: float, unit: "dB", description: "Noise gate threshold, -90 to -40 (/audio/noise_gate/threshold)" }
+  audio.noise_gate_hold: { type: float, unit: "ms", description: "Noise gate hold time, 50-1000 (/audio/noise_gate/hold_time)" }
+  audio.noise_gate: { type: bool, description: "Noise gate on (/audio/noise_gate/active)" }
+  audio.analog_out_label: { type: string, description: "Analog output label (/audio/out1/label)" }
+  audio.analog_out_description: { type: string, description: "Analog output description (/audio/out1/desc)" }
+  audio.analog_out_attenuation: { type: float, unit: "dB", description: "Analog output attenuation, -18 to 0 (/audio/out1/attenuation)" }
+  dante.version: { type: string, description: "Dante module software version (/audio/out2/identity/version)" }
+  dante.macs.*: { type: string, description: "Dante MAC address, keyed primary, secondary (/audio/out2/network/ether/macs)" }
+  dante.interfaces.*: { type: string, description: "Dante interface name, keyed primary, secondary (/audio/out2/network/ether/interfaces)" }
+  dante.interface_mapping: { type: string, description: "Dante port mode: AUDIO_SWITCHED or AUDIO_REDUNDANT (/audio/out2/network/ether/interface_mapping)" }
+  dante.netmask.*: { type: string, description: "Current Dante netmask, keyed primary, secondary (/audio/out2/network/ipv4/netmask)" }
+  dante.manual_address.*: { type: string, description: "Dante address used with manual addressing, keyed primary, secondary (/audio/out2/network/ipv4/manual_ipaddr)" }
+  dante.manual_gateway.*: { type: string, description: "Dante gateway used with manual addressing, keyed primary, secondary (/audio/out2/network/ipv4/manual_gateway)" }
+  dante.address.*: { type: string, description: "Current Dante address, keyed primary, secondary (/audio/out2/network/ipv4/ipaddr)" }
+  dante.interface_numbers.*: { type: float, description: "Dante IPv4 interface number, keyed primary, secondary (/audio/out2/network/ipv4/interfaces)" }
+  dante.gateway.*: { type: string, description: "Current Dante gateway, keyed primary, secondary (/audio/out2/network/ipv4/gateway)" }
+  dante.auto.*: { type: bool, description: "Dante automatic addressing, keyed primary, secondary (/audio/out2/network/ipv4/auto)" }
+  audio.dante_out_label: { type: string, description: "Dante output label (/audio/out2/label)" }
+  audio.dante_out_gain: { type: float, unit: "dB", description: "Dante output gain, 0 to 24 (/audio/out2/gain)" }
+  audio.dante_out_description: { type: string, description: "Dante output description (/audio/out2/desc)" }
+  audio.priority_zone.elevation_min: { type: int, unit: deg, description: "Priority zone elevation min (/audio/priority/zones)" }
+  audio.priority_zone.elevation_max: { type: int, unit: deg, description: "Priority zone elevation max (/audio/priority/zones)" }
+  audio.priority_zone.azimuth_min: { type: int, unit: deg, description: "Priority zone azimuth min (/audio/priority/zones)" }
+  audio.priority_zone.azimuth_max: { type: int, unit: deg, description: "Priority zone azimuth max (/audio/priority/zones)" }
+  audio.priority_weight: { type: float, description: "Priority zone weight, 1 to 4 (1.0 neutral) (/audio/priority/weights)" }
+  audio.priority_active: { type: bool, description: "Priority zone active (/audio/priority/active)" }
+  audio.reference_label: { type: string, description: "AEC reference label (/audio/ref1/label)" }
+  audio.reference_gain: { type: float, unit: "dB", description: "AEC reference gain, -60 to +10 (/audio/ref1/gain)" }
+  audio.far_end_auto_adjust: { type: bool, description: "Far-end automatic level adjustment on (/audio/ref1/farend_auto_adjust_enable)" }
+  audio.reference_description: { type: string, description: "AEC reference description (/audio/ref1/desc)" }
+  audio.source_detection: { type: string, description: "Source detection threshold: quiet_room, normal_room or loud_room (/audio/source_detection/threshold)" }
+  audio.voice_lift_emergency_mute_time: { type: float, unit: "s", description: "Voice lift emergency mute time, 1-30 (/audio/voice_lift/emergency_mute_time)" }
+  audio.voice_lift_emergency_mute_threshold: { type: float, unit: "dB", description: "Voice lift emergency mute threshold, -50 to -3 (/audio/voice_lift/emergency_mute_threshold)" }
+  audio.voice_lift: { type: bool, description: "Voice lift on (/audio/voice_lift/active)" }
+  audio.room_in_use: { type: bool, description: "Near-end speech detected (room in use) (/audio/room_in_use)" }
+  audio.mute: { type: bool, description: "Outputs muted (/audio/mute)" }
+  audio.installation: { type: string, description: "Installation: flush_mount or suspended (30 cm or more) (/audio/installation_type)" }
+  beam.orientation_visual: { type: bool, description: "Two LEDs show the 0 degree direction (/beam/orientation/visual)" }
+  beam.orientation_offset: { type: int, unit: "deg", description: "Beam orientation offset in degrees: 0, 90, 180 or 270 (/beam/orientation/offset)" }
+  error.code: { type: int, description: "Code of the last error the device answered (/osc/error): 400 not understood, 404 address not found, 406 not acceptable, 423 locked, ..." }
+  error.address: { type: string, description: "The first method address the last error named" }
+
+telemetry:
+  subscribe:
+    send:
+      - '{"osc":{"state":{"subscribe":[{"#":{"lifetime":60},"device":{"identification":{"visual":null},"button":{"state":null},"update":{"progress":null,"error":null,"enable":null},"led":{"custom":{"color":null,"active":null},"mic_mute":{"color":null},"mic_on":{"color":null},"show_farend_activity":null,"brightness":null},"network":{"ipv4":{"netmask":null,"manual_netmask":null,"manual_ipaddr":null,"manual_gateway":null,"ipaddr":null,"gateway":null,"auto":null},"mdns":null},"system":null,"position":null,"name":null,"location":null},"beam":{"orientation":{"visual":null,"offset":null}}}]}}}'
+      - '{"osc":{"state":{"subscribe":[{"#":{"lifetime":60},"audio":{"equalizer":{"preset":null,"custom":null},"exclusion":{"zones":null,"active":null},"noise_gate":{"threshold":null,"hold_time":null,"active":null},"out1":{"attenuation":null},"out2":{"network":{"ether":{"interface_mapping":null},"ipv4":{"netmask":null,"manual_ipaddr":null,"manual_gateway":null,"ipaddr":null,"gateway":null,"auto":null}},"gain":null},"priority":{"zones":null,"weights":null,"active":null},"ref1":{"gain":null,"farend_auto_adjust_enable":null},"source_detection":{"threshold":null},"voice_lift":{"emergency_mute_time":null,"emergency_mute_threshold":null,"active":null},"room_in_use":null,"mute":null,"installation_type":null}}]}}}'
+      - '{"osc":{"state":{"subscribe":[{"#":{"lifetime":60,"max":250},"m":{"beam":{"elevation":null,"azimuth":null},"in1":{"peak":null},"ref1":{"rms":null}}}]}}}'
+    every_ms: 20000
+  poll:
+    send:
+      - '{"device":{"button":{"label":null,"description":null},"identity":{"version":null,"vendor":null,"serial":null,"product":null,"hw_revision":null},"network":{"ether":{"macs":null,"interfaces":null},"ipv4":{"interfaces":null}},"timeprecision":null,"time":null,"language":null,"date":null},"interface":{"version":null},"audio":{"out1":{"label":null,"desc":null},"out2":{"identity":{"version":null},"network":{"ether":{"macs":null,"interfaces":null},"ipv4":{"interfaces":null}},"label":null,"desc":null},"ref1":{"label":null,"desc":null}}}'
+  updates:
+    - json_match: { "$.m.beam.elevation": '.' }
+      json: { v: "$.m.beam.elevation" }
+      state: { "meters.beam_elevation": "{v}" }
+    - json_match: { "$.m.beam.azimuth": '.' }
+      json: { v: "$.m.beam.azimuth" }
+      state: { "meters.beam_azimuth": "{v}" }
+    - json_match: { "$.m.in1.peak": '.' }
+      json: { v: "$.m.in1.peak" }
+      state: { "meters.input_peak": "{v}" }
+    - json_match: { "$.m.ref1.rms": '.' }
+      json: { v: "$.m.ref1.rms" }
+      state: { "meters.reference_rms": "{v}" }
+    - json_match: { "$.device.identification.visual": '.' }
+      json: { v: "$.device.identification.visual" }
+      state: { "device.identifying": "{v}" }
+    - json_match: { "$.device.button.state": '.' }
+      json: { v: "$.device.button.state" }
+      state: { "device.button": "{v}" }
+    - json_match: { "$.device.button.label": '.' }
+      json: { v: "$.device.button.label" }
+      state: { "device.button_label": "{v}" }
+    - json_match: { "$.device.button.description": '.' }
+      json: { v: "$.device.button.description" }
+      state: { "device.button_description": "{v}" }
+    - json_match: { "$.device.identity.version": '.' }
+      json: { v: "$.device.identity.version" }
+      state: { "device.firmware": "{v}" }
+    - json_match: { "$.device.identity.vendor": '.' }
+      json: { v: "$.device.identity.vendor" }
+      state: { "device.vendor": "{v}" }
+    - json_match: { "$.device.identity.serial": '.' }
+      json: { v: "$.device.identity.serial" }
+      state: { "device.serial": "{v}" }
+    - json_match: { "$.device.identity.product": '.' }
+      json: { v: "$.device.identity.product" }
+      state: { "device.product": "{v}" }
+    - json_match: { "$.device.identity.hw_revision": '.' }
+      json: { v: "$.device.identity.hw_revision" }
+      state: { "device.hardware_revision": "{v}" }
+    - json_match: { "$.device.update.progress": '.' }
+      json: { v: "$.device.update.progress" }
+      state: { "update.progress": "{v}" }
+    - json_match: { "$.device.update.error": '.' }
+      json: { v: "$.device.update.error" }
+      state: { "update.error": "{v}" }
+    - json_match: { "$.device.update.enable": '.' }
+      json: { v: "$.device.update.enable" }
+      state: { "update.running": "{v}" }
+    - json_match: { "$.device.led.custom.color": '.' }
+      json: { v: "$.device.led.custom.color" }
+      state: { "led.custom_color": "{v}" }
+    - json_match: { "$.device.led.custom.active": '.' }
+      json: { v: "$.device.led.custom.active" }
+      state: { "led.custom_active": "{v}" }
+    - json_match: { "$.device.led.mic_mute.color": '.' }
+      json: { v: "$.device.led.mic_mute.color" }
+      state: { "led.mute_color": "{v}" }
+    - json_match: { "$.device.led.mic_on.color": '.' }
+      json: { v: "$.device.led.mic_on.color" }
+      state: { "led.on_color": "{v}" }
+    - json_match: { "$.device.led.show_farend_activity": '.' }
+      json: { v: "$.device.led.show_farend_activity" }
+      state: { "led.show_far_end": "{v}" }
+    - json_match: { "$.device.led.brightness": '.' }
+      json: { v: "$.device.led.brightness" }
+      state: { "led.brightness": "{v}" }
+    - json_match: { "$.device.network.ether.macs": '^\[' }
+      json: { v: "$.device.network.ether.macs[0]" }
+      state: { "network.mac": "{v}" }
+    - json_match: { "$.device.network.ether.interfaces": '^\[' }
+      json: { v: "$.device.network.ether.interfaces[0]" }
+      state: { "network.interface": "{v}" }
+    - json_match: { "$.device.network.ipv4.netmask": '^\[' }
+      json: { v: "$.device.network.ipv4.netmask[0]" }
+      state: { "network.netmask": "{v}" }
+    - json_match: { "$.device.network.ipv4.manual_netmask": '^\[' }
+      json: { v: "$.device.network.ipv4.manual_netmask[0]" }
+      state: { "network.manual_netmask": "{v}" }
+    - json_match: { "$.device.network.ipv4.manual_ipaddr": '^\[' }
+      json: { v: "$.device.network.ipv4.manual_ipaddr[0]" }
+      state: { "network.manual_address": "{v}" }
+    - json_match: { "$.device.network.ipv4.manual_gateway": '^\[' }
+      json: { v: "$.device.network.ipv4.manual_gateway[0]" }
+      state: { "network.manual_gateway": "{v}" }
+    - json_match: { "$.device.network.ipv4.ipaddr": '^\[' }
+      json: { v: "$.device.network.ipv4.ipaddr[0]" }
+      state: { "network.address": "{v}" }
+    - json_match: { "$.device.network.ipv4.interfaces": '^\[' }
+      json: { v: "$.device.network.ipv4.interfaces[0]" }
+      state: { "network.interface_count": "{v}" }
+    - json_match: { "$.device.network.ipv4.gateway": '^\[' }
+      json: { v: "$.device.network.ipv4.gateway[0]" }
+      state: { "network.gateway": "{v}" }
+    - json_match: { "$.device.network.ipv4.auto": '^\[' }
+      json: { v: "$.device.network.ipv4.auto[0]" }
+      state: { "network.auto": "{v}" }
+    - json_match: { "$.device.network.mdns": '.' }
+      json: { v: "$.device.network.mdns" }
+      state: { "network.mdns": "{v}" }
+    - json_match: { "$.device.timeprecision": '.' }
+      json: { v: "$.device.timeprecision" }
+      state: { "device.time_precision": "{v}" }
+    - json_match: { "$.device.time": '.' }
+      json: { v: "$.device.time" }
+      state: { "device.time": "{v}" }
+    - json_match: { "$.device.system": '.' }
+      json: { v: "$.device.system" }
+      state: { "device.system": "{v}" }
+    - json_match: { "$.device.position": '.' }
+      json: { v: "$.device.position" }
+      state: { "device.position": "{v}" }
+    - json_match: { "$.device.name": '.' }
+      json: { v: "$.device.name" }
+      state: { "device.name": "{v}" }
+    - json_match: { "$.device.location": '.' }
+      json: { v: "$.device.location" }
+      state: { "device.location": "{v}" }
+    - json_match: { "$.device.language": '.' }
+      json: { v: "$.device.language" }
+      state: { "device.language": "{v}" }
+    - json_match: { "$.device.date": '.' }
+      json: { v: "$.device.date" }
+      state: { "device.date": "{v}" }
+    - json_match: { "$.interface.version": '.' }
+      json: { v: "$.interface.version" }
+      state: { "device.interface_version": "{v}" }
+    - json_match: { "$.audio.equalizer.preset": '.' }
+      json: { v: "$.audio.equalizer.preset" }
+      state: { "audio.equalizer": "{v}" }
+    - json_match: { "$.audio.equalizer.custom": '^\[' }
+      json: { v0: "$.audio.equalizer.custom[0]", v1: "$.audio.equalizer.custom[1]", v2: "$.audio.equalizer.custom[2]", v3: "$.audio.equalizer.custom[3]", v4: "$.audio.equalizer.custom[4]", v5: "$.audio.equalizer.custom[5]", v6: "$.audio.equalizer.custom[6]" }
+      state: { "audio.equalizer_bands.125": "{v0}", "audio.equalizer_bands.250": "{v1}", "audio.equalizer_bands.500": "{v2}", "audio.equalizer_bands.1000": "{v3}", "audio.equalizer_bands.2000": "{v4}", "audio.equalizer_bands.4000": "{v5}", "audio.equalizer_bands.8000": "{v6}" }
+    - json_match: { "$.audio.exclusion.zones": '^\[' }
+      json: { elevation_min: "$.audio.exclusion.zones[0][0]", elevation_max: "$.audio.exclusion.zones[0][1]", azimuth_min: "$.audio.exclusion.zones[0][2]", azimuth_max: "$.audio.exclusion.zones[0][3]" }
+      state: { "audio.exclusion_zones.1.elevation_min": "{elevation_min}", "audio.exclusion_zones.1.elevation_max": "{elevation_max}", "audio.exclusion_zones.1.azimuth_min": "{azimuth_min}", "audio.exclusion_zones.1.azimuth_max": "{azimuth_max}" }
+    - json_match: { "$.audio.exclusion.zones": '^\[' }
+      json: { elevation_min: "$.audio.exclusion.zones[1][0]", elevation_max: "$.audio.exclusion.zones[1][1]", azimuth_min: "$.audio.exclusion.zones[1][2]", azimuth_max: "$.audio.exclusion.zones[1][3]" }
+      state: { "audio.exclusion_zones.2.elevation_min": "{elevation_min}", "audio.exclusion_zones.2.elevation_max": "{elevation_max}", "audio.exclusion_zones.2.azimuth_min": "{azimuth_min}", "audio.exclusion_zones.2.azimuth_max": "{azimuth_max}" }
+    - json_match: { "$.audio.exclusion.zones": '^\[' }
+      json: { elevation_min: "$.audio.exclusion.zones[2][0]", elevation_max: "$.audio.exclusion.zones[2][1]", azimuth_min: "$.audio.exclusion.zones[2][2]", azimuth_max: "$.audio.exclusion.zones[2][3]" }
+      state: { "audio.exclusion_zones.3.elevation_min": "{elevation_min}", "audio.exclusion_zones.3.elevation_max": "{elevation_max}", "audio.exclusion_zones.3.azimuth_min": "{azimuth_min}", "audio.exclusion_zones.3.azimuth_max": "{azimuth_max}" }
+    - json_match: { "$.audio.exclusion.zones": '^\[' }
+      json: { elevation_min: "$.audio.exclusion.zones[3][0]", elevation_max: "$.audio.exclusion.zones[3][1]", azimuth_min: "$.audio.exclusion.zones[3][2]", azimuth_max: "$.audio.exclusion.zones[3][3]" }
+      state: { "audio.exclusion_zones.4.elevation_min": "{elevation_min}", "audio.exclusion_zones.4.elevation_max": "{elevation_max}", "audio.exclusion_zones.4.azimuth_min": "{azimuth_min}", "audio.exclusion_zones.4.azimuth_max": "{azimuth_max}" }
+    - json_match: { "$.audio.exclusion.zones": '^\[' }
+      json: { elevation_min: "$.audio.exclusion.zones[4][0]", elevation_max: "$.audio.exclusion.zones[4][1]", azimuth_min: "$.audio.exclusion.zones[4][2]", azimuth_max: "$.audio.exclusion.zones[4][3]" }
+      state: { "audio.exclusion_zones.5.elevation_min": "{elevation_min}", "audio.exclusion_zones.5.elevation_max": "{elevation_max}", "audio.exclusion_zones.5.azimuth_min": "{azimuth_min}", "audio.exclusion_zones.5.azimuth_max": "{azimuth_max}" }
+    - json_match: { "$.audio.exclusion.active": '^\[' }
+      json: { v0: "$.audio.exclusion.active[0]", v1: "$.audio.exclusion.active[1]", v2: "$.audio.exclusion.active[2]", v3: "$.audio.exclusion.active[3]", v4: "$.audio.exclusion.active[4]" }
+      state: { "audio.exclusion_active.1": "{v0}", "audio.exclusion_active.2": "{v1}", "audio.exclusion_active.3": "{v2}", "audio.exclusion_active.4": "{v3}", "audio.exclusion_active.5": "{v4}" }
+    - json_match: { "$.audio.noise_gate.threshold": '.' }
+      json: { v: "$.audio.noise_gate.threshold" }
+      state: { "audio.noise_gate_threshold": "{v}" }
+    - json_match: { "$.audio.noise_gate.hold_time": '.' }
+      json: { v: "$.audio.noise_gate.hold_time" }
+      state: { "audio.noise_gate_hold": "{v}" }
+    - json_match: { "$.audio.noise_gate.active": '.' }
+      json: { v: "$.audio.noise_gate.active" }
+      state: { "audio.noise_gate": "{v}" }
+    - json_match: { "$.audio.out1.label": '.' }
+      json: { v: "$.audio.out1.label" }
+      state: { "audio.analog_out_label": "{v}" }
+    - json_match: { "$.audio.out1.desc": '.' }
+      json: { v: "$.audio.out1.desc" }
+      state: { "audio.analog_out_description": "{v}" }
+    - json_match: { "$.audio.out1.attenuation": '.' }
+      json: { v: "$.audio.out1.attenuation" }
+      state: { "audio.analog_out_attenuation": "{v}" }
+    - json_match: { "$.audio.out2.identity.version": '.' }
+      json: { v: "$.audio.out2.identity.version" }
+      state: { "dante.version": "{v}" }
+    - json_match: { "$.audio.out2.network.ether.macs": '^\[' }
+      json: { v0: "$.audio.out2.network.ether.macs[0]", v1: "$.audio.out2.network.ether.macs[1]" }
+      state: { "dante.macs.primary": "{v0}", "dante.macs.secondary": "{v1}" }
+    - json_match: { "$.audio.out2.network.ether.interfaces": '^\[' }
+      json: { v0: "$.audio.out2.network.ether.interfaces[0]", v1: "$.audio.out2.network.ether.interfaces[1]" }
+      state: { "dante.interfaces.primary": "{v0}", "dante.interfaces.secondary": "{v1}" }
+    - json_match: { "$.audio.out2.network.ether.interface_mapping": '.' }
+      json: { v: "$.audio.out2.network.ether.interface_mapping" }
+      state: { "dante.interface_mapping": "{v}" }
+    - json_match: { "$.audio.out2.network.ipv4.netmask": '^\[' }
+      json: { v0: "$.audio.out2.network.ipv4.netmask[0]", v1: "$.audio.out2.network.ipv4.netmask[1]" }
+      state: { "dante.netmask.primary": "{v0}", "dante.netmask.secondary": "{v1}" }
+    - json_match: { "$.audio.out2.network.ipv4.manual_ipaddr": '^\[' }
+      json: { v0: "$.audio.out2.network.ipv4.manual_ipaddr[0]", v1: "$.audio.out2.network.ipv4.manual_ipaddr[1]" }
+      state: { "dante.manual_address.primary": "{v0}", "dante.manual_address.secondary": "{v1}" }
+    - json_match: { "$.audio.out2.network.ipv4.manual_gateway": '^\[' }
+      json: { v0: "$.audio.out2.network.ipv4.manual_gateway[0]", v1: "$.audio.out2.network.ipv4.manual_gateway[1]" }
+      state: { "dante.manual_gateway.primary": "{v0}", "dante.manual_gateway.secondary": "{v1}" }
+    - json_match: { "$.audio.out2.network.ipv4.ipaddr": '^\[' }
+      json: { v0: "$.audio.out2.network.ipv4.ipaddr[0]", v1: "$.audio.out2.network.ipv4.ipaddr[1]" }
+      state: { "dante.address.primary": "{v0}", "dante.address.secondary": "{v1}" }
+    - json_match: { "$.audio.out2.network.ipv4.interfaces": '^\[' }
+      json: { v0: "$.audio.out2.network.ipv4.interfaces[0]", v1: "$.audio.out2.network.ipv4.interfaces[1]" }
+      state: { "dante.interface_numbers.primary": "{v0}", "dante.interface_numbers.secondary": "{v1}" }
+    - json_match: { "$.audio.out2.network.ipv4.gateway": '^\[' }
+      json: { v0: "$.audio.out2.network.ipv4.gateway[0]", v1: "$.audio.out2.network.ipv4.gateway[1]" }
+      state: { "dante.gateway.primary": "{v0}", "dante.gateway.secondary": "{v1}" }
+    - json_match: { "$.audio.out2.network.ipv4.auto": '^\[' }
+      json: { v0: "$.audio.out2.network.ipv4.auto[0]", v1: "$.audio.out2.network.ipv4.auto[1]" }
+      state: { "dante.auto.primary": "{v0}", "dante.auto.secondary": "{v1}" }
+    - json_match: { "$.audio.out2.label": '.' }
+      json: { v: "$.audio.out2.label" }
+      state: { "audio.dante_out_label": "{v}" }
+    - json_match: { "$.audio.out2.gain": '.' }
+      json: { v: "$.audio.out2.gain" }
+      state: { "audio.dante_out_gain": "{v}" }
+    - json_match: { "$.audio.out2.desc": '.' }
+      json: { v: "$.audio.out2.desc" }
+      state: { "audio.dante_out_description": "{v}" }
+    - json_match: { "$.audio.priority.zones": '^\[' }
+      json: { elevation_min: "$.audio.priority.zones[0][0]", elevation_max: "$.audio.priority.zones[0][1]", azimuth_min: "$.audio.priority.zones[0][2]", azimuth_max: "$.audio.priority.zones[0][3]" }
+      state: { "audio.priority_zone.elevation_min": "{elevation_min}", "audio.priority_zone.elevation_max": "{elevation_max}", "audio.priority_zone.azimuth_min": "{azimuth_min}", "audio.priority_zone.azimuth_max": "{azimuth_max}" }
+    - json_match: { "$.audio.priority.weights": '^\[' }
+      json: { v: "$.audio.priority.weights[0]" }
+      state: { "audio.priority_weight": "{v}" }
+    - json_match: { "$.audio.priority.active": '^\[' }
+      json: { v: "$.audio.priority.active[0]" }
+      state: { "audio.priority_active": "{v}" }
+    - json_match: { "$.audio.ref1.label": '.' }
+      json: { v: "$.audio.ref1.label" }
+      state: { "audio.reference_label": "{v}" }
+    - json_match: { "$.audio.ref1.gain": '.' }
+      json: { v: "$.audio.ref1.gain" }
+      state: { "audio.reference_gain": "{v}" }
+    - json_match: { "$.audio.ref1.farend_auto_adjust_enable": '.' }
+      json: { v: "$.audio.ref1.farend_auto_adjust_enable" }
+      state: { "audio.far_end_auto_adjust": "{v}" }
+    - json_match: { "$.audio.ref1.desc": '.' }
+      json: { v: "$.audio.ref1.desc" }
+      state: { "audio.reference_description": "{v}" }
+    - json_match: { "$.audio.source_detection.threshold": '.' }
+      json: { v: "$.audio.source_detection.threshold" }
+      state: { "audio.source_detection": "{v}" }
+    - json_match: { "$.audio.voice_lift.emergency_mute_time": '.' }
+      json: { v: "$.audio.voice_lift.emergency_mute_time" }
+      state: { "audio.voice_lift_emergency_mute_time": "{v}" }
+    - json_match: { "$.audio.voice_lift.emergency_mute_threshold": '.' }
+      json: { v: "$.audio.voice_lift.emergency_mute_threshold" }
+      state: { "audio.voice_lift_emergency_mute_threshold": "{v}" }
+    - json_match: { "$.audio.voice_lift.active": '.' }
+      json: { v: "$.audio.voice_lift.active" }
+      state: { "audio.voice_lift": "{v}" }
+    - json_match: { "$.audio.room_in_use": '.' }
+      json: { v: "$.audio.room_in_use" }
+      state: { "audio.room_in_use": "{v}" }
+    - json_match: { "$.audio.mute": '.' }
+      json: { v: "$.audio.mute" }
+      state: { "audio.mute": "{v}" }
+    - json_match: { "$.audio.installation_type": '.' }
+      json: { v: "$.audio.installation_type" }
+      state: { "audio.installation": "{v}" }
+    - json_match: { "$.beam.orientation.visual": '.' }
+      json: { v: "$.beam.orientation.visual" }
+      state: { "beam.orientation_visual": "{v}" }
+    - json_match: { "$.beam.orientation.offset": '.' }
+      json: { v: "$.beam.orientation.offset" }
+      state: { "beam.orientation_offset": "{v}" }
+    - json_match: { "$.osc.error": '^\[' }
+      json: { code: "$.osc.error[0]" }
+      state: { error.code: "{code}" }

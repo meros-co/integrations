@@ -1,0 +1,1050 @@
+spec: 1
+id: rme-totalmix
+name: RME TotalMix FX (OSC)
+vendor: RME
+category: mixer
+
+# TotalMix FX, the mixer software of RME's interfaces, takes OSC over UDP on
+# a port set for each of up to four remotes (Options, Settings, OSC; typically
+# 7001) and sends its feedback to the remote's address and outgoing port
+# (typically 9001). The addresses follow a control surface: page 1 is a bank
+# of faders on the selected row (inputs, playbacks or outputs) sending to the
+# selected submix, page 2 one channel's settings, page 3 the effects,
+# snapshots, groups and the DURec recorder, page 4 an output's Room EQ.
+# Addressing a page selects it, and TotalMix then sends that page's every
+# value. The host is the computer running TotalMix FX.
+source:
+  - title: "OSC implementation chart, TotalMix FX 1.96 (OscTableTotalMix_240722, 22.07.2024)"
+    author: RME
+    url: https://www.rme-audio.de/downloads/osc_table_totalmix_new.zip
+    note: >
+      Manufacturer document. The scale types (linear 0-1, the fader curve,
+      the 20 Hz-20 kHz frequency scale, on/off, toggle, direct values, and the
+      display strings sent at <address>Val), the 1.96 changes and the 1.90
+      compatibility mode (Comments); the unpaged parameters; pages 1-4 and
+      their parameters.
+  - title: "User's Guide Fireface UFX III, Version 1.6 (02/2026), TotalMix FX chapters"
+    author: RME
+    url: https://www.rme-audio.de/downloads/fface_ufx3_e.pdf
+    note: >
+      Manufacturer document; the TotalMix FX chapters are common to RME's
+      manuals. OSC page: four remotes, ports incoming (typically 7001 or
+      8000) and outgoing (typically 9001 or 9000), the remote's address, Send
+      Peak Level Data, Lock Remote to submix, faders per bank (8 to 48),
+      compatibility mode (25.8.3, p.79); Enable MIDI/OSC Control (25.10, p.81);
+      channels hidden from OSC remotes (25.5.3, p.69); OSC (28.8, p.93).
+
+transport:
+  type: osc-udp
+  port: 7001
+  reply: none
+  listen_port: { setting: feedback_port }
+
+settings:
+  feedback_port: { type: int, min: 1, max: 65535, default: 9001,
+                   label: Feedback port,
+                   description: "Local UDP port this host listens on for TotalMix's feedback; set the remote's outgoing port in TotalMix to this value and its address to this host, or leave it empty to read nothing back." }
+
+ports:
+  - { port: 7001, protocol: udp, role: control, note: "TotalMix FX's incoming port for this remote (typically 7001 or 8000)" }
+  - { port: 9001, protocol: udp, role: feedback, listener: core, setting: feedback_port, note: "where TotalMix sends its feedback (typically 9001 or 9000)" }
+
+maps:
+  snapshot_row: { "1": "8", "2": "7", "3": "6", "4": "5", "5": "4", "6": "3", "7": "2", "8": "1" }
+  group_row: { "1": "4", "2": "3", "3": "2", "4": "1" }
+  page_prefix: { "0": "", "1": "1/", "2": "2/", "3": "3/", "4": "4/" }
+
+models:
+  - id: totalmix-fx
+    name: RME TotalMix FX 1.96 and later (any RME interface it drives)
+    supports:
+      - set_submix
+      - set_bank_start
+      - set_offset_in_bank
+      - load_quick_workspace
+      - select_input_bus
+      - select_playback_bus
+      - select_output_bus
+      - select_input_bus_page2
+      - select_playback_bus_page2
+      - select_output_bus_page2
+      - bank_next
+      - bank_previous
+      - track_next
+      - track_previous
+      - channel_next
+      - channel_previous
+      - room_eq_channel_next
+      - room_eq_channel_previous
+      - toggle_global_mute
+      - toggle_global_solo
+      - toggle_trim
+      - toggle_dim
+      - toggle_speaker_b
+      - toggle_speaker_b_linked
+      - main_recall
+      - toggle_main_mute_fx
+      - toggle_main_mono
+      - toggle_main_ext_in
+      - toggle_talkback
+      - set_main_volume
+      - set_fader
+      - set_fader_pan
+      - set_fader_gain
+      - set_fader_mute
+      - set_fader_phantom
+      - set_fader_solo
+      - set_fader_select
+      - set_fader_cue
+      - toggle_channel_mute
+      - toggle_channel_solo
+      - toggle_channel_phase
+      - toggle_channel_phase_right
+      - toggle_channel_phantom
+      - toggle_channel_instrument
+      - toggle_channel_pad
+      - toggle_channel_ms_proc
+      - toggle_channel_autoset
+      - toggle_channel_loopback
+      - toggle_channel_stereo
+      - toggle_channel_cue
+      - toggle_channel_talkback_sel
+      - toggle_channel_no_trim
+      - toggle_channel_record_enable
+      - toggle_channel_lowcut_enable
+      - toggle_channel_eq_enable
+      - toggle_channel_compexp_enable
+      - toggle_channel_alev_enable
+      - set_channel_volume
+      - set_channel_pan
+      - set_channel_gain
+      - set_channel_gain_right
+      - set_channel_width
+      - set_channel_reverb_send
+      - set_channel_reverb_return
+      - set_channel_lowcut_grade
+      - set_channel_lowcut_freq
+      - set_channel_eq_type1
+      - set_channel_eq_gain1
+      - set_channel_eq_freq1
+      - set_channel_eq_q1
+      - set_channel_eq_gain2
+      - set_channel_eq_freq2
+      - set_channel_eq_q2
+      - set_channel_eq_type3
+      - set_channel_eq_gain3
+      - set_channel_eq_freq3
+      - set_channel_eq_q3
+      - set_channel_compexp_gain
+      - set_channel_compexp_attack
+      - set_channel_compexp_release
+      - set_channel_comp_trsh
+      - set_channel_comp_ratio
+      - set_channel_exp_trsh
+      - set_channel_exp_ratio
+      - set_channel_alev_maxgain
+      - set_channel_alev_headroom
+      - set_channel_alev_risetime
+      - set_channel_reference_level
+      - set_channel_play_track
+      - toggle_reverb_enable
+      - toggle_echo_enable
+      - toggle_record_record_start
+      - toggle_record_play_pause
+      - toggle_record_stop
+      - undo
+      - redo
+      - set_reverb_type
+      - set_reverb_predelay
+      - set_reverb_lowcut
+      - set_reverb_highcut
+      - set_reverb_roomscale
+      - set_reverb_attack
+      - set_reverb_hold
+      - set_reverb_release
+      - set_reverb_time
+      - set_reverb_highdamp
+      - set_reverb_smooth
+      - set_reverb_width
+      - set_reverb_volume
+      - set_echo_type
+      - set_echo_delaytime
+      - set_echo_feedback
+      - set_echo_width
+      - set_echo_volume
+      - load_snapshot
+      - toggle_mute_group
+      - toggle_solo_group
+      - toggle_fader_group
+      - toggle_room_eq_left_channel
+      - toggle_room_eq_right_channel
+      - toggle_room_eq_enable
+      - set_room_eq_delay
+      - set_room_eq_volume_corr
+      - set_room_eq_type1
+      - set_room_eq_type8
+      - set_room_eq_type9
+      - set_room_eq_band_gain
+      - set_room_eq_band_freq
+      - set_room_eq_band_q
+      - send_parameter
+    verification: none
+
+commands:
+  set_submix:
+    summary: "Select the submix (output) the bank's faders send to (/setSubmix), counted from 1"
+    params:
+      submix: { type: int, min: 1, max: 256, required: true, label: "Submix", description: "Submix (output) from 1, as TotalMix numbers single channels." }
+    send: { address: "/setSubmix", args: [ { value: "{submix:-1}", type: float } ] }
+    returns: none
+
+  set_bank_start:
+    summary: "Make a channel the first of the bank on page 1, or the channel of page 2 (/setBankStart), counted from 1"
+    params:
+      channel: { type: int, min: 1, max: 256, required: true, label: "Channel", description: "Channel from 1 (a stereo channel by its left channel)." }
+    send: { address: "/setBankStart", args: [ { value: "{channel:-1}", type: float } ] }
+    returns: none
+
+  set_offset_in_bank:
+    summary: "Choose page 2's channel by its fader in the bank (/setOffsetInBank)"
+    params:
+      fader: { type: int, min: 1, max: 48, required: true, label: "Fader", description: "Fader position in the bank, 1 to the faders per bank (8 by default, up to 48)." }
+    send: { address: "/setOffsetInBank", args: [ { value: "{fader:-1}", type: float } ] }
+    returns: none
+
+  load_quick_workspace:
+    summary: "Load a Quick Workspace (/loadQuickWorkspace)"
+    params:
+      workspace: { type: int, min: 1, max: 30, required: true, label: "Workspace", description: "Quick Workspace, 1 to 30, if configured." }
+    send: { address: "/loadQuickWorkspace", args: [ { value: "{workspace}", type: float } ] }
+    returns: none
+
+  select_input_bus:
+    summary: "Show the input row on page 1 (/1/busInput)"
+    send: { address: "/1/busInput", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  select_playback_bus:
+    summary: "Show the playback row on page 1 (/1/busPlayback)"
+    send: { address: "/1/busPlayback", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  select_output_bus:
+    summary: "Show the output row on page 1 (/1/busOutput)"
+    send: { address: "/1/busOutput", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  select_input_bus_page2:
+    summary: "Show the input row on page 2 (/2/busInput)"
+    send: { address: "/2/busInput", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  select_playback_bus_page2:
+    summary: "Show the playback row on page 2 (/2/busPlayback)"
+    send: { address: "/2/busPlayback", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  select_output_bus_page2:
+    summary: "Show the output row on page 2 (/2/busOutput)"
+    send: { address: "/2/busOutput", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  bank_next:
+    summary: "Move the bank on by its size (/1/bank+)"
+    send: { address: "/1/bank+", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  bank_previous:
+    summary: "Move the bank back by its size (/1/bank-)"
+    send: { address: "/1/bank-", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  track_next:
+    summary: "Move the bank start on by one channel (/1/track+)"
+    send: { address: "/1/track+", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  track_previous:
+    summary: "Move the bank start back by one channel (/1/track-)"
+    send: { address: "/1/track-", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  channel_next:
+    summary: "Show the next channel on page 2 (/2/track+)"
+    send: { address: "/2/track+", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  channel_previous:
+    summary: "Show the previous channel on page 2 (/2/track-)"
+    send: { address: "/2/track-", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  room_eq_channel_next:
+    summary: "Show the next output's Room EQ on page 4 (/4/track+)"
+    send: { address: "/4/track+", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  room_eq_channel_previous:
+    summary: "Show the previous output's Room EQ on page 4 (/4/track-)"
+    send: { address: "/4/track-", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_global_mute:
+    summary: "Toggle global mute (/1/globalMute)"
+    send: { address: "/1/globalMute", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_global_solo:
+    summary: "Toggle global solo (/1/globalSolo)"
+    send: { address: "/1/globalSolo", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_trim:
+    summary: "Toggle trim mode for every channel (/1/trim)"
+    send: { address: "/1/trim", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_dim:
+    summary: "Toggle the main output's dim (/1/mainDim)"
+    send: { address: "/1/mainDim", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_speaker_b:
+    summary: "Toggle speaker B (/1/mainSpeakerB)"
+    send: { address: "/1/mainSpeakerB", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_speaker_b_linked:
+    summary: "Toggle speaker B's volume link to the main (/1/speakerBLinked)"
+    send: { address: "/1/speakerBLinked", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  main_recall:
+    summary: "Toggle the main output's recall volume (/1/mainRecall)"
+    send: { address: "/1/mainRecall", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_main_mute_fx:
+    summary: "Toggle the FX return mute on the main output (/1/mainMuteFx)"
+    send: { address: "/1/mainMuteFx", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_main_mono:
+    summary: "Toggle mono on the main output (/1/mainMono)"
+    send: { address: "/1/mainMono", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_main_ext_in:
+    summary: "Toggle the external input path (/1/mainExtIn)"
+    send: { address: "/1/mainExtIn", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_talkback:
+    summary: "Toggle talkback (/1/mainTalkback)"
+    send: { address: "/1/mainTalkback", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  set_main_volume:
+    summary: "Set the main output volume as a fader position (/1/mastervolume)"
+    params:
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: "Position", description: "Fader position 0 to 1 on TotalMix's fader curve: 1 is +6 dB, about 0.634 is -6 dB, 0 is -inf." }
+    send: { address: "/1/mastervolume", args: [ { value: "{position}", type: float } ] }
+    returns: none
+
+  set_fader:
+    summary: "Set a bank fader's level as a fader position (/1/volume<n>)"
+    params:
+      fader: { type: int, min: 1, max: 48, required: true, label: "Fader", description: "Fader position in the bank, 1 to the faders per bank (8 by default, up to 48)." }
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: "Position", description: "Fader position 0 to 1 on TotalMix's fader curve: 1 is +6 dB, about 0.634 is -6 dB, 0 is -inf." }
+    send: { address: "/1/volume{fader}", args: [ { value: "{position}", type: float } ] }
+    returns: none
+
+  set_fader_pan:
+    summary: "Set a bank fader's pan or balance (/1/pan<n>)"
+    params:
+      fader: { type: int, min: 1, max: 48, required: true, label: "Fader", description: "Fader position in the bank, 1 to the faders per bank (8 by default, up to 48)." }
+      pan: { type: float, min: 0.0, max: 1.0, required: true, label: "Pan", description: "Pan from 0 (left) through 0.5 (centre) to 1 (right)." }
+    send: { address: "/1/pan{fader}", args: [ { value: "{pan}", type: float } ] }
+    returns: none
+
+  set_fader_gain:
+    summary: "Set a bank fader's mic or digital input gain on TotalMix's 0-1 scale (/1/micgain<n>), where the input has one"
+    params:
+      fader: { type: int, min: 1, max: 48, required: true, label: "Fader", description: "Fader position in the bank, 1 to the faders per bank (8 by default, up to 48)." }
+      gain: { type: float, min: 0.0, max: 1.0, required: true, label: "Gain", description: "Gain on a 0 to 1 scale that TotalMix maps per device and channel." }
+    send: { address: "/1/micgain{fader}", args: [ { value: "{gain}", type: float } ] }
+    returns: none
+
+  set_fader_mute:
+    summary: "Turn a bank fader's mute on or off (/1/mute/1/<n>)"
+    params:
+      fader: { type: int, min: 1, max: 48, required: true, label: "Fader", description: "Fader position in the bank, 1 to the faders per bank (8 by default, up to 48)." }
+      enabled: { type: bool, required: true, label: "Mute", description: "On turns it on, off turns it off (mute)." }
+    send: { address: "/1/mute/1/{fader}", args: [ { value: "{enabled:bool01}", type: float } ] }
+    returns: none
+
+  set_fader_phantom:
+    summary: "Turn a bank fader's phantom power on or off (/1/phantom/1/<n>)"
+    params:
+      fader: { type: int, min: 1, max: 48, required: true, label: "Fader", description: "Fader position in the bank, 1 to the faders per bank (8 by default, up to 48)." }
+      enabled: { type: bool, required: true, label: "Phantom power", description: "On turns it on, off turns it off (phantom power)." }
+    send: { address: "/1/phantom/1/{fader}", args: [ { value: "{enabled:bool01}", type: float } ] }
+    returns: none
+
+  set_fader_solo:
+    summary: "Turn a bank fader's solo on or off (/1/solo/1/<n>)"
+    params:
+      fader: { type: int, min: 1, max: 48, required: true, label: "Fader", description: "Fader position in the bank, 1 to the faders per bank (8 by default, up to 48)." }
+      enabled: { type: bool, required: true, label: "Solo", description: "On turns it on, off turns it off (solo (pfl in pfl mode))." }
+    send: { address: "/1/solo/1/{fader}", args: [ { value: "{enabled:bool01}", type: float } ] }
+    returns: none
+
+  set_fader_select:
+    summary: "Turn a bank fader's selection for the ad-hoc fader group on or off (/1/select/1/<n>)"
+    params:
+      fader: { type: int, min: 1, max: 48, required: true, label: "Fader", description: "Fader position in the bank, 1 to the faders per bank (8 by default, up to 48)." }
+      enabled: { type: bool, required: true, label: "Selection for the ad-hoc fader group", description: "On turns it on, off turns it off (selection for the ad-hoc fader group)." }
+    send: { address: "/1/select/1/{fader}", args: [ { value: "{enabled:bool01}", type: float } ] }
+    returns: none
+
+  set_fader_cue:
+    summary: "Turn a bank fader's cue on or off (/1/cue/1/<n>)"
+    params:
+      fader: { type: int, min: 1, max: 48, required: true, label: "Fader", description: "Fader position in the bank, 1 to the faders per bank (8 by default, up to 48)." }
+      enabled: { type: bool, required: true, label: "Cue", description: "On turns it on, off turns it off (cue (outputs))." }
+    send: { address: "/1/cue/1/{fader}", args: [ { value: "{enabled:bool01}", type: float } ] }
+    returns: none
+
+  toggle_channel_mute:
+    summary: "Toggle the selected channel's mute (/2/mute)"
+    send: { address: "/2/mute", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_channel_solo:
+    summary: "Toggle the selected channel's solo or PFL (/2/solo)"
+    send: { address: "/2/solo", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_channel_phase:
+    summary: "Toggle the selected channel's phase invert (left or mono) (/2/phase)"
+    send: { address: "/2/phase", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_channel_phase_right:
+    summary: "Toggle the selected channel's phase invert of the right side (/2/phaseRight)"
+    send: { address: "/2/phaseRight", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_channel_phantom:
+    summary: "Toggle the selected channel's phantom power (/2/phantom)"
+    send: { address: "/2/phantom", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_channel_instrument:
+    summary: "Toggle the selected channel's the instrument option (/2/instrument)"
+    send: { address: "/2/instrument", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_channel_pad:
+    summary: "Toggle the selected channel's the pad (/2/pad)"
+    send: { address: "/2/pad", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_channel_ms_proc:
+    summary: "Toggle the selected channel's M/S processing (/2/msProc)"
+    send: { address: "/2/msProc", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_channel_autoset:
+    summary: "Toggle the selected channel's AutoSet gain (/2/autoset)"
+    send: { address: "/2/autoset", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_channel_loopback:
+    summary: "Toggle the selected channel's loopback (outputs) (/2/loopback)"
+    send: { address: "/2/loopback", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_channel_stereo:
+    summary: "Toggle the selected channel's stereo (/2/stereo)"
+    send: { address: "/2/stereo", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_channel_cue:
+    summary: "Toggle the selected channel's cue (outputs) (/2/cue)"
+    send: { address: "/2/cue", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_channel_talkback_sel:
+    summary: "Toggle the selected channel's talkback inclusion (outputs) (/2/talkbackSel)"
+    send: { address: "/2/talkbackSel", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_channel_no_trim:
+    summary: "Toggle the selected channel's trim exclusion (outputs) (/2/noTrim)"
+    send: { address: "/2/noTrim", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_channel_record_enable:
+    summary: "Toggle the selected channel's record enable (/2/recordEnable)"
+    send: { address: "/2/recordEnable", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_channel_lowcut_enable:
+    summary: "Toggle the selected channel's the low cut (/2/lowcutEnable)"
+    send: { address: "/2/lowcutEnable", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_channel_eq_enable:
+    summary: "Toggle the selected channel's the parametric EQ (/2/eqEnable)"
+    send: { address: "/2/eqEnable", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_channel_compexp_enable:
+    summary: "Toggle the selected channel's the compressor/expander (/2/compexpEnable)"
+    send: { address: "/2/compexpEnable", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_channel_alev_enable:
+    summary: "Toggle the selected channel's auto level (/2/alevEnable)"
+    send: { address: "/2/alevEnable", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  set_channel_volume:
+    summary: "Set the selected channel's level as a fader position (TotalMix's fader curve) (/2/volume)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The level as a fader position, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/volume", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_pan:
+    summary: "Set the selected channel's pan or balance, 0 left to 1 right (/2/pan)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The pan or balance, 0 left to 1 right, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/pan", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_gain:
+    summary: "Set the selected channel's input gain on TotalMix's 0-1 scale (/2/gain)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The input gain on TotalMix's 0-1 scale, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/gain", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_gain_right:
+    summary: "Set the selected channel's right-side input gain of a stereo channel (/2/gainRight)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The right-side input gain of a stereo channel, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/gainRight", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_width:
+    summary: "Set the selected channel's stereo width (/2/width)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The stereo width, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/width", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_reverb_send:
+    summary: "Set the selected channel's reverb send (/2/reverbSend)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The reverb send, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/reverbSend", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_reverb_return:
+    summary: "Set the selected channel's reverb return (outputs) (/2/reverbReturn)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The reverb return, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/reverbReturn", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_lowcut_grade:
+    summary: "Set the selected channel's low cut slope (its choices spread over 0-1) (/2/lowcutGrade)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The low cut slope, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/lowcutGrade", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_lowcut_freq:
+    summary: "Set the selected channel's low cut frequency on the 20 Hz-20 kHz log scale (/2/lowcutFreq)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The low cut frequency on the 20 Hz-20 kHz log scale, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/lowcutFreq", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_eq_type1:
+    summary: "Set the selected channel's EQ band 1 type (its choices spread over 0-1) (/2/eqType1)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The EQ band 1 type, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/eqType1", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_eq_gain1:
+    summary: "Set the selected channel's EQ band 1 gain (/2/eqGain1)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The EQ band 1 gain, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/eqGain1", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_eq_freq1:
+    summary: "Set the selected channel's EQ band 1 frequency (log scale) (/2/eqFreq1)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The EQ band 1 frequency, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/eqFreq1", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_eq_q1:
+    summary: "Set the selected channel's EQ band 1 Q (/2/eqQ1)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The EQ band 1 Q, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/eqQ1", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_eq_gain2:
+    summary: "Set the selected channel's EQ band 2 gain (/2/eqGain2)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The EQ band 2 gain, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/eqGain2", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_eq_freq2:
+    summary: "Set the selected channel's EQ band 2 frequency (log scale) (/2/eqFreq2)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The EQ band 2 frequency, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/eqFreq2", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_eq_q2:
+    summary: "Set the selected channel's EQ band 2 Q (/2/eqQ2)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The EQ band 2 Q, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/eqQ2", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_eq_type3:
+    summary: "Set the selected channel's EQ band 3 type (its choices spread over 0-1) (/2/eqType3)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The EQ band 3 type, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/eqType3", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_eq_gain3:
+    summary: "Set the selected channel's EQ band 3 gain (/2/eqGain3)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The EQ band 3 gain, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/eqGain3", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_eq_freq3:
+    summary: "Set the selected channel's EQ band 3 frequency (log scale) (/2/eqFreq3)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The EQ band 3 frequency, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/eqFreq3", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_eq_q3:
+    summary: "Set the selected channel's EQ band 3 Q (/2/eqQ3)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The EQ band 3 Q, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/eqQ3", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_compexp_gain:
+    summary: "Set the selected channel's compressor make-up gain (/2/compexpGain)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The compressor make-up gain, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/compexpGain", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_compexp_attack:
+    summary: "Set the selected channel's compressor attack (/2/compexpAttack)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The compressor attack, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/compexpAttack", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_compexp_release:
+    summary: "Set the selected channel's compressor release (/2/compexpRelease)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The compressor release, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/compexpRelease", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_comp_trsh:
+    summary: "Set the selected channel's compressor threshold (/2/compTrsh)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The compressor threshold, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/compTrsh", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_comp_ratio:
+    summary: "Set the selected channel's compressor ratio (/2/compRatio)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The compressor ratio, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/compRatio", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_exp_trsh:
+    summary: "Set the selected channel's expander threshold (/2/expTrsh)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The expander threshold, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/expTrsh", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_exp_ratio:
+    summary: "Set the selected channel's expander ratio (/2/expRatio)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The expander ratio, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/expRatio", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_alev_maxgain:
+    summary: "Set the selected channel's auto level maximum gain (/2/alevMaxgain)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The auto level maximum gain, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/alevMaxgain", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_alev_headroom:
+    summary: "Set the selected channel's auto level headroom (/2/alevHeadroom)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The auto level headroom, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/alevHeadroom", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_alev_risetime:
+    summary: "Set the selected channel's auto level rise speed (/2/alevRisetime)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The auto level rise speed, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/2/alevRisetime", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_channel_reference_level:
+    summary: "Set the selected channel's analog reference level (/2/refLevel), 0-3 by device and channel"
+    params:
+      level: { type: int, min: 0, max: 3, required: true, label: "Reference level", description: "Reference level index, 0 to 3, as the device and channel offer." }
+    send: { address: "/2/refLevel", args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  set_channel_play_track:
+    summary: "Choose the DURec playback track for the selected channel (/2/playChannel), 0 for off"
+    params:
+      track: { type: int, min: 0, max: 64, required: true, label: "Track", description: "Track in the file, or 0 for off." }
+    send: { address: "/2/playChannel", args: [ { value: "{track}", type: float } ] }
+    returns: none
+
+  toggle_reverb_enable:
+    summary: "Toggle the reverb (/3/reverbEnable)"
+    send: { address: "/3/reverbEnable", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_echo_enable:
+    summary: "Toggle the echo (/3/echoEnable)"
+    send: { address: "/3/echoEnable", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_record_record_start:
+    summary: "Toggle DURec record (/3/recordRecordStart)"
+    send: { address: "/3/recordRecordStart", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_record_play_pause:
+    summary: "Toggle DURec play/pause (/3/recordPlayPause)"
+    send: { address: "/3/recordPlayPause", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_record_stop:
+    summary: "Toggle DURec stop (/3/recordStop)"
+    send: { address: "/3/recordStop", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  undo:
+    summary: "Undo the last change (/3/undo)"
+    send: { address: "/3/undo", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  redo:
+    summary: "Redo (/3/redo)"
+    send: { address: "/3/redo", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  set_reverb_type:
+    summary: "Set the reverb type (its choices spread over 0-1) (/3/reverbType)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The reverb type, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/3/reverbType", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_reverb_predelay:
+    summary: "Set the reverb pre-delay (/3/reverbPredelay)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The reverb pre-delay, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/3/reverbPredelay", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_reverb_lowcut:
+    summary: "Set the reverb low cut (log scale) (/3/reverbLowcut)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The reverb low cut, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/3/reverbLowcut", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_reverb_highcut:
+    summary: "Set the reverb high cut (log scale) (/3/reverbHighcut)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The reverb high cut, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/3/reverbHighcut", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_reverb_roomscale:
+    summary: "Set the reverb room scale (/3/reverbRoomscale)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The reverb room scale, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/3/reverbRoomscale", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_reverb_attack:
+    summary: "Set the reverb attack (envelope types) (/3/reverbAttack)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The reverb attack, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/3/reverbAttack", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_reverb_hold:
+    summary: "Set the reverb hold (envelope types) (/3/reverbHold)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The reverb hold, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/3/reverbHold", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_reverb_release:
+    summary: "Set the reverb release (envelope types) (/3/reverbRelease)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The reverb release, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/3/reverbRelease", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_reverb_time:
+    summary: "Set the reverb time (Space type) (/3/reverbTime)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The reverb time, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/3/reverbTime", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_reverb_highdamp:
+    summary: "Set the reverb high damp (Space type, log scale) (/3/reverbHighdamp)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The reverb high damp, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/3/reverbHighdamp", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_reverb_smooth:
+    summary: "Set the reverb smoothness (/3/reverbSmooth)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The reverb smoothness, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/3/reverbSmooth", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_reverb_width:
+    summary: "Set the reverb width (/3/reverbWidth)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The reverb width, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/3/reverbWidth", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_reverb_volume:
+    summary: "Set the reverb volume (/3/reverbVolume)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The reverb volume, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/3/reverbVolume", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_echo_type:
+    summary: "Set the echo type (its choices spread over 0-1) (/3/echoType)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The echo type, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/3/echoType", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_echo_delaytime:
+    summary: "Set the echo delay time (/3/echoDelaytime)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The echo delay time, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/3/echoDelaytime", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_echo_feedback:
+    summary: "Set the echo feedback (/3/echoFeedback)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The echo feedback, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/3/echoFeedback", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_echo_width:
+    summary: "Set the echo width (/3/echoWidth)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The echo width, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/3/echoWidth", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_echo_volume:
+    summary: "Set the echo volume (/3/echoVolume)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The echo volume, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/3/echoVolume", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  load_snapshot:
+    summary: "Load a snapshot, 1 to 8 (/3/snapshots/<9-n>/1)"
+    params:
+      snapshot: { type: int, min: 1, max: 8, required: true, label: "Snapshot", description: "Snapshot 1 to 8." }
+    send: { address: "/3/snapshots/{snapshot:map.snapshot_row}/1", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_mute_group:
+    summary: "Toggle mute group 1 to 4 (/3/muteGroups/<5-n>/1)"
+    params:
+      group: { type: int, min: 1, max: 4, required: true, label: "Group", description: "Group 1 to 4." }
+    send: { address: "/3/muteGroups/{group:map.group_row}/1", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_solo_group:
+    summary: "Toggle solo group 1 to 4 (/3/soloGroups/<5-n>/1)"
+    params:
+      group: { type: int, min: 1, max: 4, required: true, label: "Group", description: "Group 1 to 4." }
+    send: { address: "/3/soloGroups/{group:map.group_row}/1", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_fader_group:
+    summary: "Toggle fader group 1 to 4 (/3/faderGroups/<5-n>/1)"
+    params:
+      group: { type: int, min: 1, max: 4, required: true, label: "Group", description: "Group 1 to 4." }
+    send: { address: "/3/faderGroups/{group:map.group_row}/1", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_room_eq_left_channel:
+    summary: "Toggle left channel selection on page 4 (/4/leftChannel)"
+    send: { address: "/4/leftChannel", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_room_eq_right_channel:
+    summary: "Toggle right channel selection on page 4 (/4/rightChannel)"
+    send: { address: "/4/rightChannel", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  toggle_room_eq_enable:
+    summary: "Toggle the Room EQ on page 4 (/4/reqEnable)"
+    send: { address: "/4/reqEnable", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  set_room_eq_delay:
+    summary: "Set the Room EQ delay (/4/reqDelay)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The Room EQ delay, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/4/reqDelay", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_room_eq_volume_corr:
+    summary: "Set the Room EQ volume correction (/4/reqVolumeCorr)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The Room EQ volume correction, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/4/reqVolumeCorr", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_room_eq_type1:
+    summary: "Set the Room EQ band 1 type (/4/reqType1)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The Room EQ band 1 type, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/4/reqType1", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_room_eq_type8:
+    summary: "Set the Room EQ band 8 type (/4/reqType8)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The Room EQ band 8 type, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/4/reqType8", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_room_eq_type9:
+    summary: "Set the Room EQ band 9 type (/4/reqType9)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The Room EQ band 9 type, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/4/reqType9", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_room_eq_band_gain:
+    summary: "Set a Room EQ band's gain (/4/reqGain<n>)"
+    params:
+      band: { type: int, min: 1, max: 9, required: true, label: "Band", description: "Room EQ band, 1 to 9." }
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The band's gain, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/4/reqGain{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_room_eq_band_freq:
+    summary: "Set a Room EQ band's frequency (log scale) (/4/reqFreq<n>)"
+    params:
+      band: { type: int, min: 1, max: 9, required: true, label: "Band", description: "Room EQ band, 1 to 9." }
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The band's frequency, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/4/reqFreq{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_room_eq_band_q:
+    summary: "Set a Room EQ band's Q (/4/reqQ<n>)"
+    params:
+      band: { type: int, min: 1, max: 9, required: true, label: "Band", description: "Room EQ band, 1 to 9." }
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: "Value", description: "The band's Q, 0 to 1 on TotalMix's scale for it." }
+    send: { address: "/4/reqQ{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  send_parameter:
+    summary: "Send any parameter of the OSC chart as a float (/<page>/<name>); page 0 for the unpaged ones"
+    params:
+      page: { type: int, min: 0, max: 4, required: true, label: "Page", description: "Page 1 to 4, or 0 for the unpaged parameters (setSubmix, setBankStart, setOffsetInBank, loadQuickWorkspace)." }
+      name: { type: string, max_length: 64, pattern: "^[A-Za-z0-9+/-]+$", required: true, label: "Parameter", description: "The parameter name as the chart writes it, such as volume3 or mute/1/3." }
+      value: { type: float, required: true, label: "Value", description: "The value, 0 to 1 for most parameters (1 toggles a toggle)." }
+    send: { address: "/{page:map.page_prefix}{name}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      load_snapshot and load_quick_workspace replace the mix at once, and
+      undo, redo and the group toggles change many channels; none can be
+      undone from here.
+  - models: [all]
+    severity: warning
+    text: >
+      TotalMix's OSC is bank-oriented, not channel-oriented: page 1's faders
+      are positions in the bank on the selected row, and page 2 shows the
+      channel at the bank start plus the offset. Navigate first (select a
+      row, set_bank_start, set_submix), then set. State follows the same
+      model: pages.<page>.<parameter> holds what TotalMix last sent for that
+      control, and display.<page>.<parameter> its display text. Hidden
+      channels are skipped in the bank. Enable MIDI/OSC Control must be on,
+      and with Lock Remote to submix the remote can change only that submix.
+  - models: [all]
+    severity: info
+    text: >
+      TotalMix sends its feedback to the address and outgoing port set for the
+      remote, and sends a page's every value when the page is selected (by
+      any message to it); nothing documented asks for state, so state fills
+      as TotalMix sends it. Meters arrive only with Send Peak Level Data on.
+      Toggle parameters change on 1.0 and TotalMix answers with the state;
+      levels and most settings are 0 to 1 on TotalMix's scale for each, with
+      the readable value in the matching display text. In 1.90 compatibility
+      mode gains, EQ types and some ranges are scaled the old way.
+
+state:
+  pages.*.*:   { type: float, description: "The value TotalMix last sent for a control, keyed by page (1-4) then the chart's parameter name (volume1, mute/1/3, eqGain1, snapshots/8/1, ...), 0 to 1 on the control's scale" }
+  display.*.*: { type: string, description: "Text TotalMix sent for a control, keyed by page then name: display values (volume1Val, as dB or a choice), channel names (trackname1), the submix name, recorder time and state" }
+
+telemetry:
+  updates:
+    - address: '^/([1-4])/(.+)$'
+      arg_types: f
+      state: { "pages.{1}.{2:key}": "{arg0}" }
+    - address: '^/([1-4])/(.+)$'
+      arg_types: s
+      state: { "display.{1}.{2:key}": "{arg0}" }

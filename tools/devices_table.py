@@ -59,6 +59,7 @@ NATIVE = {
     "generic-snmp": "SNMP v1, v2c or v3 over UDP 161; traps and informs",
     "generic-tcp-udp": "Text or bytes over TCP, UDP or a serial port",
     "generic-websocket": "Text, bytes or JSON over WebSocket (ws or wss)",
+    "aes67-sap": "SAP with SDP on multicast UDP 9875 (239.255.255.255); hears and announces",
     "christie-pandorasbox": "Pandoras Box Automation binary messages over TCP 6211",
     "epson-projector": "ESC/VP21 over ESC/VP.net (TCP 3629) or a serial port",
     "labgruppen-lake": "DLM over UDP 6016 (or 6015, answers on 6004)",
