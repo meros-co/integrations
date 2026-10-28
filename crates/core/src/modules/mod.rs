@@ -149,6 +149,8 @@ mod philips_sicp;
 mod pjlink;
 #[cfg(feature = "posistagenet")]
 mod posistagenet;
+#[cfg(feature = "ptp")]
+mod ptp;
 #[cfg(feature = "qsys")]
 mod qsys;
 #[cfg(feature = "resolume")]
@@ -320,6 +322,8 @@ pub(crate) fn construct(
         "sacn" => Ok(Box::new(sacn::Sacn::new(context)?)),
         #[cfg(feature = "posistagenet")]
         "posistagenet" => Ok(Box::new(posistagenet::Psn::new(context)?)),
+        #[cfg(feature = "ptp")]
+        "ptp" => Ok(Box::new(ptp::Ptp::new(context)?)),
         #[cfg(feature = "osc-listener")]
         "osc-listener" => Ok(Box::new(osc_listener::OscListener::new(context)?)),
         #[cfg(feature = "tsl-umd-display")]
@@ -558,10 +562,17 @@ mod tests {
                     // These send nothing until asked (a request, a watched
                     // stream), so there is nothing to compare on starting.
                     // An sACN source sends nothing before it holds a
-                    // universe, nor a PSN server before it has a tracker.
+                    // universe, nor a PSN server before it has a tracker;
+                    // a PTP monitor only listens.
                     if used.is_none()
-                        && ["generic-http", "http-snapshot", "posistagenet", "sacn"]
-                            .contains(&spec.id.as_str())
+                        && [
+                            "generic-http",
+                            "http-snapshot",
+                            "posistagenet",
+                            "ptp",
+                            "sacn",
+                        ]
+                        .contains(&spec.id.as_str())
                     {
                         continue;
                     }

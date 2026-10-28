@@ -3277,6 +3277,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the media and audio playlist replies: the document gives media's items as an object with array fields and audio's reply as an array of playlists; an object with id and an items array is assumed for both. ([specs/propresenter.yaml:2260](specs/propresenter.yaml#L2260))
 - [ ] Open POST /v1/status/updates with Accept application/json and confirm each update arrives as {"url", "data"} followed by a blank line (not as server-sent events), that url carries /v1 as the document's example does, and that data is what each endpoint's own GET returns; and record whether the stream ends when ProPresenter changes presentations. ([specs/propresenter.yaml:1756](specs/propresenter.yaml#L1756))
 
+## ptp — PTP version 2 (IEEE 1588) network monitor
+
+- [ ] On a SMPTE ST 2059-2 or AES67 network with a real grandmaster (and a boundary clock), confirm the Announce dataset, the best master and the clock accuracy and time source texts match what the grandmaster's own interface shows. ([specs/ptp.yaml:87](specs/ptp.yaml#L87))
+- [ ] Confirm the Delay_Req (1) and Delay_Resp (9) message types and the slave role they show, taken from a BSD-licensed decoder rather than IEEE 1588's own text, against a real end-to-end network. ([specs/ptp.yaml:107](specs/ptp.yaml#L107))
+- [ ] Check host_offset_ms on a host disciplined by PTP (it should stay within a millisecond or so) and on one that is not, and that sharing ports 319 and 320 with a PTP daemon on the same host works on Windows, Linux and macOS. ([specs/ptp.yaml:158](specs/ptp.yaml#L158))
+
 ## ptzoptics — PTZOptics
 
 - [ ] Check whether the camera asks for digest authentication (the document says all endpoints use it, the examples send none). ([specs/ptzoptics.yaml:1681](specs/ptzoptics.yaml#L1681))
