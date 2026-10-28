@@ -55,6 +55,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the value ranges Live accepts for tempo, song and scene signatures, clip transposition and detune, groove amount (the Live Object Model says 0 to 1), and what Live does with a value outside them. ([specs/ableton-live.yaml:3097](specs/ableton-live.yaml#L3097))
 - [ ] Confirm /live/startup is sent when Live loads another Set, so the rule registering everything again runs then. ([specs/ableton-live.yaml:3112](specs/ableton-live.yaml#L3112))
 
+## adder-xdip — Adder XDIP receivers
+
+- [ ] Check that a switch with an expired token (after a day) is answered 401, which logs in again, and that a receiver without an Access password answers the access login with 401. ([specs/adder-xdip.yaml:49](specs/adder-xdip.yaml#L49))
+
 ## aes70 — AES70 / OCA devices
 
 - [ ] Check the device's OCP.1 port (AES70 assigns none) and which transports it accepts: TCP, UDP, WebSocket (and its path), or only secure OCP.1. ([specs/aes70.yaml:401](specs/aes70.yaml#L401))

@@ -1,0 +1,215 @@
+spec: 1
+id: adder-xdip
+name: Adder XDIP KVM-over-IP receivers (public REST API)
+vendor: Adder Technology
+category: other
+
+# Each XDIP receiver is controlled on its own, over HTTPS on 8443 with a
+# self-signed certificate, once Enable Remote Control is ticked in its OSD
+# (Advanced, Network Info). Reads need no login; switching channels takes an
+# access token from POST /api/nodes/self/access with the receiver's Access
+# password, sent back as Authorization: Bearer and valid for a day.
+
+source:
+  - title: XDIP Public REST API (public-rest-api.yaml, version 1.05)
+    author: Adder Technology
+    url: https://support.adder.com/tiki/tiki-download_file.php?fileId=721
+    note: >
+      The OpenAPI 2.0 definition the support wiki links as "Download XDIP API": base path /api over HTTPS with TLS 1.2;
+      GET /channels, /channels/{id}, /channels/connected (id 0x7fffffff when not connected), /channels/maximumAllowed,
+      /channels/status (summary disconnected, connecting, connected, failedAuthorisation, failedResolution, noVideo;
+      connections with id, state disconnected, connecting or connected, and status unknown, ok, badAuthorisation,
+      incompatibleResolution or noInput); POST /channels/{id}/switch with Authorization 'Bearer JWT' (204, 401, 404;
+      id 0x7fffffff disconnects); GET /nodes/{uuid} (self for the receiver) and /nodes/selected (uuid, name,
+      description, type transmitter, receiver or startOfLife, active, serialNumber, macAddress); POST
+      /nodes/self/access with accessPassword, answered with accessToken (401 for a wrong password); GET
+      /localComputer (name, description); ETag and If-None-Match on the reads.
+  - title: "XDIP: Using the API (Adder Support Wiki, last modified 15 January 2021)"
+    author: Adder Technology
+    url: https://support.adder.com/tiki/tiki-index.php?page=XDIP%3A%20Using%20the%20API
+    note: >
+      Firmware 1.05 or later; the API off by default and turned on in the receiver's OSD (Advanced, Network Info,
+      Enable Remote Control); HTTPS on port 8443 with a self-signed certificate; each receiver controlled
+      independently; an Access password set on the receiver; a token valid for one day; no configuration through the
+      API; poll rather than keep connections open, and not continuously.
+
+transport:
+  type: http
+  port: 8443
+  scheme: https
+  accept_invalid_certs: true
+  auth: none
+  timeout_ms: 5000
+  probe: { method: GET, path: /api/channels/connected }
+  session:
+    # Only switching needs the token; without an Access password nothing logs in.
+    when_set: password
+    login: { method: POST, path: /api/nodes/self/access, body: '{"accessPassword":{settings.password:json}}', content_type: application/json }
+    capture: { json: $.accessToken, header: Authorization, scheme: Bearer }
+    relogin: { status: [401] }
+    refused: { status: [401] }
+
+settings:
+  password: { type: string, secret: true, max_length: 31, default: "", label: Access password,
+              description: "The receiver's Access password, set when it was configured or under its General settings; needed to switch channels." }
+
+ports:
+  - { port: 8443, protocol: https, role: control }
+
+models:
+  - id: xdip-receiver
+    name: Adder XDIP receiver (firmware 1.05 or later, Enable Remote Control on)
+    supports: [get_channels, get_channel, get_connected_channel, get_channel_status, get_max_channels,
+               switch_channel, disconnect, get_self, get_node, get_selected_nodes, get_local_computer]
+    verification: none
+
+commands:
+  get_channels:
+    summary: "The channels configured on the receiver, each {id, nodes: [{nodeUuid}]} (GET /api/channels)"
+    send: { method: GET, path: /api/channels }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_channel:
+    summary: "One channel, {id, nodes} (GET /api/channels/{id}); 404 when the id is out of range"
+    params:
+      id: { type: int, min: 0, max: 2147483646, required: true, label: Channel, description: "The channel id, which is also its hot key and its place on the channel OSD." }
+    send: { method: GET, path: "/api/channels/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_connected_channel:
+    summary: The channel the receiver is connected to, 2147483647 (0x7fffffff) for none (GET /api/channels/connected)
+    send: { method: GET, path: /api/channels/connected }
+    expect: { status: 200, json_path: "$.id" }
+    returns: value
+  get_channel_status:
+    summary: "The current channel's status: {summary, connections} (GET /api/channels/status)"
+    send: { method: GET, path: /api/channels/status }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_max_channels:
+    summary: The most channels the receiver supports (GET /api/channels/maximumAllowed)
+    send: { method: GET, path: /api/channels/maximumAllowed }
+    expect: { status: 200, json_path: "$.count" }
+    returns: value
+  switch_channel:
+    summary: Switch the receiver to a channel (POST /api/channels/{id}/switch, with the access token)
+    params:
+      id: { type: int, min: 0, max: 2147483646, required: true, label: Channel, description: "The channel id to connect to." }
+    send:
+      - { method: POST, path: "/api/channels/{id}/switch" }
+      - { method: GET, path: /api/channels/connected }
+    expect: { status: [200, 204] }
+    returns: ack
+  disconnect:
+    summary: Disconnect the receiver from its channel (POST /api/channels/2147483647/switch)
+    send:
+      - { method: POST, path: /api/channels/2147483647/switch }
+      - { method: GET, path: /api/channels/connected }
+    expect: { status: [200, 204] }
+    returns: ack
+  get_self:
+    summary: "The receiver itself: {uuid, name, description, type, active, serialNumber, macAddress} (GET /api/nodes/self)"
+    send: { method: GET, path: /api/nodes/self }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_node:
+    summary: "A node (transmitter or receiver) by its uuid (GET /api/nodes/{uuid}); 404 when unknown"
+    params:
+      uuid: { type: string, pattern: '^[0-9A-Fa-f-]{1,36}$', required: true, label: Node, description: "The node's unique id, as a channel's nodes give it." }
+    send: { method: GET, path: "/api/nodes/{uuid}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_selected_nodes:
+    summary: The nodes the receiver's channels use, with their details (GET /api/nodes/selected)
+    send: { method: GET, path: /api/nodes/selected }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_local_computer:
+    summary: "The computer attached to the receiver: {name, description} (GET /api/localComputer)"
+    send: { method: GET, path: /api/localComputer }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+state:
+  channel.connected: { type: int, description: "The channel the receiver is connected to; 2147483647 (0x7fffffff) when none, as the receiver reports it" }
+  channel.status: { type: string, description: "The current channel's summary: disconnected, connecting, connected, failedAuthorisation, failedResolution or noVideo" }
+  channel.connections.*.id: { type: string, description: "A connection of the current channel, in order: what kind it is" }
+  channel.connections.*.state: { type: string, description: "disconnected, connecting or connected" }
+  channel.connections.*.status: { type: string, description: "unknown, ok, badAuthorisation, incompatibleResolution or noInput" }
+  channels.*.node: { type: string, description: "A configured channel, keyed by its id: the uuid of its node" }
+  max_channels: { type: int, description: "The most channels the receiver supports" }
+  receiver.uuid: { type: string, description: "The receiver's unique id" }
+  receiver.name: { type: string, description: "Its friendly name" }
+  receiver.description: { type: string, description: "Its description" }
+  receiver.active: { type: bool, description: "Whether it is powered and on the network" }
+  receiver.serial_number: { type: string, description: "Its serial number" }
+  receiver.mac_address: { type: string, description: "Its MAC address" }
+  nodes.*.name: { type: string, description: "A node the channels use, keyed by uuid: its name" }
+  nodes.*.description: { type: string, description: "Its description" }
+  nodes.*.type: { type: string, description: "transmitter, receiver or startOfLife" }
+  nodes.*.active: { type: bool, description: "Whether it is powered and on the network" }
+  nodes.*.serial_number: { type: string, description: "Its serial number" }
+  nodes.*.mac_address: { type: string, description: "Its MAC address" }
+  local_computer.name: { type: string, description: "The name of the computer attached to the receiver" }
+  local_computer.description: { type: string, description: "Its description" }
+
+telemetry:
+  poll:
+    - every_ms: 2000
+      send:
+        - { method: GET, path: /api/channels/connected }
+        - { method: GET, path: /api/channels/status }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /api/channels }
+        - { method: GET, path: /api/channels/maximumAllowed }
+        - { method: GET, path: /api/nodes/self }
+        - { method: GET, path: /api/nodes/selected }
+        - { method: GET, path: /api/localComputer }
+  updates:
+    - path: "^/api/channels/connected$"
+      json: { id: "$.id" }
+      state: { channel.connected: "{id}" }
+    - path: "^/api/channels/status$"
+      json: { summary: "$.summary" }
+      state: { channel.status: "{summary}" }
+    - path: "^/api/channels/status$"
+      json_each: "$.connections"
+      json: { id: "$.id", state: "$.state", status: "$.status" }
+      replace: channel.connections
+      state: { "channel.connections.{index}.id": "{id}", "channel.connections.{index}.state": "{state}", "channel.connections.{index}.status": "{status}" }
+    - path: "^/api/channels$"
+      json_each: "$"
+      json: { id: "$.id", node: "$.nodes[0].nodeUuid" }
+      replace: channels
+      state: { "channels.{id}.node": "{node}" }
+    - path: "^/api/channels/maximumAllowed$"
+      json: { count: "$.count" }
+      state: { max_channels: "{count}" }
+    - path: "^/api/nodes/self$"
+      json: { uuid: "$.uuid", name: "$.name", description: "$.description", active: "$.active", serial: "$.serialNumber", mac: "$.macAddress" }
+      state: { receiver.uuid: "{uuid}", receiver.name: "{name}", receiver.description: "{description}", receiver.active: "{active}",
+               receiver.serial_number: "{serial}", receiver.mac_address: "{mac}" }
+    - path: "^/api/nodes/selected$"
+      json_each: "$"
+      json: { uuid: "$.uuid", name: "$.name", description: "$.description", type: "$.type", active: "$.active", serial: "$.serialNumber", mac: "$.macAddress" }
+      replace: nodes
+      state: { "nodes.{uuid:key}.name": "{name}", "nodes.{uuid:key}.description": "{description}", "nodes.{uuid:key}.type": "{type}",
+               "nodes.{uuid:key}.active": "{active}", "nodes.{uuid:key}.serial_number": "{serial}", "nodes.{uuid:key}.mac_address": "{mac}" }
+    - path: "^/api/localComputer$"
+      json: { name: "$.name", description: "$.description" }
+      state: { local_computer.name: "{name}", local_computer.description: "{description}" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      The API is off until Enable Remote Control is ticked in the receiver's OSD (Advanced, Network Info), and it
+      offers no configuration: channels, nodes and passwords are set in the OSD. Switching needs the receiver's
+      Access password; a wrong one is a refused credential. The token lasts a day; a switch refused with 401 logs in
+      again once.
+  - models: [all]
+    severity: info
+    text: >
+      The receiver pushes nothing, so state is polled: the connected channel and its status every 2 s, the channels,
+      nodes and attached computer every 30 s, as Adder asks clients to poll without loading the receiver.
