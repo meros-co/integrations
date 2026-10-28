@@ -17,6 +17,7 @@ mod osc;
 mod pacing;
 mod telemetry;
 pub(crate) mod template;
+mod zeromq;
 
 use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::net::{IpAddr, SocketAddr};
@@ -966,6 +967,8 @@ pub(crate) struct SpecEngine {
     /// feedback arrives on, beside a transport of another kind (CasparCG's
     /// OSC beside its AMCP line protocol).
     osc_listen: Option<u16>,
+    /// `telemetry.zeromq`: a ZeroMQ bus beside the transport.
+    zmq: Option<zeromq::Zmq>,
     /// `OpenRequest::monitor`. Without it nothing in `telemetry` is sent or
     /// opened: no subscription, poll or push websocket. Replies and anything
     /// the device sends unasked still go to the rules.
@@ -1857,6 +1860,10 @@ impl SpecEngine {
             }
             Some(o) => listen_port(o.get("listen_port"), &ctx.settings)?,
         };
+        let zmq = match spec.telemetry.as_ref().and_then(|t| t.get("zeromq")) {
+            None => None,
+            Some(z) => Some(zeromq::Zmq::new(zeromq::parse(z, &ctx.settings)?)),
+        };
         let push = match spec.telemetry.as_ref().and_then(|t| t.get("websocket")) {
             None => None,
             Some(w) => {
@@ -2173,6 +2180,7 @@ impl SpecEngine {
             events_reply,
             events_backoff: RECONNECT_MIN,
             osc_listen,
+            zmq,
             pacer,
             outbox: VecDeque::new(),
             pace_pass: false,
@@ -4393,6 +4401,7 @@ impl Module for SpecEngine {
         cx.connection(Connection::Connecting);
         self.connect(cx);
         self.open_osc_listen(cx);
+        self.open_zmq(cx);
         self.open_push(cx);
         self.open_events(cx);
         self.validate_token(cx);
@@ -4424,7 +4433,11 @@ impl Module for SpecEngine {
         self.pump(cx);
     }
 
-    fn tcp(&mut self, cx: &mut Cx, _socket: Key, input: TcpInput) {
+    fn tcp(&mut self, cx: &mut Cx, socket: Key, input: TcpInput) {
+        if socket == zeromq::ZMQ_SUB || socket == zeromq::ZMQ_PUB {
+            self.zmq_input(cx, socket, input);
+            return;
+        }
         match input {
             TcpInput::Connected => self.opened(cx),
             TcpInput::Data(mut bytes) => {
@@ -4672,6 +4685,11 @@ impl Module for SpecEngine {
     }
 
     fn timer(&mut self, cx: &mut Cx, key: Key) {
+        match key {
+            zeromq::ZMQ_SUB_RETRY | zeromq::ZMQ_PUB_RETRY => return self.zmq_retry(cx, key),
+            zeromq::ZMQ_RENEW => return self.zmq_publish(cx),
+            _ => {}
+        }
         if self.refused.is_some() {
             return;
         }
@@ -4802,6 +4820,7 @@ impl Module for SpecEngine {
         if self.osc_listen.is_some() {
             cx.udp_close(OSC_LISTEN);
         }
+        self.close_zmq(cx);
     }
 
     fn sse(&mut self, cx: &mut Cx, stream: Key, input: SseInput) {
@@ -4844,6 +4863,12 @@ impl Module for SpecEngine {
             }
             self.osc_listen = fresh.osc_listen;
             self.open_osc_listen(cx);
+        }
+        // Other ZeroMQ ports, topics or messages: the bus is opened again.
+        if self.zmq.as_ref().map(|z| &z.spec) != fresh.zmq.as_ref().map(|z| &z.spec) {
+            self.close_zmq(cx);
+            self.zmq = fresh.zmq;
+            self.open_zmq(cx);
         }
         // A session was opened with the old credential: the next request
         // logs in with the new one.

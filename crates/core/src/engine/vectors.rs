@@ -329,6 +329,55 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
             }
         }
     }
+    // A ZeroMQ bus beside the transport: what is published when its
+    // publisher connects, as frames of text.
+    if engine.zmq.is_some() {
+        let ready = |socket: &str| {
+            let mut bytes = crate::zmtp::greeting();
+            let mut data = vec![11u8];
+            data.extend_from_slice(b"Socket-Type");
+            data.extend_from_slice(&(socket.len() as u32).to_be_bytes());
+            data.extend_from_slice(socket.as_bytes());
+            let mut body = vec![5u8];
+            body.extend_from_slice(b"READY");
+            body.extend_from_slice(&data);
+            bytes.extend([0x04, body.len() as u8]);
+            bytes.extend(body);
+            bytes
+        };
+        let mut cx = Cx::new(2);
+        engine.tcp(&mut cx, super::zeromq::ZMQ_SUB, TcpInput::Connected);
+        engine.tcp(
+            &mut cx,
+            super::zeromq::ZMQ_SUB,
+            TcpInput::Data(ready("XPUB")),
+        );
+        engine.tcp(&mut cx, super::zeromq::ZMQ_PUB, TcpInput::Connected);
+        engine.tcp(
+            &mut cx,
+            super::zeromq::ZMQ_PUB,
+            TcpInput::Data(ready("XSUB")),
+        );
+        let mut published: Vec<Vec<String>> = Vec::new();
+        for a in cx.take() {
+            if let Action::TcpSend { socket, data } = a {
+                if socket == super::zeromq::ZMQ_PUB {
+                    published.extend(zmq_frames(&data));
+                }
+            }
+        }
+        if let Some(expected) = v.get("expect_connect_zmq") {
+            let expected: Vec<Vec<String>> = serde_json::from_value(expected.clone())
+                .map_err(|e| format!("expect_connect_zmq: {e}"))?;
+            if published != expected {
+                return Err(format!(
+                    "ZeroMQ publish mismatch
+  expected {expected:?}
+  sent     {published:?}"
+                ));
+            }
+        }
+    }
     let expect_connect = if let Some(w) = v.get("expect_connect_wire") {
         Some(expected_wire(&json!({ "expect_wire": w }), 0).unwrap())
     } else {
@@ -377,6 +426,13 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
             _ => "push",
         };
         engine.ws(&mut cx, socket, WsInput::Text(text.to_string()));
+    } else if let Some(frames) = v.get("inbound_zmq") {
+        // One message on `telemetry.zeromq`'s subscriber, its frames as text.
+        let frames: Vec<String> = serde_json::from_value(frames.clone())
+            .map_err(|e| format!("inbound_zmq is a list of frames: {e}"))?;
+        let frames: Vec<Vec<u8>> = frames.into_iter().map(String::into_bytes).collect();
+        let doc = super::zeromq::message_value(&frames);
+        engine.offer(&mut cx, &super::telemetry::Inbound::Json(&doc));
     } else if let Some(e) = v.get("inbound_sse") {
         // An event on `telemetry.sse`: its name (`message` when absent) and data.
         let event = crate::sse::SseEvent {
@@ -540,6 +596,7 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         "inbound_http",
         "inbound_ws",
         "inbound_sse",
+        "inbound_zmq",
     ]
     .iter()
     .any(|k| v.get(k).is_some())
@@ -1046,6 +1103,7 @@ fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
             "inbound_http",
             "inbound_ws",
             "inbound_sse",
+            "inbound_zmq",
         ]
         .iter()
         .any(|k| v.get(k).is_some())
@@ -1090,4 +1148,32 @@ fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
             );
         }
     }
+}
+
+/// The messages in bytes this side sent on a ZeroMQ connection, each a list
+/// of its frames as text; the greeting and commands are left out.
+fn zmq_frames(data: &[u8]) -> Vec<Vec<String>> {
+    if data.len() == 64 && data[0] == 0xFF {
+        return Vec::new();
+    }
+    let (mut at, mut messages, mut parts) = (0, Vec::new(), Vec::new());
+    while at < data.len() {
+        let flags = data[at];
+        let (size, head) = if flags & 0x02 != 0 {
+            let b: [u8; 8] = data[at + 1..at + 9].try_into().unwrap();
+            (u64::from_be_bytes(b) as usize, 9)
+        } else {
+            (data[at + 1] as usize, 2)
+        };
+        let body = &data[at + head..at + head + size];
+        at += head + size;
+        if flags & 0x04 != 0 {
+            continue;
+        }
+        parts.push(String::from_utf8_lossy(body).into_owned());
+        if flags & 0x01 == 0 {
+            messages.push(std::mem::take(&mut parts));
+        }
+    }
+    messages
 }
