@@ -58,7 +58,8 @@ mod mcp_discovery;
     feature = "blackmagic-videohub",
     feature = "generic-midi",
     feature = "meros-camera",
-    feature = "midi-show-control"
+    feature = "midi-show-control",
+    feature = "nmos-node"
 ))]
 mod mdns;
 #[cfg(any(feature = "generic-midi", feature = "midi-show-control"))]

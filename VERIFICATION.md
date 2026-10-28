@@ -2897,6 +2897,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm GET /v1/datalink lists every DataLink key as <data><key/><value/></data> elements. ([specs/newtek-tricaster.yaml:686](specs/newtek-tricaster.yaml#L686))
 - [ ] Confirm Vizrt Vectar and Viz Vectar Plus answer the same shortcuts, dictionaries and change notification websocket as a TriCaster, and their input count for the net commands. ([specs/newtek-tricaster.yaml:852](specs/newtek-tricaster.yaml#L852))
 
+## nmos-node — AMWA NMOS Node (IS-04, IS-05, IS-08, IS-07)
+
+- [ ] Check against a real Node (and nmos-cpp's node) that GET /x-nmos/node answers as the liveness probe. ([specs/nmos-node.yaml:56](specs/nmos-node.yaml#L56))
+- [ ] Check that an empty connection_port (and channelmapping_port, events_port) reaches a Node serving every API on its Node API port, and record which Nodes serve them on other ports. ([specs/nmos-node.yaml:86](specs/nmos-node.yaml#L86))
+- [ ] Check which Nodes still accept the deprecated PUT /receivers/{id}/target, and what they answer (202, or 501). ([specs/nmos-node.yaml:262](specs/nmos-node.yaml#L262))
+- [ ] Check a connect_receiver with an SDP against a Node, and its answer to the read-back of active. ([specs/nmos-node.yaml:406](specs/nmos-node.yaml#L406))
+- [ ] Check that a Node's /single/senders and /single/receivers lists end each id with a slash, as the example shows, and that the per-id reads keep up with many senders every 5 seconds. ([specs/nmos-node.yaml:940](specs/nmos-node.yaml#L940))
+- [ ] Check that a Sender's transportfile answers with the SDP itself (not a redirect the client must follow). ([specs/nmos-node.yaml:1001](specs/nmos-node.yaml#L1001))
+- [ ] Check an IS-08 Node's channel indexes (from 0) and route_channel's single-channel activation. ([specs/nmos-node.yaml:588](specs/nmos-node.yaml#L588))
+- [ ] Check that GET /map/activations/ (with the trailing slash) answers the scheduled activations on IS-08 Nodes. ([specs/nmos-node.yaml:1055](specs/nmos-node.yaml#L1055))
+- [ ] Check that reading IS-07 event states every 2 seconds is fast enough for tally, and what a Node without IS-07 answers at /x-nmos/events. ([specs/nmos-node.yaml:681](specs/nmos-node.yaml#L681))
+
 ## novastar-central-control — NovaStar COEX central control protocol
 
 - [ ] Record a refused request's answer (a non-zero ACK byte is assumed) and whether its checksum covers the aa 55 header as the documented answer's does. ([specs/novastar-central-control.yaml:153](specs/novastar-central-control.yaml#L153))

@@ -1,5 +1,5 @@
-//! Finding Blackmagic Design devices, Meros Cameras and RTP-MIDI sessions
-//! over Multicast DNS and DNS-SD (Bonjour).
+//! Finding Blackmagic Design devices, Meros Cameras, RTP-MIDI sessions and
+//! NMOS Nodes over Multicast DNS and DNS-SD (Bonjour).
 //!
 //! Multicast DNS (RFC 6762) carries ordinary DNS messages to 224.0.0.251 on
 //! UDP 5353; DNS-SD (RFC 6763) names each advertised service instance
@@ -27,6 +27,11 @@
 //! setting), `model` (the phone or tablet's model) and `proto`, and the port
 //! in SRV (8790 by default). A camera is told apart by its id, never by name
 //! or address, since its address can change with DHCP.
+//!
+//! AMWA documents NMOS's advertisements (IS-04, Discovery - Peer to Peer
+//! Operation): a Node API as `_nmos-node._tcp`, its port in SRV, with TXT
+//! `api_proto` (`http` or `https`) and `api_ver` (the versions it serves). A
+//! Node is reported at its SRV port, once per address and port.
 //!
 //! Apple documents RTP-MIDI's advertisement (MIDI Network Driver Protocol):
 //! each session's control port is advertised as `_apple-midi._udp`, its data
@@ -123,6 +128,7 @@ pub(crate) const SPECS: &[&str] = &[
     "generic-midi",
     "meros-camera",
     "midi-show-control",
+    "nmos-node",
 ];
 
 /// One way to recognise a device: instances of `service` (whose TXT `class`
@@ -231,6 +237,15 @@ const RULES: &[Rule] = &[
         class: None,
         spec: "midi-show-control",
         source: APPLE_MIDI_SOURCE,
+        key_txt: None,
+        srv_port: true,
+        name_txt: None,
+    },
+    Rule {
+        service: "_nmos-node._tcp.local",
+        class: None,
+        spec: "nmos-node",
+        source: "AMWA IS-04 v1.3, Discovery - Peer to Peer Operation: a Node API advertised as _nmos-node._tcp, its port in SRV, TXT api_proto (http or https) and api_ver",
         key_txt: None,
         srv_port: true,
         name_txt: None,
@@ -1671,6 +1686,7 @@ mod tests {
                 "_hyperdeck_ctrl._tcp.local",
                 "_smartview._tcp.local",
                 APPLE_MIDI,
+                "_nmos-node._tcp.local",
                 MEROS_CAMERA
             ]
         );
@@ -1923,6 +1939,45 @@ mod tests {
         let events = cache.absorb(LOCAL, &other, Heard::Scan);
         assert_eq!(events.len(), 2);
         assert!(events.iter().all(|e| discovered(e).2 == 5006));
+    }
+
+    /// An NMOS Node's answer, as IS-04 documents it: the Node API as
+    /// _nmos-node._tcp, its port in SRV, TXT api_proto and api_ver.
+    #[cfg(feature = "nmos-node")]
+    #[test]
+    fn an_nmos_node_is_reported_at_its_srv_port() {
+        let service = labels(&["_nmos-node", "_tcp", "local"]);
+        let instance = labels(&["gateway-1", "_nmos-node", "_tcp", "local"]);
+        let host = labels(&["gateway-1", "local"]);
+        let mut p = header(1, 3);
+        p.extend_from_slice(&service);
+        rr(&mut p, TYPE_PTR, false, 4500, &instance);
+        p.extend_from_slice(&instance);
+        let mut srv = vec![0, 0, 0, 0];
+        srv.extend_from_slice(&3212u16.to_be_bytes());
+        srv.extend_from_slice(&host);
+        rr(&mut p, TYPE_SRV, true, 120, &srv);
+        p.extend_from_slice(&instance);
+        rr(
+            &mut p,
+            TYPE_TXT,
+            true,
+            4500,
+            &txt_rdata(&["api_proto=http", "api_ver=v1.2,v1.3", "api_auth=false"]),
+        );
+        p.extend_from_slice(&host);
+        rr(&mut p, TYPE_A, true, 120, &[10, 0, 0, 60]);
+        let mut cache = Cache::new(table());
+        let events = cache.absorb(LOCAL, &parse(&p).unwrap(), Heard::Scan);
+        assert_eq!(events.len(), 1);
+        let (protocol, address, port, device, models, evidence) = discovered(&events[0]);
+        assert_eq!(
+            (protocol, address, port, device),
+            ("mdns", "10.0.0.60", 3212, "nmos-node")
+        );
+        assert_eq!(models, ["node"]);
+        assert_eq!(evidence["txt"]["api_ver"], "v1.2,v1.3");
+        assert!(evidence["port"].as_str().unwrap().starts_with("the SRV"));
     }
 
     const CAMERA_ID: &str = "00112233aabbccdd";

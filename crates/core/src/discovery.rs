@@ -8,8 +8,8 @@
 //! Sennheiser EW G3/G4 receivers (MCP) are found by `crate::mcp_discovery`,
 //! Sony cameras (SSDP) by `crate::ssdp`, and PJLink Class 2 projectors
 //! (SRCH/ACKN and LKUP on UDP 4352) by `crate::pjlink_discovery`, and
-//! Blackmagic Design devices, Meros Cameras and RTP-MIDI sessions (mDNS /
-//! DNS-SD) by
+//! Blackmagic Design devices, Meros Cameras, RTP-MIDI sessions and NMOS
+//! Nodes (mDNS / DNS-SD) by
 //! `crate::mdns`, whose rules are there. Each is compiled only with the
 //! integrations whose devices it finds. Protocols are independent: each listens, scans and stops on its own.
 
@@ -40,6 +40,7 @@ pub const PROTOCOLS: &[(&str, &[&str])] = &[
             "generic-midi",
             "meros-camera",
             "midi-show-control",
+            "nmos-node",
         ],
     ),
 ];
@@ -52,7 +53,7 @@ pub struct DiscoverRequest {
     /// Which discovery protocols: `mcp` (Sennheiser G3/G4), `ssdp` (Sony
     /// cameras), `pjlink` (PJLink Class 2 projectors) and `mdns` (Blackmagic
     /// ATEM, Videohub, HyperDeck, SmartView and MultiView, Meros Cameras,
-    /// and RTP-MIDI sessions). Empty means every
+    /// RTP-MIDI sessions and NMOS Nodes). Empty means every
     /// protocol that finds a device in this core's catalogue; naming one that
     /// finds none of them is an error.
     #[serde(default)]
@@ -105,7 +106,8 @@ pub(crate) struct Discovery {
         feature = "blackmagic-videohub",
         feature = "generic-midi",
         feature = "meros-camera",
-        feature = "midi-show-control"
+        feature = "midi-show-control",
+        feature = "nmos-node"
     ))]
     mdns: crate::mdns::Mdns,
     /// The protocols that find a device in the core's catalogue.
@@ -138,7 +140,8 @@ impl Discovery {
                 feature = "blackmagic-videohub",
                 feature = "generic-midi",
                 feature = "meros-camera",
-                feature = "midi-show-control"
+                feature = "midi-show-control",
+                feature = "nmos-node"
             ))]
             mdns: crate::mdns::Mdns::new(catalog),
             available: protocols_for(catalog),
@@ -205,7 +208,8 @@ impl Discovery {
                     feature = "blackmagic-videohub",
                     feature = "generic-midi",
                     feature = "meros-camera",
-                    feature = "midi-show-control"
+                    feature = "midi-show-control",
+                    feature = "nmos-node"
                 ))]
                 if mdns {
                     self.mdns.stop();
@@ -233,7 +237,8 @@ impl Discovery {
                     feature = "blackmagic-videohub",
                     feature = "generic-midi",
                     feature = "meros-camera",
-                    feature = "midi-show-control"
+                    feature = "midi-show-control",
+                    feature = "nmos-node"
                 ))]
                 if mdns {
                     self.mdns.listen(services)?;
@@ -264,7 +269,8 @@ impl Discovery {
                     feature = "blackmagic-videohub",
                     feature = "generic-midi",
                     feature = "meros-camera",
-                    feature = "midi-show-control"
+                    feature = "midi-show-control",
+                    feature = "nmos-node"
                 ))]
                 if mdns {
                     self.mdns.listen(services)?;

@@ -34,6 +34,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "allenheath-sq",
         ],
     ),
+    ("vendor-amwa", &["nmos-node"]),
     (
         "vendor-analogway",
         &[
