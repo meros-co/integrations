@@ -1787,6 +1787,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the word_order setting against devices that document 32-bit floats and integers in either register order (a power meter, a PLC), and that 0-based addressing matches devices that document 1-based 4xxxx and 3xxxx registers. ([specs/generic-modbus.yaml:220](specs/generic-modbus.yaml#L220))
 - [ ] Check that servers answer a liveness read of a register they lack with an exception rather than silence, and that common Modbus TCP to RTU gateways answer for the unit IDs behind them without stalling the single outstanding request. ([specs/generic-modbus.yaml:245](specs/generic-modbus.yaml#L245))
 
+## generic-mqtt — Generic MQTT broker client
+
+- [ ] Connect to Mosquitto, EMQX and HiveMQ with versions 3.1.1 and 5 over tcp, tls and wss, and confirm CONNACK, SUBACK and version 5 properties (server keep alive, assigned client id, maximum QoS) are read as described, and that their WebSocket endpoints accept the mqtt subprotocol at the paths they document. ([specs/generic-mqtt.yaml:42](specs/generic-mqtt.yaml#L42))
+- [ ] With clean_start false and a session expiry, confirm a broker delivers the messages queued while the client was away after reconnecting, and that dropping unacknowledged QoS 1 and 2 publishes (not resent with DUP) is acceptable to it. ([specs/generic-mqtt.yaml:153](specs/generic-mqtt.yaml#L153))
+
 ## generic-ping — Network presence (ping) and Wake-on-LAN
 
 - [ ] Check that network adapters with a SecureOn password take it as 4 or 6 bytes right after the sixteen MAC repetitions (from practice, not AMD's paper). ([specs/generic-ping.yaml:66](specs/generic-ping.yaml#L66))

@@ -111,6 +111,8 @@ mod midi_link;
 mod midi_show_control;
 #[cfg(feature = "generic-modbus")]
 mod modbus;
+#[cfg(feature = "generic-mqtt")]
+mod mqtt;
 #[cfg(feature = "nec-display")]
 mod nec_display;
 #[cfg(feature = "nec-projector")]
@@ -419,6 +421,8 @@ pub(crate) fn construct(
         "vdcp" => Ok(Box::new(vdcp::Vdcp::new(context)?)),
         #[cfg(feature = "generic-modbus")]
         "generic-modbus" => Ok(Box::new(modbus::Modbus::new(context)?)),
+        #[cfg(feature = "generic-mqtt")]
+        "generic-mqtt" => Ok(Box::new(mqtt::Mqtt::new(context)?)),
         #[cfg(feature = "generic-osc")]
         "generic-osc" => Ok(Box::new(generic_osc::GenericOsc::new(context)?)),
         #[cfg(feature = "generic-tcp-udp")]
