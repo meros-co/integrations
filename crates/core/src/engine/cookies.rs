@@ -96,10 +96,6 @@ impl Jar {
                 .join("; ")
         })
     }
-
-    pub(crate) fn clear(&mut self) {
-        self.cookies.clear();
-    }
 }
 
 #[cfg(test)]
@@ -137,7 +133,5 @@ mod tests {
             5_000,
         );
         assert_eq!(jar.header().as_deref(), Some("a=b"));
-        jar.clear();
-        assert_eq!(jar.header(), None);
     }
 }
