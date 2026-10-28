@@ -2068,15 +2068,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that the role is spelled Administrator when creating an account (the reference's field description spells Administator). ([specs/haivision-makito-x4.yaml:331](specs/haivision-makito-x4.yaml#L331))
 - [ ] Check that PUT /apis/services with one service ({"onvif":1}) or one nic entry changes only that service, and that preview and passthrough take the same form. ([specs/haivision-makito-x4.yaml:824](specs/haivision-makito-x4.yaml#L824))
 - [ ] Check the recordings API (1.10): POST and PUT bodies with limitSize and segmentSize as text, segmentType "0" for none, and whether the recording id is the stream's id. ([specs/haivision-makito-x4.yaml:1164](specs/haivision-makito-x4.yaml#L1164))
-- [ ] Check that PUT /apis/decoders/{id} with streamId alone keeps the other decoder settings, and the reply of a decoder PUT. ([specs/haivision-makito-x4.yaml:1746](specs/haivision-makito-x4.yaml#L1746))
-- [ ] Check that PUT /apis/st2110/{id} takes name, tos and ttl beside address and port, and packetTime for an audio essence. ([specs/haivision-makito-x4.yaml:1811](specs/haivision-makito-x4.yaml#L1811))
+- [ ] Check that PUT /apis/decoders/{id} with streamId alone keeps the other decoder settings, and the reply of a decoder PUT. ([specs/haivision-makito-x4.yaml:1778](specs/haivision-makito-x4.yaml#L1778))
+- [ ] Check that PUT /apis/st2110/{id} takes name, tos and ttl beside address and port, and packetTime for an audio essence. ([specs/haivision-makito-x4.yaml:1843](specs/haivision-makito-x4.yaml#L1843))
 - [ ] Check the certificate upload's form fields: the file part's filename (the certificate's name here, the reference's example uses the original file name) and an empty password field. ([specs/haivision-makito-x4.yaml:508](specs/haivision-makito-x4.yaml#L508))
-- [ ] Check that PUT /apis/logosettings/{id} without if_name, url and panelColor (which the web interface sends) is accepted. ([specs/haivision-makito-x4.yaml:1712](specs/haivision-makito-x4.yaml#L1712))
+- [ ] Check that PUT /apis/logosettings/{id} without if_name, url and panelColor (which the web interface sends) is accepted. ([specs/haivision-makito-x4.yaml:1744](specs/haivision-makito-x4.yaml#L1744))
 - [ ] Check what the audio encoder accepts for sampleRate 16 on non-analog inputs and the bit rate ranges per mode (the user's guide table). ([specs/haivision-makito-x4.yaml:1324](specs/haivision-makito-x4.yaml#L1324))
-- [ ] Check what GET /apis/essences and GET /apis/logos answer outside the 2110 and DEFENSE personalities, and GET /apis/comport on a non-rugged encoder (the polls ask regardless). ([specs/haivision-makito-x4.yaml:3932](specs/haivision-makito-x4.yaml#L3932))
+- [ ] Check what GET /apis/essences and GET /apis/logos answer outside the 2110 and DEFENSE personalities, and GET /apis/comport on a non-rugged encoder (the polls ask regardless). ([specs/haivision-makito-x4.yaml:3964](specs/haivision-makito-x4.yaml#L3964))
 - [ ] Check that a rugged encoder answers the comport endpoints and that the plain encoder does not, as the model split assumes. ([specs/haivision-makito-x4.yaml:930](specs/haivision-makito-x4.yaml#L930))
 - [ ] Check that POST /apis/leds takes duration as a number (the reference's example sends it as text). ([specs/haivision-makito-x4.yaml:306](specs/haivision-makito-x4.yaml#L306))
 - [ ] Check how long an upgrade package upload with verification (POST /apis/upgrade) takes on a unit; the transport waits 20 s for an answer. ([specs/haivision-makito-x4.yaml:93](specs/haivision-makito-x4.yaml#L93))
+- [ ] Confirm the id in /apis/preview/{id} is the video input's id as list_video_inputs gives it, and that the snapshot, preview and logo downloads answer the image itself with 200. ([specs/haivision-makito-x4.yaml:1685](specs/haivision-makito-x4.yaml#L1685))
 
 ## highend-hog4 — High End Systems Hog 4 / Hog OS
 

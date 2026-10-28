@@ -135,7 +135,7 @@ models:
        upload_preset, set_preset_autosave, set_preset_startup, make_startup_preset, load_preset,
        duplicate_preset, rename_preset, delete_preset, check_preset_saved, list_streams, get_stream,
        create_stream, configure_stream, delete_stream, set_personality, get_messages, clear_messages,
-       get_license, set_preview_service, start_stream, stop_stream, get_stream_srt_csv,
+       get_license, set_preview_service, download_input_preview, start_stream, stop_stream, get_stream_srt_csv,
        get_stream_srt_csv_path, get_recording, create_recording, configure_recording, start_recording,
        stop_recording, delete_recording, list_video_encoders, get_video_encoder, list_downscale_resolutions,
        configure_video_encoder, start_video_encoder, stop_video_encoder, list_video_inputs, get_video_input,
@@ -146,8 +146,8 @@ models:
        configure_ad_insertion_source, start_ad_insertion_source, stop_ad_insertion_source, list_essences,
        list_essence_resolutions, create_video_essence, create_audio_essence, create_data_essence,
        configure_video_essence, configure_audio_essence, configure_data_essence, start_essence, stop_essence,
-       delete_essence, list_snapshots, take_snapshot, delete_snapshot, get_snapshot_settings,
-       configure_snapshot_settings, list_logos, upload_logo, delete_logo, list_logo_settings, configure_logo]
+       delete_essence, list_snapshots, take_snapshot, delete_snapshot, download_snapshot, get_snapshot_settings,
+       configure_snapshot_settings, list_logos, upload_logo, delete_logo, download_logo, list_logo_settings, configure_logo]
     verification: none
     notes: >
       Four-input HEVC/H.264 encoder (SDI; DisplayPort and HDMI inputs on some
@@ -172,7 +172,7 @@ models:
        upload_preset, set_preset_autosave, set_preset_startup, make_startup_preset, load_preset,
        duplicate_preset, rename_preset, delete_preset, check_preset_saved, list_streams, get_stream,
        create_stream, configure_stream, delete_stream, set_personality, get_messages, clear_messages,
-       get_license, set_preview_service, start_stream, stop_stream, get_stream_srt_csv,
+       get_license, set_preview_service, download_input_preview, start_stream, stop_stream, get_stream_srt_csv,
        get_stream_srt_csv_path, get_recording, create_recording, configure_recording, start_recording,
        stop_recording, delete_recording, list_video_encoders, get_video_encoder, list_downscale_resolutions,
        configure_video_encoder, start_video_encoder, stop_video_encoder, list_video_inputs, get_video_input,
@@ -183,8 +183,8 @@ models:
        configure_ad_insertion_source, start_ad_insertion_source, stop_ad_insertion_source, list_essences,
        list_essence_resolutions, create_video_essence, create_audio_essence, create_data_essence,
        configure_video_essence, configure_audio_essence, configure_data_essence, start_essence, stop_essence,
-       delete_essence, list_snapshots, take_snapshot, delete_snapshot, get_snapshot_settings,
-       configure_snapshot_settings, list_logos, upload_logo, delete_logo, list_logo_settings, configure_logo,
+       delete_essence, list_snapshots, take_snapshot, delete_snapshot, download_snapshot, get_snapshot_settings,
+       configure_snapshot_settings, list_logos, upload_logo, delete_logo, download_logo, list_logo_settings, configure_logo,
        set_passthrough, get_comport, set_comport_mode, set_comport_baud_rate]
     verification: none
     notes: >
@@ -209,7 +209,7 @@ models:
        upload_preset, set_preset_autosave, set_preset_startup, make_startup_preset, load_preset,
        duplicate_preset, rename_preset, delete_preset, check_preset_saved, list_streams, get_stream,
        create_stream, configure_stream, delete_stream, set_decoder_personality, validate_hostname,
-       set_decoder_preview_service, list_decoders, get_decoder, set_decoder_stream, configure_decoder,
+       set_decoder_preview_service, download_decoder_preview, list_decoders, get_decoder, set_decoder_stream, configure_decoder,
        start_decoder, stop_decoder, list_st2110_outputs, configure_st2110_output,
        configure_st2110_audio_output, start_st2110_output, stop_st2110_output]
     verification: none
@@ -1674,6 +1674,38 @@ commands:
     expect: *ok
     returns: ack
 
+  download_snapshot:
+    summary: "Save a stored snapshot image to a host file (GET /apis/snapshots/{id}); returns the file saved and its size"
+    params:
+      id: { type: string, required: true, max_length: 128, label: Snapshot, description: "The snapshot's id (its file name), as list_snapshots gives it." }
+      to: { type: save, required: true, label: Save to, description: "The host file the image is written to; replaced once the whole file has arrived." }
+    send: { method: GET, path: "/apis/snapshots/{id}", save: to }
+    expect: { status: 200 }
+    returns: file
+  download_input_preview:
+    summary: "Save a video input's latest preview image to a host file (GET /apis/preview/{id}), with preview images on (set_preview_service)"
+    params:
+      id: { type: string, required: true, max_length: 128, label: Input, description: "The video input's id, as list_video_inputs gives it." }
+      to: { type: save, required: true, label: Save to, description: "The host file the image is written to; replaced once the whole file has arrived." }
+    send: { method: GET, path: "/apis/preview/{id}", save: to }
+    expect: { status: 200 }
+    returns: file
+  download_logo:
+    summary: "Save a logo file to a host file (GET /apis/logos/{file}), DEFENSE personality"
+    params:
+      file: { type: string, required: true, max_length: 128, pattern: "^[^/]+$", label: Logo, description: "The logo's file name, as list_logos gives it." }
+      to: { type: save, required: true, label: Save to, description: "The host file the image is written to; replaced once the whole file has arrived." }
+    send: { method: GET, path: "/apis/logos/{file}", save: to }
+    expect: { status: 200 }
+    returns: file
+  download_decoder_preview:
+    summary: "Save a decoder's latest preview image to a host file (GET /apis/decoders/{id}/preview), with decoder preview images on (set_decoder_preview_service)"
+    params:
+      id: { type: int, min: 0, required: true, label: Decoder, description: "The decoder's id, as list_decoders gives it." }
+      to: { type: save, required: true, label: Save to, description: "The host file the image is written to; replaced once the whole file has arrived." }
+    send: { method: GET, path: "/apis/decoders/{id}/preview", save: to }
+    expect: { status: 200 }
+    returns: file
   list_logos:
     summary: "Logo files on the unit (GET /apis/logos), DEFENSE personality"
     send: { method: GET, path: /apis/logos }
@@ -1923,8 +1955,8 @@ quirks:
       Images and files the API serves as binary (snapshots at
       /apis/snapshots/{id}, input previews at /apis/preview/{id}, decoder
       previews at /apis/decoders/{id}/preview, logos at /apis/logos/{file})
-      are not offered: a spec-driven command cannot hand a binary answer to
-      the consumer. Their lists and settings are in state.
+      are saved to a host file by the download_* commands, streamed. Their
+      lists and settings are in state.
   - models: [makito-x4-encoder, makito-x4-rugged-encoder]
     severity: info
     text: >

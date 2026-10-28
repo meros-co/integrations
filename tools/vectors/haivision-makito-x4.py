@@ -528,3 +528,9 @@ _hmx_t("messages", "/apis/messages", {"messages": "Thu May 8 04:08:04 WST 2025: 
        {"messages": {"text": "Thu May 8 04:08:04 WST 2025: Software installed.&#10;"}})
 _hmx_t("session", "/apis/authentication", {"username": "admin", "uid": 500, "gid": 511, "passwordExp": False},
        {"session": {"username": "admin", "uid": 500, "gid": 511, "password_expired": False}})
+# Binary answers saved to the host file named (never written by a vector).
+_hmx("download_snapshot", {"id": "snap-1.png", "to": {"file": "snap-1.png"}}, "GET", "/apis/snapshots/snap-1.png")
+_hmx("download_input_preview", {"id": "0", "to": {"file": "preview.jpg"}}, "GET", "/apis/preview/0")
+_hmx("download_logo", {"file": "station.png", "to": {"file": "station.png"}}, "GET", "/apis/logos/station.png")
+_hmx("download_decoder_preview", {"id": 0, "to": {"file": "decoder.jpg"}}, "GET", "/apis/decoders/0/preview",
+     model="makito-x4-decoder")
