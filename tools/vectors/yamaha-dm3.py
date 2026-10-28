@@ -292,3 +292,12 @@ _ydm3_explicit("telemetry", "error-reply-is-not-state", inbound="ERROR get Inval
 
 _ydm3_vectors()
 _ydm3_EXPLICIT.clear()
+
+# ── Meters and scene titles ───────────────────────────────────────────────
+# With the meters setting on, mtrstart for each meter of the console's list
+# goes first on connecting, before the reads (DME7 document 2-16 p.22). A
+# notification is a type word, then two hex digits per channel (3.2.3 p.10);
+# 00-7E are -126 to 0 dBFS, 7F OVER (5.1 p.50).
+telemetry('yamaha-dm3', 'meters-subscribe', settings={'meters': True, 'meter_interval_ms': 200, 'meter_point': 'PreFader'}, expect_connect_wire=['mtrstart MIXER:Current/InCh/PreFader 200\n'], inbound='NOTIFY mtr MIXER:Current/InCh/PreFader level 7e 7F 00 6a\n', expect_state={'inputs': {'1': {'meter': 126, 'meter_db': 0.0}, '2': {'meter': 127}, '3': {'meter': 0, 'meter_db': -126.0}, '4': {'meter': 106, 'meter_db': -20.0}}})
+telemetry('yamaha-dm3', 'scene-title', inbound='OK ssinfo_ex scene_b 12 "B12" "Band" "" user\n', expect_state={'scenes': {'b': {'list': {'12': {'number_text': 'B12', 'title': 'Band', 'comment': '', 'attribute': 'user'}}}}})
+telemetry('yamaha-dm3', 'scene-stored-reads-title', inbound='OK ssupdate_ex scene_a 7\n', expect_state={}, expect_then_send=['ssinfo_ex scene_a 7\n'])
