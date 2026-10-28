@@ -1,0 +1,804 @@
+spec: 1
+id: kiloview-multiview-server
+name: Kiloview Multiview Server (NDI Multiview) HTTP API 1.0
+vendor: Kiloview
+category: switcher
+
+source:
+  - title: Multiview Server API (Version 1.0), Multiview-Server-APIVersion-1.pdf (2023-02-03)
+    author: Kiloview
+    url: https://enstatic.kiloview.com/wp-content/uploads/2025/09/Multiview-Server-APIVersion-1.pdf
+    note: >
+      Manufacturer document, linked as "Multiview Pro API" from
+      https://www.kiloview.com/en/docs/multiview/api/ (checked 2026-10-27).
+      The PDF's fonts carry no text mapping, so it was read from the
+      rendered pages. The source of every request, field and reply here:
+      2.1 URL rules (port 65532); 2.2 replies; 3 general configuration and
+      navigation; 4 layouts (list, templates, add, delete, modify); 5
+      window configuration (window list, add, rename and select, close,
+      screens, window position on a screen); 6 single-window configuration
+      (window information, grid layout, clear, toolbar, border, audio
+      gain); 7 single-grid configuration (audio, stream mode, grid
+      settings, PVW/PGM tally); 8 NDI streaming and Take (NDI status, Take
+      parameters and apply, NDI output parameters, resolution, aspect
+      ratio and frame rate lists); 9 NDI discovery (groups, manual
+      addresses); 10 NDI sources (list, preloading, web page, refresh);
+      11 WebRTC SDP.
+
+transport:
+  type: http
+  port: 65532
+  scheme: http
+  timeout_ms: 5000
+  probe: { method: GET, path: /api/config/general/get.json }
+
+ports:
+  - { port: 65532, protocol: http, role: control, note: "the HTTP service's default port (2.1)" }
+
+models:
+  - id: multiview-server
+    name: Kiloview Multiview Server (NDI Multiview, API 1.0)
+    supports:
+      - get_general
+      - get_nav
+      - get_layouts
+      - get_layout_templates
+      - add_layout
+      - remove_layout
+      - modify_layout
+      - get_windows
+      - add_window
+      - rename_window
+      - select_window
+      - close_window
+      - get_screens
+      - get_window_screen
+      - set_window_screen
+      - get_window
+      - set_window_layout
+      - clear_window_sources
+      - get_toolbar
+      - set_toolbar
+      - get_border
+      - set_border
+      - get_audio_gain
+      - set_audio_gain
+      - set_grid_audio
+      - get_stream_mode
+      - set_stream_mode
+      - get_grid
+      - set_grid
+      - set_grid_tally
+      - get_ndi_status
+      - set_ndi_status
+      - get_take
+      - set_take
+      - apply_take
+      - get_ndi_output
+      - set_ndi_output
+      - get_resolutions
+      - get_aspect_ratios
+      - get_frame_rates
+      - get_ndi_groups
+      - get_manual_ips
+      - set_ndi_discovery
+      - get_sources
+      - set_source_preload
+      - open_source_webpage
+      - refresh_sources
+      - get_window_sdp
+    verification: none
+    notes: >
+      The earlier Kiloview multiview software (Multiview Server, shown as
+      NDI Multiview), whose windows show NDI sources in grids, go to the
+      host's screens and can be sent as NDI. Multiview Pro's later API
+      (/api/v2) is the kiloview-multiview spec.
+
+commands:
+  # ── 3 General configuration ──────────────────────────────────────────
+  get_general:
+    summary: Return the device name, languages, logo and QR code address (GET /api/config/general/get.json)
+    send: { method: GET, path: /api/config/general/get.json }
+    expect: &data { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+  get_nav:
+    summary: Return whether the navigation bar is shown (GET /api/config/nav/nav.json)
+    send: { method: GET, path: /api/config/nav/nav.json }
+    expect: *data
+    returns: value
+
+  # ── 4 Layouts ────────────────────────────────────────────────────────
+  get_layouts:
+    summary: Return every added layout with its grids and whether it is in use (GET /api/output/icon.json)
+    send: { method: GET, path: /api/output/icon.json }
+    expect: *data
+    returns: value
+  get_layout_templates:
+    summary: Return the layout templates a layout is added from (GET /api/pattern/template.json)
+    send: { method: GET, path: /api/pattern/template.json }
+    expect: *data
+    returns: value
+  add_layout:
+    summary: "Add a layout; grids is the API's data list of {x, y, width, height} (POST /api/pattern/add.json)"
+    params:
+      layout: &layout { type: string, required: true, max_length: 16, pattern: '^[0-9]+$', label: Layout, description: "The layout's id, as layouts.<id> in state lists it (the template's id when adding)." }
+      name: &layout_name { type: string, required: true, max_length: 64, label: Name, description: "The layout's name, unique among layouts." }
+      grids: &grids { type: json, required: true, label: Grids, description: "Every grid as an object with x, y, width and height, in percent of the window." }
+    send: { method: POST, path: /api/pattern/add.json, content_type: application/json, body: '{"id":{layout:json},"name":{name:json},"data":{grids}}' }
+    expect: &ok { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+  remove_layout:
+    summary: Delete a layout that is not in use (GET /api/pattern/remove.json)
+    params:
+      layout: { type: int, min: 0, required: true, label: Layout, description: "The layout's id, as layouts.<id> in state lists it." }
+    send: { method: GET, path: /api/pattern/remove.json, query: { id: "{layout}" } }
+    expect: *ok
+    returns: ack
+  modify_layout:
+    summary: "Rename a layout and set its grids; grids is the API's data list of {x, y, width, height} (POST /api/pattern/modify.json)"
+    params:
+      layout: *layout
+      name: *layout_name
+      grids: *grids
+    send: { method: POST, path: /api/pattern/modify.json, content_type: application/json, body: '{"id":{layout:json},"name":{name:json},"data":{grids}}' }
+    expect: *ok
+    returns: ack
+
+  # ── 5 Windows ────────────────────────────────────────────────────────
+  get_windows:
+    summary: Return every window with its NDI status, use and Take target (GET /api/output/tabs_get.json)
+    send: { method: GET, path: /api/output/tabs_get.json }
+    expect: *data
+    returns: value
+  add_window:
+    summary: Add a window (GET /api/window/new.json)
+    send: { method: GET, path: /api/window/new.json }
+    expect: *ok
+    returns: ack
+  rename_window:
+    summary: Rename a window (POST /api/output/tabs_modify.json)
+    params:
+      window: &window_int { type: int, min: 0, required: true, label: Window, description: "The window's id, as windows.<id> in state lists it." }
+      name: { type: string, required: true, max_length: 64, label: Name, description: "The window's new name." }
+    send: { method: POST, path: /api/output/tabs_modify.json, content_type: application/json, body: '{"id":{window},"name":{name:json}}' }
+    expect: *ok
+    returns: ack
+  select_window:
+    summary: Switch the web interface to a window, the request with an id and no name (POST /api/output/tabs_modify.json)
+    params:
+      window: *window_int
+    send: { method: POST, path: /api/output/tabs_modify.json, content_type: application/json, body: '{"id":{window}}' }
+    expect: *ok
+    returns: ack
+  close_window:
+    summary: Close (delete) a window (POST /api/window/close_window.json)
+    params:
+      window: *window_int
+    send: { method: POST, path: /api/window/close_window.json, content_type: application/json, body: '{"output":"{window}"}' }
+    expect: *ok
+    returns: ack
+  get_screens:
+    summary: Return the host graphics card's outputs (GET /api/window/get_screen_list.json)
+    send: { method: GET, path: /api/window/get_screen_list.json }
+    expect: *data
+    returns: value
+  get_window_screen:
+    summary: Return the screen a window is on, and whether it is full screen and shown (GET /api/window/get_window_position.json)
+    params:
+      window: *window_int
+    send: { method: GET, path: /api/window/get_window_position.json, query: { output: "{window}" } }
+    expect: *data
+    returns: value
+  set_window_screen:
+    summary: Move a window to a screen, full screen or normal size, shown or minimized (POST /api/window/set_window_position.json)
+    params:
+      window: *window_int
+      screen: { type: int, min: 0, required: true, label: Screen, description: "The screen's id, as screens.<id> in state lists it." }
+      full_screen: { type: bool, default: true, label: Full screen, description: "On for full screen; off for normal size." }
+      shown: { type: bool, default: true, label: Shown, description: "On to show the window; off to minimize it." }
+    send: { method: POST, path: /api/window/set_window_position.json, content_type: application/json, body: '{"output":"{window}","screen":{screen},"isFull":{full_screen},"isShow":{shown}}' }
+    expect: *ok
+    returns: ack
+
+  # ── 6 Single window ──────────────────────────────────────────────────
+  get_window:
+    summary: Return a window's layout and every grid's source, name, tally, frame rate and resolution (GET /api/output/get.json)
+    params:
+      window: *window_int
+    send: { method: GET, path: /api/output/get.json, query: { output: "{window}" } }
+    expect: *data
+    returns: value
+  set_window_layout:
+    summary: Change a window's layout, or set or remove a grid of it (POST /api/output/layout.json)
+    params:
+      window: *window_int
+      action: { type: enum, values: [change, set, remove], required: true, label: Action, description: "change, set or remove, as the document names the operations." }
+      position: { type: int, min: 0, default: 0, label: Grid, description: "The grid's position the operation is for." }
+      layout: { type: int, min: 0, required: true, label: Layout, description: "The layout's id." }
+      layout_number: { type: int, min: 1, required: true, label: Grid count, description: "The layout's number of grids." }
+    send: { method: POST, path: /api/output/layout.json, content_type: application/json, body: '{"action":{action:json},"output":{window},"position":{position},"layout_id":{layout},"layout_number":{layout_number}}' }
+    expect: *ok
+    returns: ack
+  clear_window_sources:
+    summary: Remove the source of every grid of a window (POST /api/output/delete_all.json)
+    params:
+      window: *window_int
+    send: { method: POST, path: /api/output/delete_all.json, content_type: application/json, body: '{"output":{window}}' }
+    expect: *ok
+    returns: ack
+  get_toolbar:
+    summary: Return whether a window shows audio meters, safe areas, center crosses and names (GET /api/output/get_state_contol.json)
+    params:
+      window: *window_int
+    send: { method: GET, path: /api/output/get_state_contol.json, query: { output: "{window}" } }
+    expect: *data
+    returns: value
+  set_toolbar:
+    summary: Turn audio meters, safe areas, center crosses or names on or off for every grid of a window (POST /api/output/set_state_contol.json)
+    params:
+      window: *window_int
+      item: { type: enum, values: [soundColumn, securityBox, centerline, nameEnable], required: true, label: Overlay, description: "soundColumn (audio meters), securityBox (safe areas), centerline (center crosses) or nameEnable (names)." }
+      enabled: { type: bool, required: true, label: Shown, description: "On to show it; off to hide it." }
+    send: { method: POST, path: /api/output/set_state_contol.json, content_type: application/json, body: '{"output":"{window}","type":{item:json},"enable":{enabled:bool01}}' }
+    expect: *ok
+    returns: ack
+  get_border:
+    summary: Return the window border's color and whether it is shown (GET /api/output/GetEnableBorder.json)
+    send: { method: GET, path: /api/output/GetEnableBorder.json }
+    expect: *data
+    returns: value
+  set_border:
+    summary: Set the window border's color and show or hide it (POST /api/output/EnableBorder.json)
+    params:
+      color: { type: int, min: 0, max: 16777215, required: true, label: Color, description: "The border color as a 24-bit RGB number, 16777215 for white." }
+      enabled: { type: bool, required: true, label: Shown, description: "On to show the border; off to hide it." }
+    send: { method: POST, path: /api/output/EnableBorder.json, content_type: application/json, body: '{"bordercolor":{color},"bordercolor_enabled":{enabled:bool01}}' }
+    expect: *ok
+    returns: ack
+  get_audio_gain:
+    summary: Return the audio gain of the pulled sources (GET /api/audio/getGlobalGain.json)
+    send: { method: GET, path: /api/audio/getGlobalGain.json }
+    expect: *data
+    returns: value
+  set_audio_gain:
+    summary: Set the audio gain of every source in a window (POST /api/audio/setGlobalGain.json)
+    params:
+      window: *window_int
+      gain: { type: enum, values: ["0", "6", "10", "20"], required: true, label: Gain, description: "The gain in dB: 0, 6, 10 or 20." }
+    send: { method: POST, path: /api/audio/setGlobalGain.json, content_type: application/json, body: '{"output":{window},"audioGain":{gain}}' }
+    expect: *ok
+    returns: ack
+
+  # ── 7 Single grid ────────────────────────────────────────────────────
+  set_grid_audio:
+    summary: Turn a grid's source audio on or off (POST /api/output/window_audio_set.json)
+    params:
+      window: *window_int
+      grid: &grid { type: int, min: 0, required: true, label: Grid, description: "The grid's id, as grids.<window>.<id> in state lists it." }
+      audio: { type: enum, values: ["on", "off"], required: true, label: Audio, description: "on for the source's audio, off to mute it." }
+    send: { method: POST, path: /api/output/window_audio_set.json, content_type: application/json, body: '{"output":"{window}","id":{grid},"volume":{audio:json}}' }
+    expect: *ok
+    returns: ack
+  get_stream_mode:
+    summary: Return whether a grid pulls its source's main stream, sub stream or chooses automatically (GET /api/output/get_stream_mode.json)
+    params:
+      window: *window_int
+      grid: *grid
+    send: { method: GET, path: /api/output/get_stream_mode.json, query: { output: "{window}", id: "{grid}" } }
+    expect: *data
+    returns: value
+  set_stream_mode:
+    summary: Make a grid pull the main stream, the sub stream, or choose by grid size (POST /api/output/set_stream_mode.json)
+    params:
+      grid: *grid
+      mode: { type: enum, values: [auto, main, sub], required: true, label: Stream, description: "auto (main stream when the grid is wider than 720 and taller than 576), main or sub." }
+    send: { method: POST, path: /api/output/set_stream_mode.json, content_type: application/json, body: '{"id":{grid},"mode":{mode:json}}' }
+    expect: *ok
+    returns: ack
+  get_grid:
+    summary: Return a grid's name, font, safe area, audio meter and center cross (GET /api/output/get_single_layout.json)
+    params:
+      window: *window_int
+      grid: *grid
+    send: { method: GET, path: /api/output/get_single_layout.json, query: { output_id: "{window}", id: "{grid}" } }
+    expect: *data
+    returns: value
+  set_grid:
+    summary: Set a grid's name, its font, and its safe area, audio meter and center cross (POST /api/output/set_single_layout.json)
+    params:
+      window: *window_int
+      grid: *grid
+      name: { type: string, required: true, max_length: 128, label: Name, description: "The grid's name shown on it." }
+      size: { type: int, min: 1, max: 200, required: true, label: Font size, description: "The name's font size." }
+      color: { type: string, required: true, max_length: 16, pattern: '^#[0-9A-Fa-f]{3,8}$', label: Font color, description: "The name's color as a CSS hex color, such as #265ddd." }
+      safe_area: { type: bool, required: true, label: Safe area, description: "Whether the safe area is shown." }
+      audio_meter: { type: bool, required: true, label: Audio meter, description: "Whether the audio meter is shown." }
+      center_cross: { type: bool, required: true, label: Center cross, description: "Whether the center cross is shown." }
+    send: { method: POST, path: /api/output/set_single_layout.json, content_type: application/json, body: '{"output":"{window}","id":{grid},"name":{name:json},"size":{size},"color":{color:json},"safe":{safe_area},"soundColumn":{audio_meter},"centerline":{center_cross}}' }
+    expect: *ok
+    returns: ack
+  set_grid_tally:
+    summary: Turn a grid's PVW or PGM tally on or off, for any source pulled to it (POST /api/output/set_pvw_pgm.json)
+    params:
+      window: *window_int
+      grid: *grid
+      tally: { type: enum, values: [PVW, PGM], required: true, label: Tally, description: "PVW (preview) or PGM (program)." }
+      enabled: { type: bool, required: true, label: Lit, description: "On to light it; off to turn it off." }
+    send: { method: POST, path: /api/output/set_pvw_pgm.json, content_type: application/json, body: '{"output":"{window}","id":{grid},"name":{tally:json},"enable":{enabled:bool01}}' }
+    expect: *ok
+    returns: ack
+
+  # ── 8 NDI streaming and Take ─────────────────────────────────────────
+  get_ndi_status:
+    summary: Return whether a window is in NDI streaming mode rather than preview (GET /api/ndi/get_status.json)
+    params:
+      window: *window_int
+    send: { method: GET, path: /api/ndi/get_status.json, query: { output: "{window}" } }
+    expect: *data
+    returns: value
+  set_ndi_status:
+    summary: Turn a window's NDI streaming on or off (POST /api/ndi/set_status.json)
+    params:
+      window: *window_int
+      enabled: { type: bool, required: true, label: NDI streaming, description: "On to stream the window as NDI; off for preview mode." }
+    send: { method: POST, path: /api/ndi/set_status.json, content_type: application/json, body: '{"output":"{window}","enable":{enabled}}' }
+    expect: { status: 200 }
+    returns: ack
+  get_take:
+    summary: Return a window's Take settings, target window and the overlays copied with it (GET /api/ndi/get_take.json)
+    params:
+      window: *window_int
+    send: { method: GET, path: /api/ndi/get_take.json, query: { output: "{window}" } }
+    expect: *data
+    returns: value
+  set_take:
+    summary: Set a window's Take target and what it copies (POST /api/ndi/set_take.json)
+    params:
+      window: *window_int
+      target: { type: int, min: 0, required: true, label: Target window, description: "The window the Take copies this one to." }
+      auto_take: { type: bool, default: false, label: Auto take, description: "Whether the Take happens automatically." }
+      center_cross: { type: bool, default: false, label: Center cross, description: "Whether center crosses are copied with the pictures." }
+      title: { type: bool, default: false, label: Titles, description: "Whether titles are copied with the pictures." }
+      safe_area: { type: bool, default: false, label: Safe area, description: "Whether safe areas are copied with the pictures." }
+      audio_meter: { type: bool, default: false, label: Audio meters, description: "Whether audio meters are copied with the pictures." }
+      border: { type: bool, default: false, label: Border, description: "Whether borders are copied with the pictures." }
+      sync_volume: { type: bool, default: false, label: Sync volume, description: "Whether the volume follows." }
+    send: { method: POST, path: /api/ndi/set_take.json, content_type: application/json, body: '{"output":"{window}","takeTarget":"{target}","autoTake":{auto_take},"centerLine":{center_cross},"title":{title},"safeFrame":{safe_area},"volumeMeter":{audio_meter},"border":{border},"syncVolume":{sync_volume}}' }
+    expect: *ok
+    returns: ack
+  apply_take:
+    summary: Take a window to its target window, copying it there (POST /api/ndi/apply_take.json)
+    params:
+      window: *window_int
+    send: { method: POST, path: /api/ndi/apply_take.json, content_type: application/json, body: '{"output":"{window}","apply":true}' }
+    expect: *ok
+    returns: ack
+  get_ndi_output:
+    summary: Return the NDI output's window, host, channel name, resolution, aspect ratio and frame rate (GET /api/ndi/get.json)
+    send: { method: GET, path: /api/ndi/get.json }
+    expect: *data
+    returns: value
+  set_ndi_output:
+    summary: Set the NDI output's channel name, resolution, aspect ratio and frame rate, in NDI streaming mode (POST /api/ndi/set.json)
+    params:
+      window: *window_int
+      host: { type: string, required: true, max_length: 128, label: Host, description: "The host name, as get_ndi_output returns it." }
+      name: { type: string, required: true, max_length: 128, label: Channel name, description: "The window name, which is also the NDI channel name." }
+      resolution: { type: int, min: 0, required: true, label: Resolution, description: "The resolution's value in get_resolutions' list; 0 for the custom width and height." }
+      width: { type: int, min: 1, required: true, label: Width, description: "The resolution's width (the list's, or the custom one)." }
+      height: { type: int, min: 1, required: true, label: Height, description: "The resolution's height (the list's, or the custom one)." }
+      aspect_ratio: { type: int, min: 0, required: true, label: Aspect ratio, description: "The aspect ratio's id in get_aspect_ratios' list: 0 no limit, 999 custom." }
+      aspect_width: { type: int, min: 1, default: 16, label: Custom aspect width, description: "The custom aspect ratio's width, used with 999." }
+      aspect_height: { type: int, min: 1, default: 9, label: Custom aspect height, description: "The custom aspect ratio's height, used with 999." }
+      frame_rate: { type: int, min: 0, required: true, label: Frame rate, description: "The frame rate: 30, 40, 50 or 60, or 0 for the custom one." }
+      custom_frame_rate: { type: int, min: 1, default: 24, label: Custom frame rate, description: "The custom frame rate, used with 0." }
+    send: { method: POST, path: /api/ndi/set.json, content_type: application/json, body: '{"output":"{window}","host":{host:json},"name":{name:json},"resolution":{resolution},"customResolution":{"width":{width},"height":{height}},"aspectRatio":{aspect_ratio},"customAspectRatio":{"width":{aspect_width},"height":{aspect_height}},"frameRate":{frame_rate},"customFrameRate":{custom_frame_rate}}' }
+    expect: *ok
+    returns: ack
+  get_resolutions:
+    summary: Return the resolutions offered for the NDI output (GET /api/ndi/resolution.json)
+    send: { method: GET, path: /api/ndi/resolution.json }
+    expect: *data
+    returns: value
+  get_aspect_ratios:
+    summary: Return the aspect ratios offered for the NDI output (GET /api/ndi/aspectRatio.json)
+    send: { method: GET, path: /api/ndi/aspectRatio.json }
+    expect: *data
+    returns: value
+  get_frame_rates:
+    summary: Return the frame rates offered for the NDI output (GET /api/ndi/frameRate.json)
+    send: { method: GET, path: /api/ndi/frameRate.json }
+    expect: *data
+    returns: value
+
+  # ── 9 NDI discovery, 10 NDI sources, 11 others ───────────────────────
+  get_ndi_groups:
+    summary: Return the NDI groups searched (GET /api/discovery/scan/groupChecked.json)
+    send: { method: GET, path: /api/discovery/scan/groupChecked.json }
+    expect: *data
+    returns: value
+  get_manual_ips:
+    summary: Return the addresses searched outside the subnet (GET /api/discovery/scan/getManualIps.json)
+    send: { method: GET, path: /api/discovery/scan/getManualIps.json }
+    expect: *data
+    returns: value
+  set_ndi_discovery:
+    summary: "Set the NDI groups and the addresses searched outside the subnet; groups and ips are the API's lists (POST /api/discovery/scan/addManualIp.json)"
+    params:
+      groups: { type: json, required: true, label: NDI groups, description: "The NDI group names, as a list of strings." }
+      ips: { type: json, required: true, label: Addresses, description: "The IP addresses searched outside the subnet, as a list of strings." }
+    send: { method: POST, path: /api/discovery/scan/addManualIp.json, content_type: application/json, body: '{"group_name":{groups},"ip":{ips}}' }
+    expect: *ok
+    returns: ack
+  get_sources:
+    summary: Return every discovered NDI source (GET /api/source/get.json)
+    send: { method: GET, path: /api/source/get.json }
+    expect: *data
+    returns: value
+  set_source_preload:
+    summary: Turn preloading of an NDI source on or off, connecting to it before it is pulled (POST /api/source/modify.json)
+    params:
+      source: { type: string, required: true, max_length: 256, label: Source, description: "The NDI source's name, as sources.<name> in state lists it." }
+      enabled: { type: bool, required: true, label: Preload, description: "On to preload the source; off not to." }
+    send: { method: POST, path: /api/source/modify.json, content_type: application/json, body: '{"id":{source:json},"switch":{enabled}}' }
+    expect: *ok
+    returns: ack
+  open_source_webpage:
+    summary: Have the host open a source's web page in its default browser (POST /api/webSite/set.json)
+    params:
+      url: { type: string, required: true, max_length: 512, label: URL, description: "The source's web address, such as 192.168.2.33." }
+    send: { method: POST, path: /api/webSite/set.json, content_type: application/json, body: '{"url":{url:json}}' }
+    expect: *ok
+    returns: ack
+  refresh_sources:
+    summary: Search for NDI sources again (GET /api/webSite/refresh.json)
+    send: { method: GET, path: /api/webSite/refresh.json }
+    expect: *ok
+    returns: ack
+  get_window_sdp:
+    summary: Return the WebRTC SDP offer for previewing a video source (GET /api/webrtc/get_sdp.json)
+    params:
+      stream: { type: string, required: true, max_length: 64, label: Source, description: "The video source's id, as the document's example gives it (1)." }
+      ip: { type: string, required: true, max_length: 64, label: Address, description: "The video source's IP address." }
+    send: { method: GET, path: /api/webrtc/get_sdp.json, query: { stream_id: "{stream}", ip: "{ip}" } }
+    expect: *data
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The API has no authentication. Requests are GET or POST (both are
+      documented for each); parameters go in the query of the GETs that
+      read one window, grid or layout, and as a JSON body in POSTs, as the
+      document's examples show them. Window ids are sent as strings or
+      numbers exactly as each example shows them.
+  - models: [all]
+    severity: critical
+    text: >
+      apply_take copies a window to its target at once; set_window_layout,
+      clear_window_sources and set_ndi_output change what a window shows
+      or sends; close_window and remove_layout cannot be undone;
+      set_ndi_status off stops a window's NDI stream. None asks for
+      confirmation.
+  - models: [all]
+    severity: warning
+    text: >
+      Gaps in the document: 6.2 (output/layout.json) lists only action
+      (change, set, remove), output, position, layout_id and layout_number,
+      with no example and no source field, so which source a grid takes
+      cannot be chosen through this API; 7.2 (get_stream_mode) gives no
+      parameters (the window and grid are sent as output and id); 7.3's
+      example sends only the grid id and mode; 6.6 and 6.8 name no window,
+      so the border and audio gain are read as one setting; 8.4's example
+      leaves out autoTake, which its table lists (it is sent). set_ndi_status
+      is answered with {output, enable}, not the usual result, so it
+      succeeds on HTTP 200.
+  - models: [all]
+    severity: info
+    text: >
+      State is polled every 3 seconds (the windows, then each window's
+      grids, screen, toolbar, NDI status and Take settings) and every 30
+      seconds (the layouts and templates, screens, border, audio gain, NDI
+      output, sources, NDI groups and addresses, and the general
+      configuration). A grid's own name settings and stream mode are read
+      when a command changes them or asks for them. Every accepted change
+      has what it changed read again.
+
+state:
+  general.device_name: { type: string, description: "The device name" }
+  general.language_switch: { type: bool, description: "Whether the language switch icon is shown" }
+  general.languages: { type: string, description: "The languages offered, as JSON text of {value, name, default}" }
+  general.logo_shown: { type: bool, description: "Whether the logo is shown" }
+  general.qrcode: { type: string, description: "The address the QR code points to" }
+  general.nav_shown: { type: bool, description: "Whether the navigation bar is shown" }
+  layouts.*.name: { type: string, description: "An added layout, keyed by id: its name" }
+  layouts.*.grid_count: { type: int, description: "Its number of grids" }
+  layouts.*.in_use: { type: bool, description: "Whether it is in use" }
+  layouts.*.grids: { type: string, description: "Its grids as JSON text of {x, y, width, height}" }
+  layout_templates.*.name: { type: string, description: "A layout template, keyed by id: its name" }
+  layout_templates.*.grids: { type: string, description: "Its grids as JSON text" }
+  windows.*.name: { type: string, description: "A window, keyed by id: its name" }
+  windows.*.in_use: { type: bool, description: "Whether it is the window in use (enable)" }
+  windows.*.ndi: { type: bool, description: "Whether NDI streaming is on (window list)" }
+  windows.*.take_target: { type: int, description: "The window its Take goes to (window list)" }
+  windows.*.layout: { type: string, description: "Its layout's id" }
+  windows.*.grid_count: { type: int, description: "Its number of grids" }
+  windows.*.screen: { type: int, description: "The screen it is on" }
+  windows.*.full_screen: { type: bool, description: "Whether it is full screen" }
+  windows.*.shown: { type: bool, description: "Whether it is shown (false: minimized)" }
+  windows.*.toolbar.audio_meters: { type: bool, description: "Whether audio meters are shown" }
+  windows.*.toolbar.safe_areas: { type: bool, description: "Whether safe areas are shown" }
+  windows.*.toolbar.center_crosses: { type: bool, description: "Whether center crosses are shown" }
+  windows.*.toolbar.names: { type: bool, description: "Whether names are shown" }
+  windows.*.ndi_streaming: { type: bool, description: "Whether it is in NDI streaming mode (get_status)" }
+  windows.*.take.auto: { type: bool, description: "Whether the Take is automatic" }
+  windows.*.take.target: { type: string, description: "The window the Take goes to" }
+  windows.*.take.center_cross: { type: bool, description: "Whether center crosses are copied" }
+  windows.*.take.title: { type: bool, description: "Whether titles are copied" }
+  windows.*.take.safe_area: { type: bool, description: "Whether safe areas are copied" }
+  windows.*.take.audio_meter: { type: bool, description: "Whether audio meters are copied" }
+  windows.*.take.border: { type: bool, description: "Whether borders are copied" }
+  grids.*.*.source: { type: string, description: "A grid, keyed by window then grid id: its source's id (stream_id)" }
+  grids.*.*.source_name: { type: string, description: "Its source's name" }
+  grids.*.*.audio: { type: string, description: "on, or off when muted" }
+  grids.*.*.name: { type: string, description: "Its name" }
+  grids.*.*.name_color: { type: string, description: "Its name's font color" }
+  grids.*.*.name_size: { type: int, description: "Its name's font size" }
+  grids.*.*.pvw: { type: bool, description: "Whether its PVW tally is on" }
+  grids.*.*.pgm: { type: bool, description: "Whether its PGM tally is on" }
+  grids.*.*.active: { type: int, description: "Tally summary: 0 none, 1 PVW, 2 PVW and PGM" }
+  grids.*.*.frame_rate: { type: int, description: "Its source's frame rate" }
+  grids.*.*.resolution: { type: string, description: "Its source's resolution, such as 1080x720" }
+  grids.*.*.url: { type: string, description: "Its NDI source's web address" }
+  grids.*.*.safe_area: { type: bool, description: "Whether its safe area is shown (grid settings)" }
+  grids.*.*.audio_meter: { type: bool, description: "Whether its audio meter is shown" }
+  grids.*.*.center_cross: { type: bool, description: "Whether its center cross is shown" }
+  grids.*.*.stream_mode: { type: string, description: "auto, main or sub" }
+  screens.*: { type: string, description: "A screen of the host, keyed by id: its label" }
+  border.color: { type: int, description: "The border color as a 24-bit RGB number" }
+  border.shown: { type: bool, description: "Whether the border is shown" }
+  audio_gain: { type: int, unit: dB, description: "The audio gain of the pulled sources" }
+  ndi_output.window: { type: string, description: "The window the NDI output sends" }
+  ndi_output.host: { type: string, description: "The host name" }
+  ndi_output.name: { type: string, description: "The NDI channel name" }
+  ndi_output.resolution: { type: int, description: "The resolution's value, 0 custom" }
+  ndi_output.width: { type: int, description: "The resolution's width" }
+  ndi_output.height: { type: int, description: "The resolution's height" }
+  ndi_output.aspect_ratio: { type: int, description: "The aspect ratio's id, 0 no limit, 999 custom" }
+  ndi_output.aspect_width: { type: int, description: "The custom aspect ratio's width" }
+  ndi_output.aspect_height: { type: int, description: "The custom aspect ratio's height" }
+  ndi_output.frame_rate: { type: int, description: "The frame rate, 0 custom" }
+  ndi_output.custom_frame_rate: { type: int, description: "The custom frame rate" }
+  sources.*.ip: { type: string, description: "A discovered NDI source, keyed by name: its address" }
+  sources.*.url: { type: string, description: "Its address and port" }
+  sources.*.official: { type: bool, description: "Whether it is an official source" }
+  ndi_discovery.groups: { type: string, description: "The NDI groups searched, as JSON text" }
+  ndi_discovery.manual_ips: { type: string, description: "The addresses searched outside the subnet, as JSON text" }
+
+telemetry:
+  poll:
+    - every_ms: 3000
+      send:
+        - { method: GET, path: /api/output/tabs_get.json }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /api/config/general/get.json }
+        - { method: GET, path: /api/config/nav/nav.json }
+        - { method: GET, path: /api/output/icon.json }
+        - { method: GET, path: /api/pattern/template.json }
+        - { method: GET, path: /api/window/get_screen_list.json }
+        - { method: GET, path: /api/output/GetEnableBorder.json }
+        - { method: GET, path: /api/audio/getGlobalGain.json }
+        - { method: GET, path: /api/ndi/get.json }
+        - { method: GET, path: /api/source/get.json }
+        - { method: GET, path: /api/discovery/scan/groupChecked.json }
+        - { method: GET, path: /api/discovery/scan/getManualIps.json }
+  updates:
+    - path: "^/api/config/general/get\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { name: "$.data.deviceName", lang: "$.data.languageShow", langs: "$.data.languageOptions", logo: "$.data.logoShow", qr: "$.data.qrcode" }
+      state:
+        general.device_name: "{name}"
+        general.language_switch: "{lang}"
+        general.languages: "{langs}"
+        general.logo_shown: "{logo}"
+        general.qrcode: "{qr}"
+    - path: "^/api/config/nav/nav\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { home: "$.data.main_nav.home" }
+      state: { general.nav_shown: "{home}" }
+    - path: "^/api/output/icon\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", nm: "$.number", name: "$.name", use: "$.use_output", pos: "$.position" }
+      replace: layouts
+      state:
+        "layouts.{id}.name": "{name}"
+        "layouts.{id}.grid_count": "{nm}"
+        "layouts.{id}.in_use": { value: "{use}", map: { "1": true, "0": false } }
+        "layouts.{id}.grids": "{pos}"
+    - path: "^/api/pattern/template\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", name: "$.name", pos: "$.position" }
+      replace: layout_templates
+      state:
+        "layout_templates.{id}.name": "{name}"
+        "layout_templates.{id}.grids": "{pos}"
+    - path: "^/api/window/get_screen_list\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", label: "$.label" }
+      replace: screens
+      state: { "screens.{id}": "{label}" }
+    - path: "^/api/output/GetEnableBorder\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { c: "$.data.bordercolor", e: "$.data.bordercolor_enabled" }
+      state:
+        border.color: "{c}"
+        border.shown: { value: "{e}", map: { "1": true, "0": false } }
+    - path: "^/api/audio/getGlobalGain\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { g: "$.data.audioGain" }
+      state: { audio_gain: "{g}" }
+    - path: "^/api/ndi/get\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { o: "$.data.output", h: "$.data.host", nm: "$.data.name", r: "$.data.resolution", w: "$.data.customResolution.width", ht: "$.data.customResolution.height", a: "$.data.aspectRatio", aw: "$.data.customAspectRatio.width", ah: "$.data.customAspectRatio.height", f: "$.data.frameRate", cf: "$.data.customFrameRate" }
+      state:
+        ndi_output.window: "{o}"
+        ndi_output.host: "{h}"
+        ndi_output.name: "{nm}"
+        ndi_output.resolution: "{r}"
+        ndi_output.width: "{w}"
+        ndi_output.height: "{ht}"
+        ndi_output.aspect_ratio: "{a}"
+        ndi_output.aspect_width: "{aw}"
+        ndi_output.aspect_height: "{ah}"
+        ndi_output.frame_rate: "{f}"
+        ndi_output.custom_frame_rate: "{cf}"
+    - path: "^/api/source/get\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", ip: "$.ip", url: "$.url", official: "$.official" }
+      replace: sources
+      state:
+        "sources.{id:key}.ip": "{ip}"
+        "sources.{id:key}.url": "{url}"
+        "sources.{id:key}.official": "{official}"
+    - path: "^/api/discovery/scan/groupChecked\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { g: "$.data" }
+      state: { ndi_discovery.groups: "{g}" }
+    - path: "^/api/discovery/scan/getManualIps\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { i: "$.data" }
+      state: { ndi_discovery.manual_ips: "{i}" }
+
+    # ── Windows, then each window's grids, screen, toolbar, NDI, Take ──
+    - path: "^/api/output/tabs_get\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", name: "$.name", enable: "$.enable", ndi: "$.NDIStatus", take: "$.takeTarget" }
+      replace: windows
+      state:
+        "windows.{id}.name": "{name}"
+        "windows.{id}.in_use": "{enable}"
+        "windows.{id}.ndi": "{ndi}"
+        "windows.{id}.take_target": "{take}"
+      then_send:
+        - { method: GET, path: /api/output/get.json, query: { output: "{id}" } }
+        - { method: GET, path: /api/window/get_window_position.json, query: { output: "{id}" } }
+        - { method: GET, path: /api/output/get_state_contol.json, query: { output: "{id}" } }
+        - { method: GET, path: /api/ndi/get_status.json, query: { output: "{id}" } }
+        - { method: GET, path: /api/ndi/get_take.json, query: { output: "{id}" } }
+    - path: "^/api/output/get\\.json\\?output=(\\d+)$"
+      json_match: { "$.result": "^ok$" }
+      json: { l: "$.data.layout_id", nm: "$.data.layout_number" }
+      state:
+        "windows.{1}.layout": "{l}"
+        "windows.{1}.grid_count": "{nm}"
+    - path: "^/api/output/get\\.json\\?output=(\\d+)$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.layout"
+      json: { id: "$.id", sid: "$.stream_id", sname: "$.stream_name", vol: "$.volume", pn: "$.pattern_name", pc: "$.pattern_color", ps: "$.pattern_size", pvw: "$.PVW", pgm: "$.PGM", act: "$.Active", fr: "$.frameRate", ar: "$.aspectRatio", url: "$.url" }
+      replace: "grids.{1}"
+      state:
+        "grids.{1}.{id}.source": "{sid}"
+        "grids.{1}.{id}.source_name": "{sname}"
+        "grids.{1}.{id}.audio": "{vol}"
+        "grids.{1}.{id}.name": "{pn}"
+        "grids.{1}.{id}.name_color": "{pc}"
+        "grids.{1}.{id}.name_size": "{ps}"
+        "grids.{1}.{id}.pvw": { value: "{pvw}", map: { "1": true, "0": false } }
+        "grids.{1}.{id}.pgm": { value: "{pgm}", map: { "1": true, "0": false } }
+        "grids.{1}.{id}.active": "{act}"
+        "grids.{1}.{id}.frame_rate": "{fr}"
+        "grids.{1}.{id}.resolution": "{ar}"
+        "grids.{1}.{id}.url": "{url}"
+    - path: "^/api/window/get_window_position\\.json\\?output=(\\d+)$"
+      json_match: { "$.result": "^ok$" }
+      json: { s: "$.data.screen", f: "$.data.isFull", v: "$.data.isShow" }
+      state:
+        "windows.{1}.screen": "{s}"
+        "windows.{1}.full_screen": "{f}"
+        "windows.{1}.shown": "{v}"
+    - path: "^/api/output/get_state_contol\\.json\\?output=(\\d+)$"
+      json_match: { "$.result": "^ok$" }
+      json: { a: "$.data.soundColumn.enable", s: "$.data.securityBox.enable", c: "$.data.centerline.enable", nm: "$.data.nameEnable.enable" }
+      state:
+        "windows.{1}.toolbar.audio_meters": { value: "{a}", map: { "1": true, "0": false, "true": true, "false": false } }
+        "windows.{1}.toolbar.safe_areas": { value: "{s}", map: { "1": true, "0": false, "true": true, "false": false } }
+        "windows.{1}.toolbar.center_crosses": { value: "{c}", map: { "1": true, "0": false, "true": true, "false": false } }
+        "windows.{1}.toolbar.names": { value: "{nm}", map: { "1": true, "0": false, "true": true, "false": false } }
+    - path: "^/api/ndi/get_status\\.json\\?output=(\\d+)$"
+      json_match: { "$.result": "^ok$" }
+      json: { e: "$.data.enable" }
+      state: { "windows.{1}.ndi_streaming": "{e}" }
+    - path: "^/api/ndi/get_take\\.json\\?output=(\\d+)$"
+      json_match: { "$.result": "^ok$" }
+      json: { a: "$.data.autoTake", t: "$.data.takeTarget", c: "$.data.centerLine", ti: "$.data.title", s: "$.data.safeFrame", v: "$.data.volumeMeter", b: "$.data.border" }
+      state:
+        "windows.{1}.take.auto": "{a}"
+        "windows.{1}.take.target": "{t}"
+        "windows.{1}.take.center_cross": "{c}"
+        "windows.{1}.take.title": "{ti}"
+        "windows.{1}.take.safe_area": "{s}"
+        "windows.{1}.take.audio_meter": "{v}"
+        "windows.{1}.take.border": "{b}"
+    - path: "^/api/output/get_single_layout\\.json\\?output_id=(\\d+)&id=(\\d+)$"
+      json_match: { "$.result": "^ok$" }
+      json: { nm: "$.data.name", s: "$.data.size", c: "$.data.color", sa: "$.data.safe", sc: "$.data.soundColumn", cl: "$.data.centerline" }
+      state:
+        "grids.{1}.{2}.name": "{nm}"
+        "grids.{1}.{2}.name_size": "{s}"
+        "grids.{1}.{2}.name_color": "{c}"
+        "grids.{1}.{2}.safe_area": "{sa}"
+        "grids.{1}.{2}.audio_meter": "{sc}"
+        "grids.{1}.{2}.center_cross": "{cl}"
+    - path: "^/api/output/get_stream_mode\\.json\\?output=(\\d+)&id=(\\d+)$"
+      json_match: { "$.result": "^ok$" }
+      json: { m: "$.data.mode" }
+      state: { "grids.{1}.{2}.stream_mode": "{m}" }
+
+    # ── Read-backs ──────────────────────────────────────────────────────
+    - path: "^/api/pattern/(add|remove|modify)\\.json(\\?.*)?$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/output/icon.json }]
+    - path: "^/api/(window/new|output/tabs_modify|window/close_window|window/set_window_position|output/layout|output/delete_all|output/set_state_contol|output/window_audio_set|output/set_pvw_pgm|ndi/set_take|ndi/apply_take)\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/output/tabs_get.json }]
+    - path: "^/api/ndi/set_status\\.json$"
+      json: {}
+      then_send: [{ method: GET, path: /api/output/tabs_get.json }]
+    - path: "^/api/output/set_single_layout\\.json$"
+      request_match: { "$.output": "^(\\d+)$", "$.id": "^(\\d+)$" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/output/get_single_layout.json, query: { output_id: "{1}", id: "{2}" } }
+        - { method: GET, path: /api/output/get.json, query: { output: "{1}" } }
+    - path: "^/api/output/EnableBorder\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/output/GetEnableBorder.json }]
+    - path: "^/api/audio/setGlobalGain\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/audio/getGlobalGain.json }]
+    - path: "^/api/ndi/set\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/ndi/get.json }]
+    - path: "^/api/(source/modify|webSite/refresh)\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/source/get.json }]
+    - path: "^/api/discovery/scan/addManualIp\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/discovery/scan/groupChecked.json }
+        - { method: GET, path: /api/discovery/scan/getManualIps.json }

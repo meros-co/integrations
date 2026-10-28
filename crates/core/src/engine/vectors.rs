@@ -706,6 +706,8 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         "* REPORT ok *",
         // Meyer Sound GALAXY: the answer to :ping.
         ":pong",
+        // Visual Productions' UDP API: hello is answered "<prefix>-hello".
+        "core-hello",
     ];
     let line = match &engine.transport {
         super::Transport::LineTcp {

@@ -726,11 +726,12 @@ impl Aes67Sap {
         cx.connection(Connection::Connected);
         cx.udp_open(
             SOCKET,
-            Bind::Multicast {
-                group: self.group,
+            Bind::Network {
+                address: None,
                 port: self.port,
             },
         );
+        cx.udp_join(SOCKET, self.group);
     }
 
     fn count(&self, patch: &mut Map<String, Value>) {
@@ -1108,10 +1109,14 @@ mod tests {
         let a = cx.take();
         assert!(a.contains(&Action::UdpOpen {
             socket: SOCKET,
-            bind: Bind::Multicast {
-                group: Ipv4Addr::new(239, 255, 255, 255),
+            bind: Bind::Network {
+                address: None,
                 port: 9875
             }
+        }));
+        assert!(a.contains(&Action::UdpJoin {
+            socket: SOCKET,
+            group: Ipv4Addr::new(239, 255, 255, 255)
         }));
         assert!(a.contains(&Action::Connection(Connection::Connected)));
         assert!(Aes67Sap::new(OpenContext {

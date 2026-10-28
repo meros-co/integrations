@@ -1,8 +1,8 @@
 //! AES67 stream discovery against real loopback sockets, through the public
 //! API: an announcer simulated as a UDP sender of SAP packets (RFC 2974
 //! section 6) carrying Audinate's sample description. The core is bound to
-//! loopback, where no group is joined, so announcements are sent to the
-//! listening address directly.
+//! loopback, where multicast is unreliable across platforms, so
+//! announcements are sent to the listening address directly.
 
 #![cfg(feature = "aes67-sap")]
 

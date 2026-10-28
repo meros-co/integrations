@@ -1,0 +1,179 @@
+spec: 1
+id: sacn
+name: sACN (ANSI E1.31 streaming ACN) source and receiver
+vendor: ESTA (ANSI E1.31; any sACN console, node, media server or fixture)
+category: lighting
+implementation: native
+reason: >
+  sACN is binary ACN-framed UDP spoken among the sources and receivers of a network on one fixed port, mostly
+  by multicast: the core binds the port for itself, joins one multicast group per universe received, holds DMX
+  output per universe and sends it with the standard's repeat, keep-alive, termination and synchronization
+  timing, advertises its universes with Universe Discovery, and merges what several sources send by priority,
+  with sequence checks and data-loss timeouts.
+
+source:
+  - title: "ANSI E1.31 - 2016, Entertainment Technology - Lightweight streaming protocol for transport of DMX512 using ACN (CP/2014-1009r3)"
+    author: ESTA Technical Standards Program
+    url: https://tsp.esta.org/tsp/documents/docs/E1-31-2016.pdf
+    note: >
+      Standards body document, public on ESTA's site (the 2016 edition; the current edition is downloaded
+      after an email sign-in, so this spec follows 2016). Root layer (§5: preamble 0x0010, ACN Packet Identifier,
+      Flags and Length counted from octet 16, VECTOR_ROOT_E131_DATA 4 and _EXTENDED 8, CID a UUID); Data Packet
+      framing layer (§6.2: source name, priority 0-200 default 100, synchronization address, sequence, options
+      Preview_Data, Stream_Terminated and Force_Synchronization, universe 1-63999); DMP layer (§7: 0x02, 0xA1,
+      first address 0, increment 1, count 1-513, start code then slots); Synchronization Packet (§6.3);
+      Universe Discovery Packet (§6.4, §8: pages of up to 512 sorted universes, universe 64214, every 10 s);
+      source timing (§6.6: at most the DMX512 rate, three packets of unchanged data then a keep-alive every 800
+      to 1000 ms, three Stream_Terminated packets on stopping); receiver timing (§6.7: data loss after 2.5 s,
+      sequence numbers B - A in (-20, 0] discarded); priority and merging (§6.2.3); multicast 239.255.hi.lo on
+      UDP 5568, unicast also to be accepted (§9); Universe Synchronization (§11).
+
+settings:
+  bind_address: { type: string, pattern: '^[0-9A-Fa-f.:]*$', max_length: 45, label: Bind address, description: "The local IPv4 address of the network interface on the sACN network, where multicast groups are joined; empty binds where the core binds and joins on every IPv4 interface." }
+  source_name: { type: string, max_length: 63, default: Meros Integrations, label: Source name, description: "The source name receivers show for the core's output, up to 63 bytes of UTF-8." }
+  cid: { type: string, pattern: '^([0-9A-Fa-f]{8}-?[0-9A-Fa-f]{4}-?[0-9A-Fa-f]{4}-?[0-9A-Fa-f]{4}-?[0-9A-Fa-f]{12})?$', max_length: 36, default: "", label: CID, description: "The source's Component Identifier, a UUID such as ef07c8dd-0064-4401-a3a2-459ef8e6143e, kept the same across restarts so receivers know the source; empty makes a new one each time the integration is opened." }
+  priority: { type: int, min: 0, max: 200, default: 100, label: Priority, description: "The priority of universes sent, 0-200 (higher wins at receivers), unless set_universe_priority gives one its own." }
+  multicast: { type: bool, default: true, label: Multicast, description: "Send each universe to its multicast group, 239.255.<universe high byte>.<universe low byte>; false sends to the unicast addresses and the host only." }
+  unicast_addresses: { type: string, max_length: 1024, default: "", label: Unicast addresses, description: "Comma-separated receivers each universe is also unicast to, as IP addresses (port 5568) or ip:port; the host, when given, is one too." }
+  sync_universe: { type: int, min: 0, max: 63999, default: 0, label: Synchronization universe, description: "A universe to synchronize output on: data packets name it, and an E1.31 Synchronization Packet follows every burst; 0 for unsynchronized output." }
+  force_sync: { type: bool, default: false, label: Force synchronization, description: "With a synchronization universe, set Force_Synchronization in data packets: receivers that lose the Synchronization Packets go back to acting on data at once, rather than holding their last look." }
+  preview: { type: bool, default: false, label: Preview data, description: "Mark everything sent as preview data, for visualizers and media server previews, never live output." }
+  receive: { type: string, max_length: 1024, default: "", pattern: '^([0-9]+(-[0-9]+)?(\s*,\s*[0-9]+(-[0-9]+)?)*)?$', label: Universes received, description: "Universes 1-63999 to receive, as a list such as 1-4, 10; each one's multicast group is joined. Empty receives none." }
+  receive_interval_ms: { type: int, min: 0, max: 60000, default: 100, label: Receive interval, description: "The shortest time in milliseconds between two state updates of one received universe's levels; the latest are reported when it ends." }
+
+ports:
+  - { port: 5568, protocol: udp, role: control, listener: core, note: "The ACN-SDT multicast port, used for multicast (239.255.0.1 to 239.255.249.255, and 239.255.250.214 for Universe Discovery) and unicast alike: the core listens on it (shared with other programs on the host) and sends from and to it" }
+
+models:
+  - id: sacn
+    name: sACN network (any E1.31 source or receiver; the core sends and receives)
+    supports: [set_channel, set_channels, set_universe, clear_universe, set_universe_priority, release_universe, release_all, send_sync, send_start_code, receive_universe]
+    verification: none
+
+commands:
+  set_channel:
+    summary: Set one channel of a universe's held output and send the universe. Returns unverified, sACN having no acknowledgement
+    params:
+      universe: { type: int, min: 1, max: 63999, required: true, label: Universe, description: "sACN universe, 1-63999." }
+      channel: { type: int, min: 1, max: 512, required: true, label: Channel, description: "DMX channel (slot), numbered from 1." }
+      value: { type: int, min: 0, max: 255, required: true, label: Value, description: "Level, 0 to 255." }
+    returns: none
+  set_channels:
+    summary: >
+      Set consecutive channels of a universe's held output from start, the others kept, and send it. values is a
+      JSON array of integers 0-255 that fits within channel 512
+    params:
+      universe: { type: int, min: 1, max: 63999, required: true, label: Universe, description: "sACN universe, 1-63999." }
+      start: { type: int, min: 1, max: 512, default: 1, label: Start channel, description: "The first channel the values set, numbered from 1." }
+      values: { type: json, required: true, label: Values, description: "A list of levels 0-255, one per channel from the start channel." }
+    returns: none
+  set_universe:
+    summary: >
+      Replace a universe's whole held output with values (a JSON array of up to 512 integers 0-255) from channel
+      1, the rest 0, and send it
+    params:
+      universe: { type: int, min: 1, max: 63999, required: true, label: Universe, description: "sACN universe, 1-63999." }
+      values: { type: json, required: true, label: Values, description: "A list of up to 512 levels 0-255 from channel 1; later channels are set to 0." }
+    returns: none
+  clear_universe:
+    summary: Set every channel of a universe's held output to 0 and send it
+    params:
+      universe: { type: int, min: 1, max: 63999, required: true, label: Universe, description: "sACN universe, 1-63999." }
+    returns: none
+  set_universe_priority:
+    summary: Give one universe sent its own priority (starting it, all 0, if not held), and send it
+    params:
+      universe: { type: int, min: 1, max: 63999, required: true, label: Universe, description: "sACN universe, 1-63999." }
+      priority: { type: int, min: 0, max: 200, required: true, label: Priority, description: "Priority 0-200; receivers take the highest." }
+    returns: none
+  release_universe:
+    summary: >
+      Stop sending a universe: three packets with Stream_Terminated, after which receivers treat the source as
+      gone at once
+    params:
+      universe: { type: int, min: 1, max: 63999, required: true, label: Universe, description: "sACN universe to stop sending." }
+    returns: none
+  release_all:
+    summary: Stop sending every universe, terminating each stream
+    returns: none
+  send_sync:
+    summary: >
+      Send one E1.31 Synchronization Packet on a universe (sync_universe when 0), so receivers act on the data
+      that names it
+    params:
+      universe: { type: int, min: 0, max: 63999, default: 0, label: Synchronization universe, description: "The synchronization universe; 0 for the sync_universe setting." }
+    returns: none
+  send_start_code:
+    summary: >
+      Send one data packet with a non-zero DMX512 start code on a universe (such as 0xDD per-channel priority),
+      not held or repeated. values is a JSON array of up to 512 integers 0-255
+    params:
+      universe: { type: int, min: 1, max: 63999, required: true, label: Universe, description: "sACN universe, 1-63999." }
+      start_code: { type: int, min: 1, max: 255, required: true, label: Start code, description: "The DMX512 alternate start code, 1-255." }
+      values: { type: json, required: true, label: Values, description: "A list of up to 512 slot values 0-255 after the start code." }
+    returns: none
+  receive_universe:
+    summary: Start or stop receiving a universe (joining or leaving its multicast group); receive in state lists those received
+    params:
+      universe: { type: int, min: 1, max: 63999, required: true, label: Universe, description: "sACN universe, 1-63999." }
+      enabled: { type: bool, default: true, label: Receive, description: "true starts receiving the universe, false stops and drops it from state." }
+    returns: ack
+
+state:
+  cid: { type: string, description: "The core's CID as a source, the setting or the one made on opening" }
+  source_name: { type: string, description: "The core's source name" }
+  port: { type: int, description: "The UDP port listened on and sent to" }
+  receive: { type: array, description: "The universes received, in order" }
+  outputs.*.channels: { type: array, description: "The held output of a universe, 512 levels 0-255 from channel 1, keyed by universe" }
+  outputs.*.priority: { type: int, description: "The universe's priority" }
+  inputs.*.channels: { type: array, description: "A received universe's levels: the highest-priority live sources merged slot by slot, highest takes precedence; empty when none is left" }
+  inputs.*.priority: { type: int, description: "The priority the levels come from, 0 when no live source is left" }
+  inputs.*.merged_sources: { type: int, description: "How many sources at that priority were merged" }
+  inputs.*.sources.*.name: { type: string, description: "A source sending the universe, keyed by its CID: its source name" }
+  inputs.*.sources.*.ip: { type: string, description: "The source's IP address" }
+  inputs.*.sources.*.priority: { type: int, description: "The source's priority on the universe" }
+  inputs.*.sources.*.preview: { type: bool, description: "The source marks its data preview (left out of the levels)" }
+  inputs.*.sources.*.sync_universe: { type: int, description: "The synchronization universe the source names, 0 for none" }
+  sources.*.name: { type: string, description: "A source's name from its Universe Discovery, keyed by CID" }
+  sources.*.ip: { type: string, description: "The source's IP address" }
+  sources.*.universes: { type: array, description: "The universes the source says it sends, from every page of its Universe Discovery" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Opened with no host: the core listens on UDP 5568 (another program can listen there too), sends each
+      universe to its multicast group, and joins the groups of the universes received and of Universe Discovery
+      (239.255.250.214). Give a receiver's address as host to unicast every universe to it as well. Connected
+      means listening; a port that cannot be bound is reported disconnected and retried after 1 s, doubling to
+      30 s. A group that cannot be joined on an interface is logged.
+  - models: [all]
+    severity: info
+    text: >
+      Output is the full 512 channels of each held universe: a change goes at once (at most every 23 ms, 44 Hz,
+      later changes waiting for the next frame) and twice more, then a keep-alive every second, as E1.31
+      requires; set_universe_priority, release and stopping the integration go out the same way. Stopping or
+      releasing sends three Stream_Terminated packets. Universe Discovery lists the universes sent (and the
+      synchronization universe) every 10 s, and nothing while none is sent. The sequence of each universe counts
+      up from 1. Nothing is acknowledged, so commands return unverified.
+  - models: [all]
+    severity: info
+    text: >
+      Received levels are those of the highest priority among the universe's live sources, merged highest takes
+      precedence where several share it; preview data is listed but left out. A source is removed when it
+      terminates its stream or is silent 2.5 s, and the levels are merged again. A Universe Discovery source not
+      heard for 25 s is removed from sources. Synchronization Packets and data with a non-zero start code are
+      reported as message events (sacn/sync, sacn/start_code), not applied: the core does not hold received data
+      for synchronization. The core's own packets, heard back through multicast, are ignored by their CID.
+  - models: [all]
+    severity: info
+    text: >
+      Opening for commands only (monitor false) still sends and keeps output, but joins no multicast group and
+      keeps nothing received. Without a cid setting a new CID is made each time the integration is opened, so
+      receivers see a new source after a restart; set cid to keep one.
+  - models: [all]
+    severity: info
+    text: >
+      Written to the 2016 edition of E1.31, the one ESTA publishes openly; the current edition is fetched after
+      an email sign-in. Multicast is IPv4 only, with the operating system's TTL (1) and interface choice for
+      sending; receivers on another subnet need unicast addresses.

@@ -489,14 +489,20 @@ pub enum Bind {
         address: Option<std::net::IpAddr>,
         port: u16,
     },
-    /// A port owned by this session that also hears an IPv4 multicast
-    /// group, joined on every interface the core uses (none when it is bound
-    /// to loopback, where only datagrams sent to that address arrive), shared
-    /// with other programs listening to the same group and port. Multicast
-    /// sent from it goes with a time to live of 255 and loops back to this
-    /// host's own listeners. For a protocol announced on a group (SAP).
-    Multicast {
-        group: std::net::Ipv4Addr,
+    /// A fixed port owned by this session for a protocol spoken among the
+    /// devices of a network rather than with one (Art-Net, sACN,
+    /// PosiStageNet), each with one fixed port. It hears every sender, may
+    /// send to a broadcast address, can join IPv4 multicast groups
+    /// ([`Action::UdpJoin`]), and is bound so that other programs on this
+    /// host can listen on the same port (SO_REUSEADDR, and SO_REUSEPORT
+    /// where the system has it): a multicast or broadcast datagram then
+    /// reaches each of them. A datagram that cannot be sent to one
+    /// destination (a broadcast address of no network of this host) is
+    /// logged and the socket kept, since that says nothing about the others.
+    /// `address` is the local address to bind, the core's bind address when
+    /// absent.
+    Network {
+        address: Option<std::net::IpAddr>,
         port: u16,
     },
 }
@@ -613,6 +619,21 @@ pub enum Action {
     },
     UdpClose {
         socket: Key,
+    },
+    /// Join an IPv4 multicast group on a socket opened with
+    /// [`Bind::Network`]: on the interface of its bind address, or on every
+    /// IPv4 interface of this host when it is bound to none. A group that
+    /// cannot be joined on an interface is logged; nothing is joined on a
+    /// socket of another kind. Leaving the socket open keeps the group
+    /// joined.
+    UdpJoin {
+        socket: Key,
+        group: std::net::Ipv4Addr,
+    },
+    /// Leave a group joined with [`Action::UdpJoin`].
+    UdpLeave {
+        socket: Key,
+        group: std::net::Ipv4Addr,
     },
     /// Connect, replacing any connection open under this key.
     TcpOpen {
@@ -907,6 +928,16 @@ impl Cx {
 
     pub fn udp_close(&mut self, socket: Key) {
         self.push(Action::UdpClose { socket });
+    }
+
+    /// Join a multicast group; see [`Action::UdpJoin`].
+    pub fn udp_join(&mut self, socket: Key, group: std::net::Ipv4Addr) {
+        self.push(Action::UdpJoin { socket, group });
+    }
+
+    /// Leave a multicast group; see [`Action::UdpLeave`].
+    pub fn udp_leave(&mut self, socket: Key, group: std::net::Ipv4Addr) {
+        self.push(Action::UdpLeave { socket, group });
     }
 
     pub fn tcp_open(&mut self, socket: Key, to: SocketAddr) {

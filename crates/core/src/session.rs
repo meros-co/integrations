@@ -180,6 +180,9 @@ enum Socket {
     Own {
         socket: Arc<UdpSocket>,
         reader: JoinHandle<()>,
+        /// Bound with `Bind::Network`: may join multicast groups, and a
+        /// send that fails is logged, not the socket's end.
+        network: bool,
     },
     Shared {
         port: u16,
@@ -659,6 +662,8 @@ impl Session {
                 }
                 Action::UdpSend { socket, to, data } => self.send(socket, to, data).await,
                 Action::UdpClose { socket } => self.drop_socket(socket),
+                Action::UdpJoin { socket, group } => self.multicast(socket, group, true),
+                Action::UdpLeave { socket, group } => self.multicast(socket, group, false),
                 Action::TcpOpen { socket, to } => {
                     self.close_tcp(socket);
                     let generation = self.next_generation;
@@ -1061,39 +1066,43 @@ impl Session {
                     Some(self.host),
                     self.inbound_tx.clone(),
                 );
-                self.sockets.insert(key, Socket::Own { socket, reader });
+                self.sockets.insert(
+                    key,
+                    Socket::Own {
+                        socket,
+                        reader,
+                        network: false,
+                    },
+                );
             }
             Bind::Any { address, port } => {
                 let address = address.unwrap_or(self.services.bind_address);
                 let socket = bind_any(address, port).map_err(|e| format!("bind :{port}: {e}"))?;
                 let socket = Arc::new(socket);
                 let reader = spawn_reader(key, socket.clone(), None, self.inbound_tx.clone());
-                self.sockets.insert(key, Socket::Own { socket, reader });
+                self.sockets.insert(
+                    key,
+                    Socket::Own {
+                        socket,
+                        reader,
+                        network: false,
+                    },
+                );
             }
-            Bind::Multicast { group, port } => {
-                let bind = self.services.bind_address;
+            Bind::Network { address, port } => {
+                let address = address.unwrap_or(self.services.bind_address);
                 let socket =
-                    bind_multicast(bind, group, port).map_err(|e| format!("bind :{port}: {e}"))?;
-                if !bind.is_loopback() {
-                    let mut problems = Vec::new();
-                    for (ip, _) in crate::discovery::interfaces(bind) {
-                        if let Err(e) =
-                            socket2::SockRef::from(&socket).join_multicast_v4(&group, &ip)
-                        {
-                            problems.push(format!(
-                                "cannot join {group} on {ip} ({e}); it will not be heard there"
-                            ));
-                        }
-                    }
-                    let mut cx = self.cx();
-                    for problem in problems {
-                        cx.log(crate::module::Level::Warning, problem);
-                    }
-                    Box::pin(self.apply(cx.take())).await;
-                }
+                    bind_network(address, port).map_err(|e| format!("bind :{port}: {e}"))?;
                 let socket = Arc::new(socket);
                 let reader = spawn_reader(key, socket.clone(), None, self.inbound_tx.clone());
-                self.sockets.insert(key, Socket::Own { socket, reader });
+                self.sockets.insert(
+                    key,
+                    Socket::Own {
+                        socket,
+                        reader,
+                        network: true,
+                    },
+                );
             }
             Bind::Shared(port) => {
                 let bound = self.services.shared_udp.register(
@@ -1114,11 +1123,23 @@ impl Session {
     }
 
     async fn send(&mut self, key: Key, to: SocketAddr, data: Vec<u8>) {
-        let result = match self.sockets.get(&key) {
-            Some(Socket::Own { socket, .. }) => socket.send_to(&data, to).await.map(|_| ()),
-            Some(Socket::Shared { port }) => self.services.shared_udp.send(*port, to, &data).await,
+        let (result, network) = match self.sockets.get(&key) {
+            Some(Socket::Own {
+                socket, network, ..
+            }) => (socket.send_to(&data, to).await.map(|_| ()), *network),
+            Some(Socket::Shared { port }) => {
+                (self.services.shared_udp.send(*port, to, &data).await, false)
+            }
             None => return,
         };
+        if let (Err(e), true) = (&result, network) {
+            self.services.events.push(Event::Log {
+                device: self.device,
+                level: crate::module::Level::Debug,
+                message: format!("send to {to} failed: {e}"),
+            });
+            return;
+        }
         if let Err(e) = result {
             let mut cx = self.cx();
             cx.log(
@@ -1128,6 +1149,52 @@ impl Session {
             self.module.socket_error(&mut cx, key, &e.to_string());
             self.drop_socket(key);
             Box::pin(self.apply(cx.take())).await;
+        }
+    }
+
+    /// Join or leave a multicast group on a `Bind::Network` socket, on the
+    /// interface it is bound to or on every IPv4 interface.
+    fn multicast(&mut self, key: Key, group: std::net::Ipv4Addr, join: bool) {
+        let Some(Socket::Own {
+            socket,
+            network: true,
+            ..
+        }) = self.sockets.get(&key)
+        else {
+            return;
+        };
+        let interfaces: Vec<std::net::Ipv4Addr> = match socket.local_addr() {
+            Ok(SocketAddr::V4(local)) if !local.ip().is_unspecified() => vec![*local.ip()],
+            _ => {
+                let all: Vec<_> = crate::discovery::interfaces(self.services.bind_address)
+                    .into_iter()
+                    .map(|(ip, _)| ip)
+                    .collect();
+                // A host with no other interface still hears itself.
+                if all.is_empty() {
+                    vec![std::net::Ipv4Addr::UNSPECIFIED]
+                } else {
+                    all
+                }
+            }
+        };
+        let raw = socket2::SockRef::from(&**socket);
+        for interface in interfaces {
+            let result = if join {
+                raw.join_multicast_v4(&group, &interface)
+            } else {
+                raw.leave_multicast_v4(&group, &interface)
+            };
+            if let Err(e) = result {
+                self.services.events.push(Event::Log {
+                    device: self.device,
+                    level: crate::module::Level::Warning,
+                    message: format!(
+                        "cannot {} multicast group {group} on {interface}: {e}",
+                        if join { "join" } else { "leave" }
+                    ),
+                });
+            }
         }
     }
 
@@ -1303,42 +1370,28 @@ fn bind_any(address: IpAddr, port: u16) -> std::io::Result<UdpSocket> {
     UdpSocket::from_std(socket.into())
 }
 
-/// A socket for a multicast group's port, shared with other listeners to it.
-/// On Unix it binds the group's address, so it hears only that group; on
-/// Windows, which cannot bind a multicast address, the core's. A core bound
-/// to loopback binds there.
-fn bind_multicast(
-    bind: IpAddr,
-    group: std::net::Ipv4Addr,
-    port: u16,
-) -> std::io::Result<UdpSocket> {
+/// A UDP socket on a protocol's fixed port, shared with other programs on
+/// this host that listen there too, which may broadcast and join multicast
+/// groups (`Bind::Network`).
+fn bind_network(address: IpAddr, port: u16) -> std::io::Result<UdpSocket> {
     use socket2::{Domain, Protocol, Socket, Type};
-    let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
+    let domain = if address.is_ipv6() {
+        Domain::IPV6
+    } else {
+        Domain::IPV4
+    };
+    let socket = Socket::new(domain, Type::DGRAM, Some(Protocol::UDP))?;
     socket.set_reuse_address(true)?;
-    #[cfg(all(
-        unix,
-        not(any(target_os = "solaris", target_os = "illumos", target_os = "cygwin"))
-    ))]
+    // BSD and macOS deliver multicast to every socket on a port only with
+    // SO_REUSEPORT; Linux takes SO_REUSEADDR for that.
+    #[cfg(all(unix, not(any(target_os = "solaris", target_os = "illumos"))))]
     let _ = socket.set_reuse_port(true);
     let _ = socket.set_recv_buffer_size(RECV_BUFFER);
-    socket.set_multicast_ttl_v4(255)?;
-    socket.set_multicast_loop_v4(true)?;
-    let local = match bind {
-        IpAddr::V4(v4) => v4,
-        IpAddr::V6(_) => std::net::Ipv4Addr::UNSPECIFIED,
-    };
-    if !local.is_unspecified() {
-        socket.set_multicast_if_v4(&local)?;
+    if address.is_ipv4() {
+        socket.set_broadcast(true)?;
     }
     socket.set_nonblocking(true)?;
-    #[cfg(unix)]
-    let address = if local.is_loopback() { local } else { group };
-    #[cfg(not(unix))]
-    let address = {
-        let _ = group;
-        local
-    };
-    socket.bind(&SocketAddr::new(IpAddr::V4(address), port).into())?;
+    socket.bind(&SocketAddr::new(address, port).into())?;
     UdpSocket::from_std(socket.into())
 }
 
@@ -1448,6 +1501,16 @@ mod tests {
         let socket = super::bind_ephemeral("127.0.0.1".parse().unwrap()).unwrap();
         assert!(socket.broadcast().unwrap());
         assert_ne!(socket.local_addr().unwrap().port(), 0);
+    }
+
+    /// Two programs on one host can listen on a network protocol's port.
+    #[tokio::test]
+    async fn a_network_socket_shares_its_port_and_may_broadcast() {
+        let first = super::bind_network("127.0.0.1".parse().unwrap(), 0).unwrap();
+        let port = first.local_addr().unwrap().port();
+        let second = super::bind_network("127.0.0.1".parse().unwrap(), port).unwrap();
+        assert_eq!(second.local_addr().unwrap().port(), port);
+        assert!(first.broadcast().unwrap());
     }
 
     type Computed = (String, Result<Vec<u8>, String>);

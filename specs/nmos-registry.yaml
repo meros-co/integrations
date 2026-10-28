@@ -1,0 +1,527 @@
+spec: 1
+id: nmos-registry
+name: AMWA NMOS registry (IS-04 Query API, with websocket subscriptions)
+vendor: AMWA (NMOS specifications; any NMOS registry)
+category: router
+
+source:
+  - title: AMWA IS-04 NMOS Discovery and Registration Specification v1.3.3
+    author: Advanced Media Workflow Association (AMWA)
+    url: https://specs.amwa.tv/is-04/v1.3.3/
+    note: >
+      Apache 2.0 specification, the source of every request and resource field
+      here: APIs/QueryAPI.raml (/nodes, /devices, /sources, /flows, /senders,
+      /receivers and their single resources, /subscriptions with its POST, GET
+      and DELETE), the subscription request, response and websocket grain
+      schemas, the resource schemas (resource_core, node, device, source, flow,
+      sender, receiver), docs/APIs - Query Parameters.md (basic queries and
+      paging), docs/Behaviour - Querying.md (subscriptions, the sync grain on
+      connecting, non-persistent subscriptions removed with their last client),
+      docs/Discovery - Registered Operation.md (the _nmos-query._tcp
+      advertisement with api_proto, api_ver, api_auth and pri). Repository
+      https://github.com/AMWA-TV/is-04 at tag v1.3.3.
+
+transport:
+  type: http
+  port: null
+  scheme: { setting: scheme }
+  accept_invalid_certs: true
+  # IS-10 authorization, where a registry uses it.
+  auth: bearer
+  # IS-10: 401 is a token refused; 403 a scope missing or a request refused
+  # (deleting a non-persistent subscription), which fails that request only.
+  refusal_status: [401]
+  timeout_ms: 5000
+  probe: { method: GET, path: /x-nmos/query }
+
+# The websocket of each subscription is named by the answer that creates it,
+# which the format cannot follow.
+extension: nmos-query-websocket
+
+settings:
+  scheme:
+    type: enum
+    values: [http, https]
+    default: http
+    label: Protocol
+    description: "http, or https for a registry served over TLS (BCP-003-01); its api_proto TXT record says which."
+  token:
+    type: string
+    secret: true
+    default: ""
+    label: Access token
+    description: "An IS-10 bearer token for a registry that requires authorization (TXT api_auth true), sent with every request and websocket; empty sends none."
+  query_version:
+    type: enum
+    values: [v1.3, v1.2, v1.1, v1.0]
+    default: v1.3
+    label: Query API version
+    description: "The Query API version to use, one the registry lists in its api_ver TXT record or at /x-nmos/query; resources are answered in that version."
+  max_update_rate_ms:
+    type: int
+    min: 0
+    max: 60000
+    default: 100
+    label: Update interval
+    description: "The shortest time between two updates the registry sends on a subscription, in milliseconds; 0 sends each change as it happens."
+
+ports:
+  - { port: null, protocol: http, role: control, note: "the Query API port has no standard number: it is given when the registry is opened, from its _nmos-query._tcp SRV record or its configuration" }
+  - { port: null, protocol: ws, role: push, note: "each subscription's websocket, at the ws_href the registry names (usually the Query API's port)" }
+  - { port: 5353, protocol: udp, role: discovery, note: "mDNS / DNS-SD: _nmos-query._tcp" }
+models:
+  - id: registry
+    name: Any AMWA NMOS registry (IS-04 Query API v1.0 to v1.3)
+    supports:
+      - get_nodes
+      - get_node
+      - get_devices
+      - get_device
+      - get_sources
+      - get_source
+      - get_flows
+      - get_flow
+      - get_senders
+      - get_sender
+      - get_receivers
+      - get_receiver
+      - query_resources
+      - list_subscriptions
+      - get_subscription
+      - create_subscription
+      - delete_subscription
+    verification: none
+    notes: >
+      A registry of any vendor, such as nmos-cpp's, Sony's NMOS registry or
+      an orchestration system's. It reports every Node registered with it; the
+      Nodes themselves are controlled with nmos-node.
+commands:
+  get_nodes:
+    summary: "List the registry's nodes (GET /nodes), as many as one page holds"
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/nodes" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # QueryAPI.raml /nodes
+
+  get_node:
+    summary: "Read one Node (GET /nodes/{id})"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Node id, description: "The Node's id, a UUID." }
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/nodes/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # QueryAPI.raml /nodes/{id}
+
+  get_devices:
+    summary: "List the registry's devices (GET /devices), as many as one page holds"
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/devices" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # QueryAPI.raml /devices
+
+  get_device:
+    summary: "Read one Device (GET /devices/{id})"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Device id, description: "The Device's id, a UUID." }
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/devices/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # QueryAPI.raml /devices/{id}
+
+  get_sources:
+    summary: "List the registry's sources (GET /sources), as many as one page holds"
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/sources" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # QueryAPI.raml /sources
+
+  get_source:
+    summary: "Read one Source (GET /sources/{id})"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Source id, description: "The Source's id, a UUID." }
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/sources/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # QueryAPI.raml /sources/{id}
+
+  get_flows:
+    summary: "List the registry's flows (GET /flows), as many as one page holds"
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/flows" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # QueryAPI.raml /flows
+
+  get_flow:
+    summary: "Read one Flow (GET /flows/{id})"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Flow id, description: "The Flow's id, a UUID." }
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/flows/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # QueryAPI.raml /flows/{id}
+
+  get_senders:
+    summary: "List the registry's senders (GET /senders), as many as one page holds"
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/senders" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # QueryAPI.raml /senders
+
+  get_sender:
+    summary: "Read one Sender (GET /senders/{id})"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Sender id, description: "The Sender's id, a UUID." }
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/senders/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # QueryAPI.raml /senders/{id}
+
+  get_receivers:
+    summary: "List the registry's receivers (GET /receivers), as many as one page holds"
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/receivers" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # QueryAPI.raml /receivers
+
+  get_receiver:
+    summary: "Read one Receiver (GET /receivers/{id})"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Receiver id, description: "The Receiver's id, a UUID." }
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/receivers/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # QueryAPI.raml /receivers/{id}
+
+  query_resources:
+    summary: "Query resources of one type with the Query API's query parameters (basic queries such as label=Camera%201, paging.since, paging.limit)"
+    params:
+      type: { type: enum, values: [nodes, devices, sources, flows, senders, receivers], required: true,
+        label: Resource type, description: "The resources to query." }
+      query: { type: string, required: true, max_length: 2048, pattern: "^[A-Za-z0-9._~%:=&,()!*'+-]+$",
+        label: Query, description: "The query string, percent-encoded, without the question mark, such as label=Camera%201 or paging.limit=100&paging.since=0:0." }
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/{type}", raw_query: "{query}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # docs/APIs - Query Parameters.md
+
+  list_subscriptions:
+    summary: "List the registry's subscriptions (GET /subscriptions)"
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/subscriptions" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # QueryAPI.raml /subscriptions
+
+  get_subscription:
+    summary: "Read one subscription (GET /subscriptions/{id})"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Subscription id, description: "The subscription's id, a UUID." }
+    send: { method: GET, path: "/x-nmos/query/{settings.query_version}/subscriptions/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+    # QueryAPI.raml /subscriptions/{subscriptionId}
+
+  create_subscription:
+    summary: "Create a subscription for another client (POST /subscriptions) and return it, with its ws_href"
+    params:
+      resource_path: { type: enum, values: ["/nodes", "/devices", "/sources", "/flows", "/senders", "/receivers"], required: true,
+        label: Resources, description: "The resource type the subscription reports." }
+      persist: { type: bool, default: false,
+        label: Persistent, description: "On keeps the subscription when no client is connected, until it is deleted." }
+      max_update_rate_ms: { type: int, min: 0, max: 60000, default: 100,
+        label: Update interval, description: "The shortest time between two updates, in milliseconds." }
+      secure: { type: bool, default: false,
+        label: Secure, description: "On asks for a wss websocket, for a registry served over https." }
+      params: { type: json, default: {},
+        label: Filter, description: "Basic query parameters filtering the resources, an object of strings, as the IS-04 subscription request schema gives it." }
+    send: { method: POST, path: "/x-nmos/query/{settings.query_version}/subscriptions", content_type: application/json,
+            body: '{"max_update_rate_ms":{max_update_rate_ms},"resource_path":"{resource_path}","params":{params},"persist":{persist},"secure":{secure}}' }
+    expect: { status: [200, 201], json_path: "$" }
+    returns: value
+    # queryapi-subscriptions-post-request.json, queryapi-subscription-response.json
+
+  delete_subscription:
+    summary: "Delete a persistent subscription (DELETE /subscriptions/{id})"
+    params:
+      id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Subscription id, description: "The subscription's id, a UUID." }
+    send: { method: DELETE, path: "/x-nmos/query/{settings.query_version}/subscriptions/{id}" }
+    expect: { status: [200, 204] }
+    returns: ack
+    # QueryAPI.raml: 204, or 403 for a non-persistent subscription
+telemetry:
+  # The nmos-query-websocket extension subscribes to each resource type and
+  # offers every update as {"nmos": <type>, "op": sync, set or delete, ...}:
+  # sync with every resource on (re)connecting, set with those changed,
+  # delete with the ids gone.
+  updates:
+    - json_match: { "$.nmos": "^nodes$", "$.op": "^sync$" }
+      replace: nodes
+    - json_match: { "$.nmos": "^nodes$", "$.op": "^(sync|set)$" }
+      json_each: "$.items"
+      json: { rid: "$.id", label: "$.label", description: "$.description", version: "$.version", tags: "$.tags", resource: "$", hostname: "$.hostname", href: "$.href", api_versions: "$.api.versions", api_endpoints: "$.api.endpoints", caps: "$.caps", services: "$.services", clocks: "$.clocks", interfaces: "$.interfaces" }
+      state:
+        "nodes.{rid:key}.label": "{label}"
+        "nodes.{rid:key}.description": "{description}"
+        "nodes.{rid:key}.version": "{version}"
+        "nodes.{rid:key}.tags": "{tags}"
+        "nodes.{rid:key}.resource": "{resource}"
+        "nodes.{rid:key}.hostname": "{hostname}"
+        "nodes.{rid:key}.href": "{href}"
+        "nodes.{rid:key}.api_versions": "{api_versions}"
+        "nodes.{rid:key}.api_endpoints": "{api_endpoints}"
+        "nodes.{rid:key}.caps": "{caps}"
+        "nodes.{rid:key}.services": "{services}"
+        "nodes.{rid:key}.clocks": "{clocks}"
+        "nodes.{rid:key}.interfaces": "{interfaces}"
+    - json_match: { "$.nmos": "^nodes$", "$.op": "^delete$" }
+      json_each: "$.ids"
+      each_match: { "$": "^(.+)$" }
+      json: {}
+      state: { "nodes.{1:key}": { delete: true } }
+    - json_match: { "$.nmos": "^devices$", "$.op": "^sync$" }
+      replace: devices
+    - json_match: { "$.nmos": "^devices$", "$.op": "^(sync|set)$" }
+      json_each: "$.items"
+      json: { rid: "$.id", label: "$.label", description: "$.description", version: "$.version", tags: "$.tags", resource: "$", type: "$.type", node_id: "$.node_id", controls: "$.controls" }
+      state:
+        "devices.{rid:key}.label": "{label}"
+        "devices.{rid:key}.description": "{description}"
+        "devices.{rid:key}.version": "{version}"
+        "devices.{rid:key}.tags": "{tags}"
+        "devices.{rid:key}.resource": "{resource}"
+        "devices.{rid:key}.type": "{type}"
+        "devices.{rid:key}.node_id": "{node_id}"
+        "devices.{rid:key}.controls": "{controls}"
+    - json_match: { "$.nmos": "^devices$", "$.op": "^delete$" }
+      json_each: "$.ids"
+      each_match: { "$": "^(.+)$" }
+      json: {}
+      state: { "devices.{1:key}": { delete: true } }
+    - json_match: { "$.nmos": "^sources$", "$.op": "^sync$" }
+      replace: sources
+    - json_match: { "$.nmos": "^sources$", "$.op": "^(sync|set)$" }
+      json_each: "$.items"
+      json: { rid: "$.id", label: "$.label", description: "$.description", version: "$.version", tags: "$.tags", resource: "$", format: "$.format", device_id: "$.device_id", clock_name: "$.clock_name", grain_rate: "$.grain_rate", caps: "$.caps", parents: "$.parents", channels: "$.channels" }
+      state:
+        "sources.{rid:key}.label": "{label}"
+        "sources.{rid:key}.description": "{description}"
+        "sources.{rid:key}.version": "{version}"
+        "sources.{rid:key}.tags": "{tags}"
+        "sources.{rid:key}.resource": "{resource}"
+        "sources.{rid:key}.format": "{format}"
+        "sources.{rid:key}.device_id": "{device_id}"
+        "sources.{rid:key}.clock_name": "{clock_name}"
+        "sources.{rid:key}.grain_rate": "{grain_rate}"
+        "sources.{rid:key}.caps": "{caps}"
+        "sources.{rid:key}.parents": "{parents}"
+        "sources.{rid:key}.channels": "{channels}"
+    - json_match: { "$.nmos": "^sources$", "$.op": "^(sync|set)$" }
+      json_each: "$.items"
+      each_match: { "$.clock_name": "^null$" }
+      json: { rid: "$.id" }
+      state: { "sources.{rid:key}.clock_name": "" }
+    - json_match: { "$.nmos": "^sources$", "$.op": "^delete$" }
+      json_each: "$.ids"
+      each_match: { "$": "^(.+)$" }
+      json: {}
+      state: { "sources.{1:key}": { delete: true } }
+    - json_match: { "$.nmos": "^flows$", "$.op": "^sync$" }
+      replace: flows
+    - json_match: { "$.nmos": "^flows$", "$.op": "^(sync|set)$" }
+      json_each: "$.items"
+      json: { rid: "$.id", label: "$.label", description: "$.description", version: "$.version", tags: "$.tags", resource: "$", format: "$.format", source_id: "$.source_id", device_id: "$.device_id", media_type: "$.media_type", grain_rate: "$.grain_rate", frame_width: "$.frame_width", frame_height: "$.frame_height", interlace_mode: "$.interlace_mode", colorspace: "$.colorspace", transfer_characteristic: "$.transfer_characteristic", sample_rate: "$.sample_rate", bit_depth: "$.bit_depth", parents: "$.parents" }
+      state:
+        "flows.{rid:key}.label": "{label}"
+        "flows.{rid:key}.description": "{description}"
+        "flows.{rid:key}.version": "{version}"
+        "flows.{rid:key}.tags": "{tags}"
+        "flows.{rid:key}.resource": "{resource}"
+        "flows.{rid:key}.format": "{format}"
+        "flows.{rid:key}.source_id": "{source_id}"
+        "flows.{rid:key}.device_id": "{device_id}"
+        "flows.{rid:key}.media_type": "{media_type}"
+        "flows.{rid:key}.grain_rate": "{grain_rate}"
+        "flows.{rid:key}.frame_width": "{frame_width}"
+        "flows.{rid:key}.frame_height": "{frame_height}"
+        "flows.{rid:key}.interlace_mode": "{interlace_mode}"
+        "flows.{rid:key}.colorspace": "{colorspace}"
+        "flows.{rid:key}.transfer_characteristic": "{transfer_characteristic}"
+        "flows.{rid:key}.sample_rate": "{sample_rate}"
+        "flows.{rid:key}.bit_depth": "{bit_depth}"
+        "flows.{rid:key}.parents": "{parents}"
+    - json_match: { "$.nmos": "^flows$", "$.op": "^delete$" }
+      json_each: "$.ids"
+      each_match: { "$": "^(.+)$" }
+      json: {}
+      state: { "flows.{1:key}": { delete: true } }
+    - json_match: { "$.nmos": "^senders$", "$.op": "^sync$" }
+      replace: senders
+    - json_match: { "$.nmos": "^senders$", "$.op": "^(sync|set)$" }
+      json_each: "$.items"
+      json: { rid: "$.id", label: "$.label", description: "$.description", version: "$.version", tags: "$.tags", resource: "$", flow_id: "$.flow_id", transport: "$.transport", device_id: "$.device_id", manifest_href: "$.manifest_href", interface_bindings: "$.interface_bindings", subscription_receiver_id: "$.subscription.receiver_id", subscription_active: "$.subscription.active", caps: "$.caps" }
+      state:
+        "senders.{rid:key}.label": "{label}"
+        "senders.{rid:key}.description": "{description}"
+        "senders.{rid:key}.version": "{version}"
+        "senders.{rid:key}.tags": "{tags}"
+        "senders.{rid:key}.resource": "{resource}"
+        "senders.{rid:key}.flow_id": "{flow_id}"
+        "senders.{rid:key}.transport": "{transport}"
+        "senders.{rid:key}.device_id": "{device_id}"
+        "senders.{rid:key}.manifest_href": "{manifest_href}"
+        "senders.{rid:key}.interface_bindings": "{interface_bindings}"
+        "senders.{rid:key}.subscription.receiver_id": "{subscription_receiver_id}"
+        "senders.{rid:key}.subscription.active": "{subscription_active}"
+        "senders.{rid:key}.caps": "{caps}"
+    - json_match: { "$.nmos": "^senders$", "$.op": "^(sync|set)$" }
+      json_each: "$.items"
+      each_match: { "$.flow_id": "^null$" }
+      json: { rid: "$.id" }
+      state: { "senders.{rid:key}.flow_id": "" }
+    - json_match: { "$.nmos": "^senders$", "$.op": "^(sync|set)$" }
+      json_each: "$.items"
+      each_match: { "$.manifest_href": "^null$" }
+      json: { rid: "$.id" }
+      state: { "senders.{rid:key}.manifest_href": "" }
+    - json_match: { "$.nmos": "^senders$", "$.op": "^(sync|set)$" }
+      json_each: "$.items"
+      each_match: { "$.subscription.receiver_id": "^null$" }
+      json: { rid: "$.id" }
+      state: { "senders.{rid:key}.subscription.receiver_id": "" }
+    - json_match: { "$.nmos": "^senders$", "$.op": "^delete$" }
+      json_each: "$.ids"
+      each_match: { "$": "^(.+)$" }
+      json: {}
+      state: { "senders.{1:key}": { delete: true } }
+    - json_match: { "$.nmos": "^receivers$", "$.op": "^sync$" }
+      replace: receivers
+    - json_match: { "$.nmos": "^receivers$", "$.op": "^(sync|set)$" }
+      json_each: "$.items"
+      json: { rid: "$.id", label: "$.label", description: "$.description", version: "$.version", tags: "$.tags", resource: "$", format: "$.format", transport: "$.transport", device_id: "$.device_id", interface_bindings: "$.interface_bindings", subscription_sender_id: "$.subscription.sender_id", subscription_active: "$.subscription.active", caps: "$.caps" }
+      state:
+        "receivers.{rid:key}.label": "{label}"
+        "receivers.{rid:key}.description": "{description}"
+        "receivers.{rid:key}.version": "{version}"
+        "receivers.{rid:key}.tags": "{tags}"
+        "receivers.{rid:key}.resource": "{resource}"
+        "receivers.{rid:key}.format": "{format}"
+        "receivers.{rid:key}.transport": "{transport}"
+        "receivers.{rid:key}.device_id": "{device_id}"
+        "receivers.{rid:key}.interface_bindings": "{interface_bindings}"
+        "receivers.{rid:key}.subscription.sender_id": "{subscription_sender_id}"
+        "receivers.{rid:key}.subscription.active": "{subscription_active}"
+        "receivers.{rid:key}.caps": "{caps}"
+    - json_match: { "$.nmos": "^receivers$", "$.op": "^(sync|set)$" }
+      json_each: "$.items"
+      each_match: { "$.subscription.sender_id": "^null$" }
+      json: { rid: "$.id" }
+      state: { "receivers.{rid:key}.subscription.sender_id": "" }
+    - json_match: { "$.nmos": "^receivers$", "$.op": "^delete$" }
+      json_each: "$.ids"
+      each_match: { "$": "^(.+)$" }
+      json: {}
+      state: { "receivers.{1:key}": { delete: true } }
+state:
+  nodes.*.label: { type: string, description: "Node: its label, free text" }
+  nodes.*.description: { type: string, description: "Node: its description, free text" }
+  nodes.*.version: { type: string, description: "Node: its version, the TAI time of its last change as <seconds>:<nanoseconds>" }
+  nodes.*.tags: { type: string, description: "Node: its tags, as JSON text (an object of string arrays)" }
+  nodes.*.resource: { type: string, description: "Node: the whole resource as the API gives it, as JSON text" }
+  nodes.*.hostname: { type: string, description: "Node: the Node's host name" }
+  nodes.*.href: { type: string, description: "Node: the Node's HTTP access URL (deprecated in v1.1 in favor of api.endpoints)" }
+  nodes.*.api_versions: { type: string, description: "Node: the Node API versions the Node supports, as JSON text" }
+  nodes.*.api_endpoints: { type: string, description: "Node: the Node API's endpoints (host, port, protocol, authorization), as JSON text" }
+  nodes.*.caps: { type: string, description: "Node: the Node's capabilities, as JSON text" }
+  nodes.*.services: { type: string, description: "Node: the Node's services (href, type, authorization), as JSON text" }
+  nodes.*.clocks: { type: string, description: "Node: the Node's clocks (internal or PTP, with their parameters), as JSON text" }
+  nodes.*.interfaces: { type: string, description: "Node: the Node's network interfaces (name, chassis_id, port_id, attached network device), as JSON text" }
+  devices.*.label: { type: string, description: "Device: its label, free text" }
+  devices.*.description: { type: string, description: "Device: its description, free text" }
+  devices.*.version: { type: string, description: "Device: its version, the TAI time of its last change as <seconds>:<nanoseconds>" }
+  devices.*.tags: { type: string, description: "Device: its tags, as JSON text (an object of string arrays)" }
+  devices.*.resource: { type: string, description: "Device: the whole resource as the API gives it, as JSON text" }
+  devices.*.type: { type: string, description: "Device: the Device's type, a URN such as urn:x-nmos:device:pipeline" }
+  devices.*.node_id: { type: string, description: "Device: the id of the Node the Device belongs to" }
+  devices.*.controls: { type: string, description: "Device: the Device's control endpoints (href, type such as urn:x-nmos:control:sr-ctrl/v1.1, authorization), as JSON text" }
+  sources.*.label: { type: string, description: "Source: its label, free text" }
+  sources.*.description: { type: string, description: "Source: its description, free text" }
+  sources.*.version: { type: string, description: "Source: its version, the TAI time of its last change as <seconds>:<nanoseconds>" }
+  sources.*.tags: { type: string, description: "Source: its tags, as JSON text (an object of string arrays)" }
+  sources.*.resource: { type: string, description: "Source: the whole resource as the API gives it, as JSON text" }
+  sources.*.format: { type: string, description: "Source: the Source's format, a URN such as urn:x-nmos:format:video" }
+  sources.*.device_id: { type: string, description: "Source: the id of the Device the Source belongs to" }
+  sources.*.clock_name: { type: string, description: "Source: the name of the Node clock the Source is timed by, empty when none" }
+  sources.*.grain_rate: { type: string, description: "Source: the Source's maximum grain rate as JSON text ({numerator, denominator})" }
+  sources.*.caps: { type: string, description: "Source: the Source's capabilities, as JSON text" }
+  sources.*.parents: { type: string, description: "Source: the ids of the Sources this one derives from, as JSON text" }
+  sources.*.channels: { type: string, description: "Source: an audio Source's channels (label, symbol), as JSON text" }
+  flows.*.label: { type: string, description: "Flow: its label, free text" }
+  flows.*.description: { type: string, description: "Flow: its description, free text" }
+  flows.*.version: { type: string, description: "Flow: its version, the TAI time of its last change as <seconds>:<nanoseconds>" }
+  flows.*.tags: { type: string, description: "Flow: its tags, as JSON text (an object of string arrays)" }
+  flows.*.resource: { type: string, description: "Flow: the whole resource as the API gives it, as JSON text" }
+  flows.*.format: { type: string, description: "Flow: the Flow's format, a URN such as urn:x-nmos:format:audio" }
+  flows.*.source_id: { type: string, description: "Flow: the id of the Source the Flow is from" }
+  flows.*.device_id: { type: string, description: "Flow: the id of the Device the Flow belongs to" }
+  flows.*.media_type: { type: string, description: "Flow: the Flow's media type, such as video/raw or audio/L24" }
+  flows.*.grain_rate: { type: string, description: "Flow: the Flow's grain rate as JSON text ({numerator, denominator})" }
+  flows.*.frame_width: { type: int, description: "Flow: a video Flow's width in pixels" }
+  flows.*.frame_height: { type: int, description: "Flow: a video Flow's height in lines" }
+  flows.*.interlace_mode: { type: string, description: "Flow: a video Flow's interlace mode: progressive, interlaced_tff, interlaced_bff or interlaced_psf" }
+  flows.*.colorspace: { type: string, description: "Flow: a video Flow's colorspace, such as BT709 or BT2020" }
+  flows.*.transfer_characteristic: { type: string, description: "Flow: a video Flow's transfer characteristic: SDR, HLG or PQ" }
+  flows.*.sample_rate: { type: string, description: "Flow: an audio Flow's sample rate as JSON text ({numerator, denominator})" }
+  flows.*.bit_depth: { type: int, description: "Flow: an audio Flow's bit depth" }
+  flows.*.parents: { type: string, description: "Flow: the ids of the Flows this one derives from, as JSON text" }
+  senders.*.label: { type: string, description: "Sender: its label, free text" }
+  senders.*.description: { type: string, description: "Sender: its description, free text" }
+  senders.*.version: { type: string, description: "Sender: its version, the TAI time of its last change as <seconds>:<nanoseconds>" }
+  senders.*.tags: { type: string, description: "Sender: its tags, as JSON text (an object of string arrays)" }
+  senders.*.resource: { type: string, description: "Sender: the whole resource as the API gives it, as JSON text" }
+  senders.*.flow_id: { type: string, description: "Sender: the id of the Flow the Sender sends, empty when none" }
+  senders.*.transport: { type: string, description: "Sender: the Sender's transport, a URN such as urn:x-nmos:transport:rtp.mcast" }
+  senders.*.device_id: { type: string, description: "Sender: the id of the Device the Sender belongs to" }
+  senders.*.manifest_href: { type: string, description: "Sender: the URL of the Sender's transport file (SDP), empty when none" }
+  senders.*.interface_bindings: { type: string, description: "Sender: the Node interfaces the Sender sends on, as JSON text" }
+  senders.*.subscription.receiver_id: { type: string, description: "Sender: the Receiver the Sender sends to (unicast), empty when none" }
+  senders.*.subscription.active: { type: bool, description: "Sender: the Sender is active (sending)" }
+  senders.*.caps: { type: string, description: "Sender: the Sender's capabilities, as JSON text" }
+  receivers.*.label: { type: string, description: "Receiver: its label, free text" }
+  receivers.*.description: { type: string, description: "Receiver: its description, free text" }
+  receivers.*.version: { type: string, description: "Receiver: its version, the TAI time of its last change as <seconds>:<nanoseconds>" }
+  receivers.*.tags: { type: string, description: "Receiver: its tags, as JSON text (an object of string arrays)" }
+  receivers.*.resource: { type: string, description: "Receiver: the whole resource as the API gives it, as JSON text" }
+  receivers.*.format: { type: string, description: "Receiver: the Receiver's format, a URN such as urn:x-nmos:format:video" }
+  receivers.*.transport: { type: string, description: "Receiver: the Receiver's transport, a URN such as urn:x-nmos:transport:rtp" }
+  receivers.*.device_id: { type: string, description: "Receiver: the id of the Device the Receiver belongs to" }
+  receivers.*.interface_bindings: { type: string, description: "Receiver: the Node interfaces the Receiver listens on, as JSON text" }
+  receivers.*.subscription.sender_id: { type: string, description: "Receiver: the Sender the Receiver is subscribed to, empty when none (or a non-NMOS sender)" }
+  receivers.*.subscription.active: { type: bool, description: "Receiver: the Receiver is active (receiving)" }
+  receivers.*.caps: { type: string, description: "Receiver: the Receiver's capabilities (media types, constraint sets), as JSON text" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      A registry has no standard port: open it with the Query API's port from its
+      _nmos-query._tcp advertisement or its configuration. State comes from six
+      non-persistent websocket subscriptions, one per resource type; each starts
+      with the whole list, so a reconnection leaves nothing stale. The Query API
+      is read only: connections are made on each Node with nmos-node, whose
+      address and Connection API are in nodes.*.api_endpoints and
+      devices.*.controls.
+
+  - models: [all]
+    severity: info
+    text: >
+      The get_ commands answer one page: a registry may page its answers (the
+      default page size is its own, docs/APIs - Query Parameters.md); query_resources
+      takes paging.since, paging.until and paging.limit for the rest. The
+      subscriptions are not paged.
