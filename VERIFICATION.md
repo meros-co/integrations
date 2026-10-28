@@ -1210,6 +1210,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which of arg1 and arg2 carry the vertical and horizontal speeds for each move code, and the speed range. ([specs/dahua-ptz.yaml:61](specs/dahua-ptz.yaml#L61))
 - [ ] Check the stop, zoom, focus and GotoPreset argument forms, and what the camera answers on success and on an unknown preset. ([specs/dahua-ptz.yaml:112](specs/dahua-ptz.yaml#L112))
 
+## dashare-multiplay — MultiPlay 3 (OSC control)
+
+- [ ] Confirm MultiPlay takes OSC over UDP on its Control port, and which port a fresh install uses. ([specs/dashare-multiplay.yaml:59](specs/dashare-multiplay.yaml#L59))
+- [ ] Confirm the cue actions and /Stopwatch are matched without case: the help writes Go and /Stopwatch/Start, the Companion module sends go and /stopwatch/start. ([specs/dashare-multiplay.yaml:109](specs/dashare-multiplay.yaml#L109))
+- [ ] Record the OSC type of the status booleans (/status/go and the others): OSC true/false, the strings TRUE/FALSE, or ints. ([specs/dashare-multiplay.yaml:375](specs/dashare-multiplay.yaml#L375))
+- [ ] Confirm /status/refresh sends every status message, and that MultiPlay sends status only to the Remote target. ([specs/dashare-multiplay.yaml:369](specs/dashare-multiplay.yaml#L369))
+- [ ] Confirm the int and float argument types of Pan, Speed, Volume and their /- and /+ forms, and that Position and the jumps take a float. ([specs/dashare-multiplay.yaml:221](specs/dashare-multiplay.yaml#L221))
+- [ ] Confirm the lowest volume level bounds Volume and Volume/- (-60 dB unless changed). ([specs/dashare-multiplay.yaml:292](specs/dashare-multiplay.yaml#L292))
+
 ## dataton-watchout6 — Dataton WATCHOUT 6
 
 - [ ] Confirm that every ID-tagged command ([m]) gets a tagged reply on WATCHOUT 6 (production and display) as the guide says, including an empty [m] for a successful action; WATCHOUT 7 documents the empty tag, the 6.x guide does not. ([specs/dataton-watchout6.yaml:489](specs/dataton-watchout6.yaml#L489))
@@ -1365,6 +1374,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check what CGs_level and CGs_mute do on input channels and aux, group and matrix outputs (taken as the level and mute a strip takes from its control groups), and what a CGs_level position means in dB. ([specs/digico-sd.yaml:3804](specs/digico-sd.yaml#L3804))
 - [ ] Confirm Matrix_Inputs/N/Matrix_Send/M sends matrix input N to matrix output M, both numbered from 1, and how many matrix inputs each console has. ([specs/digico-sd.yaml:3900](specs/digico-sd.yaml#L3900))
 - [ ] Find what a multi is on current SD and Quantum software, how many exist, and whether Multis/N solo, fader, mute and name act on them as the list's rows read. ([specs/digico-sd.yaml:3930](specs/digico-sd.yaml#L3930))
+
+## digitalprojection-dvision — Digital Projection dVision 35 and dVision Scope (ASCII protocol)
+
+- [ ] Confirm commands without a value in the document (MENU, NVUP, PRST, RD65, FCRE, SINF) are sent as the mnemonic alone and acknowledged. ([specs/digitalprojection-dvision.yaml:978](specs/digitalprojection-dvision.yaml#L978))
+- [ ] Confirm the meaning of the table rows the document prints one row off: PMUT 0/1, SABS's value table, CMTV 3200-9300, RD65 set-only, DSCR's table. ([specs/digitalprojection-dvision.yaml:130](specs/digitalprojection-dvision.yaml#L130))
+- [ ] Record each setting's range with ?N and ?M (brightness, contrast, lamp power and the others the document gives no range for). ([specs/digitalprojection-dvision.yaml:1099](specs/digitalprojection-dvision.yaml#L1099))
+- [ ] Confirm a negative value is acknowledged as - and five digits, and how a string value (SERI) is answered. ([specs/digitalprojection-dvision.yaml:1438](specs/digitalprojection-dvision.yaml#L1438))
+- [ ] Confirm the 5 s pause after 20 commands is needed on the LAN as well as on RS-232, and whether TCP 1025 takes several commands on one connection. ([specs/digitalprojection-dvision.yaml:39](specs/digitalprojection-dvision.yaml#L39))
+- [ ] Confirm TATB, EDIR and EDIT take the value before the target (":TATB 1 3"). ([specs/digitalprojection-dvision.yaml:1025](specs/digitalprojection-dvision.yaml#L1025))
+- [ ] Confirm LPW1 is the LED power on LED models and lamp commands answer !00002 there. ([specs/digitalprojection-dvision.yaml:649](specs/digitalprojection-dvision.yaml#L649))
 
 ## digitalprojection-evision-6500 — Digital Projection E-Vision Laser 6500 II (VXX command set)
 
@@ -1835,6 +1854,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the status bits a K2 sets (the names follow the T2's AMP manual) and whether 61.20 0F returns fifteen bytes. ([specs/grassvalley-amp.yaml:354](specs/grassvalley-amp.yaml#L354))
 - [ ] Check which AMP commands Ross Tria, Mira and Kiva servers take over TCP 3811 and what their channels are called. ([specs/grassvalley-amp.yaml:87](specs/grassvalley-amp.yaml#L87))
 - [ ] Check the times a K2 answers for 61.0C 01, 04, 08 and 40, and whether 02 (VITC) is answered or 70.0D. ([specs/grassvalley-amp.yaml:199](specs/grassvalley-amp.yaml#L199))
+
+## grassvalley-kaleido — Grass Valley Kaleido multiviewers (Remote Control Protocol gateway)
+
+- [ ] Confirm `<openID></openID>` opens a session without a room as `<openID/>` does, and that a session opened with a user takes the clear password. ([specs/grassvalley-kaleido.yaml:44](specs/grassvalley-kaleido.yaml#L44))
+- [ ] Confirm a carriage return alone ends each command (the guide asks for a carriage return, and a line feed in scripts). ([specs/grassvalley-kaleido.yaml:33](specs/grassvalley-kaleido.yaml#L33))
+- [ ] Record whether getKRoom's answer arrives on one line or several. ([specs/grassvalley-kaleido.yaml:112](specs/grassvalley-kaleido.yaml#L112))
+- [ ] Confirm the -20 dB mode is written with a hyphen (the guide prints an en dash) in setKAudioOutMode and its answer. ([specs/grassvalley-kaleido.yaml:343](specs/grassvalley-kaleido.yaml#L343))
+- [ ] Confirm getKAudioOutVolume's value format (whole dB, tenths on the Kaleido-X series, with or without a unit). ([specs/grassvalley-kaleido.yaml:426](specs/grassvalley-kaleido.yaml#L426))
+- [ ] Confirm the gateway answers each command before reading the next on one connection, and that getKCurrentLayout closes it as the guide says. ([specs/grassvalley-kaleido.yaml:452](specs/grassvalley-kaleido.yaml#L452))
 
 ## greenhippo-hippotizer — Green Hippo Hippotizer
 
@@ -3802,6 +3830,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the status and body Multicam Logger answers the commands with, and its answer when no document is open. ([specs/softron-multicam-logger.yaml:45](specs/softron-multicam-logger.yaml#L45))
 - [ ] Confirm GET /angle_changes answers a JSON list (the guide's example also wraps it in braces). ([specs/softron-multicam-logger.yaml:165](specs/softron-multicam-logger.yaml#L165))
 - [ ] Confirm /status gives program and preview as numbers in strings, and logging_state as a boolean. ([specs/softron-multicam-logger.yaml:105](specs/softron-multicam-logger.yaml#L105))
+
+## softron-ontheair-video — Softron OnTheAir Video (REST API and WebSocket)
+
+- [ ] Compare every call with the app's api.html: method (GET for the transport calls), path, and answer status (200, 201 or 202). ([specs/softron-ontheair-video.yaml:109](specs/softron-ontheair-video.yaml#L109))
+- [ ] Confirm how a client authenticates when Bypass authorisation is off, and what the API answers then. ([specs/softron-ontheair-video.yaml:72](specs/softron-ontheair-video.yaml#L72))
+- [ ] Confirm the playback websocket sends to a client offering playback_update_v1, and record its event fields (playback_status_changed, item_changed, playback_timing_changed, CG project property). ([specs/softron-ontheair-video.yaml:481](specs/softron-ontheair-video.yaml#L481))
+- [ ] Record /playback/playing's fields and units (seconds as numbers) and /info's available_actions. ([specs/softron-ontheair-video.yaml:529](specs/softron-ontheair-video.yaml#L529))
+- [ ] Confirm the item fields of `/playlists/<id>/items` (unique_id, name, duration) and that a playlist is found by index and by name. ([specs/softron-ontheair-video.yaml:554](specs/softron-ontheair-video.yaml#L554))
+- [ ] Confirm `POST /playlists/<p>/items[/<index>]` with clip_type 0, 3, 4 and 5 and the name, url, live_source_name and duration fields, and what it answers. ([specs/softron-ontheair-video.yaml:316](specs/softron-ontheair-video.yaml#L316))
+- [ ] Confirm GET /playback/clocked_items?enabled=0 turns the option off (only enabled=1 is in the release notes). ([specs/softron-ontheair-video.yaml:292](specs/softron-ontheair-video.yaml#L292))
+- [ ] Confirm the timecode queries position_relative_timecode and position_media_timecode take HH:MM:SS:FF, and position_relative_seconds a decimal. ([specs/softron-ontheair-video.yaml:228](specs/softron-ontheair-video.yaml#L228))
 
 ## sony-9pin — Sony 9-pin (RS-422 VTR protocol) decks and servers
 

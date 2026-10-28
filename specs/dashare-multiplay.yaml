@@ -1,0 +1,441 @@
+spec: 1
+id: dashare-multiplay
+name: MultiPlay 3 (OSC control)
+vendor: da-share
+category: playback
+
+# MultiPlay 3's OSC Control: MultiPlay listens for OSC on the port set in
+# Preferences > OSC Control > Control (no default is documented, so the port
+# is given when the device is opened), and sends status messages to the remote
+# IP address and port set under Remote. It never answers the sender, so every
+# command reports unverified; state comes from the status messages, received
+# on a fixed local port (feedback_port) that MultiPlay's Remote setting must
+# name. Addresses and arguments are the online help's ("OSC Control" pages,
+# MultiPlay 3.0.196 and later); the help spells cue actions in capitals
+# (/cue/{cue}/Go), and they are sent so.
+
+source:
+  - title: MultiPlay 3 online help, "Preferences > OSC Control"
+    author: da-share (David Duffy)
+    url: https://da-share.com/help/multiplay3/Prefs-OSC-Control.html
+    note: >
+      Manufacturer document, retrieved 2026-10-28. The adapter, the Control
+      port MultiPlay listens on for OSC, and the Remote IP address and port
+      that status messages are sent to. No default port is given.
+  - title: MultiPlay 3 online help, "OSC Control" (Cue List Navigation, Cue Actions, Stopwatch)
+    author: da-share (David Duffy)
+    url: https://da-share.com/help/multiplay3/OSC-Control-Cue-Actions.html
+    note: >
+      Manufacturer document, retrieved 2026-10-28. /select/first, prev
+      (previous), next, last, pageup, pagedown and /select/{cue};
+      /cue/{cue}/{action} [arg], /cue/playhead (or current) and /cue/active;
+      the actions CuePoint, Fade, Go (Start), JumpBack, JumpEnd, JumpFwd, Pan,
+      PanS, Pan/-, Pan/+, Pan/Revert, Pause, PauseToggle, Restart, Resume,
+      Position, Speed, SpeedS, Speed/-, Speed/+, Speed/Revert, Stop, Track,
+      Volume, VolumeS, Volume/-, Volume/+, Volume/Revert, with their argument
+      ranges and targets; /Stopwatch/Start, Stop and Reset
+      (OSC-Control-Cue-List-Nav.html, OSC-Control-Stopwatch.html).
+  - title: MultiPlay 3 online help, "OSC Remote > Status"
+    author: da-share (David Duffy)
+    url: https://da-share.com/help/multiplay3/OSC-Control-Status.html
+    note: >
+      Manufacturer document, retrieved 2026-10-28. /status/select/prev,
+      /status/select/next, /status/go, /status/stopall and /status/fadeall
+      with TRUE or FALSE as each button's enabled state, sent when it
+      changes; /status/current/qdesc with the Q# and description;
+      /status/elapsed and /status/remaining as time strings; /status/refresh
+      sends them all.
+  - title: companion-module-dashare-multiplay3 (Bitfocus Companion module, MIT licence)
+    author: Bitfocus and contributors
+    url: https://github.com/bitfocus/companion-module-dashare-multiplay3
+    note: >
+      Corroboration only, licence checked (MIT), read 2026-10-28 (main.js,
+      actions.js); no code taken. Sends the same addresses in lower case
+      (/cue/current/go, /stopwatch/start), position and jump times as OSC
+      floats, pan, speed and volume as ints, cue points and tracks as
+      strings; reads the status booleans as OSC booleans.
+
+transport:
+  type: osc-udp
+  port: null
+  reply: none
+  listen_port: { setting: feedback_port }
+
+settings:
+  feedback_port: { type: int, min: 1, max: 65535, label: Feedback port, description: "Local UDP port that receives MultiPlay's OSC status messages; set MultiPlay's Preferences > OSC Control > Remote to this host and port. Empty for no status." }
+
+ports:
+  - { port: null, protocol: udp, role: control, note: "no default: the Control port set in MultiPlay's Preferences > OSC Control, given when the device is opened" }
+  - { port: null, protocol: udp, role: feedback, listener: core, setting: feedback_port, note: "no default: the Remote port set in MultiPlay's Preferences > OSC Control" }
+
+maps:
+  select_position: { first: first, previous: prev, next: next, last: last, page_up: pageup, page_down: pagedown }
+  stopwatch_action: { start: Start, stop: Stop, reset: Reset }
+
+models:
+  - id: multiplay-3
+    name: MultiPlay 3
+    supports: [select, select_cue, go, stop, pause, toggle_pause, resume, restart, fade, jump_back, jump_back_by,
+               jump_forward, jump_forward_by, jump_to_end, jump_to_end_by, cue_point, set_position, track,
+               set_pan, set_pan_scale, pan_left, pan_right, revert_pan, set_speed, set_speed_scale, slow_down,
+               speed_up, revert_speed, set_volume, set_volume_scale, volume_down, volume_down_by, volume_up,
+               volume_up_by, revert_volume, stopwatch, refresh_status]
+    verification: none
+    notes: >
+      OSC Control needs MultiPlay 3.0.196 or later (the Companion module's
+      help); MultiPlay 2 has no OSC control.
+
+commands:
+  # ── Cue list navigation ──────────────────────────────────────────────────
+  select:
+    summary: Move the GO position in the focused cue list (/select/first, prev, next, last, pageup, pagedown)
+    params:
+      position: { type: enum, values: [first, previous, next, last, page_up, page_down], required: true, label: Position, description: "Where the GO position moves: the first or last cue, one cue back or on, or a page up or down." }
+    send: { address: "/select/{position:map.select_position}" }
+    returns: none
+
+  select_cue:
+    summary: Move the GO position to the cue with a Q# (/select/{cue})
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", required: true, label: Q#, description: "The cue's Q# as shown in the cue list, without spaces." }
+    send: { address: "/select/{cue}" }
+    returns: none
+
+  # ── Cue actions ──────────────────────────────────────────────────────────
+  go:
+    summary: GO the cue at the GO position or a cue by Q# (/cue/{cue}/Go)
+    params: &cue_one
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), or playhead for the cue at the GO position." }
+    send: { address: "/cue/{cue}/Go" }
+    returns: none
+
+  stop:
+    summary: Stop a cue, the cue at the GO position, or every active cue (/cue/{cue}/Stop)
+    params: &cue_all
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), playhead for the cue at the GO position, or active for every playing or paused cue." }
+    send: { address: "/cue/{cue}/Stop" }
+    returns: none
+
+  pause:
+    summary: Pause a cue, the cue at the GO position, or every active cue (/cue/{cue}/Pause)
+    params: *cue_all
+    send: { address: "/cue/{cue}/Pause" }
+    returns: none
+
+  toggle_pause:
+    summary: Pause playing cues and resume paused ones (/cue/{cue}/PauseToggle)
+    params: *cue_all
+    send: { address: "/cue/{cue}/PauseToggle" }
+    returns: none
+
+  resume:
+    summary: Resume a paused cue (/cue/{cue}/Resume)
+    params: *cue_all
+    send: { address: "/cue/{cue}/Resume" }
+    returns: none
+
+  restart:
+    summary: Restart a cue from its beginning (/cue/{cue}/Restart)
+    params: *cue_all
+    send: { address: "/cue/{cue}/Restart" }
+    returns: none
+
+  fade:
+    summary: Fade a cue out with its fade time, or every active cue with Fade All Out (/cue/{cue}/Fade)
+    params: *cue_all
+    send: { address: "/cue/{cue}/Fade" }
+    returns: none
+
+  jump_back:
+    summary: Jump the playback position back by the Jump Back Time preference (/cue/{cue}/JumpBack)
+    params: *cue_all
+    send: { address: "/cue/{cue}/JumpBack" }
+    returns: none
+
+  jump_back_by:
+    summary: Jump the playback position back by a number of seconds (/cue/{cue}/JumpBack float)
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), playhead for the cue at the GO position, or active for every playing or paused cue." }
+      seconds: { type: float, min: 0.001, max: 86400, required: true, label: Seconds, description: "How far back the playback position jumps, in seconds." }
+    send: { address: "/cue/{cue}/JumpBack", args: [ { value: "{seconds}", type: float } ] }
+    returns: none
+
+  jump_forward:
+    summary: Jump the playback position forward by the Jump Fwd Time preference (/cue/{cue}/JumpFwd)
+    params: *cue_all
+    send: { address: "/cue/{cue}/JumpFwd" }
+    returns: none
+
+  jump_forward_by:
+    summary: Jump the playback position forward by a number of seconds (/cue/{cue}/JumpFwd float)
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), playhead for the cue at the GO position, or active for every playing or paused cue." }
+      seconds: { type: float, min: 0.001, max: 86400, required: true, label: Seconds, description: "How far forward the playback position jumps, in seconds." }
+    send: { address: "/cue/{cue}/JumpFwd", args: [ { value: "{seconds}", type: float } ] }
+    returns: none
+
+  jump_to_end:
+    summary: Jump to the cue's end minus the Jump End Time preference (/cue/{cue}/JumpEnd)
+    params: *cue_all
+    send: { address: "/cue/{cue}/JumpEnd" }
+    returns: none
+
+  jump_to_end_by:
+    summary: Jump to a number of seconds before the cue's end (/cue/{cue}/JumpEnd float)
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), playhead for the cue at the GO position, or active for every playing or paused cue." }
+      seconds: { type: float, min: 0.001, max: 86400, required: true, label: Seconds before end, description: "How many seconds before the cue's end the playback position lands." }
+    send: { address: "/cue/{cue}/JumpEnd", args: [ { value: "{seconds}", type: float } ] }
+    returns: none
+
+  cue_point:
+    summary: Jump the playback position to a cue point of the cue (/cue/{cue}/CuePoint string)
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), playhead for the cue at the GO position, or active for every playing or paused cue." }
+      point: { type: string, pattern: "^(First|Prev|Next|Last|[0-9]{1,4})$", required: true, label: Cue point, description: "First, Prev, Next or Last, or the cue point's number; a number the cue lacks is ignored." }
+    send: { address: "/cue/{cue}/CuePoint", args: [ { value: "{point}", type: string } ] }
+    returns: none
+
+  set_position:
+    summary: Jump the playback position to a time in the cue (/cue/{cue}/Position float)
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), or playhead for the cue at the GO position." }
+      seconds: { type: float, min: 0, max: 86400, required: true, label: Position, description: "Playback position from the cue's start, in seconds." }
+    send: { address: "/cue/{cue}/Position", args: [ { value: "{seconds}", type: float } ] }
+    returns: none
+
+  track:
+    summary: Jump to a track of a Play List cue (/cue/{cue}/Track string)
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), or playhead for the cue at the GO position." }
+      track: { type: string, pattern: "^(First|Prev|Next|Last|[0-9]{1,4})$", required: true, label: Track, description: "First, Prev, Next or Last, or the track's position in the list, numbered from 1." }
+    send: { address: "/cue/{cue}/Track", args: [ { value: "{track}", type: string } ] }
+    returns: none
+
+  # ── Live adjustments (the cue's properties are not changed) ─────────────
+  set_pan:
+    summary: Set a playing cue's pan (/cue/{cue}/Pan int)
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), or playhead for the cue at the GO position." }
+      pan: { type: int, min: -100, max: 100, required: true, label: Pan, description: "Pan position, -100 (left) to 100 (right), 0 center." }
+    send: { address: "/cue/{cue}/Pan", args: [ { value: "{pan}", type: int } ] }
+    returns: none
+
+  set_pan_scale:
+    summary: Set a playing cue's pan as a scale (/cue/{cue}/PanS float)
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), or playhead for the cue at the GO position." }
+      pan: { type: float, min: -1, max: 1, required: true, label: Pan, description: "Pan position, -1.0 (left) to 1.0 (right), 0 center." }
+    send: { address: "/cue/{cue}/PanS", args: [ { value: "{pan}", type: float } ] }
+    returns: none
+
+  pan_left:
+    summary: Move a playing cue's pan to the left (/cue/{cue}/Pan/- int)
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), or playhead for the cue at the GO position." }
+      amount: { type: int, min: 1, max: 100, required: true, label: Amount, description: "How far the pan moves left, on the -100 to 100 pan scale." }
+    send: { address: "/cue/{cue}/Pan/-", args: [ { value: "{amount}", type: int } ] }
+    returns: none
+
+  pan_right:
+    summary: Move a playing cue's pan to the right (/cue/{cue}/Pan/+ int)
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), or playhead for the cue at the GO position." }
+      amount: { type: int, min: 1, max: 100, required: true, label: Amount, description: "How far the pan moves right, on the -100 to 100 pan scale." }
+    send: { address: "/cue/{cue}/Pan/+", args: [ { value: "{amount}", type: int } ] }
+    returns: none
+
+  revert_pan:
+    summary: Return a playing cue's pan to its cue property (/cue/{cue}/Pan/Revert)
+    params: *cue_one
+    send: { address: "/cue/{cue}/Pan/Revert" }
+    returns: none
+
+  set_speed:
+    summary: Set a playing cue's speed (/cue/{cue}/Speed int)
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), or playhead for the cue at the GO position." }
+      percent: { type: int, min: 50, max: 150, required: true, label: Speed, description: "Playback speed in percent, 100 being normal speed." }
+    send: { address: "/cue/{cue}/Speed", args: [ { value: "{percent}", type: int } ] }
+    returns: none
+
+  set_speed_scale:
+    summary: Set a playing cue's speed as a scale (/cue/{cue}/SpeedS float)
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), or playhead for the cue at the GO position." }
+      speed: { type: float, min: -1, max: 1, required: true, label: Speed, description: "Playback speed on MultiPlay's -1.0 (slowest) to 1.0 (fastest) scale, 0 being normal speed." }
+    send: { address: "/cue/{cue}/SpeedS", args: [ { value: "{speed}", type: float } ] }
+    returns: none
+
+  slow_down:
+    summary: Slow a playing cue down (/cue/{cue}/Speed/- int)
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), or playhead for the cue at the GO position." }
+      amount: { type: int, min: 1, max: 100, required: true, label: Amount, description: "How much slower the cue plays, in speed percent." }
+    send: { address: "/cue/{cue}/Speed/-", args: [ { value: "{amount}", type: int } ] }
+    returns: none
+
+  speed_up:
+    summary: Speed a playing cue up (/cue/{cue}/Speed/+ int)
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), or playhead for the cue at the GO position." }
+      amount: { type: int, min: 1, max: 100, required: true, label: Amount, description: "How much faster the cue plays, in speed percent." }
+    send: { address: "/cue/{cue}/Speed/+", args: [ { value: "{amount}", type: int } ] }
+    returns: none
+
+  revert_speed:
+    summary: Return a playing cue's speed to its cue property (/cue/{cue}/Speed/Revert)
+    params: *cue_one
+    send: { address: "/cue/{cue}/Speed/Revert" }
+    returns: none
+
+  set_volume:
+    summary: Set a playing cue's volume (/cue/{cue}/Volume int)
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), or playhead for the cue at the GO position." }
+      db: { type: int, min: -200, max: 0, required: true, label: Volume, description: "Level in whole dB, 0 down to MultiPlay's lowest level (-60 unless changed in its preferences)." }
+    send: { address: "/cue/{cue}/Volume", args: [ { value: "{db}", type: int } ] }
+    returns: none
+
+  set_volume_scale:
+    summary: Set a playing cue's volume as a scale (/cue/{cue}/VolumeS float)
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), or playhead for the cue at the GO position." }
+      level: { type: float, min: 0, max: 1, required: true, label: Volume, description: "Level from 0.0 (the lowest level) to 1.0 (0 dB)." }
+    send: { address: "/cue/{cue}/VolumeS", args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  volume_down:
+    summary: Lower a playing cue's volume by the Volume Inc Dec preference (/cue/{cue}/Volume/-)
+    params: *cue_one
+    send: { address: "/cue/{cue}/Volume/-" }
+    returns: none
+
+  volume_down_by:
+    summary: Lower a playing cue's volume by a number of dB (/cue/{cue}/Volume/- int)
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), or playhead for the cue at the GO position." }
+      db: { type: int, min: 1, max: 200, required: true, label: Amount, description: "How many whole dB the level drops, up to MultiPlay's level range (60 unless changed in its preferences)." }
+    send: { address: "/cue/{cue}/Volume/-", args: [ { value: "{db}", type: int } ] }
+    returns: none
+
+  volume_up:
+    summary: Raise a playing cue's volume by the Volume Inc Dec preference (/cue/{cue}/Volume/+)
+    params: *cue_one
+    send: { address: "/cue/{cue}/Volume/+" }
+    returns: none
+
+  volume_up_by:
+    summary: Raise a playing cue's volume by a number of dB (/cue/{cue}/Volume/+ int)
+    params:
+      cue: { type: string, pattern: "^[^\\s/#*,?\\[\\]{}]{1,32}$", default: playhead, label: Cue, description: "The cue's Q# (without spaces), or playhead for the cue at the GO position." }
+      db: { type: int, min: 1, max: 200, required: true, label: Amount, description: "How many whole dB the level rises, up to MultiPlay's level range (60 unless changed in its preferences)." }
+    send: { address: "/cue/{cue}/Volume/+", args: [ { value: "{db}", type: int } ] }
+    returns: none
+
+  revert_volume:
+    summary: Return a playing cue's volume to its cue property (/cue/{cue}/Volume/Revert)
+    params: *cue_one
+    send: { address: "/cue/{cue}/Volume/Revert" }
+    returns: none
+
+  # ── Stopwatch and status ─────────────────────────────────────────────────
+  stopwatch:
+    summary: Start, stop or reset the stopwatch (/Stopwatch/Start, Stop, Reset)
+    params:
+      action: { type: enum, values: [start, stop, reset], required: true, label: Action, description: "What the stopwatch does." }
+    send: { address: "/Stopwatch/{action:map.stopwatch_action}" }
+    returns: none
+
+  refresh_status:
+    summary: Ask MultiPlay to send every status message again (/status/refresh)
+    send: { address: /status/refresh }
+    returns: none
+
+state:
+  buttons.previous:  { type: bool, description: "The cue list's previous button is enabled (/status/select/prev)" }
+  buttons.next:      { type: bool, description: "The cue list's next button is enabled (/status/select/next)" }
+  buttons.go:        { type: bool, description: "The GO button is enabled (/status/go)" }
+  buttons.stop_all:  { type: bool, description: "The Stop All button is enabled, which it is while cues are active (/status/stopall)" }
+  buttons.fade_all:  { type: bool, description: "The Fade All button is enabled (/status/fadeall)" }
+  current.qdesc:     { type: string, description: "Q# and description of the cue at the GO position (/status/current/qdesc)" }
+  elapsed:           { type: string, description: "The Elapsed Time window: hours, minutes and seconds, with decimals when enabled in MultiPlay" }
+  remaining:         { type: string, description: "The Remaining Time window: hours, minutes and seconds, with decimals when enabled in MultiPlay" }
+
+telemetry:
+  # Status messages go to the Remote target only; /status/refresh asks for
+  # all of them once the feedback port is open.
+  subscribe:
+    send: [ { address: /status/refresh } ]
+  updates:
+    - address: "^/status/select/prev$"
+      state: { buttons.previous: { value: "{arg0}", map: { "TRUE": true, "FALSE": false, "true": true, "false": false, "True": true, "False": false, "1": true, "0": false } } }
+    - address: "^/status/select/next$"
+      state: { buttons.next: { value: "{arg0}", map: { "TRUE": true, "FALSE": false, "true": true, "false": false, "True": true, "False": false, "1": true, "0": false } } }
+    - address: "^/status/go$"
+      state: { buttons.go: { value: "{arg0}", map: { "TRUE": true, "FALSE": false, "true": true, "false": false, "True": true, "False": false, "1": true, "0": false } } }
+    - address: "^/status/stopall$"
+      state: { buttons.stop_all: { value: "{arg0}", map: { "TRUE": true, "FALSE": false, "true": true, "false": false, "True": true, "False": false, "1": true, "0": false } } }
+    - address: "^/status/fadeall$"
+      state: { buttons.fade_all: { value: "{arg0}", map: { "TRUE": true, "FALSE": false, "true": true, "false": false, "True": true, "False": false, "1": true, "0": false } } }
+    - address: "^/status/current/qdesc$"
+      state: { current.qdesc: "{arg0}" }
+    - address: "^/status/elapsed$"
+      state: { elapsed: "{arg0}" }
+    - address: "^/status/remaining$"
+      state: { remaining: "{arg0}" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      MultiPlay listens for OSC only on the Control port set in its
+      Preferences > OSC Control, and sends status only to the Remote address
+      and port set there; neither has a documented default, so the port is
+      given when the device is opened and Remote must name this host and the
+      feedback_port setting. Nothing can set either up over OSC. Without the
+      Remote target every command still works and the state stays empty.
+  - models: [all]
+    severity: info
+    text: >
+      MultiPlay never answers the sender and documents no error message:
+      every command reports unverified. A command naming a Q# that does not
+      exist, or a cue point the cue lacks, is ignored.
+  - models: [all]
+    severity: info
+    text: >
+      The status messages report which buttons are enabled, the cue at the GO
+      position and the elapsed and remaining times; MultiPlay's OSC Control
+      sends nothing on cue properties, levels or the stopwatch, so those are
+      not in state (an API limit). A button's status is sent only when it
+      changes; refresh_status (sent once when the feedback port opens) asks
+      for every one again.
+  - models: [all]
+    severity: info
+    text: >
+      The help writes the status values as TRUE and FALSE without saying
+      their OSC type; the Companion module reads OSC booleans. Booleans,
+      the strings TRUE/FALSE in any of the usual cases, and 1/0 are all read.
+  - models: [all]
+    severity: info
+    text: >
+      The help spells cue actions with capitals (Go, PauseToggle, Volume/+)
+      and the stopwatch as /Stopwatch/Start, and they are sent so; the
+      Companion module sends the same addresses in lower case, so MultiPlay
+      appears to compare them without case. Start is a documented synonym of
+      Go and previous of prev, and are not sent.
+  - models: [all]
+    severity: info
+    text: >
+      The help says a cue's Q# in an address may hold no spaces, so a Q# with a
+      space cannot be addressed; renumber such cues. playhead and current
+      name the cue at the GO position, active every playing or paused cue
+      (Stop, Pause, PauseToggle, Resume, Restart, Fade and the jumps only).
+      Fade on active triggers Fade All Out with its preference time.
+  - models: [all]
+    severity: info
+    text: >
+      Live adjustments (pan, speed, volume) change the playing cue only, never
+      its cue properties; the Revert commands return it to them. The lowest
+      volume level is a MultiPlay preference (-60 dB unless changed), which
+      bounds set_volume, volume_down_by and volume_up_by.

@@ -113,6 +113,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-clock8001", &["clock-8001"]),
     ("vendor-cockos", &["cockos-reaper", "cockos-reaper-web"]),
     ("vendor-dahua", &["dahua-ptz"]),
+    ("vendor-dashare", &["dashare-multiplay"]),
     (
         "vendor-denon",
         &[
@@ -133,6 +134,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     (
         "vendor-digitalprojection",
         &[
+            "digitalprojection-dvision",
             "digitalprojection-evision-6500",
             "digitalprojection-evision-op",
             "digitalprojection-projector",
@@ -176,7 +178,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-google", &["youtube-live"]),
-    ("vendor-grassvalley", &["grassvalley-amp"]),
+    (
+        "vendor-grassvalley",
+        &["grassvalley-amp", "grassvalley-kaleido"],
+    ),
     ("vendor-greenhippo", &["greenhippo-hippotizer"]),
     ("vendor-h2r", &["h2r-graphics"]),
     ("vendor-haivision", &["haivision-kb", "haivision-makito-x4"]),
@@ -355,6 +360,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "softron-movierecorder",
             "softron-mreplay",
             "softron-multicam-logger",
+            "softron-ontheair-video",
         ],
     ),
     (
