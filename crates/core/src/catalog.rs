@@ -77,9 +77,8 @@ pub struct PortSpec {
     pub port: Option<u16>,
     /// `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls`, `ssh`, `serial`
     /// (a serial port on the host, named by its `setting`, with no number),
-    /// `midi` (a MIDI port on the host, likewise), `icmp` (ICMP echo, with
-    /// no number) or `applescript` (Apple events to an application on the
-    /// host running the core, with no number).
+    /// `midi` (a MIDI port on the host, likewise) or `icmp` (ICMP echo, with
+    /// no number).
     pub protocol: String,
     /// `control` (where commands go; `OpenRequest::port` overrides it),
     /// `push`, `feedback`, `notification` or `discovery`.
@@ -293,12 +292,6 @@ impl DeviceSpec {
     /// may be opened without a network host (SPEC.md §2, Ports).
     pub fn uses_midi(&self) -> bool {
         self.ports.iter().any(|p| p.protocol == "midi")
-    }
-
-    /// Whether the device is an application on the host running the core,
-    /// reached with Apple events, so it is opened without a host.
-    pub fn uses_applescript(&self) -> bool {
-        self.ports.iter().any(|p| p.protocol == "applescript")
     }
 
     pub fn model(&self, id: &str) -> Option<&ModelSpec> {

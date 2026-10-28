@@ -116,12 +116,6 @@ pub(crate) enum Inbound {
         generation: u64,
         result: crate::module::EchoResult,
     },
-    /// An AppleScript the module ran finished.
-    Script {
-        key: Key,
-        generation: u64,
-        result: Result<String, String>,
-    },
     /// A task the module handed off finished.
     Computed {
         key: Key,
@@ -515,13 +509,6 @@ impl Session {
                             self.echoes.remove(key);
                             self.module.icmp(&mut cx, key, result);
                         }
-                        Inbound::Script { key, generation, result } => {
-                            if self.computes.get(key) != Some(&generation) {
-                                continue;
-                            }
-                            self.computes.remove(key);
-                            self.module.osascript(&mut cx, key, result);
-                        }
                         Inbound::Computed { key, generation, result } => {
                             if self.computes.get(key) != Some(&generation) {
                                 continue;
@@ -812,33 +799,6 @@ impl Session {
                             .unwrap_or_else(|e| Err(format!("the task failed: {e}")));
                         let _ = inbound
                             .send(Inbound::Computed {
-                                key,
-                                generation,
-                                result,
-                            })
-                            .await;
-                    });
-                }
-                Action::OsaScript {
-                    key,
-                    script,
-                    timeout,
-                } => {
-                    // Keyed with the computes: a newer script under the same
-                    // key replaces an older one's result.
-                    let generation = self.next_generation;
-                    self.next_generation += 1;
-                    self.computes.insert(key, generation);
-                    let inbound = self.inbound_tx.clone();
-                    tokio::spawn(async move {
-                        let timeout = timeout.map(Duration::from_millis);
-                        let result = tokio::task::spawn_blocking(move || {
-                            crate::osascript::run(&script, timeout)
-                        })
-                        .await
-                        .unwrap_or_else(|e| Err(format!("the script failed: {e}")));
-                        let _ = inbound
-                            .send(Inbound::Script {
                                 key,
                                 generation,
                                 result,

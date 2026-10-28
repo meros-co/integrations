@@ -74,7 +74,6 @@ mod modules;
 mod oauth_session_tests;
 #[cfg(test)]
 mod oauth_validate_session_tests;
-mod osascript;
 #[cfg(feature = "pjlink")]
 mod pjlink_discovery;
 mod serial;
@@ -497,7 +496,6 @@ impl Core {
         let host = if request.host.trim().is_empty()
             && (spec.core_listens_only()
                 || spec.uses_midi()
-                || spec.uses_applescript()
                 || (spec.uses_serial() && serial_link != Some(false)))
         {
             IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)

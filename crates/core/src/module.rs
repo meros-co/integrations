@@ -740,19 +740,6 @@ pub enum Action {
         key: Key,
         task: Task,
     },
-    /// Run an AppleScript with `osascript` on the host running the core
-    /// (macOS only); its result goes to [`Module::osascript`] under `key`.
-    /// For native modules that drive an application on the same Mac through
-    /// its scripting dictionary with fixed scripts, every value they carry
-    /// escaped as an AppleScript string: never a script taken from a caller.
-    /// `timeout`, when given, ends the process after that long. A newer
-    /// script under the same key replaces an older one still running, whose
-    /// result is then dropped.
-    OsaScript {
-        key: Key,
-        script: String,
-        timeout: Option<Millis>,
-    },
     /// Accept connections from the device on a local TCP port, shared with
     /// other sessions and routed by peer address. Each accepted connection is
     /// reported on `socket` as `TcpInput::Connected`, replacing any before it.
@@ -993,15 +980,6 @@ impl Cx {
     }
 
     /// Run work off the session's task; see [`Action::Compute`].
-    /// Run an AppleScript on the host (see [`Action::OsaScript`]).
-    pub fn osascript(&mut self, key: Key, script: impl Into<String>, timeout: Option<Millis>) {
-        self.push(Action::OsaScript {
-            key,
-            script: script.into(),
-            timeout,
-        });
-    }
-
     pub fn compute(
         &mut self,
         key: Key,
@@ -1253,13 +1231,6 @@ pub trait Module: Send + 'static {
 
     /// A task started with [`Cx::compute`] finished.
     fn computed(&mut self, cx: &mut Cx, key: Key, result: Result<Vec<u8>, String>) {
-        let _ = (cx, key, result);
-    }
-
-    /// A script started with [`Cx::osascript`] finished: its result as
-    /// `osascript` prints it (the trailing line break removed), or why it
-    /// failed (`osascript`'s error text, a timeout, or a host without it).
-    fn osascript(&mut self, cx: &mut Cx, key: Key, result: Result<String, String>) {
         let _ = (cx, key, result);
     }
 
