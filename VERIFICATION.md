@@ -2049,9 +2049,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that software before 4.3.1 needs no login, and how 4.3.1 or later answers a request without one (the probe, GET /ecs/version.json, goes without the session). ([specs/haivision-kb.yaml:71](specs/haivision-kb.yaml#L71))
 - [ ] Check whether the channel part of /ecs/channels/{channel}.json takes the channel's id, its label, or both (the document calls it the label; its lists and examples use the id). ([specs/haivision-kb.yaml:165](specs/haivision-kb.yaml#L165))
 - [ ] Check that create_channel accepts an empty id (to have the encoder choose one) and the status a successful create answers. ([specs/haivision-kb.yaml:152](specs/haivision-kb.yaml#L152))
-- [ ] Check the signal list's query form (index=-1, time=HH:MM:SS:mmm, timespan=60, without the quotes the document's syntax line shows) and the reply's top-level shape. ([specs/haivision-kb.yaml:300](specs/haivision-kb.yaml#L300))
-- [ ] Check that ad cue durations and offsets with three decimals are accepted, and whether repeat takes true/false (the document's text) or no/yes (its example). ([specs/haivision-kb.yaml:339](specs/haivision-kb.yaml#L339))
-- [ ] Check that reading each channel listed by GET /ecs.json every 2 s is light enough for the ECS with many channels running. ([specs/haivision-kb.yaml:966](specs/haivision-kb.yaml#L966))
+- [ ] Check the signal list's query form (index=-1, time=HH:MM:SS:mmm, timespan=60, without the quotes the document's syntax line shows) and the reply's top-level shape. ([specs/haivision-kb.yaml:309](specs/haivision-kb.yaml#L309))
+- [ ] Check that ad cue durations and offsets with three decimals are accepted, and whether repeat takes true/false (the document's text) or no/yes (its example). ([specs/haivision-kb.yaml:348](specs/haivision-kb.yaml#L348))
+- [ ] Check that reading each channel listed by GET /ecs.json every 2 s is light enough for the ECS with many channels running. ([specs/haivision-kb.yaml:974](specs/haivision-kb.yaml#L974))
 
 ## haivision-makito-x4 — Haivision Makito X4 encoder and decoder
 
@@ -2157,9 +2157,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## jvc-camera — JVC camcorders and PTZ cameras (Camcorder Web API)
 
 - [ ] Check the login exchange: whether /api.php answers 302 or 200 with the SessionID cookie, how many cookies it sets, and whether api.cgi needs the cookie, the body's SessionID or both. ([specs/jvc-camera.yaml:53](specs/jvc-camera.yaml#L53))
-- [ ] Check whether a second API client is refused while one holds a session, and what a session left idle does (the document says SessionRenewal is no longer needed). ([specs/jvc-camera.yaml:1344](specs/jvc-camera.yaml#L1344))
-- [ ] Record a full GetCamStatus answer on a camcorder and a KY-PZ camera, to check the Enable and ButtonString members the rules read and the field names the examples spell differently (AspectRetio, Sw, Agc). ([specs/jvc-camera.yaml:1102](specs/jvc-camera.yaml#L1102))
-- [ ] Check how the camera answers text with a space (an alias or a name), given the document's rule against spaces in requests. ([specs/jvc-camera.yaml:1359](specs/jvc-camera.yaml#L1359))
+- [ ] Check whether a second API client is refused while one holds a session, and what a session left idle does (the document says SessionRenewal is no longer needed). ([specs/jvc-camera.yaml:1351](specs/jvc-camera.yaml#L1351))
+- [ ] Record a full GetCamStatus answer on a camcorder and a KY-PZ camera, to check the Enable and ButtonString members the rules read and the field names the examples spell differently (AspectRetio, Sw, Agc). ([specs/jvc-camera.yaml:1109](specs/jvc-camera.yaml#L1109))
+- [ ] Check how the camera answers text with a space (an alias or a name), given the document's rule against spaces in requests. ([specs/jvc-camera.yaml:1366](specs/jvc-camera.yaml#L1366))
+- [ ] Confirm GET /cgi-bin/get_jpg.cgi answers the JPEG still with no query, carrying the session cookie, once JpegEncode has started. ([specs/jvc-camera.yaml:825](specs/jvc-camera.yaml#L825))
 
 ## kiloview-avx — Kiloview AVX24-4 Media HUB
 

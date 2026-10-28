@@ -36,6 +36,7 @@ _hkb("create_channel", {"label": "Preview", "id": "21EC2020-3AEA-1069-A2DD-08002
      "/ecs/channels.json", {"channel": {"label": "Preview", "id": "21EC2020-3AEA-1069-A2DD-08002B30309D", "previewonly": "1"}},
      file="create_channel-preview")
 _hkb("get_channel", {"channel": _HKB_CH}, "GET", f"/ecs/channels/{_HKB_CH}.json")
+_hkb("save_channel_preview", {"channel": _HKB_CH, "to": {"file": "preview.jpg"}}, "GET", f"/ecs/channels/{_HKB_CH}/preview.jpg")
 _hkb("delete_channel", {"channel": "Channel_1"}, "DELETE", "/ecs/channels/Channel_1.json")
 _hkb("start_channel", {"channel": _HKB_CH}, "PUT", f"/ecs/channels/{_HKB_CH}.json",
      {"invoke": {"command": "StartChannel", "param": ""}})

@@ -83,7 +83,7 @@ models:
     name: Haivision KB Encoder/Transcoder
     supports:
       [get_version, get_system, get_time, get_ecs_state, get_license, get_license_state, reset_license,
-       list_channels, create_channel, get_channel, delete_channel, start_channel, prepare_stop_channel,
+       list_channels, create_channel, get_channel, save_channel_preview, delete_channel, start_channel, prepare_stop_channel,
        stop_channel, start_recording, stop_recording, set_audio_gain, increase_audio_gain,
        decrease_audio_gain, enable_output, disable_output, get_signals_after, get_signals_since,
        get_signals_recent, inject_metadata, inject_scte35, inject_splice_out, list_channel_configs,
@@ -169,6 +169,15 @@ commands:
     send: { method: GET, path: "/ecs/channels/{channel}.json" }
     expect: *read
     returns: value
+
+  save_channel_preview:
+    summary: "Save a channel's video preview, a JPEG, to a host file (GET /ecs/channels/{channel}/preview.jpg); returns the file saved and its size"
+    params:
+      channel: *channel
+      to: { type: save, required: true, label: Save to, description: "The host file the preview is written to; replaced once the whole image has arrived." }
+    send: { method: GET, path: "/ecs/channels/{channel}/preview.jpg", save: to }
+    expect: { status: 200 }
+    returns: file
 
   delete_channel:
     summary: "Close and delete a channel (DELETE /ecs/channels/{channel}.json)"
@@ -444,9 +453,8 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      The video preview (GET /ecs/channels/{channel}/preview.jpg) is a JPEG
-      image, which a spec-driven command cannot hand to the consumer, so it
-      is not offered. Values come as text; numbers and on/off flags given
+      The video preview (GET /ecs/channels/{channel}/preview.jpg), a JPEG
+      image, is saved to a host file by save_channel_preview. Values come as text; numbers and on/off flags given
       as text are converted where state declares them so.
   - models: [all]
     severity: info
