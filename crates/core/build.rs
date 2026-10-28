@@ -47,7 +47,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-anomes", &["millumin"]),
-    ("vendor-apc", &["apc-rack-pdu"]),
+    ("vendor-apc", &["apc-rack-pdu", "apc-ups"]),
     ("vendor-arkaos", &["arkaos-mediamaster"]),
     ("vendor-artisticlicence", &["artnet"]),
     ("vendor-atlona", &["atlona-matrix"]),

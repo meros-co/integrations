@@ -1,0 +1,1649 @@
+spec: 1
+id: apc-ups
+name: APC UPS (SNMP)
+vendor: APC (Schneider Electric)
+category: other
+implementation: native
+reason: >
+  SNMP: BER-encoded requests over UDP, matched to their responses, retransmitted, walked with GETBULK, and on v3
+  authenticated and encrypted with keys derived from passwords (see generic-snmp). The UPS's battery, input,
+  output, outlet groups, phases and diagnostics are objects and table rows the agent lists only when walked, and
+  its traps arrive on a port of the core's. The integration is the SNMP manager with PowerNet-MIB's UPS objects
+  named.
+
+source:
+  - title: "APC PowerNet MIB v4.6.0 (powernet460.mib, document APC_POWERNETMIB_EN), 09 Jul 2026"
+    author: APC by Schneider Electric
+    url: "https://www.se.com/ww/en/download/document/APC_POWERNETMIB_EN/"
+    note: >
+      The ups group (enterprises 318.1.1.1: identification, battery, input, output, configuration, control, test,
+      communication, phases, synchronized control groups, state, outlet groups, diagnostics, parallel systems,
+      physical layout, integrated ATS, DC output, universal I/O, energy efficiency and statistics), every object's
+      OID, syntax, access, units and enumeration, and the TRAP-TYPEs of the apc enterprise. The MIB covers every
+      APC network-enabled device but NetBotz (FAQ FA156048). Facts only (names, numbers, enumerations) are used;
+      the MIB's text is not reproduced.
+  - title: "Which MIB do APC network-enabled devices support?, FAQ FA156048"
+    author: Schneider Electric
+    url: "https://www.se.com/ww/en/faqs/FA156048/"
+    note: "PowerNet-MIB serves all APC network-enabled devices except NetBotz, which has a MIB of its own."
+  - title: "RFC 3416, RFC 3418 and the SNMP RFCs generic-snmp cites"
+    author: IETF
+    url: "https://www.rfc-editor.org/rfc/rfc3416"
+    note: "The protocol (GETBULK walks, SET, traps); the system group (sysDescr, sysUpTime...)."
+
+models:
+  - id: ups
+    name: "APC UPS with a Network Management Card (Smart-UPS, Smart-UPS On-Line, Symmetra, Galaxy and others implementing PowerNet-MIB's ups group)"
+    supports: [get, walk, set, refresh, set_adv_config_ac_qualification_time, set_adv_config_alarm, set_adv_config_alarm_load_over, set_adv_config_alarm_redundancy, set_adv_config_alarm_runtime_under, set_adv_config_alarm_timer, set_adv_config_asi_ups_control_server_request_shutdown, set_adv_config_auto_shutdown_battery_capacity, set_adv_config_auto_shutdown_control_auto_restart, set_adv_config_auto_shutdown_control_battery_capacity, set_adv_config_auto_shutdown_control_load_percent_on_ups, set_adv_config_auto_shutdown_control_runtime_remaining, set_adv_config_auto_shutdown_control_skip_off_delay, set_adv_config_auto_shutdown_control_time_on_battery, set_adv_config_auto_shutdown_load_percent_on_ups, set_adv_config_auto_shutdown_runtime_remaining, set_adv_config_auto_shutdown_time_on_battery, set_adv_config_automatic_restart, set_adv_config_basic_signal_low_battery_duration, set_adv_config_batt_cab_amp_hour, set_adv_config_batt_exhaust_thresh, set_adv_config_battery_charger_type, set_adv_config_battery_health_alarm_sleep_time, set_adv_config_battery_health_alarm_warning_time, set_adv_config_battery_selection, set_adv_config_battery_temperature_compensation, set_adv_config_bypass_frequency_range_lower_limit, set_adv_config_bypass_frequency_range_upper_limit, set_adv_config_bypass_phase_lock_required, set_adv_config_bypass_tolerance_setting, set_adv_config_charger_level, set_adv_config_charger_rate, set_adv_config_deep_discharge_protection, set_adv_config_eco_voltage_range_lower_limit, set_adv_config_eco_voltage_range_upper_limit, set_adv_config_freq_bypass_transfer_range, set_adv_config_frequency_converter_mode, set_adv_config_green_mode, set_adv_config_high_bypass_ll_transfer_volt, set_adv_config_high_bypass_transfer_volt, set_adv_config_high_ll_transfer_volt, set_adv_config_high_transfer_volt, set_adv_config_informational_alarm_delay, set_adv_config_lcd_local_language, set_adv_config_lcd_lock_out, set_adv_config_low_battery_run_time, set_adv_config_low_bypass_ll_transfer_volt, set_adv_config_low_bypass_transfer_volt, set_adv_config_low_ll_transfer_volt, set_adv_config_low_transfer_volt, set_adv_config_lower_bypass_volt_tolerance, set_adv_config_lower_output_volt_tolerance, set_adv_config_max_shutdown_time, set_adv_config_min_return_capacity, set_adv_config_min_return_runtime, set_adv_config_num_external_batteries, set_adv_config_outof_sync_bypass_transfer_delay, set_adv_config_output_freq_range, set_adv_config_output_freq_slew_rate, set_adv_config_password, set_adv_config_position_selector, set_adv_config_rated_output_voltage, set_adv_config_reboot_duration, set_adv_config_return_delay, set_adv_config_sensitivity, set_adv_config_set_eeprom_defaults, set_adv_config_shutoff_delay, set_adv_config_signal_flash_voltage, set_adv_config_simple_signal_shutdowns, set_adv_config_upper_bypass_volt_tolerance, set_adv_config_upper_output_volt_tolerance, set_adv_config_ups_fail, set_adv_config_ups_powerconverter_type, set_adv_config_ups_sleep_time, set_adv_config_vout_reporting, set_adv_config_warning_alarm_delay, set_adv_control_bypass_switch, set_adv_control_firmware_update, set_adv_control_flash_and_beep, set_adv_control_reboot_shutdown_ups, set_adv_control_reboot_ups_with_or_without_ac, set_adv_control_simulate_power_fail, set_adv_control_turn_on_ups, set_adv_control_ups_off, set_adv_control_ups_sleep, set_adv_test_battery_interval, set_adv_test_diagnostic_day, set_adv_test_diagnostic_schedule, set_adv_test_diagnostic_time, set_adv_test_diagnostics, set_adv_test_runtime_calibration, set_basic_battery_last_replace_date, set_basic_config_device_accept_this_device, set_basic_config_device_device_name, set_basic_config_device_va_rating, set_basic_control_conserve_battery, set_basic_ident_name, set_battery_stats_reset, set_diag_sub_feed_breaker_subfeed_breaker_name, set_diag_sub_feed_breaker_subfeed_breaker_upper_accept_power_critical, set_diag_sub_feed_breaker_subfeed_breaker_upper_accept_power_warning, set_diag_sub_sys_backfeed_contactor_sysbackfeed_contactor_name, set_diag_switch_gear_breaker_switchgear_breaker_name, set_energy_efficiency_stats_reset, set_high_prec_battery_pack_cartridge_install_date, set_high_prec_battery_pack_only_install_date, set_high_prec_battery_pack_only_manufacture_date, set_high_prec_battery_pack_only_sku, set_input_contact_config_action, set_input_contacts_contact_config_polarity, set_integrated_ats_preferred_source, set_integrated_ats_source_line_fail_delay, set_integrated_ats_source_line_stability_delay, set_integrated_ats_ups_return_staggering, set_operational_stats_op_stats_reset, set_outlet_group_config_load_shed_control_auto_restart, set_outlet_group_config_load_shed_control_in_overload, set_outlet_group_config_load_shed_control_runtime_remaining, set_outlet_group_config_load_shed_control_skip_off_delay, set_outlet_group_config_load_shed_control_time_on_battery, set_outlet_group_config_load_shed_runtime_remaining, set_outlet_group_config_load_shed_time_on_battery, set_outlet_group_config_min_return_runtime, set_outlet_group_config_name, set_outlet_group_config_power_off_delay, set_outlet_group_config_power_on_delay, set_outlet_group_config_reboot_duration, set_outlet_group_control_command, set_output_relay_config_cause, set_output_relay_config_delay, set_output_relays_relay_config_peak_period, set_output_relays_relay_config_polarity, set_parallel_system_sys_local_address, set_parallel_system_sys_name, set_parallel_system_sys_redundancy, set_parallel_system_sys_remote_address, set_phase_input_name, set_phase_reset_values_max_min_values, set_sync_ctrl_group_config_scg_active_membership_status, set_sync_ctrl_group_config_scg_membership_group_number, set_sync_ctrl_group_config_scg_multi_cast_ip, set_sync_ctrl_group_config_scg_power_synchronization_delay_time, set_sync_ctrl_group_config_scg_return_battery_capacity_offset]
+    verification: none
+    notes: >
+      Walks PowerNet-MIB's ups group; a UPS fills the parts its family has (a single-phase Smart-UPS has no phase
+      tables, a Smart-UPS without switched outlet groups has no outlet group rows).
+
+settings:
+  version: { type: enum, values: [v1, v2c, v3], default: v2c, label: SNMP version,
+             description: "The SNMP version the agent is asked with: v1 and v2c use a community string, v3 a user with authentication and privacy." }
+  community: { type: string, secret: true, max_length: 255, default: public, label: Community,
+               description: "v1 and v2c: the community string for reads, and for SETs when no write community is set." }
+  write_community: { type: string, secret: true, max_length: 255, default: "", label: Write community,
+                     description: "v1 and v2c: the community string SETs are sent with, often private; empty uses the community." }
+  user: { type: string, max_length: 32, default: "", label: User,
+          description: "v3: the user name (securityName) the agent knows." }
+  security_level: { type: enum, values: [no_auth_no_priv, auth_no_priv, auth_priv], default: auth_priv, label: Security level,
+                    description: "v3: no_auth_no_priv sends messages unauthenticated, auth_no_priv authenticates them, auth_priv also encrypts them." }
+  auth_protocol: { type: enum, values: [md5, sha, sha224, sha256, sha384, sha512], default: sha, label: Authentication protocol,
+                   description: "v3: HMAC-MD5-96, HMAC-SHA-96 (sha) or HMAC-SHA-2 (RFC 7860), as the user is set up on the agent." }
+  auth_password: { type: string, secret: true, max_length: 256, default: "", label: Authentication password,
+                   description: "v3: the user's authentication password, at least 8 characters." }
+  priv_protocol: { type: enum, values: [des, aes, aes192, aes256], default: aes, label: Privacy protocol,
+                   description: "v3 at auth_priv: CBC-DES, AES-128 (aes, RFC 3826), or AES-192 or AES-256 as draft-blumenthal-aes-usm-04 defines them." }
+  priv_password: { type: string, secret: true, max_length: 256, default: "", label: Privacy password,
+                   description: "v3 at auth_priv: the user's privacy password, at least 8 characters." }
+  context_name: { type: string, max_length: 32, default: "", label: Context name,
+                  description: "v3: the context requests are made in, empty for the agent's default context." }
+  context_engine_id: { type: string, pattern: '^[0-9A-Fa-fxX :.-]*$', max_length: 100, default: "", label: Context engine ID,
+                       description: "v3: the contextEngineID in hex, for an agent proxying another engine; empty uses the agent's own snmpEngineID." }
+  timeout_ms: { type: int, min: 1, max: 60000, default: 1500, label: Timeout,
+                description: "Milliseconds to wait for each response before sending the request again." }
+  retries: { type: int, min: 0, max: 10, default: 2, label: Retries,
+             description: "How many times an unanswered request is sent again before it fails with timeout." }
+  max_repetitions: { type: int, min: 1, max: 1000, default: 20, label: GETBULK repetitions,
+                     description: "Objects asked for per GETBULK request while walking." }
+  poll_interval_ms: { type: int, min: 100, max: 86400000, default: 10000, label: Poll interval,
+                      description: "Milliseconds between walks of the device's objects, and reads of sysUpTime.0, the liveness check." }
+  trap_port: { type: int, min: 1, max: 65535, label: Notification port,
+               description: "The UDP port traps and informs are received on, 162 as standard; unset receives none." }
+  trap_bind_address: { type: string, pattern: '^[0-9A-Fa-f.:]*$', max_length: 45, default: "", label: Notification bind address,
+                       description: "The local address to receive notifications on with a port of this device's own; empty shares the port with every SNMP device of the core, each hearing its own agent." }
+  trap_community: { type: string, secret: true, max_length: 255, default: "", label: Notification community,
+                    description: "v1 and v2c notifications: accept only this community; empty accepts any." }
+  local_engine_id: { type: string, pattern: '^[0-9A-Fa-fxX :.-]*$', max_length: 100, default: "", label: Local engine ID,
+                     description: "v3 informs: this receiver's snmpEngineID in hex, 5 to 32 bytes, as configured on the agent; empty uses a random one for each opening." }
+
+ports:
+  - { port: 161, protocol: udp, role: control, note: "the agent; requests go from an ephemeral port of the core's" }
+  - { port: null, protocol: udp, role: notification, listener: core, setting: trap_port, note: "traps and informs, when trap_port is set (162 as standard)" }
+
+commands:
+  get:
+    summary: >
+      GET objects by OID and return {varbinds: [{oid, type, value, hex}]}, for objects the named commands and state
+      do not cover; an object state holds is updated from the answer too
+    params:
+      oids: { type: string, pattern: '^[0-9., ;]+$', max_length: 65536, required: true, label: OIDs,
+              description: "One or more OIDs in dotted decimal, separated by commas or spaces, such as 1.3.6.1.2.1.1.3.0." }
+    returns: value
+  walk:
+    summary: Every object under an OID, in order, as {varbinds}
+    params:
+      oid: { type: string, pattern: '^\.?[0-9]+(\.[0-9]+)+$', max_length: 1024, required: true, label: OID,
+             description: "The subtree's root in dotted decimal." }
+      limit: { type: int, min: 1, max: 100000000, label: Object limit,
+               description: "Stop after this many objects; unset walks the whole subtree." }
+    returns: value
+  set:
+    summary: >
+      SET one object by OID to a typed value and return the agent's response as {varbinds}; fails with the agent's
+      error-status (notWritable, wrongValue...) as the code
+    params:
+      oid: { type: string, pattern: '^\.?[0-9]+(\.[0-9]+)+$', max_length: 1024, required: true, label: OID,
+             description: "The object instance to set, in dotted decimal." }
+      type: { type: enum, values: [integer, string, hex, oid, ip_address, counter32, gauge32, timeticks, counter64, opaque], required: true, label: Type,
+              description: "The value's SNMP type: string is UTF-8 text and hex is bytes for an OCTET STRING; gauge32 is also Unsigned32." }
+      value: { type: string, max_length: 65536, required: true, label: Value,
+               description: "The value as text: a decimal number, text, hex bytes, a dotted OID or an IPv4 address, as the type asks." }
+    returns: value
+  refresh:
+    summary: Read the system group and walk every object now; answered when they have been read
+    returns: ack
+  set_basic_ident_name:
+    summary: "Set upsBasicIdentName, then read its group back"
+    params:
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new basic ident name. }
+    returns: ack
+  set_basic_battery_last_replace_date:
+    summary: "Set upsBasicBatteryLastReplaceDate, then read its group back"
+    params:
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new basic battery last replace date. }
+    returns: ack
+  set_high_prec_battery_pack_cartridge_install_date:
+    summary: "Set upsHighPrecBatteryPackCartridgeInstallDate of one upsHighPrecBatteryPackEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: High prec battery pack index, description: "The row of upsHighPrecBatteryPackEntry to write, by its upsHighPrecBatteryPackIndex." }
+      cartridge_index: { type: int, min: 0, max: 2147483647, required: true, label: High prec battery cartridge index, description: "The row of upsHighPrecBatteryPackEntry to write, by its upsHighPrecBatteryCartridgeIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new high prec battery pack cartridge install date. }
+    returns: ack
+  set_high_prec_battery_pack_only_install_date:
+    summary: "Set upsHighPrecBatteryPackOnlyInstallDate of one upsHighPrecBatteryPackOnlyEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: High prec battery pack only index, description: "The row of upsHighPrecBatteryPackOnlyEntry to write, by its upsHighPrecBatteryPackOnlyIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new high prec battery pack only install date. }
+    returns: ack
+  set_high_prec_battery_pack_only_manufacture_date:
+    summary: "Set upsHighPrecBatteryPackOnlyManufactureDate of one upsHighPrecBatteryPackOnlyEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: High prec battery pack only index, description: "The row of upsHighPrecBatteryPackOnlyEntry to write, by its upsHighPrecBatteryPackOnlyIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new high prec battery pack only manufacture date. }
+    returns: ack
+  set_high_prec_battery_pack_only_sku:
+    summary: "Set upsHighPrecBatteryPackOnlySKU of one upsHighPrecBatteryPackOnlyEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: High prec battery pack only index, description: "The row of upsHighPrecBatteryPackOnlyEntry to write, by its upsHighPrecBatteryPackOnlyIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new high prec battery pack only sku. }
+    returns: ack
+  set_basic_config_device_device_name:
+    summary: "Set deviceName of one upsBasicConfigDeviceEntry row, then read its table back"
+    params:
+      device_index: { type: int, min: 0, max: 2147483647, required: true, label: Device index, description: "The row of upsBasicConfigDeviceEntry to write, by its deviceIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new device name. }
+    returns: ack
+  set_basic_config_device_va_rating:
+    summary: "Set vaRating of one upsBasicConfigDeviceEntry row, then read its table back"
+    params:
+      device_index: { type: int, min: 0, max: 2147483647, required: true, label: Device index, description: "The row of upsBasicConfigDeviceEntry to write, by its deviceIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new va rating, as the MIB counts it." }
+    returns: ack
+  set_basic_config_device_accept_this_device:
+    summary: "Set acceptThisDevice of one upsBasicConfigDeviceEntry row, then read its table back"
+    params:
+      device_index: { type: int, min: 0, max: 2147483647, required: true, label: Device index, description: "The row of upsBasicConfigDeviceEntry to write, by its deviceIndex." }
+      value: { type: enum, values: ["yes", "no"], required: true, label: Value, description: "The new accept this device, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_rated_output_voltage:
+    summary: "Set upsAdvConfigRatedOutputVoltage, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config rated output voltage, in V." }
+    returns: ack
+  set_adv_config_high_transfer_volt:
+    summary: "Set upsAdvConfigHighTransferVolt, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config high transfer volt, in V." }
+    returns: ack
+  set_adv_config_low_transfer_volt:
+    summary: "Set upsAdvConfigLowTransferVolt, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config low transfer volt, in V." }
+    returns: ack
+  set_adv_config_alarm:
+    summary: "Set upsAdvConfigAlarm, then read its group back"
+    params:
+      value: { type: enum, values: [timed, at_low_battery, never, mute], required: true, label: Value, description: "The new adv config alarm, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_alarm_timer:
+    summary: "Set upsAdvConfigAlarmTimer, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 4294967295, required: true, label: Value, description: "The new adv config alarm timer, in 1/100 s." }
+    returns: ack
+  set_adv_config_min_return_capacity:
+    summary: "Set upsAdvConfigMinReturnCapacity, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config min return capacity, as the MIB counts it." }
+    returns: ack
+  set_adv_config_sensitivity:
+    summary: "Set upsAdvConfigSensitivity, then read its group back"
+    params:
+      value: { type: enum, values: [auto, low, medium, high], required: true, label: Value, description: "The new adv config sensitivity, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_low_battery_run_time:
+    summary: "Set upsAdvConfigLowBatteryRunTime, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 4294967295, required: true, label: Value, description: "The new adv config low battery run time, in 1/100 s." }
+    returns: ack
+  set_adv_config_return_delay:
+    summary: "Set upsAdvConfigReturnDelay, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 4294967295, required: true, label: Value, description: "The new adv config return delay, in 1/100 s." }
+    returns: ack
+  set_adv_config_shutoff_delay:
+    summary: "Set upsAdvConfigShutoffDelay, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 4294967295, required: true, label: Value, description: "The new adv config shutoff delay, in 1/100 s." }
+    returns: ack
+  set_adv_config_ups_sleep_time:
+    summary: "Set upsAdvConfigUpsSleepTime, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 4294967295, required: true, label: Value, description: "The new adv config ups sleep time, in 1/100 s." }
+    returns: ack
+  set_adv_config_set_eeprom_defaults:
+    summary: "Set upsAdvConfigSetEEPROMDefaults, then read its group back"
+    params:
+      value: { type: enum, values: [no_set_eeprom_defaults, set_eeprom_defaults], required: true, label: Value, description: "The new adv config set eeprom defaults, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_batt_exhaust_thresh:
+    summary: "Set upsAdvConfigBattExhaustThresh, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 4294967295, required: true, label: Value, description: "The new adv config batt exhaust thresh, in 1/100 s." }
+    returns: ack
+  set_adv_config_password:
+    summary: "Set upsAdvConfigPassword, then read its group back"
+    params:
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new adv config password. }
+    returns: ack
+  set_adv_config_batt_cab_amp_hour:
+    summary: "Set upsAdvConfigBattCabAmpHour, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config batt cab amp hour, as the MIB counts it." }
+    returns: ack
+  set_adv_config_position_selector:
+    summary: "Set upsAdvConfigPositionSelector, then read its group back"
+    params:
+      value: { type: enum, values: [unknown, rack, tower], required: true, label: Value, description: "The new adv config position selector, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_output_freq_range:
+    summary: "Set upsAdvConfigOutputFreqRange, then read its group back"
+    params:
+      value: { type: enum, values: [unknown, freq_range_auto, freq_range60_var1, freq_range60_var3, freq_range50_var1, freq_range50_var3, freq_range60_var10, freq_range50_var10, freq_range60_var1dot0, freq_range50_var1dot0, freq_range50_pct0dot5, freq_range50_pct1, freq_range50_pct2, freq_range50_pct4, freq_range50_pct6, freq_range50_pct8, freq_range60_pct0dot5, freq_range60_pct1, freq_range60_pct2, freq_range60_pct4, freq_range60_pct6, freq_range60_pct8, freq_range50_var4, freq_range60_var4], required: true, label: Value, description: "The new adv config output freq range, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_ups_fail:
+    summary: "Set upsAdvConfigUPSFail, then read its group back"
+    params:
+      value: { type: enum, values: [unknown, goto_bypass, drop_load], required: true, label: Value, description: "The new adv config ups fail, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_alarm_redundancy:
+    summary: "Set upsAdvConfigAlarmRedundancy, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config alarm redundancy, as the MIB counts it." }
+    returns: ack
+  set_adv_config_alarm_load_over:
+    summary: "Set upsAdvConfigAlarmLoadOver, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config alarm load over, as the MIB counts it." }
+    returns: ack
+  set_adv_config_alarm_runtime_under:
+    summary: "Set upsAdvConfigAlarmRuntimeUnder, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config alarm runtime under, as the MIB counts it." }
+    returns: ack
+  set_adv_config_vout_reporting:
+    summary: "Set upsAdvConfigVoutReporting, then read its group back"
+    params:
+      value: { type: enum, values: [unknown, vout_auto, vout208, vout240], required: true, label: Value, description: "The new adv config vout reporting, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_num_external_batteries:
+    summary: "Set upsAdvConfigNumExternalBatteries, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config num external batteries, as the MIB counts it." }
+    returns: ack
+  set_adv_config_simple_signal_shutdowns:
+    summary: "Set upsAdvConfigSimpleSignalShutdowns, then read its group back"
+    params:
+      value: { type: enum, values: [unknown, disabled, enabled], required: true, label: Value, description: "The new adv config simple signal shutdowns, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_max_shutdown_time:
+    summary: "Set upsAdvConfigMaxShutdownTime, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config max shutdown time, as the MIB counts it." }
+    returns: ack
+  set_adv_config_asi_ups_control_server_request_shutdown:
+    summary: "Set upsAsiUpsControlServerRequestShutdown, then read its group back"
+    params:
+      value: { type: enum, values: [server_shutdown_off, server_shutdown_reboot], required: true, label: Value, description: "The new asi ups control server request shutdown, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_min_return_runtime:
+    summary: "Set upsAdvConfigMinReturnRuntime, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 4294967295, required: true, label: Value, description: "The new adv config min return runtime, in 1/100 s." }
+    returns: ack
+  set_adv_config_basic_signal_low_battery_duration:
+    summary: "Set upsAdvConfigBasicSignalLowBatteryDuration, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 4294967295, required: true, label: Value, description: "The new adv config basic signal low battery duration, in 1/100 s." }
+    returns: ack
+  set_adv_config_bypass_phase_lock_required:
+    summary: "Set upsAdvConfigBypassPhaseLockRequired, then read its group back"
+    params:
+      value: { type: enum, values: [unknown, disabled, enabled, always_acceptable, never_acceptable], required: true, label: Value, description: "The new adv config bypass phase lock required, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_output_freq_slew_rate:
+    summary: "Set upsAdvConfigOutputFreqSlewRate, then read its group back"
+    params:
+      value: { type: enum, values: [unknown, slew_rate_quarter_hz_per_sec, slew_rate_half_hz_per_sec, slew_rate1_hz_per_sec, slew_rate2_hz_per_sec, slew_rate4_hz_per_sec, slew_rate6_hz_per_sec], required: true, label: Value, description: "The new adv config output freq slew rate, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_charger_level:
+    summary: "Set upsAdvConfigChargerLevel, then read its group back"
+    params:
+      value: { type: enum, values: [unknown, low, high], required: true, label: Value, description: "The new adv config charger level, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_bypass_tolerance_setting:
+    summary: "Set upsAdvConfigBypassToleranceSetting, then read its group back"
+    params:
+      value: { type: enum, values: [unknown, wide, medium, narrow, custom], required: true, label: Value, description: "The new adv config bypass tolerance setting, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_upper_output_volt_tolerance:
+    summary: "Set upsAdvConfigUpperOutputVoltTolerance, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 100, required: true, label: Value, description: "The new adv config upper output volt tolerance, as the MIB counts it." }
+    returns: ack
+  set_adv_config_lower_output_volt_tolerance:
+    summary: "Set upsAdvConfigLowerOutputVoltTolerance, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 100, required: true, label: Value, description: "The new adv config lower output volt tolerance, as the MIB counts it." }
+    returns: ack
+  set_adv_config_upper_bypass_volt_tolerance:
+    summary: "Set upsAdvConfigUpperBypassVoltTolerance, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 100, required: true, label: Value, description: "The new adv config upper bypass volt tolerance, as the MIB counts it." }
+    returns: ack
+  set_adv_config_lower_bypass_volt_tolerance:
+    summary: "Set upsAdvConfigLowerBypassVoltTolerance, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 100, required: true, label: Value, description: "The new adv config lower bypass volt tolerance, as the MIB counts it." }
+    returns: ack
+  set_adv_config_outof_sync_bypass_transfer_delay:
+    summary: "Set upsAdvConfigOutofSyncBypassTransferDelay, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config outof sync bypass transfer delay, as the MIB counts it." }
+    returns: ack
+  set_adv_config_warning_alarm_delay:
+    summary: "Set upsAdvConfigWarningAlarmDelay, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config warning alarm delay, in s." }
+    returns: ack
+  set_adv_config_informational_alarm_delay:
+    summary: "Set upsAdvConfigInformationalAlarmDelay, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config informational alarm delay, in s." }
+    returns: ack
+  set_adv_config_green_mode:
+    summary: "Set upsAdvConfigGreenMode, then read its group back"
+    params:
+      value: { type: enum, values: [disable, enable], required: true, label: Value, description: "The new adv config green mode, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_lcd_local_language:
+    summary: "Set upsAdvConfigLCDLocalLanguage, then read its group back"
+    params:
+      value: { type: enum, values: [english, french, italian, german, spanish, portuguese, japanese, russian], required: true, label: Value, description: "The new adv config lcd local language, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_lcd_lock_out:
+    summary: "Set upsAdvConfigLCDLockOut, then read its group back"
+    params:
+      value: { type: enum, values: [disable, enable], required: true, label: Value, description: "The new adv config lcd lock out, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_charger_rate:
+    summary: "Set upsAdvConfigChargerRate, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config charger rate, as the MIB counts it." }
+    returns: ack
+  set_adv_config_battery_selection:
+    summary: "Set upsAdvConfigBatterySelection, then read its group back"
+    params:
+      value: { type: enum, values: [vrla, ventedcell, nicd, li_ion], required: true, label: Value, description: "The new adv config battery selection, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_battery_health_alarm_warning_time:
+    summary: "Set upsAdvConfigBatteryHealthAlarmWarningTime, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config battery health alarm warning time, as the MIB counts it." }
+    returns: ack
+  set_adv_config_battery_health_alarm_sleep_time:
+    summary: "Set upsAdvConfigBatteryHealthAlarmSleepTime, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config battery health alarm sleep time, as the MIB counts it." }
+    returns: ack
+  set_adv_config_signal_flash_voltage:
+    summary: "Set upsAdvConfigSignalFlashVoltage, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config signal flash voltage, in 0.1 V." }
+    returns: ack
+  set_adv_config_battery_temperature_compensation:
+    summary: "Set upsAdvConfigBatteryTemperatureCompensation, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config battery temperature compensation, as the MIB counts it." }
+    returns: ack
+  set_adv_config_battery_charger_type:
+    summary: "Set upsAdvConfigBatteryChargerType, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config battery charger type, as the MIB counts it." }
+    returns: ack
+  set_adv_config_automatic_restart:
+    summary: "Set upsAdvConfigAutomaticRestart, then read its group back"
+    params:
+      value: { type: enum, values: [enabled, disabled], required: true, label: Value, description: "The new adv config automatic restart, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_deep_discharge_protection:
+    summary: "Set upsAdvConfigDeepDischargeProtection, then read its group back"
+    params:
+      value: { type: enum, values: [enabled, disabled], required: true, label: Value, description: "The new adv config deep discharge protection, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_freq_bypass_transfer_range:
+    summary: "Set upsAdvConfigFreqBypassTransferRange, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config freq bypass transfer range, as the MIB counts it." }
+    returns: ack
+  set_adv_config_ups_powerconverter_type:
+    summary: "Set upsAdvConfigUpsPowerconverterType, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config ups powerconverter type, as the MIB counts it." }
+    returns: ack
+  set_adv_config_frequency_converter_mode:
+    summary: "Set upsAdvConfigFrequencyConverterMode, then read its group back"
+    params:
+      value: { type: enum, values: [auto_ranging, frequency_converter, unknown], required: true, label: Value, description: "The new adv config frequency converter mode, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_ac_qualification_time:
+    summary: "Set upsAdvConfigACQualificationTime, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config ac qualification time, in s." }
+    returns: ack
+  set_adv_config_reboot_duration:
+    summary: "Set upsAdvConfigRebootDuration, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 4294967295, required: true, label: Value, description: "The new adv config reboot duration, in 1/100 s." }
+    returns: ack
+  set_adv_config_auto_shutdown_control_skip_off_delay:
+    summary: "Set upsAdvConfigAutoShutdownControlSkipOffDelay, then read its group back"
+    params:
+      value: { type: enum, values: [ups_adv_config_skip_off_delay_auto_shutdown, ups_adv_config_use_off_delay_auto_shutdown], required: true, label: Value, description: "The new adv config auto shutdown control skip off delay, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_auto_shutdown_control_auto_restart:
+    summary: "Set upsAdvConfigAutoShutdownControlAutoRestart, then read its group back"
+    params:
+      value: { type: enum, values: [ups_adv_config_control_auto_restart_auto_shutdown, ups_adv_config_control_manual_restart_auto_shutdown], required: true, label: Value, description: "The new adv config auto shutdown control auto restart, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_auto_shutdown_control_time_on_battery:
+    summary: "Set upsAdvConfigAutoShutdownControlTimeOnBattery, then read its group back"
+    params:
+      value: { type: enum, values: [ups_adv_config_disable_time_on_battery_auto_shutdown, ups_adv_config_enable_time_on_battery_auto_shutdown], required: true, label: Value, description: "The new adv config auto shutdown control time on battery, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_auto_shutdown_control_runtime_remaining:
+    summary: "Set upsAdvConfigAutoShutdownControlRuntimeRemaining, then read its group back"
+    params:
+      value: { type: enum, values: [ups_adv_config_disable_runtime_remaining_auto_shutdown, ups_adv_config_enable_runtime_remaining_auto_shutdown], required: true, label: Value, description: "The new adv config auto shutdown control runtime remaining, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_auto_shutdown_time_on_battery:
+    summary: "Set upsAdvConfigAutoShutdownTimeOnBattery, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 4294967295, required: true, label: Value, description: "The new adv config auto shutdown time on battery, in 1/100 s." }
+    returns: ack
+  set_adv_config_auto_shutdown_runtime_remaining:
+    summary: "Set upsAdvConfigAutoShutdownRuntimeRemaining, then read its group back"
+    params:
+      value: { type: int, min: 0, max: 4294967295, required: true, label: Value, description: "The new adv config auto shutdown runtime remaining, in 1/100 s." }
+    returns: ack
+  set_adv_config_high_ll_transfer_volt:
+    summary: "Set upsAdvConfigHighLLTransferVolt, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config high ll transfer volt, in V." }
+    returns: ack
+  set_adv_config_low_ll_transfer_volt:
+    summary: "Set upsAdvConfigLowLLTransferVolt, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config low ll transfer volt, in V." }
+    returns: ack
+  set_adv_config_high_bypass_transfer_volt:
+    summary: "Set upsAdvConfigHighBypassTransferVolt, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config high bypass transfer volt, in V." }
+    returns: ack
+  set_adv_config_low_bypass_transfer_volt:
+    summary: "Set upsAdvConfigLowBypassTransferVolt, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config low bypass transfer volt, in V." }
+    returns: ack
+  set_adv_config_high_bypass_ll_transfer_volt:
+    summary: "Set upsAdvConfigHighBypassLLTransferVolt, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config high bypass ll transfer volt, in V." }
+    returns: ack
+  set_adv_config_low_bypass_ll_transfer_volt:
+    summary: "Set upsAdvConfigLowBypassLLTransferVolt, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config low bypass ll transfer volt, in V." }
+    returns: ack
+  set_adv_config_auto_shutdown_control_battery_capacity:
+    summary: "Set upsAdvConfigAutoShutdownControlBatteryCapacity, then read its group back"
+    params:
+      value: { type: enum, values: [ups_adv_config_disable_battery_capacity_auto_shutdown, ups_adv_config_enable_battery_capacity_auto_shutdown], required: true, label: Value, description: "The new adv config auto shutdown control battery capacity, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_auto_shutdown_battery_capacity:
+    summary: "Set upsAdvConfigAutoShutdownBatteryCapacity, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config auto shutdown battery capacity, as the MIB counts it." }
+    returns: ack
+  set_adv_config_auto_shutdown_control_load_percent_on_ups:
+    summary: "Set upsAdvConfigAutoShutdownControlLoadPercentOnUps, then read its group back"
+    params:
+      value: { type: enum, values: [ups_adv_config_disable_load_percent_on_ups_auto_shutdown, ups_adv_config_enable_load_percent_on_ups_auto_shutdown], required: true, label: Value, description: "The new adv config auto shutdown control load percent on ups, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_config_auto_shutdown_load_percent_on_ups:
+    summary: "Set upsAdvConfigAutoShutdownLoadPercentOnUps, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config auto shutdown load percent on ups, as the MIB counts it." }
+    returns: ack
+  set_adv_config_bypass_frequency_range_lower_limit:
+    summary: "Set upsAdvConfigBypassFrequencyRangeLowerLimit, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config bypass frequency range lower limit, in Hz." }
+    returns: ack
+  set_adv_config_bypass_frequency_range_upper_limit:
+    summary: "Set upsAdvConfigBypassFrequencyRangeUpperLimit, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config bypass frequency range upper limit, in Hz." }
+    returns: ack
+  set_adv_config_eco_voltage_range_lower_limit:
+    summary: "Set upsAdvConfigEcoVoltageRangeLowerLimit, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config eco voltage range lower limit, in V." }
+    returns: ack
+  set_adv_config_eco_voltage_range_upper_limit:
+    summary: "Set upsAdvConfigEcoVoltageRangeUpperLimit, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new adv config eco voltage range upper limit, in V." }
+    returns: ack
+  set_basic_control_conserve_battery:
+    summary: "Set upsBasicControlConserveBattery, then read its group back"
+    params:
+      value: { type: enum, values: [no_turn_off_ups, turn_off_ups_to_conserve_battery], required: true, label: Value, description: "The new basic control conserve battery, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_control_ups_off:
+    summary: "Set upsAdvControlUpsOff, then read its group back"
+    params:
+      value: { type: enum, values: [no_turn_ups_off, turn_ups_off, turn_ups_off_gracefully, turn_ups_sync_group_off, turn_ups_sync_group_off_after_delay, turn_ups_sync_group_off_gracefully], required: true, label: Value, description: "The new adv control ups off, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_control_reboot_shutdown_ups:
+    summary: "Set upsAdvControlRebootShutdownUps, then read its group back"
+    params:
+      value: { type: enum, values: [no_reboot_shutdown_ups, reboot_shutdown_ups, reboot_shutdown_ups_gracefully, reboot_shutdown_sync_group_ups, reboot_shutdown_sync_group_ups_gracefully], required: true, label: Value, description: "The new adv control reboot shutdown ups, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_control_ups_sleep:
+    summary: "Set upsAdvControlUpsSleep, then read its group back"
+    params:
+      value: { type: enum, values: [no_put_ups_to_sleep, put_ups_to_sleep, put_ups_to_sleep_gracefully, put_ups_sync_group_to_sleep, put_ups_sync_group_to_sleep_gracefully], required: true, label: Value, description: "The new adv control ups sleep, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_control_simulate_power_fail:
+    summary: "Set upsAdvControlSimulatePowerFail, then read its group back"
+    params:
+      value: { type: enum, values: [no_simulate_power_failure, simulate_power_failure], required: true, label: Value, description: "The new adv control simulate power fail, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_control_flash_and_beep:
+    summary: "Set upsAdvControlFlashAndBeep, then read its group back"
+    params:
+      value: { type: enum, values: [no_flash_and_beep, flash_and_beep, flash_and_beep_sync_group, flash_and_beep_cont, flash_and_beep_cancel], required: true, label: Value, description: "The new adv control flash and beep, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_control_turn_on_ups:
+    summary: "Set upsAdvControlTurnOnUPS, then read its group back"
+    params:
+      value: { type: enum, values: [no_turn_on_ups, turn_on_ups, turn_on_ups_sync_group, turn_on_ups_delayed], required: true, label: Value, description: "The new adv control turn on ups, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_control_bypass_switch:
+    summary: "Set upsAdvControlBypassSwitch, then read its group back"
+    params:
+      value: { type: enum, values: [no_bypass_switch, switch_to_bypass, switch_out_of_bypass], required: true, label: Value, description: "The new adv control bypass switch, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_control_reboot_ups_with_or_without_ac:
+    summary: "Set upsAdvControlRebootUpsWithOrWithoutAC, then read its group back"
+    params:
+      value: { type: enum, values: [no_reboot_ups_with_or_without_ac, reboot_ups_immediately_with_or_without_ac, reboot_ups_delayed_with_or_without_ac], required: true, label: Value, description: "The new adv control reboot ups with or without ac, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_control_firmware_update:
+    summary: "Set upsAdvControlFirmwareUpdate, then read its group back"
+    params:
+      value: { type: enum, values: [no_firmware_update, firmware_update, update_in_process, update_successful, update_failed], required: true, label: Value, description: "The new adv control firmware update, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_test_diagnostic_schedule:
+    summary: "Set upsAdvTestDiagnosticSchedule, then read its group back"
+    params:
+      value: { type: enum, values: [unknown, biweekly, weekly, at_turn_on, never, four_weeks, twelve_weeks, biweekly_since_last_test, weekly_since_last_test, eight_weeks, twentysix_weeks, fiftytwo_weeks], required: true, label: Value, description: "The new adv test diagnostic schedule, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_test_diagnostics:
+    summary: "Set upsAdvTestDiagnostics, then read its group back"
+    params:
+      value: { type: enum, values: [no_test_diagnostics, test_diagnostics], required: true, label: Value, description: "The new adv test diagnostics, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_test_runtime_calibration:
+    summary: "Set upsAdvTestRuntimeCalibration, then read its group back"
+    params:
+      value: { type: enum, values: [no_perform_calibration, perform_calibration, cancel_current_calibration], required: true, label: Value, description: "The new adv test runtime calibration, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_test_diagnostic_time:
+    summary: "Set upsAdvTestDiagnosticTime, then read its group back"
+    params:
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new adv test diagnostic time. }
+    returns: ack
+  set_adv_test_diagnostic_day:
+    summary: "Set upsAdvTestDiagnosticDay, then read its group back"
+    params:
+      value: { type: enum, values: [monday, tuesday, wednesday, thursday, friday, saturday, sunday], required: true, label: Value, description: "The new adv test diagnostic day, as PowerNet-MIB names its values." }
+    returns: ack
+  set_adv_test_battery_interval:
+    summary: "Set upsAdvTestBatteryInterval, then read its group back"
+    params:
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new adv test battery interval. }
+    returns: ack
+  set_phase_reset_values_max_min_values:
+    summary: "Set upsPhaseResetMaxMinValues, then read its group back"
+    params:
+      value: { type: enum, values: [none, reset], required: true, label: Value, description: "The new phase reset max min values, as PowerNet-MIB names its values." }
+    returns: ack
+  set_phase_input_name:
+    summary: "Set upsPhaseInputName of one upsPhaseInputEntry row, then read its table back"
+    params:
+      table_index: { type: int, min: 0, max: 2147483647, required: true, label: Phase input table index, description: "The row of upsPhaseInputEntry to write, by its upsPhaseInputTableIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new phase input name. }
+    returns: ack
+  set_sync_ctrl_group_config_scg_membership_group_number:
+    summary: "Set upsSCGMembershipGroupNumber, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new scg membership group number, as the MIB counts it." }
+    returns: ack
+  set_sync_ctrl_group_config_scg_active_membership_status:
+    summary: "Set upsSCGActiveMembershipStatus, then read its group back"
+    params:
+      value: { type: enum, values: [enabled_scg, disabled_scg], required: true, label: Value, description: "The new scg active membership status, as PowerNet-MIB names its values." }
+    returns: ack
+  set_sync_ctrl_group_config_scg_power_synchronization_delay_time:
+    summary: "Set upsSCGPowerSynchronizationDelayTime, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new scg power synchronization delay time, as the MIB counts it." }
+    returns: ack
+  set_sync_ctrl_group_config_scg_return_battery_capacity_offset:
+    summary: "Set upsSCGReturnBatteryCapacityOffset, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new scg return battery capacity offset, as the MIB counts it." }
+    returns: ack
+  set_sync_ctrl_group_config_scg_multi_cast_ip:
+    summary: "Set upsSCGMultiCastIP, then read its group back"
+    params:
+      value: { type: string, pattern: "^(\\d{1,3}\\.){3}\\d{1,3}$", max_length: 15, required: true, label: Value, description: "The new scg multi cast ip, an IPv4 address." }
+    returns: ack
+  set_outlet_group_config_name:
+    summary: "Set upsOutletGroupConfigName of one upsOutletGroupConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet group config index, description: "The row of upsOutletGroupConfigEntry to write, by its upsOutletGroupConfigIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new outlet group config name. }
+    returns: ack
+  set_outlet_group_config_power_on_delay:
+    summary: "Set upsOutletGroupConfigPowerOnDelay of one upsOutletGroupConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet group config index, description: "The row of upsOutletGroupConfigEntry to write, by its upsOutletGroupConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet group config power on delay, as the MIB counts it." }
+    returns: ack
+  set_outlet_group_config_power_off_delay:
+    summary: "Set upsOutletGroupConfigPowerOffDelay of one upsOutletGroupConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet group config index, description: "The row of upsOutletGroupConfigEntry to write, by its upsOutletGroupConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet group config power off delay, as the MIB counts it." }
+    returns: ack
+  set_outlet_group_config_reboot_duration:
+    summary: "Set upsOutletGroupConfigRebootDuration of one upsOutletGroupConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet group config index, description: "The row of upsOutletGroupConfigEntry to write, by its upsOutletGroupConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet group config reboot duration, as the MIB counts it." }
+    returns: ack
+  set_outlet_group_config_min_return_runtime:
+    summary: "Set upsOutletGroupConfigMinReturnRuntime of one upsOutletGroupConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet group config index, description: "The row of upsOutletGroupConfigEntry to write, by its upsOutletGroupConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet group config min return runtime, as the MIB counts it." }
+    returns: ack
+  set_outlet_group_config_load_shed_control_skip_off_delay:
+    summary: "Set upsOutletGroupConfigLoadShedControlSkipOffDelay of one upsOutletGroupConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet group config index, description: "The row of upsOutletGroupConfigEntry to write, by its upsOutletGroupConfigIndex." }
+      value: { type: enum, values: [ups_outlet_group_config_skip_off_delay, ups_outlet_group_config_use_off_delay], required: true, label: Value, description: "The new outlet group config load shed control skip off delay, as PowerNet-MIB names its values." }
+    returns: ack
+  set_outlet_group_config_load_shed_control_auto_restart:
+    summary: "Set upsOutletGroupConfigLoadShedControlAutoRestart of one upsOutletGroupConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet group config index, description: "The row of upsOutletGroupConfigEntry to write, by its upsOutletGroupConfigIndex." }
+      value: { type: enum, values: [ups_outlet_group_config_auto_restart, ups_outlet_group_config_manual_restart], required: true, label: Value, description: "The new outlet group config load shed control auto restart, as PowerNet-MIB names its values." }
+    returns: ack
+  set_outlet_group_config_load_shed_control_time_on_battery:
+    summary: "Set upsOutletGroupConfigLoadShedControlTimeOnBattery of one upsOutletGroupConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet group config index, description: "The row of upsOutletGroupConfigEntry to write, by its upsOutletGroupConfigIndex." }
+      value: { type: enum, values: [ups_outlet_group_config_disable_time_on_battery_load_shed, ups_outlet_group_config_enable_time_on_battery_load_shed], required: true, label: Value, description: "The new outlet group config load shed control time on battery, as PowerNet-MIB names its values." }
+    returns: ack
+  set_outlet_group_config_load_shed_control_runtime_remaining:
+    summary: "Set upsOutletGroupConfigLoadShedControlRuntimeRemaining of one upsOutletGroupConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet group config index, description: "The row of upsOutletGroupConfigEntry to write, by its upsOutletGroupConfigIndex." }
+      value: { type: enum, values: [ups_outlet_group_config_disable_runtime_remaining_load_shed, ups_outlet_group_config_enable_runtime_remaining_load_shed], required: true, label: Value, description: "The new outlet group config load shed control runtime remaining, as PowerNet-MIB names its values." }
+    returns: ack
+  set_outlet_group_config_load_shed_control_in_overload:
+    summary: "Set upsOutletGroupConfigLoadShedControlInOverload of one upsOutletGroupConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet group config index, description: "The row of upsOutletGroupConfigEntry to write, by its upsOutletGroupConfigIndex." }
+      value: { type: enum, values: [ups_outlet_group_config_disable_in_overload_load_shed, ups_outlet_group_config_enable_in_overload_load_shed], required: true, label: Value, description: "The new outlet group config load shed control in overload, as PowerNet-MIB names its values." }
+    returns: ack
+  set_outlet_group_config_load_shed_time_on_battery:
+    summary: "Set upsOutletGroupConfigLoadShedTimeOnBattery of one upsOutletGroupConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet group config index, description: "The row of upsOutletGroupConfigEntry to write, by its upsOutletGroupConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet group config load shed time on battery, as the MIB counts it." }
+    returns: ack
+  set_outlet_group_config_load_shed_runtime_remaining:
+    summary: "Set upsOutletGroupConfigLoadShedRuntimeRemaining of one upsOutletGroupConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet group config index, description: "The row of upsOutletGroupConfigEntry to write, by its upsOutletGroupConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new outlet group config load shed runtime remaining, as the MIB counts it." }
+    returns: ack
+  set_outlet_group_control_command:
+    summary: "Set upsOutletGroupControlCommand of one upsOutletGroupControlEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Outlet group control index, description: "The row of upsOutletGroupControlEntry to write, by its upsOutletGroupControlIndex." }
+      value: { type: enum, values: [ups_outlet_group_immediate_on, ups_outlet_group_immediate_off, ups_outlet_group_immediate_reboot_with_or_without_ac, ups_outlet_group_delayed_on, ups_outlet_group_delayed_off, ups_outlet_group_delayed_reboot_with_or_without_ac, ups_outlet_group_cancel_pending_command, ups_outlet_group_control_unknown, ups_outlet_group_immediate_reboot_shutdown, ups_outlet_group_delayed_reboot_shutdown], required: true, label: Value, description: "The new outlet group control command, as PowerNet-MIB names its values." }
+    returns: ack
+  set_diag_sub_sys_backfeed_contactor_sysbackfeed_contactor_name:
+    summary: "Set upsDiagSubSysbackfeedContactorName of one upsDiagSubSysBackfeedContactorEntry row, then read its table back"
+    params:
+      sysbackfeed_contactor_index: { type: int, min: 0, max: 2147483647, required: true, label: Diag sub sysbackfeed contactor index, description: "The row of upsDiagSubSysBackfeedContactorEntry to write, by its upsDiagSubSysbackfeedContactorIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new diag sub sysbackfeed contactor name. }
+    returns: ack
+  set_diag_switch_gear_breaker_switchgear_breaker_name:
+    summary: "Set switchgearBreakerName of one upsDiagSwitchGearBreakerEntry row, then read its table back"
+    params:
+      switchgear_breaker_index: { type: int, min: 0, max: 2147483647, required: true, label: Switchgear breaker index, description: "The row of upsDiagSwitchGearBreakerEntry to write, by its switchgearBreakerIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new switchgear breaker name. }
+    returns: ack
+  set_diag_sub_feed_breaker_subfeed_breaker_upper_accept_power_warning:
+    summary: "Set subfeedBreakerUpperAcceptPowerWarning of one upsDiagSubFeedBreakerEntry row, then read its table back"
+    params:
+      subfeed_breaker_index: { type: int, min: 0, max: 2147483647, required: true, label: Subfeed breaker index, description: "The row of upsDiagSubFeedBreakerEntry to write, by its subfeedBreakerIndex." }
+      value: { type: int, min: 0, max: 100, required: true, label: Value, description: "The new subfeed breaker upper accept power warning, as the MIB counts it." }
+    returns: ack
+  set_diag_sub_feed_breaker_subfeed_breaker_upper_accept_power_critical:
+    summary: "Set subfeedBreakerUpperAcceptPowerCritical of one upsDiagSubFeedBreakerEntry row, then read its table back"
+    params:
+      subfeed_breaker_index: { type: int, min: 0, max: 2147483647, required: true, label: Subfeed breaker index, description: "The row of upsDiagSubFeedBreakerEntry to write, by its subfeedBreakerIndex." }
+      value: { type: int, min: 0, max: 125, required: true, label: Value, description: "The new subfeed breaker upper accept power critical, as the MIB counts it." }
+    returns: ack
+  set_diag_sub_feed_breaker_subfeed_breaker_name:
+    summary: "Set subfeedBreakerName of one upsDiagSubFeedBreakerEntry row, then read its table back"
+    params:
+      subfeed_breaker_index: { type: int, min: 0, max: 2147483647, required: true, label: Subfeed breaker index, description: "The row of upsDiagSubFeedBreakerEntry to write, by its subfeedBreakerIndex." }
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new subfeed breaker name. }
+    returns: ack
+  set_parallel_system_sys_local_address:
+    summary: "Set upsParallelSysLocalAddress, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new parallel sys local address, as the MIB counts it." }
+    returns: ack
+  set_parallel_system_sys_remote_address:
+    summary: "Set upsParallelSysRemoteAddress, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new parallel sys remote address, as the MIB counts it." }
+    returns: ack
+  set_parallel_system_sys_redundancy:
+    summary: "Set upsParallelSysRedundancy, then read its group back"
+    params:
+      value: { type: enum, values: [nplus0, nplus1, nplus2, nplus3, nplus4, nplus5], required: true, label: Value, description: "The new parallel sys redundancy, as PowerNet-MIB names its values." }
+    returns: ack
+  set_parallel_system_sys_name:
+    summary: "Set upsParallelSysName, then read its group back"
+    params:
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new parallel sys name. }
+    returns: ack
+  set_integrated_ats_preferred_source:
+    summary: "Set upsIntegratedATSPreferredSource, then read its group back"
+    params:
+      value: { type: enum, values: [ups_integrated_ats_no_source_preference, ups_integrated_ats_prefer_source_a, ups_integrated_ats_prefer_source_b], required: true, label: Value, description: "The new integrated ats preferred source, as PowerNet-MIB names its values." }
+    returns: ack
+  set_integrated_ats_ups_return_staggering:
+    summary: "Set upsIntegratedATSUpsReturnStaggering, then read its group back"
+    params:
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new integrated ats ups return staggering, as the MIB counts it." }
+    returns: ack
+  set_integrated_ats_source_line_fail_delay:
+    summary: "Set upsIntegratedATSLineFailDelay of one upsIntegratedATSSourceEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Integrated ats source index, description: "The row of upsIntegratedATSSourceEntry to write, by its upsIntegratedATSSourceIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new integrated ats line fail delay, in s." }
+    returns: ack
+  set_integrated_ats_source_line_stability_delay:
+    summary: "Set upsIntegratedATSLineStabilityDelay of one upsIntegratedATSSourceEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Integrated ats source index, description: "The row of upsIntegratedATSSourceEntry to write, by its upsIntegratedATSSourceIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new integrated ats line stability delay, in s." }
+    returns: ack
+  set_output_relay_config_delay:
+    summary: "Set upsOutputRelayConfigDelay of one upsOutputRelayConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Output relay config index, description: "The row of upsOutputRelayConfigEntry to write, by its upsOutputRelayConfigIndex." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value, description: "The new output relay config delay, as the MIB counts it." }
+    returns: ack
+  set_output_relay_config_cause:
+    summary: "Set upsOutputRelayConfigCause of one upsOutputRelayConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Output relay config index, description: "The row of upsOutputRelayConfigEntry to write, by its upsOutputRelayConfigIndex." }
+      value: { type: enum, values: [output_relay_config_cause_none, output_relay_config_cause_on_bat_pwr_fail, output_relay_config_cause_on_bat_pwr_fail_except_peak_period, output_relay_config_cause_lo_bat_while_on_bat, output_relay_config_cause_alarm, output_relay_config_cause_fault, output_relay_config_cause_output_on, output_relay_config_cause_output_off, output_relay_config_cause_online, output_relay_config_cause_in_bypass], required: true, label: Value, description: "The new output relay config cause, as PowerNet-MIB names its values." }
+    returns: ack
+  set_output_relays_relay_config_polarity:
+    summary: "Set upsOutputRelayConfigPolarity, then read its group back"
+    params:
+      value: { type: enum, values: [ups_output_relay_all_relays_energized_when_true, ups_output_relay_all_relays_not_energized_when_true], required: true, label: Value, description: "The new output relay config polarity, as PowerNet-MIB names its values." }
+    returns: ack
+  set_output_relays_relay_config_peak_period:
+    summary: "Set upsOutputRelayConfigPeakPeriod, then read its group back"
+    params:
+      value: { type: string, max_length: 255, required: true, label: Value, description: The new output relay config peak period. }
+    returns: ack
+  set_input_contact_config_action:
+    summary: "Set upsInputContactConfigAction of one upsInputContactConfigEntry row, then read its table back"
+    params:
+      index: { type: int, min: 0, max: 2147483647, required: true, label: Input contact config index, description: "The row of upsInputContactConfigEntry to write, by its upsInputContactConfigIndex." }
+      value: { type: enum, values: [ups_input_contact_config_action_none, ups_input_contact_config_action_self_test, ups_input_contact_config_action_external_alarm_on, ups_input_contact_config_action_external_alarm_off, ups_input_contact_config_action_output_off_no_delay, ups_input_contact_config_action_output_on], required: true, label: Value, description: "The new input contact config action, as PowerNet-MIB names its values." }
+    returns: ack
+  set_input_contacts_contact_config_polarity:
+    summary: "Set upsInputContactConfigPolarity, then read its group back"
+    params:
+      value: { type: enum, values: [ups_input_contact_all_contacts_closed_equals_true, ups_input_contact_all_contacts_open_equals_true], required: true, label: Value, description: "The new input contact config polarity, as PowerNet-MIB names its values." }
+    returns: ack
+  set_battery_stats_reset:
+    summary: "Set upsBatteryStatsReset, then read its group back"
+    params:
+      value: { type: enum, values: [not_supported, no_operation, reset], required: true, label: Value, description: "The new battery stats reset, as PowerNet-MIB names its values." }
+    returns: ack
+  set_operational_stats_op_stats_reset:
+    summary: "Set upsOpStatsReset, then read its group back"
+    params:
+      value: { type: enum, values: [not_supported, no_operation, reset], required: true, label: Value, description: "The new op stats reset, as PowerNet-MIB names its values." }
+    returns: ack
+  set_energy_efficiency_stats_reset:
+    summary: "Set upsEnergyEfficiencyStatsReset, then read its group back"
+    params:
+      value: { type: enum, values: [not_supported, no_operation, reset], required: true, label: Value, description: "The new energy efficiency stats reset, as PowerNet-MIB names its values." }
+    returns: ack
+
+state:
+  version: { type: string, description: "The SNMP version used: v1, v2c or v3" }
+  system.description: { type: string, description: "sysDescr.0: the agent's description of the device" }
+  system.object_id: { type: string, description: "sysObjectID.0: the vendor's OID for the device type" }
+  system.uptime: { type: int, unit: "1/100 s", description: "sysUpTime.0, in hundredths of a second (TimeTicks)" }
+  system.contact: { type: string, description: "sysContact.0" }
+  system.name: { type: string, description: "sysName.0" }
+  system.location: { type: string, description: "sysLocation.0" }
+  engine.id: { type: string, description: "v3: the agent's snmpEngineID in hex" }
+  engine.boots: { type: int, description: "v3: the agent's snmpEngineBoots" }
+  engine.time: { type: int, unit: s, description: "v3: the agent's snmpEngineTime when last heard" }
+  local_engine_id: { type: string, description: "With trap_port: this receiver's snmpEngineID in hex, to configure on agents sending v3 informs" }
+  traps.count: { type: int, description: "Notifications received since opening" }
+  traps.last: { type: object, description: "The last notification: {kind (trap or inform), version, source, trap_oid, name (the MIB's name for it, or null), uptime, varbinds, and for v1 enterprise, agent_address, generic_trap, specific_trap, and for v3 user}" }
+  basic_ident.model: { type: string, description: upsBasicIdentModel (PowerNet-MIB) }
+  basic_ident.name: { type: string, description: upsBasicIdentName (PowerNet-MIB) }
+  basic_ident.family_name: { type: string, description: upsBasicIdentFamilyName (PowerNet-MIB) }
+  basic_ident.model_type: { type: string, description: upsBasicIdentModelType (PowerNet-MIB) }
+  adv_ident.firmware_revision: { type: string, description: upsAdvIdentFirmwareRevision (PowerNet-MIB) }
+  adv_ident.date_of_manufacture: { type: string, description: upsAdvIdentDateOfManufacture (PowerNet-MIB) }
+  adv_ident.serial_number: { type: string, description: upsAdvIdentSerialNumber (PowerNet-MIB) }
+  adv_ident.firmware_revision_2: { type: string, description: upsAdvIdentFirmwareRevision2 (PowerNet-MIB) }
+  adv_ident.sku_number: { type: string, description: upsAdvIdentSkuNumber (PowerNet-MIB) }
+  adv_ident.hardware_revision: { type: string, description: upsAdvIdentHardwareRevision (PowerNet-MIB) }
+  adv_ident.ups_phase_config_type: { type: string, description: "upsAdvIdentUpsPhaseConfigType (PowerNet-MIB): unknown, three_phase_in_out, one_phase_in_out, three_phase_in_one_out" }
+  adv_ident.energy_storage_type: { type: string, description: "upsAdvEnergyStorageType (PowerNet-MIB): unknown, vrla_or_wet_cells, ni_cd_batteries, li_ion_batteries, no_energy_storage, flywheel, ultracaps" }
+  adv_ident.apparent_power_rating: { type: string, description: upsAdvIdentApparentPowerRating (PowerNet-MIB) }
+  basic_battery.status: { type: string, description: "upsBasicBatteryStatus (PowerNet-MIB): unknown, battery_normal, battery_low, battery_in_fault_condition, no_battery_present" }
+  basic_battery.time_on_battery: { type: int, unit: "1/100 s", description: upsBasicBatteryTimeOnBattery (PowerNet-MIB) }
+  basic_battery.last_replace_date: { type: string, description: upsBasicBatteryLastReplaceDate (PowerNet-MIB) }
+  adv_battery.capacity: { type: int, unit: "%", description: upsAdvBatteryCapacity (PowerNet-MIB) }
+  adv_battery.temperature: { type: int, unit: °C, description: upsAdvBatteryTemperature (PowerNet-MIB) }
+  adv_battery.run_time_remaining: { type: int, unit: "1/100 s", description: upsAdvBatteryRunTimeRemaining (PowerNet-MIB) }
+  adv_battery.replace_indicator: { type: string, description: "upsAdvBatteryReplaceIndicator (PowerNet-MIB): no_battery_needs_replacing, battery_needs_replacing" }
+  adv_battery.num_of_batt_packs: { type: int, description: upsAdvBatteryNumOfBattPacks (PowerNet-MIB) }
+  adv_battery.num_of_bad_batt_packs: { type: int, description: upsAdvBatteryNumOfBadBattPacks (PowerNet-MIB) }
+  adv_battery.nominal_voltage: { type: int, unit: V, description: upsAdvBatteryNominalVoltage (PowerNet-MIB) }
+  adv_battery.actual_voltage: { type: int, unit: V, description: upsAdvBatteryActualVoltage (PowerNet-MIB) }
+  adv_battery.current: { type: int, unit: A, description: upsAdvBatteryCurrent (PowerNet-MIB) }
+  adv_battery.total_dc_current: { type: int, unit: A, description: upsAdvTotalDCCurrent (PowerNet-MIB) }
+  adv_battery.full_capacity: { type: int, description: upsAdvBatteryFullCapacity (PowerNet-MIB) }
+  adv_battery_actual_voltage.*.polarity: { type: string, description: "upsAdvBatteryActualVoltagePolarity (PowerNet-MIB): positive, negative" }
+  adv_battery_actual_voltage.*.frame_actual_voltage: { type: int, unit: V, description: upsAdvBatteryFrameActualVoltage (PowerNet-MIB) }
+  adv_total_dc_current.*.polarity: { type: string, description: "upsAdvTotalDCCurrentPolarity (PowerNet-MIB): positive, negative" }
+  adv_total_dc_current.*.frame_dc_current: { type: int, unit: A, description: upsAdvTotalFrameDCCurrent (PowerNet-MIB) }
+  adv_battery_current.*.*.polarity: { type: string, description: "upsAdvBatteryCurrentPolarity (PowerNet-MIB): positive, negative" }
+  adv_battery_current.*.*.frame_current: { type: int, unit: A, description: upsAdvBatteryFrameCurrent (PowerNet-MIB) }
+  adv_battery.estimated_charge_time: { type: int, unit: "1/100 s", description: upsAdvBatteryEstimatedChargeTime (PowerNet-MIB) }
+  adv_battery.power: { type: int, description: upsAdvBatteryPower (PowerNet-MIB) }
+  adv_battery.charger_status: { type: string, description: "upsAdvBatteryChargerStatus (PowerNet-MIB): unknown, ok, in_fault_condition, float_charging, boost_charging, resting, not_charging, equalization_charging, test_in_progress, cyclic_float_charging" }
+  adv_battery.internal_sku: { type: string, description: upsAdvBatteryInternalSKU (PowerNet-MIB) }
+  adv_battery.external_sku: { type: string, description: upsAdvBatteryExternalSKU (PowerNet-MIB) }
+  adv_battery.recommended_replace_date: { type: string, description: upsAdvBatteryRecommendedReplaceDate (PowerNet-MIB) }
+  adv_battery.nominal_backup_time: { type: int, unit: min, description: upsAdvBatteryNominalBackupTime (PowerNet-MIB) }
+  adv_battery.condition: { type: string, description: "upsAdvBatteryCondition (PowerNet-MIB): unknown, ok, weak, poor" }
+  adv_battery.charging_current_restricted: { type: string, description: "upsAdvBatteryChargingCurrentRestricted (PowerNet-MIB): yes, no" }
+  adv_battery.total_capacity: { type: int, description: upsAdvBatteryTotalCapacity (PowerNet-MIB) }
+  adv_battery.fuse_status: { type: string, description: "upsAdvBatteryFuseStatus (PowerNet-MIB): fuse_open, fuse_ok, not_present" }
+  adv_battery.breaker_status: { type: string, description: "upsAdvBatteryBreakerStatus (PowerNet-MIB): disconnected, closed, not_present" }
+  adv_battery.wiring_configuration: { type: string, description: "upsAdvBatteryWiringConfiguration (PowerNet-MIB): two_wire, three_wire" }
+  high_prec_battery.capacity: { type: int, unit: "0.1 %", description: upsHighPrecBatteryCapacity (PowerNet-MIB) }
+  high_prec_battery.temperature: { type: int, unit: "0.1 °C", description: upsHighPrecBatteryTemperature (PowerNet-MIB) }
+  high_prec_battery.nominal_voltage: { type: int, unit: "0.1 V", description: upsHighPrecBatteryNominalVoltage (PowerNet-MIB) }
+  high_prec_battery.actual_voltage: { type: int, unit: "0.1 V", description: upsHighPrecBatteryActualVoltage (PowerNet-MIB) }
+  high_prec_battery.current: { type: int, unit: "0.1 A", description: upsHighPrecBatteryCurrent (PowerNet-MIB) }
+  high_prec_battery.total_dc_current: { type: int, unit: "0.1 A", description: upsHighPrecTotalDCCurrent (PowerNet-MIB) }
+  high_prec_battery_actual_voltage.*.polarity: { type: string, description: "upsHighPrecBatteryActualVoltagePolarity (PowerNet-MIB): positive, negative" }
+  high_prec_battery_actual_voltage.*.voltage: { type: int, unit: "0.1 V", description: upsHighPrecBatteryVoltage (PowerNet-MIB) }
+  high_prec_total_dc_current.*.polarity: { type: string, description: "upsHighPrecTotalDCCurrentPolarity (PowerNet-MIB): positive, negative" }
+  high_prec_total_dc_current.*.frame_current: { type: int, unit: "0.1 A", description: upsHighPrecTotalDCFrameCurrent (PowerNet-MIB) }
+  high_prec_battery_current.*.*.polarity: { type: string, description: "upsHighPrecBatteryCurrentPolarity (PowerNet-MIB): positive, negative" }
+  high_prec_battery_current.*.*.frame_current: { type: int, unit: "0.1 A", description: upsHighPrecBatteryFrameCurrent (PowerNet-MIB) }
+  high_prec_battery_packs.pack_table_size: { type: int, description: upsHighPrecBatteryPackTableSize (PowerNet-MIB) }
+  high_prec_battery_pack.*.*.firmware_revision: { type: string, description: upsHighPrecBatteryPackFirmwareRevision (PowerNet-MIB) }
+  high_prec_battery_pack.*.*.serial_number: { type: string, description: upsHighPrecBatteryPackSerialNumber (PowerNet-MIB) }
+  high_prec_battery_pack.*.*.temperature: { type: int, description: upsHighPrecBatteryPackTemperature (PowerNet-MIB) }
+  high_prec_battery_pack.*.*.status: { type: string, description: upsHighPrecBatteryPackStatus (PowerNet-MIB) }
+  high_prec_battery_pack.*.*.cartridge_health: { type: string, description: upsHighPrecBatteryPackCartridgeHealth (PowerNet-MIB) }
+  high_prec_battery_pack.*.*.cartridge_replace_date: { type: string, description: upsHighPrecBatteryPackCartridgeReplaceDate (PowerNet-MIB) }
+  high_prec_battery_pack.*.*.cartridge_install_date: { type: string, description: upsHighPrecBatteryPackCartridgeInstallDate (PowerNet-MIB) }
+  high_prec_battery_pack.*.*.cartridge_status: { type: string, description: upsHighPrecBatteryPackCartridgeStatus (PowerNet-MIB) }
+  high_prec_battery_packs.pack_only_table_size: { type: int, description: upsHighPrecBatteryPackOnlyTableSize (PowerNet-MIB) }
+  high_prec_battery_pack_only.*.firmware_revision: { type: string, description: upsHighPrecBatteryPackOnlyFirmwareRevision (PowerNet-MIB) }
+  high_prec_battery_pack_only.*.serial_number: { type: string, description: upsHighPrecBatteryPackOnlySerialNumber (PowerNet-MIB) }
+  high_prec_battery_pack_only.*.temperature: { type: int, description: upsHighPrecBatteryPackOnlyTemperature (PowerNet-MIB) }
+  high_prec_battery_pack_only.*.status: { type: string, description: upsHighPrecBatteryPackOnlyStatus (PowerNet-MIB) }
+  high_prec_battery_pack_only.*.health: { type: string, description: upsHighPrecBatteryPackOnlyHealth (PowerNet-MIB) }
+  high_prec_battery_pack_only.*.replace_date: { type: string, description: upsHighPrecBatteryPackOnlyReplaceDate (PowerNet-MIB) }
+  high_prec_battery_pack_only.*.install_date: { type: string, description: upsHighPrecBatteryPackOnlyInstallDate (PowerNet-MIB) }
+  high_prec_battery_pack_only.*.manufacture_date: { type: string, description: upsHighPrecBatteryPackOnlyManufactureDate (PowerNet-MIB) }
+  high_prec_battery_pack_only.*.sku: { type: string, description: upsHighPrecBatteryPackOnlySKU (PowerNet-MIB) }
+  high_prec_battery.health: { type: string, description: upsHighPrecBatteryHealth (PowerNet-MIB) }
+  high_prec_battery.active_power: { type: int, unit: "0.1 kW", description: upsHighPrecActivePower (PowerNet-MIB) }
+  high_prec_battery.extd_battery_temperature: { type: int, unit: "0.1 °C", description: upsHighPrecExtdBatteryTemperature (PowerNet-MIB) }
+  high_prec_battery.maximum_module_temperature: { type: int, unit: "0.1 °C", description: upsHighPrecMaximumModuleTemperature (PowerNet-MIB) }
+  high_prec_battery.minimum_module_temperature: { type: int, unit: "0.1 °C", description: upsHighPrecMinimumModuleTemperature (PowerNet-MIB) }
+  high_prec_battery.maximum_cell_voltage: { type: int, description: upsHighPrecMaximumCellVoltage (PowerNet-MIB) }
+  high_prec_battery.minimum_cell_voltage: { type: int, description: upsHighPrecMinimumCellVoltage (PowerNet-MIB) }
+  high_prec_battery.state_of_health: { type: int, unit: "0.1 %", description: upsHighPrecBatteryStateOfHealth (PowerNet-MIB) }
+  battery.number_of_cabinets: { type: int, description: upsBatteryNumberOfCabinets (PowerNet-MIB) }
+  battery_cabinet.*.local_index: { type: int, description: upsBatteryCabinetLocalIndex (PowerNet-MIB) }
+  battery_cabinet.*.wiring_configuration: { type: string, description: "upsBatteryCabinetWiringConfiguration (PowerNet-MIB): two_wire, three_wire" }
+  battery_cabinet.*.voltage_polarity_1: { type: int, description: upsBatteryCabinetVoltagePolarity1 (PowerNet-MIB) }
+  battery_cabinet.*.voltage_polarity_2: { type: int, description: upsBatteryCabinetVoltagePolarity2 (PowerNet-MIB) }
+  battery_cabinet.*.current_polarity_1: { type: int, description: upsBatteryCabinetCurrentPolarity1 (PowerNet-MIB) }
+  battery_cabinet.*.current_polarity_2: { type: int, description: upsBatteryCabinetCurrentPolarity2 (PowerNet-MIB) }
+  battery_cabinet.*.temperature: { type: int, description: upsBatteryCabinetTemperature (PowerNet-MIB) }
+  battery_cabinet.*.max_temperature: { type: int, description: upsBatteryCabinetMaxTemperature (PowerNet-MIB) }
+  battery_cabinet.*.min_temperature: { type: int, description: upsBatteryCabinetMinTemperature (PowerNet-MIB) }
+  battery_cabinet.*.average_temperature: { type: int, description: upsBatteryCabinetAverageTemperature (PowerNet-MIB) }
+  battery_cabinet.*.fuse: { type: string, description: "upsBatteryCabinetFuse (PowerNet-MIB): fuse_open, fuse_ok, not_present" }
+  battery_cabinet.*.breaker: { type: string, description: "upsBatteryCabinetBreaker (PowerNet-MIB): no_breaker, unknown, breaker_open, breaker_closed" }
+  battery_cabinet.*.number_of_strings: { type: int, description: upsBatteryCabinetNumberOfStrings (PowerNet-MIB) }
+  battery_cabinet.*.number_of_vertical_positions: { type: int, description: upsBatteryCabinetNumberOfVerticalPositions (PowerNet-MIB) }
+  battery_cabinet.*.number_of_horizontal_positions: { type: int, description: upsBatteryCabinetNumberOfHorizontalPositions (PowerNet-MIB) }
+  battery_cab_string.*.cab_reference: { type: int, description: upsBatteryCabStringCabReference (PowerNet-MIB) }
+  battery_cab_string.*.local_index: { type: int, description: upsBatteryCabStringLocalIndex (PowerNet-MIB) }
+  battery_cab_string.*.current: { type: int, unit: "0.1 A", description: upsBatteryCabStringCurrent (PowerNet-MIB) }
+  battery_cab_string.*.average_temperature: { type: int, description: upsBatteryCabStringAverageTemperature (PowerNet-MIB) }
+  battery_cab_string.*.max_temperature: { type: int, description: upsBatteryCabStringMaxTemperature (PowerNet-MIB) }
+  battery_cab_string.*.min_temperature: { type: int, description: upsBatteryCabStringMinTemperature (PowerNet-MIB) }
+  battery_cab_string.*.fuse_status: { type: string, description: "upsBatteryCabStringFuseStatus (PowerNet-MIB): fuse_open, fuse_ok, not_present" }
+  battery_cab_string.*.number_of_blocks: { type: int, description: upsBatteryCabStringNumberOfBlocks (PowerNet-MIB) }
+  battery_cab_block.*.string_reference: { type: int, description: upsBatteryCabBlockStringReference (PowerNet-MIB) }
+  battery_cab_block.*.local_index: { type: int, description: upsBatteryCabBlockLocalIndex (PowerNet-MIB) }
+  battery_cab_block.*.present: { type: string, description: "upsBatteryCabBlockPresent (PowerNet-MIB): present, not_present, not_available" }
+  battery_cab_block.*.type: { type: string, description: upsBatteryCabBlockType (PowerNet-MIB) }
+  battery_cab_block.*.temperature: { type: int, description: upsBatteryCabBlockTemperature (PowerNet-MIB) }
+  battery_cab_block.*.fuse_status: { type: string, description: "upsBatteryCabBlockFuseStatus (PowerNet-MIB): fuse_open, fuse_ok, not_present" }
+  battery_cab_block.*.voltage: { type: int, description: upsBatteryCabBlockVoltage (PowerNet-MIB) }
+  battery_cab_block.*.number_of_cells: { type: int, description: upsBatteryCabBlockNumberOfCells (PowerNet-MIB) }
+  battery_cab_block.*.vertical_position: { type: int, description: upsBatteryCabBlockVerticalPosition (PowerNet-MIB) }
+  battery_cab_block.*.horizontal_position: { type: int, description: upsBatteryCabBlockHorizontalPosition (PowerNet-MIB) }
+  battery_cab_block_cell.*.reference: { type: int, description: upsBatteryCabBlockCellReference (PowerNet-MIB) }
+  battery_cab_block_cell.*.local_index: { type: int, description: upsBatteryCabBlockCellLocalIndex (PowerNet-MIB) }
+  battery_cab_block_cell.*.voltage: { type: int, description: upsBatteryCabBlockCellVoltage (PowerNet-MIB) }
+  battery_cab_block_cell.*.temperature: { type: int, description: upsBatteryCabBlockCellTemperature (PowerNet-MIB) }
+  basic_input.phase: { type: int, description: upsBasicInputPhase (PowerNet-MIB) }
+  adv_input.line_voltage: { type: int, unit: V, description: upsAdvInputLineVoltage (PowerNet-MIB) }
+  adv_input.max_line_voltage: { type: int, unit: V, description: upsAdvInputMaxLineVoltage (PowerNet-MIB) }
+  adv_input.min_line_voltage: { type: int, unit: V, description: upsAdvInputMinLineVoltage (PowerNet-MIB) }
+  adv_input.frequency: { type: int, unit: Hz, description: upsAdvInputFrequency (PowerNet-MIB) }
+  adv_input.line_fail_cause: { type: string, description: "upsAdvInputLineFailCause (PowerNet-MIB): no_transfer, high_line_voltage, brownout, blackout, small_momentary_sag, deep_momentary_sag, small_momentary_spike, large_momentary_spike, self_test, rate_of_voltage_change" }
+  adv_input.nominal_frequency: { type: int, unit: Hz, description: upsAdvInputNominalFrequency (PowerNet-MIB) }
+  adv_input.nominal_voltage: { type: int, unit: V, description: upsAdvInputNominalVoltage (PowerNet-MIB) }
+  adv_input.bypass_nominal_frequency: { type: int, unit: Hz, description: upsAdvInputBypassNominalFrequency (PowerNet-MIB) }
+  adv_input.bypass_nominal_voltage: { type: int, unit: V, description: upsAdvInputBypassNominalVoltage (PowerNet-MIB) }
+  adv_input_statistics.*.apparent_power: { type: int, description: upsAdvInputApparentPower (PowerNet-MIB) }
+  adv_input_statistics.*.voltage_thd: { type: int, unit: "%", description: upsAdvInputVoltageTHD (PowerNet-MIB) }
+  adv_input_statistics.*.bypass_voltage_thd: { type: int, unit: "%", description: upsAdvInputBypassVoltageTHD (PowerNet-MIB) }
+  adv_input_statistics.*.peak_current: { type: int, unit: A, description: upsAdvInputPeakCurrent (PowerNet-MIB) }
+  adv_input_statistics.*.bypass_peak_current: { type: int, unit: A, description: upsAdvInputBypassPeakCurrent (PowerNet-MIB) }
+  adv_input_statistics.*.active_power: { type: int, description: upsAdvInputActivePower (PowerNet-MIB) }
+  adv_input.total_apparent_power: { type: int, description: upsAdvInputTotalApparentPower (PowerNet-MIB) }
+  adv_input.total_active_power: { type: int, description: upsAdvInputTotalActivePower (PowerNet-MIB) }
+  adv_input.bypass_total_apparent_power: { type: int, description: upsAdvInputBypassTotalApparentPower (PowerNet-MIB) }
+  adv_input.bypass_total_active_power: { type: int, description: upsAdvInputBypassTotalActivePower (PowerNet-MIB) }
+  adv_input.energy_usage: { type: int, description: upsAdvInputEnergyUsage (PowerNet-MIB) }
+  adv_input.dc_voltage: { type: int, unit: V, description: upsAdvInputDCVoltage (PowerNet-MIB) }
+  adv_input.dc_current: { type: int, unit: A, description: upsAdvInputDCCurrent (PowerNet-MIB) }
+  adv_input.nominal_dc_voltage: { type: int, unit: V, description: upsAdvInputNominalDCVoltage (PowerNet-MIB) }
+  high_prec_input.line_voltage: { type: int, unit: "0.1 V", description: upsHighPrecInputLineVoltage (PowerNet-MIB) }
+  high_prec_input.max_line_voltage: { type: int, unit: "0.1 V", description: upsHighPrecInputMaxLineVoltage (PowerNet-MIB) }
+  high_prec_input.min_line_voltage: { type: int, unit: "0.1 V", description: upsHighPrecInputMinLineVoltage (PowerNet-MIB) }
+  high_prec_input.frequency: { type: int, unit: "0.1 Hz", description: upsHighPrecInputFrequency (PowerNet-MIB) }
+  high_prec_input.energy_usage: { type: int, unit: "0.01 kWh", description: upsHighPrecInputEnergyUsage (PowerNet-MIB) }
+  high_prec_input.bypass_voltage: { type: int, unit: "0.1 V", description: upsHighPrecInputBypassVoltage (PowerNet-MIB) }
+  high_prec_input.bypass_frequency: { type: int, unit: "0.1 Hz", description: upsHighPrecInputBypassFrequency (PowerNet-MIB) }
+  high_prec_input.dc_voltage: { type: int, description: upsHighPrecInputDCVoltage (PowerNet-MIB) }
+  high_prec_input.dc_current: { type: int, unit: "0.1 A", description: upsHighPrecInputDCCurrent (PowerNet-MIB) }
+  basic_output.status: { type: string, description: "upsBasicOutputStatus (PowerNet-MIB): unknown, on_line, on_battery, on_smart_boost, timed_sleeping, software_bypass, off, rebooting, switched_bypass, hardware_failure_bypass, sleeping_until_power_return, on_smart_trim, eco_mode, hot_standby, on_battery_test, emergency_static_bypass, static_bypass_standby, power_saving_mode, spot_mode, e_conversion, charger_spotmode, inverter_spotmode, active_load, battery_discharge_spotmode, inverter_standby, charger_only, distributed_energy_reserve, self_test" }
+  basic_output.phase: { type: int, description: upsBasicOutputPhase (PowerNet-MIB) }
+  basic_output.system_status: { type: string, description: "upsBasicSystemStatus (PowerNet-MIB): unknown, on_line, on_battery, on_smart_boost, timed_sleeping, software_bypass, off, rebooting, switched_bypass, hardware_failure_bypass, sleeping_until_power_return, on_smart_trim, eco_mode, inverter, e_conversion, static_bypass_standby, efficiency_booster_mode" }
+  basic_output.system_internal_temperature: { type: int, unit: °C, description: upsBasicSystemInternalTemperature (PowerNet-MIB) }
+  basic_output.system_inverter_status: { type: string, description: "upsBasicSystemInverterStatus (PowerNet-MIB): unknown, ok, in_fault_condition" }
+  basic_output.system_pfc_status: { type: string, description: "upsBasicSystemPFCStatus (PowerNet-MIB): unknown, ok, in_fault_condition" }
+  basic_output.a_cwiring_configuration: { type: string, description: "upsBasicOutputACwiringConfiguration (PowerNet-MIB): unknown, no_neutral_wiredon_system, neutral_usedfor_supplying_load" }
+  adv_output.voltage: { type: int, unit: V, description: upsAdvOutputVoltage (PowerNet-MIB) }
+  adv_output.frequency: { type: int, unit: Hz, description: upsAdvOutputFrequency (PowerNet-MIB) }
+  adv_output.load: { type: int, unit: "%", description: upsAdvOutputLoad (PowerNet-MIB) }
+  adv_output.current: { type: int, unit: A, description: upsAdvOutputCurrent (PowerNet-MIB) }
+  adv_output.redundancy: { type: int, description: upsAdvOutputRedundancy (PowerNet-MIB) }
+  adv_output.kva_capacity: { type: int, description: upsAdvOutputKVACapacity (PowerNet-MIB) }
+  adv_output.nominal_frequency: { type: int, unit: Hz, description: upsAdvOutputNominalFrequency (PowerNet-MIB) }
+  adv_output.active_power: { type: int, description: upsAdvOutputActivePower (PowerNet-MIB) }
+  adv_output.apparent_power: { type: int, description: upsAdvOutputApparentPower (PowerNet-MIB) }
+  adv_output_statistics.*.peak_current: { type: int, unit: A, description: upsAdvOutputPeakCurrent (PowerNet-MIB) }
+  adv_output_statistics.*.current_thd: { type: int, unit: "%", description: upsAdvOutputCurrentTHD (PowerNet-MIB) }
+  adv_output_statistics.*.crest_factor: { type: int, description: upsAdvOutputCrestFactor (PowerNet-MIB) }
+  adv_output.neutral_current: { type: int, unit: A, description: upsAdvOutputNeutralCurrent (PowerNet-MIB) }
+  adv_output.energy_usage: { type: int, description: upsAdvOutputEnergyUsage (PowerNet-MIB) }
+  adv_output.source_synchronization: { type: int, description: upsAdvOutputSourceSynchronization (PowerNet-MIB) }
+  adv_output.inverter_frequency: { type: int, unit: Hz, description: upsAdvOutputInverterFrequency (PowerNet-MIB) }
+  adv_output.inverter_load: { type: int, unit: "%", description: upsAdvOutputInverterLoad (PowerNet-MIB) }
+  adv_output.percent_power: { type: int, unit: "%", description: upsAdvOutputPercentPower (PowerNet-MIB) }
+  adv_output.inverter_active_power: { type: int, description: upsAdvOutputInverterActivePower (PowerNet-MIB) }
+  adv_output.percent_load: { type: int, unit: "%", description: upsAdvOutputPercentLoad (PowerNet-MIB) }
+  adv_output.inverter_current: { type: int, unit: A, description: upsAdvOutputInverterCurrent (PowerNet-MIB) }
+  adv_output.reactive_power: { type: int, description: upsAdvOutputReactivePower (PowerNet-MIB) }
+  adv_output.inverter_voltage: { type: int, unit: V, description: upsAdvOutputInverterVoltage (PowerNet-MIB) }
+  adv_output.upper_accept_power_setting_pct: { type: int, description: upsAdvOutputUpperAcceptPowerSettingPct (PowerNet-MIB) }
+  high_prec_output.voltage: { type: int, unit: "0.1 V", description: upsHighPrecOutputVoltage (PowerNet-MIB) }
+  high_prec_output.frequency: { type: int, unit: "0.1 Hz", description: upsHighPrecOutputFrequency (PowerNet-MIB) }
+  high_prec_output.load: { type: int, unit: "0.1 %", description: upsHighPrecOutputLoad (PowerNet-MIB) }
+  high_prec_output.current: { type: int, unit: "0.1 A", description: upsHighPrecOutputCurrent (PowerNet-MIB) }
+  high_prec_output.efficiency: { type: int, unit: "0.1 %", description: upsHighPrecOutputEfficiency (PowerNet-MIB) }
+  high_prec_output.energy_usage: { type: int, unit: "0.01 kWh", description: upsHighPrecOutputEnergyUsage (PowerNet-MIB) }
+  basic_config.num_devices: { type: int, description: upsBasicConfigNumDevices (PowerNet-MIB) }
+  basic_config_device.*.device_name: { type: string, description: deviceName (PowerNet-MIB) }
+  basic_config_device.*.va_rating: { type: int, description: vaRating (PowerNet-MIB) }
+  basic_config_device.*.accept_this_device: { type: string, description: "acceptThisDevice (PowerNet-MIB): yes, no" }
+  adv_config.rated_output_voltage: { type: int, unit: V, description: upsAdvConfigRatedOutputVoltage (PowerNet-MIB) }
+  adv_config.high_transfer_volt: { type: int, unit: V, description: upsAdvConfigHighTransferVolt (PowerNet-MIB) }
+  adv_config.low_transfer_volt: { type: int, unit: V, description: upsAdvConfigLowTransferVolt (PowerNet-MIB) }
+  adv_config.alarm: { type: string, description: "upsAdvConfigAlarm (PowerNet-MIB): timed, at_low_battery, never, mute" }
+  adv_config.alarm_timer: { type: int, unit: "1/100 s", description: upsAdvConfigAlarmTimer (PowerNet-MIB) }
+  adv_config.min_return_capacity: { type: int, description: upsAdvConfigMinReturnCapacity (PowerNet-MIB) }
+  adv_config.sensitivity: { type: string, description: "upsAdvConfigSensitivity (PowerNet-MIB): auto, low, medium, high" }
+  adv_config.low_battery_run_time: { type: int, unit: "1/100 s", description: upsAdvConfigLowBatteryRunTime (PowerNet-MIB) }
+  adv_config.return_delay: { type: int, unit: "1/100 s", description: upsAdvConfigReturnDelay (PowerNet-MIB) }
+  adv_config.shutoff_delay: { type: int, unit: "1/100 s", description: upsAdvConfigShutoffDelay (PowerNet-MIB) }
+  adv_config.ups_sleep_time: { type: int, unit: "1/100 s", description: upsAdvConfigUpsSleepTime (PowerNet-MIB) }
+  adv_config.set_eeprom_defaults: { type: string, description: "upsAdvConfigSetEEPROMDefaults (PowerNet-MIB): no_set_eeprom_defaults, set_eeprom_defaults" }
+  adv_config_dip_switch.*.dip_switch_status: { type: string, description: "dipSwitchStatus (PowerNet-MIB): on, off" }
+  adv_config.batt_exhaust_thresh: { type: int, unit: "1/100 s", description: upsAdvConfigBattExhaustThresh (PowerNet-MIB) }
+  adv_config.password: { type: string, description: upsAdvConfigPassword (PowerNet-MIB) }
+  adv_config.batt_cab_amp_hour: { type: int, description: upsAdvConfigBattCabAmpHour (PowerNet-MIB) }
+  adv_config.position_selector: { type: string, description: "upsAdvConfigPositionSelector (PowerNet-MIB): unknown, rack, tower" }
+  adv_config.output_freq_range: { type: string, description: "upsAdvConfigOutputFreqRange (PowerNet-MIB): unknown, freq_range_auto, freq_range60_var1, freq_range60_var3, freq_range50_var1, freq_range50_var3, freq_range60_var10, freq_range50_var10, freq_range60_var1dot0, freq_range50_var1dot0, freq_range50_pct0dot5, freq_range50_pct1, freq_range50_pct2, freq_range50_pct4, freq_range50_pct6, freq_range50_pct8, freq_range60_pct0dot5, freq_range60_pct1, freq_range60_pct2, freq_range60_pct4, freq_range60_pct6, freq_range60_pct8, freq_range50_var4, freq_range60_var4" }
+  adv_config.ups_fail: { type: string, description: "upsAdvConfigUPSFail (PowerNet-MIB): unknown, goto_bypass, drop_load" }
+  adv_config.alarm_redundancy: { type: int, description: upsAdvConfigAlarmRedundancy (PowerNet-MIB) }
+  adv_config.alarm_load_over: { type: int, description: upsAdvConfigAlarmLoadOver (PowerNet-MIB) }
+  adv_config.alarm_runtime_under: { type: int, description: upsAdvConfigAlarmRuntimeUnder (PowerNet-MIB) }
+  adv_config.vout_reporting: { type: string, description: "upsAdvConfigVoutReporting (PowerNet-MIB): unknown, vout_auto, vout208, vout240" }
+  adv_config.num_external_batteries: { type: int, description: upsAdvConfigNumExternalBatteries (PowerNet-MIB) }
+  adv_config.simple_signal_shutdowns: { type: string, description: "upsAdvConfigSimpleSignalShutdowns (PowerNet-MIB): unknown, disabled, enabled" }
+  adv_config.max_shutdown_time: { type: int, description: upsAdvConfigMaxShutdownTime (PowerNet-MIB) }
+  adv_config.asi_ups_control_server_request_shutdown: { type: string, description: "upsAsiUpsControlServerRequestShutdown (PowerNet-MIB): server_shutdown_off, server_shutdown_reboot" }
+  adv_config.min_return_runtime: { type: int, unit: "1/100 s", description: upsAdvConfigMinReturnRuntime (PowerNet-MIB) }
+  adv_config.basic_signal_low_battery_duration: { type: int, unit: "1/100 s", description: upsAdvConfigBasicSignalLowBatteryDuration (PowerNet-MIB) }
+  adv_config.bypass_phase_lock_required: { type: string, description: "upsAdvConfigBypassPhaseLockRequired (PowerNet-MIB): unknown, disabled, enabled, always_acceptable, never_acceptable" }
+  adv_config.output_freq_slew_rate: { type: string, description: "upsAdvConfigOutputFreqSlewRate (PowerNet-MIB): unknown, slew_rate_quarter_hz_per_sec, slew_rate_half_hz_per_sec, slew_rate1_hz_per_sec, slew_rate2_hz_per_sec, slew_rate4_hz_per_sec, slew_rate6_hz_per_sec" }
+  adv_config.charger_level: { type: string, description: "upsAdvConfigChargerLevel (PowerNet-MIB): unknown, low, high" }
+  adv_config.bypass_tolerance_setting: { type: string, description: "upsAdvConfigBypassToleranceSetting (PowerNet-MIB): unknown, wide, medium, narrow, custom" }
+  adv_config.mains_setting: { type: string, description: "upsAdvConfigMainsSetting (PowerNet-MIB): single_input, dual_input" }
+  adv_config.ac_wiring_setting: { type: string, description: "upsAdvConfigACWiringSetting (PowerNet-MIB): three_wire, four_wire, four_wire_hrg" }
+  adv_config.upper_output_volt_tolerance: { type: int, description: upsAdvConfigUpperOutputVoltTolerance (PowerNet-MIB) }
+  adv_config.lower_output_volt_tolerance: { type: int, description: upsAdvConfigLowerOutputVoltTolerance (PowerNet-MIB) }
+  adv_config.upper_bypass_volt_tolerance: { type: int, description: upsAdvConfigUpperBypassVoltTolerance (PowerNet-MIB) }
+  adv_config.lower_bypass_volt_tolerance: { type: int, description: upsAdvConfigLowerBypassVoltTolerance (PowerNet-MIB) }
+  adv_config.outof_sync_bypass_transfer_delay: { type: int, description: upsAdvConfigOutofSyncBypassTransferDelay (PowerNet-MIB) }
+  adv_config.warning_alarm_delay: { type: int, unit: s, description: upsAdvConfigWarningAlarmDelay (PowerNet-MIB) }
+  adv_config.informational_alarm_delay: { type: int, unit: s, description: upsAdvConfigInformationalAlarmDelay (PowerNet-MIB) }
+  adv_config.green_mode: { type: string, description: "upsAdvConfigGreenMode (PowerNet-MIB): disable, enable" }
+  adv_config.lcd_local_language: { type: string, description: "upsAdvConfigLCDLocalLanguage (PowerNet-MIB): english, french, italian, german, spanish, portuguese, japanese, russian" }
+  adv_config.lcd_lock_out: { type: string, description: "upsAdvConfigLCDLockOut (PowerNet-MIB): disable, enable" }
+  adv_config.charger_rate: { type: int, description: upsAdvConfigChargerRate (PowerNet-MIB) }
+  adv_config.battery_selection: { type: string, description: "upsAdvConfigBatterySelection (PowerNet-MIB): vrla, ventedcell, nicd, li_ion" }
+  adv_config.battery_health_alarm_warning_time: { type: int, description: upsAdvConfigBatteryHealthAlarmWarningTime (PowerNet-MIB) }
+  adv_config.battery_health_alarm_sleep_time: { type: int, description: upsAdvConfigBatteryHealthAlarmSleepTime (PowerNet-MIB) }
+  adv_config.signal_flash_voltage: { type: int, unit: "0.1 V", description: upsAdvConfigSignalFlashVoltage (PowerNet-MIB) }
+  adv_config.battery_temperature_compensation: { type: int, description: upsAdvConfigBatteryTemperatureCompensation (PowerNet-MIB) }
+  adv_config.battery_charger_type: { type: int, description: upsAdvConfigBatteryChargerType (PowerNet-MIB) }
+  adv_config.automatic_restart: { type: string, description: "upsAdvConfigAutomaticRestart (PowerNet-MIB): enabled, disabled" }
+  adv_config.deep_discharge_protection: { type: string, description: "upsAdvConfigDeepDischargeProtection (PowerNet-MIB): enabled, disabled" }
+  adv_config.freq_bypass_transfer_range: { type: int, description: upsAdvConfigFreqBypassTransferRange (PowerNet-MIB) }
+  adv_config.ups_powerconverter_type: { type: int, description: upsAdvConfigUpsPowerconverterType (PowerNet-MIB) }
+  adv_config.frequency_converter_mode: { type: string, description: "upsAdvConfigFrequencyConverterMode (PowerNet-MIB): auto_ranging, frequency_converter, unknown" }
+  adv_config.ac_qualification_time: { type: int, unit: s, description: upsAdvConfigACQualificationTime (PowerNet-MIB) }
+  adv_config.reboot_duration: { type: int, unit: "1/100 s", description: upsAdvConfigRebootDuration (PowerNet-MIB) }
+  adv_config.auto_shutdown_control_skip_off_delay: { type: string, description: "upsAdvConfigAutoShutdownControlSkipOffDelay (PowerNet-MIB): ups_adv_config_skip_off_delay_auto_shutdown, ups_adv_config_use_off_delay_auto_shutdown" }
+  adv_config.auto_shutdown_control_auto_restart: { type: string, description: "upsAdvConfigAutoShutdownControlAutoRestart (PowerNet-MIB): ups_adv_config_control_auto_restart_auto_shutdown, ups_adv_config_control_manual_restart_auto_shutdown" }
+  adv_config.auto_shutdown_control_time_on_battery: { type: string, description: "upsAdvConfigAutoShutdownControlTimeOnBattery (PowerNet-MIB): ups_adv_config_disable_time_on_battery_auto_shutdown, ups_adv_config_enable_time_on_battery_auto_shutdown" }
+  adv_config.auto_shutdown_control_runtime_remaining: { type: string, description: "upsAdvConfigAutoShutdownControlRuntimeRemaining (PowerNet-MIB): ups_adv_config_disable_runtime_remaining_auto_shutdown, ups_adv_config_enable_runtime_remaining_auto_shutdown" }
+  adv_config.auto_shutdown_time_on_battery: { type: int, unit: "1/100 s", description: upsAdvConfigAutoShutdownTimeOnBattery (PowerNet-MIB) }
+  adv_config.auto_shutdown_runtime_remaining: { type: int, unit: "1/100 s", description: upsAdvConfigAutoShutdownRuntimeRemaining (PowerNet-MIB) }
+  adv_config.high_ll_transfer_volt: { type: int, unit: V, description: upsAdvConfigHighLLTransferVolt (PowerNet-MIB) }
+  adv_config.low_ll_transfer_volt: { type: int, unit: V, description: upsAdvConfigLowLLTransferVolt (PowerNet-MIB) }
+  adv_config.high_bypass_transfer_volt: { type: int, unit: V, description: upsAdvConfigHighBypassTransferVolt (PowerNet-MIB) }
+  adv_config.low_bypass_transfer_volt: { type: int, unit: V, description: upsAdvConfigLowBypassTransferVolt (PowerNet-MIB) }
+  adv_config.high_bypass_ll_transfer_volt: { type: int, unit: V, description: upsAdvConfigHighBypassLLTransferVolt (PowerNet-MIB) }
+  adv_config.low_bypass_ll_transfer_volt: { type: int, unit: V, description: upsAdvConfigLowBypassLLTransferVolt (PowerNet-MIB) }
+  adv_config.auto_shutdown_control_battery_capacity: { type: string, description: "upsAdvConfigAutoShutdownControlBatteryCapacity (PowerNet-MIB): ups_adv_config_disable_battery_capacity_auto_shutdown, ups_adv_config_enable_battery_capacity_auto_shutdown" }
+  adv_config.auto_shutdown_battery_capacity: { type: int, description: upsAdvConfigAutoShutdownBatteryCapacity (PowerNet-MIB) }
+  adv_config.auto_shutdown_control_load_percent_on_ups: { type: string, description: "upsAdvConfigAutoShutdownControlLoadPercentOnUps (PowerNet-MIB): ups_adv_config_disable_load_percent_on_ups_auto_shutdown, ups_adv_config_enable_load_percent_on_ups_auto_shutdown" }
+  adv_config.auto_shutdown_load_percent_on_ups: { type: int, description: upsAdvConfigAutoShutdownLoadPercentOnUps (PowerNet-MIB) }
+  adv_config.bypass_frequency_range_lower_limit: { type: int, unit: Hz, description: upsAdvConfigBypassFrequencyRangeLowerLimit (PowerNet-MIB) }
+  adv_config.bypass_frequency_range_upper_limit: { type: int, unit: Hz, description: upsAdvConfigBypassFrequencyRangeUpperLimit (PowerNet-MIB) }
+  adv_config.eco_voltage_range_lower_limit: { type: int, unit: V, description: upsAdvConfigEcoVoltageRangeLowerLimit (PowerNet-MIB) }
+  adv_config.eco_voltage_range_upper_limit: { type: int, unit: V, description: upsAdvConfigEcoVoltageRangeUpperLimit (PowerNet-MIB) }
+  basic_control.conserve_battery: { type: string, description: "upsBasicControlConserveBattery (PowerNet-MIB): no_turn_off_ups, turn_off_ups_to_conserve_battery" }
+  adv_control.ups_off: { type: string, description: "upsAdvControlUpsOff (PowerNet-MIB): no_turn_ups_off, turn_ups_off, turn_ups_off_gracefully, turn_ups_sync_group_off, turn_ups_sync_group_off_after_delay, turn_ups_sync_group_off_gracefully" }
+  adv_control.reboot_shutdown_ups: { type: string, description: "upsAdvControlRebootShutdownUps (PowerNet-MIB): no_reboot_shutdown_ups, reboot_shutdown_ups, reboot_shutdown_ups_gracefully, reboot_shutdown_sync_group_ups, reboot_shutdown_sync_group_ups_gracefully" }
+  adv_control.ups_sleep: { type: string, description: "upsAdvControlUpsSleep (PowerNet-MIB): no_put_ups_to_sleep, put_ups_to_sleep, put_ups_to_sleep_gracefully, put_ups_sync_group_to_sleep, put_ups_sync_group_to_sleep_gracefully" }
+  adv_control.simulate_power_fail: { type: string, description: "upsAdvControlSimulatePowerFail (PowerNet-MIB): no_simulate_power_failure, simulate_power_failure" }
+  adv_control.flash_and_beep: { type: string, description: "upsAdvControlFlashAndBeep (PowerNet-MIB): no_flash_and_beep, flash_and_beep, flash_and_beep_sync_group, flash_and_beep_cont, flash_and_beep_cancel" }
+  adv_control.turn_on_ups: { type: string, description: "upsAdvControlTurnOnUPS (PowerNet-MIB): no_turn_on_ups, turn_on_ups, turn_on_ups_sync_group, turn_on_ups_delayed" }
+  adv_control.bypass_switch: { type: string, description: "upsAdvControlBypassSwitch (PowerNet-MIB): no_bypass_switch, switch_to_bypass, switch_out_of_bypass" }
+  adv_control.reboot_ups_with_or_without_ac: { type: string, description: "upsAdvControlRebootUpsWithOrWithoutAC (PowerNet-MIB): no_reboot_ups_with_or_without_ac, reboot_ups_immediately_with_or_without_ac, reboot_ups_delayed_with_or_without_ac" }
+  adv_control.firmware_update: { type: string, description: "upsAdvControlFirmwareUpdate (PowerNet-MIB): no_firmware_update, firmware_update, update_in_process, update_successful, update_failed" }
+  adv_test.diagnostic_schedule: { type: string, description: "upsAdvTestDiagnosticSchedule (PowerNet-MIB): unknown, biweekly, weekly, at_turn_on, never, four_weeks, twelve_weeks, biweekly_since_last_test, weekly_since_last_test, eight_weeks, twentysix_weeks, fiftytwo_weeks" }
+  adv_test.diagnostics: { type: string, description: "upsAdvTestDiagnostics (PowerNet-MIB): no_test_diagnostics, test_diagnostics" }
+  adv_test.diagnostics_results: { type: string, description: "upsAdvTestDiagnosticsResults (PowerNet-MIB): ok, failed, invalid_test, test_in_progress" }
+  adv_test.last_diagnostics_date: { type: string, description: upsAdvTestLastDiagnosticsDate (PowerNet-MIB) }
+  adv_test.runtime_calibration: { type: string, description: "upsAdvTestRuntimeCalibration (PowerNet-MIB): no_perform_calibration, perform_calibration, cancel_current_calibration" }
+  adv_test.calibration_results: { type: string, description: "upsAdvTestCalibrationResults (PowerNet-MIB): ok, invalid_calibration, calibration_in_progress, refused, aborted, pending, unknown" }
+  adv_test.calibration_date: { type: string, description: upsAdvTestCalibrationDate (PowerNet-MIB) }
+  adv_test.diagnostic_time: { type: string, description: upsAdvTestDiagnosticTime (PowerNet-MIB) }
+  adv_test.diagnostic_day: { type: string, description: "upsAdvTestDiagnosticDay (PowerNet-MIB): monday, tuesday, wednesday, thursday, friday, saturday, sunday" }
+  adv_test.battery_interval: { type: string, description: upsAdvTestBatteryInterval (PowerNet-MIB) }
+  adv_test.calibration_last_successful_date: { type: string, description: upsAdvTestCalibrationLastSuccessfulDate (PowerNet-MIB) }
+  adv_test.battery_last_successful_date: { type: string, description: upsAdvTestBatteryLastSuccessfulDate (PowerNet-MIB) }
+  adv_test.battery_last_date: { type: string, description: upsAdvTestBatteryLastDate (PowerNet-MIB) }
+  adv_test.battery_process_status: { type: string, description: "upsAdvTestBatteryProcessStatus (PowerNet-MIB): ok, precondition_not_meet, battery_test_in_progress, refused, aborted, pending, unknown, no_battery_present" }
+  adv_test.battery_condition_status: { type: string, description: "upsAdvTestBatteryConditionStatus (PowerNet-MIB): unknown, battery_ok, battery_capacity_decreased, battery_defect, no_battery_present" }
+  adv_test.diagnostics_battery_interval: { type: string, description: "upsAdvTestDiagnosticsBatteryInterval (PowerNet-MIB): never, weekly, biweekly, every4weeks, every8weeks, every12weeks, every26weeks, every52weeks" }
+  comm.status: { type: string, description: "upsCommStatus (PowerNet-MIB): ok, no_comm" }
+  phase_reset_values.max_min_values: { type: string, description: "upsPhaseResetMaxMinValues (PowerNet-MIB): none, reset" }
+  phase_input_num_inputs: { type: int, description: upsPhaseNumInputs (PowerNet-MIB) }
+  phase_input.*.num_input_phases: { type: int, description: upsPhaseNumInputPhases (PowerNet-MIB) }
+  phase_input.*.voltage_orientation: { type: string, description: "upsPhaseInputVoltageOrientation (PowerNet-MIB): unknown, single_phase, split_phase, three_phase_phase_to_neutral, three_phase_phase_to_phase" }
+  phase_input.*.frequency: { type: int, description: upsPhaseInputFrequency (PowerNet-MIB) }
+  phase_input.*.type: { type: string, description: "upsPhaseInputType (PowerNet-MIB): unknown, main, bypass" }
+  phase_input.*.name: { type: string, description: upsPhaseInputName (PowerNet-MIB) }
+  phase_input_phase.*.*.voltage: { type: int, unit: V, description: upsPhaseInputVoltage (PowerNet-MIB) }
+  phase_input_phase.*.*.max_voltage: { type: int, unit: V, description: upsPhaseInputMaxVoltage (PowerNet-MIB) }
+  phase_input_phase.*.*.min_voltage: { type: int, unit: V, description: upsPhaseInputMinVoltage (PowerNet-MIB) }
+  phase_input_phase.*.*.current: { type: int, description: upsPhaseInputCurrent (PowerNet-MIB) }
+  phase_input_phase.*.*.max_current: { type: int, description: upsPhaseInputMaxCurrent (PowerNet-MIB) }
+  phase_input_phase.*.*.min_current: { type: int, description: upsPhaseInputMinCurrent (PowerNet-MIB) }
+  phase_input_phase.*.*.power: { type: int, unit: W, description: upsPhaseInputPower (PowerNet-MIB) }
+  phase_input_phase.*.*.max_power: { type: int, unit: W, description: upsPhaseInputMaxPower (PowerNet-MIB) }
+  phase_input_phase.*.*.min_power: { type: int, unit: W, description: upsPhaseInputMinPower (PowerNet-MIB) }
+  phase_input_phase.*.*.apparent_power: { type: int, description: upsPhaseInputApparentPower (PowerNet-MIB) }
+  phase_input_phase.*.*.power_factor: { type: int, description: upsPhaseInputPowerFactor (PowerNet-MIB) }
+  phase_input_phase.*.*.voltage_pn: { type: int, unit: V, description: upsPhaseInputVoltagePN (PowerNet-MIB) }
+  phase_output_num_outputs: { type: int, description: upsPhaseNumOutputs (PowerNet-MIB) }
+  phase_output.*.num_output_phases: { type: int, description: upsPhaseNumOutputPhases (PowerNet-MIB) }
+  phase_output.*.voltage_orientation: { type: string, description: "upsPhaseOutputVoltageOrientation (PowerNet-MIB): unknown, single_phase, split_phase, three_phase_phase_to_neutral, three_phase_phase_to_phase" }
+  phase_output.*.frequency: { type: int, description: upsPhaseOutputFrequency (PowerNet-MIB) }
+  phase_output_phase.*.*.voltage: { type: int, unit: V, description: upsPhaseOutputVoltage (PowerNet-MIB) }
+  phase_output_phase.*.*.current: { type: int, description: upsPhaseOutputCurrent (PowerNet-MIB) }
+  phase_output_phase.*.*.max_current: { type: int, description: upsPhaseOutputMaxCurrent (PowerNet-MIB) }
+  phase_output_phase.*.*.min_current: { type: int, description: upsPhaseOutputMinCurrent (PowerNet-MIB) }
+  phase_output_phase.*.*.load: { type: int, description: upsPhaseOutputLoad (PowerNet-MIB) }
+  phase_output_phase.*.*.max_load: { type: int, description: upsPhaseOutputMaxLoad (PowerNet-MIB) }
+  phase_output_phase.*.*.min_load: { type: int, description: upsPhaseOutputMinLoad (PowerNet-MIB) }
+  phase_output_phase.*.*.percent_load: { type: int, description: upsPhaseOutputPercentLoad (PowerNet-MIB) }
+  phase_output_phase.*.*.max_percent_load: { type: int, description: upsPhaseOutputMaxPercentLoad (PowerNet-MIB) }
+  phase_output_phase.*.*.min_percent_load: { type: int, description: upsPhaseOutputMinPercentLoad (PowerNet-MIB) }
+  phase_output_phase.*.*.power: { type: int, unit: W, description: upsPhaseOutputPower (PowerNet-MIB) }
+  phase_output_phase.*.*.max_power: { type: int, unit: W, description: upsPhaseOutputMaxPower (PowerNet-MIB) }
+  phase_output_phase.*.*.min_power: { type: int, unit: W, description: upsPhaseOutputMinPower (PowerNet-MIB) }
+  phase_output_phase.*.*.percent_power: { type: int, unit: W, description: upsPhaseOutputPercentPower (PowerNet-MIB) }
+  phase_output_phase.*.*.max_percent_power: { type: int, unit: W, description: upsPhaseOutputMaxPercentPower (PowerNet-MIB) }
+  phase_output_phase.*.*.min_percent_power: { type: int, unit: W, description: upsPhaseOutputMinPercentPower (PowerNet-MIB) }
+  phase_output_phase.*.*.power_factor: { type: int, description: upsPhaseOutputPowerFactor (PowerNet-MIB) }
+  phase_output_phase.*.*.apparent_power: { type: int, description: upsPhaseOutputApparentPower (PowerNet-MIB) }
+  phase_output_phase.*.*.inverter_voltage: { type: int, unit: V, description: upsPhaseOutputInverterVoltage (PowerNet-MIB) }
+  phase_output_phase.*.*.voltage_pn: { type: int, unit: V, description: upsPhaseOutputVoltagePN (PowerNet-MIB) }
+  phase_output_phase.*.*.energy_usage: { type: int, unit: "0.01 kWh", description: upsPhaseOutputEnergyUsage (PowerNet-MIB) }
+  sync_ctrl_group_config.scg_membership_group_number: { type: int, description: upsSCGMembershipGroupNumber (PowerNet-MIB) }
+  sync_ctrl_group_config.scg_active_membership_status: { type: string, description: "upsSCGActiveMembershipStatus (PowerNet-MIB): enabled_scg, disabled_scg" }
+  sync_ctrl_group_config.scg_power_synchronization_delay_time: { type: int, description: upsSCGPowerSynchronizationDelayTime (PowerNet-MIB) }
+  sync_ctrl_group_config.scg_return_battery_capacity_offset: { type: int, description: upsSCGReturnBatteryCapacityOffset (PowerNet-MIB) }
+  sync_ctrl_group_config.scg_multi_cast_ip: { type: string, description: upsSCGMultiCastIP (PowerNet-MIB) }
+  sync_ctrl_group_status.scg_num_of_group_members: { type: int, description: upsSCGNumOfGroupMembers (PowerNet-MIB) }
+  scg_status.*.member_ip: { type: string, description: upsSCGMemberIP (PowerNet-MIB) }
+  scg_status.*.scgac_input_status: { type: string, description: "upsSCGACInputStatus (PowerNet-MIB): ac_in_good, ac_in_bad" }
+  scg_status.*.scgac_output_status: { type: string, description: "upsSCGACOutputStatus (PowerNet-MIB): ac_out_on, ac_out_off" }
+  basic_state.output_state: { type: string, description: upsBasicStateOutputState (PowerNet-MIB) }
+  basic_state.alarm_status: { type: string, description: "upsBasicStateAlarmStatus (PowerNet-MIB): no_alarms, info_alarm, warning_alarm, critical_alarm" }
+  adv_state.abnormal_conditions: { type: string, description: upsAdvStateAbnormalConditions (PowerNet-MIB) }
+  adv_state.symmetra_3_phase_specific_faults: { type: string, description: upsAdvStateSymmetra3PhaseSpecificFaults (PowerNet-MIB) }
+  adv_state.dp_300_e_specific_faults: { type: string, description: upsAdvStateDP300ESpecificFaults (PowerNet-MIB) }
+  adv_state.symmetra_specific_faults: { type: string, description: upsAdvStateSymmetraSpecificFaults (PowerNet-MIB) }
+  adv_state.smart_ups_specific_faults: { type: string, description: upsAdvStateSmartUPSSpecificFaults (PowerNet-MIB) }
+  adv_state.system_messages: { type: string, description: upsAdvStateSystemMessages (PowerNet-MIB) }
+  adv_state.totaltimeonbattery: { type: string, description: upsAdvStateTotaltimeonbattery (PowerNet-MIB) }
+  adv_state.totaltimeonbypass: { type: string, description: upsAdvStateTotaltimeonbypass (PowerNet-MIB) }
+  adv_state.totaltimeon_normal: { type: string, description: upsAdvStateTotaltimeonNormal (PowerNet-MIB) }
+  adv_state.numberoftimesonbattery: { type: int, description: upsAdvStateNumberoftimesonbattery (PowerNet-MIB) }
+  adv_state.numberoftimesbypass: { type: int, description: upsAdvStateNumberoftimesbypass (PowerNet-MIB) }
+  adv_state.numberoftimes_normal: { type: int, description: upsAdvStateNumberoftimesNormal (PowerNet-MIB) }
+  adv_state.ecomode: { type: string, description: "upsAdvStateEcomode (PowerNet-MIB): ups_on_eco_mode, ups_not_on_eco_mode" }
+  adv_state.life_cycle_management: { type: string, description: upsAdvStateLifeCycleManagement (PowerNet-MIB) }
+  adv_state.galaxy_vseries_specific_fault: { type: string, description: upsAdvStateGalaxyVseriesSpecificFault (PowerNet-MIB) }
+  adv_state.gutor_modular_specific_faults: { type: string, description: upsAdvStateGutorModularSpecificFaults (PowerNet-MIB) }
+  outlet_group_status_table_size: { type: int, description: upsOutletGroupStatusTableSize (PowerNet-MIB) }
+  outlet_group_status.*.name: { type: string, description: upsOutletGroupStatusName (PowerNet-MIB) }
+  outlet_group_status.*.group_state: { type: string, description: "upsOutletGroupStatusGroupState (PowerNet-MIB): ups_outlet_group_status_on, ups_outlet_group_status_off, ups_outlet_group_status_unknown" }
+  outlet_group_status.*.command_pending: { type: string, description: "upsOutletGroupStatusCommandPending (PowerNet-MIB): ups_outlet_group_command_pending, ups_outlet_group_no_command_pending" }
+  outlet_group_status.*.outlet_type: { type: string, description: "upsOutletGroupStatusOutletType (PowerNet-MIB): ups_switched_outlet_group, ups_main_outlet_group" }
+  outlet_group_status.*.group_full_state: { type: string, description: upsOutletGroupStatusGroupFullState (PowerNet-MIB) }
+  outlet_group_config_table_size: { type: int, description: upsOutletGroupConfigTableSize (PowerNet-MIB) }
+  outlet_group_config.*.name: { type: string, description: upsOutletGroupConfigName (PowerNet-MIB) }
+  outlet_group_config.*.power_on_delay: { type: int, description: upsOutletGroupConfigPowerOnDelay (PowerNet-MIB) }
+  outlet_group_config.*.power_off_delay: { type: int, description: upsOutletGroupConfigPowerOffDelay (PowerNet-MIB) }
+  outlet_group_config.*.reboot_duration: { type: int, description: upsOutletGroupConfigRebootDuration (PowerNet-MIB) }
+  outlet_group_config.*.min_return_runtime: { type: int, description: upsOutletGroupConfigMinReturnRuntime (PowerNet-MIB) }
+  outlet_group_config.*.outlet_type: { type: string, description: "upsOutletGroupConfigOutletType (PowerNet-MIB): ups_switched_outlet_group, ups_main_outlet_group" }
+  outlet_group_config.*.load_shed_control_skip_off_delay: { type: string, description: "upsOutletGroupConfigLoadShedControlSkipOffDelay (PowerNet-MIB): ups_outlet_group_config_skip_off_delay, ups_outlet_group_config_use_off_delay" }
+  outlet_group_config.*.load_shed_control_auto_restart: { type: string, description: "upsOutletGroupConfigLoadShedControlAutoRestart (PowerNet-MIB): ups_outlet_group_config_auto_restart, ups_outlet_group_config_manual_restart" }
+  outlet_group_config.*.load_shed_control_time_on_battery: { type: string, description: "upsOutletGroupConfigLoadShedControlTimeOnBattery (PowerNet-MIB): ups_outlet_group_config_disable_time_on_battery_load_shed, ups_outlet_group_config_enable_time_on_battery_load_shed" }
+  outlet_group_config.*.load_shed_control_runtime_remaining: { type: string, description: "upsOutletGroupConfigLoadShedControlRuntimeRemaining (PowerNet-MIB): ups_outlet_group_config_disable_runtime_remaining_load_shed, ups_outlet_group_config_enable_runtime_remaining_load_shed" }
+  outlet_group_config.*.load_shed_control_in_overload: { type: string, description: "upsOutletGroupConfigLoadShedControlInOverload (PowerNet-MIB): ups_outlet_group_config_disable_in_overload_load_shed, ups_outlet_group_config_enable_in_overload_load_shed" }
+  outlet_group_config.*.load_shed_time_on_battery: { type: int, description: upsOutletGroupConfigLoadShedTimeOnBattery (PowerNet-MIB) }
+  outlet_group_config.*.load_shed_runtime_remaining: { type: int, description: upsOutletGroupConfigLoadShedRuntimeRemaining (PowerNet-MIB) }
+  outlet_group_control_table_size: { type: int, description: upsOutletGroupControlTableSize (PowerNet-MIB) }
+  outlet_group_control.*.name: { type: string, description: upsOutletGroupControlName (PowerNet-MIB) }
+  outlet_group_control.*.command: { type: string, description: "upsOutletGroupControlCommand (PowerNet-MIB): ups_outlet_group_immediate_on, ups_outlet_group_immediate_off, ups_outlet_group_immediate_reboot_with_or_without_ac, ups_outlet_group_delayed_on, ups_outlet_group_delayed_off, ups_outlet_group_delayed_reboot_with_or_without_ac, ups_outlet_group_cancel_pending_command, ups_outlet_group_control_unknown, ups_outlet_group_immediate_reboot_shutdown, ups_outlet_group_delayed_reboot_shutdown" }
+  outlet_group_control.*.outlet_type: { type: string, description: "upsOutletGroupControlOutletType (PowerNet-MIB): ups_switched_outlet_group, ups_main_outlet_group" }
+  diagnostic_im.diag_im_table_size: { type: int, description: upsDiagIMTableSize (PowerNet-MIB) }
+  diag_im.*.type: { type: string, description: "upsDiagIMType (PowerNet-MIB): im_unknown, im_mim, im_rim" }
+  diag_im.*.status: { type: string, description: "upsDiagIMStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diag_im.*.firmware_rev: { type: string, description: upsDiagIMFirmwareRev (PowerNet-MIB) }
+  diag_im.*.slave_firmware_rev: { type: string, description: upsDiagIMSlaveFirmwareRev (PowerNet-MIB) }
+  diag_im.*.hardware_rev: { type: string, description: upsDiagIMHardwareRev (PowerNet-MIB) }
+  diag_im.*.serial_num: { type: string, description: upsDiagIMSerialNum (PowerNet-MIB) }
+  diag_im.*.manufacture_date: { type: string, description: upsDiagIMManufactureDate (PowerNet-MIB) }
+  diag_im.*.in_control: { type: string, description: "upsDiagIMInControl (PowerNet-MIB): active_in_control, passive, unknown, fault" }
+  diag_im.*.imsku: { type: string, description: upsDiagIMSKU (PowerNet-MIB) }
+  diagnostic_power_modules.diag_pm_table_size: { type: int, description: upsDiagPMTableSize (PowerNet-MIB) }
+  diag_pm.*.status: { type: string, description: "upsDiagPMStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diag_pm.*.firmware_rev: { type: string, description: upsDiagPMFirmwareRev (PowerNet-MIB) }
+  diag_pm.*.hardware_rev: { type: string, description: upsDiagPMHardwareRev (PowerNet-MIB) }
+  diag_pm.*.serial_num: { type: string, description: upsDiagPMSerialNum (PowerNet-MIB) }
+  diag_pm.*.manufacture_date: { type: string, description: upsDiagPMManufactureDate (PowerNet-MIB) }
+  diag_pm.*.model_num: { type: string, description: upsDiagPMModelNum (PowerNet-MIB) }
+  diag_pm.*.rating: { type: string, description: upsDiagPMRating (PowerNet-MIB) }
+  diag_pm.*.pmsku: { type: string, description: upsDiagPMSKU (PowerNet-MIB) }
+  diag_pm.*.average_fan_speed: { type: int, description: upsDiagPMAverageFanSpeed (PowerNet-MIB) }
+  diag_pm.*.ambient_temperature: { type: int, unit: "0.1 °C", description: upsDiagPMAmbientTemperature (PowerNet-MIB) }
+  diag_pm_lifetime_info.*.status: { type: string, description: "upsDiagPMLifetimeStatus (PowerNet-MIB): ok, near_end, exceeded, unknown" }
+  diag_pm_lifetime_info.*.estmtd_lifetime_rmng: { type: int, description: upsDiagPMEstmtdLifetimeRmng (PowerNet-MIB) }
+  diag_pm_lifetime_info.*.estmtd_lifetime_rmng_pct: { type: int, description: upsDiagPMEstmtdLifetimeRmngPct (PowerNet-MIB) }
+  diag_pm_lifetime_info.*.fan_lifetime_status: { type: string, description: "upsDiagPMFanLifetimeStatus (PowerNet-MIB): ok, near_end, exceeded, unknown" }
+  diag_pm_lifetime_info.*.fan_estmtd_lifetime_rmng: { type: int, description: upsDiagPMFanEstmtdLifetimeRmng (PowerNet-MIB) }
+  diag_pm_lifetime_info.*.fan_estmtd_lifetime_rmng_pct: { type: int, description: upsDiagPMFanEstmtdLifetimeRmngPct (PowerNet-MIB) }
+  diagnostic_power_modules.diag_pm_encl_door_fltr_table_size: { type: int, description: upsDiagPMEnclDoorFltrTableSize (PowerNet-MIB) }
+  diag_pm_encl_door_fltr.*.lifetime: { type: string, description: "upsDiagPMEnclDoorFltrLifetime (PowerNet-MIB): heavy_filtration15days, normal_filtration30days, light_filtration60days, not_present" }
+  diag_pm_encl_door_fltr.*.status: { type: string, description: "upsDiagPMEnclDoorFltrStatus (PowerNet-MIB): ok, near_end, exceeded, unknown" }
+  diag_pm_encl_door_fltr.*.estmtd_lifetime_rmng: { type: int, description: upsDiagPMEnclDoorFltrEstmtdLifetimeRmng (PowerNet-MIB) }
+  diag_pm_encl_door_fltr.*.estmtd_lifetime_rmng_pct: { type: int, description: upsDiagPMEnclDoorFltrEstmtdLifetimeRmngPct (PowerNet-MIB) }
+  diagnostic_batteries.diag_battery_table_size: { type: int, description: upsDiagBatteryTableSize (PowerNet-MIB) }
+  diag_battery.*.frame_index: { type: int, description: upsDiagBatteryFrameIndex (PowerNet-MIB) }
+  diag_battery.*.status: { type: string, description: "upsDiagBatteryStatus (PowerNet-MIB): unknown, not_installed, ok, failed, high_temperature, replace_immediately, low_capacity" }
+  diag_battery.*.serial_number: { type: string, description: upsDiagBatterySerialNumber (PowerNet-MIB) }
+  diag_battery.*.firmware_rev: { type: string, description: upsDiagBatteryFirmwareRev (PowerNet-MIB) }
+  diag_battery.*.manufacture_date: { type: string, description: upsDiagBatteryManufactureDate (PowerNet-MIB) }
+  diag_battery.*.type: { type: string, description: upsDiagBatteryType (PowerNet-MIB) }
+  diag_battery.*.frame_present: { type: string, description: "upsDiagBatteryFramePresent (PowerNet-MIB): not_present, present" }
+  diag_battery.*.frame_temperature: { type: int, unit: "0.1 °C", description: upsDiagBatteryFrameTemperature (PowerNet-MIB) }
+  diag_battery.*.sku: { type: string, description: upsDiagBatterySKU (PowerNet-MIB) }
+  diag_battery.*.health: { type: string, description: upsDiagBatteryHealth (PowerNet-MIB) }
+  diagnostic_batteries.diag_battery_frame_table_size: { type: int, description: upsDiagBatteryFrameTableSize (PowerNet-MIB) }
+  diag_battery_frame.*.module_status_per_frame: { type: string, description: upsDiagBatteryModuleStatusPerFrame (PowerNet-MIB) }
+  diag_battery_frame.*.positive_voltage: { type: int, unit: V, description: upsDiagBatteryPositiveVoltage (PowerNet-MIB) }
+  diag_battery_frame.*.negative_voltage: { type: int, unit: V, description: upsDiagBatteryNegativeVoltage (PowerNet-MIB) }
+  diag_battery_frame.*.temperature: { type: int, unit: "0.1 °C", description: upsDiagBatteryTemperature (PowerNet-MIB) }
+  diagnostic_subsystem.diag_sub_sys_frame_table_size: { type: int, description: upsDiagSubSysFrameTableSize (PowerNet-MIB) }
+  diag_sub_sys_frame.*.type: { type: string, description: "upsDiagSubSysFrameType (PowerNet-MIB): unknown, not_installed, frame_type_main, frame_type_xr, frame_type_lxr" }
+  diag_sub_sys_frame.*.firmware_rev: { type: string, description: upsDiagSubSysFrameFirmwareRev (PowerNet-MIB) }
+  diag_sub_sys_frame.*.hardware_rev: { type: string, description: upsDiagSubSysFrameHardwareRev (PowerNet-MIB) }
+  diag_sub_sys_frame.*.serial_num: { type: string, description: upsDiagSubSysFrameSerialNum (PowerNet-MIB) }
+  diag_sub_sys_frame.*.manufacture_date: { type: string, description: upsDiagSubSysFrameManufactureDate (PowerNet-MIB) }
+  diag_sub_sys_frame.*.sku: { type: string, description: upsDiagSubSysFrameSKU (PowerNet-MIB) }
+  diagnostic_subsystem.diag_sub_sys_int_byp_switch_table_size: { type: int, description: upsDiagSubSysIntBypSwitchTableSize (PowerNet-MIB) }
+  diag_sub_sys_int_byp_switch.*.frame_index: { type: int, description: upsDiagSubSysIntBypSwitchFrameIndex (PowerNet-MIB) }
+  diag_sub_sys_int_byp_switch.*.status: { type: string, description: "upsDiagSubSysIntBypSwitchStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diag_sub_sys_int_byp_switch.*.firmware_rev: { type: string, description: upsDiagSubSysIntBypSwitchFirmwareRev (PowerNet-MIB) }
+  diag_sub_sys_int_byp_switch.*.hardware_rev: { type: string, description: upsDiagSubSysIntBypSwitchHardwareRev (PowerNet-MIB) }
+  diag_sub_sys_int_byp_switch.*.serial_num: { type: string, description: upsDiagSubSysIntBypSwitchSerialNum (PowerNet-MIB) }
+  diag_sub_sys_int_byp_switch.*.manufacture_date: { type: string, description: upsDiagSubSysIntBypSwitchManufactureDate (PowerNet-MIB) }
+  diag_sub_sys_int_byp_switch.*.model_num: { type: string, description: upsDiagSubSysIntBypSwitchModelNum (PowerNet-MIB) }
+  diag_sub_sys_int_byp_switch.*.fan_speed: { type: int, description: upsDiagSubSysIntBypFanSpeed (PowerNet-MIB) }
+  diag_sub_sys_int_byp_switch.*.ambient_temperature: { type: int, description: upsDiagSubSysIntBypAmbientTemperature (PowerNet-MIB) }
+  diagnostic_subsystem.diag_sub_sys_batt_monitor_table_size: { type: int, description: upsDiagSubSysBattMonitorTableSize (PowerNet-MIB) }
+  diag_sub_sys_batt_monitor.*.frame_index: { type: int, description: upsDiagSubSysBattMonitorFrameIndex (PowerNet-MIB) }
+  diag_sub_sys_batt_monitor.*.status: { type: string, description: "upsDiagSubSysBattMonitorStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diag_sub_sys_batt_monitor.*.firmware_rev: { type: string, description: upsDiagSubSysBattMonitorFirmwareRev (PowerNet-MIB) }
+  diag_sub_sys_batt_monitor.*.hardware_rev: { type: string, description: upsDiagSubSysBattMonitorHardwareRev (PowerNet-MIB) }
+  diag_sub_sys_batt_monitor.*.serial_num: { type: string, description: upsDiagSubSysBattMonitorSerialNum (PowerNet-MIB) }
+  diag_sub_sys_batt_monitor.*.manufacture_date: { type: string, description: upsDiagSubSysBattMonitorManufactureDate (PowerNet-MIB) }
+  diagnostic_subsystem.diag_sub_sys_external_switch_gear_table_size: { type: int, description: upsDiagSubSysExternalSwitchGearTableSize (PowerNet-MIB) }
+  diag_sub_sys_external_switch_gear.*.frame_index: { type: int, description: upsDiagSubSysExternalSwitchGearFrameIndex (PowerNet-MIB) }
+  diag_sub_sys_external_switch_gear.*.status: { type: string, description: "upsDiagSubSysExternalSwitchGearStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diag_sub_sys_external_switch_gear.*.firmware_rev: { type: string, description: upsDiagSubSysExternalSwitchGearFirmwareRev (PowerNet-MIB) }
+  diag_sub_sys_external_switch_gear.*.hardware_rev: { type: string, description: upsDiagSubSysExternalSwitchGearHardwareRev (PowerNet-MIB) }
+  diag_sub_sys_external_switch_gear.*.serial_num: { type: string, description: upsDiagSubSysExternalSwitchGearSerialNum (PowerNet-MIB) }
+  diag_sub_sys_external_switch_gear.*.manufacture_date: { type: string, description: upsDiagSubSysExternalSwitchGearManufactureDate (PowerNet-MIB) }
+  diag_sub_sys_external_switch_gear.*.temperature: { type: int, unit: "0.1 °C", description: upsDiagSubSysExternalSwitchGearTemperature (PowerNet-MIB) }
+  diagnostic_subsystem.diag_sub_sys_display_interface_card_table_size: { type: int, description: upsDiagSubSysDisplayInterfaceCardTableSize (PowerNet-MIB) }
+  diag_sub_sys_display_interface_card.*.frame_index: { type: int, description: upsDiagSubSysDisplayInterfaceCardFrameIndex (PowerNet-MIB) }
+  diag_sub_sys_display_interface_card.*.status: { type: string, description: "upsDiagSubSysDisplayInterfaceCardStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diagnostic_subsystem.diag_sub_sys_dc_circuit_breaker_table_size: { type: int, description: upsDiagSubSysDCCircuitBreakerTableSize (PowerNet-MIB) }
+  diag_sub_sys_dc_circuit_breaker.*.frame_index: { type: int, description: upsDiagSubSysDCCircuitBreakerFrameIndex (PowerNet-MIB) }
+  diag_sub_sys_dc_circuit_breaker.*.status: { type: string, description: "upsDiagSubSysDCCircuitBreakerStatus (PowerNet-MIB): unknown, not_installed, opened, closed" }
+  diagnostic_subsystem.diag_sub_sys_system_power_supply_table_size: { type: int, description: upsDiagSubSysSystemPowerSupplyTableSize (PowerNet-MIB) }
+  diag_sub_sys_system_power_supply.*.frame_index: { type: int, description: upsDiagSubSysSystemPowerSupplyFrameIndex (PowerNet-MIB) }
+  diag_sub_sys_system_power_supply.*.status: { type: string, description: "upsDiagSubSysSystemPowerSupplyStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diag_sub_sys_system_power_supply.*.firmware_rev: { type: string, description: upsDiagSubSysSystemPowerSupplyFirmwareRev (PowerNet-MIB) }
+  diag_sub_sys_system_power_supply.*.hardware_rev: { type: string, description: upsDiagSubSysSystemPowerSupplyHardwareRev (PowerNet-MIB) }
+  diag_sub_sys_system_power_supply.*.serial_num: { type: string, description: upsDiagSubSysSystemPowerSupplySerialNum (PowerNet-MIB) }
+  diag_sub_sys_system_power_supply.*.manufacture_date: { type: string, description: upsDiagSubSysSystemPowerSupplyManufactureDate (PowerNet-MIB) }
+  diagnostic_subsystem.diag_sub_sys_xr_communication_card_table_size: { type: int, description: upsDiagSubSysXRCommunicationCardTableSize (PowerNet-MIB) }
+  diag_sub_sys_xr_communication_card.*.frame_index: { type: int, description: upsDiagSubSysXRCommunicationCardFrameIndex (PowerNet-MIB) }
+  diag_sub_sys_xr_communication_card.*.status: { type: string, description: "upsDiagSubSysXRCommunicationCardStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diag_sub_sys_xr_communication_card.*.firmware_rev: { type: string, description: upsDiagSubSysXRCommunicationCardFirmwareRev (PowerNet-MIB) }
+  diag_sub_sys_xr_communication_card.*.serial_num: { type: string, description: upsDiagSubSysXRCommunicationCardSerialNum (PowerNet-MIB) }
+  diagnostic_subsystem.diag_sub_sys_external_power_frame_board_table_size: { type: int, description: upsDiagSubSysExternalPowerFrameBoardTableSize (PowerNet-MIB) }
+  diag_sub_sys_external_power_frame_board.*.frame_index: { type: int, description: upsDiagSubSysExternalPowerFrameBoardFrameIndex (PowerNet-MIB) }
+  diag_sub_sys_external_power_frame_board.*.status: { type: string, description: "upsDiagSubSysExternalPowerFrameBoardStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diagnostic_subsystem.diag_sub_sys_charger_table_size: { type: int, description: upsDiagSubSysChargerTableSize (PowerNet-MIB) }
+  diag_sub_sys_charger.*.frame_index: { type: int, description: upsDiagSubSysChargerFrameIndex (PowerNet-MIB) }
+  diag_sub_sys_charger.*.status: { type: string, description: "upsDiagSubSysChargerStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diagnostic_subsystem.diag_sub_sys_inverter_table_size: { type: int, description: upsDiagSubSysInverterTableSize (PowerNet-MIB) }
+  diag_sub_sys_inverter.*.frame_index: { type: int, description: upsDiagSubSysInverterFrameIndex (PowerNet-MIB) }
+  diag_sub_sys_inverter.*.status: { type: string, description: "upsDiagSubSysInverterStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diag_sub_sys_inverter.*.firmware_rev: { type: string, description: upsDiagSubSysInverterFirmwareRev (PowerNet-MIB) }
+  diag_sub_sys_inverter.*.hardware_rev: { type: string, description: upsDiagSubSysInverterHardwareRev (PowerNet-MIB) }
+  diag_sub_sys_inverter.*.serial_num: { type: string, description: upsDiagSubSysInverterSerialNum (PowerNet-MIB) }
+  diag_sub_sys_inverter.*.manufacture_date: { type: string, description: upsDiagSubSysInverterManufactureDate (PowerNet-MIB) }
+  diagnostic_subsystem.diag_sub_sys_power_factor_correction_table_size: { type: int, description: upsDiagSubSysPowerFactorCorrectionTableSize (PowerNet-MIB) }
+  diag_sub_sys_power_factor_correction.*.frame_index: { type: int, description: upsDiagSubSysPowerFactorCorrectionFrameIndex (PowerNet-MIB) }
+  diag_sub_sys_power_factor_correction.*.status: { type: string, description: "upsDiagSubSysPowerFactorCorrectionStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diag_sub_sys_power_factor_correction.*.firmware_rev: { type: string, description: upsDiagSubSysPowerFactorCorrectionFirmwareRev (PowerNet-MIB) }
+  diag_sub_sys_power_factor_correction.*.hardware_rev: { type: string, description: upsDiagSubSysPowerFactorCorrectionHardwareRev (PowerNet-MIB) }
+  diag_sub_sys_power_factor_correction.*.serial_num: { type: string, description: upsDiagSubSysPowerFactorCorrectionSerialNum (PowerNet-MIB) }
+  diag_sub_sys_power_factor_correction.*.manufacture_date: { type: string, description: upsDiagSubSysPowerFactorCorrectionManufactureDate (PowerNet-MIB) }
+  diagnostic_subsystem.diag_sub_sys_network_com_card_table_size: { type: int, description: upsDiagSubSysNetworkComCardTableSize (PowerNet-MIB) }
+  diag_sub_sys_network_com_card.*.model_number: { type: string, description: upsDiagSubSysNetworkComCardModelNumber (PowerNet-MIB) }
+  diag_sub_sys_network_com_card.*.serial_number: { type: string, description: upsDiagSubSysNetworkComCardSerialNumber (PowerNet-MIB) }
+  diag_sub_sys_network_com_card.*.date_of_manufacture: { type: string, description: upsDiagSubSysNetworkComCardDateOfManufacture (PowerNet-MIB) }
+  diag_sub_sys_network_com_card.*.hardware_rev: { type: string, description: upsDiagSubSysNetworkComCardHardwareRev (PowerNet-MIB) }
+  diag_sub_sys_network_com_card.*.firmware_app_rev: { type: string, description: upsDiagSubSysNetworkComCardFirmwareAppRev (PowerNet-MIB) }
+  diag_sub_sys_network_com_card.*.firmware_app_os_rev: { type: string, description: upsDiagSubSysNetworkComCardFirmwareAppOSRev (PowerNet-MIB) }
+  diagnostic_subsystem.diag_sub_sys_usr_supp_batt_monitor_table_size: { type: int, description: upsDiagSubSysUsrSuppBattMonitorTableSize (PowerNet-MIB) }
+  diag_sub_sys_usr_supp_batt_monitor.*.status: { type: string, description: "upsDiagSubSysUsrSuppBattMonitorStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diag_sub_sys_usr_supp_batt_monitor.*.firmware_rev: { type: string, description: upsDiagSubSysUsrSuppBattMonitorFirmwareRev (PowerNet-MIB) }
+  diag_sub_sys_usr_supp_batt_monitor.*.hardware_rev: { type: string, description: upsDiagSubSysUsrSuppBattMonitorHardwareRev (PowerNet-MIB) }
+  diag_sub_sys_usr_supp_batt_monitor.*.serial_num: { type: string, description: upsDiagSubSysUsrSuppBattMonitorSerialNum (PowerNet-MIB) }
+  diag_sub_sys_usr_supp_batt_monitor.*.temperature: { type: int, unit: "0.1 °C", description: upsDiagSubSysUsrSuppBattMonitorTemperature (PowerNet-MIB) }
+  diagnostic_subsystem.diag_sub_sys_usr_supp_batt_breaker_status: { type: string, description: "upsDiagSubSysUsrSuppBattBreakerStatus (PowerNet-MIB): unknown, not_installed, opened, closed" }
+  diagnostic_subsystem.diag_sub_sys_psu_table_size: { type: int, description: upsDiagSubSysPSUTableSize (PowerNet-MIB) }
+  diag_sub_sys_psu.*.status: { type: string, description: "upsDiagSubSysPSUStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diagnostic_subsystem.diag_sub_sys_idrc_table_size: { type: int, description: upsDiagSubSysIDRCTableSize (PowerNet-MIB) }
+  diag_sub_sys_idrc.*.status: { type: string, description: "upsDiagSubSysIDRCStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diag_sub_sys_idrc.*.firmware_rev: { type: string, description: upsDiagSubSysIDRCFirmwareRev (PowerNet-MIB) }
+  diag_sub_sys_idrc.*.hardware_rev: { type: string, description: upsDiagSubSysIDRCHardwareRev (PowerNet-MIB) }
+  diag_sub_sys_idrc.*.serial_num: { type: string, description: upsDiagSubSysIDRCSerialNum (PowerNet-MIB) }
+  diagnostic_subsystem.diag_sub_sys_external_connector_status: { type: string, description: "upsDiagSubSysExternalConnectorStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diagnostic_subsystem.diag_sub_sys_backfeed_contactor_table_size: { type: int, description: upsDiagSubSysBackfeedContactorTableSize (PowerNet-MIB) }
+  diag_sub_sys_backfeed_contactor.*.sysbackfeed_contactor_name: { type: string, description: upsDiagSubSysbackfeedContactorName (PowerNet-MIB) }
+  diag_sub_sys_backfeed_contactor.*.sysbackfeed_contactor_type: { type: string, description: "upsDiagSubSysbackfeedContactorType (PowerNet-MIB): unknown, normal_ac, bypass_ac" }
+  diag_sub_sys_backfeed_contactor.*.sysbackfeed_contactor_status: { type: string, description: "upsDiagSubSysbackfeedContactorStatus (PowerNet-MIB): unknown, opened, closed" }
+  diagnostic_subsystem.diag_sub_sys_int_byp_switch_fan_lifetime_info_table_size: { type: int, description: upsDiagSubSysIntBypSwitchFanLifetimeInfoTableSize (PowerNet-MIB) }
+  diag_sub_sys_int_byp_switch_fan_lifetime_info.*.status: { type: string, description: "upsDiagSubSysIntBypSwitchFanLifetimeStatus (PowerNet-MIB): ok, near_end, exceeded, unknown" }
+  diag_sub_sys_int_byp_switch_fan_lifetime_info.*.estmtd_lifetime_rmng: { type: int, description: upsDiagSubSysIntBypSwitchFanEstmtdLifetimeRmng (PowerNet-MIB) }
+  diag_sub_sys_int_byp_switch_fan_lifetime_info.*.estmtd_lifetime_rmng_pct: { type: int, description: upsDiagSubSysIntBypSwitchFanEstmtdLifetimeRmngPct (PowerNet-MIB) }
+  diag_switch_gear.status: { type: string, description: "upsDiagSwitchGearStatus (PowerNet-MIB): unknown, not_installed, ok, fail, lost_comm, overtemp" }
+  diag_switch_gear.input_switch_status: { type: string, description: "upsDiagSwitchGearInputSwitchStatus (PowerNet-MIB): unknown, not_installed, opened, closed" }
+  diag_switch_gear.output_switch_status: { type: string, description: "upsDiagSwitchGearOutputSwitchStatus (PowerNet-MIB): unknown, not_installed, opened, closed" }
+  diag_switch_gear.bypass_switch_status: { type: string, description: "upsDiagSwitchGearBypassSwitchStatus (PowerNet-MIB): unknown, not_installed, opened, closed" }
+  diag_switch_gear.bypass_input_switch_status: { type: string, description: "upsDiagSwitchGearBypassInputSwitchStatus (PowerNet-MIB): unknown, not_installed, opened, closed" }
+  diag_switch_gear.breaker_table_size: { type: int, description: upsDiagSwitchGearBreakerTableSize (PowerNet-MIB) }
+  diag_switch_gear_breaker.*.switchgear_breaker_present: { type: string, description: "switchgearBreakerPresent (PowerNet-MIB): not_present, present" }
+  diag_switch_gear_breaker.*.switchgear_breaker_name: { type: string, description: switchgearBreakerName (PowerNet-MIB) }
+  diag_switch_gear_breaker.*.switchgear_breaker_type: { type: string, description: "switchgearBreakerType (PowerNet-MIB): unknown, unit_input_breaker, static_switch_input_breaker, maintenance_bypass_breaker, unit_output_breaker, system_isolation_breaker, battery_breaker, bypass_back_feed_breaker, internal_maintenance_bypass_breaker, redundant_internal_maintenance_bypass_breaker, load_bank_breaker" }
+  diag_switch_gear_breaker.*.switchgear_breaker_status: { type: string, description: "switchgearBreakerStatus (PowerNet-MIB): unknown, opened, closed" }
+  diag_switch_gear.sub_feed_breaker_table_size: { type: int, description: upsDiagSubFeedBreakerTableSize (PowerNet-MIB) }
+  diag_sub_feed_breaker.*.subfeed_breaker_present: { type: string, description: "subfeedBreakerPresent (PowerNet-MIB): not_present, present" }
+  diag_sub_feed_breaker.*.subfeed_breaker_rating: { type: int, description: subfeedBreakerRating (PowerNet-MIB) }
+  diag_sub_feed_breaker.*.subfeed_breaker_upper_accept_power_warning: { type: int, description: subfeedBreakerUpperAcceptPowerWarning (PowerNet-MIB) }
+  diag_sub_feed_breaker.*.subfeed_breaker_upper_accept_power_critical: { type: int, description: subfeedBreakerUpperAcceptPowerCritical (PowerNet-MIB) }
+  diag_sub_feed_breaker.*.subfeed_breaker_status: { type: string, description: "subfeedBreakerStatus (PowerNet-MIB): unknown, not_installed, opened, closed" }
+  diag_sub_feed_breaker.*.subfeed_breaker_name: { type: string, description: subfeedBreakerName (PowerNet-MIB) }
+  diag_sub_feed_breaker.*.subfeed_breaker_current: { type: int, unit: "0.1 A", description: subfeedBreakerCurrent (PowerNet-MIB) }
+  diag_switch_gear.installation_load_pct: { type: int, description: upsDiagSwitchGearInstallationLoadPct (PowerNet-MIB) }
+  diag_sub_feed_phase.*.breaker_index: { type: int, description: upsDiagSubFeedBreakerIndex (PowerNet-MIB) }
+  diag_sub_feed_phase.*.current: { type: int, unit: A, description: upsDiagSubFeedPhaseCurrent (PowerNet-MIB) }
+  diag_sub_feed_phase.*.current_alternate: { type: int, unit: "0.1 A", description: upsDiagSubFeedPhaseCurrentAlternate (PowerNet-MIB) }
+  diag_switch_gear.switchgear_serial_number: { type: string, description: upsDiagSwitchgearSerialNumber (PowerNet-MIB) }
+  diag_switch_gear.switchgear_ambient_temperature: { type: int, unit: "0.1 °C", description: upsDiagSwitchgearAmbientTemperature (PowerNet-MIB) }
+  diag_switch_gear.usr_supp_switchgear_monitor_table_size: { type: int, description: upsDiagUsrSuppSwitchgearMonitorTableSize (PowerNet-MIB) }
+  diag_usr_supp_switchgear_monitor.*.status: { type: string, description: "upsDiagUsrSuppSwitchgearMonitorStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diag_usr_supp_switchgear_monitor.*.firmware_rev: { type: string, description: upsDiagUsrSuppSwitchgearMonitorFirmwareRev (PowerNet-MIB) }
+  diag_usr_supp_switchgear_monitor.*.hardware_rev: { type: string, description: upsDiagUsrSuppSwitchgearMonitorHardwareRev (PowerNet-MIB) }
+  diag_usr_supp_switchgear_monitor.*.serial_num: { type: string, description: upsDiagUsrSuppSwitchgearMonitorSerialNum (PowerNet-MIB) }
+  diag_usr_supp_switchgear_monitor.*.temperature: { type: int, unit: "0.1 °C", description: upsDiagUsrSuppSwitchgearMonitorTemperature (PowerNet-MIB) }
+  diag_mccb_box.status: { type: string, description: "upsDiagMCCBBoxStatus (PowerNet-MIB): unknown, not_installed, opened, closed" }
+  diag_transformer.status: { type: string, description: "upsDiagTransformerStatus (PowerNet-MIB): unknown, not_installed, ok, fail, lost_comm, overtemp, opened, closed" }
+  diag_fly_wheel.status: { type: string, description: "upsDiagFlyWheelStatus (PowerNet-MIB): unknown, present, not_present" }
+  diagnostic_com_bus.diag_com_bus_internal_mim_status: { type: string, description: "upsDiagComBusInternalMIMStatus (PowerNet-MIB): unknown, not_installed, ok, lost_comm, rx_failure, tx_failure" }
+  diagnostic_com_bus.diag_com_bus_internal_rim_status: { type: string, description: "upsDiagComBusInternalRIMStatus (PowerNet-MIB): unknown, not_installed, ok, lost_comm, rx_failure, tx_failure" }
+  diagnostic_com_bus.diag_com_bus_mi_mto_rim_status: { type: string, description: "upsDiagComBusMIMtoRIMStatus (PowerNet-MIB): unknown, not_installed, ok, lost_comm, rx_failure, tx_failure" }
+  diagnostic_com_bus.diag_com_bus_external_mim_status: { type: string, description: "upsDiagComBusExternalMIMStatus (PowerNet-MIB): unknown, not_installed, ok, lost_comm, rx_failure, tx_failure" }
+  diagnostic_com_bus.diag_com_bus_external_rim_status: { type: string, description: "upsDiagComBusExternalRIMStatus (PowerNet-MIB): unknown, not_installed, ok, lost_comm, rx_failure, tx_failure" }
+  diagnostic_power_cabinet_table_size: { type: int, description: upsDiagnosticPowerCabinetTableSize (PowerNet-MIB) }
+  diagnostic_power_cabinet.*.ambient_temperature: { type: int, unit: "0.1 °C", description: upsDiagnosticPowerCabinetAmbientTemperature (PowerNet-MIB) }
+  diagnostic_display.hardware_rev: { type: string, description: upsDiagnosticDisplayHardwareRev (PowerNet-MIB) }
+  diagnostic_display.serial_num: { type: string, description: upsDiagnosticDisplaySerialNum (PowerNet-MIB) }
+  diagnostic_display.firmware_rev: { type: string, description: upsDiagnosticDisplayFirmwareRev (PowerNet-MIB) }
+  diagnostic_display.model_num: { type: string, description: upsDiagnosticDisplayModelNum (PowerNet-MIB) }
+  diagnostic_display.status: { type: string, description: "upsDiagnosticDisplayStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diagnostic_unit_controller.diag_unit_controller_table_size: { type: int, description: upsDiagUnitControllerTableSize (PowerNet-MIB) }
+  diag_unit_controller.*.status: { type: string, description: "upsDiagUnitControllerStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diag_unit_controller.*.firmware_rev: { type: string, description: upsDiagUnitControllerFirmwareRev (PowerNet-MIB) }
+  diag_unit_controller.*.hardware_rev: { type: string, description: upsDiagUnitControllerHardwareRev (PowerNet-MIB) }
+  diag_unit_controller.*.serial_num: { type: string, description: upsDiagUnitControllerSerialNum (PowerNet-MIB) }
+  diag_unit_controller.*.model_num: { type: string, description: upsDiagUnitControllerModelNum (PowerNet-MIB) }
+  diagnostic_slc.hardware_rev: { type: string, description: upsDiagnosticSLCHardwareRev (PowerNet-MIB) }
+  diagnostic_slc.serial_num: { type: string, description: upsDiagnosticSLCSerialNum (PowerNet-MIB) }
+  diagnostic_slc.firmware_rev: { type: string, description: upsDiagnosticSLCFirmwareRev (PowerNet-MIB) }
+  diagnostic_slc.model_number: { type: string, description: upsDiagnosticSLCModelNumber (PowerNet-MIB) }
+  diagnostic_slc.diag_slc_status: { type: string, description: "upsDiagSLCStatus (PowerNet-MIB): unknown, not_installed, off_ok, on_ok, off_fail, on_fail, lost_comm" }
+  diagnostic_temperature.ambient_temperature: { type: int, unit: "0.1 °C", description: upsDiagnosticTemperatureAmbientTemperature (PowerNet-MIB) }
+  diagnostic_life_cycle_management.diag_lcmdc_capacitor_maintenance_interval: { type: int, description: upsDiagLCMDCCapacitorMaintenanceInterval (PowerNet-MIB) }
+  diagnostic_life_cycle_management.diag_lcmdc_capacitor_time_since_maintenance: { type: int, description: upsDiagLCMDCCapacitorTimeSinceMaintenance (PowerNet-MIB) }
+  diagnostic_life_cycle_management.diag_lcmac_capacitor_maintenance_interval: { type: int, description: upsDiagLCMACCapacitorMaintenanceInterval (PowerNet-MIB) }
+  diagnostic_life_cycle_management.diag_lcmac_capacitor_time_since_maintenance: { type: int, description: upsDiagLCMACCapacitorTimeSinceMaintenance (PowerNet-MIB) }
+  diagnostic_life_cycle_management.diag_lcm_battery_maintenance_interval: { type: int, description: upsDiagLCMBatteryMaintenanceInterval (PowerNet-MIB) }
+  diagnostic_life_cycle_management.diag_lcm_battery_time_since_maintenance: { type: int, description: upsDiagLCMBatteryTimeSinceMaintenance (PowerNet-MIB) }
+  diagnostic_life_cycle_management.diag_lcm_aux_power_supply_maintenance_interval: { type: int, description: upsDiagLCMAuxPowerSupplyMaintenanceInterval (PowerNet-MIB) }
+  diagnostic_life_cycle_management.diag_lcm_aux_power_supply_time_since_maintenance: { type: int, description: upsDiagLCMAuxPowerSupplyTimeSinceMaintenance (PowerNet-MIB) }
+  diagnostic_life_cycle_management.diag_lcm_air_filter_maintenance_interval: { type: int, description: upsDiagLCMAirFilterMaintenanceInterval (PowerNet-MIB) }
+  diagnostic_life_cycle_management.diag_lcm_air_filter_time_since_maintenance: { type: int, description: upsDiagLCMAirFilterTimeSinceMaintenance (PowerNet-MIB) }
+  diagnostic_life_cycle_management.diag_lcm_warranty_interval: { type: int, description: upsDiagLCMWarrantyInterval (PowerNet-MIB) }
+  diagnostic_life_cycle_management.diag_lcm_warranty_elapsed_time: { type: int, description: upsDiagLCMWarrantyElapsedTime (PowerNet-MIB) }
+  diagnostic_relative_humidity.pct: { type: int, description: upsDiagnosticRelativeHumidityPct (PowerNet-MIB) }
+  parallel_system.sys_local_address: { type: int, description: upsParallelSysLocalAddress (PowerNet-MIB) }
+  parallel_system.sys_remote_address: { type: int, description: upsParallelSysRemoteAddress (PowerNet-MIB) }
+  parallel_system.sys_redundancy: { type: string, description: "upsParallelSysRedundancy (PowerNet-MIB): nplus0, nplus1, nplus2, nplus3, nplus4, nplus5" }
+  parallel_system.input_maximum_current: { type: int, unit: A, description: upsParallelInputMaximumCurrent (PowerNet-MIB) }
+  parallel_system.total_output_power: { type: int, description: upsParallelTotalOutputPower (PowerNet-MIB) }
+  parallel_system.total_output_apparent_power: { type: int, description: upsParallelTotalOutputApparentPower (PowerNet-MIB) }
+  parallel_input_phase.*.*.current: { type: int, unit: A, description: upsParallelInputCurrent (PowerNet-MIB) }
+  parallel_input_phase.*.*.active_power: { type: int, description: upsParallelInputActivePower (PowerNet-MIB) }
+  parallel_input_phase.*.*.apparent_power: { type: int, description: upsParallelInputApparentPower (PowerNet-MIB) }
+  parallel_input_phase.*.*.voltage: { type: int, unit: V, description: upsParallelInputVoltage (PowerNet-MIB) }
+  parallel_input_phase.*.*.max_voltage: { type: int, unit: V, description: upsParallelInputMaxVoltage (PowerNet-MIB) }
+  parallel_input_phase.*.*.max_current: { type: int, unit: A, description: upsParallelInputMaxCurrent (PowerNet-MIB) }
+  parallel_input_phase.*.*.total_active_power: { type: int, description: upsParallelInputTotalActivePower (PowerNet-MIB) }
+  parallel_input_phase.*.*.total_apparent_power: { type: int, description: upsParallelInputTotalApparentPower (PowerNet-MIB) }
+  parallel_output_phase.*.*.current: { type: int, unit: A, description: upsParallelOutputCurrent (PowerNet-MIB) }
+  parallel_output_phase.*.*.load: { type: int, description: upsParallelOutputLoad (PowerNet-MIB) }
+  parallel_output_phase.*.*.percent_load: { type: int, description: upsParallelOutputPercentLoad (PowerNet-MIB) }
+  parallel_output_phase.*.*.power: { type: int, unit: W, description: upsParallelOutputPower (PowerNet-MIB) }
+  parallel_output_apparent_power.*.power: { type: int, description: upsParallelOutputApparentPower (PowerNet-MIB) }
+  parallel_diag_sub_sys_breaker.*.*.status: { type: string, description: "upsParallelDiagSubSysBreakerStatus (PowerNet-MIB): unknown, not_installed, opened, closed" }
+  parallel_diag_sub_sys_breaker.*.*.name: { type: string, description: upsParallelDiagSubSysBreakerName (PowerNet-MIB) }
+  parallel_system.output_total_percent_load: { type: int, description: upsParallelOutputTotalPercentLoad (PowerNet-MIB) }
+  parallel_output_active_power.*.power: { type: int, description: upsParallelOutputActivePower (PowerNet-MIB) }
+  parallel_system.sys_switch_gear_installation_load_pct: { type: int, description: upsParallelSysSwitchGearInstallationLoadPct (PowerNet-MIB) }
+  parallel_system.sys_redundancy_status: { type: string, description: "upsParallelSysRedundancyStatus (PowerNet-MIB): nplus0, nplus1, nplus2, nplus3, nplus4, nplus5" }
+  parallel_system.sys_name: { type: string, description: upsParallelSysName (PowerNet-MIB) }
+  parallel_system.sys_ups_table_size: { type: int, description: upsParallelSysUpsTableSize (PowerNet-MIB) }
+  parallel_sys_ups.*.name: { type: string, description: upsParallelSysUpsName (PowerNet-MIB) }
+  parallel_sys_ups.*.alarm_status: { type: string, description: "upsParallelSysUpsAlarmStatus (PowerNet-MIB): unknown, normal, informational, warning, critical" }
+  parallel_sys_ups.*.mode: { type: string, description: "upsParallelSysUpsMode (PowerNet-MIB): unknown, on_line, on_battery, on_battery_test, requested_static_bypass, forced_bypass, maintenance_bypass, off, eco_mode, hot_standby, inquiring" }
+  parallel_sys_ups.*.serial_number: { type: string, description: upsParallelSysUpsSerialNumber (PowerNet-MIB) }
+  parallel_system.num_of_ups_powering_load: { type: int, description: upsParallelNumOfUpsPoweringLoad (PowerNet-MIB) }
+  parallel_system.min_num_of_required_ups: { type: int, description: upsParallelMinNumOfRequiredUps (PowerNet-MIB) }
+  physical_layout.io_frame_layout_position_id: { type: int, description: upsIOFrameLayoutPositionID (PowerNet-MIB) }
+  physical_layout.bottom_feed_frame_layout_position_id: { type: int, description: upsBottomFeedFrameLayoutPositionID (PowerNet-MIB) }
+  physical_layout.switch_gear_layout_position_id: { type: int, description: upsSwitchGearLayoutPositionID (PowerNet-MIB) }
+  physical_layout.battery_frame_layout_table_size: { type: int, description: upsBatteryFrameLayoutTableSize (PowerNet-MIB) }
+  battery_frame_layout.*.battery_frame_position_id: { type: int, description: batteryFramePositionID (PowerNet-MIB) }
+  physical_layout.side_car_frame_layout_table_size: { type: int, description: upsSideCarFrameLayoutTableSize (PowerNet-MIB) }
+  side_car_frame_layout.*.side_car_frame_position_id: { type: int, description: sideCarFramePositionID (PowerNet-MIB) }
+  physical_layout.power_frame_layout_table_size: { type: int, description: upsPowerFrameLayoutTableSize (PowerNet-MIB) }
+  power_frame_layout.*.power_frame_position_id: { type: int, description: powerFramePositionID (PowerNet-MIB) }
+  integrated_ats.selected_source: { type: string, description: "upsIntegratedATSSelectedSource (PowerNet-MIB): no_source_selected, unknown, source_a, source_b" }
+  integrated_ats.preferred_source: { type: string, description: "upsIntegratedATSPreferredSource (PowerNet-MIB): ups_integrated_ats_no_source_preference, ups_integrated_ats_prefer_source_a, ups_integrated_ats_prefer_source_b" }
+  integrated_ats.ups_return_staggering: { type: int, description: upsIntegratedATSUpsReturnStaggering (PowerNet-MIB) }
+  integrated_ats.source_table_size: { type: int, description: upsIntegratedATSSourceTableSize (PowerNet-MIB) }
+  integrated_ats_source.*.name: { type: string, description: upsIntegratedATSSourceName (PowerNet-MIB) }
+  integrated_ats_source.*.status: { type: string, description: "upsIntegratedATSSourceStatus (PowerNet-MIB): ups_integrated_ats_source_good, ups_integrated_ats_source_bad, ups_integrated_ats_source_unknown" }
+  integrated_ats_source.*.line_fail_delay: { type: int, unit: s, description: upsIntegratedATSLineFailDelay (PowerNet-MIB) }
+  integrated_ats_source.*.line_stability_delay: { type: int, unit: s, description: upsIntegratedATSLineStabilityDelay (PowerNet-MIB) }
+  dc_output_status_table_size: { type: int, description: upsDCOutputStatusTableSize (PowerNet-MIB) }
+  dc_output_status.*.voltage_nominal: { type: int, unit: "0.1 V", description: upsDCOutputStatusVoltageNominal (PowerNet-MIB) }
+  dc_output_status.*.current_rating: { type: int, unit: "0.1 A", description: upsDCOutputStatusCurrentRating (PowerNet-MIB) }
+  dc_output_status.*.voltage: { type: int, unit: "0.1 V", description: upsDCOutputStatusVoltage (PowerNet-MIB) }
+  dc_output_status.*.current: { type: int, unit: "0.1 A", description: upsDCOutputStatusCurrent (PowerNet-MIB) }
+  dc_output_status.*.abnormal_conditions: { type: string, description: upsDCOutputStatusAbnormalConditions (PowerNet-MIB) }
+  output_relays.relay_status_table_size: { type: int, description: upsOutputRelayStatusTableSize (PowerNet-MIB) }
+  output_relay_status.*.state: { type: string, description: "upsOutputRelayState (PowerNet-MIB): output_relay_normal_state, output_relay_abnormal_state" }
+  output_relay_status.*.detailed_status: { type: string, description: upsOutputRelayDetailedStatus (PowerNet-MIB) }
+  output_relays.relay_config_table_size: { type: int, description: upsOutputRelayConfigTableSize (PowerNet-MIB) }
+  output_relay_config.*.delay: { type: int, description: upsOutputRelayConfigDelay (PowerNet-MIB) }
+  output_relay_config.*.cause: { type: string, description: "upsOutputRelayConfigCause (PowerNet-MIB): output_relay_config_cause_none, output_relay_config_cause_on_bat_pwr_fail, output_relay_config_cause_on_bat_pwr_fail_except_peak_period, output_relay_config_cause_lo_bat_while_on_bat, output_relay_config_cause_alarm, output_relay_config_cause_fault, output_relay_config_cause_output_on, output_relay_config_cause_output_off, output_relay_config_cause_online, output_relay_config_cause_in_bypass" }
+  output_relays.relay_config_polarity: { type: string, description: "upsOutputRelayConfigPolarity (PowerNet-MIB): ups_output_relay_all_relays_energized_when_true, ups_output_relay_all_relays_not_energized_when_true" }
+  output_relays.relay_config_peak_period: { type: string, description: upsOutputRelayConfigPeakPeriod (PowerNet-MIB) }
+  input_contacts.contact_status_table_size: { type: int, description: upsInputContactStatusTableSize (PowerNet-MIB) }
+  input_contact_status.*.state: { type: string, description: "upsInputContactState (PowerNet-MIB): ups_input_contact_normal_state, ups_input_contact_abnormal_state" }
+  input_contacts.contact_config_table_size: { type: int, description: upsInputContactConfigTableSize (PowerNet-MIB) }
+  input_contact_config.*.action: { type: string, description: "upsInputContactConfigAction (PowerNet-MIB): ups_input_contact_config_action_none, ups_input_contact_config_action_self_test, ups_input_contact_config_action_external_alarm_on, ups_input_contact_config_action_external_alarm_off, ups_input_contact_config_action_output_off_no_delay, ups_input_contact_config_action_output_on" }
+  input_contacts.contact_config_polarity: { type: string, description: "upsInputContactConfigPolarity (PowerNet-MIB): ups_input_contact_all_contacts_closed_equals_true, ups_input_contact_all_contacts_open_equals_true" }
+  ec_omode.eco_mode_freq_transfer_range: { type: int, unit: Hz, description: upsEcoModeFreqTransferRange (PowerNet-MIB) }
+  ec_omode.eco_mode_high_volt_threshold: { type: int, unit: V, description: upsEcoModeHighVoltThreshold (PowerNet-MIB) }
+  ec_omode.eco_mode_low_volt_threshold: { type: int, unit: V, description: upsEcoModeLowVoltThreshold (PowerNet-MIB) }
+  ec_omode.eco_mode_setting: { type: string, description: "upsEcoModeSetting (PowerNet-MIB): enabled, disabled" }
+  ec_omode.eco_mode_status: { type: string, description: "upsEcoModeStatus (PowerNet-MIB): active, inactive" }
+  ec_omode.eco_mode_count_since_reset: { type: int, description: upsEcoModeCountSinceReset (PowerNet-MIB) }
+  ec_omode.eco_mode_online_since_commission: { type: int, unit: min, description: upsEcoModeOnlineSinceCommission (PowerNet-MIB) }
+  ec_omode.eco_mode_online_since_reset: { type: int, unit: min, description: upsEcoModeOnlineSinceReset (PowerNet-MIB) }
+  ec_omode.eco_mode_total_percent_time_since_reset: { type: int, description: upsEcoModeTotalPercentTimeSinceReset (PowerNet-MIB) }
+  ec_omode.eco_mode_percent_time_since_commission: { type: int, description: upsEcoModePercentTimeSinceCommission (PowerNet-MIB) }
+  ec_omode.eco_mode_total_time_since_reset: { type: int, unit: min, description: upsEcoModeTotalTimeSinceReset (PowerNet-MIB) }
+  ec_omode.eco_mode_total_time_since_commission: { type: int, unit: min, description: upsEcoModeTotalTimeSinceCommission (PowerNet-MIB) }
+  ec_omode.eco_mode_total_time_in_month: { type: int, unit: min, description: upsEcoModeTotalTimeInMonth (PowerNet-MIB) }
+  eb_mmode.ebm_mode_setting: { type: string, description: "upsEbmModeSetting (PowerNet-MIB): enabled, disabled" }
+  eb_mmode.ebm_mode_status: { type: string, description: "upsEbmModeStatus (PowerNet-MIB): active, inactive" }
+  eb_mmode.ebm_mode_count_since_reset: { type: int, description: upsEbmModeCountSinceReset (PowerNet-MIB) }
+  eb_mmode.ebm_mode_total_time_in_month: { type: int, unit: min, description: upsEbmModeTotalTimeInMonth (PowerNet-MIB) }
+  eb_mmode.ebm_mode_total_time_since_reset: { type: int, unit: min, description: upsEbmModeTotalTimeSinceReset (PowerNet-MIB) }
+  eb_mmode.ebm_mode_total_percent_time_since_reset: { type: int, description: upsEbmModeTotalPercentTimeSinceReset (PowerNet-MIB) }
+  eb_mmode.ebm_mode_online_since_commission: { type: int, unit: min, description: upsEbmModeOnlineSinceCommission (PowerNet-MIB) }
+  eb_mmode.ebm_mode_percent_time_since_commission: { type: int, description: upsEbmModePercentTimeSinceCommission (PowerNet-MIB) }
+  eb_mmode.ebm_mode_runtime_since_commission: { type: int, unit: min, description: upsEbmModeRuntimeSinceCommission (PowerNet-MIB) }
+  eb_mmode.ebm_mode_online_since_reset: { type: int, unit: min, description: upsEbmModeOnlineSinceReset (PowerNet-MIB) }
+  eb_mmode.ebm_mode_ups_count: { type: int, description: upsEbmModeUpsCount (PowerNet-MIB) }
+  battery_stats.reset: { type: string, description: "upsBatteryStatsReset (PowerNet-MIB): not_supported, no_operation, reset" }
+  battery_stats.time_since_reset: { type: int, unit: min, description: upsBatteryStatsTimeSinceReset (PowerNet-MIB) }
+  battery_stats.time_on_battery: { type: int, unit: min, description: upsBatteryStatsTimeOnBattery (PowerNet-MIB) }
+  operational_stats.op_stats_reset: { type: string, description: "upsOpStatsReset (PowerNet-MIB): not_supported, no_operation, reset" }
+  operational_stats.op_stats_time_since_reset: { type: int, unit: min, description: upsOpStatsTimeSinceReset (PowerNet-MIB) }
+  operational_stats.op_stats_time_in_normal_operation: { type: int, unit: min, description: upsOpStatsTimeInNormalOperation (PowerNet-MIB) }
+  operational_stats.op_stats_time_in_bypass_operation: { type: int, unit: min, description: upsOpStatsTimeInBypassOperation (PowerNet-MIB) }
+  operational_stats.op_stats_time_in_ec_omode_operation: { type: int, unit: min, description: upsOpStatsTimeInECOmodeOperation (PowerNet-MIB) }
+  operational_stats.op_stats_time_in_econversion_operation: { type: int, unit: min, description: upsOpStatsTimeInEconversionOperation (PowerNet-MIB) }
+  energy_efficiency_stats.reset: { type: string, description: "upsEnergyEfficiencyStatsReset (PowerNet-MIB): not_supported, no_operation, reset" }
+  energy_efficiency_stats.output_energy_time_since_reset: { type: int, unit: min, description: upsEnergyEfficiencyStatsOutputEnergyTimeSinceReset (PowerNet-MIB) }
+  energy_efficiency_stats.time_in_ec_omode: { type: int, unit: min, description: upsEnergyEfficiencyStatsTimeInECOmode (PowerNet-MIB) }
+  energy_efficiency_stats.time_in_econversion: { type: int, unit: min, description: upsEnergyEfficiencyStatsTimeInEconversion (PowerNet-MIB) }
+  energy_efficiency_stats.input_energy_usage: { type: int, description: upsEnergyEfficiencyStatsInputEnergyUsage (PowerNet-MIB) }
+  energy_efficiency_stats.output_energy_usage: { type: int, description: upsEnergyEfficiencyStatsOutputEnergyUsage (PowerNet-MIB) }
+  energy_efficiency_stats.input_energy_time_since_reset: { type: int, unit: min, description: upsEnergyEfficiencyStatsInputEnergyTimeSinceReset (PowerNet-MIB) }
+  energy_efficiency_stats.ec_omode_time_since_reset: { type: int, unit: min, description: upsEnergyEfficiencyStatsECOmodeTimeSinceReset (PowerNet-MIB) }
+  energy_efficiency_stats.econversion_time_since_reset: { type: int, unit: min, description: upsEnergyEfficiencyStatsEconversionTimeSinceReset (PowerNet-MIB) }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      The control commands act on the UPS's output at once and cannot be undone live: set_adv_control_ups_off,
+      set_adv_control_reboot_shutdown_ups, set_adv_control_ups_sleep, set_adv_control_reboot_ups_with_or_without_ac,
+      set_adv_control_bypass_switch, set_adv_control_simulate_power_fail, set_basic_control_conserve_battery and
+      set_outlet_group_control_command turn off, reboot or transfer the load; set_adv_test_runtime_calibration
+      discharges the battery; set_adv_control_firmware_update starts a firmware update. Each acts as PowerNet-MIB
+      describes its values, gracefully or after the configured delays where the value says so.
+  - models: [all]
+    severity: info
+    text: >
+      State and commands are named after PowerNet-MIB's ups group, the "ups" prefix left off: each table is keyed by
+      the row index the agent gives, enumerations are the MIB's labels in snake case, and numbers are as the MIB
+      counts them (tenths of volts in the high-precision objects, TimeTicks for runtimes), with the unit in each
+      key's description where the MIB states it. A UPS lists only the objects its family has.
+  - models: [all]
+    severity: info
+    text: >
+      A control object reads back as the state it caused rather than the action written (upsAdvControlUpsOff reads
+      no_turn_ups_off), so each command reads its group or table again after the SET; the result of a delayed or
+      graceful action shows at a later poll.
+  - models: [all]
+    severity: info
+    text: >
+      Each notification received is a message event, {event: message, address, args, source}: address is its
+      snmpTrapOID (a v1 trap's as RFC 3584 §3.1 derives it, enterprises.318.0.n for PowerNet-MIB's traps), args is
+      the same object as traps.last with the MIB's trap name, and a notification starts a poll half a second later.
+      Point the UPS's trap receiver at the core's address and trap_port.
+  - models: [all]
+    severity: info
+    text: >
+      v1 and v2c agents drop requests with a wrong community without answering, so a wrong community looks like an
+      agent that is not there (disconnected, commands time out). SETs need the write community the card is
+      configured with (write_community), or a v3 user with write access.
+  - models: [all]
+    severity: info
+    text: >
+      Opening for commands only walks nothing; a GET of sysUpTime.0 each interval stays as the liveness check, and
+      notifications are still received.

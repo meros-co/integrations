@@ -42,6 +42,8 @@ mod allenheath_sq;
 mod analogway;
 #[cfg(feature = "apc-rack-pdu")]
 mod apc_rack_pdu_profile;
+#[cfg(feature = "apc-ups")]
+mod apc_ups_profile;
 #[cfg(feature = "artnet")]
 mod artnet;
 #[cfg(feature = "blackmagic-atem")]
@@ -147,7 +149,7 @@ mod philips_sicp;
 mod pjlink;
 #[cfg(feature = "posistagenet")]
 mod posistagenet;
-#[cfg(feature = "apc-rack-pdu")]
+#[cfg(any(feature = "apc-rack-pdu", feature = "apc-ups"))]
 mod powernet_traps;
 #[cfg(feature = "qsys")]
 mod qsys;
@@ -175,13 +177,25 @@ mod sennheiser_mcp;
 mod sennheiser_spectera;
 #[cfg(feature = "shure-wireless")]
 mod shure;
-#[cfg(any(feature = "generic-snmp", feature = "apc-rack-pdu"))]
+#[cfg(any(
+    feature = "generic-snmp",
+    feature = "apc-rack-pdu",
+    feature = "apc-ups"
+))]
 mod snmp;
-#[cfg(any(feature = "generic-snmp", feature = "apc-rack-pdu"))]
+#[cfg(any(
+    feature = "generic-snmp",
+    feature = "apc-rack-pdu",
+    feature = "apc-ups"
+))]
 mod snmp_ber;
-#[cfg(feature = "apc-rack-pdu")]
+#[cfg(any(feature = "apc-rack-pdu", feature = "apc-ups"))]
 mod snmp_device;
-#[cfg(any(feature = "generic-snmp", feature = "apc-rack-pdu"))]
+#[cfg(any(
+    feature = "generic-snmp",
+    feature = "apc-rack-pdu",
+    feature = "apc-ups"
+))]
 mod snmp_usm;
 #[cfg(feature = "sony-bravia-serial")]
 mod sony_bravia_serial;
@@ -432,6 +446,11 @@ pub(crate) fn construct(
         #[cfg(feature = "apc-rack-pdu")]
         "apc-rack-pdu" => Ok(Box::new(snmp_device::SnmpDevice::new(
             &apc_rack_pdu_profile::PROFILE,
+            context,
+        )?)),
+        #[cfg(feature = "apc-ups")]
+        "apc-ups" => Ok(Box::new(snmp_device::SnmpDevice::new(
+            &apc_ups_profile::PROFILE,
             context,
         )?)),
         #[cfg(feature = "generic-http")]

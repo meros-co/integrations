@@ -1215,6 +1215,8 @@ mod tests {
     /// Every profile built in, and the spec it serves.
     fn profiles() -> Vec<(&'static str, &'static Profile)> {
         vec![
+            #[cfg(feature = "apc-ups")]
+            ("apc-ups", &crate::modules::apc_ups_profile::PROFILE),
             #[cfg(feature = "apc-rack-pdu")]
             (
                 "apc-rack-pdu",

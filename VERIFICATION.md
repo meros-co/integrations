@@ -252,6 +252,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Receive a v1 trap from the PDU (an outlet turned off) and check its snmpTrapOID is enterprises.318.0.n and is named. ([specs/apc-rack-pdu.yaml:1059](specs/apc-rack-pdu.yaml#L1059))
 - [ ] Check a first-generation PDU (AP79xx) answers GETBULK walks of the rPDU group over v2c, or needs v1. ([specs/apc-rack-pdu.yaml:44](specs/apc-rack-pdu.yaml#L44))
 
+## apc-ups — APC UPS (SNMP)
+
+- [ ] Walk a Smart-UPS with a Network Management Card 2 or 3 and check which groups it fills, and that every table is keyed by single integer indexes as the MIB declares. ([specs/apc-ups.yaml:36](specs/apc-ups.yaml#L36))
+- [ ] Check that upsAdvControlUpsOff and the other control objects read back their idle value (no_turn_ups_off) after a SET, and when a graceful turn-off shows in upsBasicOutputStatus. ([specs/apc-ups.yaml:1629](specs/apc-ups.yaml#L1629))
+- [ ] Check the units taken from the MIB's descriptions (tenths of volts in the high-precision objects, TimeTicks runtimes) against the UPS's display. ([specs/apc-ups.yaml:1624](specs/apc-ups.yaml#L1624))
+- [ ] Receive a v1 trap (on battery, then back on line) and check it is named and that the poll after it shows the change. ([specs/apc-ups.yaml:1636](specs/apc-ups.yaml#L1636))
+
 ## arkaos-mediamaster — ArKaos MediaMaster
 
 - [ ] Confirm the Remote Command Service listens on TCP 45678 and takes each command as a line ended by CR LF; the user guide does not say. ([specs/arkaos-mediamaster.yaml:49](specs/arkaos-mediamaster.yaml#L49))
