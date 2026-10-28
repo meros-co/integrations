@@ -1,0 +1,148 @@
+spec: 1
+id: atlona-sw510w-rest
+name: Atlona AT-UHD-SW-510W (REST API)
+vendor: Atlona
+category: router
+
+# The AT-UHD-SW-510W's REST commands, the part of its API that is not on
+# Telnet: GET /API?method=<Command>&<parameter>=<value>... answered with a JSON
+# object holding "result". They set the Wi-Fi fence that drops weak wireless
+# clients, drop one client, and set the weekly maintenance reboot. The Telnet
+# commands are in the atlona-ms52w spec (model at-uhd-sw-510w).
+source:
+  - title: "AT-UHD-SW-510W Application Programming Interface, firmware 2.9.1 (version 13, February 2021)"
+    author: Atlona Inc.
+    url: https://atlona.com/pdf/AT-UHD-SW-510W_API.pdf
+    note: >
+      Manufacturer document, read from the Internet Archive's copy of Atlona's URL
+      (web.archive.org/web/20220517003648). REST commands, case-sensitive (p.29): Net:WiFiFence:Get and Set
+      (enable, period 5000-60000 ms, threshold in dB, duration in minutes, timethreshold in ms; p.29-30),
+      Net:WiFiStations:Kick (mac, timeout in minutes; p.31), System:MaintenanceTime:Get and Set (enable, the
+      days monday to sunday, timezone, and the time as hour and minute; p.31-32), each with its example URL
+      (http://[ip]/API?method=...) and answer.
+
+transport:
+  type: http
+  port: 80
+  scheme: http
+  auth: none
+  timeout_ms: 5000
+  probe: { method: GET, path: /API, query: { method: "Net:WiFiFence:Get" } }
+
+ports:
+  - { port: 80, protocol: http, role: control, note: "The unit's web server; the REST API is /API" }
+
+models:
+  - id: at-uhd-sw-510w
+    name: Atlona AT-UHD-SW-510W
+    supports: [get_wifi_fence, set_wifi_fence, kick_wifi_station, get_maintenance_time, set_maintenance_time]
+    verification: none
+    notes: >
+      Five-input switcher with wireless presentation. Its Telnet commands are in
+      the atlona-ms52w spec.
+
+commands:
+  get_wifi_fence:
+    summary: "Read the Wi-Fi fence settings (Net:WiFiFence:Get)"
+    send: { method: GET, path: /API, query: { method: "Net:WiFiFence:Get" } }
+    expect: { status: 200, json_path: "$.result" }
+    returns: value
+
+  set_wifi_fence:
+    summary: "Set the Wi-Fi fence, which drops wireless clients whose signal stays below a threshold (Net:WiFiFence:Set)"
+    params:
+      enable: { type: bool, required: true, label: Enabled, description: "True turns the fence on." }
+      period: { type: int, min: 5000, max: 60000, default: 5000, label: Period, description: "How often the signal is checked, in milliseconds, 5000-60000." }
+      threshold: { type: int, min: -120, max: 0, default: -75, label: Threshold, description: "Signal level below which a client is dropped, in dB." }
+      duration: { type: int, min: 0, max: 1440, default: 2, label: Duration, description: "How long a dropped client is kept off, in minutes." }
+      timethreshold: { type: int, min: 0, max: 3600000, default: 60000, label: Time threshold, description: "How long the signal must stay below the threshold, in milliseconds." }
+    send:
+      - { method: GET, path: /API, query: { method: "Net:WiFiFence:Set", enable: "{enable}", period: "{period}", threshold: "{threshold}", duration: "{duration}", timethreshold: "{timethreshold}" } }
+      - { method: GET, path: /API, query: { method: "Net:WiFiFence:Get" } }
+    expect: { status: 200 }
+    returns: ack
+
+  kick_wifi_station:
+    summary: "Drop a wireless client from the access point for a time (Net:WiFiStations:Kick)"
+    params:
+      mac: { type: string, pattern: '^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$', required: true, label: MAC address, description: "The client's MAC address, such as 30:59:b7:0f:d6:cc." }
+      timeout: { type: int, min: 1, max: 1440, required: true, label: Timeout, description: "Minutes the client is kept off." }
+    send: { method: GET, path: /API, query: { method: "Net:WiFiStations:Kick", mac: "{mac}", timeout: "{timeout}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_maintenance_time:
+    summary: "Read the maintenance reboot schedule (System:MaintenanceTime:Get)"
+    send: { method: GET, path: /API, query: { method: "System:MaintenanceTime:Get" } }
+    expect: { status: 200, json_path: "$.result" }
+    returns: value
+
+  set_maintenance_time:
+    summary: "Set the weekly maintenance reboot: on or off, the days, the time and the time zone (System:MaintenanceTime:Set)"
+    params:
+      enable: { type: bool, required: true, label: Enabled, description: "True turns the maintenance reboot on." }
+      hour: { type: int, min: 0, max: 23, default: 0, label: Hour, description: "Hour of the reboot, 0-23." }
+      minute: { type: int, min: 0, max: 59, default: 0, label: Minute, description: "Minute of the reboot, 0-59." }
+      timezone: { type: string, pattern: '^[A-Za-z0-9_+/-]{1,64}$', default: UTC, label: Time zone, description: "An IANA time zone name, such as UTC or America/Los_Angeles." }
+      monday: &day { type: bool, default: false, label: Day, description: "True reboots on this day." }
+      tuesday: *day
+      wednesday: *day
+      thursday: *day
+      friday: *day
+      saturday: *day
+      sunday: *day
+    send:
+      - { method: GET, path: /API, query: { method: "System:MaintenanceTime:Set", enable: "{enable}", hour: "{hour}", minute: "{minute}", timezone: "{timezone}",
+          monday: "{monday}", tuesday: "{tuesday}", wednesday: "{wednesday}", thursday: "{thursday}", friday: "{friday}",
+          saturday: "{saturday}", sunday: "{sunday}" } }
+      - { method: GET, path: /API, query: { method: "System:MaintenanceTime:Get" } }
+    expect: { status: 200 }
+    returns: ack
+
+telemetry:
+  # Nothing is pushed: both settings are read every minute, and after each set.
+  poll:
+    every_ms: 60000
+    send:
+      - { method: GET, path: /API, query: { method: "Net:WiFiFence:Get" } }
+      - { method: GET, path: /API, query: { method: "System:MaintenanceTime:Get" } }
+  updates:
+    - path: 'method=Net(?:%3A|:)WiFiFence(?:%3A|:)(?:Get|Set)'
+      json: { enable: "$.result.enable", period: "$.result.period", threshold: "$.result.threshold", duration: "$.result.duration", timethreshold: "$.result.timethreshold" }
+      state: { wifi_fence.enabled: "{enable}", wifi_fence.period_ms: "{period}", wifi_fence.threshold_db: "{threshold}",
+               wifi_fence.duration_min: "{duration}", wifi_fence.time_threshold_ms: "{timethreshold}" }
+    - path: 'method=System(?:%3A|:)MaintenanceTime(?:%3A|:)(?:Get|Set)'
+      json: { enable: "$.result.enable", time: "$.result.time", timezone: "$.result.timezone", next: "$.result.next_maintenance",
+              mon: "$.result.monday", tue: "$.result.tuesday", wed: "$.result.wednesday", thu: "$.result.thursday",
+              fri: "$.result.friday", sat: "$.result.saturday", sun: "$.result.sunday" }
+      state: { maintenance.enabled: "{enable}", maintenance.time: "{time}", maintenance.timezone: "{timezone}", maintenance.next: "{next}",
+               maintenance.days.monday: "{mon}", maintenance.days.tuesday: "{tue}", maintenance.days.wednesday: "{wed}",
+               maintenance.days.thursday: "{thu}", maintenance.days.friday: "{fri}", maintenance.days.saturday: "{sat}",
+               maintenance.days.sunday: "{sun}" }
+
+state:
+  wifi_fence.enabled:          { type: bool, description: "The Wi-Fi fence is on" }
+  wifi_fence.period_ms:        { type: int, unit: ms, description: "How often the signal is checked" }
+  wifi_fence.threshold_db:     { type: int, unit: dB, description: "Signal level below which a client is dropped" }
+  wifi_fence.duration_min:     { type: int, unit: min, description: "How long a dropped client is kept off" }
+  wifi_fence.time_threshold_ms: { type: int, unit: ms, description: "How long the signal must stay below the threshold" }
+  maintenance.enabled:         { type: bool, description: "The maintenance reboot is on" }
+  maintenance.time:            { type: string, description: "Time of the reboot, HH:MM" }
+  maintenance.timezone:        { type: string, description: "Time zone of the schedule" }
+  maintenance.next:            { type: string, description: "Next reboot, as an ISO 8601 date and time" }
+  maintenance.days.*:          { type: bool, description: "The reboot runs on this day, keyed monday to sunday" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Inferred: the port (80, the unit's web server; the document's examples give none), that the API needs no
+      login, and the Set commands' parameters. System:MaintenanceTime:Set's table lists enable, hour, minute and
+      day while its example sends one boolean per day and a timezone, and its answer has time as HH:MM; every one
+      of them is sent here. The ranges of Wi-Fi fence threshold, duration and time threshold are not given; the
+      limits here are wide.
+  - models: [all]
+    severity: info
+    text: >
+      State is kept current by reading both settings every minute and after each set; the unit sends nothing on
+      its own here. The commands' JSON answers are as the document prints them.

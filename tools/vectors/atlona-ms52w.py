@@ -134,3 +134,28 @@ telemetry(AMS, "usb-mode", inbound=jl({"result": {"mode": "AUTOSWITCH"}, "method
           expect_state={"usb": {"mode": "autoswitch"}})
 telemetry(AMS, "zone", inbound=jl({"result": {"zone": 1, "params": "[9600, 8, 0, 1]"}, "methodreturn": "zone: portparams 1"}),
           expect_state={"zones": {"1": {"params": "[9600, 8, 0, 1]"}}})
+
+# AT-UHD-SW-510W (API 40xxx version 13: SetVol -61, Input:Set 1, Misc:Version:Get mcu, OSD:State:Set 1)
+SW = {"model": "at-uhd-sw-510w"}
+ams("set_volume_level", {"db": -61}, "SetVol -61\r", device_reply=ok("setvol -61"), **_ACK, **SW)
+ams("get_volume_level", {}, "SetVol sta\r", device_reply=jl({"result": {"volume": -61, "success": True}, "methodreturn": "setvol sta"}),
+    expect_result={"ok": {"kind": "value", "value": "-61"}}, **SW)
+ams("get_active_input", {}, "Input:Get\r",
+    device_reply=jl({"result": {"input": 4, "type": "airplay"}, "methodreturn": "input:get", "jsonrpc": "2.0"}),
+    expect_result={"ok": {"kind": "value", "value": "4"}}, **SW)
+ams("select_input", {"input": "displayport"}, "Input:Set 1\r", **SW)
+ams("get_version", {"system": "mcu"}, "Misc:Version:Get mcu\r",
+    device_reply=jl({"result": {"version": {"mcu": "V1.1.05"}}, "methodreturn": "misc:version:get mcu"}),
+    expect_result={"ok": {"kind": "value", "value": "V1.1.05"}}, **SW)
+ams("get_osd", {}, "OSD:State:Get\r", device_reply=jl({"result": {"state": True}, "methodreturn": "osd:state:get"}),
+    expect_result={"ok": {"kind": "value", "value": "true"}}, **SW)
+ams("set_osd", {"shown": True}, "OSD:State:Set 1\r", **SW)
+ams("set_route", {"input": "usb_c", "output": "hdbaset"}, "Display:Matrix:Set 0 0\r", file="set_route-sw510w", **SW)
+telemetry(AMS, "osd-sw510w", model="at-uhd-sw-510w", inbound=jl({"result": {"state": True}, "methodreturn": "osd:state:get"}),
+          expect_state={"osd_shown": True})
+telemetry(AMS, "version-mcu-sw510w", model="at-uhd-sw-510w",
+          inbound=jl({"result": {"version": {"mcu": "V1.1.05"}}, "methodreturn": "misc:version:get mcu"}),
+          expect_state={"versions": {"mcu": "V1.1.05"}})
+telemetry(AMS, "active-input-sw510w", model="at-uhd-sw-510w",
+          inbound=jl({"result": {"input": 4, "type": "airplay"}, "methodreturn": "input:get", "jsonrpc": "2.0"}),
+          expect_state={"active_input": "byod", "active_input_type": "airplay"})

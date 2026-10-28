@@ -1,6 +1,6 @@
 spec: 1
 id: atlona-ms52w
-name: Atlona AT-OME-MS52W matrix switcher (Telnet JSON API)
+name: Atlona AT-OME-MS52W and AT-UHD-SW-510W switchers (Telnet JSON API)
 vendor: Atlona
 category: router
 
@@ -11,7 +11,9 @@ category: router
 # or for a few commands a line of text. OutputMode j is sent on connecting so
 # every JSON answer is one line. With Broadcast on (the default) the unit sends
 # its state changes as JSON events; they and the answers keep state current,
-# and the rest is polled.
+# and the rest is polled. The AT-UHD-SW-510W speaks a subset of the same
+# command set over Telnet, with a few commands of its own (Input:Get and Set,
+# Misc:Version:Get, OSD:State, SetVol with a level).
 source:
   - title: "AT-OME-MS52W Application Programming Interface, version 5 (May 2023), firmware 2.9.6, 40139-R5"
     author: Atlona Inc.
@@ -23,6 +25,22 @@ source:
       between commands, "Unknown command" for a wrong one (p.4); the command list (p.4-5) and each command's
       syntax, ranges and example answer (p.6-41), among them OutputMode h, j and p (p.31) and SetBroadcast
       (state changes sent over RS-232, Telnet and TCP 9000 when on, on by default, p.36).
+
+  - title: "AT-UHD-SW-510W Application Programming Interface, firmware 2.9.1 (version 13, February 2021)"
+    author: Atlona Inc.
+    url: https://atlona.com/pdf/AT-UHD-SW-510W_API.pdf
+    note: >
+      Manufacturer document, read from the Internet Archive's copy of Atlona's URL
+      (web.archive.org/web/20220517003648). Telnet commands not case sensitive, CR after each command and CR
+      LF after each answer, at least 500 ms between commands, "Unknown command" for a wrong one (p.2); the
+      command list (p.2-3), OutputMode in the ? listing (p.4), and each command's syntax, ranges and example
+      answer (p.5-28): Audio:Mute, Audio:SetSource, Audio:Volume (Get, Set -80 to 0, Increase and Decrease
+      1-80), Display:BYOD:Kick, Display:Control:IP, Display:Input (All:Get, Get, Set 0-4, HDCP:State),
+      Display:Matrix (Get, Set, Mode 0-2), Display:Minimal, GetHostName, Input:Get and Set,
+      Instruments:Temperature:Get, Misc:Model:Get, Misc:Version:Get (master, mcu), Misc:Versions:Get,
+      Moderator (Enable, Kick, Show, Status:Get), Net:GetInfo, OSD:State, Platform (Reset, Restart,
+      Shutdown), Relay:State (relays 0-1), SetVol (-80 to 0, sta), Zone (PortParams, PortSetup, SendCmd,
+      zones 1-2). Its REST commands (p.29-33) are in the atlona-sw510w-rest spec.
 
 transport:
   type: line-tcp
@@ -50,7 +68,7 @@ on_connect:
 
 ports:
   - { port: 23, protocol: tcp, role: control, when: "link tcp", note: "the Telnet API" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232, 3-pin captive screw" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232, 3-pin captive screw (AT-OME-MS52W; the AT-UHD-SW-510W's document names Telnet only)" }
 
 maps:
   hdcp: { "true": "1", "false": "0" }
@@ -66,6 +84,7 @@ maps:
   usb_mode: { manual: MANUAL, autoswitch: AUTOSWITCH, follow: FOLLOW }
   parity: { none: "0", odd: "1", even: "2" }
   reset_network: { "true": " network", "false": "" }
+  osd: { "true": "1", "false": "0" }
 
 models:
   - id: at-ome-ms52w
@@ -79,6 +98,19 @@ models:
       restart, shutdown, get_relay_pulse, set_relay_pulse, get_relay, set_relay, usb_follow_input, get_usb_input,
       set_usb_input, get_usb_mode, set_usb_mode, get_zone, set_zone, send_zone_command]
     verification: none
+  - id: at-uhd-sw-510w
+    name: Atlona AT-UHD-SW-510W
+    supports: [get_mute, set_mute, set_audio_source, get_volume, set_volume, volume_up, volume_down,
+      set_volume_level, get_volume_level, kick_byod, get_display_control, set_display_control, get_inputs, get_input,
+      set_input, get_active_input, select_input, get_hdcp, set_hdcp, get_route, set_route, get_matrix_mode,
+      set_matrix_mode, get_display_power, set_display_power, get_hostname, get_temperature, get_model, get_version,
+      get_versions, get_moderator, set_moderator, get_moderator_status, moderator_kick, moderator_show, get_network,
+      get_osd, set_osd, factory_reset, restart, shutdown, get_relay, set_relay, get_zone, set_zone, send_zone_command]
+    verification: none
+    notes: >
+      Five-input switcher with wireless presentation: inputs 0 (USB-C), 1 (DisplayPort), 2 and 3 (HDMI) and 4
+      (BYOD), outputs 0 (HDBaseT) and 1 (HDMI), as for the MS52W. RS-232 zones 1 (the RS-232 port) and 2 (the
+      HDBaseT output).
 
 commands:
   # ── Audio ────────────────────────────────────────────────────────────────
@@ -156,6 +188,18 @@ commands:
     send: "Audio:Volume:Decrease {db}"
     expect: { matches: '"success":\s*true' }
     returns: ack
+  set_volume_level:
+    summary: Set the output volume in dB (SetVol level), the AT-UHD-SW-510W's form
+    params:
+      db: { type: int, min: -80, max: 0, required: true, label: Volume, description: "Output level in dB, -80 to 0." }
+    send: "SetVol {db}"
+    expect: { matches: '"success":\s*true' }
+    returns: ack
+  get_volume_level:
+    summary: Read the output volume in dB (SetVol sta)
+    send: "SetVol sta"
+    expect: { matches: '"(?:volume|value)":\s*(-?\d+)' }
+    returns: value
   volume_step_up:
     summary: Raise the output volume by 1 dB (SetVol +)
     send: "SetVol +"
@@ -216,6 +260,19 @@ commands:
     send:
       - "Display:Input:Set {input:map.input}"
       - "Display:Input:Get"
+    expect: { matches: "methodreturn" }
+    returns: ack
+  get_active_input:
+    summary: Read the active input (Input:Get)
+    send: "Input:Get"
+    expect: { matches: '"input":\s*"?(\w+)"?' }
+    returns: value
+  select_input:
+    summary: Select the active input (Input:Set)
+    params: { input: *input }
+    send:
+      - "Input:Set {input:map.input}"
+      - "Input:Get"
     expect: { matches: "methodreturn" }
     returns: ack
   get_hdcp:
@@ -318,6 +375,13 @@ commands:
     send: "Misc:Model:Get"
     expect: { matches: '"model":\s*"([^"]*)"' }
     returns: value
+  get_version:
+    summary: Read one firmware version, master or MCU (Misc:Version:Get)
+    params:
+      system: { type: enum, values: [master, mcu], required: true, label: System, description: "The master firmware or the MCU firmware." }
+    send: "Misc:Version:Get {system}"
+    expect: { matches: '"version":\s*\{[^}]*"\w+":\s*"([^"]*)"' }
+    returns: value
   get_versions:
     summary: Read the master and MCU firmware versions (Misc:Versions:Get)
     send: "Misc:Versions:Get"
@@ -328,6 +392,20 @@ commands:
     send: "Net:GetInfo"
     expect: { matches: '"netinfo":\s*(\{.*\})\s*\}\s*,\s*"methodreturn"' }
     returns: value
+  get_osd:
+    summary: Read whether the on-screen display is shown (OSD:State:Get)
+    send: "OSD:State:Get"
+    expect: { matches: '"state":\s*(true|false)' }
+    returns: value
+  set_osd:
+    summary: Show or hide the on-screen display (OSD:State:Set)
+    params:
+      shown: { type: bool, required: true, label: OSD, description: "True shows the on-screen display overlay." }
+    send:
+      - "OSD:State:Set {shown:map.osd}"
+      - "OSD:State:Get"
+    expect: { matches: "methodreturn" }
+    returns: ack
   factory_reset:
     summary: Reset to factory defaults, keeping or resetting the network settings (Platform:Reset)
     params:
@@ -497,6 +575,7 @@ state:
   model:               { type: string, description: "The model" }
   versions.master:     { type: string, description: "Master firmware version" }
   versions.mcu:        { type: string, description: "MCU firmware version" }
+  osd_shown:           { type: bool, description: "The on-screen display is shown (OSD:State; AT-UHD-SW-510W)" }
   moderator.enabled:   { type: bool, description: "Moderator mode is on" }
   moderator.active_index: { type: int, description: "The BYOD client shown, -1 for none" }
   moderator.streams:   { type: string, description: "The BYOD clients' IDs, as the JSON array the unit sends" }
@@ -519,12 +598,33 @@ telemetry:
       send: ["Display:Input:Get", "Display:Input:All:Get", "Display:Matrix:Get 0", "Display:Matrix:Get 1",
              "Audio:Volume:Get", "Audio:Mute:Get", "Display:Minimal:Get"]
     - every_ms: 60000
-      send: ["Audio:GetBass", "Audio:GetTreble", "Audio:GetSource", "Display:Control:IP:Get", "Display:Matrix:Mode:Get",
-             "Display:Input:HDCP:State:Get 0", "Display:Input:HDCP:State:Get 1", "Display:Input:HDCP:State:Get 2",
-             "Display:Input:HDCP:State:Get 3", "Display:Input:HDCP:State:Get 4", "GetBroadcast", "GetHostName",
-             "GetNoSignalTimeout", "Instruments:Temperature:Get c", "Misc:Model:Get", "Misc:Versions:Get",
-             "Moderator:Status:Get", "Net:GetInfo", "Relay:PulseDuration:Get", "Relay:State:Get 0", "Relay:State:Get 1",
-             "USBRouting:Input:Get", "USBRouting:Mode:Get", "Zone:PortParams 1", "Zone:PortParams 2"]
+      send:
+        - "Display:Control:IP:Get"
+        - "Display:Matrix:Mode:Get"
+        - "Display:Input:HDCP:State:Get 0"
+        - "Display:Input:HDCP:State:Get 1"
+        - "Display:Input:HDCP:State:Get 2"
+        - "Display:Input:HDCP:State:Get 3"
+        - "Display:Input:HDCP:State:Get 4"
+        - "GetHostName"
+        - "Instruments:Temperature:Get c"
+        - "Misc:Model:Get"
+        - "Misc:Versions:Get"
+        - "Moderator:Status:Get"
+        - "Net:GetInfo"
+        - "Relay:State:Get 0"
+        - "Relay:State:Get 1"
+        - "Zone:PortParams 1"
+        - "Zone:PortParams 2"
+        - { models: [at-ome-ms52w], message: "Audio:GetBass" }
+        - { models: [at-ome-ms52w], message: "Audio:GetTreble" }
+        - { models: [at-ome-ms52w], message: "Audio:GetSource" }
+        - { models: [at-ome-ms52w], message: "GetBroadcast" }
+        - { models: [at-ome-ms52w], message: "GetNoSignalTimeout" }
+        - { models: [at-ome-ms52w], message: "Relay:PulseDuration:Get" }
+        - { models: [at-ome-ms52w], message: "USBRouting:Input:Get" }
+        - { models: [at-ome-ms52w], message: "USBRouting:Mode:Get" }
+        - { models: [at-uhd-sw-510w], message: "OSD:State:Get" }
   updates:
     - json_match: { "$.methodreturn": "(?i)^audio:\\s*getbass" }
       json: { v: "$.result.bass.value" }
@@ -552,10 +652,10 @@ telemetry:
       json_each: "$.result.*"
       json: { status: "$.status", type: "$.type" }
       state: { "inputs.{key}.connected": "{status}", "inputs.{key}.type": "{type}" }
-    - json_match: { "$.methodreturn": "(?i)^(display:\\s*)?input:\\s*get", "$.result.input": "^(\\d)$" }
+    - json_match: { "$.methodreturn": "(?i)^(?:display:\\s*)?input:\\s*get", "$.result.input": "^(\\d)$" }
       json: { type: "$.result.type" }
-      state: { active_input: { value: "{2}", map: { "0": usb_c, "1": displayport, "2": hdmi_3, "3": hdmi_4, "4": byod } }, active_input_type: "{type}" }
-    - json_match: { "$.methodreturn": "(?i)^(display:\\s*)?input:\\s*get", "$.result.input": "^unknown$" }
+      state: { active_input: { value: "{1}", map: { "0": usb_c, "1": displayport, "2": hdmi_3, "3": hdmi_4, "4": byod } }, active_input_type: "{type}" }
+    - json_match: { "$.methodreturn": "(?i)^(?:display:\\s*)?input:\\s*get", "$.result.input": "^unknown$" }
       json: {}
       state: { active_input: "unknown", active_input_type: "" }
     - json_match: { "$.methodreturn": "(?i)^display:\\s*input:\\s*hdcp:\\s*state:\\s*get\\s*(\\d)" }
@@ -594,6 +694,15 @@ telemetry:
     - json_match: { "$.methodreturn": "(?i)^misc:\\s*versions:\\s*get" }
       json: { master: "$.result.versions.master", mcu: "$.result.versions.mcu" }
       state: { versions.master: "{master}", versions.mcu: "{mcu}" }
+    - json_match: { "$.methodreturn": "(?i)^osd:\\s*state:\\s*get" }
+      json: { v: "$.result.state" }
+      state: { osd_shown: "{v}" }
+    - json_match: { "$.methodreturn": "(?i)^misc:\\s*version:\\s*get\\s*mcu" }
+      json: { v: "$.result.version.mcu" }
+      state: { versions.mcu: "{v}" }
+    - json_match: { "$.methodreturn": "(?i)^misc:\\s*version:\\s*get\\s*master" }
+      json: { v: "$.result.version.master" }
+      state: { versions.master: "{v}" }
     - json_match: { "$.methodreturn": "(?i)^moderator:\\s*enable:\\s*get" }
       json: { v: "$.result.enable" }
       state: { moderator.enabled: "{v}" }
@@ -629,6 +738,14 @@ telemetry:
       state: { "zones.{1}.params": "{v}" }
 
 quirks:
+  - models: [at-uhd-sw-510w]
+    severity: info
+    text: >
+      Inferred for the AT-UHD-SW-510W: that the Telnet port is 23 (its document does not give it), that it
+      takes OutputMode j as the MS52W does (the command appears in its ? listing without a page of its own),
+      and how SetVol sta answers (read as the level under "volume" or "value"). It has no audio source read,
+      bass, treble, broadcast, no-signal timeout, relay pulse or USB routing commands. Its REST commands
+      (Wi-Fi fence, Wi-Fi station kick, maintenance reboot time) are in the atlona-sw510w-rest spec.
   - models: [all]
     severity: critical
     text: >

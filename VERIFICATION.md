@@ -290,12 +290,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] AT-UHD-CLSO-601: InputStatus without an input answers one digit per input, and VersionMCU and VersionVSRX answer V followed by the version ([specs/atlona-matrix.yaml:1666](specs/atlona-matrix.yaml#L1666))
 - [ ] AT-UHD-CLSO-601 and AT-UHD-CLSO-840: the RS-232 control port's factory line is 115200 8N1 (the documents give the CSpara example only) ([specs/atlona-matrix.yaml:272](specs/atlona-matrix.yaml#L272))
 
-## atlona-ms52w — Atlona AT-OME-MS52W matrix switcher (Telnet JSON API)
+## atlona-ms52w — Atlona AT-OME-MS52W and AT-UHD-SW-510W switchers (Telnet JSON API)
 
-- [ ] Confirm the Telnet port (23) takes the commands with no login prompt, and that OutputMode j makes every JSON answer one line. ([specs/atlona-ms52w.yaml:48](specs/atlona-ms52w.yaml#L48))
-- [ ] Record the plain-text answers of Display:Minimal:Get, GetBroadcast and SetBroadcast, and whether Platform:Restart, Reset and Shutdown answer at all. ([specs/atlona-ms52w.yaml:641](specs/atlona-ms52w.yaml#L641))
-- [ ] Record what the unit broadcasts on a change (routing, input, volume) besides the moderator event, so rules can follow it. ([specs/atlona-ms52w.yaml:605](specs/atlona-ms52w.yaml#L605))
-- [ ] Confirm the parity numbering (0 none, 1 odd, 2 even) and which relay state is closed. ([specs/atlona-ms52w.yaml:649](specs/atlona-ms52w.yaml#L649))
+- [ ] Confirm the Telnet port (23) takes the commands with no login prompt, and that OutputMode j makes every JSON answer one line. ([specs/atlona-ms52w.yaml:66](specs/atlona-ms52w.yaml#L66))
+- [ ] Record the plain-text answers of Display:Minimal:Get, GetBroadcast and SetBroadcast, and whether Platform:Restart, Reset and Shutdown answer at all. ([specs/atlona-ms52w.yaml:758](specs/atlona-ms52w.yaml#L758))
+- [ ] Record what the unit broadcasts on a change (routing, input, volume) besides the moderator event, so rules can follow it. ([specs/atlona-ms52w.yaml:714](specs/atlona-ms52w.yaml#L714))
+- [ ] Confirm the parity numbering (0 none, 1 odd, 2 even) and which relay state is closed. ([specs/atlona-ms52w.yaml:766](specs/atlona-ms52w.yaml#L766))
+- [ ] AT-UHD-SW-510W: confirm the Telnet port (23), that OutputMode j is taken, and how SetVol sta answers ([specs/atlona-ms52w.yaml:741](specs/atlona-ms52w.yaml#L741))
+- [ ] AT-UHD-SW-510W: record what Input:Set and Display:Input:Set answer (the examples set input 1 and answer activeinput 0) ([specs/atlona-ms52w.yaml:270](specs/atlona-ms52w.yaml#L270))
+
+## atlona-sw510w-rest — Atlona AT-UHD-SW-510W (REST API)
+
+- [ ] Confirm the REST API is on port 80 at /API with no login, and that the colons in method= may be percent-encoded. ([specs/atlona-sw510w-rest.yaml:30](specs/atlona-sw510w-rest.yaml#L30))
+- [ ] Record which parameters System:MaintenanceTime:Set takes (its table lists hour, minute and day; its example sends one boolean per day and a timezone) and that the Set commands answer as the Get commands do. ([specs/atlona-sw510w-rest.yaml:80](specs/atlona-sw510w-rest.yaml#L80))
+- [ ] Record the accepted ranges of the Wi-Fi fence threshold, duration and time threshold, and of the station kick timeout. ([specs/atlona-sw510w-rest.yaml:51](specs/atlona-sw510w-rest.yaml#L51))
 
 ## avolites-titan — Avolites Titan
 
