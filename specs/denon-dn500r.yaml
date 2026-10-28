@@ -45,6 +45,9 @@ transport:
   reply_match: '^(\x06|\x15|@0)'
   error_match: '^(\x15|@0BDERBUSY)'
   probe: "@0?PW"
+  # Each status the recorder notifies by itself is answered with the ACK byte alone (no CR), or it is sent once
+  # more; the status answering a status request is not, nor BUSY.
+  acknowledge: { match: '^@0(?:[^B]|B[^D]|BD[^E])', send: "\u0006", framed: false, answers: '^@0\?' }
   # One second after power on before the next command (p.5).
   pacing:
     groups:
@@ -1668,9 +1671,11 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      The recorder expects the host to answer each status it sends by itself with ACK within 300 ms; the spec format
-      cannot answer a push without awaiting a reply, so the recorder sends each such status twice and then stops
-      repeating it. State is unaffected. NACK, or BUSY when commands come too fast, fails the command.
+      The recorder expects the host to answer each status it sends by itself with ACK within 300 ms, and sends it once
+      more without one; the core answers each such status at once, opened for commands only too. The status that
+      answers a status request is not a notification and is not answered: the next status after each request is taken
+      as its answer (unless it has not come within the timeout, or NACK came instead). NACK, or BUSY when commands
+      come too fast, fails the command.
   - models: [all]
     severity: warning
     text: >
