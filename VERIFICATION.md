@@ -3780,6 +3780,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the control data carries subCompositionName for each sub-composition (the reference lists it, its example omits it). ([specs/singular-live.yaml:272](specs/singular-live.yaml#L272))
 - [ ] Check that GET requests are not counted against the rate limits (only the POST/PATCH control and command endpoints are listed). ([specs/singular-live.yaml:261](specs/singular-live.yaml#L261))
 
+## snapav-wattbox — SnapAV WattBox IP power (Integration Protocol)
+
+- [ ] Record the login exchange: the exact prompts, what a wrong password is answered with, and whether "Successfully Logged In!" follows a good one on every model and firmware. ([specs/snapav-wattbox.yaml:59](specs/snapav-wattbox.yaml#L59))
+- [ ] Check what "API locked" looks like and how long the lock lasts after failed logins. ([specs/snapav-wattbox.yaml:65](specs/snapav-wattbox.yaml#L65))
+- [ ] Record which "~" messages a unit pushes (an outlet switched from its front panel or web page), so they can be read instead of waiting for the next poll. ([specs/snapav-wattbox.yaml:413](specs/snapav-wattbox.yaml#L413))
+- [ ] Check ?ServiceTag on units with v1.7 firmware, which the document does not list. ([specs/snapav-wattbox.yaml:103](specs/snapav-wattbox.yaml#L103))
+- [ ] Check what non-metered models answer ?OutletPowerStatus and ?PowerStatus with (#Error is assumed). ([specs/snapav-wattbox.yaml:83](specs/snapav-wattbox.yaml#L83))
+- [ ] Check !NetworkSet with the host name alone selects DHCP, as the document implies without giving the exact message. ([specs/snapav-wattbox.yaml:259](specs/snapav-wattbox.yaml#L259))
+
 ## sofie-chef — Sofie Chef
 
 - [ ] Record the REST answers: GET /api/status and /api/list bodies (the list is read as the WebSocket list body) and the PUT routes' status and body. ([specs/sofie-chef.yaml:177](specs/sofie-chef.yaml#L177))

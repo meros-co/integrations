@@ -1,0 +1,413 @@
+spec: 1
+id: snapav-wattbox
+name: SnapAV WattBox IP power (Integration Protocol)
+vendor: SnapAV (Snap One)
+category: other
+source:
+  - title: "SnapAV Wattbox Integration Protocol Document, Integration Protocol v1.7 rev20190520"
+    author: SnapAV
+    url: "https://www.snapav.com/wcsstore/ExtendedSitesCatalogAssetStore/attachments/documents/PowerManagement/SupportDocuments/SnapAV_Wattbox_API_V1.7.pdf"
+    note: >
+      Telnet on port 23, up to 10 connections at a time; a login (user name and password) before any command,
+      asked again after a wrong one; ASCII messages ended by a line feed, "?" requests, "!" controls, "#" errors and
+      "~" unsolicited messages. Requests: ?Firmware, ?Hostname, ?Serial, ?Model, ?OutletCount, ?OutletStatus,
+      ?OutletPowerStatus=OUTLET, ?PowerStatus, ?AutoReboot, ?OutletName, ?UPSStatus, ?UPSConnection. Controls, each
+      answered OK: !OutletNameSet, !OutletNameSetAll, !OutletSet (ON, OFF, TOGGLE, RESET, an optional reset delay of
+      1-600 s, outlet 0 resetting all), !OutletPowerOnDelaySet (1-600 s), !OutletModeSet (0 enabled, 1 disabled, 2
+      reset only), !OutletRebootSet (0 or, 1 and, one per outlet), !AutoReboot, !AutoRebootTimeoutSet (timeout
+      1-60 s, count 1-10, ping delay 1-30 min, reboot attempts 0-10), !FirmwareUpdate, !Reboot, !AccountSet,
+      !NetworkSet, !ScheduleAdd (action 0 off, 1 on, 2 reset; frequency 0 once, 1 recurring; days as seven 0/1
+      flags from Sunday or a yyyy/mm/dd date; time hh:mm), !HostAdd; #Error for an invalid command.
+  - title: "companion-module-snapav-wattbox (Bitfocus Companion module, MIT)"
+    author: David Stevens and contributors
+    url: "https://github.com/bitfocus/companion-module-snapav-wattbox"
+    note: >
+      Corroboration only (src/telnet.js): the prompts "Username: " and "Password: ", "Successfully Logged In!"
+      after a login, "API locked" after too many failed logins, ?ServiceTag, and ~OutletStatus pushed when an
+      outlet changes.
+  - title: "pywattbox (MIT)"
+    author: Erik Seglem
+    url: "https://github.com/eseglem/pywattbox"
+    note: "Corroboration only: the request and control messages, ?ServiceTag, and !Exit to close a session."
+
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: lf
+  encoding: ascii
+  timeout_ms: 3000
+  reply: expected
+  # Answers are "?Name=value", "OK" or "#Error"; "~" messages are the
+  # unit's own (v1.7 names none), never an answer.
+  reply_match: '^(\?[A-Za-z]+=|OK|#Error)'
+  error_match: '^#Error'
+  probe: "?Firmware"
+
+settings:
+  username: { type: string, default: "", max_length: 64, label: User name,
+              description: "The WattBox account the integration protocol logs in with, as set up on the unit." }
+  password: { type: string, secret: true, default: "", max_length: 64, label: Password,
+              description: "That account's password, sent after the unit's Password: prompt." }
+
+ports:
+  - { port: 23, protocol: tcp, role: control, note: "Telnet; up to 10 connections at a time" }
+
+on_connect:
+  # An empty user name skips the login, for a unit set up without one.
+  - when_set: username
+    after_prompt: "Username:"
+    send: "{settings.username}"
+  - when_set: username
+    after_prompt: "Password:"
+    send: "{settings.password}"
+    accepted: "Successfully Logged In!"
+    refused: "API locked"
+
+maps:
+  outlet_action: { "on": "ON", "off": "OFF", toggle: "TOGGLE", reset: "RESET" }
+  outlet_mode: { enabled: "0", disabled: "1", reset_only: "2" }
+  schedule_action: { "off": "0", "on": "1", reset: "2" }
+
+models:
+  - id: wattbox
+    name: "SnapAV WattBox IP power conditioners and PDUs with the Telnet integration protocol (WB-150, WB-250, WB-300, WB-700, WB-800 series)"
+    supports: [get_firmware, get_hostname, get_serial, get_service_tag, get_model, get_outlet_count, get_outlet_status,
+               get_outlet_power_status, get_power_status, get_auto_reboot, get_outlet_names, get_ups_status,
+               get_ups_connection, set_outlet_name, set_all_outlet_names, set_outlet, reset_outlet_after,
+               reset_all_outlets, set_outlet_power_on_delay, set_outlet_mode, set_outlet_reboot_operations,
+               set_auto_reboot, set_auto_reboot_timeouts, update_firmware, reboot, set_account, set_network_dhcp,
+               set_network_static, add_schedule_once, add_schedule_recurring, add_host]
+    verification: none
+    notes: >
+      Outlet counts from 2 to 18 by model. Per-outlet power, current and voltage (?OutletPowerStatus) and the
+      system's power status are measured on the metered models (IPVM); others answer #Error.
+
+commands:
+  get_firmware:
+    summary: Read the firmware version (?Firmware)
+    send: "?Firmware"
+    expect: { reply_contains: "?Firmware=", matches: '^\?Firmware=(.*)$' }
+    returns: value
+  get_hostname:
+    summary: Read the host name (?Hostname)
+    send: "?Hostname"
+    expect: { reply_contains: "?Hostname=", matches: '^\?Hostname=(.*)$' }
+    returns: value
+  get_serial:
+    summary: Read the serial number (?Serial)
+    send: "?Serial"
+    expect: { reply_contains: "?Serial=", matches: '^\?Serial=(.*)$' }
+    returns: value
+  get_service_tag:
+    summary: Read the service tag (?ServiceTag), which v1.7 does not list
+    send: "?ServiceTag"
+    expect: { reply_contains: "?ServiceTag=", matches: '^\?ServiceTag=(.*)$' }
+    returns: value
+  get_model:
+    summary: Read the model number (?Model)
+    send: "?Model"
+    expect: { reply_contains: "?Model=", matches: '^\?Model=(.*)$' }
+    returns: value
+  get_outlet_count:
+    summary: Read how many outlets the unit has (?OutletCount)
+    send: "?OutletCount"
+    expect: { reply_contains: "?OutletCount=", matches: '^\?OutletCount=(\d+)$' }
+    returns: value
+  get_outlet_status:
+    summary: Read every outlet's state, comma-separated 0 (off) or 1 (on) from outlet 1 (?OutletStatus)
+    send: "?OutletStatus"
+    expect: { reply_contains: "?OutletStatus=", matches: '^\?OutletStatus=(.*)$' }
+    returns: value
+  get_outlet_power_status:
+    summary: Read an outlet's power in W, current in A and voltage in V, as "outlet,watts,amps,volts" (?OutletPowerStatus)
+    params:
+      outlet: &outlet { type: int, min: 1, max: 99, required: true, label: Outlet, description: "The outlet, numbered from 1 as on the unit." }
+    send: "?OutletPowerStatus={outlet}"
+    expect: { reply_contains: "?OutletPowerStatus=", matches: '^\?OutletPowerStatus=(.*)$' }
+    returns: value
+  get_power_status:
+    summary: Read the unit's current in A, power in W, voltage in V and safe-voltage status, as "amps,watts,volts,safe" (?PowerStatus)
+    send: "?PowerStatus"
+    expect: { reply_contains: "?PowerStatus=", matches: '^\?PowerStatus=(.*)$' }
+    returns: value
+  get_auto_reboot:
+    summary: Read whether auto reboot is on, 1 or 0 (?AutoReboot)
+    send: "?AutoReboot"
+    expect: { reply_contains: "?AutoReboot=", matches: '^\?AutoReboot=([01])$' }
+    returns: value
+  get_outlet_names:
+    summary: Read every outlet's name, as {name},{name},... from outlet 1 (?OutletName)
+    send: "?OutletName"
+    expect: { reply_contains: "?OutletName=", matches: '^\?OutletName=(.*)$' }
+    returns: value
+  get_ups_status:
+    summary: >
+      Read the attached UPS's status, as "charge %,load %,health (Good or Bad),power lost (True or False),runtime
+      minutes,alarm enabled,alarm muted" (?UPSStatus)
+    send: "?UPSStatus"
+    expect: { reply_contains: "?UPSStatus=", matches: '^\?UPSStatus=(.*)$' }
+    returns: value
+  get_ups_connection:
+    summary: Read whether a UPS is attached, 1 or 0 (?UPSConnection)
+    send: "?UPSConnection"
+    expect: { reply_contains: "?UPSConnection=", matches: '^\?UPSConnection=([01])$' }
+    returns: value
+  set_outlet_name:
+    summary: Name an outlet (!OutletNameSet), then read the names back
+    params:
+      outlet: *outlet
+      name: { type: string, max_length: 64, pattern: '^[^,{}]*$', required: true, label: Name,
+              description: "The outlet's new name, without commas or braces, which the protocol uses as separators." }
+    send: ["!OutletNameSet={outlet},{name}", "?OutletName"]
+    expect: { matches: '^(OK|\?OutletName=.*)$' }
+    returns: ack
+  set_all_outlet_names:
+    summary: Name every outlet at once, in outlet order from 1 (!OutletNameSetAll), then read the names back
+    params:
+      names: { type: string, max_length: 2048, pattern: '^\{[^{},]*\}(,\{[^{},]*\})*$', required: true, label: Names,
+               description: "Every outlet's name in braces, separated by commas, from outlet 1, such as {Rack}, {Display}." }
+    send: ["!OutletNameSetAll={names}", "?OutletName"]
+    expect: { matches: '^(OK|\?OutletName=.*)$' }
+    returns: ack
+  set_outlet:
+    summary: Turn an outlet on, off, toggle it or reset it (power-cycle after its power-on delay) (!OutletSet), then read the outlets back
+    params:
+      outlet: *outlet
+      action: { type: enum, values: ["on", "off", toggle, reset], required: true, label: Action,
+                description: "on and off switch the outlet, toggle inverts it, reset turns it off and on again after its power-on delay." }
+    send: ["!OutletSet={outlet},{action:map.outlet_action}", "?OutletStatus"]
+    expect: { matches: '^(OK|\?OutletStatus=.*)$' }
+    returns: ack
+  reset_outlet_after:
+    summary: Reset an outlet with a delay of its own instead of its power-on delay (!OutletSet=OUTLET,RESET,DELAY)
+    params:
+      outlet: *outlet
+      delay_s: &delay { type: int, min: 1, max: 600, required: true, label: Delay,
+                        description: "Seconds the outlet stays off before it is turned on again, 1 to 600." }
+    send: ["!OutletSet={outlet},RESET,{delay_s}", "?OutletStatus"]
+    expect: { matches: '^(OK|\?OutletStatus=.*)$' }
+    returns: ack
+  reset_all_outlets:
+    summary: Reset every outlet (!OutletSet=0,RESET)
+    send: ["!OutletSet=0,RESET", "?OutletStatus"]
+    expect: { matches: '^(OK|\?OutletStatus=.*)$' }
+    returns: ack
+  set_outlet_power_on_delay:
+    summary: Set the seconds an outlet waits before powering on after a reset (!OutletPowerOnDelaySet)
+    params:
+      outlet: *outlet
+      delay_s: *delay
+    send: "!OutletPowerOnDelaySet={outlet},{delay_s}"
+    expect: { matches: '^OK' }
+    returns: ack
+  set_outlet_mode:
+    summary: Set an outlet's mode (!OutletModeSet)
+    params:
+      outlet: *outlet
+      mode: { type: enum, values: [enabled, disabled, reset_only], required: true, label: Mode,
+              description: "enabled switches normally, disabled keeps the outlet off, reset_only lets it only be reset." }
+    send: "!OutletModeSet={outlet},{mode:map.outlet_mode}"
+    expect: { matches: '^OK' }
+    returns: ack
+  set_outlet_reboot_operations:
+    summary: Set, for every outlet, whether auto reboot needs any (0, or) or all (1, and) of its monitored hosts to time out (!OutletRebootSet)
+    params:
+      operations: { type: string, max_length: 256, pattern: '^[01](,[01])*$', required: true, label: Operations,
+                    description: "One digit per outlet from outlet 1, separated by commas: 0 reboots when any of its hosts times out, 1 when all do." }
+    send: "!OutletRebootSet={operations}"
+    expect: { matches: '^OK' }
+    returns: ack
+  set_auto_reboot:
+    summary: Turn auto reboot on or off (!AutoReboot), then read it back
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On reboots outlets whose monitored hosts stop answering." }
+    send: ["!AutoReboot={enabled:bool01}", "?AutoReboot"]
+    expect: { matches: '^(OK|\?AutoReboot=[01])$' }
+    returns: ack
+  set_auto_reboot_timeouts:
+    summary: Set how auto reboot tests its hosts (!AutoRebootTimeoutSet)
+    params:
+      timeout_s: { type: int, min: 1, max: 60, required: true, label: Timeout, description: "Seconds the unit waits for a host before counting a time-out, 1 to 60." }
+      count: { type: int, min: 1, max: 10, required: true, label: Count, description: "Consecutive time-outs that trigger an auto reboot, 1 to 10." }
+      ping_delay_min: { type: int, min: 1, max: 30, required: true, label: Ping delay, description: "Minutes the unit waits after an auto reboot before testing the host again, 1 to 30." }
+      reboot_attempts: { type: int, min: 0, max: 10, required: true, label: Reboot attempts, description: "How many times the unit auto-reboots, 1 to 10, or 0 for no limit." }
+    send: "!AutoRebootTimeoutSet={timeout_s},{count},{ping_delay_min},{reboot_attempts}"
+    expect: { matches: '^OK' }
+    returns: ack
+  update_firmware:
+    summary: Update the firmware from a URL (!FirmwareUpdate); the unit answers OK, then restarts and drops the connection
+    params:
+      url: { type: string, max_length: 1024, pattern: '^[^,\s]+$', required: true, label: URL, description: "The full URL of the firmware file the unit downloads." }
+    send: "!FirmwareUpdate={url}"
+    expect: { matches: '^OK' }
+    returns: ack
+  reboot:
+    summary: Restart the unit's controller now (!Reboot); the connection drops until it is back
+    send: "!Reboot"
+    expect: { matches: '^OK' }
+    returns: ack
+  set_account:
+    summary: Change the login's user name and password (!AccountSet); the unit drops the connection, which logs in again only with the new settings
+    params:
+      user: { type: string, max_length: 64, pattern: '^[^,\s]+$', required: true, label: User name, description: "The new user name." }
+      password: { type: string, secret: true, max_length: 64, pattern: '^[^,\s]+$', required: true, label: Password, description: "The new password." }
+    send: "!AccountSet={user},{password}"
+    expect: { matches: '^OK' }
+    returns: ack
+  set_network_dhcp:
+    summary: Set the host name and take the address from DHCP (!NetworkSet with the host name alone); the unit restarts
+    params:
+      hostname: &hostname { type: string, max_length: 63, pattern: '^[A-Za-z0-9-]+$', required: true, label: Host name, description: "The unit's host name: letters, digits and hyphens." }
+    send: "!NetworkSet={hostname}"
+    expect: { matches: '^OK' }
+    returns: ack
+  set_network_static:
+    summary: Set the host name and a static address (!NetworkSet); the unit restarts, possibly at another address
+    params:
+      hostname: *hostname
+      ip: &ipv4 { type: string, max_length: 15, pattern: '^(\d{1,3}\.){3}\d{1,3}$', required: true, label: IP address, description: "The static IPv4 address." }
+      subnet: { type: string, max_length: 15, pattern: '^(\d{1,3}\.){3}\d{1,3}$', required: true, label: Subnet mask, description: "The subnet mask, such as 255.255.255.0." }
+      gateway: { type: string, max_length: 15, pattern: '^(\d{1,3}\.){3}\d{1,3}$', required: true, label: Gateway, description: "The default gateway's IPv4 address." }
+      dns1: { type: string, max_length: 15, pattern: '^(\d{1,3}\.){3}\d{1,3}$', required: true, label: Primary DNS, description: "The primary DNS server's IPv4 address." }
+      dns2: { type: string, max_length: 15, pattern: '^(\d{1,3}\.){3}\d{1,3}$', default: 8.8.8.8, label: Secondary DNS, description: "The secondary DNS server's IPv4 address; the unit itself fills in 8.8.8.8 when none is given." }
+    send: "!NetworkSet={hostname},{ip},{subnet},{gateway},{dns1},{dns2}"
+    expect: { matches: '^OK' }
+    returns: ack
+  add_schedule_once:
+    summary: Add a schedule that runs once, on a date (!ScheduleAdd with frequency 0)
+    params:
+      name: &sched_name { type: string, max_length: 64, pattern: '^[^,{}]+$', required: true, label: Name, description: "The schedule's name, without commas or braces." }
+      outlets: &sched_outlets { type: string, max_length: 256, pattern: '^\d+(,\d+)*$', required: true, label: Outlets, description: "The outlets it acts on, numbers separated by commas, such as 1,2,3." }
+      action: &sched_action { type: enum, values: ["off", "on", reset], required: true, label: Action, description: "What it does to the outlets: off, on or reset." }
+      date: { type: string, max_length: 10, pattern: '^\d{4}/\d{2}/\d{2}$', required: true, label: Date, description: "The day it runs, as yyyy/mm/dd." }
+      time: &sched_time { type: string, max_length: 5, pattern: '^([01]\d|2[0-3]):[0-5]\d$', required: true, label: Time, description: "The time it runs, 24-hour hh:mm." }
+    send: '!ScheduleAdd=\{{name}\},\{{outlets}\},\{{action:map.schedule_action}\},\{0\},\{{date}\},\{{time}\}'
+    expect: { matches: '^OK' }
+    returns: ack
+  add_schedule_recurring:
+    summary: Add a schedule that recurs on days of the week (!ScheduleAdd with frequency 1)
+    params:
+      name: *sched_name
+      outlets: *sched_outlets
+      action: *sched_action
+      days: { type: string, max_length: 13, pattern: '^[01](,[01]){6}$', required: true, label: Days,
+              description: "Seven flags from Sunday to Saturday, 1 for a day it runs, such as 0,1,0,1,0,1,0 for Monday, Wednesday and Friday." }
+      time: *sched_time
+    send: '!ScheduleAdd=\{{name}\},\{{outlets}\},\{{action:map.schedule_action}\},\{1\},\{{days}\},\{{time}\}'
+    expect: { matches: '^OK' }
+    returns: ack
+  add_host:
+    summary: Add a host for auto reboot to test, tied to outlets (!HostAdd)
+    params:
+      name: { type: string, max_length: 64, pattern: '^[^,{}]+$', required: true, label: Name, description: "The host's name, without commas or braces." }
+      address: { type: string, max_length: 253, pattern: '^[A-Za-z0-9.:-]+$', required: true, label: Address, description: "The web site or IP address the unit tests." }
+      outlets: *sched_outlets
+    send: '!HostAdd={name},{address},\{{outlets}\}'
+    expect: { matches: '^OK' }
+    returns: ack
+
+state:
+  device.firmware: { type: string, description: "?Firmware: the firmware version" }
+  device.hostname: { type: string, description: "?Hostname" }
+  device.serial: { type: string, description: "?Serial: the serial number" }
+  device.service_tag: { type: string, description: "?ServiceTag, where the unit answers it" }
+  device.model: { type: string, description: "?Model, such as WB-700-IPV-12" }
+  outlet_count: { type: int, description: "?OutletCount: the unit's outlets" }
+  outlets.*.on: { type: bool, description: "Whether the outlet is on (?OutletStatus), by outlet number from 1" }
+  outlets.*.name: { type: string, description: "The outlet's name (?OutletName)" }
+  outlets.*.power: { type: float, unit: W, description: "The outlet's power (?OutletPowerStatus), on metered models" }
+  outlets.*.current: { type: float, unit: A, description: "The outlet's current (?OutletPowerStatus), on metered models" }
+  outlets.*.voltage: { type: float, unit: V, description: "The outlet's voltage (?OutletPowerStatus), on metered models" }
+  power.current: { type: float, unit: A, description: "The unit's current (?PowerStatus)" }
+  power.power: { type: float, unit: W, description: "The unit's power (?PowerStatus)" }
+  power.voltage: { type: float, unit: V, description: "The unit's voltage (?PowerStatus)" }
+  power.safe_voltage: { type: bool, description: "The safe voltage status (?PowerStatus): true when 1" }
+  auto_reboot: { type: bool, description: "Whether auto reboot is on (?AutoReboot)" }
+  ups.connected: { type: bool, description: "Whether a UPS is attached (?UPSConnection)" }
+  ups.battery_charge: { type: int, unit: "%", description: "The UPS's battery charge (?UPSStatus)" }
+  ups.battery_load: { type: int, unit: "%", description: "The UPS's load (?UPSStatus)" }
+  ups.battery_health: { type: string, description: "The UPS's battery health: Good or Bad (?UPSStatus)" }
+  ups.power_lost: { type: bool, description: "Whether the UPS has lost input power (?UPSStatus)" }
+  ups.runtime: { type: int, unit: min, description: "The UPS's battery runtime (?UPSStatus)" }
+  ups.alarm_enabled: { type: bool, description: "Whether the UPS's alarm is enabled (?UPSStatus)" }
+  ups.alarm_muted: { type: bool, description: "Whether the UPS's alarm is muted (?UPSStatus)" }
+
+telemetry:
+  poll:
+    - every_ms: 5000
+      send: ["?OutletStatus", "?PowerStatus", "?UPSStatus"]
+    - every_ms: 60000
+      send: ["?Firmware", "?Hostname", "?Serial", "?Model", "?OutletCount", "?OutletName", "?AutoReboot", "?UPSConnection"]
+  updates:
+    - match: '^\?Firmware=(.*)$'
+      state: { device.firmware: "{1}" }
+    - match: '^\?Hostname=(.*)$'
+      state: { device.hostname: "{1}" }
+    - match: '^\?Serial=(.*)$'
+      state: { device.serial: "{1}" }
+    - match: '^\?ServiceTag=(.*)$'
+      state: { device.service_tag: "{1}" }
+    - match: '^\?Model=(.*)$'
+      state: { device.model: "{1}" }
+    - match: '^\?OutletCount=(\d+)$'
+      state: { outlet_count: "{1}" }
+    # One digit per outlet; each outlet's metering is read after it.
+    - match: '^\?OutletStatus=((?:[01],?)*)$'
+      match_each: '([01])'
+      match_each_in: 1
+      state: { "outlets.{index:+1}.on": { value: "{2}", map: { "0": false, "1": true } } }
+      then_send: ["?OutletPowerStatus={index:+1}"]
+    - match: '^\?OutletPowerStatus=(\d+),([0-9.]+),([0-9.]+),([0-9.]+)$'
+      state: { "outlets.{1}.power": "{2}", "outlets.{1}.current": "{3}", "outlets.{1}.voltage": "{4}" }
+    - match: '^\?OutletName=(.*)$'
+      match_each: '\{([^}]*)\}'
+      match_each_in: 1
+      state: { "outlets.{index:+1}.name": "{2}" }
+    - match: '^\?PowerStatus=([0-9.]+),([0-9.]+),([0-9.]+),([01])$'
+      state:
+        power.current: "{1}"
+        power.power: "{2}"
+        power.voltage: "{3}"
+        power.safe_voltage: { value: "{4}", map: { "0": false, "1": true } }
+    - match: '^\?AutoReboot=([01])$'
+      state: { auto_reboot: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\?UPSConnection=([01])$'
+      state: { ups.connected: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\?UPSStatus=(\d+),(\d+),(\w+),(True|False),(\d+),(True|False),(True|False)$'
+      state:
+        ups.battery_charge: "{1}"
+        ups.battery_load: "{2}"
+        ups.battery_health: "{3}"
+        ups.power_lost: { value: "{4}", map: { "True": true, "False": false } }
+        ups.runtime: "{5}"
+        ups.alarm_enabled: { value: "{6}", map: { "True": true, "False": false } }
+        ups.alarm_muted: { value: "{7}", map: { "True": true, "False": false } }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      set_outlet with off or reset, reset_outlet_after and reset_all_outlets cut the power of what is plugged in at
+      once; reboot, update_firmware, set_network_dhcp and set_network_static restart the unit (the network
+      settings may move it to another address), and set_account changes the credential this connection logs in
+      with: update the settings with the new one, or the next login is refused.
+  - models: [all]
+    severity: warning
+    text: >
+      Logging in: v1.7 says only that a login prompt comes and that a wrong login is asked again. The prompts
+      "Username:" and "Password:", the "Successfully Logged In!" that accepts a login, and "API locked" after too
+      many failed logins are taken from the Companion module, not from SnapAV. A wrong password that is not locked
+      out goes unnoticed: the unit asks again, and commands time out.
+  - models: [all]
+    severity: info
+    text: >
+      The protocol reads back outlet states, names, auto reboot and the UPS, but not an outlet's power-on delay or
+      mode, the reboot operations, the auto-reboot timeouts, schedules, hosts or the network settings: those
+      commands write without read-back (API limit). Schedules and hosts can be added but not listed or removed.
+  - models: [all]
+    severity: info
+    text: >
+      State is polled: outlet states, the power status and the UPS every 5 s (each outlet's metering read after the
+      outlet list), the rest every minute. v1.7 defines "~" as an unsolicited message without listing any; the
+      ~OutletStatus a unit may push is not read, the next poll shows the change.
