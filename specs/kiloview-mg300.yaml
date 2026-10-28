@@ -252,6 +252,7 @@ models:
       - parse_url
       - replace_url_address
       - import_config
+      - export_config
       - import_config_from_path
       - get_usage
       - get_no_signal_mode
@@ -1896,6 +1897,15 @@ commands:
         - { name: upload, binary: file, filename: "{filename}", content_type: application/octet-stream }
     expect: *ok
     returns: ack
+  export_config:
+    summary: "Save the source configuration (source groups and streams), a zip holding kv_source.json, to a host file (GET /api/sys/config/export, modules source)"
+    params:
+      name: { type: string, default: source_config, max_length: 128, label: Name, description: "The zip's name." }
+      to: { type: save, required: true, label: Save to, description: "The host file the download is written to; replaced once the whole file has arrived." }
+    send: { method: GET, path: /api/sys/config/export, content_type: application/json,
+            body: '{"modules":["source"],"name":{name:json}}', save: to }
+    expect: { status: 200 }
+    returns: file
   import_config_from_path:
     summary: "Import a source configuration zip already on the gateway, under /tmp or /var/tmp (POST /api/sys/config/import with path)"
     params:
@@ -3398,8 +3408,8 @@ quirks:
       as that request's example does. Some reads take their parameter in a
       JSON body of a GET request (source/groups/list, users/info,
       overlay/editing/get, overlay/preview/get), as the document says;
-      export of the configuration (GET /api/sys/config/export) answers a zip
-      file, which the format cannot return, and is not offered.
+      export of the configuration (GET /api/sys/config/export, export_config)
+      answers a zip file, saved to a host file.
   - models: [all]
     severity: info
     text: >

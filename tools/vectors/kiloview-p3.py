@@ -812,3 +812,5 @@ _kp3_rb("panel", "/api/codec/panel/settings", ["/api/codec/panel/settings"])
 # A read is not a write: the status read (no body) asks for nothing more.
 _kp3_tel("no-readback-on-read", "/api/record/v1/get_recording_status", {"result": "ok", "data": {"status": False}},
          {"recording": {"active": False}}, expect_then_send=[])
+# Downloads saved to the host file named (never written by a vector).
+V.append({"spec": "kiloview-p3", "command": "export_logs", "input": {"time": "old", "to": {"file": "logs.tgz"}}, "expect_request": {"method": "GET", "target": "/api/systemctrl/system_log/export/old"}})

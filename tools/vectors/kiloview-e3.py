@@ -859,3 +859,8 @@ _ke3t("readback-none-on-read", "/api/systemctrl/users/auth_info", {"result": "ok
 # A write the device refused queues nothing.
 _ke3t("readback-none-on-error", "/api/streamer/hdmi/stream/enable", '{"result":"error","msg":"Parameter error"}', {},
       expect_then_send=[])
+# Downloads saved to the host file named (never written by a vector).
+V.append({"spec": KE3, "command": "download_preset_modules", "input": {"name": "show", "modules": ["time", "osd"], "to": {"file": "show.zip"}}, "expect_request": {"method": "GET", "target": "/api/systemctrl/system_preset/download?name=show&modules=%5B%22time%22%2C%22osd%22%5D"}})
+V.append({"spec": KE3, "command": "export_preset", "input": {"pid": "3", "to": {"file": "preset.zip"}}, "expect_request": {"method": "GET", "target": "/api/systemctrl/system_preset/3/export"}})
+V.append({"spec": KE3, "command": "export_logs", "input": {"time": "new", "to": {"file": "logs.zip"}}, "expect_request": {"method": "GET", "target": "/api/systemctrl/system_log/export/new"}})
+V.append({"spec": KE3, "command": "save_snapshot", "input": {"interface": "hdmi", "to": {"file": "snap.jpg"}}, "expect_request": {"method": "GET", "target": "/api/codec/hdmi/venc/snap"}})

@@ -404,3 +404,5 @@ _reread("reread-template-switch", "/template/switch", {"switch_id": 2, "save": T
 # A refused change reads nothing again.
 _reread("reread-route-error", "/panel/output/input", {"id": 3, "output_id": 1, "input_id": 2}, [],
         body='{"result":"error","error":{"code":"10010","info":"Output is locked"}}')
+# Downloads saved to the host file named (never written by a vector).
+V.append({"spec": "kiloview-cube-x1", "command": "download_logs", "input": {"to": {"file": "logs.tar.gz"}}, "expect_request": {"method": "GET", "target": "/api/cube/v2/log/download"}})

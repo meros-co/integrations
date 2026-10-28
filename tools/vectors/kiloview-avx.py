@@ -1089,3 +1089,5 @@ _ka_reread("reread-alarm-config", "/v1/alarm/config/set", {"cpu_enabled": True},
 _ka_reread("reread-serial", "/v1/test/set_serial_number", {"serial_number": "S"},
            _ka_then("/v1/test/get_resources", "/v1/switch/sys/info"),
            body='{"code":200,"message":"ok","data":{"code":1,"message":"string"}}')
+# Downloads saved to the host file named (never written by a vector).
+V.append({"spec": "kiloview-avx", "command": "download_alarm_export", "input": {"file_path": "alarm_export_1.xlsx", "to": {"file": "alarms.xlsx"}}, "expect_request": {"method": "POST", "target": "/v1/alarm/file/download", "body": "{\"file_path\":\"alarm_export_1.xlsx\"}", "content_type": "application/json"}})

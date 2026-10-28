@@ -904,3 +904,5 @@ for _mg_name, _mg_path, _mg_sends, _mg_request in [
 ]:
     _mg_t(_mg_name, _mg_path, _MG_OKB, {}, request=_mg_request, expect_then_send=_mg_sends)
 _mg_t("readback-not-on-error", "/api/layout/select", {"result": "error", "msg": "105"}, {}, expect_then_send=[])
+# Downloads saved to the host file named (never written by a vector).
+V.append({"spec": "kiloview-mg300", "command": "export_config", "input": {"to": {"file": "source_config.zip"}}, "expect_request": {"method": "GET", "target": "/api/sys/config/export", "body": "{\"modules\":[\"source\"],\"name\":\"source_config\"}", "content_type": "application/json"}})

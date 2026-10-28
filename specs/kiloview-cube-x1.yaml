@@ -105,6 +105,7 @@ models:
       - get_operation_log
       - find_operation_log
       - download_operation_log
+      - download_logs
       - restart_service
       - get_version
       - get_inputs
@@ -322,6 +323,14 @@ commands:
     send: { method: GET, path: /api/cube/v2/log/operate/download }
     expect: { status: 200 }
     returns: text
+
+  download_logs:
+    summary: Save the server's logs, a .tar.gz archive, to a host file (GET /api/cube/v2/log/download); returns the file saved and its size
+    params:
+      to: { type: save, required: true, label: Save to, description: "The host file the download is written to; replaced once the whole file has arrived." }
+    send: { method: GET, path: /api/cube/v2/log/download, save: to }
+    expect: { status: 200 }
+    returns: file
 
   # ── 4 Service management ─────────────────────────────────────────────
   restart_service:
@@ -734,9 +743,8 @@ quirks:
       are the same as the rotation lists read under resource management and
       are kept there. A panel deleted in the web console stays in panel_*
       state until the device is opened again, since the panel list does not
-      name the details it replaces. log/download returns a .tar.gz archive
-      of the server's logs, which a command cannot hand to the host, so it
-      is not offered.
+      name the details it replaces. log/download (download_logs) returns a .tar.gz archive
+      of the server's logs, which it saves to a host file.
   - models: [all]
     severity: info
     text: >

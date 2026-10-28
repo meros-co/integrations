@@ -132,8 +132,8 @@ models:
        get_components, get_hostname, set_hostname, get_web_ports, set_web_ports, get_ssl, upload_ssl_file, apply_ssl,
        reset_ssl, factory_reset, restart_codec, reboot, ping_host, get_network_speed, get_system_info,
        upload_firmware, upload_firmware_chunk, merge_firmware, get_production_service, set_production_service,
-       get_preset_modules, list_presets, import_preset, save_preset, load_preset, delete_preset,
-       get_log, get_maintenance, set_maintenance,
+       get_preset_modules, list_presets, import_preset, save_preset, load_preset, delete_preset, download_preset_modules, export_preset,
+       get_log, export_logs, get_maintenance, set_maintenance,
        delete_recording_file, list_recording_files, list_recording_files_of, select_usb_storage, select_nas_storage,
        get_storage, get_record_settings, set_record_settings, start_recording, stop_recording, get_recording_status,
        add_nas, remove_nas,
@@ -151,7 +151,7 @@ models:
        set_uvc_input, set_pip_input,
        get_audio_input, set_audio_input, list_audio_encoders, add_audio_encoder, update_audio_encoder,
        delete_audio_encoder, list_audio_sources,
-       get_video_encoding, set_video_encoding, set_video_encoding_auto_fps, set_video_bitrate,
+       get_video_encoding, save_snapshot, set_video_encoding, set_video_encoding_auto_fps, set_video_bitrate,
        set_encoding_enabled, swap_pip, get_pip_layout, set_pip_layout, get_pip_input, set_pip_input_format,
        get_ndi_compliance, restore_ndi_compliance,
        list_images, upload_image, delete_image, get_crop, set_crop, apply_crop_to_layout, get_orientation,
@@ -557,7 +557,38 @@ commands:
     expect: *ok
     returns: ack
 
+  download_preset_modules:
+    summary: "Save the current configuration of the chosen modules to a host file as a preset zip, without keeping it on the device (GET /api/systemctrl/system_preset/download)"
+    params:
+      name: { type: string, required: true, max_length: 64, label: Preset name,
+              description: "The preset's name, which names the zip." }
+      modules: { type: json, required: true, label: Modules,
+                 description: "JSON array of module names to save, from get_preset_modules, such as [\"codec_stream\", \"osd\"]." }
+      to: { type: save, required: true, label: Save to, description: "The host file the download is written to; replaced once the whole file has arrived." }
+    send: { method: GET, path: /api/systemctrl/system_preset/download, query: { name: "{name}", modules: "{modules}" }, save: to }
+    expect: { status: 200 }
+    returns: file
+
+  export_preset:
+    summary: "Save a stored preset to a host file (GET /api/systemctrl/system_preset/{pid}/export), for import_preset on this or another device"
+    params:
+      pid: *pid
+      to: { type: save, required: true, label: Save to, description: "The host file the download is written to; replaced once the whole file has arrived." }
+    send: { method: GET, path: "/api/systemctrl/system_preset/{pid}/export", save: to }
+    expect: { status: 200 }
+    returns: file
+
   # ── Logs and scheduled maintenance (1.5, 1.6) ───────────────────────────
+  export_logs:
+    summary: "Save the system logs, a zip, to a host file (GET /api/systemctrl/system_log/export/{time})"
+    params:
+      time: { type: enum, values: [new, old], required: true, label: Logs,
+              description: "new for the current system logs, old for the historical ones." }
+      to: { type: save, required: true, label: Save to, description: "The host file the download is written to; replaced once the whole file has arrived." }
+    send: { method: GET, path: "/api/systemctrl/system_log/export/{time}", save: to }
+    expect: { status: 200 }
+    returns: file
+
   get_log:
     summary: "One service's log as text (GET /api/systemctrl/system_log/get/{logname})"
     params:
@@ -1576,6 +1607,15 @@ commands:
     returns: value
 
   # ── Video encoding and picture-in-picture (6.3) ─────────────────────────
+  save_snapshot:
+    summary: "Save a channel's encoding snapshot, a JPEG, to a host file (GET /api/codec/{interface}/venc/snap); a channel not encoding answers a black picture with a white prompt"
+    params:
+      interface: *iface
+      to: { type: save, required: true, label: Save to, description: "The host file the download is written to; replaced once the whole file has arrived." }
+    send: { method: GET, path: "/api/codec/{interface}/venc/snap", save: to }
+    expect: { status: 200 }
+    returns: file
+
   get_video_encoding:
     summary: "A channel's main or sub video encoding: codec, size, rate control, bitrate, GOP, frame rate, QP and timecode (GET /api/codec/{interface}/venc/settings)"
     params:
@@ -3348,11 +3388,10 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Not offered here because the spec format cannot take a file or image
-      the device answers with: the encoding snapshot JPEG
-      (/api/codec/{interface}/venc/snap), the preset download and export
-      (/system_preset/download, /system_preset/{pid}/export) and the log
-      export (/system_log/export/{time}). Two intercom requests the
+      The encoding snapshot JPEG (/api/codec/{interface}/venc/snap,
+      save_snapshot), the preset download and export (/system_preset/download,
+      /system_preset/{pid}/export) and the log export (/system_log/export/{time})
+      are saved to host files. Two intercom requests the
       document marks as not for the front end (dLinkLDEnable,
       notifyDevDelTalk) are exchanged between devices and are not offered.
   - models: [all]

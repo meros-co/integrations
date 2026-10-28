@@ -250,6 +250,7 @@ models:
       - set_alarm_status
       - set_alarms_status
       - export_alarms
+      - download_alarm_export
       - export_alarms_by_level
       - get_alarm_config
       - set_alarm_config
@@ -1844,6 +1845,14 @@ commands:
     send: { method: GET, path: /v1/alarm/list/export }
     expect: { status: 200, code_path: "$.code", code_range: [200, 200], json_path: "$.data.file_path" }
     returns: value
+  download_alarm_export:
+    summary: "Save an alarm export, the Excel file export_alarms made, to a host file (POST /v1/alarm/file/download, 13.1.6)"
+    params:
+      file_path: { type: string, required: true, max_length: 1024, label: File path, description: "The file path export_alarms returned." }
+      to: { type: save, required: true, label: Save to, description: "The host file the download is written to; replaced once the whole file has arrived." }
+    send: { method: POST, path: /v1/alarm/file/download, content_type: application/json, body: '{"file_path":{file_path:json}}', save: to }
+    expect: { status: 200 }
+    returns: file
   export_alarms_by_level:
     summary: Export the alarms of one level to a spreadsheet file on the device and return its path there (13.1.7)
     params:
@@ -2062,10 +2071,10 @@ quirks:
       documented fields and no requests to change them, so they are not
       kept. There is no list of KLS panels: a KLS panel's state comes from
       kls_get_panel and the KLS commands that read it back. Preview state,
-      the operation log export's file and the alarm export's file (13.1.6
-      downloads it as an Excel file, which a command cannot hand to the
-      host) cannot be read back; export_operation_log and export_alarms
-      return the file's path on the device. upload_firmware carries the
+      the operation log export's file (the document names no download for
+      it) cannot be read back; export_operation_log and export_alarms
+      return the file's path on the device, and download_alarm_export saves
+      the alarm export, an Excel file, to a host file (13.1.6). upload_firmware carries the
       file as base64 text inside JSON, so the caller gives the base64 text
       rather than a host file, and it is not streamed. A panel deleted from
       the web console stays in panel_* state until the device is opened
