@@ -1407,6 +1407,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Lens memories 1 to 8 on the E-Vision Laser 9000 and 9100. ([specs/digitalprojection-evision-op.yaml:827](specs/digitalprojection-evision-op.yaml#L827))
 - [ ] Confirm the 200 ms between commands the manuals ask of "RS232 by Telnet" holds when counted from each answer, and that the RS-232 port itself needs no gap (none is applied there). ([specs/digitalprojection-evision-op.yaml:59](specs/digitalprojection-evision-op.yaml#L59))
 
+## digitalprojection-insight-laser — Digital Projection INSIGHT 4K Laser (binary protocol)
+
+- [ ] Confirm Get Current Title is 00 85 00 00 01 02 88 (the guide prints 02 as its first byte). ([specs/digitalprojection-insight-laser.yaml:153](specs/digitalprojection-insight-laser.yaml#L153))
+- [ ] Record the reply status byte (C0h in every example) for a refused or unsupported request, and whether a reply's length can exceed 255. ([specs/digitalprojection-insight-laser.yaml:158](specs/digitalprojection-insight-laser.yaml#L158))
+- [ ] Confirm the running status's field order (external control, power, cooling, power processing, mode at bytes 6 to 10; light status and on/off at 14 and 15). ([specs/digitalprojection-insight-laser.yaml:129](specs/digitalprojection-insight-laser.yaml#L129))
+- [ ] Confirm the light power level is at byte 12 of the Get Light Power Level reply. ([specs/digitalprojection-insight-laser.yaml:137](specs/digitalprojection-insight-laser.yaml#L137))
+- [ ] Confirm TCP 43728 takes several requests on one connection and needs no delay between them. ([specs/digitalprojection-insight-laser.yaml:39](specs/digitalprojection-insight-laser.yaml#L39))
+
 ## digitalprojection-projector — Digital Projection projectors (ASCII control protocol)
 
 - [ ] A set ("*brightness = 10") is answered "ack brightness = 10" on one CR-ended line, echoing the keyword and the value now in effect, on every series. ([specs/digitalprojection-projector.yaml:96](specs/digitalprojection-projector.yaml#L96))
@@ -1800,6 +1808,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Linux, confirm the core's own ALSA sequencer calls (libasound.so.2 loaded at first use) list a USB MIDI device and a software port under the same names midir gave, send and receive notes and long SysEx both ways, and that on a machine without libasound.so.2, and on one without the sequencer (snd-seq not loaded), the core starts, lists no port and reports why a port device stays disconnected. ([specs/generic-midi.yaml:450](specs/generic-midi.yaml#L450))
 - [ ] Run the MTC generator into a DAW or lighting console chasing MTC, over a MIDI port and over RTP-MIDI, at 24, 25, 30df and 30: confirm it locks at the time located, reads drop-frame across a minute (00:00:59:28 to 00:01:00:02), and stays within a frame of the core's clock for an hour. ([specs/generic-midi.yaml:457](specs/generic-midi.yaml#L457))
 - [ ] Against an MMC device (a DAW or recorder), confirm READ answers for selected_time_code and motion_control_tally decode as kept, including short time code updates. ([specs/generic-midi.yaml:475](specs/generic-midi.yaml#L475))
+
+## generic-ntp — NTP server status (RFC 5905 client request)
+
+- [ ] Check against a GPS time server (a TimeMachines TM2000A, a Meinberg) that the stratum, reference ID and offset agree with the server's own display. ([specs/generic-ntp.yaml:47](specs/generic-ntp.yaml#L47))
 
 ## generic-ping — Network presence (ping) and Wake-on-LAN
 
@@ -3211,6 +3223,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record whether the multi-window report (FD) starts with the window number. ([specs/philips-sicp.yaml:792](specs/philips-sicp.yaml#L792))
 - [ ] Confirm the operating hours report is a big-endian 16-bit count of hours. ([specs/philips-sicp.yaml:724](specs/philips-sicp.yaml#L724))
 
+## piclock — PiClock studio clock (tally server)
+
+- [ ] Confirm the AUTH digest is lowercase hexadecimal SHA-512 of the challenge followed by the secret. ([specs/piclock.yaml:202](specs/piclock.yaml#L202))
+- [ ] Confirm region commands take the region number directly before the command name (0SETTALLY:...). ([specs/piclock.yaml:208](specs/piclock.yaml#L208))
+- [ ] Confirm SETCOUNTDOWN's empty flash field and SETLAYOUT's empty legacy field are accepted. ([specs/piclock.yaml:122](specs/piclock.yaml#L122))
+- [ ] Confirm the clock sends GPI on connecting and on each change, and that a 16-bit word is read bit 0 first. ([specs/piclock.yaml:190](specs/piclock.yaml#L190))
+
 ## pixotope — Pixotope
 
 - [ ] Record the Gateway's HTTP answer bodies (to a Set, a Get, a Call, and a Call that times out), so replies can be read into state. ([specs/pixotope.yaml:321](specs/pixotope.yaml#L321))
@@ -4049,6 +4068,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the values import_settings's type takes besides encoder. ([specs/teradek-prism.yaml:1013](specs/teradek-prism.yaml#L1013))
 - [ ] On a 2.25 unit, confirm the list, inputs and capacity endpoints answer 404 and that encoder 0, decoder 0 and streams 0-4 answer on the shared paths. ([specs/teradek-prism.yaml:2061](specs/teradek-prism.yaml#L2061))
 - [ ] Record the units of the audio delay and volume fields (encoder audio delay, audio output delay and embedded volume, channel volume). ([specs/teradek-prism.yaml:1963](specs/teradek-prism.yaml#L1963))
+
+## timemachines-clock — TimeMachines clocks, timers and time servers (Locator Protocol API)
+
+- [ ] Record a clock's 40-byte status and confirm bytes 20 to 39 (alarm, days, digits value, WiFi signal, name). ([specs/timemachines-clock.yaml:260](specs/timemachines-clock.yaml#L260))
+- [ ] Confirm the clock answers from port 7372 to the sender's port, and answers every control request with 'A'. ([specs/timemachines-clock.yaml:30](specs/timemachines-clock.yaml#L30))
+- [ ] Record what Get Program and Get Active Program answer. ([specs/timemachines-clock.yaml:168](specs/timemachines-clock.yaml#L168))
+- [ ] Confirm Load Program's second byte is 4Fh as the guide writes, and that the steps are the same 32-byte structure as Store Program's. ([specs/timemachines-clock.yaml:183](specs/timemachines-clock.yaml#L183))
+- [ ] Confirm the two-line clock's text takes a line feed for a new line, and the DotMatrix text's ESC form on the TM848. ([specs/timemachines-clock.yaml:154](specs/timemachines-clock.yaml#L154))
+- [ ] Confirm the TM1000A and TM2000A answer the locator query with the 80-byte status. ([specs/timemachines-clock.yaml:68](specs/timemachines-clock.yaml#L68))
 
 ## tractus-fullview — Tractus FullView for NDI
 

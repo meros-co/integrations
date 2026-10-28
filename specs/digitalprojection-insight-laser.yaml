@@ -1,0 +1,171 @@
+spec: 1
+id: digitalprojection-insight-laser
+name: Digital Projection INSIGHT 4K Laser (binary protocol)
+vendor: Digital Projection
+category: display
+implementation: native
+reason: >
+  The INSIGHT 4K Laser's protocol is binary: three command bytes, a two-byte length, the command data and a
+  checksum (the low byte of the sum of every byte before it), answered by the command bytes with 20h added, a
+  status byte, a one-byte length, data and a checksum. Request bytes above 7Fh and a computed checksum are
+  beyond the spec format's text templates.
+
+source:
+  - title: "Protocol Guides, 115-482F, Rev F, October 2016: INSIGHT 4K Laser Series (pages 61-90)"
+    author: Digital Projection Ltd
+    url: https://digitalprojection.co.uk/dpdownloads/Protocol/Protocol%20Guide%20Rev%20F.pdf
+    note: >
+      Manufacturer document (retrieved 2026-10-28). Network port 43728 and serial 38400 8N1, no flow control
+      (p.61); the command structure, checksum and examples, and waiting for each reply (p.62); power on and
+      off, light on and off, set and get light power level (30 to 100 %), get light status (hours, warning
+      time, percent remaining, strike count), douser close, open and status, running status with its value
+      tables (p.63-73); lens move up, down, left, right, stop, zoom in, out, stop, focus in, out, stop
+      (p.74-85); lens memory store, recall and delete (p.86-88); set title and get current title (p.89-90).
+
+settings:
+  poll_ms: { type: int, min: 1000, max: 3600000, default: 5000, label: Read interval,
+             description: "Milliseconds between reads of the running status (power, mode, light); the douser, light power, light status and title are read every minute." }
+  link: { type: enum, values: [tcp, serial], default: tcp, label: Link,
+          description: "tcp reaches the projector on the network on port 43728; serial uses an RS-232 port of the host wired to the projector." }
+  serial_port: { type: string, max_length: 256, label: Serial port,
+                 description: "With link serial, the host's serial port wired to the projector: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
+  baud_rate: { type: enum, values: ["38400"], default: "38400", label: Baud rate, description: "With link serial, 38400 bit/s as the guide gives." }
+  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "With link serial, eight data bits." }
+  parity: { type: enum, values: [none], default: none, label: Parity, description: "With link serial, no parity." }
+  stop_bits: { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "With link serial, one stop bit." }
+  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "With link serial, no flow control." }
+
+ports:
+  - { port: 43728, protocol: tcp, role: control, when: "link tcp", note: "the projector's control port" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232 port of the host wired to the projector, 38400 8N1" }
+
+models:
+  - id: insight-4k-laser
+    name: Digital Projection INSIGHT 4K Laser
+    supports: [power_on, power_off, light_on, light_off, set_light_power, get_light_power, get_light_status,
+               close_douser, open_douser, get_douser, get_running_status, lens_shift, lens_shift_stop, zoom, focus,
+               store_lens_memory, recall_lens_memory, delete_lens_memory, set_title, get_title]
+    verification: none
+
+commands:
+  power_on:
+    summary: Power the projector on from standby; the running status is read back
+    returns: ack
+  power_off:
+    summary: Put the projector in standby; the running status is read back
+    returns: ack
+  light_on:
+    summary: Turn the laser light source on; the running status is read back
+    returns: ack
+  light_off:
+    summary: Turn the laser light source off; the running status is read back
+    returns: ack
+  set_light_power:
+    summary: Set the light power level; it is read back
+    params:
+      percent: { type: int, min: 30, max: 100, required: true, label: Light power, description: "Light output in percent, 30 to 100." }
+    returns: ack
+  get_light_power:
+    summary: Read the light power level, in percent
+    returns: value
+  get_light_status:
+    summary: Read the light source's hours, warning time, percent remaining and strike count
+    returns: value
+  close_douser:
+    summary: Close the douser; its state is read back
+    returns: ack
+  open_douser:
+    summary: Open the douser; its state is read back
+    returns: ack
+  get_douser:
+    summary: Read whether the douser is closed (true) or open (false)
+    returns: value
+  get_running_status:
+    summary: Read the running status (external control, power, cooling, mode, light)
+    returns: value
+  lens_shift:
+    summary: Start shifting the lens; it moves until lens_shift_stop
+    params:
+      direction: { type: enum, values: [up, down, left, right], required: true, label: Direction, description: "Which way the lens shifts." }
+    returns: ack
+  lens_shift_stop:
+    summary: Stop the lens shifting on an axis
+    params:
+      axis: { type: enum, values: [vertical, horizontal], required: true, label: Axis, description: "vertical stops an up or down move, horizontal a left or right one." }
+    returns: ack
+  zoom:
+    summary: Start zooming in or out, or stop zooming
+    params:
+      direction: { type: enum, values: [in, out, stop], required: true, label: Direction, description: "in or out starts the zoom moving; stop halts it." }
+    returns: ack
+  focus:
+    summary: Start focusing in or out, or stop focusing
+    params:
+      direction: { type: enum, values: [in, out, stop], required: true, label: Direction, description: "in or out starts the focus moving; stop halts it." }
+    returns: ack
+  store_lens_memory:
+    summary: Store the lens position in a lens memory
+    params:
+      memory: &memory { type: int, min: 0, max: 9, required: true, label: Lens memory, description: "The lens memory, 0 to 9, named memory 0 to memory 9 on the projector." }
+    returns: ack
+  recall_lens_memory:
+    summary: Move the lens to a stored lens memory
+    params: { memory: *memory }
+    returns: ack
+  delete_lens_memory:
+    summary: Delete a lens memory
+    params: { memory: *memory }
+    returns: ack
+  set_title:
+    summary: Select a title (preset button); the current title is read back
+    params:
+      title: { type: int, min: 1, max: 100, required: true, label: Title, description: "The title to select, 1 to 100 as the projector numbers them." }
+    returns: ack
+  get_title:
+    summary: Read the current title, 1 to 100
+    returns: value
+
+state:
+  power:                { type: bool, description: "The projector is powered on (running status)" }
+  external_control:     { type: bool, description: "External control is on (running status)" }
+  light_cooling:        { type: bool, description: "The light source is cooling (running status)" }
+  power_processing:     { type: bool, description: "The projector is powering up or down (running status)" }
+  mode:                 { type: string, description: "Projector status: standby, power_on_protect, ignition_first_attempt, power_on_running, running_light_on, cooling, reset_wait, fan_stop_error, light_ignition_retry, light_error, running_light_off, or unknown_<hex> for a code the guide does not list" }
+  light:                { type: bool, description: "The light source is on (running status)" }
+  light_processing:     { type: bool, description: "The light source is turning on or off (running status)" }
+  douser_closed:        { type: bool, description: "The douser is closed" }
+  light_power:          { type: int, unit: "%", description: "Light power level, 30 to 100" }
+  light_status.hours:   { type: int, unit: h, description: "Light source hours" }
+  light_status.warning_hours: { type: int, unit: h, description: "Hours at which the light source warning is given" }
+  light_status.remaining_percent: { type: int, unit: "%", description: "Light source life remaining" }
+  light_status.strikes: { type: int, description: "Light source strike count" }
+  title:                { type: int, description: "Current title (preset), 1 to 100" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      power_off and light_off take the picture off screen at once, and power_on and light_on start a warm-up
+      the projector does not abort; recall_lens_memory moves the lens.
+  - models: [all]
+    severity: warning
+    text: >
+      The guide prints Get Current Title's request starting 02h, but its checksum (88h) and the example reply
+      (starting 20h) are those of 00h, the first byte of the other status reads; 00 85 00 00 01 02 88 is sent.
+  - models: [all]
+    severity: info
+    text: >
+      Every reply in the guide carries C0h after its command bytes, and the guide does not say what another
+      value means; the module accepts any value there and logs it. A request with a wrong checksum is ignored
+      by the projector and times out. The guide documents no error reply.
+  - models: [all]
+    severity: info
+    text: >
+      Lens moves run until stopped: lens_shift, zoom and focus start a move, and lens_shift_stop or the stop
+      direction ends it. Lens memories are addressed by number; their names are "memory 0" to "memory 9".
+  - models: [all]
+    severity: info
+    text: >
+      The guide documents no reads of the lens position or of picture settings; those are not in state (an
+      API limit). The running status gives power, mode and light; the INSIGHT Dual Laser 4K and later
+      INSIGHT models speak the ASCII protocol instead (digitalprojection-projector).

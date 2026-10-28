@@ -137,6 +137,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "digitalprojection-dvision",
             "digitalprojection-evision-6500",
             "digitalprojection-evision-op",
+            "digitalprojection-insight-laser",
             "digitalprojection-projector",
         ],
     ),
@@ -166,6 +167,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &[
             "generic-http",
             "generic-midi",
+            "generic-ntp",
             "generic-osc",
             "generic-ping",
             "generic-snmp",
@@ -281,6 +283,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-phabrix", &["phabrix-qx"]),
     ("vendor-pharos", &["pharos-designer"]),
     ("vendor-philips", &["philips-sicp"]),
+    ("vendor-piclock", &["piclock"]),
     ("vendor-pixotope", &["pixotope"]),
     ("vendor-pjlink", &["pjlink"]),
     ("vendor-planningcenter", &["planningcenter-services"]),
@@ -395,6 +398,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-teradek", &["teradek-prism"]),
+    ("vendor-timemachines", &["timemachines-clock"]),
     ("vendor-tinkerlist", &["cuez-automator"]),
     (
         "vendor-tractus",
