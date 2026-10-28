@@ -1,0 +1,324 @@
+spec: 1
+id: blackmagic-audio-monitor
+name: Blackmagic Audio Monitor 12G G3
+vendor: Blackmagic Design
+category: other
+
+source:
+  - title: Blackmagic Audio Monitor Installation and Operation Manual (2025), Developer Information, Blackmagic Audio Monitor 12G Ethernet Protocol v1.4
+    author: Blackmagic Design
+    url: https://documents.blackmagicdesign.com/UserManuals/AudioMonitorManual.pdf
+    note: >
+      Manufacturer-documented, and the source of every block and command here
+      unless the command says otherwise. TCP 9996, blocks with an all-caps header
+      ended by a blank line, the state dump on connecting and the changes sent
+      after it, ignoring unknown blocks and lines (p.16); the preamble, the
+      AUDIOMONITOR DEVICE block with its writable label, the read-only NETWORK
+      block, AUDIO METER with its eight meter modes and AUDIO INPUT routing
+      (p.17-18); the ST2110 block, AUDIO OUTPUT with speaker and headphone gain
+      0-255, mute, solo and the audio delay fields, the ACK answer that repeats
+      what was set (p.18); PING and HELP, whose listing names every writable field
+      and the full list of input routings (p.19). Ethernet setup on the 12G G3 only,
+      network access from Audio Monitor Setup and the USB-only setting (p.10,
+      p.13); audio delay set in Audio Monitor Setup in frames or milliseconds
+      (p.11); front panel mute, solo and input buttons (p.6-8).
+
+transport:
+  type: line-tcp
+  port: 9996
+  framing: block
+  encoding: utf-8
+  timeout_ms: 2000
+  reply: expected
+  reply_match: "^(ACK|NAK)"
+  probe: "PING:"
+
+ports:
+  - { port: 9996, protocol: tcp, role: control }
+
+models:
+  - id: audio-monitor-12g-g3
+    name: Blackmagic Audio Monitor 12G G3
+    supports:
+      [set_label, set_meter_mode, set_input, set_speaker_gain, set_headphone_gain,
+       set_mute, set_solo, get_device_info, get_network, get_audio_meter,
+       get_audio_input, get_st2110, get_audio_output, ping]
+    verification: none
+    notes: >
+      Rack audio monitor with 12G-SDI, 10G Ethernet SMPTE 2110, AES/EBU XLR,
+      analog XLR and RCA inputs, speakers and a headphone output (p.5-6). The
+      original Blackmagic Audio Monitor and the Audio Monitor 12G before G3 are
+      set up over USB only and have no Ethernet protocol (p.10).
+
+commands:
+  set_label:
+    summary: Rename the audio monitor; the only writable field of the device block
+    params:
+      label: { type: string, required: true, max_length: 64,
+        label: Label,
+        description: "The name the audio monitor shows in Audio Monitor Setup and on the network." }
+    send: |
+      AUDIOMONITOR DEVICE:
+      Label: {label}
+    expect: { contains: "ACK" }
+    returns: ack
+    # Ethernet Protocol v1.4, p.17: "Only the label can be modified"
+
+  set_meter_mode:
+    summary: Choose the audio level meter type and its reference or scale
+    params:
+      mode:
+        type: enum
+        values: ["VU (-20dBFS Ref)", "VU (-18dBFS Ref)", "PPM EBU (-20dBFS Ref)", "PPM EBU (-18dBFS Ref)",
+                 "PPM BBC (-20dBFS Ref)", "PPM BBC (-18dBFS Ref)", "Loudness (EBU +9 scale)", "Loudness (EBU +18 scale)"]
+        required: true
+        label: Meter mode
+        description: "Meter type and its reference: VU or PPM (EBU or BBC) referenced to -20 or -18 dBFS, or loudness on the EBU +9 or +18 scale."
+    send: |
+      AUDIO METER:
+      Meter Mode: {mode}
+    expect: { contains: "ACK" }
+    returns: ack
+    # Ethernet Protocol v1.4, p.17-18 and the HELP listing, p.19
+
+  set_input:
+    summary: Choose the stereo pair the speakers and headphones play and the meters show
+    params:
+      input:
+        type: enum
+        values: ["SDI Stereo 1-2", "SDI Stereo 3-4", "SDI Stereo 5-6", "SDI Stereo 7-8", "SDI Stereo 9-10",
+                 "SDI Stereo 11-12", "SDI Stereo 13-14", "SDI Stereo 15-16", "SDI Stereo 17-18", "SDI Stereo 19-20",
+                 "SDI Stereo 21-22", "SDI Stereo 23-24", "SDI Stereo 25-26", "SDI Stereo 27-28", "SDI Stereo 29-30",
+                 "SDI Stereo 31-32", "SDI Stereo 33-34", "SDI Stereo 35-36", "SDI Stereo 37-38", "SDI Stereo 39-40",
+                 "SDI Stereo 41-42", "SDI Stereo 43-44", "SDI Stereo 45-46", "SDI Stereo 47-48", "SDI Stereo 49-50",
+                 "SDI Stereo 51-52", "SDI Stereo 53-54", "SDI Stereo 55-56", "SDI Stereo 57-58", "SDI Stereo 59-60",
+                 "SDI Stereo 61-62", "SDI Stereo 63-64",
+                 "XLR AES/EBU Stereo 1-2", "XLR Analog Stereo", "RCA Stereo",
+                 "ST2110 Stereo 1-2", "ST2110 Stereo 3-4", "ST2110 Stereo 5-6", "ST2110 Stereo 7-8", "ST2110 Stereo 9-10",
+                 "ST2110 Stereo 11-12", "ST2110 Stereo 13-14", "ST2110 Stereo 15-16", "ST2110 Stereo 17-18", "ST2110 Stereo 19-20",
+                 "ST2110 Stereo 21-22", "ST2110 Stereo 23-24", "ST2110 Stereo 25-26", "ST2110 Stereo 27-28", "ST2110 Stereo 29-30",
+                 "ST2110 Stereo 31-32", "ST2110 Stereo 33-34", "ST2110 Stereo 35-36", "ST2110 Stereo 37-38", "ST2110 Stereo 39-40",
+                 "ST2110 Stereo 41-42", "ST2110 Stereo 43-44", "ST2110 Stereo 45-46", "ST2110 Stereo 47-48", "ST2110 Stereo 49-50",
+                 "ST2110 Stereo 51-52", "ST2110 Stereo 53-54", "ST2110 Stereo 55-56", "ST2110 Stereo 57-58", "ST2110 Stereo 59-60",
+                 "ST2110 Stereo 61-62", "ST2110 Stereo 63-64"]
+        required: true
+        label: Input
+        description: "The stereo pair to monitor: an SDI or SMPTE 2110 channel pair, the AES/EBU or analog XLR input, or the RCA input."
+    send: |
+      AUDIO INPUT:
+      Routing: Speaker Stereo {input}
+    expect: { contains: "ACK" }
+    returns: ack
+    # Ethernet Protocol v1.4, p.18 and the HELP listing, p.19: "Routing: <enum1> <enum2>", enum1 always "Speaker Stereo"
+
+  set_speaker_gain:
+    summary: Set the speaker volume, 0-255
+    params:
+      gain: { type: int, min: 0, max: 255, required: true,
+        label: Speaker volume,
+        description: "Speaker volume from 0 (silent) to 255 (loudest), as the front panel volume knob sets it." }
+    send: |
+      AUDIO OUTPUT:
+      Gain: Speaker Stereo {gain}
+    expect: { contains: "ACK" }
+    returns: ack
+    # Ethernet Protocol v1.4, p.18: "Gain: Speaker Stereo 125"
+
+  set_headphone_gain:
+    summary: Set the headphone volume, 0-255
+    params:
+      gain: { type: int, min: 0, max: 255, required: true,
+        label: Headphone volume,
+        description: "Headphone volume from 0 (silent) to 255 (loudest)." }
+    send: |
+      AUDIO OUTPUT:
+      Gain: Headphone Stereo {gain}
+    expect: { contains: "ACK" }
+    returns: ack
+    # Ethernet Protocol v1.4, p.18-19
+
+  set_mute:
+    summary: Mute or unmute the speakers and headphones
+    params:
+      muted: { type: bool, required: true,
+        label: Muted,
+        description: "On mutes the speakers and headphones, off restores them, as the front panel MUTE button does." }
+    send: |
+      AUDIO OUTPUT:
+      Mute: {muted}
+    expect: { contains: "ACK" }
+    returns: ack
+    # Ethernet Protocol v1.4, p.18: "Mute can be true or false"
+
+  set_solo:
+    summary: Play the left or right channel alone, or both
+    params:
+      solo: { type: enum, values: ["Off", "Left", "Right"], required: true,
+        label: Solo,
+        description: "Left or Right plays that channel alone, as the front panel solo buttons do; Off plays stereo." }
+    send: |
+      AUDIO OUTPUT:
+      Solo: {solo}
+    expect: { contains: "ACK" }
+    returns: ack
+    # Ethernet Protocol v1.4, p.18: "Solo can be Off, Left or Right"
+
+  get_device_info:
+    summary: Ask the monitor to resend its device block; it follows the ACK and updates state
+    send: "AUDIOMONITOR DEVICE:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub-style status request; not in the Audio Monitor document, see quirks
+
+  get_network:
+    summary: Ask the monitor to resend its network block; it follows the ACK and updates state
+    send: "NETWORK:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub-style status request; not in the Audio Monitor document, see quirks
+
+  get_audio_meter:
+    summary: Ask the monitor to resend its meter block; it follows the ACK and updates state
+    send: "AUDIO METER:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub-style status request; not in the Audio Monitor document, see quirks
+
+  get_audio_input:
+    summary: Ask the monitor to resend its input block; it follows the ACK and updates state
+    send: "AUDIO INPUT:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub-style status request; not in the Audio Monitor document, see quirks
+
+  get_st2110:
+    summary: Ask the monitor to resend its ST2110 block; it follows the ACK and updates state
+    send: "ST2110:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub-style status request; not in the Audio Monitor document, see quirks
+
+  get_audio_output:
+    summary: Ask the monitor to resend its output block; it follows the ACK and updates state
+    send: "AUDIO OUTPUT:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub-style status request; not in the Audio Monitor document, see quirks
+
+  ping:
+    summary: Check that the monitor is still responding
+    send: "PING:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Ethernet Protocol v1.4, p.19
+
+telemetry:
+  # The monitor sends its whole state as blocks when a client connects, then each
+  # change (p.16). Nothing needs polling. Its answer to a change is a block opening
+  # with ACK: that repeats the fields set (p.17-18), read here as well.
+  updates:
+    - header: "^PROTOCOL PREAMBLE:$"
+      fields:
+        Version: device.protocol_version
+    - header: "^(AUDIOMONITOR DEVICE|ACK):$"
+      fields:
+        Model: device.model
+        Label: device.label
+        Unique ID: device.unique_id
+    - header: "^NETWORK:$"
+      fields:
+        Dynamic IP: { path: network.dynamic_ip, map: { "1": true, "0": false, "true": true, "false": false } }
+        Static address: network.static_address
+        Static subnet: network.static_subnet
+        Static gateway: network.static_gateway
+        Current address: network.current_address
+        Current subnet: network.current_subnet
+        Current gateway: network.current_gateway
+    - header: "^(AUDIO METER|ACK):$"
+      fields:
+        Meter Mode: meter.mode
+    - header: "^(AUDIO INPUT|ACK):$"
+      each_line: "^Routing: Speaker Stereo (.+)$"
+      state: { input.routing: "{1}" }
+    - header: "^ST2110:$"
+      fields:
+        SDI Output Level: st2110.sdi_output_level
+    # Gain appears once per output, so it is read line by line.
+    - header: "^(AUDIO OUTPUT|ACK):$"
+      each_line: "^Gain: Speaker Stereo (\\d+)$"
+      state: { output.speaker_gain: "{1}" }
+    - header: "^(AUDIO OUTPUT|ACK):$"
+      each_line: "^Gain: Headphone Stereo (\\d+)$"
+      state: { output.headphone_gain: "{1}" }
+    - header: "^(AUDIO OUTPUT|ACK):$"
+      fields:
+        Mute: { path: output.mute, map: { "true": true, "false": false } }
+        Solo: output.solo
+        Audio delay in ms: output.delay_ms
+        Audio delay in frames: output.delay_frames
+        Audio delay unit selected: output.delay_unit
+
+state:
+  device.protocol_version:  { type: string, description: "Protocol version from the preamble, e.g. 1.4" }
+  device.model:             { type: string, description: "Model, e.g. Blackmagic Audio Monitor 12G" }
+  device.label:             { type: string, description: "The monitor's name (writable with set_label)" }
+  device.unique_id:         { type: string, description: "The monitor's unique ID" }
+  network.dynamic_ip:       { type: bool, description: "DHCP in use (the device sends 1 or 0)" }
+  network.static_address:   { type: string, description: "Configured static IP address" }
+  network.static_subnet:    { type: string, description: "Configured static subnet mask" }
+  network.static_gateway:   { type: string, description: "Configured static gateway" }
+  network.current_address:  { type: string, description: "Active IP address" }
+  network.current_subnet:   { type: string, description: "Active subnet mask" }
+  network.current_gateway:  { type: string, description: "Active gateway" }
+  meter.mode:               { type: string, description: "Meter mode, one of set_meter_mode's values, e.g. VU (-20dBFS Ref)" }
+  input.routing:            { type: string, description: "The stereo pair monitored, one of set_input's values, e.g. SDI Stereo 1-2" }
+  st2110.sdi_output_level:  { type: string, description: "The SDI output level, e.g. Auto (read only)" }
+  output.speaker_gain:      { type: int, description: "Speaker volume, 0-255" }
+  output.headphone_gain:    { type: int, description: "Headphone volume, 0-255" }
+  output.mute:              { type: bool, description: "Speakers and headphones muted" }
+  output.solo:              { type: string, description: "Solo: Off, Left or Right" }
+  output.delay_ms:          { type: int, description: "Audio delay to the speaker and headphone outputs, in milliseconds (read only)", unit: ms }
+  output.delay_frames:      { type: int, description: "Audio delay to the speaker and headphone outputs, in frames (read only)" }
+  output.delay_unit:        { type: string, description: "The unit the audio delay is set in, Milliseconds or Frames (read only)" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      The network settings, the SDI output level and the audio delay are read only
+      over this protocol: they are set in Audio Monitor Setup over USB or the network
+      (p.11, p.13, p.17-18), and the HELP listing names no writable field for them
+      (p.19). Audio Monitor Setup can also be limited to USB, which does not affect
+      this protocol as far as the document says.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The document documents PING and HELP but no header-only status request.
+      get_device_info, get_network, get_audio_meter, get_audio_input, get_st2110 and
+      get_audio_output send the Videohub protocol's form (the header alone), which
+      this protocol resembles; the full state also arrives on every connection.
+
+  - models: [all]
+    severity: info
+    text: >
+      A change is answered with a block opening with ACK: that repeats the fields
+      set, followed by their block (p.17-18); state reads both. A NAK is not shown in
+      the document; commands fail on any reply without ACK. The NETWORK block reports
+      Dynamic IP as 1 or 0 (p.17), while HELP calls it a boolean; state accepts both.
+
+  - models: [all]
+    severity: info
+    text: >
+      The input routing list holds every SDI pair up to 63-64 and every ST2110 pair
+      (p.19); a pair the current signal does not carry may be refused or may play
+      silence. The routing is sent and reported as "Speaker Stereo" followed by the
+      pair; state keeps the pair only.
+
+  - models: [all]
+    severity: info
+    text: >
+      The document's legend calls the line end a line feed or carriage return
+      (p.16); commands end lines with LF as on the Videohub protocol, and received
+      lines may end in CR, LF or CRLF. The label length is not documented; 64
+      characters is assumed, as on other Blackmagic devices.

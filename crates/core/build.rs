@@ -75,6 +75,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-blackmagic",
         &[
             "blackmagic-atem",
+            "blackmagic-audio-monitor",
             "blackmagic-camera",
             "blackmagic-hyperdeck",
             "blackmagic-multiview",

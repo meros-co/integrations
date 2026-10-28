@@ -665,6 +665,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Compare a label drawn by set_multiviewer_label with ATEM Software Control's on a switcher before the ATEM Mini, at each multiviewer resolution: box size and position, the palette (atem-connection's coverage mapping), border and corners, and which resolutions the switcher expects stacked in the buffer. ([specs/blackmagic-atem.yaml:4240](specs/blackmagic-atem.yaml#L4240))
 - [ ] Check that the multiviewer modes in _VMC (one bit per video mode, at byte 4 of each entry) are the resolutions the switcher wants labels for, and what it does with a label buffer of the wrong size. ([specs/blackmagic-atem.yaml:4240](specs/blackmagic-atem.yaml#L4240))
 
+## blackmagic-audio-monitor — Blackmagic Audio Monitor 12G G3
+
+- [ ] Check that the monitor answers a header-only block (such as `AUDIO OUTPUT:` alone) with ACK and that block, as the Videohub protocol does. ([specs/blackmagic-audio-monitor.yaml:166](specs/blackmagic-audio-monitor.yaml#L166))
+- [ ] Record the reply to a refused change (NAK, or something else) and confirm the ACK: block repeats the fields set as the manual shows. ([specs/blackmagic-audio-monitor.yaml:223](specs/blackmagic-audio-monitor.yaml#L223))
+- [ ] Check the longest label the monitor takes (64 characters assumed). ([specs/blackmagic-audio-monitor.yaml:54](specs/blackmagic-audio-monitor.yaml#L54))
+- [ ] Check which input routings a monitor refuses (SDI pairs beyond those the signal carries, ST2110 pairs without a 2110 stream). ([specs/blackmagic-audio-monitor.yaml:84](specs/blackmagic-audio-monitor.yaml#L84))
+- [ ] Record the SDI Output Level values the ST2110 block reports besides Auto. ([specs/blackmagic-audio-monitor.yaml:245](specs/blackmagic-audio-monitor.yaml#L245))
+- [ ] Record the audio delay fields with a delay set in frames, and the units' other value (Frames assumed). ([specs/blackmagic-audio-monitor.yaml:257](specs/blackmagic-audio-monitor.yaml#L257))
+
 ## blackmagic-camera — Blackmagic cameras
 
 - [ ] Confirm the notification websocket's path, /control/api/v1/event/websocket, against the camera's /control/documentation.html: the PDF does not give it. ([specs/blackmagic-camera.yaml:2387](specs/blackmagic-camera.yaml#L2387))
