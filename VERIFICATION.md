@@ -3861,6 +3861,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm GET /playback/clocked_items?enabled=0 turns the option off (only enabled=1 is in the release notes). ([specs/softron-ontheair-video.yaml:292](specs/softron-ontheair-video.yaml#L292))
 - [ ] Confirm the timecode queries position_relative_timecode and position_media_timecode take HH:MM:SS:FF, and position_relative_seconds a decimal. ([specs/softron-ontheair-video.yaml:228](specs/softron-ontheair-video.yaml#L228))
 
+## songbeamer — SongBeamer (OSC remote control)
+
+- [ ] Confirm a query (the address alone) is answered on the same address to the sender, as on the X32. ([specs/songbeamer.yaml:37](specs/songbeamer.yaml#L37))
+- [ ] Record the integer each enum answers with (presentation state, video state, live video) and confirm enums are taken as strings. ([specs/songbeamer.yaml:342](specs/songbeamer.yaml#L342))
+- [ ] Confirm /xremote subscribes for 10 s and what it sends, and whether /playlist/changed reaches subscribers. ([specs/songbeamer.yaml:256](specs/songbeamer.yaml#L256))
+- [ ] Confirm changes made over OSC are still not reported back on current versions (the document's known bug). ([specs/songbeamer.yaml:337](specs/songbeamer.yaml#L337))
+- [ ] Confirm /video/position and /video/length answer as doubles (1.0 = 24 h) and take the string forms hh:mm:ss and +seconds. ([specs/songbeamer.yaml:321](specs/songbeamer.yaml#L321))
+
 ## sony-9pin — Sony 9-pin (RS-422 VTR protocol) decks and servers
 
 - [ ] Check the jog, var and shuttle speeds the device runs at for the speed bytes sent (10^(N/32-2) times play speed, a second byte for finer steps), and whether speed 0 pauses it or creeps. ([specs/sony-9pin.yaml:121](specs/sony-9pin.yaml#L121))

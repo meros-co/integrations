@@ -366,6 +366,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "softron-ontheair-video",
         ],
     ),
+    ("vendor-songbeamer", &["songbeamer"]),
     (
         "vendor-sony",
         &[
