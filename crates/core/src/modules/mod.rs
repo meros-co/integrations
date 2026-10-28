@@ -56,6 +56,12 @@ mod barco_projection_table;
 mod bss_london;
 #[cfg(feature = "christie-pandorasbox")]
 mod christie_pandorasbox;
+#[cfg(any(feature = "cyberpower-pdu", feature = "cyberpower-ups"))]
+mod cps_traps;
+#[cfg(feature = "cyberpower-pdu")]
+mod cyberpower_pdu_profile;
+#[cfg(feature = "cyberpower-ups")]
+mod cyberpower_ups_profile;
 #[cfg(feature = "datavideo-switcher")]
 mod datavideo_switcher;
 #[cfg(feature = "datavideo-switcher")]
@@ -180,21 +186,32 @@ mod shure;
 #[cfg(any(
     feature = "generic-snmp",
     feature = "apc-rack-pdu",
-    feature = "apc-ups"
+    feature = "apc-ups",
+    feature = "cyberpower-pdu",
+    feature = "cyberpower-ups"
 ))]
 mod snmp;
 #[cfg(any(
     feature = "generic-snmp",
     feature = "apc-rack-pdu",
-    feature = "apc-ups"
+    feature = "apc-ups",
+    feature = "cyberpower-pdu",
+    feature = "cyberpower-ups"
 ))]
 mod snmp_ber;
-#[cfg(any(feature = "apc-rack-pdu", feature = "apc-ups"))]
+#[cfg(any(
+    feature = "apc-rack-pdu",
+    feature = "apc-ups",
+    feature = "cyberpower-pdu",
+    feature = "cyberpower-ups"
+))]
 mod snmp_device;
 #[cfg(any(
     feature = "generic-snmp",
     feature = "apc-rack-pdu",
-    feature = "apc-ups"
+    feature = "apc-ups",
+    feature = "cyberpower-pdu",
+    feature = "cyberpower-ups"
 ))]
 mod snmp_usm;
 #[cfg(feature = "sony-bravia-serial")]
@@ -451,6 +468,16 @@ pub(crate) fn construct(
         #[cfg(feature = "apc-ups")]
         "apc-ups" => Ok(Box::new(snmp_device::SnmpDevice::new(
             &apc_ups_profile::PROFILE,
+            context,
+        )?)),
+        #[cfg(feature = "cyberpower-pdu")]
+        "cyberpower-pdu" => Ok(Box::new(snmp_device::SnmpDevice::new(
+            &cyberpower_pdu_profile::PROFILE,
+            context,
+        )?)),
+        #[cfg(feature = "cyberpower-ups")]
+        "cyberpower-ups" => Ok(Box::new(snmp_device::SnmpDevice::new(
+            &cyberpower_ups_profile::PROFILE,
             context,
         )?)),
         #[cfg(feature = "generic-http")]

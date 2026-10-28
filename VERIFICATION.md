@@ -1220,6 +1220,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a step index counts the trigger itself as 0, and what /api/trigger/step/<n> answers past the last step. ([specs/cuez-automator.yaml:104](specs/cuez-automator.yaml#L104))
 - [ ] Record the shapes of /api/timer, /api/macro/ and /api/trigger/current so timers, macros and the current trigger can be kept in state. ([specs/cuez-automator.yaml:241](specs/cuez-automator.yaml#L241))
 
+## cyberpower-ups — CyberPower UPS (SNMP)
+
+- [ ] Walk a UPS through an RMCARD205 and an RMCARD305 and check which groups each fills, and that every table is keyed by single integer indexes. ([specs/cyberpower-ups.yaml:33](specs/cyberpower-ups.yaml#L33))
+- [ ] Check that the UPS control objects read back their idle value after a SET, and when a turn-off or sleep shows in the output status. ([specs/cyberpower-ups.yaml:697](specs/cyberpower-ups.yaml#L697))
+- [ ] Check the units taken from the MIB's descriptions against the UPS's display. ([specs/cyberpower-ups.yaml:692](specs/cyberpower-ups.yaml#L692))
+- [ ] Receive a v1 trap (on battery, then back on line) and check it is named and that the poll after it shows the change. ([specs/cyberpower-ups.yaml:703](specs/cyberpower-ups.yaml#L703))
+
 ## dahua-ptz — Dahua and Amcrest PTZ cameras (HTTP CGI, public subset)
 
 - [ ] Check whether ptz.cgi numbers the first channel 1 (as the public integration sends) or 0. ([specs/dahua-ptz.yaml:43](specs/dahua-ptz.yaml#L43))

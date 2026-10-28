@@ -113,6 +113,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-chyron", &["chyron-prime"]),
     ("vendor-clock8001", &["clock-8001"]),
     ("vendor-cockos", &["cockos-reaper", "cockos-reaper-web"]),
+    ("vendor-cyberpower", &["cyberpower-pdu", "cyberpower-ups"]),
     ("vendor-dahua", &["dahua-ptz"]),
     (
         "vendor-denon",
