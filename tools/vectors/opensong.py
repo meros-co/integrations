@@ -70,3 +70,6 @@ telemetry(OS, "status-stopped", inbound_http={"path": "/presentation/status", "b
     state_before={"presentation": {"running": True, "screen": {"mode": "N", "name": "normal"},
                                    "slide": {"item": 1, "name": "Testslide", "title": "Untitled"}}},
     expect_state={"presentation": {"running": False}})
+# Downloads saved to the host file named (never written by a vector).
+osv("save_slide_preview", {"item": 12, "to": {"file": "s12.jpg"}}, "GET", "/presentation/slide/12/preview")
+osv("save_slide_image", {"item": 12, "to": {"file": "s12.jpg"}}, "GET", "/presentation/slide/12/image")

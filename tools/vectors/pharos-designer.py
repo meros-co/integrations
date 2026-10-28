@@ -241,3 +241,5 @@ ph_ws("ws-remote-device", {"data": {"remote_devices": [
     {"name": "EDN 20 1", "name_with_type": "EDN 20 1", "num": 1, "online": False, "serial": [], "type": "EDN 20"}]}},
     {"remote_devices": {"1": {"name": "EDN 20 1", "type": "EDN 20", "online": False}}})
 ph_ws("ws-lua", {"broadcast": "lua", "data": {"slider_level": "56"}}, {"lua": {"slider_level": "56"}})
+# Downloads saved to the host file named (never written by a vector).
+V.append({"spec": PH, "command": "download_project", "input": {"to": {"file": "project.pharos"}}, "expect_request": {"method": "GET", "target": "/api/project/file"}})

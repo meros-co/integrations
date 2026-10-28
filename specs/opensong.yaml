@@ -51,7 +51,7 @@ models:
   - id: opensong-2
     name: OpenSong 2.0 and later
     supports:
-      [get_status, get_slides, get_slide, get_songs, get_songs_in_folder, get_song,
+      [get_status, get_slides, get_slide, save_slide_preview, save_slide_image, get_songs, get_songs_in_folder, get_song,
        get_song_in_folder, get_song_folders, get_sets, get_set_slides, get_set_slide, load_song,
        load_song_from_folder, present_song, present_song_from_folder, load_set, present_set,
        insert_song, insert_song_from_folder, insert_song_after, insert_song_from_folder_after,
@@ -82,6 +82,22 @@ commands:
     send: { method: GET, path: "/presentation/slide/{item}" }
     expect: { status: 200 }
     returns: text
+  save_slide_preview:
+    summary: "Save a slide's preview of the running presentation, a JPEG, to a host file (GET /presentation/slide/<item>/preview)"
+    params:
+      item: {"type": "int", "min": 0, "required": true, "label": "Slide", "description": "The slide's item number, as the presentation's slide list gives it (not its position)."}
+      to: { type: save, required: true, label: Save to, description: "The host file the download is written to; replaced once the whole file has arrived." }
+    send: { method: GET, path: "/presentation/slide/{item}/preview", save: to }
+    expect: { status: 200 }
+    returns: file
+  save_slide_image:
+    summary: "Save a slide of the running presentation as a full image, a JPEG, to a host file (GET /presentation/slide/<item>/image)"
+    params:
+      item: {"type": "int", "min": 0, "required": true, "label": "Slide", "description": "The slide's item number, as the presentation's slide list gives it (not its position)."}
+      to: { type: save, required: true, label: Save to, description: "The host file the download is written to; replaced once the whole file has arrived." }
+    send: { method: GET, path: "/presentation/slide/{item}/image", save: to }
+    expect: { status: 200 }
+    returns: file
   get_songs:
     summary: "List the songs in the songs root (GET /song/list)"
     send: { method: GET, path: "/song/list" }
@@ -451,8 +467,8 @@ quirks:
       OpenSong sends (get_slides, get_songs, get_song_folders, get_sets,
       get_set_slides) without state, their element names being undocumented.
       Slide previews and images (/presentation/slide/<item>/preview and
-      /image) are JPEG and are not offered: the spec format reads text and
-      JSON replies only.
+      /image) are JPEG, saved to a host file by save_slide_preview and
+      save_slide_image.
   - models: [all]
     severity: info
     text: >

@@ -695,3 +695,7 @@ _t("modem", "/api/v1/network/modem/0",
                                  "label": "Modem 1", "status_json": json.dumps(_MODEM, separators=(",", ":"))}}}})
 _t("settings-import", "/api/v1/settings/sync/import", '{"status":"ok","message":"Imported"}', {},
    expect_then_send=[_g("/api/v1/encoders"), _g("/api/v1/decoders"), _g("/api/v1/streams")])
+# Downloads saved to the host file named (never written by a vector).
+V.append({"spec": "teradek-prism", "command": "save_encoder_snapshot", "input": {"encoder": 0, "to": {"file": "enc.jpg"}}, "expect_request": {"method": "GET", "target": "/api/v1/encoders/0/snapshot"}})
+_post("save_decoder_snapshot", {"decoder": 0, "width": 1280, "height": 720, "quality": 90, "to": {"file": "dec.jpg"}},
+      "/api/v1/decoders/0/snapshot", '{"settings":{"width":1280,"height":720,"quality":90}}')

@@ -116,7 +116,7 @@ models:
        set_encoder_metadata_settings, set_encoder_closed_captions, insert_scte_marker,
        insert_scte_marker_with, get_encoder_record_settings, describe_encoder_record_settings,
        set_encoder_record_settings, get_encoder_record_info, start_encoder_recording,
-       start_encoder_recording_with, stop_encoder_recording, set_encoder_snapshot_settings,
+       start_encoder_recording_with, stop_encoder_recording, set_encoder_snapshot_settings, save_encoder_snapshot,
        list_decoders, add_decoder, get_decoder, set_decoder, set_decoder_name,
        set_decoder_failover_timeout, delete_decoder, restart_decoder, list_decoder_streams,
        get_decoder_info, get_decoder_ingest, set_decoder_ingest, set_decoder_ingest_mode,
@@ -127,7 +127,7 @@ models:
        get_decoder_metadata_settings, describe_decoder_metadata_settings,
        set_decoder_metadata_settings, get_decoder_record_settings,
        describe_decoder_record_settings, set_decoder_record_settings, get_decoder_record_info,
-       start_decoder_recording, stop_decoder_recording, set_decoder_snapshot_settings,
+       start_decoder_recording, stop_decoder_recording, set_decoder_snapshot_settings, save_decoder_snapshot,
        list_streams, add_stream, delete_stream, get_stream, set_stream, set_stream_name,
        set_stream_mode, set_stream_codec_modes, get_stream_settings, describe_stream_settings,
        set_stream_settings, get_stream_info, start_stream, stop_stream, start_all_streams,
@@ -549,6 +549,14 @@ commands:
     send: { method: POST, path: "/api/v1/encoders/{encoder}/record/stop" }
     expect: *ok
     returns: ack
+  save_encoder_snapshot:
+    summary: "Save the encoder's latest periodic snapshot, a JPEG, to a host file (GET /api/v1/encoders/{id}/snapshot, 2.26)"
+    params:
+      encoder: *encoder
+      to: { type: save, required: true, label: Save to, description: "The host file the download is written to; replaced once the whole file has arrived." }
+    send: { method: GET, path: "/api/v1/encoders/{encoder}/snapshot", save: to }
+    expect: { status: 200 }
+    returns: file
   set_encoder_snapshot_settings:
     summary: "Set the size and JPEG quality of the encoder's periodic snapshot, applied from the next one (POST /api/v1/encoders/{id}/snapshot, 2.26); the image in the reply is not returned"
     params:
@@ -812,6 +820,18 @@ commands:
     send: { method: POST, path: "/api/v1/decoders/{decoder}/record/stop" }
     expect: *ok
     returns: ack
+  save_decoder_snapshot:
+    summary: "Set the decoder's snapshot size and JPEG quality and save the snapshot the reply carries to a host file (POST /api/v1/decoders/{id}/snapshot, 2.26)"
+    params:
+      decoder: *decoder
+      width: *snap_width
+      height: *snap_height
+      quality: *snap_quality
+      to: { type: save, required: true, label: Save to, description: "The host file the download is written to; replaced once the whole file has arrived." }
+    send: { method: POST, path: "/api/v1/decoders/{decoder}/snapshot",
+            body: '{"settings":{"width":{width},"height":{height},"quality":{quality}}}', content_type: application/json, save: to }
+    expect: { status: 200 }
+    returns: file
   set_decoder_snapshot_settings:
     summary: "Set the size and JPEG quality of the decoder's periodic snapshot, applied from the next one (POST /api/v1/decoders/{id}/snapshot, 2.26); the image in the reply is not returned"
     params: { decoder: *decoder, width: *snap_width, height: *snap_height, quality: *snap_quality }

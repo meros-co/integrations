@@ -76,7 +76,7 @@ models:
       set_datetime, set_watchdog, set_log_level, set_syslog, set_ntp, mark_dali_fixed,
       refresh_dali, factory_reset, set_group_master, set_output_enabled, override_intensity,
       override_rgb, override_hue_saturation, override_temperature, override_snapshot,
-      release_override, release_all_overrides, upload_project, rdm_discovery, rdm_discovery_update,
+      release_override, release_all_overrides, upload_project, download_project, rdm_discovery, rdm_discovery_update,
       rdm_patch_assign, rdm_patch_replace, rdm_get, rdm_set, reboot, start_scene,
       start_scene_release_others, start_scene_release_same_group, release_scene, toggle_scene,
       release_all_scenes, release_scenes_in_group, start_timeline, start_timeline_release_others,
@@ -104,7 +104,7 @@ models:
       set_datetime, set_watchdog, set_log_level, set_syslog, set_ntp, mark_dali_fixed,
       refresh_dali, factory_reset, set_content_target_master, set_output_enabled,
       override_intensity, override_rgb, override_hue_saturation, override_temperature,
-      override_snapshot, release_override, release_all_overrides, upload_project, rdm_discovery,
+      override_snapshot, release_override, release_all_overrides, upload_project, download_project, rdm_discovery,
       rdm_discovery_update, rdm_patch_assign, rdm_patch_replace, rdm_get, rdm_set, reboot,
       start_scene, start_scene_release_others, start_scene_release_same_group, release_scene,
       toggle_scene, release_all_scenes, release_scenes_in_group, start_timeline,
@@ -391,6 +391,14 @@ commands:
     send: { method: POST, path: /api/project/file, body: { binary: file }, content_type: application/vnd.pharos }
     expect: { status: [200, 202, 204] }
     returns: ack
+
+  download_project:
+    summary: "Save the controller's project file to a host file (GET /api/project/file)"
+    params:
+      to: { type: save, required: true, label: Save to, description: "The host file the download is written to; replaced once the whole file has arrived." }
+    send: { method: GET, path: /api/project/file, save: to }
+    expect: { status: 200 }
+    returns: file
 
   rdm_discovery:
     summary: "Start a full RDM discovery on a universe; results arrive on the rdm_discovery channel (POST /api/rdm/discovery)"
@@ -1165,8 +1173,8 @@ quirks:
       RDM Get and Set results arrive on the rdm_discovery and rdm_get_set channels and are not
       kept in state; get_rdm_discovery and get_rdm_device read results on demand. The Ping
       endpoint is given in the reference as POST /api/beacon, the beacon's own path, so it is
-      not built. Downloading the project file (GET /api/project/file) is not built: the format
-      has no file download for a spec-driven command. Lua values pushed with push_to_web are
+      not built. download_project saves the project file (GET /api/project/file) to a host
+      file. Lua values pushed with push_to_web are
       kept as text.
   - models: [vlc, vlc-plus]
     severity: info

@@ -64,7 +64,7 @@ ports:
 models:
   - id: native
     name: Nimble Streamer native API
-    supports: [get_server_status, sync_panel_settings, reload_config, reload_config_with_drm, reload_ssl_certificates, get_live_streams_status, list_sessions, delete_sessions, get_rtmp_settings, get_rtmp_republish_stats, list_rtmp_republish_rules, get_rtmp_republish_rule, create_rtmp_republish_rule, create_rtmp_republish_rule_custom, delete_rtmp_republish_rule, get_mpegts_status, get_mpegts_settings, get_srt_sender_stats, get_srt_receiver_stats, get_rist_sender_stats, get_rist_receiver_stats, list_ndi_streams, get_dvr_status, get_dvr_timeline, get_stream_dvr_status, get_stream_dvr_timeline, export_dvr_subtitles, export_dvr_subtitles_language, reload_dvr_archive, cleanup_dvr_archive, cleanup_dvr_archive_keep, cleanup_dvr_archive_span, insert_scte35_out, insert_scte35_out_for, insert_scte35_out_program, insert_scte35_in, insert_scte35_in_program, insert_scte35_time_signal, insert_scte35_time_signal_for, get_icecast_stream_info, insert_icecast_metadata, get_server_playlist_status, get_publish_control_status, deny_publishers, get_cache_key, delete_cache_item, list_sdi_sources, list_sdi_sinks, list_aja_devices]
+    supports: [get_server_status, sync_panel_settings, reload_config, reload_config_with_drm, reload_ssl_certificates, get_live_streams_status, list_sessions, delete_sessions, get_rtmp_settings, get_rtmp_republish_stats, list_rtmp_republish_rules, get_rtmp_republish_rule, create_rtmp_republish_rule, create_rtmp_republish_rule_custom, delete_rtmp_republish_rule, get_mpegts_status, get_mpegts_settings, get_srt_sender_stats, get_srt_receiver_stats, get_rist_sender_stats, get_rist_receiver_stats, list_ndi_streams, get_dvr_status, get_dvr_timeline, get_stream_dvr_status, get_stream_dvr_timeline, export_dvr_subtitles, export_dvr_mp4, export_dvr_subtitles_language, reload_dvr_archive, cleanup_dvr_archive, cleanup_dvr_archive_keep, cleanup_dvr_archive_span, insert_scte35_out, insert_scte35_out_for, insert_scte35_out_program, insert_scte35_in, insert_scte35_in_program, insert_scte35_time_signal, insert_scte35_time_signal_for, get_icecast_stream_info, insert_icecast_metadata, get_server_playlist_status, get_publish_control_status, deny_publishers, get_cache_key, delete_cache_item, list_sdi_sources, list_sdi_sinks, list_aja_devices]
     verification: none
     notes: >
       A server with management_token set cannot be reached (see quirks);
@@ -248,6 +248,17 @@ commands:
     expect: { status: 200, json_path: "$" }
     returns: value
 
+  export_dvr_mp4:
+    summary: "Save a time span of one stream's DVR recording as an MP4 file on the host, streamed (dvr/export_mp4); returns the file saved and its size"
+    params:
+      app: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Application", "description": "The application's name, such as live."}
+      stream: {"type": "string", "pattern": "^[^/?#\\s]+$", "max_length": 256, "required": true, "label": "Stream", "description": "The stream's name within the application."}
+      start: {"type": "int", "min": 0, "max": 4102444800, "required": true, "label": "From", "description": "Unix time in seconds of the first content to include."}
+      end: {"type": "int", "min": 0, "max": 4102444800, "required": true, "label": "To", "description": "Unix time in seconds of the last content to include."}
+      to: { type: save, required: true, label: Save to, description: "The host file the download is written to; replaced once the whole file has arrived." }
+    send: {"method": "GET", "path": "/manage/dvr/export_mp4/{app}/{stream}", "query": {"start": "{start}", "end": "{end}"}, "save": "to"}
+    expect: { status: 200 }
+    returns: file
   export_dvr_subtitles:
     summary: "One stream's recorded WebVTT subtitles as an SRT file's text, for a time span (dvr/export_srt)"
     params:
@@ -485,9 +496,9 @@ quirks:
       Configuration (applications, inputs, outputs, transcoder, DVR
       settings) is WMSPanel's; this API reloads it (sync_panel_settings,
       reload_config) but does not change it. RTMP re-publishing rules made
-      here last only until the server reloads. DVR export to MP4 answers
-      the file itself and is not offered (the core keeps no file from an
-      HTTP answer); the SRT subtitle export answers text. Field values of
+      here last only until the server reloads. DVR export to MP4
+      (export_dvr_mp4) answers the file itself, saved to a host file; the
+      SRT subtitle export answers text. Field values of
       the SRT and RIST statistics are those of their protocols' libraries.
 
   - models: [all]

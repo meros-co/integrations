@@ -135,3 +135,6 @@ telemetry(NB, "publish-control", inbound_http={"path": "/manage/publish_control/
                              {"key": "2", "id": "ID_2", "ip": "192.168.1.2", "stream": "live/stream2"}]})},
     expect_state={"publishers": {"1": {"id": "ID_1", "ip": "192.168.1.1", "stream": "live/stream1"},
                                  "2": {"id": "ID_2", "ip": "192.168.1.2", "stream": "live/stream2"}}})
+# Downloads saved to the host file named (never written by a vector).
+_nb("export_dvr_mp4", dict(_NBA, start=1542708934, end=1542712534, to={"file": "span.mp4"}), "GET",
+    "/manage/dvr/export_mp4/live/stream?start=1542708934&end=1542712534")
