@@ -1,0 +1,1466 @@
+spec: 1
+id: aws-elemental-live
+name: AWS Elemental Live (REST API)
+vendor: AWS Elemental
+category: other
+
+# An Elemental Live encoder appliance (or a node running its software) on
+# the venue network: its REST interface on the web server, under /api. Every
+# documented endpoint is a command; documents are XML, as the encoder takes
+# and answers them. State follows the live events and their status, the
+# input devices and the system's load.
+
+source:
+  - title: Elemental Live API and User Guide, applicable to 2.26 and higher releases (Feb 2024)
+    author: AWS Elemental
+    url: https://docs.aws.amazon.com/elemental-onprem/latest/pdf/live_api.pdf
+    note: >
+      Manufacturer document (linked from the AWS Elemental Live
+      documentation page), retrieved 2026-10-28. Web Services REST
+      Interface: requests over HTTPS to https://<server>/api/<endpoint>
+      (an /api/v<version> prefix pins the API version), with Accept
+      application/xml and, for POST and PUT, Content-Type application/xml;
+      validation errors answer <errors><error>...</error></errors>; GET
+      with ?clean=true answers XML fit to POST again. Live events: GET,
+      POST /live_events (page, per_page up to 100; filter pending, pre,
+      post, cancelled, archived, active, complete, running, error); GET,
+      PUT (?unlocked=1 restarts a running event; active_input_id or
+      active_input_label), DELETE /live_events/<id>; GET /status;
+      GET and POST /priority; POST /start (active_input_id or label), /stop,
+      /cancel, /archive, /reset, /mute_audio, /unmute_audio,
+      /adjust_audio_gain (gain), /rollover_output, /pause_output,
+      /unpause_output, /stop_output, /start_output (output_id),
+      /pause_output_group, /unpause_output_group, /stop_output_group,
+      /start_output_group (group_id or group_name), /stream_metadata,
+      /amf_metadata, /update_timing, /cue_point (event_id, splice_time or
+      splice_offset, duration; return_offset; cancel_event_id;
+      get_current_time), /time_signal (time or offset, descriptors),
+      /image_inserter, /motion_image_inserter, /activate_input (input_id or
+      input_label, optional utc_time YYYYMMDDThhmmss.fff), /prepare_input
+      (utc_time, perpetual, preparation_index 0 or 1, 0xffffffff cancels),
+      /playlist; GET, POST /inputs, PUT, DELETE /inputs/<id> and
+      /inputs/by_label/<label> (inactive inputs, up to 30); GET /outputs;
+      POST /reset_video_buffer_stats, /timed_metadata, /private_metadata,
+      /bulk_metadata, /avail_image (uri, username, password),
+      /blackout_image (uri); GET /cut_lists[/<output_id>]. Live event
+      profiles, schedules, presets and preset categories: GET, POST, GET,
+      PUT, DELETE. MPTS: GET, POST /mpts, GET, PUT, DELETE /mpts/<id>, POST
+      and DELETE /mpts/<id>/mux (start, stop), GET /mpts/statuses,
+      /mpts/<id>/status, /mpts/<id>/stats, and the members. Settings: GET
+      /settings (?cluster=true), /network, /mount_points, /firewall, /snmp,
+      /authentication, /advanced; POST /settings/advanced, /settings/stop,
+      /settings/start. GET /alerts (filter=all), /messages (filter Error,
+      Warning, Audit). Devices: GET /devices[/<id>], PUT /devices/<id>
+      (name), POST /devices/<id>/preview. GET /system_status.json (cpu
+      pct, mem pct, gpu list, status, date, devices, psu_status,
+      raid_status). Routers (blackmagic_videohub, miranda_nvision,
+      harris_panacea, snell_aurora) with their inputs and outputs. With
+      user authentication turned on (configure --config-auth), every
+      request carries X-Auth-User, X-Auth-Expires (a Unix time about 30
+      seconds ahead) and X-Auth-Key, md5(api_key + md5(path + user +
+      api_key + expires)).
+
+transport:
+  type: http
+  port: 80
+  https_port: 443
+  scheme: { setting: scheme }
+  accept_invalid_certs: true
+  auth: none
+  headers:
+    Accept: application/xml
+  timeout_ms: 10000
+  # The system status: small, and served while the service runs.
+  probe: { method: GET, path: /api/system_status.json }
+
+settings:
+  scheme: { type: enum, values: [https, http], default: https,
+            label: Connection,
+            description: "https, as the API guide documents the REST interface, or http where the encoder's web server serves it unencrypted." }
+
+ports:
+  - { port: 443, protocol: https, role: control, when: "scheme https", note: "the encoder's web server, REST interface under /api" }
+  - { port: 80, protocol: http, role: control, when: "scheme http" }
+
+models:
+  - id: live
+    name: AWS Elemental Live (2.26 and later)
+    supports: [list_live_events, list_live_events_filtered, get_live_event, get_live_event_clean, get_live_event_status, create_live_event, create_live_event_from_profile, update_live_event, update_live_event_restart, update_live_event_restart_at_input, update_live_event_restart_at_input_label, delete_live_event, get_live_event_priority, set_live_event_priority, start_live_event, stop_live_event, cancel_live_event, archive_live_event, reset_live_event, mute_audio, unmute_audio, reset_video_buffer_stats, start_live_event_at_input, start_live_event_at_input_label, set_audio_gain, rollover_output, pause_output, unpause_output, stop_output, start_output, pause_output_group, pause_output_group_by_name, unpause_output_group, unpause_output_group_by_name, stop_output_group, stop_output_group_by_name, start_output_group, start_output_group_by_name, send_stream_metadata, send_amf_metadata, update_timing, insert_avail, insert_avail_at, return_from_avail, cancel_avail, get_stream_time, insert_time_signal, insert_time_signal_at, image_inserter, motion_image_inserter, activate_input, activate_input_by_label, activate_input_at, prepare_input, prepare_input_custom, set_playlist, list_live_event_inputs, get_live_event_input, add_live_event_input, update_live_event_input, delete_live_event_input, update_live_event_input_by_label, delete_live_event_input_by_label, list_live_event_outputs, insert_timed_metadata, insert_private_metadata, insert_bulk_metadata, set_avail_image, set_avail_image_custom, set_blackout_image, list_cut_lists, get_cut_list, list_live_event_profiles, get_live_event_profile, create_live_event_profile, update_live_event_profile, delete_live_event_profile, list_schedules, get_schedule, create_schedule, update_schedule, delete_schedule, list_presets, get_preset, create_preset, update_preset, delete_preset, list_preset_categories, get_preset_category, create_preset_category, update_preset_category, delete_preset_category, list_mpts, get_mpts, create_mpts, update_mpts, delete_mpts, start_mpts, stop_mpts, get_mpts_statuses, get_mpts_status, get_mpts_stats, list_mpts_members, get_mpts_member, add_mpts_member, update_mpts_member, remove_mpts_member, get_settings, get_settings_cluster, get_network_settings, get_mount_points_settings, get_firewall_settings, get_snmp_settings, get_authentication_settings, get_advanced_settings, update_advanced_settings, stop_service, start_service, list_alerts, list_all_alerts, list_messages, list_messages_filtered, list_devices, get_device, rename_device, preview_device, get_system_status, list_routers, get_router, create_router, update_router, delete_router, list_router_inputs, get_router_input, create_router_input, update_router_input, delete_router_input, list_router_outputs, get_router_output, create_router_output, update_router_output, delete_router_output]
+    verification: none
+    notes: >
+      An encoder with user authentication turned on cannot be reached:
+      its per-request key depends on the time (see quirks).
+
+commands:
+  list_live_events:
+    summary: "A page of the live events, archived ones left out (GET /live_events)"
+    params:
+      page: {"type": "int", "min": 1, "default": 1, "label": "Page", "description": "Which page of the list, from 1."}
+      per_page: {"type": "int", "min": 1, "max": 100, "default": 100, "label": "Per page", "description": "How many items each page holds, at most 100."}
+    send: {"method": "GET", "path": "/api/live_events", "query": {"page": "{page}", "per_page": "{per_page}"}}
+    expect: { status: [200, 201] }
+    returns: text
+
+  list_live_events_filtered:
+    summary: "A page of the live events in one state (GET /live_events?filter)"
+    params:
+      filter: {"type": "enum", "values": ["pending", "pre", "post", "cancelled", "archived", "active", "complete", "running", "error"], "required": true, "label": "State", "description": "pending, pre (preprocessing), post (postprocessing), cancelled, archived, active (pre, running or post), complete, running or error."}
+      page: {"type": "int", "min": 1, "default": 1, "label": "Page", "description": "Which page of the list, from 1."}
+      per_page: {"type": "int", "min": 1, "max": 100, "default": 100, "label": "Per page", "description": "How many items each page holds, at most 100."}
+    send: {"method": "GET", "path": "/api/live_events", "query": {"filter": "{filter}", "page": "{page}", "per_page": "{per_page}"}}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_live_event:
+    summary: "One live event with every setting (GET /live_events/<id>)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+    send: {"method": "GET", "path": "/api/live_events/{event}"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_live_event_clean:
+    summary: "One live event as clean XML, fit to POST again as a new event (GET /live_events/<id>?clean=true)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+    send: {"method": "GET", "path": "/api/live_events/{event}", "query": {"clean": "true"}}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_live_event_status:
+    summary: "A live event's status without its encoding settings: state, progress, average fps, times, errors and warnings (GET /live_events/<id>/status)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+    send: {"method": "GET", "path": "/api/live_events/{event}/status"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  create_live_event:
+    summary: "Create a live event from a full live_event document (POST /live_events)"
+    params:
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The live_event as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/live_events", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  create_live_event_from_profile:
+    summary: "Create a live event from a live event profile that holds its input (POST /live_events with name and profile)"
+    params:
+      name: {"type": "string", "pattern": "^[^<>&]+$", "max_length": 256, "required": true, "label": "Name", "description": "The new event's name."}
+      profile: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 256, "required": true, "label": "Live event profile", "description": "The live event profile's id or permalink."}
+    send: {"method": "POST", "path": "/api/live_events", "body": "<live_event><name>{name}</name><profile>{profile}</profile></live_event>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  update_live_event:
+    summary: "Change a live event's settings with a live_event document; a running event keeps running on its old settings until restarted (PUT /live_events/<id>)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The live_event as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "PUT", "path": "/api/live_events/{event}", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  update_live_event_restart:
+    summary: "Change a running live event's settings, stopping and restarting it on them (PUT /live_events/<id>?unlocked=1)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The live_event as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "PUT", "path": "/api/live_events/{event}", "query": {"unlocked": "1"}, "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  update_live_event_restart_at_input:
+    summary: "Change a running live event's settings and restart it at one of its original inputs, by id (PUT ?unlocked=1&active_input_id)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The live_event as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+      input: {"type": "int", "min": 1, "required": true, "label": "Input", "description": "The input's id, from list_live_event_inputs or the event's XML."}
+    send: {"method": "PUT", "path": "/api/live_events/{event}", "query": {"unlocked": "1", "active_input_id": "{input}"}, "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  update_live_event_restart_at_input_label:
+    summary: "Change a running live event's settings and restart it at one of its original inputs, by label (PUT ?unlocked=1&active_input_label)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The live_event as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+      label: {"type": "string", "pattern": "^[^<>&/]+$", "max_length": 256, "required": true, "label": "Input label", "description": "The input's unique label."}
+    send: {"method": "PUT", "path": "/api/live_events/{event}", "query": {"unlocked": "1", "active_input_label": "{label}"}, "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  delete_live_event:
+    summary: "Delete a live event permanently (DELETE /live_events/<id>)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+    send: {"method": "DELETE", "path": "/api/live_events/{event}"}
+    expect: { status: [200, 201, 204] }
+    returns: ack
+
+  get_live_event_priority:
+    summary: "A live event's priority (GET /live_events/<id>/priority)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+    send: {"method": "GET", "path": "/api/live_events/{event}/priority"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  set_live_event_priority:
+    summary: "Set a live event's priority (POST /live_events/<id>/priority)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      priority: {"type": "int", "min": 0, "max": 100, "required": true, "label": "Priority", "description": "The event's priority; a higher one is given resources first."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/priority", "body": "<priority>{priority}</priority>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  start_live_event:
+    summary: "Start encoding a live event (POST /live_events/<id>/start)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/start", "body": "<start></start>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  stop_live_event:
+    summary: "Stop encoding a live event (POST /live_events/<id>/stop)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/stop", "body": "<stop></stop>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  cancel_live_event:
+    summary: "Cancel a pending live event (POST /live_events/<id>/cancel)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/cancel", "body": "<cancel></cancel>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  archive_live_event:
+    summary: "Archive a live event, which leaves the main list (POST /live_events/<id>/archive)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/archive", "body": "<archive></archive>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  reset_live_event:
+    summary: "Reset a live event to pending; use $d$ in archive destinations to keep earlier files (POST /live_events/<id>/reset)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/reset", "body": "<reset></reset>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  mute_audio:
+    summary: "Mute a live event's audio (gain -60) (POST /live_events/<id>/mute_audio)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/mute_audio", "body": "<mute_audio></mute_audio>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  unmute_audio:
+    summary: "Unmute a live event's audio (gain 0) (POST /live_events/<id>/unmute_audio)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/unmute_audio", "body": "<unmute_audio></unmute_audio>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  reset_video_buffer_stats:
+    summary: "Reset a running event's input video buffer statistics (POST /live_events/<id>/reset_video_buffer_stats)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/reset_video_buffer_stats", "body": "<reset_video_buffer_stats></reset_video_buffer_stats>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  start_live_event_at_input:
+    summary: "Start a live event at one of its original inputs, by id (POST /start?active_input_id)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      input: {"type": "int", "min": 1, "required": true, "label": "Input", "description": "The input's id, from list_live_event_inputs or the event's XML."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/start", "query": {"active_input_id": "{input}"}, "body": "<start></start>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  start_live_event_at_input_label:
+    summary: "Start a live event at one of its original inputs, by label (POST /start?active_input_label)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      label: {"type": "string", "pattern": "^[^<>&/]+$", "max_length": 256, "required": true, "label": "Input label", "description": "The input's unique label."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/start", "query": {"active_input_label": "{label}"}, "body": "<start></start>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  set_audio_gain:
+    summary: "Set a live event's audio gain (POST /live_events/<id>/adjust_audio_gain)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      gain: {"type": "int", "min": -60, "max": 60, "required": true, "label": "Gain", "description": "Audio gain in dB, -60 to 60."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/adjust_audio_gain", "body": "<gain>{gain}</gain>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  rollover_output:
+    summary: "Make a running archive output start a new file (POST /live_events/<id>/rollover_output)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      output: {"type": "int", "min": 1, "required": true, "label": "Output", "description": "The output's id, from list_live_event_outputs or the event's XML."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/rollover_output", "body": "<output_id>{output}</output_id>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  pause_output:
+    summary: "Pause a running output (POST /live_events/<id>/pause_output)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      output: {"type": "int", "min": 1, "required": true, "label": "Output", "description": "The output's id, from list_live_event_outputs or the event's XML."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/pause_output", "body": "<output_id>{output}</output_id>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  unpause_output:
+    summary: "Resume a paused output (POST /live_events/<id>/unpause_output)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      output: {"type": "int", "min": 1, "required": true, "label": "Output", "description": "The output's id, from list_live_event_outputs or the event's XML."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/unpause_output", "body": "<output_id>{output}</output_id>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  stop_output:
+    summary: "Stop a running output (POST /live_events/<id>/stop_output)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      output: {"type": "int", "min": 1, "required": true, "label": "Output", "description": "The output's id, from list_live_event_outputs or the event's XML."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/stop_output", "body": "<output_id>{output}</output_id>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  start_output:
+    summary: "Start a stopped output (POST /live_events/<id>/start_output)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      output: {"type": "int", "min": 1, "required": true, "label": "Output", "description": "The output's id, from list_live_event_outputs or the event's XML."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/start_output", "body": "<output_id>{output}</output_id>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  pause_output_group:
+    summary: "Pause a running output group, by id (POST /live_events/<id>/pause_output_group)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      group: {"type": "int", "min": 1, "required": true, "label": "Output group", "description": "The output group's id, from the event's XML."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/pause_output_group", "body": "<group_id>{group}</group_id>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  pause_output_group_by_name:
+    summary: "Pause a running output group, by name (POST /live_events/<id>/pause_output_group)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      name: {"type": "string", "pattern": "^[^<>&]+$", "max_length": 256, "required": true, "label": "Output group name", "description": "The output group's name."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/pause_output_group", "body": "<group_name>{name}</group_name>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  unpause_output_group:
+    summary: "Resume a paused output group, by id (POST /live_events/<id>/unpause_output_group)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      group: {"type": "int", "min": 1, "required": true, "label": "Output group", "description": "The output group's id, from the event's XML."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/unpause_output_group", "body": "<group_id>{group}</group_id>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  unpause_output_group_by_name:
+    summary: "Resume a paused output group, by name (POST /live_events/<id>/unpause_output_group)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      name: {"type": "string", "pattern": "^[^<>&]+$", "max_length": 256, "required": true, "label": "Output group name", "description": "The output group's name."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/unpause_output_group", "body": "<group_name>{name}</group_name>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  stop_output_group:
+    summary: "Stop a running output group, by id (POST /live_events/<id>/stop_output_group)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      group: {"type": "int", "min": 1, "required": true, "label": "Output group", "description": "The output group's id, from the event's XML."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/stop_output_group", "body": "<group_id>{group}</group_id>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  stop_output_group_by_name:
+    summary: "Stop a running output group, by name (POST /live_events/<id>/stop_output_group)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      name: {"type": "string", "pattern": "^[^<>&]+$", "max_length": 256, "required": true, "label": "Output group name", "description": "The output group's name."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/stop_output_group", "body": "<group_name>{name}</group_name>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  start_output_group:
+    summary: "Start a stopped or paused output group, by id (POST /live_events/<id>/start_output_group)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      group: {"type": "int", "min": 1, "required": true, "label": "Output group", "description": "The output group's id, from the event's XML."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/start_output_group", "body": "<group_id>{group}</group_id>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  start_output_group_by_name:
+    summary: "Start a stopped or paused output group, by name (POST /live_events/<id>/start_output_group)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      name: {"type": "string", "pattern": "^[^<>&]+$", "max_length": 256, "required": true, "label": "Output group name", "description": "The output group's name."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/start_output_group", "body": "<group_name>{name}</group_name>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  send_stream_metadata:
+    summary: "Send metadata to every Adobe RTMP output as onUserDataEvent; the body goes as it is (POST /stream_metadata)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The metadata as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/stream_metadata", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  send_amf_metadata:
+    summary: "Send AMF metadata to every Adobe RTMP output as onCuePoint (POST /amf_metadata)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The AMF metadata as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/amf_metadata", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  update_timing:
+    summary: "Move a running scheduled event's end, with a timing document (start_type, start_at, end_type, end_at, duration) (POST /update_timing)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The timing as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/update_timing", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  insert_avail:
+    summary: "Insert an SCTE-35 avail after a preroll (POST /cue_point, splice_offset)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      preroll: {"type": "int", "min": 0, "max": 47700000, "required": true, "label": "Preroll", "description": "Milliseconds to wait before the avail."}
+      event_id: {"type": "int", "min": 0, "max": 4294967295, "required": true, "label": "Avail ID", "description": "The SCTE-35 event ID, used to cancel it later; 0 lets the encoder choose one (from 0xf0000001)."}
+      duration: {"type": "int", "min": 0, "max": 47700, "required": true, "label": "Duration", "description": "Seconds until the return from the avail."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/cue_point", "body": "<cue_point><event_id>{event_id}</event_id><splice_offset>{preroll}</splice_offset><duration>{duration}</duration></cue_point>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  insert_avail_at:
+    summary: "Insert an SCTE-35 avail at a time in the event's timecode (POST /cue_point, splice_time)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      hours: {"type": "int", "min": 0, "max": 23, "required": true, "label": "Hours", "description": "The hour of the splice time, in the event's timecode."}
+      minutes: {"type": "int", "min": 0, "max": 59, "required": true, "label": "Minutes", "description": "The minute."}
+      seconds: {"type": "int", "min": 0, "max": 59, "required": true, "label": "Seconds", "description": "The second."}
+      frames: {"type": "int", "min": 0, "max": 59, "required": true, "label": "Frames", "description": "The frame within the second."}
+      event_id: {"type": "int", "min": 0, "max": 4294967295, "required": true, "label": "Avail ID", "description": "The SCTE-35 event ID, used to cancel it later; 0 lets the encoder choose one (from 0xf0000001)."}
+      duration: {"type": "int", "min": 0, "max": 47700, "required": true, "label": "Duration", "description": "Seconds until the return from the avail."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/cue_point", "body": "<cue_point><event_id>{event_id}</event_id><splice_time><hours>{hours}</hours><minutes>{minutes}</minutes><seconds>{seconds}</seconds><frames>{frames}</frames></splice_time><duration>{duration}</duration></cue_point>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  return_from_avail:
+    summary: "Return from the avail now or after a preroll (POST /cue_point, return_offset)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      preroll: {"type": "int", "min": 0, "max": 47700000, "default": 0, "label": "Preroll", "description": "Milliseconds to wait before returning."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/cue_point", "body": "<cue_point><return_offset>{preroll}</return_offset></cue_point>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  cancel_avail:
+    summary: "Cancel an upcoming avail (POST /cue_point, cancel_event_id)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      event_id: {"type": "int", "min": 0, "max": 4294967295, "required": true, "label": "Avail ID", "description": "The SCTE-35 event ID of the upcoming avail."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/cue_point", "body": "<cue_point><cancel_event_id>{event_id}</cancel_event_id></cue_point>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_stream_time:
+    summary: "The running event's current stream time, to base cue points on (POST /cue_point, get_current_time)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/cue_point", "body": "<cue_point><get_current_time>1</get_current_time></cue_point>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  insert_time_signal:
+    summary: "Insert an SCTE-35 time signal after a preroll (POST /time_signal, offset)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      preroll: {"type": "int", "min": 0, "max": 21600000, "required": true, "label": "Preroll", "description": "Milliseconds from now."}
+      descriptors: {"type": "string", "pattern": "^([0-9A-Fa-f]{2})*$", "max_length": 4096, "default": "", "label": "Descriptors", "description": "Time signal descriptor data as hexadecimal digits; empty for none."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/time_signal", "body": "<time_signal><offset>{preroll}</offset><descriptors>{descriptors}</descriptors></time_signal>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  insert_time_signal_at:
+    summary: "Insert an SCTE-35 time signal at a local time, up to 6 hours ahead (POST /time_signal, time)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      hours: {"type": "int", "min": 0, "max": 23, "required": true, "label": "Hours", "description": "The hour of the splice time, in the event's timecode."}
+      minutes: {"type": "int", "min": 0, "max": 59, "required": true, "label": "Minutes", "description": "The minute."}
+      seconds: {"type": "int", "min": 0, "max": 59, "required": true, "label": "Seconds", "description": "The second."}
+      frames: {"type": "int", "min": 0, "max": 59, "required": true, "label": "Frames", "description": "The frame within the second."}
+      descriptors: {"type": "string", "pattern": "^([0-9A-Fa-f]{2})*$", "max_length": 4096, "default": "", "label": "Descriptors", "description": "Time signal descriptor data as hexadecimal digits; empty for none."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/time_signal", "body": "<time_signal><time><hours>{hours}</hours><minutes>{minutes}</minutes><seconds>{seconds}</seconds><frames>{frames}</frames></time><descriptors>{descriptors}</descriptors></time_signal>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  image_inserter:
+    summary: "Insert or remove images on a REST-enabled image inserter, with an image_inserter document (POST /image_inserter)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The image_inserter as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/image_inserter", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  motion_image_inserter:
+    summary: "Change the images of a REST-enabled motion image inserter, with a motion_image_inserter document (POST /motion_image_inserter)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The motion_image_inserter as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/motion_image_inserter", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  activate_input:
+    summary: "Switch a running event to another input now, by id (POST /activate_input)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      input: {"type": "int", "min": 1, "required": true, "label": "Input", "description": "The input's id, from list_live_event_inputs or the event's XML."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/activate_input", "body": "<input_id>{input}</input_id>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  activate_input_by_label:
+    summary: "Switch a running event to another input now, by label (POST /activate_input)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      label: {"type": "string", "pattern": "^[^<>&/]+$", "max_length": 256, "required": true, "label": "Input label", "description": "The input's unique label."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/activate_input", "body": "<input_label>{label}</input_label>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  activate_input_at:
+    summary: "Switch a running event to another input at a UTC time (POST /activate_input with utc_time)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      input: {"type": "int", "min": 1, "required": true, "label": "Input", "description": "The input's id, from list_live_event_inputs or the event's XML."}
+      utc_time: {"type": "string", "pattern": "^[0-9]{8}T[0-9]{6}(\\.[0-9]+)?$", "max_length": 32, "required": true, "label": "UTC time", "description": "When to switch, as YYYYMMDDThhmmss.fff in UTC, such as 20151231T235959.999."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/activate_input", "body": "<activate_input><input_id>{input}</input_id><utc_time>{utc_time}</utc_time></activate_input>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  prepare_input:
+    summary: "Prepare an input of a running event for a quick switch, now (POST /prepare_input)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      input: {"type": "int", "min": 1, "required": true, "label": "Input", "description": "The input's id, from list_live_event_inputs or the event's XML."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/prepare_input", "body": "<input_id>{input}</input_id>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  prepare_input_custom:
+    summary: "Prepare an input with a prepare_input document (input_id or input_label, utc_time, perpetual, preparation_index 0 or 1; input_id 0xffffffff cancels) (POST /prepare_input)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The prepare_input as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/prepare_input", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  set_playlist:
+    summary: "Replace a running event's inputs after the current one with an inputs document (POST /playlist)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The inputs as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/playlist", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  list_live_event_inputs:
+    summary: "A live event's inputs (GET /live_events/<id>/inputs)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+    send: {"method": "GET", "path": "/api/live_events/{event}/inputs"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_live_event_input:
+    summary: "One input of a live event (GET /inputs/<input_id>)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      input: {"type": "int", "min": 1, "required": true, "label": "Input", "description": "The input's id, from list_live_event_inputs or the event's XML."}
+    send: {"method": "GET", "path": "/api/live_events/{event}/inputs/{input}"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  add_live_event_input:
+    summary: "Add an input to a running event, up to 30, with an input document; answers its id (POST /inputs)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The input as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/inputs", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  update_live_event_input:
+    summary: "Change an input of a running event that is not active (PUT /inputs/<input_id>)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      input: {"type": "int", "min": 1, "required": true, "label": "Input", "description": "The input's id, from list_live_event_inputs or the event's XML."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The input as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "PUT", "path": "/api/live_events/{event}/inputs/{input}", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  delete_live_event_input:
+    summary: "Delete an input of a running event that is not active (DELETE /inputs/<input_id>)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      input: {"type": "int", "min": 1, "required": true, "label": "Input", "description": "The input's id, from list_live_event_inputs or the event's XML."}
+    send: {"method": "DELETE", "path": "/api/live_events/{event}/inputs/{input}"}
+    expect: { status: [200, 201, 204] }
+    returns: ack
+
+  update_live_event_input_by_label:
+    summary: "Change an input of a running event that is not active, by label (PUT /inputs/by_label/<label>)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      label: {"type": "string", "pattern": "^[^<>&/]+$", "max_length": 256, "required": true, "label": "Input label", "description": "The input's unique label."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The input as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "PUT", "path": "/api/live_events/{event}/inputs/by_label/{label}", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  delete_live_event_input_by_label:
+    summary: "Delete an input of a running event that is not active, by label (DELETE /inputs/by_label/<label>)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      label: {"type": "string", "pattern": "^[^<>&/]+$", "max_length": 256, "required": true, "label": "Input label", "description": "The input's unique label."}
+    send: {"method": "DELETE", "path": "/api/live_events/{event}/inputs/by_label/{label}"}
+    expect: { status: [200, 201, 204] }
+    returns: ack
+
+  list_live_event_outputs:
+    summary: "A live event's outputs (GET /live_events/<id>/outputs)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+    send: {"method": "GET", "path": "/api/live_events/{event}/outputs"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  insert_timed_metadata:
+    summary: "Insert ID3 timed metadata into HLS or transport stream outputs, with a timed_metadata document (POST /timed_metadata)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The timed_metadata as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/timed_metadata", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  insert_private_metadata:
+    summary: "Insert AMF private metadata into transport stream outputs, with a private_metadata document (POST /private_metadata)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The private_metadata as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/private_metadata", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  insert_bulk_metadata:
+    summary: "Insert several timed and private metadata items at once, with a bulk_metadata document (POST /bulk_metadata)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The bulk_metadata as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/bulk_metadata", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  set_avail_image:
+    summary: "Replace the ad avail blanking image (POST /avail_image)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      uri: {"type": "string", "pattern": "^[^<>&]+$", "max_length": 2048, "required": true, "label": "Image", "description": "The image's local path or URL (BMP or PNG)."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/avail_image", "body": "<avail_image><uri>{uri}</uri></avail_image>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  set_avail_image_custom:
+    summary: "Replace the ad avail blanking image with an avail_image document (uri, username, password) (POST /avail_image)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The avail_image as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/avail_image", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  set_blackout_image:
+    summary: "Replace the blackout slate image (POST /blackout_image)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      uri: {"type": "string", "pattern": "^[^<>&]+$", "max_length": 2048, "required": true, "label": "Image", "description": "The image's local path or URL (BMP or PNG)."}
+    send: {"method": "POST", "path": "/api/live_events/{event}/blackout_image", "body": "<blackout_image><uri>{uri}</uri></blackout_image>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  list_cut_lists:
+    summary: "A live event's cut lists, one per output logging edit points (GET /cut_lists)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+    send: {"method": "GET", "path": "/api/live_events/{event}/cut_lists"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_cut_list:
+    summary: "One output's cut list (GET /cut_lists/<output_id>)"
+    params:
+      event: {"type": "int", "min": 1, "required": true, "label": "Live event", "description": "The live event's id, as the event list and the web interface number it."}
+      output: {"type": "int", "min": 1, "required": true, "label": "Output", "description": "The output's id, from list_live_event_outputs or the event's XML."}
+    send: {"method": "GET", "path": "/api/live_events/{event}/cut_lists/{output}"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  list_live_event_profiles:
+    summary: "A page of the live event profiles (GET /live_event_profiles)"
+    params:
+      page: {"type": "int", "min": 1, "default": 1, "label": "Page", "description": "Which page of the list, from 1."}
+      per_page: {"type": "int", "min": 1, "max": 100, "default": 100, "label": "Per page", "description": "How many items each page holds, at most 100."}
+    send: {"method": "GET", "path": "/api/live_event_profiles", "query": {"page": "{page}", "per_page": "{per_page}"}}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_live_event_profile:
+    summary: "One live event profile (GET /live_event_profiles/<id>)"
+    params:
+      id: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 256, "required": true, "label": "Live event profile", "description": "The live event profile's id or permalink."}
+    send: {"method": "GET", "path": "/api/live_event_profiles/{id}"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  create_live_event_profile:
+    summary: "Create a live event profile from a live_event_profile document (POST /live_event_profiles)"
+    params:
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The live_event_profile as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/live_event_profiles", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  update_live_event_profile:
+    summary: "Change a live event profile with a live_event_profile document (PUT /live_event_profiles/<id>)"
+    params:
+      id: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 256, "required": true, "label": "Live event profile", "description": "The live event profile's id or permalink."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The live_event_profile as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "PUT", "path": "/api/live_event_profiles/{id}", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  delete_live_event_profile:
+    summary: "Delete a live event profile (DELETE /live_event_profiles/<id>)"
+    params:
+      id: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 256, "required": true, "label": "Live event profile", "description": "The live event profile's id or permalink."}
+    send: {"method": "DELETE", "path": "/api/live_event_profiles/{id}"}
+    expect: { status: [200, 201, 204] }
+    returns: ack
+
+  list_schedules:
+    summary: "A page of the schedules (GET /schedules)"
+    params:
+      page: {"type": "int", "min": 1, "default": 1, "label": "Page", "description": "Which page of the list, from 1."}
+      per_page: {"type": "int", "min": 1, "max": 100, "default": 100, "label": "Per page", "description": "How many items each page holds, at most 100."}
+    send: {"method": "GET", "path": "/api/schedules", "query": {"page": "{page}", "per_page": "{per_page}"}}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_schedule:
+    summary: "One schedule (GET /schedules/<id>)"
+    params:
+      id: {"type": "int", "min": 1, "required": true, "label": "Schedule", "description": "The schedule's id."}
+    send: {"method": "GET", "path": "/api/schedules/{id}"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  create_schedule:
+    summary: "Create a schedule from a schedule document (POST /schedules)"
+    params:
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The schedule as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/schedules", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  update_schedule:
+    summary: "Change a schedule with a schedule document (PUT /schedules/<id>)"
+    params:
+      id: {"type": "int", "min": 1, "required": true, "label": "Schedule", "description": "The schedule's id."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The schedule as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "PUT", "path": "/api/schedules/{id}", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  delete_schedule:
+    summary: "Delete a schedule (DELETE /schedules/<id>)"
+    params:
+      id: {"type": "int", "min": 1, "required": true, "label": "Schedule", "description": "The schedule's id."}
+    send: {"method": "DELETE", "path": "/api/schedules/{id}"}
+    expect: { status: [200, 201, 204] }
+    returns: ack
+
+  list_presets:
+    summary: "A page of the presets (GET /presets)"
+    params:
+      page: {"type": "int", "min": 1, "default": 1, "label": "Page", "description": "Which page of the list, from 1."}
+      per_page: {"type": "int", "min": 1, "max": 100, "default": 100, "label": "Per page", "description": "How many items each page holds, at most 100."}
+    send: {"method": "GET", "path": "/api/presets", "query": {"page": "{page}", "per_page": "{per_page}"}}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_preset:
+    summary: "One preset (GET /presets/<id>)"
+    params:
+      id: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 256, "required": true, "label": "Preset", "description": "The preset's id or permalink."}
+    send: {"method": "GET", "path": "/api/presets/{id}"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  create_preset:
+    summary: "Create a preset from a preset document (POST /presets)"
+    params:
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The preset as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/presets", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  update_preset:
+    summary: "Change a preset with a preset document (PUT /presets/<id>)"
+    params:
+      id: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 256, "required": true, "label": "Preset", "description": "The preset's id or permalink."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The preset as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "PUT", "path": "/api/presets/{id}", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  delete_preset:
+    summary: "Delete a preset (DELETE /presets/<id>)"
+    params:
+      id: {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "max_length": 256, "required": true, "label": "Preset", "description": "The preset's id or permalink."}
+    send: {"method": "DELETE", "path": "/api/presets/{id}"}
+    expect: { status: [200, 201, 204] }
+    returns: ack
+
+  list_preset_categories:
+    summary: "A page of the preset categories (GET /preset_categories)"
+    params:
+      page: {"type": "int", "min": 1, "default": 1, "label": "Page", "description": "Which page of the list, from 1."}
+      per_page: {"type": "int", "min": 1, "max": 100, "default": 100, "label": "Per page", "description": "How many items each page holds, at most 100."}
+    send: {"method": "GET", "path": "/api/preset_categories", "query": {"page": "{page}", "per_page": "{per_page}"}}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_preset_category:
+    summary: "One preset category (GET /preset_categories/<id>)"
+    params:
+      id: {"type": "int", "min": 1, "required": true, "label": "Preset category", "description": "The preset category's id."}
+    send: {"method": "GET", "path": "/api/preset_categories/{id}"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  create_preset_category:
+    summary: "Create a preset category from a preset_category document (POST /preset_categories)"
+    params:
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The preset_category as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/preset_categories", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  update_preset_category:
+    summary: "Change a preset category with a preset_category document (PUT /preset_categories/<id>)"
+    params:
+      id: {"type": "int", "min": 1, "required": true, "label": "Preset category", "description": "The preset category's id."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The preset_category as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "PUT", "path": "/api/preset_categories/{id}", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  delete_preset_category:
+    summary: "Delete a preset category (DELETE /preset_categories/<id>)"
+    params:
+      id: {"type": "int", "min": 1, "required": true, "label": "Preset category", "description": "The preset category's id."}
+    send: {"method": "DELETE", "path": "/api/preset_categories/{id}"}
+    expect: { status: [200, 201, 204] }
+    returns: ack
+
+  list_mpts:
+    summary: "Every MPTS multiplexer (GET /mpts)"
+    send: {"method": "GET", "path": "/api/mpts"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_mpts:
+    summary: "One MPTS (GET /mpts/<id>)"
+    params:
+      mpts: {"type": "int", "min": 1, "required": true, "label": "Mpts", "description": "The MPTS's id."}
+    send: {"method": "GET", "path": "/api/mpts/{mpts}"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  create_mpts:
+    summary: "Create an MPTS from an mpts document (POST /mpts)"
+    params:
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The mpts as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/mpts", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  update_mpts:
+    summary: "Change an MPTS with an mpts document (PUT /mpts/<id>)"
+    params:
+      mpts: {"type": "int", "min": 1, "required": true, "label": "Mpts", "description": "The MPTS's id."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The mpts as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "PUT", "path": "/api/mpts/{mpts}", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  delete_mpts:
+    summary: "Delete an MPTS (DELETE /mpts/<id>)"
+    params:
+      mpts: {"type": "int", "min": 1, "required": true, "label": "Mpts", "description": "The MPTS's id."}
+    send: {"method": "DELETE", "path": "/api/mpts/{mpts}"}
+    expect: { status: [200, 201, 204] }
+    returns: ack
+
+  start_mpts:
+    summary: "Start an MPTS (POST /mpts/<id>/mux)"
+    params:
+      mpts: {"type": "int", "min": 1, "required": true, "label": "Mpts", "description": "The MPTS's id."}
+    send: {"method": "POST", "path": "/api/mpts/{mpts}/mux", "body": "<mux></mux>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  stop_mpts:
+    summary: "Stop an MPTS (DELETE /mpts/<id>/mux)"
+    params:
+      mpts: {"type": "int", "min": 1, "required": true, "label": "Mpts", "description": "The MPTS's id."}
+    send: {"method": "DELETE", "path": "/api/mpts/{mpts}/mux"}
+    expect: { status: [200, 201, 204] }
+    returns: ack
+
+  get_mpts_statuses:
+    summary: "Every MPTS's status (GET /mpts/statuses)"
+    send: {"method": "GET", "path": "/api/mpts/statuses"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_mpts_status:
+    summary: "One MPTS's status (GET /mpts/<id>/status)"
+    params:
+      mpts: {"type": "int", "min": 1, "required": true, "label": "Mpts", "description": "The MPTS's id."}
+    send: {"method": "GET", "path": "/api/mpts/{mpts}/status"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_mpts_stats:
+    summary: "One MPTS's bitrate statistics (GET /mpts/<id>/stats)"
+    params:
+      mpts: {"type": "int", "min": 1, "required": true, "label": "Mpts", "description": "The MPTS's id."}
+    send: {"method": "GET", "path": "/api/mpts/{mpts}/stats"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  list_mpts_members:
+    summary: "An MPTS's member channels (GET /mpts/<id>/mpts_members)"
+    params:
+      mpts: {"type": "int", "min": 1, "required": true, "label": "Mpts", "description": "The MPTS's id."}
+    send: {"method": "GET", "path": "/api/mpts/{mpts}/mpts_members"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_mpts_member:
+    summary: "One member channel of an MPTS (GET /mpts_members/<id>)"
+    params:
+      mpts: {"type": "int", "min": 1, "required": true, "label": "Mpts", "description": "The MPTS's id."}
+      member: {"type": "int", "min": 1, "required": true, "label": "Member", "description": "The member's id."}
+    send: {"method": "GET", "path": "/api/mpts/{mpts}/mpts_members/{member}"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  add_mpts_member:
+    summary: "Add a member channel to an MPTS with a local or remote MPTS member document (POST /mpts_members)"
+    params:
+      mpts: {"type": "int", "min": 1, "required": true, "label": "Mpts", "description": "The MPTS's id."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The MPTS member as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/mpts/{mpts}/mpts_members", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  update_mpts_member:
+    summary: "Change a member channel of an MPTS (PUT /mpts_members/<id>)"
+    params:
+      mpts: {"type": "int", "min": 1, "required": true, "label": "Mpts", "description": "The MPTS's id."}
+      member: {"type": "int", "min": 1, "required": true, "label": "Member", "description": "The member's id."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The MPTS member as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "PUT", "path": "/api/mpts/{mpts}/mpts_members/{member}", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  remove_mpts_member:
+    summary: "Remove a member channel from an MPTS (DELETE /mpts_members/<id>)"
+    params:
+      mpts: {"type": "int", "min": 1, "required": true, "label": "Mpts", "description": "The MPTS's id."}
+      member: {"type": "int", "min": 1, "required": true, "label": "Member", "description": "The member's id."}
+    send: {"method": "DELETE", "path": "/api/mpts/{mpts}/mpts_members/{member}"}
+    expect: { status: [200, 201, 204] }
+    returns: ack
+
+  get_settings:
+    summary: "Every system setting, in the configure script's format (GET /settings)"
+    send: {"method": "GET", "path": "/api/settings"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_settings_cluster:
+    summary: "Every system setting with example cluster settings for this node as master (GET /settings?cluster=true)"
+    send: {"method": "GET", "path": "/api/settings", "query": {"cluster": "true"}}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_network_settings:
+    summary: "The network settings (GET /settings/network)"
+    send: {"method": "GET", "path": "/api/settings/network"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_mount_points_settings:
+    summary: "The mount point settings (GET /settings/mount_points)"
+    send: {"method": "GET", "path": "/api/settings/mount_points"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_firewall_settings:
+    summary: "The firewall settings (GET /settings/firewall)"
+    send: {"method": "GET", "path": "/api/settings/firewall"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_snmp_settings:
+    summary: "The SNMP settings (GET /settings/snmp)"
+    send: {"method": "GET", "path": "/api/settings/snmp"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_authentication_settings:
+    summary: "The authentication settings (GET /settings/authentication)"
+    send: {"method": "GET", "path": "/api/settings/authentication"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_advanced_settings:
+    summary: "The sequencer (clustered systems) settings (GET /settings/advanced)"
+    send: {"method": "GET", "path": "/api/settings/advanced"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  update_advanced_settings:
+    summary: "Change the sequencer settings with a sequencer document; takes effect after the service restarts (POST /settings/advanced)"
+    params:
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The sequencer as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/settings/advanced", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  stop_service:
+    summary: "Stop the Elemental service gracefully: running events finish, no new one starts (POST /settings/stop)"
+    send: {"method": "POST", "path": "/api/settings/stop", "body": "<stop></stop>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  start_service:
+    summary: "Start the Elemental service again after stop_service (POST /settings/start)"
+    send: {"method": "POST", "path": "/api/settings/start", "body": "<start></start>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  list_alerts:
+    summary: "The active alerts (GET /alerts)"
+    params:
+      page: {"type": "int", "min": 1, "default": 1, "label": "Page", "description": "Which page of the list, from 1."}
+      per_page: {"type": "int", "min": 1, "max": 100, "default": 100, "label": "Per page", "description": "How many items each page holds, at most 100."}
+    send: {"method": "GET", "path": "/api/alerts", "query": {"page": "{page}", "per_page": "{per_page}"}}
+    expect: { status: [200, 201] }
+    returns: text
+
+  list_all_alerts:
+    summary: "Every alert, cleared ones included (GET /alerts?filter=all)"
+    params:
+      page: {"type": "int", "min": 1, "default": 1, "label": "Page", "description": "Which page of the list, from 1."}
+      per_page: {"type": "int", "min": 1, "max": 100, "default": 100, "label": "Per page", "description": "How many items each page holds, at most 100."}
+    send: {"method": "GET", "path": "/api/alerts", "query": {"filter": "all", "page": "{page}", "per_page": "{per_page}"}}
+    expect: { status: [200, 201] }
+    returns: text
+
+  list_messages:
+    summary: "A page of the live events' error, warning and audit messages (GET /messages)"
+    params:
+      page: {"type": "int", "min": 1, "default": 1, "label": "Page", "description": "Which page of the list, from 1."}
+      per_page: {"type": "int", "min": 1, "max": 100, "default": 100, "label": "Per page", "description": "How many items each page holds, at most 100."}
+    send: {"method": "GET", "path": "/api/messages", "query": {"page": "{page}", "per_page": "{per_page}"}}
+    expect: { status: [200, 201] }
+    returns: text
+
+  list_messages_filtered:
+    summary: "A page of the live events' messages of one kind (GET /messages?filter)"
+    params:
+      kind: {"type": "enum", "values": ["Error", "Warning", "Audit"], "required": true, "label": "Kind", "description": "Error, Warning or Audit messages."}
+      page: {"type": "int", "min": 1, "default": 1, "label": "Page", "description": "Which page of the list, from 1."}
+      per_page: {"type": "int", "min": 1, "max": 100, "default": 100, "label": "Per page", "description": "How many items each page holds, at most 100."}
+    send: {"method": "GET", "path": "/api/messages", "query": {"filter": "{kind}", "page": "{page}", "per_page": "{per_page}"}}
+    expect: { status: [200, 201] }
+    returns: text
+
+  list_devices:
+    summary: "The input devices (SDI ports) the node detected (GET /devices)"
+    send: {"method": "GET", "path": "/api/devices"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_device:
+    summary: "One input device with its router connection (GET /devices/<id>)"
+    params:
+      device: {"type": "int", "min": 1, "required": true, "label": "Device", "description": "The device's id."}
+    send: {"method": "GET", "path": "/api/devices/{device}"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  rename_device:
+    summary: "Name an input device (PUT /devices/<id>)"
+    params:
+      device: {"type": "int", "min": 1, "required": true, "label": "Device", "description": "The device's id."}
+      name: {"type": "string", "pattern": "^[^<>&]*$", "max_length": 256, "required": true, "label": "Name", "description": "The name to show for the port; empty for none."}
+    send: {"method": "PUT", "path": "/api/devices/{device}", "body": "<device><name>{name}</name></device>", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  preview_device:
+    summary: "Make JPEG previews of a device's current input, with a preview_images document of names and sizes; answers their locations (POST /devices/<id>/preview)"
+    params:
+      device: {"type": "int", "min": 1, "required": true, "label": "Device", "description": "The device's id."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The preview_images as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/devices/{device}/preview", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_system_status:
+    summary: "CPU, memory and GPU load, input devices, power supply and RAID status (GET /system_status.json)"
+    send: {"method": "GET", "path": "/api/system_status.json"}
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_routers:
+    summary: "The routers the node controls (GET /routers)"
+    send: {"method": "GET", "path": "/api/routers"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_router:
+    summary: "One router (GET /routers/<id>)"
+    params:
+      router: {"type": "int", "min": 1, "required": true, "label": "Router", "description": "The router's id."}
+    send: {"method": "GET", "path": "/api/routers/{router}"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  create_router:
+    summary: "Add a router (Blackmagic Videohub, Miranda NVISION, Harris Panacea or Snell Aurora) with a router document (POST /routers)"
+    params:
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The router as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/routers", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  update_router:
+    summary: "Change a router with a router document (PUT /routers/<id>)"
+    params:
+      router: {"type": "int", "min": 1, "required": true, "label": "Router", "description": "The router's id."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The router as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "PUT", "path": "/api/routers/{router}", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  delete_router:
+    summary: "Remove a router (DELETE /routers/<id>)"
+    params:
+      router: {"type": "int", "min": 1, "required": true, "label": "Router", "description": "The router's id."}
+    send: {"method": "DELETE", "path": "/api/routers/{router}"}
+    expect: { status: [200, 201, 204] }
+    returns: ack
+
+  list_router_inputs:
+    summary: "A router's inputs (GET /routers/<id>/inputs)"
+    params:
+      router: {"type": "int", "min": 1, "required": true, "label": "Router", "description": "The router's id."}
+    send: {"method": "GET", "path": "/api/routers/{router}/inputs"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_router_input:
+    summary: "One router input (GET /routers/<id>/inputs/input-<n>)"
+    params:
+      router: {"type": "int", "min": 1, "required": true, "label": "Router", "description": "The router's id."}
+      number: {"type": "int", "min": 1, "max": 1152, "required": true, "label": "Router input", "description": "The router input's number, as the router numbers it."}
+    send: {"method": "GET", "path": "/api/routers/{router}/inputs/input-{number}"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  create_router_input:
+    summary: "Add a router input with a router_input document (POST /routers/<id>/inputs)"
+    params:
+      router: {"type": "int", "min": 1, "required": true, "label": "Router", "description": "The router's id."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The router_input as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/routers/{router}/inputs", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  update_router_input:
+    summary: "Change a router input (PUT /routers/<id>/inputs/input-<n>)"
+    params:
+      router: {"type": "int", "min": 1, "required": true, "label": "Router", "description": "The router's id."}
+      number: {"type": "int", "min": 1, "max": 1152, "required": true, "label": "Router input", "description": "The router input's number, as the router numbers it."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The router_input as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "PUT", "path": "/api/routers/{router}/inputs/input-{number}", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  delete_router_input:
+    summary: "Remove a router input (DELETE /routers/<id>/inputs/input-<n>)"
+    params:
+      router: {"type": "int", "min": 1, "required": true, "label": "Router", "description": "The router's id."}
+      number: {"type": "int", "min": 1, "max": 1152, "required": true, "label": "Router input", "description": "The router input's number, as the router numbers it."}
+    send: {"method": "DELETE", "path": "/api/routers/{router}/inputs/input-{number}"}
+    expect: { status: [200, 201, 204] }
+    returns: ack
+
+  list_router_outputs:
+    summary: "A router's outputs (GET /routers/<id>/outputs)"
+    params:
+      router: {"type": "int", "min": 1, "required": true, "label": "Router", "description": "The router's id."}
+    send: {"method": "GET", "path": "/api/routers/{router}/outputs"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  get_router_output:
+    summary: "One router output (GET /routers/<id>/outputs/output-<n>)"
+    params:
+      router: {"type": "int", "min": 1, "required": true, "label": "Router", "description": "The router's id."}
+      number: {"type": "int", "min": 1, "max": 1152, "required": true, "label": "Router output", "description": "The router output's number, as the router numbers it."}
+    send: {"method": "GET", "path": "/api/routers/{router}/outputs/output-{number}"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  create_router_output:
+    summary: "Add a router output with a router_output document (POST /routers/<id>/outputs)"
+    params:
+      router: {"type": "int", "min": 1, "required": true, "label": "Router", "description": "The router's id."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The router_output as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "POST", "path": "/api/routers/{router}/outputs", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  update_router_output:
+    summary: "Change a router output (PUT /routers/<id>/outputs/output-<n>)"
+    params:
+      router: {"type": "int", "min": 1, "required": true, "label": "Router", "description": "The router's id."}
+      number: {"type": "int", "min": 1, "max": 1152, "required": true, "label": "Router output", "description": "The router output's number, as the router numbers it."}
+      xml: {"type": "string", "pattern": "^\\s*<", "max_length": 10000000, "required": true, "label": "XML", "description": "The router_output as an XML document in the API guide's shape, on one line (line breaks and tabs are refused)."}
+    send: {"method": "PUT", "path": "/api/routers/{router}/outputs/output-{number}", "body": "{xml}", "content_type": "application/xml"}
+    expect: { status: [200, 201] }
+    returns: text
+
+  delete_router_output:
+    summary: "Remove a router output (DELETE /routers/<id>/outputs/output-<n>)"
+    params:
+      router: {"type": "int", "min": 1, "required": true, "label": "Router", "description": "The router's id."}
+      number: {"type": "int", "min": 1, "max": 1152, "required": true, "label": "Router output", "description": "The router output's number, as the router numbers it."}
+    send: {"method": "DELETE", "path": "/api/routers/{router}/outputs/output-{number}"}
+    expect: { status: [200, 201, 204] }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      User authentication (off unless turned on with configure
+      --config-auth) is not supported: each request must carry an
+      X-Auth-Key computed from the request's path and a Unix time about 30
+      seconds ahead (md5(api_key + md5(path + user + api_key + expires))),
+      which the spec format cannot express, so an encoder with it on answers
+      every request 401 and every command fails. Encoders with it off take
+      every command.
+
+  - models: [all]
+    severity: info
+    text: >
+      Documents are XML, given as one-line strings (line breaks and tabs are
+      refused) in the API guide's shapes; get_live_event_clean and the
+      other gets answer XML to start from. Commands that read or change
+      something answer the encoder's XML as text, including the response
+      element of cue points, time signals and images, whose errors element
+      reports a refusal with HTTP 200; a validation error answers an errors
+      document and fails the command. Values put into the small XML bodies
+      (names, labels, URIs) may not hold <, > or &.
+
+  - models: [all]
+    severity: info
+    text: >
+      The encoder pushes nothing (its notifications go to e-mail, a web
+      callback URL or SNMP traps the consumer receives itself). Every 10
+      seconds the core reads the first 100 live events, the active ones
+      and each active event's status, and the system status; every 60
+      seconds the input devices. live_events is replaced whole by each
+      read, so a deleted or archived event leaves it; event_status keeps an
+      event's last status until it runs again. A system with more than 100
+      live events keeps only the first page in state.
+
+  - models: [all]
+    severity: critical
+    text: >
+      stop_live_event, cancel_live_event and stop_output or
+      stop_output_group end live output at once; reset_live_event can
+      overwrite archive files unless their destination holds $d$;
+      update_live_event_restart restarts a running event;
+      delete_live_event, delete_live_event_profile, delete_preset and the
+      other deletes cannot be undone; stop_service stops the encoder taking
+      new events. activate_input switches the program input live.
+
+state:
+  live_events.*.name:          { type: string, description: "A live event, keyed by id: its name" }
+  live_events.*.status:        { type: string, description: "pending, preprocessing, running, postprocessing, complete, cancelled, error or archived" }
+  live_events.*.node_id:       { type: int, description: "The node it runs on (1 unless clustered)" }
+  live_events.*.submitted:     { type: string, description: "When it was created, as the encoder writes it" }
+  live_events.*.priority:      { type: int, description: "Its priority, when the answer gives it" }
+  event_status.*.status:       { type: string, description: "A live event's status as last read, keyed by id" }
+  event_status.*.pct_complete: { type: int, unit: "%", description: "Its progress" }
+  event_status.*.average_fps:  { type: float, unit: fps, description: "Its average encoding frame rate" }
+  event_status.*.start_time:   { type: string, description: "When it started" }
+  event_status.*.complete_time: { type: string, description: "When it completed, empty while running" }
+  event_status.*.elapsed:      { type: int, unit: s, description: "Time it has run" }
+  event_status.*.error_code:   { type: int, description: "Its latest error's code, as the guide's error codes list them" }
+  event_status.*.error_message: { type: string, description: "Its latest error's message" }
+  event_status.*.error_time:   { type: string, description: "When its latest error was raised" }
+  event_status.*.warning_code: { type: int, description: "Its latest warning's code" }
+  event_status.*.warning_message: { type: string, description: "Its latest warning's message" }
+  system.status:               { type: string, description: "The system's overall status, such as green_status or orange_status" }
+  system.cpu_pct:              { type: float, unit: "%", description: "CPU load" }
+  system.mem_pct:              { type: float, unit: "%", description: "Memory in use" }
+  system.date:                 { type: string, description: "The system's time, as it writes it" }
+  system.psu_status:           { type: string, description: "The power supplies' status text" }
+  system.raid_status:          { type: string, description: "The RAID's status text" }
+  system.gpus.*.pct:           { type: float, unit: "%", description: "A GPU's load, keyed by its number" }
+  devices.*.name:              { type: string, description: "An input device (SDI port), keyed by id: the name given to it" }
+  devices.*.device_type:       { type: string, description: "The card's type, such as AJA" }
+  devices.*.device_number:     { type: int, description: "The port's number on its card" }
+  devices.*.node_id:           { type: int, description: "The node it is on" }
+
+telemetry:
+  poll:
+    - every_ms: 10000
+      send:
+        - { method: GET, path: /api/live_events, query: { page: "1", per_page: "100" } }
+        - { method: GET, path: /api/live_events, query: { filter: active, page: "1", per_page: "100" } }
+        - { method: GET, path: /api/system_status.json }
+    - every_ms: 60000
+      send:
+        - { method: GET, path: /api/devices }
+  updates:
+    # Every live event (the first page), whole.
+    - path: "^/api/live_events\\?page=1&per_page=100$"
+      xml_each: live_event
+      replace: live_events
+      state:
+        "live_events.{id}.name": "{name}"
+        "live_events.{id}.status": "{status}"
+        "live_events.{id}.node_id": "{node_id}"
+        "live_events.{id}.submitted": "{submitted}"
+        "live_events.{id}.priority": "{priority}"
+    # The active ones have their status read.
+    - path: "^/api/live_events\\?filter=active&"
+      xml_each: live_event
+      then_send:
+        - { method: GET, path: "/api/live_events/{id}/status" }
+    - path: "^/api/live_events/([0-9]+)(\\?.*)?$"
+      xml_each: live_event
+      state:
+        "live_events.{1}.name": "{name}"
+        "live_events.{1}.status": "{status}"
+        "live_events.{1}.priority": "{priority}"
+    - path: "^/api/live_events/([0-9]+)/status$"
+      xml_each: live_event
+      state:
+        "event_status.{1}.status": "{status}"
+        "event_status.{1}.pct_complete": "{pct_complete}"
+        "event_status.{1}.average_fps": "{average_fps}"
+        "event_status.{1}.start_time": "{start_time}"
+        "event_status.{1}.complete_time": "{complete_time}"
+        "event_status.{1}.elapsed": "{elapsed}"
+    - path: "^/api/live_events/([0-9]+)/status$"
+      xml_each: errors/error
+      state:
+        "event_status.{1}.error_code": "{code}"
+        "event_status.{1}.error_message": "{message}"
+        "event_status.{1}.error_time": "{created_at}"
+    - path: "^/api/live_events/([0-9]+)/status$"
+      xml_each: warnings/warning
+      state:
+        "event_status.{1}.warning_code": "{code}"
+        "event_status.{1}.warning_message": "{message}"
+    - path: "^/api/live_events/([0-9]+)/priority$"
+      xml_each: priority
+      state: { "live_events.{1}.priority": "{text}" }
+
+    - path: "^/api/system_status\\.json$"
+      json: { status: "$.status", cpu: "$.cpu.pct", mem: "$.mem.pct", date: "$.date", psu: "$.psu_status", raid: "$.raid_status" }
+      state:
+        system.status: "{status}"
+        system.cpu_pct: "{cpu}"
+        system.mem_pct: "{mem}"
+        system.date: "{date}"
+        system.psu_status: "{psu}"
+        system.raid_status: "{raid}"
+    - path: "^/api/system_status\\.json$"
+      json_each: "$.gpu"
+      replace: system.gpus
+      json: { num: "$.num", pct: "$.pct" }
+      state: { "system.gpus.{num}.pct": "{pct}" }
+
+    - path: "^/api/devices$"
+      xml_each: device
+      replace: devices
+      state:
+        "devices.{id}.name": "{name}"
+        "devices.{id}.device_type": "{device_type}"
+        "devices.{id}.device_number": "{device_number}"
+        "devices.{id}.node_id": "{node_id}"
+    - path: "^/api/devices/([0-9]+)$"
+      xml_each: device
+      state:
+        "devices.{1}.name": "{name}"
+        "devices.{1}.device_type": "{device_type}"
+        "devices.{1}.device_number": "{device_number}"
+        "devices.{1}.node_id": "{node_id}"
