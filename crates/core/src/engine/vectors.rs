@@ -702,6 +702,8 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         // TEAC's TASCAM protocols: a return command (machine ID 0, then 8F,
         // the software version).
         "08F0100",
+        // Shure UHF-R: a REPORT between asterisks.
+        "* REPORT ok *",
     ];
     let line = match &engine.transport {
         super::Transport::LineTcp {
