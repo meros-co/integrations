@@ -2211,6 +2211,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that take/set.json performs the Take (progress 1.0) rather than only storing the settings, and that a T-bar move sends time 0 with the T-bar's value. ([specs/kiloview-multiview.yaml:871](specs/kiloview-multiview.yaml#L871))
 - [ ] Check that take/get.json takes pro_id in the query of a POST. ([specs/kiloview-multiview.yaml:889](specs/kiloview-multiview.yaml#L889))
 - [ ] Check what get_window_sdp's ip is (described as the video source's address) and that switch_window's session id is the one get_window_sdp returns. ([specs/kiloview-multiview.yaml:705](specs/kiloview-multiview.yaml#L705))
+- [ ] Check that pane and layout coordinates (x, y, width, height) are percentages of the window (the examples run from 0 to 100). ([specs/kiloview-multiview.yaml:1026](specs/kiloview-multiview.yaml#L1026))
+- [ ] Find out what a pane's audio mix follow follows (6.24 names always, follow and close only). ([specs/kiloview-multiview.yaml:618](specs/kiloview-multiview.yaml#L618))
+- [ ] Check whether any read reports a pane's audio_enable (get_single_layout's reply has none). ([specs/kiloview-multiview.yaml:597](specs/kiloview-multiview.yaml#L597))
 
 ## kiloview-multiview-server — Kiloview Multiview Server (NDI Multiview, API 1.0)
 
