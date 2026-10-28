@@ -1057,6 +1057,103 @@
               "$ref": "#/$defs/transport/oneOf/3/properties/listen_port"
             }
           }
+        },
+        "zeromq": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "subscribe"
+          ],
+          "description": "A ZeroMQ bus beside the transport (ZMTP 3.0, NULL mechanism), opened to the device's host while the device is monitored and reopened with backoff: a SUB socket subscribing to topic prefixes, each message offered to the json_match rules as {\"frames\": [...]}, every frame its JSON where it is JSON, its text where it is UTF-8, otherwise {\"base64\": ...}; and optionally a PUB socket publishing the spec's messages each time it connects (SPEC.md §8, A ZeroMQ bus beside the transport).",
+          "properties": {
+            "subscribe": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "port",
+                "topics"
+              ],
+              "properties": {
+                "port": {
+                  "oneOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 65535
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "setting"
+                      ],
+                      "properties": {
+                        "setting": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "topics": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Prefixes of the first frame to subscribe to, templates over settings."
+                }
+              }
+            },
+            "publish": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "port",
+                "send"
+              ],
+              "properties": {
+                "port": {
+                  "oneOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 65535
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "setting"
+                      ],
+                      "properties": {
+                        "setting": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "send": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "description": "Messages published each time the publisher connects, each a list of frames, templates over settings."
+                },
+                "every_ms": {
+                  "type": "integer",
+                  "minimum": 1000,
+                  "description": "Publish them again at this interval."
+                }
+              }
+            }
+          }
         }
       }
     },

@@ -573,6 +573,20 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                 re.compile(pattern)
             except re.error as e:
                 errors.append(f"telemetry.updates[{i}].arg_match.{index} does not compile: {e}")
+    zmq = (doc.get("telemetry") or {}).get("zeromq")
+    if zmq is not None:
+        if doc.get("implementation") == "native":
+            errors.append("telemetry.zeromq is for spec-driven devices")
+        for role in ("subscribe", "publish"):
+            port = (zmq.get(role) or {}).get("port")
+            if isinstance(port, dict) and port.get("setting") not in settings:
+                errors.append(f"telemetry.zeromq.{role}.port names unknown setting '{port.get('setting')}'")
+        for i, topic in enumerate((zmq.get("subscribe") or {}).get("topics") or []):
+            errors += check_template("text", topic, {}, settings, f"telemetry.zeromq.subscribe.topics[{i}]")
+        for i, message in enumerate((zmq.get("publish") or {}).get("send") or []):
+            for j, frame in enumerate(message if isinstance(message, list) else []):
+                errors += check_template("text", frame, {}, settings,
+                                         f"telemetry.zeromq.publish.send[{i}][{j}]")
     sse_ = (doc.get("telemetry") or {}).get("sse") or {}
     if "body" in sse_:
         errors += check_template("text", sse_["body"], {}, settings, "telemetry.sse.body")
@@ -882,7 +896,7 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
     # A native extension that offers JSON messages of its own (the NMOS Query
     # API's subscriptions) feeds json_match rules too.
     has_json = (transport_type in ("ws", "line-tcp", "line-serial", "line-udp")
-                or "websocket" in telemetry or "sse" in telemetry
+                or "websocket" in telemetry or "sse" in telemetry or "zeromq" in telemetry
                 or doc.get("extension") in ("nmos-query-websocket",))
     if "sse" in telemetry and transport_type != "http":
         errors.append("telemetry.sse needs an http transport")
@@ -1098,6 +1112,17 @@ def port_checks(doc: dict) -> list[str]:
             errors.append(f"ports: no core-listener udp entry for telemetry.osc.listen_port {osc_listen}")
         if ("websocket" in tel or "sse" in tel) and not any(e["role"] == "push" for e in ports):
             errors.append("ports: the push channel has no push entry")
+        # The ZeroMQ bus: a tcp push entry for each socket, at its port or
+        # naming its setting.
+        for role, block in ((tel.get("zeromq") or {}).items()):
+            port = (block or {}).get("port") if isinstance(block, dict) else None
+            if port is None:
+                continue
+            setting = port.get("setting") if isinstance(port, dict) else None
+            if not any(e["role"] == "push" and e["protocol"] == "tcp"
+                       and (e.get("setting") == setting if setting else e["port"] == port)
+                       for e in ports):
+                errors.append(f"ports: no tcp push entry for telemetry.zeromq.{role}'s port")
     return errors
 
 

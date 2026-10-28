@@ -2530,6 +2530,55 @@ that, and that `ports` has a `udp` `feedback` entry listened on by the core
 for it. A telemetry vector gives the datagram as `inbound_hex`, as for an OSC
 transport.
 
+#### A ZeroMQ bus beside the transport
+
+A device that publishes its changes on a ZeroMQ bus (Pixotope's Data Hub,
+beside the HTTP Gateway that takes its commands) names the bus under
+`telemetry.zeromq`. The core opens a SUB socket to the device's host on
+`subscribe.port` and subscribes to each of `topics`, prefixes of a message's
+first frame; with `publish`, it also opens a PUB socket on `publish.port`
+and publishes `send` each time that socket connects, and again every
+`every_ms` when given (requests the device answers on the bus, such as a
+read of its whole state):
+
+```yaml
+telemetry:
+  zeromq:
+    subscribe:
+      port: 16201                    # or {setting: name}
+      topics: ['{"Type":"Update","Target":"BROADCAST"']
+    publish:                         # optional
+      port: 16202
+      send:                          # each message a list of frames
+        - ['{"Type":"Get","Target":"Store","RespondTo":"{settings.client_name}","Name":"State"}', '{}']
+  updates:
+    - json_match: { "$.frames[0].Type": "^Update$", "$.frames[0].Source": "^(.+)$" }
+      json: { value: "$.frames[1].Value" }
+      state: { "services.{1:key}.value": "{value}" }
+```
+
+Each message received goes to the `json_match` rules as `{"frames": [...]}`,
+every frame its JSON where it parses as JSON, its text where it is UTF-8,
+and otherwise `{"base64": "..."}`. Topics and frames are templates over
+settings, rendered when they are sent.
+
+Both sockets speak ZMTP 3.0 (RFC 23) with the NULL mechanism: no
+encryption or credential, as ZeroMQ buses on a production network usually
+run; a peer asking for another mechanism, or of a socket type that does not
+pair (SUB with PUB or XPUB, PUB with SUB or XSUB), is logged and closed. A
+subscription is sent as ZMTP 3.0's subscription message, which ZMTP 3.1
+peers take too, and a heartbeat PING is answered. Like the push websocket
+the bus carries no commands and does not decide whether the device is
+connected; each message received reports it alive. It is opened only while
+the device is monitored (never for commands only), reopened after 1 s
+doubling to 30 s when it closes or fails, and opened again at once when
+`update_settings` changes its ports, topics or messages. Nothing bounds a
+message's size. The ports list a `tcp` `push` entry for each socket (with
+the `setting` of a port that comes from one); `tools/validate.py` checks
+it. A telemetry vector gives `inbound_zmq`, the message's frames as text,
+and optionally `expect_connect_zmq`, the messages published on connecting,
+each a list of frames.
+
 #### A status dump that ends in silence
 
 A device that sends its whole state on connecting may mark the end of it
