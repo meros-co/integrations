@@ -582,3 +582,38 @@ telemetry(BP, 'notification-emitted', model='udx',
           expect_then_send=[_GET % 'notification.count', '{"jsonrpc":"2.0","method":"notification.list","id":1}'])
 # The same JSON-RPC API on the RS232 port (link serial).
 text(BP, 'get_property', {'property': 'image.brightness'}, '{"jsonrpc":"2.0","method":"property.get","params":{"property":"image.brightness"},"id":1}', device_reply='{"jsonrpc":"2.0","result":0.15,"id":1}', expect_result={'ok': {'kind': 'value', 'value': 0.15}}, settings={"link": "serial"}, file="get_property-serial")
+# File endpoints: downloads saved to the host file named (never written by
+# a vector), uploads streamed as the multipart field file.
+V.append({'spec': BP, 'command': 'download_bio_log', 'input': {'to': {'file': 'download_bio_log.dat'}}, 'expect_request': {'method': 'GET', 'port': 80, 'target': '/api/bio/logger/transfer'}})
+V.append({'spec': BP, 'command': 'download_notification_log', 'input': {'to': {'file': 'download_notification_log.dat'}}, 'expect_request': {'method': 'GET', 'port': 80, 'target': '/api/notification/logger/transfer'}})
+V.append({'spec': BP, 'command': 'download_edid', 'input': {'to': {'file': 'download_edid.dat'}}, 'expect_request': {'method': 'GET', 'port': 80, 'target': '/api/image/connector/edid/transfer'}})
+V.append({'spec': BP, 'command': 'download_black_level_file', 'input': {'to': {'file': 'download_black_level_file.dat'}}, 'expect_request': {'method': 'GET', 'port': 80, 'target': '/api/image/processing/blacklevel/file/transfer'}})
+V.append({'spec': BP, 'command': 'download_blend_file', 'input': {'to': {'file': 'download_blend_file.dat'}}, 'expect_request': {'method': 'GET', 'port': 80, 'target': '/api/image/processing/blend/file/transfer'}})
+V.append({'spec': BP, 'command': 'download_warp_grid_file', 'input': {'to': {'file': 'download_warp_grid_file.dat'}}, 'expect_request': {'method': 'GET', 'port': 80, 'target': '/api/image/processing/warp/file/transfer'}})
+V.append({'spec': BP, 'command': 'download_test_pattern', 'input': {'to': {'file': 'download_test_pattern.dat'}}, 'expect_request': {'method': 'GET', 'port': 80, 'target': '/api/image/testpattern/file/transfer'}})
+V.append({'spec': BP, 'command': 'download_license_registration', 'input': {'to': {'file': 'download_license_registration.dat'}}, 'expect_request': {'method': 'GET', 'port': 80, 'target': '/api/system/license/file/registration'}})
+V.append({'spec': BP, 'command': 'capture_lcd', 'input': {'to': {'file': 'capture_lcd.dat'}}, 'expect_request': {'method': 'GET', 'port': 80, 'target': '/api/ui/capture/lcd'}})
+V.append({'spec': BP, 'command': 'capture_osd', 'input': {'to': {'file': 'capture_osd.dat'}}, 'expect_request': {'method': 'GET', 'port': 80, 'target': '/api/ui/capture/osd'}})
+V.append({'spec': BP, 'command': 'download_source_preview', 'input': {'to': {'file': 'download_source_preview.dat'}}, 'model': 'udx', 'expect_request': {'method': 'GET', 'port': 80, 'target': '/api/image/source/preview/transfer'}})
+V.append({'spec': BP, 'command': 'download_source_image', 'input': {'to': {'file': 'download_source_image.dat'}}, 'model': 'udx', 'expect_request': {'method': 'GET', 'port': 80, 'target': '/api/image/source/transfer'}})
+V.append({'spec': BP, 'command': 'download_camera_image', 'input': {'to': {'file': 'download_camera_image.dat'}}, 'model': 'udx', 'expect_request': {'method': 'GET', 'port': 80, 'target': '/api/peripheral/camera/transfer'}})
+
+
+def _bp_form(data, filename):
+    """multipart/form-data as the core writes it: one part, the field file,
+    the boundary derived from the parts (SPEC.md §4, "Binary request bodies")."""
+    import hashlib
+    digest = hashlib.sha256(b"file\0" + data + b"\0").hexdigest()
+    boundary = "----form-" + digest[:16]
+    body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\n"
+            "Content-Type: application/octet-stream\r\n\r\n").encode() + data + f"\r\n--{boundary}--\r\n".encode()
+    return body.hex(), f"multipart/form-data; boundary={boundary}"
+
+
+_BPB, _BPC = _bp_form(b"ABC", "x.dat")
+V.append({'spec': BP, 'command': 'upload_edid', 'input': {'file': 'QUJD', 'filename': 'x.dat'}, 'expect_request': {'method': 'POST', 'port': 80, 'target': '/api/image/connector/edid/transfer', 'body_hex': _BPB, 'content_type': _BPC}})
+V.append({'spec': BP, 'command': 'upload_black_level_file', 'input': {'file': 'QUJD', 'filename': 'x.dat'}, 'expect_request': {'method': 'POST', 'port': 80, 'target': '/api/image/processing/blacklevel/file/transfer', 'body_hex': _BPB, 'content_type': _BPC}})
+V.append({'spec': BP, 'command': 'upload_blend_file', 'input': {'file': 'QUJD', 'filename': 'x.dat'}, 'expect_request': {'method': 'POST', 'port': 80, 'target': '/api/image/processing/blend/file/transfer', 'body_hex': _BPB, 'content_type': _BPC}})
+V.append({'spec': BP, 'command': 'upload_warp_file', 'input': {'file': 'QUJD', 'filename': 'x.dat'}, 'expect_request': {'method': 'POST', 'port': 80, 'target': '/api/image/processing/warp/file/transfer', 'body_hex': _BPB, 'content_type': _BPC}})
+V.append({'spec': BP, 'command': 'upload_test_pattern', 'input': {'file': 'QUJD', 'filename': 'x.dat'}, 'expect_request': {'method': 'POST', 'port': 80, 'target': '/api/image/testpattern/file/transfer', 'body_hex': _BPB, 'content_type': _BPC}})
+V.append({'spec': BP, 'command': 'upload_splash_screen', 'input': {'file': 'QUJD', 'filename': 'x.dat'}, 'expect_request': {'method': 'POST', 'port': 80, 'target': '/api/ui/splashscreen/file', 'body_hex': _BPB, 'content_type': _BPC}})
