@@ -31,11 +31,10 @@ use std::net::{IpAddr, SocketAddr};
 use serde_json::{json, Map, Value as Json};
 
 use super::snmp::{
-    self, Client, Level as SecLevel, Notification, Reply, Request, Security, SnmpError, User,
-    VarBind, Version,
+    self, command_error, parse_oids, varbind_json, Client, Notification, Reply, Request, Security,
+    SnmpError, User, VarBind, Version,
 };
-use super::snmp_ber::{hex, parse_hex, Oid, Value, SET_TYPES};
-use super::snmp_usm::{Auth, Privacy};
+use super::snmp_ber::{hex, Oid, Value, SET_TYPES};
 use crate::catalog::Params;
 use crate::module::{
     CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
@@ -144,32 +143,6 @@ fn parse_polled(text: &str) -> Result<Vec<Polled>, String> {
     Ok(out)
 }
 
-fn parse_oids(text: &str) -> Result<Vec<Oid>, String> {
-    let oids: Vec<Oid> = text
-        .split([',', ';', ' '])
-        .filter(|e| !e.is_empty())
-        .map(Oid::parse)
-        .collect::<Result<_, _>>()?;
-    if oids.is_empty() {
-        return Err("give at least one OID".into());
-    }
-    Ok(oids)
-}
-
-/// A variable binding as JSON: {oid, type, value}, and `hex` for an
-/// OCTET STRING or Opaque.
-fn varbind_json(vb: &VarBind) -> Json {
-    let mut o = json!({
-        "oid": vb.oid.to_string(),
-        "type": vb.value.type_name(),
-        "value": vb.value.to_json(),
-    });
-    if let Some(bytes) = vb.value.bytes() {
-        o["hex"] = json!(hex(bytes));
-    }
-    o
-}
-
 /// A polled object in state: {oid, type, number, text, hex}, so each key
 /// keeps one JSON type.
 fn state_json(vb: &VarBind) -> Json {
@@ -199,160 +172,29 @@ fn state_json(vb: &VarBind) -> Json {
     })
 }
 
-fn command_error(e: &SnmpError) -> CommandError {
-    match e {
-        SnmpError::Timeout => CommandError::Timeout,
-        SnmpError::Status { status, .. } => CommandError::DeviceError {
-            code: Some(snmp::status_name(*status)),
-            message: e.to_string(),
-        },
-        SnmpError::Auth(m) => CommandError::Auth { message: m.clone() },
-        SnmpError::Protocol(m) => CommandError::DeviceError {
-            code: None,
-            message: m.clone(),
-        },
-    }
-}
-
 fn invalid(message: impl Into<String>) -> CommandError {
     CommandError::InvalidParams {
         message: message.into(),
     }
 }
 
-fn random_seed(cx_unix: Millis) -> u64 {
-    let mut bytes = [0u8; 8];
-    match getrandom::fill(&mut bytes) {
-        Ok(()) => u64::from_be_bytes(bytes),
-        // Uniqueness is what the salt and request-ids need.
-        Err(_) => cx_unix.wrapping_mul(0x9E37_79B9_7F4A_7C15),
-    }
-}
-
 impl GenericSnmp {
     pub(crate) fn new(ctx: OpenContext) -> Result<GenericSnmp, String> {
-        let s = &ctx.settings;
-        let num = |k: &str, d: u64| s.get(k).and_then(Json::as_u64).unwrap_or(d);
-        let version = match setting(s, "version") {
-            "v1" => Version::V1,
-            "" | "v2c" => Version::V2c,
-            "v3" => Version::V3,
-            other => return Err(format!("version '{other}' is not v1, v2c or v3")),
-        };
-        let community = match s.get("community").and_then(Json::as_str) {
-            Some(c) => c.as_bytes().to_vec(),
-            None => b"public".to_vec(),
-        };
-        let user = if version == Version::V3 {
-            let level = match setting(s, "security_level") {
-                "no_auth_no_priv" => SecLevel::NoAuthNoPriv,
-                "auth_no_priv" => SecLevel::AuthNoPriv,
-                "" | "auth_priv" => SecLevel::AuthPriv,
-                other => return Err(format!("unknown security_level '{other}'")),
-            };
-            let auth = Auth::from_name(match setting(s, "auth_protocol") {
-                "" => "sha",
-                a => a,
-            })
-            .ok_or("auth_protocol is not md5, sha, sha224, sha256, sha384 or sha512")?;
-            let privacy = Privacy::from_name(match setting(s, "priv_protocol") {
-                "" => "aes",
-                p => p,
-            })
-            .ok_or("priv_protocol is not des, aes, aes192 or aes256")?;
-            let name = setting(s, "user");
-            if name.is_empty() {
-                return Err("SNMPv3 needs the user setting".into());
-            }
-            // Passwords are taken as given, spaces included.
-            let password = |k: &str| s.get(k).and_then(Json::as_str).unwrap_or("").to_string();
-            Some(User::new(
-                name,
-                level,
-                Some((auth, &password("auth_password"))),
-                Some((privacy, &password("priv_password"))),
-            )?)
-        } else {
-            None
-        };
-        let hex_setting = |k: &str| -> Result<Option<Vec<u8>>, String> {
-            match setting(s, k) {
-                "" => Ok(None),
-                h => parse_hex(h).map(Some).map_err(|e| format!("{k}: {e}")),
-            }
-        };
-        let context_engine_id = hex_setting("context_engine_id")?;
-        let seed = random_seed(0) ^ u64::from(std::process::id());
-        let local_engine_id = match hex_setting("local_engine_id")? {
-            Some(id) if (5..=32).contains(&id.len()) => id,
-            Some(_) => return Err("local_engine_id must be 5 to 32 bytes (RFC 3411)".into()),
-            // RFC 3411's format 5 (octets) behind the high bit, with random
-            // octets: unique, though not kept across restarts.
-            None => {
-                let mut id = vec![0x80, 0, 0, 0, 5];
-                id.extend_from_slice(&seed.to_be_bytes());
-                id
-            }
-        };
-        let trap = match s.get("trap_port").and_then(Json::as_u64) {
-            None => None,
-            Some(p) => {
-                let address = match setting(s, "trap_bind_address") {
-                    "" => None,
-                    a => Some(
-                        a.parse::<IpAddr>()
-                            .map_err(|_| format!("trap_bind_address '{a}' is not an IP address"))?,
-                    ),
-                };
-                Some((
-                    address,
-                    u16::try_from(p).map_err(|_| "trap_port is out of range")?,
-                ))
-            }
-        };
-        let agent = if ctx.host.is_unspecified() {
-            if trap.is_none() {
-                return Err("give the agent's address as host, or set trap_port to receive notifications from any sender".into());
-            }
-            None
-        } else {
-            Some(SocketAddr::new(ctx.host, ctx.port.unwrap_or(161)))
-        };
-        let security = match &user {
-            Some(user) => Security::V3 {
-                user: user.clone(),
-                context_name: setting(s, "context_name").as_bytes().to_vec(),
-                context_engine_id,
-            },
-            None => Security::Community {
-                version,
-                read: community.clone(),
-                write: s
-                    .get("write_community")
-                    .and_then(Json::as_str)
-                    .unwrap_or("")
-                    .as_bytes()
-                    .to_vec(),
-            },
-        };
-        let trap_community = match s.get("trap_community").and_then(Json::as_str) {
-            Some(c) => c.as_bytes().to_vec(),
-            None => Vec::new(),
-        };
+        let s = snmp::Settings::parse(&ctx, 5000)?;
         Ok(GenericSnmp {
-            agent,
-            security: Some(security),
-            timeout: num("timeout_ms", 1500).max(1),
-            retries: num("retries", 2) as u32,
-            max_repetitions: num("max_repetitions", 20).max(1) as u32,
-            polled: parse_polled(setting(s, "poll_oids"))?,
-            interval: num("poll_interval_ms", 5000).max(100),
+            agent: s.agent,
+            security: Some(s.security),
+            timeout: s.timeout,
+            retries: s.retries,
+            max_repetitions: s.max_repetitions,
+            polled: parse_polled(setting(&ctx.settings, "poll_oids"))?,
+            interval: s.interval,
             monitor: ctx.monitor,
-            trap,
-            trap_community,
-            trap_user: user,
-            local_engine_id,
-            seed,
+            trap: s.trap,
+            trap_community: s.trap_community,
+            trap_user: s.user,
+            local_engine_id: s.local_engine_id,
+            seed: s.seed,
             client: None,
             receiver: None,
             next_tag: 1,

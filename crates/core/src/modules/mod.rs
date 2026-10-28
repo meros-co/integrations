@@ -40,6 +40,8 @@ mod allenheath_sq;
     feature = "analogway-midra4k"
 ))]
 mod analogway;
+#[cfg(feature = "apc-rack-pdu")]
+mod apc_rack_pdu_profile;
 #[cfg(feature = "artnet")]
 mod artnet;
 #[cfg(feature = "blackmagic-atem")]
@@ -145,6 +147,8 @@ mod philips_sicp;
 mod pjlink;
 #[cfg(feature = "posistagenet")]
 mod posistagenet;
+#[cfg(feature = "apc-rack-pdu")]
+mod powernet_traps;
 #[cfg(feature = "qsys")]
 mod qsys;
 #[cfg(feature = "resolume")]
@@ -171,11 +175,13 @@ mod sennheiser_mcp;
 mod sennheiser_spectera;
 #[cfg(feature = "shure-wireless")]
 mod shure;
-#[cfg(feature = "generic-snmp")]
+#[cfg(any(feature = "generic-snmp", feature = "apc-rack-pdu"))]
 mod snmp;
-#[cfg(feature = "generic-snmp")]
+#[cfg(any(feature = "generic-snmp", feature = "apc-rack-pdu"))]
 mod snmp_ber;
-#[cfg(feature = "generic-snmp")]
+#[cfg(feature = "apc-rack-pdu")]
+mod snmp_device;
+#[cfg(any(feature = "generic-snmp", feature = "apc-rack-pdu"))]
 mod snmp_usm;
 #[cfg(feature = "sony-bravia-serial")]
 mod sony_bravia_serial;
@@ -423,6 +429,11 @@ pub(crate) fn construct(
         "generic-ping" => Ok(Box::new(generic_ping::GenericPing::new(context)?)),
         #[cfg(feature = "generic-snmp")]
         "generic-snmp" => Ok(Box::new(generic_snmp::GenericSnmp::new(context)?)),
+        #[cfg(feature = "apc-rack-pdu")]
+        "apc-rack-pdu" => Ok(Box::new(snmp_device::SnmpDevice::new(
+            &apc_rack_pdu_profile::PROFILE,
+            context,
+        )?)),
         #[cfg(feature = "generic-http")]
         "generic-http" => Ok(Box::new(generic_http::GenericHttp::new(context)?)),
         #[cfg(feature = "generic-websocket")]

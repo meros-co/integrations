@@ -37,6 +37,7 @@ NATIVE = {
     "analogway-alta4k": "AWJ over TCP 10606",
     "analogway-livepremier": "AWJ over TCP 10606",
     "analogway-midra4k": "AWJ over TCP 10606",
+    "apc-rack-pdu": "SNMP v1, v2c or v3 over UDP 161 (PowerNet-MIB); traps and informs",
     "artnet": "Art-Net 4 over UDP 6454 (broadcast poll, unicast DMX); sends and receives",
     "barco-projection-protocol": "Barco Projection Protocol, binary over TCP 43680 or RS-232",
     "biamp-tesira": "Tesira Text Protocol over Telnet, TCP 23",

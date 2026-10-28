@@ -243,6 +243,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that lua with backslash-escaped quotes runs set_pda_value_by_index, connect and send_ui_event as sent, and what the server answers when Lua raises an error. ([specs/analogway-picturall.yaml:554](specs/analogway-picturall.yaml#L554))
 - [ ] Find the parameter names of a layer's transform, colour, crop and draw mode with object_info on a server, to give them typed commands. ([specs/analogway-picturall.yaml:576](specs/analogway-picturall.yaml#L576))
 
+## apc-rack-pdu — APC Rack PDU (SNMP)
+
+- [ ] Confirm which models implement rPDU2 (AP84xx, AP86xx, AP88xx, AP89xx, APDU9xxx) and which only rPDU (AP78xx, AP79xx); the FAQ names only AP86XX/AP89XX for rPDU2. ([specs/apc-rack-pdu.yaml:37](specs/apc-rack-pdu.yaml#L37))
+- [ ] Walk a 2G PDU and check every table is keyed by a single integer index, as the MIB declares, and that a metered PDU lists no switched outlet rows. ([specs/apc-rack-pdu.yaml:41](specs/apc-rack-pdu.yaml#L41))
+- [ ] Check an outlet's control command reads back as immediate_on or immediate_off after a SET, and when a delayed action's result shows in the switched status table. ([specs/apc-rack-pdu.yaml:1052](specs/apc-rack-pdu.yaml#L1052))
+- [ ] Check the units taken from the MIB's descriptions (tenths of amps, hundredths of kilowatts, tenths of kilowatt-hours) against the PDU's display. ([specs/apc-rack-pdu.yaml:1047](specs/apc-rack-pdu.yaml#L1047))
+- [ ] Receive a v1 trap from the PDU (an outlet turned off) and check its snmpTrapOID is enterprises.318.0.n and is named. ([specs/apc-rack-pdu.yaml:1059](specs/apc-rack-pdu.yaml#L1059))
+- [ ] Check a first-generation PDU (AP79xx) answers GETBULK walks of the rPDU group over v2c, or needs v1. ([specs/apc-rack-pdu.yaml:44](specs/apc-rack-pdu.yaml#L44))
+
 ## arkaos-mediamaster — ArKaos MediaMaster
 
 - [ ] Confirm the Remote Command Service listens on TCP 45678 and takes each command as a line ended by CR LF; the user guide does not say. ([specs/arkaos-mediamaster.yaml:49](specs/arkaos-mediamaster.yaml#L49))
