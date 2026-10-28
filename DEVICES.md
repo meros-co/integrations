@@ -500,10 +500,10 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | Devices | Protocol | Documentation |
 |---|---|---|
 | Teradek VidiU / VidiU X / VidiU Go, Cube, Serv (Prism is built) | No public API | Community |
-| Resi encoders, decoders and Studio | REST | Unknown |
+| Resi encoders, decoders and Studio | Unknown | Closed (no public API) |
 | LiveU, Vislink | Cloud API / proprietary | Closed |
 | AWS Elemental MediaLive (Elemental Live is built; MediaLive needs AWS Signature Version 4, which the spec format lacks) | REST | Public |
-| Zowietek encoders (CamStreamer is built) | HTTP | Public |
+| Zowietek encoders (CamStreamer is built) | HTTP (ZowieAPI) | Closed (the API reference is given on inquiry only) |
 
 ### Graphics and captions
 
