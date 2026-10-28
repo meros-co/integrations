@@ -620,5 +620,5 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 | Devices | Protocol | Documentation |
 |---|---|---|
-| Eaton ePDUs and Eaton UPS over its own XUPS-MIB (APC and CyberPower PDUs and UPS are built: `apc-rack-pdu`, `apc-ups`, `cyberpower-pdu`, `cyberpower-ups`; Eaton and other UPS over RFC 1628: `ups-mib`) | SNMP / HTTP | Public |
+| Eaton ePDUs and Eaton UPS over its own XUPS-MIB (APC and CyberPower PDUs and UPS are built: `apc-rack-pdu`, `apc-ups`, `cyberpower-pdu`, `cyberpower-ups`; Eaton and other UPS over RFC 1628: `ups-mib`) | SNMP / HTTP | On request (Eaton's MIBs are behind a sign-up on its portal) |
 | Netgear AV Line (M4250, M4300, M4350): its REST API reference is sent on request only | REST | On request |
