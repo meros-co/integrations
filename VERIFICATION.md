@@ -3432,7 +3432,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which TX_STATUS values each generation takes (MUTE and STANDBY on legacy, MUTED on neXt) and what an MXWNDX charger does with SET TX_STATUS. ([specs/shure-mxw.yaml:677](specs/shure-mxw.yaml#L677))
 - [ ] Confirm the mute word of INPUT_CH_MUTE, OUTPUT_CH_MUTE and AUTOMIX_OUT_MUTE (MUTE in the text, MUTED in the examples) and whether AUTOMIX_OUT_MUTE takes a channel number. ([specs/shure-mxw.yaml:594](specs/shure-mxw.yaml#L594))
 - [ ] Record the Auracast sample rates the access points accept, and the AVAILABLE_CHANNELS query the document mentions. ([specs/shure-mxw.yaml:1014](specs/shure-mxw.yaml#L1014))
-- [ ] Check the LED_STATUS reply to a secondary microphone's set (the document shows it without SEC) and the neXt reply's CH prefix. ([specs/shure-mxw.yaml:1159](specs/shure-mxw.yaml#L1159))
+- [ ] Check the LED_STATUS reply to a secondary microphone's set (the document shows it without SEC) and the neXt reply's CH prefix. ([specs/shure-mxw.yaml:1197](specs/shure-mxw.yaml#L1197))
 - [ ] Check whether UNLINK also works on MXWNCS charger bays, as the document's wording suggests. ([specs/shure-mxw.yaml:634](specs/shure-mxw.yaml#L634))
 
 ## shure-p300 — Shure P300
