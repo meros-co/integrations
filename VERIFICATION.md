@@ -3453,6 +3453,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the matrix gain REP's spacing (the document shows < REP xx MATRIX_MXR_GAIN yyzzzz > once). ([specs/shure-p300.yaml:991](specs/shure-p300.yaml#L991))
 - [ ] Capture SAMPLE_IN, SAMPLE_OUT, SAMPLE_PROC, SAMPLE_ERLE and SAMPLE_AGC with metering on, and confirm each lists one value per channel in the document's order (14, 12 as the order lists, 12, 8 and 8 values), three digits each (ERLE and AGC shown as aaa too), and record the AGC value's unit and range, which the document gives only as ERLE's. ([specs/shure-p300.yaml:1110](specs/shure-p300.yaml#L1110))
 
+## shure-uhfr — Shure UHF-R receivers
+
+- [ ] Confirm the framing: a "* " before and " *" after each message (as the bulletin prints it), no line ending, and replies sent to the sender's address and port. ([specs/shure-uhfr.yaml:40](specs/shure-uhfr.yaml#L40))
+- [ ] Confirm that SET GROUP_CHAN takes the group and the channel each one less than their numbers, and its digit width. ([specs/shure-uhfr.yaml:137](specs/shure-uhfr.yaml#L137))
+- [ ] Check how long METER updating lasts and whether repeating it every minute disturbs anything; and whether REPORTs come without METER at all. ([specs/shure-uhfr.yaml:234](specs/shure-uhfr.yaml#L234))
+- [ ] Record the dB value of each AUDIO_GAIN step (00 the most, 32 the least). ([specs/shure-uhfr.yaml:98](specs/shure-uhfr.yaml#L98))
+- [ ] Record the SAMPLE field widths and the RF codes on a receiver. ([specs/shure-uhfr.yaml:227](specs/shure-uhfr.yaml#L227))
+
 ## shure-wireless — Shure wireless receivers
 
 - [ ] On AD4Q with frequency diversity combined (FD-C), check the second RF section in SAMPLE and that the first is the right one to report. ([specs/shure-wireless.yaml:658](specs/shure-wireless.yaml#L658))
