@@ -255,15 +255,15 @@ commands:
 
   # ── Rundowns ─────────────────────────────────────────────────────────────
   list_rundowns:
-    summary: List the team's rundowns, first page (GET /rundowns); returns items, next_cursor and has_more
+    summary: List every one of the team's rundowns, page after page (GET /rundowns); returns items
     params:
       limit: &limit { type: int, min: 1, max: 100, default: 100,
                       label: Page size, description: "Items per page, up to 100." }
-    send: { method: GET, path: /rundowns, query: { limit: "{limit}" } }
-    expect: { status: 200, json_path: "$.data" }
+    send: { method: GET, path: /rundowns, query: { limit: "{limit}" }, pages: &pages { items: "$.data.items", cursor: "$.data.next_cursor", query: cursor, more: "$.data.has_more" } }
+    expect: { status: 200, json_path: "$.data.items" }
     returns: value
   list_rundowns_page:
-    summary: List the next page of the team's rundowns (GET /rundowns?cursor=)
+    summary: List one page of the team's rundowns after a cursor (GET /rundowns?cursor=); returns items, next_cursor and has_more
     params:
       cursor: &cursor { type: string, max_length: 1024, required: true,
                         label: Cursor, description: "The previous page's next_cursor." }
@@ -322,13 +322,13 @@ commands:
 
   # ── Cues ─────────────────────────────────────────────────────────────────
   list_cues:
-    summary: List the rundown's cues, first page, in ID order (GET cues)
+    summary: List every cue of the rundown, page after page, in ID order (GET cues)
     params: { limit: *limit }
-    send: { method: GET, path: "/rundowns/{settings.rundown_id}/cues", query: { limit: "{limit}" } }
-    expect: { status: 200, json_path: "$.data" }
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/cues", query: { limit: "{limit}" }, pages: *pages }
+    expect: { status: 200, json_path: "$.data.items" }
     returns: value
   list_cues_page:
-    summary: List the next page of the rundown's cues (GET cues?cursor=)
+    summary: List one page of the rundown's cues after a cursor (GET cues?cursor=); returns items, next_cursor and has_more
     params: { cursor: *cursor, limit: *limit }
     send: { method: GET, path: "/rundowns/{settings.rundown_id}/cues", query: { cursor: "{cursor}", limit: "{limit}" } }
     expect: { status: 200, json_path: "$.data" }
@@ -439,19 +439,19 @@ commands:
   # ── Cells ────────────────────────────────────────────────────────────────
   list_cells:
     summary: List the rundown's cells, up to 1000 (GET cells); kept in state
-    send: { method: GET, path: "/rundowns/{settings.rundown_id}/cells", query: { limit: "1000" } }
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/cells", query: { limit: "1000" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
   list_cue_cells:
     summary: List one cue's cells (GET cells?cue_id=)
     params: { cue_id: *cue_id }
-    send: { method: GET, path: "/rundowns/{settings.rundown_id}/cells", query: { cue_id: "{cue_id}", limit: "1000" } }
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/cells", query: { cue_id: "{cue_id}", limit: "1000" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
   list_column_cells:
     summary: List one column's cells (GET cells?column_id=)
     params: { column_id: *column_id }
-    send: { method: GET, path: "/rundowns/{settings.rundown_id}/cells", query: { column_id: "{column_id}", limit: "1000" } }
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/cells", query: { column_id: "{column_id}", limit: "1000" }, pages: *pages }
     expect: { status: 200, json_path: "$.data" }
     returns: value
   set_cell:
@@ -597,7 +597,7 @@ telemetry:
   poll:
     - send:
         - { method: GET, path: "/rundowns/{settings.rundown_id}", query: { include: "cues,columns" } }
-        - { method: GET, path: "/rundowns/{settings.rundown_id}/cells", query: { limit: "1000" } }
+        - { method: GET, path: "/rundowns/{settings.rundown_id}/cells", query: { limit: "1000" }, pages: *pages }
     - every_ms: 10000
       send:
         - { method: GET, path: "/rundowns/{settings.rundown_id}/output-message" }
@@ -920,10 +920,11 @@ quirks:
       Studio's own countdown once. The event stream closes on its own after
       a while (disconnect lifetime) and the core opens it again, which sends
       the status again. The rundown is read with its cues and columns once on
-      connecting and again after a rundown change; cells are read up to the
-      API's 1,000, and more than that leaves the rest to the stream's
-      changes. Lists are cursor-paged (list_rundowns_page, list_cues_page)
-      and return next_cursor and has_more.
+      connecting and again after a rundown change; cells are read whole,
+      1,000 a page. Lists are cursor-paged: the list commands and the
+      polls follow next_cursor while has_more holds and return every item,
+      and list_rundowns_page and list_cues_page read one page after a
+      cursor and return next_cursor and has_more.
 
   - models: [all]
     severity: critical
