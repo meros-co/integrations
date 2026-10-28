@@ -43,6 +43,8 @@ _CREATED = {"id": _LV, "stream_url": "rtmp://live-api-s.facebook.com:80/rtmp/FB-
 _fb("list_live_videos", {}, "GET", _V + "/1093482904102/live_videos?" + _F + "&source=owner&limit=10",
     http_reply={"status": 200, "body": json.dumps({"data": [_VIDEO], "paging": {}})},
     expect_result={"ok": {"kind": "value", "value": [_VIDEO]}})
+_fb("list_live_videos_after", {"after": "QVFIUmlTN2JX"}, "GET",
+    _V + "/1093482904102/live_videos?" + _F + "&source=owner&limit=10&after=QVFIUmlTN2JX")
 _fb("list_live_videos_by_status", {"status": "SCHEDULED_UNPUBLISHED", "limit": 5}, "GET",
     _V + "/1093482904102/live_videos?" + _F + "&source=owner&broadcast_status="
     + _q('["SCHEDULED_UNPUBLISHED"]', safe="") + "&limit=5")
@@ -98,6 +100,9 @@ _fb("delete_live_video", {"live_video_id": _LV}, "DELETE", _V + "/" + _LV,
 _fb("list_comments", {"live_video_id": _LV}, "GET",
     _V + "/" + _LV + "/comments?fields=" + _q("id,message,from,created_time,is_hidden,comment_count", safe="")
     + "&order=reverse_chronological&filter=stream&live_filter=no_filter&summary=total_count&limit=25")
+_fb("list_comments_after", {"live_video_id": _LV, "after": "QVFIUmlTN2JX", "limit": 50}, "GET",
+    _V + "/" + _LV + "/comments?fields=" + _q("id,message,from,created_time,is_hidden,comment_count", safe="")
+    + "&order=reverse_chronological&filter=stream&live_filter=no_filter&limit=50&after=QVFIUmlTN2JX")
 _fb("get_comment_count", {"live_video_id": _LV}, "GET",
     _V + "/" + _LV + "/comments?filter=stream&summary=total_count&limit=0",
     http_reply={"status": 200, "body": json.dumps({"data": [], "summary": {"order": "chronological",

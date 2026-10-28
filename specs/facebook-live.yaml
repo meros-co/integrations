@@ -229,11 +229,11 @@ ports:
 models:
   - id: graph-api
     name: Meta Graph API, Live Video API on a Page
-    supports: [list_live_videos, list_live_videos_by_status, get_live_video, get_stream_urls,
+    supports: [list_live_videos, list_live_videos_after, list_live_videos_by_status, get_live_video, get_stream_urls,
                get_ingest_streams, get_errors, create_live_video, schedule_live_video,
                create_live_video_custom, set_title, set_description, set_privacy, set_embeddable,
                set_master_ingest_stream, update_live_video, go_live, end_live_video,
-               delete_live_video, list_comments, get_comment_count, get_reaction_count,
+               delete_live_video, list_comments, list_comments_after, get_comment_count, get_reaction_count,
                reschedule_live_video, cancel_scheduled_live_video, comment_on_live_video, reply_to_comment,
                hide_comment, delete_comment, list_polls, get_poll, create_poll, create_quiz_poll,
                show_poll_voting, show_poll_results, close_poll, attach_poll_to_video, delete_poll,
@@ -257,6 +257,21 @@ commands:
             query: { fields: "id,title,description,status,live_views,broadcast_start_time,seconds_left,permalink_url,ingest_streams{id,is_master,stream_health}",
                      source: owner, limit: "{limit}" } }
     expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  list_live_videos_after:
+    summary: The Page's live videos older than a cursor from an earlier answer, newest first, with the answer's paging (GET /{page-id}/live_videos with after)
+    params:
+      after: &after { type: string, pattern: "^[A-Za-z0-9+/_=-]+$", max_length: 1024, required: true,
+                      label: After cursor,
+                      description: "paging.cursors.after from the previous answer; there are no more when that answer had no paging.next." }
+      limit: { type: int, min: 1, max: 100, default: 10,
+               label: Live videos,
+               description: "How many live videos to return, newest first." }
+    send: { method: GET, path: "/{settings.api_version}/{settings.page_id}/live_videos",
+            query: { fields: "id,title,description,status,live_views,broadcast_start_time,seconds_left,permalink_url,ingest_streams{id,is_master,stream_health}",
+                     source: owner, limit: "{limit}", after: "{after}" } }
+    expect: { status: 200, json_path: "$" }
     returns: value
 
   list_live_videos_by_status:
@@ -499,6 +514,23 @@ commands:
     expect: { status: 200, json_path: "$" }
     returns: value
 
+  list_comments_after:
+    summary: The live video's comments older than a cursor from an earlier answer, newest first, with the answer's paging (GET /{live-video-id}/comments with after; pages_read_user_content)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id." }
+      after: *after
+      limit: { type: int, min: 1, max: 100, default: 25,
+               label: Comments,
+               description: "How many comments to return, newest first." }
+    send: { method: GET, path: "/{settings.api_version}/{live_video_id}/comments",
+            query: { fields: "id,message,from,created_time,is_hidden,comment_count",
+                     order: reverse_chronological, filter: stream, live_filter: no_filter,
+                     limit: "{limit}", after: "{after}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
   get_comment_count:
     summary: How many comments the live video has (GET /{live-video-id}/comments summary total_count)
     params:
@@ -729,7 +761,8 @@ commands:
   list_crosspost_pages:
     summary: The Pages this Page has a crossposting relationship with, and whether each takes live crossposts without approval, kept in state (GET /{page-id}/crosspost_whitelisted_pages)
     send: { method: GET, path: "/{settings.api_version}/{settings.page_id}/crosspost_whitelisted_pages",
-            query: { fields: "id,name,allows_live_crossposts", limit: "100" } }
+            query: { fields: "id,name,allows_live_crossposts", limit: "100" },
+            pages: { items: "$.data", cursor: "$.paging.cursors.after", query: after, more: "$.paging.next" } }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
