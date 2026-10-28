@@ -4082,6 +4082,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether AudioPlayerGetStatus and listitemnum need the trailing "" from the syntax tables. ([specs/yamaha-dme7.yaml:957](specs/yamaha-dme7.yaml#L957))
 - [ ] Check the scheduler time format beyond "9:00". ([specs/yamaha-dme7.yaml:962](specs/yamaha-dme7.yaml#L962))
 
+## yamaha-mcp1 — Yamaha MCP1
+
+- [ ] Confirm the preset index range (ssnum's count, numbered from 0 or 1) and the ssinfo answer layout. ([specs/yamaha-mcp1.yaml:127](specs/yamaha-mcp1.yaml#L127))
+- [ ] Confirm the NOTIFY sscurrent push carries only the index. ([specs/yamaha-mcp1.yaml:199](specs/yamaha-mcp1.yaml#L199))
+
 ## yamaha-rivage — Yamaha RIVAGE PM
 
 - [ ] Confirm the RCP command set (get, OK/OKm, ERROR, NOTIFY set, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-rivage.yaml:9668](specs/yamaha-rivage.yaml#L9668))
@@ -4117,6 +4122,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what NOTIFY sscurrent_ex looks like after a scene recall from the surface, which now triggers a re-read of the connect-time settings. ([specs/yamaha-tf.yaml:4755](specs/yamaha-tf.yaml#L4755))
 - [ ] Check whether the console answers prmnum and prminfo <index> as the DME7 document describes, and whether the list differs by firmware and model. ([specs/yamaha-tf.yaml:4764](specs/yamaha-tf.yaml#L4764))
 - [ ] Confirm store_scene: the command form ssupdate_ex scene_a|scene_b <n> comes from the Companion module, while the console's own scninfo list names MIXER:Lib/Bank/Scene/Store (two lists, 0-100); record its reply and whether scene 0 is refused. ([specs/yamaha-tf.yaml:4775](specs/yamaha-tf.yaml#L4775))
+
+## yamaha-vxl — Yamaha VXL1-16P / VXC2P
+
+- [ ] Record what the speaker answers to an unknown command or AccessID (the document has no error section; ERROR <command> <code> as on the MCP1 is assumed). ([specs/yamaha-vxl.yaml:39](specs/yamaha-vxl.yaml#L39))
+- [ ] Record the raw scale of the compressor and ducker thresholds, ranges and attack (dB as integers assumed) and that a ratio of 201 is infinity:1. ([specs/yamaha-vxl.yaml:494](specs/yamaha-vxl.yaml#L494))
+- [ ] Confirm whether NOTIFY mtr carries a level or gr word before the values (the document shows both forms). ([specs/yamaha-vxl.yaml:1697](specs/yamaha-vxl.yaml#L1697))
+- [ ] Confirm that answering devstatus runmode is all the speaker needs before other commands, and that it pushes NOTIFY set for every change. ([specs/yamaha-vxl.yaml:40](specs/yamaha-vxl.yaml#L40))
 
 ## youtube-live — YouTube Live
 

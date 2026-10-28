@@ -1,0 +1,1736 @@
+spec: 1
+id: yamaha-vxl
+name: Yamaha VXL1-16P / VXC2P speakers (Remote Control Protocol, TCP 49280)
+vendor: Yamaha
+category: other
+
+# The Dante/PoE speakers of Yamaha's ADECIA solutions take the Yamaha Remote
+# Control Protocol on TCP 49280: one LF-ended text line per command, OK or
+# OKm (clamped) answers, and NOTIFY pushes of every change from the device or
+# another controller. Parameters are addressed by AccessID and X/Y; the
+# VXC2P names its own parameters VXC: where the VXL1-16P has VXL: (AMP:
+# stays). Values here are raw, in the units of the parameter list.
+source:
+  - title: "VXL1-16P / VXC2P Remote Control Protocol Specifications, Version 2.8.0 (Jun. 5, 2024)"
+    author: Yamaha Corporation
+    url: https://uk.yamaha.com/download/files/2305158
+    note: >
+      Manufacturer document, for firmware 2.8.0 and later. The VXC prefix for
+      the VXC2P p.1, p.6; TCP 49280 and up to four controllers p.5; syntax
+      and value encodings p.8; notifications 1-1 to 1-12 p.9-10; commands
+      2-1 to 2-12 p.11-16; extended commands 3-1 to 3-25 (device information,
+      identify, addressing, UNIT ID, host name) p.16-22; communication start,
+      re-reads after a recall, meters stopping after 10 s, notifications
+      p.23-28; meter levels p.29; value tables p.29-39; parameter list
+      (section 7) p.40-41; meter list (section 8) p.42. The document has no
+      error-reply section.
+
+transport:
+  type: line-tcp
+  port: 49280
+  framing: terminated
+  terminator: lf
+  encoding: ascii
+  timeout_ms: 3000
+  reply: expected
+  # Replies begin OK or OKm (or ERROR, which the document does not
+  # describe); NOTIFY pushes are never a reply.
+  reply_match: '^(OK|OKm|ERROR) '
+  error_match: '^ERROR '
+  probe: devstatus runmode
+
+ports:
+  - { port: 49280, protocol: tcp, role: control }
+
+maps:
+  source: { "conference": "0", "music": "1" }
+  mixer: { "conference": "0", "music": "1", "oscillator": "2" }
+  eq_type: { "peq": "0", "low_shelf_6": "1", "low_shelf_12": "2", "high_shelf_6": "3", "high_shelf_12": "4", "hpf": "5", "lpf": "6" }
+  meter: { "digital_in": "AMP:DigitalIn/Level", "compressor_out": "VXL:Compressor/OutputLevel", "compressor_gr": "VXL:Compressor/GR", "ducker_out": "VXL:Ducker/OutputLevel", "ducker_gr": "VXL:Ducker/GR", "output_voltage": "AMP:Ch/OutputVoltage" }
+  meter_vxc: { "digital_in": "AMP:DigitalIn/Level", "compressor_out": "VXC:Compressor/OutputLevel", "compressor_gr": "VXC:Compressor/GR", "ducker_out": "VXC:Ducker/OutputLevel", "ducker_gr": "VXC:Ducker/GR", "output_voltage": "AMP:Ch/OutputVoltage" }
+
+models:
+  - id: vxl1-16p
+    name: Yamaha VXL1-16P Dante/PoE line array speaker
+    supports:
+      - set_input_gain
+      - get_input_gain
+      - set_enhancer
+      - get_enhancer
+      - set_input_volume_on
+      - get_input_volume_on
+      - set_input_volume
+      - get_input_volume
+      - set_input_eq
+      - get_input_eq
+      - set_input_eq_band_bypass
+      - get_input_eq_band_bypass
+      - set_input_eq_band_frequency
+      - get_input_eq_band_frequency
+      - set_input_eq_band_gain
+      - get_input_eq_band_gain
+      - set_input_eq_band_q
+      - get_input_eq_band_q
+      - set_input_eq_band_type
+      - get_input_eq_band_type
+      - set_compressor
+      - get_compressor
+      - set_compressor_threshold
+      - get_compressor_threshold
+      - set_compressor_ratio
+      - get_compressor_ratio
+      - set_compressor_attack
+      - get_compressor_attack
+      - set_compressor_release
+      - get_compressor_release
+      - set_compressor_hold
+      - get_compressor_hold
+      - set_compressor_gain
+      - get_compressor_gain
+      - set_ducker
+      - get_ducker
+      - set_ducker_threshold
+      - get_ducker_threshold
+      - set_ducker_range
+      - get_ducker_range
+      - set_ducker_attack
+      - get_ducker_attack
+      - set_ducker_release
+      - get_ducker_release
+      - set_ducker_hold
+      - get_ducker_hold
+      - set_ducker_noise_gate
+      - get_ducker_noise_gate
+      - set_mixer_on
+      - get_mixer_on
+      - set_mixer_level
+      - get_mixer_level
+      - set_room_eq
+      - get_room_eq
+      - set_room_eq_low_band_bypass
+      - get_room_eq_low_band_bypass
+      - set_room_eq_low_band_frequency
+      - get_room_eq_low_band_frequency
+      - set_room_eq_low_band_gain
+      - get_room_eq_low_band_gain
+      - set_room_eq_low_band_q
+      - get_room_eq_low_band_q
+      - set_room_eq_low_band_type
+      - get_room_eq_low_band_type
+      - set_room_eq_band_bypass
+      - get_room_eq_band_bypass
+      - set_room_eq_band_frequency
+      - get_room_eq_band_frequency
+      - set_room_eq_band_gain
+      - get_room_eq_band_gain
+      - set_room_eq_band_q
+      - get_room_eq_band_q
+      - set_room_eq_band_type
+      - get_room_eq_band_type
+      - set_delay
+      - get_delay
+      - set_delay_time
+      - get_delay_time
+      - set_oscillator
+      - get_oscillator
+      - set_oscillator_level
+      - get_oscillator_level
+      - set_mute
+      - get_mute
+      - set_volume
+      - get_volume
+      - get_run_mode
+      - get_error_status
+      - get_protocol_version
+      - get_parameter_set_version
+      - get_firmware_version
+      - get_product_name
+      - get_serial_number
+      - get_device_id
+      - get_manufacturer
+      - get_device_name
+      - set_encoding
+      - set_keepalive
+      - identify
+      - stop_identify
+      - get_ip_setting_source
+      - set_ip_mode
+      - get_ip_mode
+      - set_next_boot_address
+      - get_next_boot_address
+      - set_next_boot_netmask
+      - get_next_boot_netmask
+      - set_next_boot_gateway
+      - get_next_boot_gateway
+      - get_gateway
+      - get_unit_id_mode
+      - set_next_boot_unit_id
+      - set_hostname_mode
+      - get_hostname_mode
+      - set_hostname
+      - get_hostname
+      - start_meter
+      - stop_meter
+    verification: none
+  - id: vxc2p
+    name: Yamaha VXC2P Dante/PoE ceiling speaker
+    supports:
+      - set_input_gain
+      - get_input_gain
+      - set_enhancer
+      - get_enhancer
+      - set_input_volume_on
+      - get_input_volume_on
+      - set_input_volume
+      - get_input_volume
+      - set_input_eq
+      - get_input_eq
+      - set_input_eq_band_bypass
+      - get_input_eq_band_bypass
+      - set_input_eq_band_frequency
+      - get_input_eq_band_frequency
+      - set_input_eq_band_gain
+      - get_input_eq_band_gain
+      - set_input_eq_band_q
+      - get_input_eq_band_q
+      - set_input_eq_band_type
+      - get_input_eq_band_type
+      - set_compressor
+      - get_compressor
+      - set_compressor_threshold
+      - get_compressor_threshold
+      - set_compressor_ratio
+      - get_compressor_ratio
+      - set_compressor_attack
+      - get_compressor_attack
+      - set_compressor_release
+      - get_compressor_release
+      - set_compressor_hold
+      - get_compressor_hold
+      - set_compressor_gain
+      - get_compressor_gain
+      - set_ducker
+      - get_ducker
+      - set_ducker_threshold
+      - get_ducker_threshold
+      - set_ducker_range
+      - get_ducker_range
+      - set_ducker_attack
+      - get_ducker_attack
+      - set_ducker_release
+      - get_ducker_release
+      - set_ducker_hold
+      - get_ducker_hold
+      - set_ducker_noise_gate
+      - get_ducker_noise_gate
+      - set_mixer_on
+      - get_mixer_on
+      - set_mixer_level
+      - get_mixer_level
+      - set_room_eq
+      - get_room_eq
+      - set_room_eq_low_band_bypass
+      - get_room_eq_low_band_bypass
+      - set_room_eq_low_band_frequency
+      - get_room_eq_low_band_frequency
+      - set_room_eq_low_band_gain
+      - get_room_eq_low_band_gain
+      - set_room_eq_low_band_q
+      - get_room_eq_low_band_q
+      - set_room_eq_low_band_type
+      - get_room_eq_low_band_type
+      - set_room_eq_band_bypass
+      - get_room_eq_band_bypass
+      - set_room_eq_band_frequency
+      - get_room_eq_band_frequency
+      - set_room_eq_band_gain
+      - get_room_eq_band_gain
+      - set_room_eq_band_q
+      - get_room_eq_band_q
+      - set_room_eq_band_type
+      - get_room_eq_band_type
+      - set_delay
+      - get_delay
+      - set_delay_time
+      - get_delay_time
+      - set_oscillator
+      - get_oscillator
+      - set_oscillator_level
+      - get_oscillator_level
+      - set_mute
+      - get_mute
+      - set_volume
+      - get_volume
+      - get_run_mode
+      - get_error_status
+      - get_protocol_version
+      - get_parameter_set_version
+      - get_firmware_version
+      - get_product_name
+      - get_serial_number
+      - get_device_id
+      - get_manufacturer
+      - get_device_name
+      - set_encoding
+      - set_keepalive
+      - identify
+      - stop_identify
+      - get_ip_setting_source
+      - set_ip_mode
+      - get_ip_mode
+      - set_next_boot_address
+      - get_next_boot_address
+      - set_next_boot_netmask
+      - get_next_boot_netmask
+      - set_next_boot_gateway
+      - get_next_boot_gateway
+      - get_gateway
+      - get_unit_id_mode
+      - set_next_boot_unit_id
+      - set_hostname_mode
+      - get_hostname_mode
+      - set_hostname
+      - get_hostname
+      - start_meter
+      - stop_meter
+    verification: none
+
+commands:
+  set_input_gain:
+    summary: "Set: input gain (VXL:Ch/InputGain/Sensitivity, raw value); answered with the value applied"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+      value: { type: int, min: -2000, max: 2000, required: true, label: "Input gain", description: "Input gain in hundredths of a dB, -2000 (-20.00 dB) to 2000 (+20.00 dB)." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Ch/InputGain/Sensitivity {source:map.source} 0 {value}" }, { models: [vxc2p], message: "set VXC:Ch/InputGain/Sensitivity {source:map.source} 0 {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Ch/InputGain/Sensitivity ' }
+    returns: ack
+
+  get_input_gain:
+    summary: "Read: input gain (VXL:Ch/InputGain/Sensitivity, raw value)"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:Ch/InputGain/Sensitivity {source:map.source} 0" }, { models: [vxc2p], message: "get VXC:Ch/InputGain/Sensitivity {source:map.source} 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Ch/InputGain/Sensitivity [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_enhancer:
+    summary: "Set: enhancer on (VXL:Ch/Enhancer/On, raw value); answered with the value applied"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+      enabled: { type: bool, required: true, label: "Enhancer on", description: "On turns it on, off turns it off (enhancer on)." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Ch/Enhancer/On {source:map.source} 0 {enabled:bool01}" }, { models: [vxc2p], message: "set VXC:Ch/Enhancer/On {source:map.source} 0 {enabled:bool01}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Ch/Enhancer/On ' }
+    returns: ack
+
+  get_enhancer:
+    summary: "Read: enhancer on (VXL:Ch/Enhancer/On, raw value)"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:Ch/Enhancer/On {source:map.source} 0" }, { models: [vxc2p], message: "get VXC:Ch/Enhancer/On {source:map.source} 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Ch/Enhancer/On [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_input_volume_on:
+    summary: "Set: input volume on (VXL:Ch/InputVolume/On, raw value); answered with the value applied"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+      enabled: { type: bool, required: true, label: "Input volume on", description: "On turns it on, off turns it off (input volume on)." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Ch/InputVolume/On {source:map.source} 0 {enabled:bool01}" }, { models: [vxc2p], message: "set VXC:Ch/InputVolume/On {source:map.source} 0 {enabled:bool01}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Ch/InputVolume/On ' }
+    returns: ack
+
+  get_input_volume_on:
+    summary: "Read: input volume on (VXL:Ch/InputVolume/On, raw value)"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:Ch/InputVolume/On {source:map.source} 0" }, { models: [vxc2p], message: "get VXC:Ch/InputVolume/On {source:map.source} 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Ch/InputVolume/On [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_input_volume:
+    summary: "Set: input volume (VXL:Ch/InputVolume/Level, raw value); answered with the value applied"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+      value: { type: int, min: -32768, max: 0, required: true, label: "Input volume", description: "Level in hundredths of a dB, -13800 (-138.00 dB) to 0, or -32768 for -inf; values between are taken from the device's steps." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Ch/InputVolume/Level {source:map.source} 0 {value}" }, { models: [vxc2p], message: "set VXC:Ch/InputVolume/Level {source:map.source} 0 {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Ch/InputVolume/Level ' }
+    returns: ack
+
+  get_input_volume:
+    summary: "Read: input volume (VXL:Ch/InputVolume/Level, raw value)"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:Ch/InputVolume/Level {source:map.source} 0" }, { models: [vxc2p], message: "get VXC:Ch/InputVolume/Level {source:map.source} 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Ch/InputVolume/Level [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_input_eq:
+    summary: "Set: input PEQ on (VXL:Ch/PEQ/On, raw value); answered with the value applied"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+      enabled: { type: bool, required: true, label: "Input PEQ on", description: "On turns it on, off turns it off (input peq on)." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Ch/PEQ/On {source:map.source} 0 {enabled:bool01}" }, { models: [vxc2p], message: "set VXC:Ch/PEQ/On {source:map.source} 0 {enabled:bool01}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Ch/PEQ/On ' }
+    returns: ack
+
+  get_input_eq:
+    summary: "Read: input PEQ on (VXL:Ch/PEQ/On, raw value)"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:Ch/PEQ/On {source:map.source} 0" }, { models: [vxc2p], message: "get VXC:Ch/PEQ/On {source:map.source} 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Ch/PEQ/On [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_input_eq_band_bypass:
+    summary: "Set: input PEQ band bypassed (VXL:Ch/PEQ/Band/Bypass, raw value); answered with the value applied"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+      band: { type: int, min: 1, max: 3, required: true, label: "Band", description: "Input PEQ band, 1 to 3 (A to C)." }
+      enabled: { type: bool, required: true, label: "Input PEQ band bypassed", description: "On turns it on, off turns it off (input peq band bypassed)." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Ch/PEQ/Band/Bypass {source:map.source} {band:-1} {enabled:bool01}" }, { models: [vxc2p], message: "set VXC:Ch/PEQ/Band/Bypass {source:map.source} {band:-1} {enabled:bool01}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Ch/PEQ/Band/Bypass ' }
+    returns: ack
+
+  get_input_eq_band_bypass:
+    summary: "Read: input PEQ band bypassed (VXL:Ch/PEQ/Band/Bypass, raw value)"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+      band: { type: int, min: 1, max: 3, required: true, label: "Band", description: "Input PEQ band, 1 to 3 (A to C)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Bypass {source:map.source} {band:-1}" }, { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Bypass {source:map.source} {band:-1}" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Ch/PEQ/Band/Bypass [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_input_eq_band_frequency:
+    summary: "Set: input PEQ band frequency (VXL:Ch/PEQ/Band/Frequency, raw value); answered with the value applied"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+      band: { type: int, min: 1, max: 3, required: true, label: "Band", description: "Input PEQ band, 1 to 3 (A to C)." }
+      value: { type: int, min: 20000, max: 20000000, required: true, label: "Input PEQ band frequency", description: "Frequency in thousandths of a Hz, 20000 (20 Hz) to 20000000 (20 kHz), on the device's steps." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Ch/PEQ/Band/Frequency {source:map.source} {band:-1} {value}" }, { models: [vxc2p], message: "set VXC:Ch/PEQ/Band/Frequency {source:map.source} {band:-1} {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Ch/PEQ/Band/Frequency ' }
+    returns: ack
+
+  get_input_eq_band_frequency:
+    summary: "Read: input PEQ band frequency (VXL:Ch/PEQ/Band/Frequency, raw value)"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+      band: { type: int, min: 1, max: 3, required: true, label: "Band", description: "Input PEQ band, 1 to 3 (A to C)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Frequency {source:map.source} {band:-1}" }, { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Frequency {source:map.source} {band:-1}" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Ch/PEQ/Band/Frequency [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_input_eq_band_gain:
+    summary: "Set: input PEQ band gain (VXL:Ch/PEQ/Band/Gain, raw value); answered with the value applied"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+      band: { type: int, min: 1, max: 3, required: true, label: "Band", description: "Input PEQ band, 1 to 3 (A to C)." }
+      value: { type: int, min: -180, max: 60, required: true, label: "Input PEQ band gain", description: "Gain in tenths of a dB, -180 (-18.0 dB) to 60 (+6.0 dB)." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Ch/PEQ/Band/Gain {source:map.source} {band:-1} {value}" }, { models: [vxc2p], message: "set VXC:Ch/PEQ/Band/Gain {source:map.source} {band:-1} {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Ch/PEQ/Band/Gain ' }
+    returns: ack
+
+  get_input_eq_band_gain:
+    summary: "Read: input PEQ band gain (VXL:Ch/PEQ/Band/Gain, raw value)"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+      band: { type: int, min: 1, max: 3, required: true, label: "Band", description: "Input PEQ band, 1 to 3 (A to C)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Gain {source:map.source} {band:-1}" }, { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Gain {source:map.source} {band:-1}" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Ch/PEQ/Band/Gain [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_input_eq_band_q:
+    summary: "Set: input PEQ band Q (VXL:Ch/PEQ/Band/Q, raw value); answered with the value applied"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+      band: { type: int, min: 1, max: 3, required: true, label: "Band", description: "Input PEQ band, 1 to 3 (A to C)." }
+      value: { type: int, min: 100, max: 63000, required: true, label: "Input PEQ band Q", description: "Q in thousandths, 100 (0.1) to 63000 (63.0), on the device's steps." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Ch/PEQ/Band/Q {source:map.source} {band:-1} {value}" }, { models: [vxc2p], message: "set VXC:Ch/PEQ/Band/Q {source:map.source} {band:-1} {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Ch/PEQ/Band/Q ' }
+    returns: ack
+
+  get_input_eq_band_q:
+    summary: "Read: input PEQ band Q (VXL:Ch/PEQ/Band/Q, raw value)"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+      band: { type: int, min: 1, max: 3, required: true, label: "Band", description: "Input PEQ band, 1 to 3 (A to C)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Q {source:map.source} {band:-1}" }, { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Q {source:map.source} {band:-1}" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Ch/PEQ/Band/Q [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_input_eq_band_type:
+    summary: "Set: input PEQ band type (VXL:Ch/PEQ/Band/Type, raw value); answered with the value applied"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+      band: { type: int, min: 1, max: 3, required: true, label: "Band", description: "Input PEQ band, 1 to 3 (A to C)." }
+      type: { type: enum, values: [peq, low_shelf_6, low_shelf_12, high_shelf_6, high_shelf_12, hpf, lpf], required: true, label: "Type", description: "PEQ, low shelf 6 or 12 dB/octave, high shelf 6 or 12 dB/octave, high-pass or low-pass." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Ch/PEQ/Band/Type {source:map.source} {band:-1} {type:map.eq_type}" }, { models: [vxc2p], message: "set VXC:Ch/PEQ/Band/Type {source:map.source} {band:-1} {type:map.eq_type}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Ch/PEQ/Band/Type ' }
+    returns: ack
+
+  get_input_eq_band_type:
+    summary: "Read: input PEQ band type (VXL:Ch/PEQ/Band/Type, raw value)"
+    params:
+      source: { type: enum, values: [conference, music], required: true, label: "Source", description: "conference (the conference input) or music (the music input)." }
+      band: { type: int, min: 1, max: 3, required: true, label: "Band", description: "Input PEQ band, 1 to 3 (A to C)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Type {source:map.source} {band:-1}" }, { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Type {source:map.source} {band:-1}" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Ch/PEQ/Band/Type [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_compressor:
+    summary: "Set: compressor (DRC) on (VXL:Compressor/On, raw value); answered with the value applied"
+    params:
+      enabled: { type: bool, required: true, label: "Compressor (DRC) on", description: "On turns it on, off turns it off (compressor (drc) on)." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Compressor/On 0 0 {enabled:bool01}" }, { models: [vxc2p], message: "set VXC:Compressor/On 0 0 {enabled:bool01}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Compressor/On ' }
+    returns: ack
+
+  get_compressor:
+    summary: "Read: compressor (DRC) on (VXL:Compressor/On, raw value)"
+    send: [{ models: [vxl1-16p], message: "get VXL:Compressor/On 0 0" }, { models: [vxc2p], message: "get VXC:Compressor/On 0 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Compressor/On [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_compressor_threshold:
+    summary: "Set: compressor threshold (VXL:Compressor/Threshold, raw value); answered with the value applied"
+    params:
+      value: { type: int, min: -54, max: 0, required: true, label: "Compressor threshold", description: "Threshold in dB, -54 to 0 (the document gives the unit as dB without a scale)." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Compressor/Threshold 0 0 {value}" }, { models: [vxc2p], message: "set VXC:Compressor/Threshold 0 0 {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Compressor/Threshold ' }
+    returns: ack
+
+  get_compressor_threshold:
+    summary: "Read: compressor threshold (VXL:Compressor/Threshold, raw value)"
+    send: [{ models: [vxl1-16p], message: "get VXL:Compressor/Threshold 0 0" }, { models: [vxc2p], message: "get VXC:Compressor/Threshold 0 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Compressor/Threshold [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_compressor_ratio:
+    summary: "Set: compressor ratio (VXL:Compressor/Ratio, raw value); answered with the value applied"
+    params:
+      value: { type: int, min: 10, max: 201, required: true, label: "Compressor ratio", description: "Ratio in tenths, 10 (1.0:1) to 200 (20.0:1), or 201 for infinity:1." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Compressor/Ratio 0 0 {value}" }, { models: [vxc2p], message: "set VXC:Compressor/Ratio 0 0 {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Compressor/Ratio ' }
+    returns: ack
+
+  get_compressor_ratio:
+    summary: "Read: compressor ratio (VXL:Compressor/Ratio, raw value)"
+    send: [{ models: [vxl1-16p], message: "get VXL:Compressor/Ratio 0 0" }, { models: [vxc2p], message: "get VXC:Compressor/Ratio 0 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Compressor/Ratio [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_compressor_attack:
+    summary: "Set: compressor attack (VXL:Compressor/Attack, raw value); answered with the value applied"
+    params:
+      value: { type: int, min: 0, max: 120, required: true, label: "Compressor attack", description: "Attack in ms, 0 to 120." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Compressor/Attack 0 0 {value}" }, { models: [vxc2p], message: "set VXC:Compressor/Attack 0 0 {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Compressor/Attack ' }
+    returns: ack
+
+  get_compressor_attack:
+    summary: "Read: compressor attack (VXL:Compressor/Attack, raw value)"
+    send: [{ models: [vxl1-16p], message: "get VXL:Compressor/Attack 0 0" }, { models: [vxc2p], message: "get VXC:Compressor/Attack 0 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Compressor/Attack [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_compressor_release:
+    summary: "Set: compressor release (VXL:Compressor/Release, raw value); answered with the value applied"
+    params:
+      value: { type: int, min: 3, max: 42700, required: true, label: "Compressor release", description: "Release in ms, 3 to 42700, on the device's steps." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Compressor/Release 0 0 {value}" }, { models: [vxc2p], message: "set VXC:Compressor/Release 0 0 {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Compressor/Release ' }
+    returns: ack
+
+  get_compressor_release:
+    summary: "Read: compressor release (VXL:Compressor/Release, raw value)"
+    send: [{ models: [vxl1-16p], message: "get VXL:Compressor/Release 0 0" }, { models: [vxc2p], message: "get VXC:Compressor/Release 0 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Compressor/Release [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_compressor_hold:
+    summary: "Set: compressor hold (VXL:Compressor/Hold, raw value); answered with the value applied"
+    params:
+      value: { type: int, min: 2, max: 196000, required: true, label: "Compressor hold", description: "Hold in hundredths of a ms, 2 (0.02 ms) to 196000 (1.96 s), on the device's steps." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Compressor/Hold 0 0 {value}" }, { models: [vxc2p], message: "set VXC:Compressor/Hold 0 0 {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Compressor/Hold ' }
+    returns: ack
+
+  get_compressor_hold:
+    summary: "Read: compressor hold (VXL:Compressor/Hold, raw value)"
+    send: [{ models: [vxl1-16p], message: "get VXL:Compressor/Hold 0 0" }, { models: [vxc2p], message: "get VXC:Compressor/Hold 0 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Compressor/Hold [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_compressor_gain:
+    summary: "Set: compressor output gain (VXL:Compressor/Gain, raw value); answered with the value applied"
+    params:
+      value: { type: int, min: 0, max: 1800, required: true, label: "Compressor output gain", description: "Output gain in hundredths of a dB, 0 to 1800 (+18.00 dB)." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Compressor/Gain 0 0 {value}" }, { models: [vxc2p], message: "set VXC:Compressor/Gain 0 0 {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Compressor/Gain ' }
+    returns: ack
+
+  get_compressor_gain:
+    summary: "Read: compressor output gain (VXL:Compressor/Gain, raw value)"
+    send: [{ models: [vxl1-16p], message: "get VXL:Compressor/Gain 0 0" }, { models: [vxc2p], message: "get VXC:Compressor/Gain 0 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Compressor/Gain [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_ducker:
+    summary: "Set: ducker on (VXL:Ducker/On, raw value); answered with the value applied"
+    params:
+      enabled: { type: bool, required: true, label: "Ducker on", description: "On turns it on, off turns it off (ducker on)." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Ducker/On 0 0 {enabled:bool01}" }, { models: [vxc2p], message: "set VXC:Ducker/On 0 0 {enabled:bool01}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Ducker/On ' }
+    returns: ack
+
+  get_ducker:
+    summary: "Read: ducker on (VXL:Ducker/On, raw value)"
+    send: [{ models: [vxl1-16p], message: "get VXL:Ducker/On 0 0" }, { models: [vxc2p], message: "get VXC:Ducker/On 0 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Ducker/On [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_ducker_threshold:
+    summary: "Set: ducker threshold (VXL:Ducker/Threshold, raw value); answered with the value applied"
+    params:
+      value: { type: int, min: -54, max: 0, required: true, label: "Ducker threshold", description: "Threshold in dB, -54 to 0." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Ducker/Threshold 0 0 {value}" }, { models: [vxc2p], message: "set VXC:Ducker/Threshold 0 0 {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Ducker/Threshold ' }
+    returns: ack
+
+  get_ducker_threshold:
+    summary: "Read: ducker threshold (VXL:Ducker/Threshold, raw value)"
+    send: [{ models: [vxl1-16p], message: "get VXL:Ducker/Threshold 0 0" }, { models: [vxc2p], message: "get VXC:Ducker/Threshold 0 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Ducker/Threshold [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_ducker_range:
+    summary: "Set: ducker range (VXL:Ducker/Range, raw value); answered with the value applied"
+    params:
+      value: { type: int, min: -70, max: 0, required: true, label: "Ducker range", description: "Range in dB, -70 to 0." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Ducker/Range 0 0 {value}" }, { models: [vxc2p], message: "set VXC:Ducker/Range 0 0 {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Ducker/Range ' }
+    returns: ack
+
+  get_ducker_range:
+    summary: "Read: ducker range (VXL:Ducker/Range, raw value)"
+    send: [{ models: [vxl1-16p], message: "get VXL:Ducker/Range 0 0" }, { models: [vxc2p], message: "get VXC:Ducker/Range 0 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Ducker/Range [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_ducker_attack:
+    summary: "Set: ducker attack (VXL:Ducker/Attack, raw value); answered with the value applied"
+    params:
+      value: { type: int, min: 0, max: 240, required: true, label: "Ducker attack", description: "Attack in ms, 0 to 240." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Ducker/Attack 0 0 {value}" }, { models: [vxc2p], message: "set VXC:Ducker/Attack 0 0 {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Ducker/Attack ' }
+    returns: ack
+
+  get_ducker_attack:
+    summary: "Read: ducker attack (VXL:Ducker/Attack, raw value)"
+    send: [{ models: [vxl1-16p], message: "get VXL:Ducker/Attack 0 0" }, { models: [vxc2p], message: "get VXC:Ducker/Attack 0 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Ducker/Attack [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_ducker_release:
+    summary: "Set: ducker release (VXL:Ducker/Release, raw value); answered with the value applied"
+    params:
+      value: { type: int, min: 3, max: 42700, required: true, label: "Ducker release", description: "Release in ms, 3 to 42700, on the device's steps." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Ducker/Release 0 0 {value}" }, { models: [vxc2p], message: "set VXC:Ducker/Release 0 0 {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Ducker/Release ' }
+    returns: ack
+
+  get_ducker_release:
+    summary: "Read: ducker release (VXL:Ducker/Release, raw value)"
+    send: [{ models: [vxl1-16p], message: "get VXL:Ducker/Release 0 0" }, { models: [vxc2p], message: "get VXC:Ducker/Release 0 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Ducker/Release [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_ducker_hold:
+    summary: "Set: ducker hold (VXL:Ducker/Hold, raw value); answered with the value applied"
+    params:
+      value: { type: int, min: 2, max: 196000, required: true, label: "Ducker hold", description: "Hold in hundredths of a ms, 2 to 196000, on the device's steps." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Ducker/Hold 0 0 {value}" }, { models: [vxc2p], message: "set VXC:Ducker/Hold 0 0 {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Ducker/Hold ' }
+    returns: ack
+
+  get_ducker_hold:
+    summary: "Read: ducker hold (VXL:Ducker/Hold, raw value)"
+    send: [{ models: [vxl1-16p], message: "get VXL:Ducker/Hold 0 0" }, { models: [vxc2p], message: "get VXC:Ducker/Hold 0 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Ducker/Hold [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_ducker_noise_gate:
+    summary: "Set: ducker noise gate on (VXL:Ducker/NoiseGateOn, raw value); answered with the value applied"
+    params:
+      enabled: { type: bool, required: true, label: "Ducker noise gate on", description: "On turns it on, off turns it off (ducker noise gate on)." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Ducker/NoiseGateOn 0 0 {enabled:bool01}" }, { models: [vxc2p], message: "set VXC:Ducker/NoiseGateOn 0 0 {enabled:bool01}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Ducker/NoiseGateOn ' }
+    returns: ack
+
+  get_ducker_noise_gate:
+    summary: "Read: ducker noise gate on (VXL:Ducker/NoiseGateOn, raw value)"
+    send: [{ models: [vxl1-16p], message: "get VXL:Ducker/NoiseGateOn 0 0" }, { models: [vxc2p], message: "get VXC:Ducker/NoiseGateOn 0 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Ducker/NoiseGateOn [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_mixer_on:
+    summary: "Set: matrix mixer input on (VXL:Mix/Fader/On, raw value); answered with the value applied"
+    params:
+      input: { type: enum, values: [conference, music, oscillator], required: true, label: "Mixer input", description: "conference, music or oscillator." }
+      enabled: { type: bool, required: true, label: "Matrix mixer input on", description: "On turns it on, off turns it off (matrix mixer input on)." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Mix/Fader/On {input:map.mixer} 0 {enabled:bool01}" }, { models: [vxc2p], message: "set VXC:Mix/Fader/On {input:map.mixer} 0 {enabled:bool01}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Mix/Fader/On ' }
+    returns: ack
+
+  get_mixer_on:
+    summary: "Read: matrix mixer input on (VXL:Mix/Fader/On, raw value)"
+    params:
+      input: { type: enum, values: [conference, music, oscillator], required: true, label: "Mixer input", description: "conference, music or oscillator." }
+    send: [{ models: [vxl1-16p], message: "get VXL:Mix/Fader/On {input:map.mixer} 0" }, { models: [vxc2p], message: "get VXC:Mix/Fader/On {input:map.mixer} 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Mix/Fader/On [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_mixer_level:
+    summary: "Set: matrix mixer input level (VXL:Mix/Fader/Level, raw value); answered with the value applied"
+    params:
+      input: { type: enum, values: [conference, music, oscillator], required: true, label: "Mixer input", description: "conference, music or oscillator." }
+      value: { type: int, min: -32768, max: 0, required: true, label: "Matrix mixer input level", description: "Level in hundredths of a dB, -13800 (-138.00 dB) to 0, or -32768 for -inf; values between are taken from the device's steps." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Mix/Fader/Level {input:map.mixer} 0 {value}" }, { models: [vxc2p], message: "set VXC:Mix/Fader/Level {input:map.mixer} 0 {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Mix/Fader/Level ' }
+    returns: ack
+
+  get_mixer_level:
+    summary: "Read: matrix mixer input level (VXL:Mix/Fader/Level, raw value)"
+    params:
+      input: { type: enum, values: [conference, music, oscillator], required: true, label: "Mixer input", description: "conference, music or oscillator." }
+    send: [{ models: [vxl1-16p], message: "get VXL:Mix/Fader/Level {input:map.mixer} 0" }, { models: [vxc2p], message: "get VXC:Mix/Fader/Level {input:map.mixer} 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Mix/Fader/Level [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_room_eq:
+    summary: "Set: room EQ on (VXL:RoomEQ/On, raw value); answered with the value applied"
+    params:
+      enabled: { type: bool, required: true, label: "Room EQ on", description: "On turns it on, off turns it off (room eq on)." }
+    send: [{ models: [vxl1-16p], message: "set VXL:RoomEQ/On 0 0 {enabled:bool01}" }, { models: [vxc2p], message: "set VXC:RoomEQ/On 0 0 {enabled:bool01}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):RoomEQ/On ' }
+    returns: ack
+
+  get_room_eq:
+    summary: "Read: room EQ on (VXL:RoomEQ/On, raw value)"
+    send: [{ models: [vxl1-16p], message: "get VXL:RoomEQ/On 0 0" }, { models: [vxc2p], message: "get VXC:RoomEQ/On 0 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):RoomEQ/On [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_room_eq_low_band_bypass:
+    summary: "Set: room EQ low band (A-D) bypassed (VXL:RoomEQ/BandL/Bypass, raw value); answered with the value applied"
+    params:
+      band: { type: int, min: 1, max: 4, required: true, label: "Band", description: "Room EQ low band, 1 to 4 (A to D)." }
+      enabled: { type: bool, required: true, label: "Room EQ low band (A-D) bypassed", description: "On turns it on, off turns it off (room eq low band (a-d) bypassed)." }
+    send: [{ models: [vxl1-16p], message: "set VXL:RoomEQ/BandL/Bypass 0 {band:-1} {enabled:bool01}" }, { models: [vxc2p], message: "set VXC:RoomEQ/BandL/Bypass 0 {band:-1} {enabled:bool01}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):RoomEQ/BandL/Bypass ' }
+    returns: ack
+
+  get_room_eq_low_band_bypass:
+    summary: "Read: room EQ low band (A-D) bypassed (VXL:RoomEQ/BandL/Bypass, raw value)"
+    params:
+      band: { type: int, min: 1, max: 4, required: true, label: "Band", description: "Room EQ low band, 1 to 4 (A to D)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Bypass 0 {band:-1}" }, { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Bypass 0 {band:-1}" }]
+    expect: { matches: '^OK get (?:VXL|VXC):RoomEQ/BandL/Bypass [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_room_eq_low_band_frequency:
+    summary: "Set: room EQ low band frequency (VXL:RoomEQ/BandL/Frequency, raw value); answered with the value applied"
+    params:
+      band: { type: int, min: 1, max: 4, required: true, label: "Band", description: "Room EQ low band, 1 to 4 (A to D)." }
+      value: { type: int, min: 20000, max: 20000000, required: true, label: "Room EQ low band frequency", description: "Frequency in thousandths of a Hz, 20000 (20 Hz) to 20000000 (20 kHz)." }
+    send: [{ models: [vxl1-16p], message: "set VXL:RoomEQ/BandL/Frequency 0 {band:-1} {value}" }, { models: [vxc2p], message: "set VXC:RoomEQ/BandL/Frequency 0 {band:-1} {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):RoomEQ/BandL/Frequency ' }
+    returns: ack
+
+  get_room_eq_low_band_frequency:
+    summary: "Read: room EQ low band frequency (VXL:RoomEQ/BandL/Frequency, raw value)"
+    params:
+      band: { type: int, min: 1, max: 4, required: true, label: "Band", description: "Room EQ low band, 1 to 4 (A to D)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Frequency 0 {band:-1}" }, { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Frequency 0 {band:-1}" }]
+    expect: { matches: '^OK get (?:VXL|VXC):RoomEQ/BandL/Frequency [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_room_eq_low_band_gain:
+    summary: "Set: room EQ low band gain (VXL:RoomEQ/BandL/Gain, raw value); answered with the value applied"
+    params:
+      band: { type: int, min: 1, max: 4, required: true, label: "Band", description: "Room EQ low band, 1 to 4 (A to D)." }
+      value: { type: int, min: -180, max: 60, required: true, label: "Room EQ low band gain", description: "Gain in tenths of a dB, -180 to 60." }
+    send: [{ models: [vxl1-16p], message: "set VXL:RoomEQ/BandL/Gain 0 {band:-1} {value}" }, { models: [vxc2p], message: "set VXC:RoomEQ/BandL/Gain 0 {band:-1} {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):RoomEQ/BandL/Gain ' }
+    returns: ack
+
+  get_room_eq_low_band_gain:
+    summary: "Read: room EQ low band gain (VXL:RoomEQ/BandL/Gain, raw value)"
+    params:
+      band: { type: int, min: 1, max: 4, required: true, label: "Band", description: "Room EQ low band, 1 to 4 (A to D)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Gain 0 {band:-1}" }, { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Gain 0 {band:-1}" }]
+    expect: { matches: '^OK get (?:VXL|VXC):RoomEQ/BandL/Gain [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_room_eq_low_band_q:
+    summary: "Set: room EQ low band Q (VXL:RoomEQ/BandL/Q, raw value); answered with the value applied"
+    params:
+      band: { type: int, min: 1, max: 4, required: true, label: "Band", description: "Room EQ low band, 1 to 4 (A to D)." }
+      value: { type: int, min: 100, max: 63000, required: true, label: "Room EQ low band Q", description: "Q in thousandths, 100 to 63000." }
+    send: [{ models: [vxl1-16p], message: "set VXL:RoomEQ/BandL/Q 0 {band:-1} {value}" }, { models: [vxc2p], message: "set VXC:RoomEQ/BandL/Q 0 {band:-1} {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):RoomEQ/BandL/Q ' }
+    returns: ack
+
+  get_room_eq_low_band_q:
+    summary: "Read: room EQ low band Q (VXL:RoomEQ/BandL/Q, raw value)"
+    params:
+      band: { type: int, min: 1, max: 4, required: true, label: "Band", description: "Room EQ low band, 1 to 4 (A to D)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Q 0 {band:-1}" }, { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Q 0 {band:-1}" }]
+    expect: { matches: '^OK get (?:VXL|VXC):RoomEQ/BandL/Q [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_room_eq_low_band_type:
+    summary: "Set: room EQ low band type (VXL:RoomEQ/BandL/Type, raw value); answered with the value applied"
+    params:
+      band: { type: int, min: 1, max: 4, required: true, label: "Band", description: "Room EQ low band, 1 to 4 (A to D)." }
+      type: { type: enum, values: [peq, low_shelf_6, low_shelf_12, high_shelf_6, high_shelf_12, hpf, lpf], required: true, label: "Type", description: "PEQ, low shelf 6 or 12 dB/octave, high shelf 6 or 12 dB/octave, high-pass or low-pass." }
+    send: [{ models: [vxl1-16p], message: "set VXL:RoomEQ/BandL/Type 0 {band:-1} {type:map.eq_type}" }, { models: [vxc2p], message: "set VXC:RoomEQ/BandL/Type 0 {band:-1} {type:map.eq_type}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):RoomEQ/BandL/Type ' }
+    returns: ack
+
+  get_room_eq_low_band_type:
+    summary: "Read: room EQ low band type (VXL:RoomEQ/BandL/Type, raw value)"
+    params:
+      band: { type: int, min: 1, max: 4, required: true, label: "Band", description: "Room EQ low band, 1 to 4 (A to D)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Type 0 {band:-1}" }, { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Type 0 {band:-1}" }]
+    expect: { matches: '^OK get (?:VXL|VXC):RoomEQ/BandL/Type [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_room_eq_band_bypass:
+    summary: "Set: room EQ band (E-J) bypassed (VXL:RoomEQ/Band/Bypass, raw value); answered with the value applied"
+    params:
+      band: { type: int, min: 1, max: 6, required: true, label: "Band", description: "Room EQ band, 1 to 6 (E to J)." }
+      enabled: { type: bool, required: true, label: "Room EQ band (E-J) bypassed", description: "On turns it on, off turns it off (room eq band (e-j) bypassed)." }
+    send: [{ models: [vxl1-16p], message: "set VXL:RoomEQ/Band/Bypass 0 {band:-1} {enabled:bool01}" }, { models: [vxc2p], message: "set VXC:RoomEQ/Band/Bypass 0 {band:-1} {enabled:bool01}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):RoomEQ/Band/Bypass ' }
+    returns: ack
+
+  get_room_eq_band_bypass:
+    summary: "Read: room EQ band (E-J) bypassed (VXL:RoomEQ/Band/Bypass, raw value)"
+    params:
+      band: { type: int, min: 1, max: 6, required: true, label: "Band", description: "Room EQ band, 1 to 6 (E to J)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Bypass 0 {band:-1}" }, { models: [vxc2p], message: "get VXC:RoomEQ/Band/Bypass 0 {band:-1}" }]
+    expect: { matches: '^OK get (?:VXL|VXC):RoomEQ/Band/Bypass [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_room_eq_band_frequency:
+    summary: "Set: room EQ band frequency (VXL:RoomEQ/Band/Frequency, raw value); answered with the value applied"
+    params:
+      band: { type: int, min: 1, max: 6, required: true, label: "Band", description: "Room EQ band, 1 to 6 (E to J)." }
+      value: { type: int, min: 100000, max: 20000000, required: true, label: "Room EQ band frequency", description: "Frequency in thousandths of a Hz, 100000 (100 Hz) to 20000000 (20 kHz)." }
+    send: [{ models: [vxl1-16p], message: "set VXL:RoomEQ/Band/Frequency 0 {band:-1} {value}" }, { models: [vxc2p], message: "set VXC:RoomEQ/Band/Frequency 0 {band:-1} {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):RoomEQ/Band/Frequency ' }
+    returns: ack
+
+  get_room_eq_band_frequency:
+    summary: "Read: room EQ band frequency (VXL:RoomEQ/Band/Frequency, raw value)"
+    params:
+      band: { type: int, min: 1, max: 6, required: true, label: "Band", description: "Room EQ band, 1 to 6 (E to J)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Frequency 0 {band:-1}" }, { models: [vxc2p], message: "get VXC:RoomEQ/Band/Frequency 0 {band:-1}" }]
+    expect: { matches: '^OK get (?:VXL|VXC):RoomEQ/Band/Frequency [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_room_eq_band_gain:
+    summary: "Set: room EQ band gain (VXL:RoomEQ/Band/Gain, raw value); answered with the value applied"
+    params:
+      band: { type: int, min: 1, max: 6, required: true, label: "Band", description: "Room EQ band, 1 to 6 (E to J)." }
+      value: { type: int, min: -180, max: 60, required: true, label: "Room EQ band gain", description: "Gain in tenths of a dB, -180 to 60." }
+    send: [{ models: [vxl1-16p], message: "set VXL:RoomEQ/Band/Gain 0 {band:-1} {value}" }, { models: [vxc2p], message: "set VXC:RoomEQ/Band/Gain 0 {band:-1} {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):RoomEQ/Band/Gain ' }
+    returns: ack
+
+  get_room_eq_band_gain:
+    summary: "Read: room EQ band gain (VXL:RoomEQ/Band/Gain, raw value)"
+    params:
+      band: { type: int, min: 1, max: 6, required: true, label: "Band", description: "Room EQ band, 1 to 6 (E to J)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Gain 0 {band:-1}" }, { models: [vxc2p], message: "get VXC:RoomEQ/Band/Gain 0 {band:-1}" }]
+    expect: { matches: '^OK get (?:VXL|VXC):RoomEQ/Band/Gain [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_room_eq_band_q:
+    summary: "Set: room EQ band Q (VXL:RoomEQ/Band/Q, raw value); answered with the value applied"
+    params:
+      band: { type: int, min: 1, max: 6, required: true, label: "Band", description: "Room EQ band, 1 to 6 (E to J)." }
+      value: { type: int, min: 100, max: 63000, required: true, label: "Room EQ band Q", description: "Q in thousandths, 100 to 63000." }
+    send: [{ models: [vxl1-16p], message: "set VXL:RoomEQ/Band/Q 0 {band:-1} {value}" }, { models: [vxc2p], message: "set VXC:RoomEQ/Band/Q 0 {band:-1} {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):RoomEQ/Band/Q ' }
+    returns: ack
+
+  get_room_eq_band_q:
+    summary: "Read: room EQ band Q (VXL:RoomEQ/Band/Q, raw value)"
+    params:
+      band: { type: int, min: 1, max: 6, required: true, label: "Band", description: "Room EQ band, 1 to 6 (E to J)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Q 0 {band:-1}" }, { models: [vxc2p], message: "get VXC:RoomEQ/Band/Q 0 {band:-1}" }]
+    expect: { matches: '^OK get (?:VXL|VXC):RoomEQ/Band/Q [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_room_eq_band_type:
+    summary: "Set: room EQ band type (VXL:RoomEQ/Band/Type, raw value); answered with the value applied"
+    params:
+      band: { type: int, min: 1, max: 6, required: true, label: "Band", description: "Room EQ band, 1 to 6 (E to J)." }
+      type: { type: enum, values: [peq, low_shelf_6, low_shelf_12, high_shelf_6, high_shelf_12, hpf, lpf], required: true, label: "Type", description: "PEQ, low shelf 6 or 12 dB/octave, high shelf 6 or 12 dB/octave, high-pass or low-pass." }
+    send: [{ models: [vxl1-16p], message: "set VXL:RoomEQ/Band/Type 0 {band:-1} {type:map.eq_type}" }, { models: [vxc2p], message: "set VXC:RoomEQ/Band/Type 0 {band:-1} {type:map.eq_type}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):RoomEQ/Band/Type ' }
+    returns: ack
+
+  get_room_eq_band_type:
+    summary: "Read: room EQ band type (VXL:RoomEQ/Band/Type, raw value)"
+    params:
+      band: { type: int, min: 1, max: 6, required: true, label: "Band", description: "Room EQ band, 1 to 6 (E to J)." }
+    send: [{ models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Type 0 {band:-1}" }, { models: [vxc2p], message: "get VXC:RoomEQ/Band/Type 0 {band:-1}" }]
+    expect: { matches: '^OK get (?:VXL|VXC):RoomEQ/Band/Type [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_delay:
+    summary: "Set: delay on (AMP:Ch/Delay/On, raw value); answered with the value applied"
+    params:
+      enabled: { type: bool, required: true, label: "Delay on", description: "On turns it on, off turns it off (delay on)." }
+    send: "set AMP:Ch/Delay/On 0 0 {enabled:bool01}"
+    expect: { matches: '^OKm? set AMP:Ch/Delay/On ' }
+    returns: ack
+
+  get_delay:
+    summary: "Read: delay on (AMP:Ch/Delay/On, raw value)"
+    send: "get AMP:Ch/Delay/On 0 0"
+    expect: { matches: '^OK get AMP:Ch/Delay/On [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_delay_time:
+    summary: "Set: delay time (AMP:Ch/Delay/Time, raw value); answered with the value applied"
+    params:
+      value: { type: int, min: 0, max: 100000, required: true, label: "Delay time", description: "Delay in thousandths of a ms, 0 to 100000 (100 ms)." }
+    send: "set AMP:Ch/Delay/Time 0 0 {value}"
+    expect: { matches: '^OKm? set AMP:Ch/Delay/Time ' }
+    returns: ack
+
+  get_delay_time:
+    summary: "Read: delay time (AMP:Ch/Delay/Time, raw value)"
+    send: "get AMP:Ch/Delay/Time 0 0"
+    expect: { matches: '^OK get AMP:Ch/Delay/Time [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_oscillator:
+    summary: "Set: pink noise generator on (VXL:Oscillator/On, raw value); answered with the value applied"
+    params:
+      enabled: { type: bool, required: true, label: "Pink noise generator on", description: "On turns it on, off turns it off (pink noise generator on)." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Oscillator/On 0 0 {enabled:bool01}" }, { models: [vxc2p], message: "set VXC:Oscillator/On 0 0 {enabled:bool01}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Oscillator/On ' }
+    returns: ack
+
+  get_oscillator:
+    summary: "Read: pink noise generator on (VXL:Oscillator/On, raw value)"
+    send: [{ models: [vxl1-16p], message: "get VXL:Oscillator/On 0 0" }, { models: [vxc2p], message: "get VXC:Oscillator/On 0 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Oscillator/On [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_oscillator_level:
+    summary: "Set: pink noise generator level (VXL:Oscillator/Level, raw value); answered with the value applied"
+    params:
+      value: { type: int, min: -32768, max: 0, required: true, label: "Pink noise generator level", description: "Level in hundredths of a dB, -13800 (-138.00 dB) to 0, or -32768 for -inf; values between are taken from the device's steps." }
+    send: [{ models: [vxl1-16p], message: "set VXL:Oscillator/Level 0 0 {value}" }, { models: [vxc2p], message: "set VXC:Oscillator/Level 0 0 {value}" }]
+    expect: { matches: '^OKm? set (?:VXL|VXC):Oscillator/Level ' }
+    returns: ack
+
+  get_oscillator_level:
+    summary: "Read: pink noise generator level (VXL:Oscillator/Level, raw value)"
+    send: [{ models: [vxl1-16p], message: "get VXL:Oscillator/Level 0 0" }, { models: [vxc2p], message: "get VXC:Oscillator/Level 0 0" }]
+    expect: { matches: '^OK get (?:VXL|VXC):Oscillator/Level [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_mute:
+    summary: "Set: master volume muted (AMP:Ch/Mute, raw value); answered with the value applied"
+    params:
+      enabled: { type: bool, required: true, label: "Master volume muted", description: "On turns it on, off turns it off (master volume muted)." }
+    send: "set AMP:Ch/Mute 0 0 {enabled:bool01}"
+    expect: { matches: '^OKm? set AMP:Ch/Mute ' }
+    returns: ack
+
+  get_mute:
+    summary: "Read: master volume muted (AMP:Ch/Mute, raw value)"
+    send: "get AMP:Ch/Mute 0 0"
+    expect: { matches: '^OK get AMP:Ch/Mute [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  set_volume:
+    summary: "Set: master volume (AMP:Ch/Volume, raw value); answered with the value applied"
+    params:
+      value: { type: int, min: -32768, max: 0, required: true, label: "Master volume", description: "Level in hundredths of a dB, -13800 (-138.00 dB) to 0, or -32768 for -inf; values between are taken from the device's steps." }
+    send: "set AMP:Ch/Volume 0 0 {value}"
+    expect: { matches: '^OKm? set AMP:Ch/Volume ' }
+    returns: ack
+
+  get_volume:
+    summary: "Read: master volume (AMP:Ch/Volume, raw value)"
+    send: "get AMP:Ch/Volume 0 0"
+    expect: { matches: '^OK get AMP:Ch/Volume [0-9]+ [0-9]+ (-?[0-9]+)' }
+    returns: value
+
+  get_run_mode:
+    summary: "Read the run mode, normal or update (devstatus runmode, 2-1)"
+    send: "devstatus runmode"
+    expect: { matches: '^OK devstatus runmode "(\w+)"' }
+    returns: value
+
+  get_error_status:
+    summary: "Read the alert level: none, warning, error or fault (devstatus error, 2-2)"
+    send: "devstatus error"
+    expect: { matches: '^OK devstatus error "(\w+)"' }
+    returns: value
+
+  get_protocol_version:
+    summary: "Read the protocol version (devinfo protocolver, 3-1)"
+    send: "devinfo protocolver"
+    expect: { matches: '^OK devinfo protocolver "(.*)"' }
+    returns: value
+
+  get_parameter_set_version:
+    summary: "Read the parameter set versions (devinfo paramsetver, 3-2)"
+    send: "devinfo paramsetver"
+    expect: { matches: '^OK devinfo paramsetver "(.*)"' }
+    returns: value
+
+  get_firmware_version:
+    summary: "Read the firmware version (devinfo version, 3-3)"
+    send: "devinfo version"
+    expect: { matches: '^OK devinfo version "(.*)"' }
+    returns: value
+
+  get_product_name:
+    summary: "Read the product name (devinfo productname, 3-4)"
+    send: "devinfo productname"
+    expect: { matches: '^OK devinfo productname "(.*)"' }
+    returns: value
+
+  get_serial_number:
+    summary: "Read the serial number (devinfo serialno, 3-5)"
+    send: "devinfo serialno"
+    expect: { matches: '^OK devinfo serialno "(.*)"' }
+    returns: value
+
+  get_device_id:
+    summary: "Read the UNIT ID as three hex digits (devinfo deviceid, 3-6)"
+    send: "devinfo deviceid"
+    expect: { matches: '^OK devinfo deviceid "(.*)"' }
+    returns: value
+
+  get_manufacturer:
+    summary: "Read the manufacturer (devinfo manufacturer, 3-7)"
+    send: "devinfo manufacturer"
+    expect: { matches: '^OK devinfo manufacturer "(.*)"' }
+    returns: value
+
+  get_device_name:
+    summary: "Read the device name (devinfo devicename, 3-8)"
+    send: "devinfo devicename"
+    expect: { matches: '^OK devinfo devicename "(.*)"' }
+    returns: value
+
+  set_encoding:
+    summary: "Choose the character set of answers, ascii or utf8 (scpmode encoding, 2-3)"
+    params:
+      encoding: { type: enum, values: [ascii, utf8], required: true, label: "Encoding", description: "ascii or utf8." }
+    send: "scpmode encoding {encoding}"
+    expect: { matches: '^OK scpmode encoding ' }
+    returns: ack
+
+  set_keepalive:
+    summary: "Make the device drop this client after a silence of the interval plus 1 s (scpmode keepalive, 2-6)"
+    params:
+      interval_ms: { type: int, min: 1001, max: 3600000, required: true, label: "Interval", description: "Interval in ms, over 1000." }
+    send: "scpmode keepalive {interval_ms}"
+    expect: { matches: '^OK scpmode keepalive ' }
+    returns: ack
+
+  identify:
+    summary: "Identify the speaker for a number of seconds (event AMP:IdentifyDev, 3-9)"
+    params:
+      seconds: { type: int, min: 1, max: 255, required: true, label: "Duration", description: "Seconds, 1 to 255." }
+    send: "event AMP:IdentifyDev \"duration={seconds}\""
+    expect: { matches: '^OK event AMP:IdentifyDev ' }
+    returns: ack
+
+  stop_identify:
+    summary: "Stop identifying (event AMP:IdentifyDev \"off\", 3-9)"
+    send: "event AMP:IdentifyDev \"off\""
+    expect: { matches: '^OK event AMP:IdentifyDev ' }
+    returns: ack
+
+  get_ip_setting_source:
+    summary: "Read whether the address comes from the UNIT ID (0) or the PC setting (1), by DIP switch 6 (VXL:GetIpSetting, 3-10)"
+    send: [{ models: [vxl1-16p], message: "event VXL:GetIpSetting \"\"" }, { models: [vxc2p], message: "event VXC:GetIpSetting \"\"" }]
+    expect: { matches: '^OK event (?:VXL|VXC):GetIpSetting "(.*)"' }
+    returns: value
+
+  set_ip_mode:
+    summary: "Choose DHCP/Auto IP (0) or a static address (1) with DIP switch 6 on PC (VXL:SetIpSettingPcMode, 3-11)"
+    params:
+      mode: { type: enum, values: ["0", "1"], required: true, label: "Mode", description: "0 DHCP or Auto IP, 1 static." }
+    send: [{ models: [vxl1-16p], message: "event VXL:SetIpSettingPcMode \"{mode}\"" }, { models: [vxc2p], message: "event VXC:SetIpSettingPcMode \"{mode}\"" }]
+    expect: { matches: '^OK event (?:VXL|VXC):SetIpSettingPcMode "(.*)"' }
+    returns: value
+
+  get_ip_mode:
+    summary: "Read the PC-mode addressing, 0 DHCP/Auto IP or 1 static (VXL:GetIpSettingPcMode, 3-12)"
+    send: [{ models: [vxl1-16p], message: "event VXL:GetIpSettingPcMode \"\"" }, { models: [vxc2p], message: "event VXC:GetIpSettingPcMode \"\"" }]
+    expect: { matches: '^OK event (?:VXL|VXC):GetIpSettingPcMode "(.*)"' }
+    returns: value
+
+  set_next_boot_address:
+    summary: "Set the static address used from the next start (VXL:SetNextBootIpAddress, 3-13)"
+    params:
+      address: { type: string, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: "Address", description: "IPv4 address, dotted." }
+    send: [{ models: [vxl1-16p], message: "event VXL:SetNextBootIpAddress \"{address}\"" }, { models: [vxc2p], message: "event VXC:SetNextBootIpAddress \"{address}\"" }]
+    expect: { matches: '^OK event (?:VXL|VXC):SetNextBootIpAddress "(.*)"' }
+    returns: value
+
+  get_next_boot_address:
+    summary: "Read the static address used from the next start (VXL:GetNextBootIpAddress, 3-14)"
+    send: [{ models: [vxl1-16p], message: "event VXL:GetNextBootIpAddress \"\"" }, { models: [vxc2p], message: "event VXC:GetNextBootIpAddress \"\"" }]
+    expect: { matches: '^OK event (?:VXL|VXC):GetNextBootIpAddress "(.*)"' }
+    returns: value
+
+  set_next_boot_netmask:
+    summary: "Set the subnet mask used from the next start (VXL:SetNextBootSubnetAddress, 3-15)"
+    params:
+      address: { type: string, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: "Address", description: "IPv4 address, dotted." }
+    send: [{ models: [vxl1-16p], message: "event VXL:SetNextBootSubnetAddress \"{address}\"" }, { models: [vxc2p], message: "event VXC:SetNextBootSubnetAddress \"{address}\"" }]
+    expect: { matches: '^OK event (?:VXL|VXC):SetNextBootSubnetAddress "(.*)"' }
+    returns: value
+
+  get_next_boot_netmask:
+    summary: "Read the subnet mask used from the next start (VXL:GetNextBootSubnetAddress, 3-16)"
+    send: [{ models: [vxl1-16p], message: "event VXL:GetNextBootSubnetAddress \"\"" }, { models: [vxc2p], message: "event VXC:GetNextBootSubnetAddress \"\"" }]
+    expect: { matches: '^OK event (?:VXL|VXC):GetNextBootSubnetAddress "(.*)"' }
+    returns: value
+
+  set_next_boot_gateway:
+    summary: "Set the default gateway used from the next start (VXL:SetNextBootDefaultGateway, 3-17)"
+    params:
+      address: { type: string, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: "Address", description: "IPv4 address, dotted." }
+    send: [{ models: [vxl1-16p], message: "event VXL:SetNextBootDefaultGateway \"{address}\"" }, { models: [vxc2p], message: "event VXC:SetNextBootDefaultGateway \"{address}\"" }]
+    expect: { matches: '^OK event (?:VXL|VXC):SetNextBootDefaultGateway "(.*)"' }
+    returns: value
+
+  get_next_boot_gateway:
+    summary: "Read the default gateway used from the next start (VXL:GetNextBootDefaultGateway, 3-18)"
+    send: [{ models: [vxl1-16p], message: "event VXL:GetNextBootDefaultGateway \"\"" }, { models: [vxc2p], message: "event VXC:GetNextBootDefaultGateway \"\"" }]
+    expect: { matches: '^OK event (?:VXL|VXC):GetNextBootDefaultGateway "(.*)"' }
+    returns: value
+
+  get_gateway:
+    summary: "Read the default gateway in use (VXL:GetDefaultGateway, 3-19)"
+    send: [{ models: [vxl1-16p], message: "event VXL:GetDefaultGateway \"\"" }, { models: [vxc2p], message: "event VXC:GetDefaultGateway \"\"" }]
+    expect: { matches: '^OK event (?:VXL|VXC):GetDefaultGateway "(.*)"' }
+    returns: value
+
+  get_unit_id_mode:
+    summary: "Read where the UNIT ID comes from: 0 the DIP switches, 1 reserved (VXL:GetUnitIDMode, 3-20)"
+    send: [{ models: [vxl1-16p], message: "event VXL:GetUnitIDMode \"\"" }, { models: [vxc2p], message: "event VXC:GetUnitIDMode \"\"" }]
+    expect: { matches: '^OK event (?:VXL|VXC):GetUnitIDMode "(.*)"' }
+    returns: value
+
+  set_next_boot_unit_id:
+    summary: "Set the UNIT ID used from the next start, with DIP switches 1-4 on RESERVED (VXL:SetNextBootUnitID, 3-21)"
+    params:
+      unit_id: { type: int, min: 0, max: 127, required: true, label: "UNIT ID", description: "UNIT ID, 0 to 127." }
+    send: [{ models: [vxl1-16p], message: "event VXL:SetNextBootUnitID \"{unit_id:03x}\"" }, { models: [vxc2p], message: "event VXC:SetNextBootUnitID \"{unit_id:03x}\"" }]
+    expect: { matches: '^OK event (?:VXL|VXC):SetNextBootUnitID "(.*)"' }
+    returns: value
+
+  set_hostname_mode:
+    summary: "Choose the host name: 0 manual, 1 from the UNIT ID (VXL:SetHostnameMode, 3-22)"
+    params:
+      mode: { type: enum, values: ["0", "1"], required: true, label: "Mode", description: "0 manual, 1 from the UNIT ID." }
+    send: [{ models: [vxl1-16p], message: "event VXL:SetHostnameMode \"{mode}\"" }, { models: [vxc2p], message: "event VXC:SetHostnameMode \"{mode}\"" }]
+    expect: { matches: '^OK event (?:VXL|VXC):SetHostnameMode "(.*)"' }
+    returns: value
+
+  get_hostname_mode:
+    summary: "Read the host name mode (VXL:GetHostnameMode, 3-23)"
+    send: [{ models: [vxl1-16p], message: "event VXL:GetHostnameMode \"\"" }, { models: [vxc2p], message: "event VXC:GetHostnameMode \"\"" }]
+    expect: { matches: '^OK event (?:VXL|VXC):GetHostnameMode "(.*)"' }
+    returns: value
+
+  set_hostname:
+    summary: "Set the host name, with the host name mode manual (VXL:SetHostname, 3-24)"
+    params:
+      hostname: { type: string, max_length: 64, pattern: "^[A-Za-z0-9-]+$", required: true, label: "Host name", description: "Up to 64 characters, letters, digits and hyphens." }
+    send: [{ models: [vxl1-16p], message: "event VXL:SetHostname \"{hostname}\"" }, { models: [vxc2p], message: "event VXC:SetHostname \"{hostname}\"" }]
+    expect: { matches: '^OK event (?:VXL|VXC):SetHostname "(.*)"' }
+    returns: value
+
+  get_hostname:
+    summary: "Read the host name (VXL:GetHostname, 3-25)"
+    send: [{ models: [vxl1-16p], message: "event VXL:GetHostname \"\"" }, { models: [vxc2p], message: "event VXC:GetHostname \"\"" }]
+    expect: { matches: '^OK event (?:VXL|VXC):GetHostname "(.*)"' }
+    returns: value
+
+  start_meter:
+    summary: "Start a meter's notifications at an interval; they stop after 10 s unless started again (mtrstart, 2-11)"
+    params:
+      meter: { type: enum, values: [digital_in, compressor_out, compressor_gr, ducker_out, ducker_gr, output_voltage], required: true, label: "Meter", description: "digital_in (digital input level, both channels), compressor_out, compressor_gr, ducker_out, ducker_gr or output_voltage." }
+      interval_ms: { type: int, min: 1, max: 10000, required: true, label: "Interval", description: "Least time between notifications in ms." }
+    send: [{ models: [vxl1-16p], message: "mtrstart {meter:map.meter} {interval_ms}" }, { models: [vxc2p], message: "mtrstart {meter:map.meter_vxc} {interval_ms}" }]
+    expect: { matches: '^OK mtrstart ' }
+    returns: ack
+
+  stop_meter:
+    summary: "Stop a meter's notifications (mtrstop, 2-12)"
+    params:
+      meter: { type: enum, values: [digital_in, compressor_out, compressor_gr, ducker_out, ducker_gr, output_voltage], required: true, label: "Meter", description: "digital_in (digital input level, both channels), compressor_out, compressor_gr, ducker_out, ducker_gr or output_voltage." }
+    send: [{ models: [vxl1-16p], message: "mtrstop {meter:map.meter}" }, { models: [vxc2p], message: "mtrstop {meter:map.meter_vxc}" }]
+    expect: { matches: '^OK mtrstop ' }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Communication start: the controller must send devstatus runmode every
+      second or more until the answer is normal, and nothing else before
+      that (p.23). The core asks it as the liveness probe; a host should hold
+      its commands until device.run_mode is normal. The next-boot address,
+      UNIT ID and host name commands take effect at the next start and can
+      move the speaker off its network.
+  - models: [all]
+    severity: info
+    text: >
+      On connecting the core reads the device information and every parameter
+      once (the device asks for a full re-read after a recall); after that the
+      speaker pushes every change as NOTIFY set. Opened for commands only,
+      nothing is read. Meters (start_meter) stop after 10 s unless started
+      again; a consumer that wants them restarts them. Up to four controllers
+      connect at once; set_keepalive drops a silent one.
+  - models: [all]
+    severity: info
+    text: >
+      Values are raw (levels in hundredths of a dB with -32768 for -inf,
+      frequencies in thousandths of a Hz, Q in thousandths, EQ gains in tenths
+      of a dB), as the parameter list gives them; values between the device's
+      steps are adjusted and answered OKm. The compressor and ducker
+      thresholds are listed in dB without a scale, and a ratio of 201 is
+      assumed to be infinity:1 (the symbol is lost in the document).
+
+state:
+  inputs.*.gain: { type: int, description: "Input gain (VXL:Ch/InputGain/Sensitivity, raw value), keyed conference or music" }
+  inputs.*.enhancer: { type: bool, description: "Enhancer on (VXL:Ch/Enhancer/On), keyed conference or music" }
+  inputs.*.volume_on: { type: bool, description: "Input volume on (VXL:Ch/InputVolume/On), keyed conference or music" }
+  inputs.*.volume: { type: int, description: "Input volume (VXL:Ch/InputVolume/Level, raw value), keyed conference or music" }
+  inputs.*.eq_on: { type: bool, description: "Input PEQ on (VXL:Ch/PEQ/On), keyed conference or music" }
+  inputs.*.eq.*.bypass: { type: bool, description: "Input PEQ band bypassed (VXL:Ch/PEQ/Band/Bypass), keyed conference or music, then by band from 1" }
+  inputs.*.eq.*.frequency: { type: int, description: "Input PEQ band frequency (VXL:Ch/PEQ/Band/Frequency, raw value), keyed conference or music, then by band from 1" }
+  inputs.*.eq.*.gain: { type: int, description: "Input PEQ band gain (VXL:Ch/PEQ/Band/Gain, raw value), keyed conference or music, then by band from 1" }
+  inputs.*.eq.*.q: { type: int, description: "Input PEQ band Q (VXL:Ch/PEQ/Band/Q, raw value), keyed conference or music, then by band from 1" }
+  inputs.*.eq.*.type: { type: string, description: "Input PEQ band type (VXL:Ch/PEQ/Band/Type), keyed conference or music, then by band from 1" }
+  compressor.on: { type: bool, description: "Compressor (DRC) on (VXL:Compressor/On)" }
+  compressor.threshold: { type: int, description: "Compressor threshold (VXL:Compressor/Threshold, raw value)" }
+  compressor.ratio: { type: int, description: "Compressor ratio (VXL:Compressor/Ratio, raw value)" }
+  compressor.attack: { type: int, description: "Compressor attack (VXL:Compressor/Attack, raw value)" }
+  compressor.release: { type: int, description: "Compressor release (VXL:Compressor/Release, raw value)" }
+  compressor.hold: { type: int, description: "Compressor hold (VXL:Compressor/Hold, raw value)" }
+  compressor.gain: { type: int, description: "Compressor output gain (VXL:Compressor/Gain, raw value)" }
+  ducker.on: { type: bool, description: "Ducker on (VXL:Ducker/On)" }
+  ducker.threshold: { type: int, description: "Ducker threshold (VXL:Ducker/Threshold, raw value)" }
+  ducker.range: { type: int, description: "Ducker range (VXL:Ducker/Range, raw value)" }
+  ducker.attack: { type: int, description: "Ducker attack (VXL:Ducker/Attack, raw value)" }
+  ducker.release: { type: int, description: "Ducker release (VXL:Ducker/Release, raw value)" }
+  ducker.hold: { type: int, description: "Ducker hold (VXL:Ducker/Hold, raw value)" }
+  ducker.noise_gate: { type: bool, description: "Ducker noise gate on (VXL:Ducker/NoiseGateOn)" }
+  mixer.*.on: { type: bool, description: "Matrix mixer input on (VXL:Mix/Fader/On), keyed conference, music or oscillator" }
+  mixer.*.level: { type: int, description: "Matrix mixer input level (VXL:Mix/Fader/Level, raw value), keyed conference, music or oscillator" }
+  room_eq.on: { type: bool, description: "Room EQ on (VXL:RoomEQ/On)" }
+  room_eq.low_bands.*.bypass: { type: bool, description: "Room EQ low band (A-D) bypassed (VXL:RoomEQ/BandL/Bypass), then by band from 1" }
+  room_eq.low_bands.*.frequency: { type: int, description: "Room EQ low band frequency (VXL:RoomEQ/BandL/Frequency, raw value), then by band from 1" }
+  room_eq.low_bands.*.gain: { type: int, description: "Room EQ low band gain (VXL:RoomEQ/BandL/Gain, raw value), then by band from 1" }
+  room_eq.low_bands.*.q: { type: int, description: "Room EQ low band Q (VXL:RoomEQ/BandL/Q, raw value), then by band from 1" }
+  room_eq.low_bands.*.type: { type: string, description: "Room EQ low band type (VXL:RoomEQ/BandL/Type), then by band from 1" }
+  room_eq.bands.*.bypass: { type: bool, description: "Room EQ band (E-J) bypassed (VXL:RoomEQ/Band/Bypass), then by band from 1" }
+  room_eq.bands.*.frequency: { type: int, description: "Room EQ band frequency (VXL:RoomEQ/Band/Frequency, raw value), then by band from 1" }
+  room_eq.bands.*.gain: { type: int, description: "Room EQ band gain (VXL:RoomEQ/Band/Gain, raw value), then by band from 1" }
+  room_eq.bands.*.q: { type: int, description: "Room EQ band Q (VXL:RoomEQ/Band/Q, raw value), then by band from 1" }
+  room_eq.bands.*.type: { type: string, description: "Room EQ band type (VXL:RoomEQ/Band/Type), then by band from 1" }
+  output.delay_on: { type: bool, description: "Delay on (AMP:Ch/Delay/On)" }
+  output.delay_time: { type: int, description: "Delay time (AMP:Ch/Delay/Time, raw value)" }
+  oscillator.on: { type: bool, description: "Pink noise generator on (VXL:Oscillator/On)" }
+  oscillator.level: { type: int, description: "Pink noise generator level (VXL:Oscillator/Level, raw value)" }
+  output.mute: { type: bool, description: "Master volume muted (AMP:Ch/Mute)" }
+  output.volume: { type: int, description: "Master volume (AMP:Ch/Volume, raw value)" }
+  network.ip_setting_source: { type: string, description: "Address source: 0 the UNIT ID, 1 the PC setting (DIP switch 6)" }
+  network.ip_mode: { type: string, description: "PC-mode addressing: 0 DHCP or Auto IP, 1 static" }
+  network.next_boot_address: { type: string, description: "Static address from the next start" }
+  network.next_boot_netmask: { type: string, description: "Subnet mask from the next start" }
+  network.next_boot_gateway: { type: string, description: "Gateway from the next start" }
+  network.gateway: { type: string, description: "Default gateway in use" }
+  network.unit_id_mode: { type: string, description: "UNIT ID source: 0 DIP switches, 1 reserved" }
+  network.next_boot_unit_id: { type: string, description: "UNIT ID from the next start, three hex digits" }
+  network.hostname_mode: { type: string, description: "Host name: 0 manual, 1 from the UNIT ID" }
+  network.hostname: { type: string, description: "Host name" }
+  meters.*.*: { type: int, unit: dBFS, description: "Meter level, keyed by meter (digital_in, compressor_out, compressor_gr, ducker_out, ducker_gr, output_voltage) then channel from 1: wire hex minus 126 (126, 0x7E, is 0 dBFS; 127, 0x7F, over)" }
+  device.run_mode: { type: string, description: "Run mode, normal or update" }
+  device.error: { type: string, description: "Alert level: none, warning, error or fault" }
+  device.protocol_version: { type: string, description: "Protocol version" }
+  device.parameter_set_version: { type: string, description: "Parameter set versions" }
+  device.firmware: { type: string, description: "Firmware version" }
+  device.product: { type: string, description: "Product name" }
+  device.serial: { type: string, description: "Serial number" }
+  device.device_id: { type: string, description: "UNIT ID, three hex digits" }
+  device.manufacturer: { type: string, description: "Manufacturer" }
+  device.name: { type: string, description: "Device name" }
+  device.identifying: { type: string, description: "Identify status as the device words it (AMP:Identified), such as Normal state" }
+  alerts.last_number: { type: string, description: "Number of the last alert, hex" }
+  alerts.last_message: { type: string, description: "Message of the last alert" }
+  alerts.last_severity: { type: string, description: "Level of the last alert: warning, error or fault" }
+
+telemetry:
+  poll:
+    send:
+      - "devstatus runmode"
+      - "devstatus error"
+      - "devinfo protocolver"
+      - "devinfo paramsetver"
+      - "devinfo version"
+      - "devinfo productname"
+      - "devinfo serialno"
+      - "devinfo deviceid"
+      - "devinfo manufacturer"
+      - "devinfo devicename"
+      - { models: [vxl1-16p], message: "get VXL:Ch/InputGain/Sensitivity 0 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/InputGain/Sensitivity 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/InputGain/Sensitivity 1 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/InputGain/Sensitivity 1 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/Enhancer/On 0 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/Enhancer/On 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/Enhancer/On 1 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/Enhancer/On 1 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/InputVolume/On 0 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/InputVolume/On 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/InputVolume/On 1 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/InputVolume/On 1 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/InputVolume/Level 0 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/InputVolume/Level 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/InputVolume/Level 1 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/InputVolume/Level 1 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/On 0 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/On 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/On 1 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/On 1 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Bypass 0 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Bypass 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Bypass 0 1" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Bypass 0 1" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Bypass 0 2" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Bypass 0 2" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Bypass 1 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Bypass 1 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Bypass 1 1" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Bypass 1 1" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Bypass 1 2" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Bypass 1 2" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Frequency 0 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Frequency 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Frequency 0 1" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Frequency 0 1" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Frequency 0 2" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Frequency 0 2" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Frequency 1 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Frequency 1 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Frequency 1 1" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Frequency 1 1" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Frequency 1 2" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Frequency 1 2" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Gain 0 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Gain 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Gain 0 1" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Gain 0 1" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Gain 0 2" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Gain 0 2" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Gain 1 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Gain 1 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Gain 1 1" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Gain 1 1" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Gain 1 2" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Gain 1 2" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Q 0 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Q 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Q 0 1" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Q 0 1" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Q 0 2" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Q 0 2" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Q 1 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Q 1 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Q 1 1" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Q 1 1" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Q 1 2" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Q 1 2" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Type 0 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Type 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Type 0 1" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Type 0 1" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Type 0 2" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Type 0 2" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Type 1 0" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Type 1 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Type 1 1" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Type 1 1" }
+      - { models: [vxl1-16p], message: "get VXL:Ch/PEQ/Band/Type 1 2" }
+      - { models: [vxc2p], message: "get VXC:Ch/PEQ/Band/Type 1 2" }
+      - { models: [vxl1-16p], message: "get VXL:Compressor/On 0 0" }
+      - { models: [vxc2p], message: "get VXC:Compressor/On 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Compressor/Threshold 0 0" }
+      - { models: [vxc2p], message: "get VXC:Compressor/Threshold 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Compressor/Ratio 0 0" }
+      - { models: [vxc2p], message: "get VXC:Compressor/Ratio 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Compressor/Attack 0 0" }
+      - { models: [vxc2p], message: "get VXC:Compressor/Attack 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Compressor/Release 0 0" }
+      - { models: [vxc2p], message: "get VXC:Compressor/Release 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Compressor/Hold 0 0" }
+      - { models: [vxc2p], message: "get VXC:Compressor/Hold 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Compressor/Gain 0 0" }
+      - { models: [vxc2p], message: "get VXC:Compressor/Gain 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ducker/On 0 0" }
+      - { models: [vxc2p], message: "get VXC:Ducker/On 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ducker/Threshold 0 0" }
+      - { models: [vxc2p], message: "get VXC:Ducker/Threshold 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ducker/Range 0 0" }
+      - { models: [vxc2p], message: "get VXC:Ducker/Range 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ducker/Attack 0 0" }
+      - { models: [vxc2p], message: "get VXC:Ducker/Attack 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ducker/Release 0 0" }
+      - { models: [vxc2p], message: "get VXC:Ducker/Release 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ducker/Hold 0 0" }
+      - { models: [vxc2p], message: "get VXC:Ducker/Hold 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Ducker/NoiseGateOn 0 0" }
+      - { models: [vxc2p], message: "get VXC:Ducker/NoiseGateOn 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Mix/Fader/On 0 0" }
+      - { models: [vxc2p], message: "get VXC:Mix/Fader/On 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Mix/Fader/On 1 0" }
+      - { models: [vxc2p], message: "get VXC:Mix/Fader/On 1 0" }
+      - { models: [vxl1-16p], message: "get VXL:Mix/Fader/On 2 0" }
+      - { models: [vxc2p], message: "get VXC:Mix/Fader/On 2 0" }
+      - { models: [vxl1-16p], message: "get VXL:Mix/Fader/Level 0 0" }
+      - { models: [vxc2p], message: "get VXC:Mix/Fader/Level 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Mix/Fader/Level 1 0" }
+      - { models: [vxc2p], message: "get VXC:Mix/Fader/Level 1 0" }
+      - { models: [vxl1-16p], message: "get VXL:Mix/Fader/Level 2 0" }
+      - { models: [vxc2p], message: "get VXC:Mix/Fader/Level 2 0" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/On 0 0" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/On 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Bypass 0 0" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Bypass 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Bypass 0 1" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Bypass 0 1" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Bypass 0 2" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Bypass 0 2" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Bypass 0 3" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Bypass 0 3" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Frequency 0 0" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Frequency 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Frequency 0 1" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Frequency 0 1" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Frequency 0 2" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Frequency 0 2" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Frequency 0 3" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Frequency 0 3" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Gain 0 0" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Gain 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Gain 0 1" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Gain 0 1" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Gain 0 2" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Gain 0 2" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Gain 0 3" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Gain 0 3" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Q 0 0" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Q 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Q 0 1" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Q 0 1" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Q 0 2" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Q 0 2" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Q 0 3" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Q 0 3" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Type 0 0" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Type 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Type 0 1" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Type 0 1" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Type 0 2" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Type 0 2" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/BandL/Type 0 3" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/BandL/Type 0 3" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Bypass 0 0" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Bypass 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Bypass 0 1" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Bypass 0 1" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Bypass 0 2" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Bypass 0 2" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Bypass 0 3" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Bypass 0 3" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Bypass 0 4" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Bypass 0 4" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Bypass 0 5" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Bypass 0 5" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Frequency 0 0" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Frequency 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Frequency 0 1" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Frequency 0 1" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Frequency 0 2" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Frequency 0 2" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Frequency 0 3" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Frequency 0 3" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Frequency 0 4" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Frequency 0 4" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Frequency 0 5" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Frequency 0 5" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Gain 0 0" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Gain 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Gain 0 1" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Gain 0 1" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Gain 0 2" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Gain 0 2" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Gain 0 3" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Gain 0 3" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Gain 0 4" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Gain 0 4" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Gain 0 5" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Gain 0 5" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Q 0 0" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Q 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Q 0 1" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Q 0 1" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Q 0 2" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Q 0 2" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Q 0 3" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Q 0 3" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Q 0 4" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Q 0 4" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Q 0 5" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Q 0 5" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Type 0 0" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Type 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Type 0 1" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Type 0 1" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Type 0 2" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Type 0 2" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Type 0 3" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Type 0 3" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Type 0 4" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Type 0 4" }
+      - { models: [vxl1-16p], message: "get VXL:RoomEQ/Band/Type 0 5" }
+      - { models: [vxc2p], message: "get VXC:RoomEQ/Band/Type 0 5" }
+      - "get AMP:Ch/Delay/On 0 0"
+      - "get AMP:Ch/Delay/Time 0 0"
+      - { models: [vxl1-16p], message: "get VXL:Oscillator/On 0 0" }
+      - { models: [vxc2p], message: "get VXC:Oscillator/On 0 0" }
+      - { models: [vxl1-16p], message: "get VXL:Oscillator/Level 0 0" }
+      - { models: [vxc2p], message: "get VXC:Oscillator/Level 0 0" }
+      - "get AMP:Ch/Mute 0 0"
+      - "get AMP:Ch/Volume 0 0"
+      - { models: [vxl1-16p], message: "event VXL:GetIpSetting \"\"" }
+      - { models: [vxc2p], message: "event VXC:GetIpSetting \"\"" }
+      - { models: [vxl1-16p], message: "event VXL:GetIpSettingPcMode \"\"" }
+      - { models: [vxc2p], message: "event VXC:GetIpSettingPcMode \"\"" }
+      - { models: [vxl1-16p], message: "event VXL:GetNextBootIpAddress \"\"" }
+      - { models: [vxc2p], message: "event VXC:GetNextBootIpAddress \"\"" }
+      - { models: [vxl1-16p], message: "event VXL:GetNextBootSubnetAddress \"\"" }
+      - { models: [vxc2p], message: "event VXC:GetNextBootSubnetAddress \"\"" }
+      - { models: [vxl1-16p], message: "event VXL:GetNextBootDefaultGateway \"\"" }
+      - { models: [vxc2p], message: "event VXC:GetNextBootDefaultGateway \"\"" }
+      - { models: [vxl1-16p], message: "event VXL:GetDefaultGateway \"\"" }
+      - { models: [vxc2p], message: "event VXC:GetDefaultGateway \"\"" }
+      - { models: [vxl1-16p], message: "event VXL:GetUnitIDMode \"\"" }
+      - { models: [vxc2p], message: "event VXC:GetUnitIDMode \"\"" }
+      - { models: [vxl1-16p], message: "event VXL:GetHostnameMode \"\"" }
+      - { models: [vxc2p], message: "event VXC:GetHostnameMode \"\"" }
+      - { models: [vxl1-16p], message: "event VXL:GetHostname \"\"" }
+      - { models: [vxc2p], message: "event VXC:GetHostname \"\"" }
+  updates:
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/InputGain/Sensitivity 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.conference.gain": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/InputGain/Sensitivity 1 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.music.gain": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/Enhancer/On 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.conference.enhancer": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/Enhancer/On 1 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.music.enhancer": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/InputVolume/On 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.conference.volume_on": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/InputVolume/On 1 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.music.volume_on": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/InputVolume/Level 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.conference.volume": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/InputVolume/Level 1 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.music.volume": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/PEQ/On 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.conference.eq_on": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/PEQ/On 1 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.music.eq_on": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/PEQ/Band/Bypass 0 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.conference.eq.{1:+1}.bypass": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/PEQ/Band/Bypass 1 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.music.eq.{1:+1}.bypass": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/PEQ/Band/Frequency 0 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.conference.eq.{1:+1}.frequency": "{2}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/PEQ/Band/Frequency 1 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.music.eq.{1:+1}.frequency": "{2}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/PEQ/Band/Gain 0 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.conference.eq.{1:+1}.gain": "{2}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/PEQ/Band/Gain 1 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.music.eq.{1:+1}.gain": "{2}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/PEQ/Band/Q 0 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.conference.eq.{1:+1}.q": "{2}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/PEQ/Band/Q 1 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.music.eq.{1:+1}.q": "{2}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/PEQ/Band/Type 0 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.conference.eq.{1:+1}.type": { value: "{2}", map: { "0": "peq", "1": "low_shelf_6", "2": "low_shelf_12", "3": "high_shelf_6", "4": "high_shelf_12", "5": "hpf", "6": "lpf" } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ch/PEQ/Band/Type 1 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "inputs.music.eq.{1:+1}.type": { value: "{2}", map: { "0": "peq", "1": "low_shelf_6", "2": "low_shelf_12", "3": "high_shelf_6", "4": "high_shelf_12", "5": "hpf", "6": "lpf" } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Compressor/On 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "compressor.on": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Compressor/Threshold 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "compressor.threshold": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Compressor/Ratio 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "compressor.ratio": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Compressor/Attack 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "compressor.attack": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Compressor/Release 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "compressor.release": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Compressor/Hold 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "compressor.hold": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Compressor/Gain 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "compressor.gain": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ducker/On 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "ducker.on": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ducker/Threshold 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "ducker.threshold": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ducker/Range 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "ducker.range": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ducker/Attack 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "ducker.attack": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ducker/Release 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "ducker.release": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ducker/Hold 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "ducker.hold": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Ducker/NoiseGateOn 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "ducker.noise_gate": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Mix/Fader/On 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "mixer.conference.on": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Mix/Fader/On 1 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "mixer.music.on": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Mix/Fader/On 2 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "mixer.oscillator.on": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Mix/Fader/Level 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "mixer.conference.level": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Mix/Fader/Level 1 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "mixer.music.level": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Mix/Fader/Level 2 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "mixer.oscillator.level": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):RoomEQ/On 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "room_eq.on": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):RoomEQ/BandL/Bypass 0 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "room_eq.low_bands.{1:+1}.bypass": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):RoomEQ/BandL/Frequency 0 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "room_eq.low_bands.{1:+1}.frequency": "{2}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):RoomEQ/BandL/Gain 0 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "room_eq.low_bands.{1:+1}.gain": "{2}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):RoomEQ/BandL/Q 0 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "room_eq.low_bands.{1:+1}.q": "{2}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):RoomEQ/BandL/Type 0 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "room_eq.low_bands.{1:+1}.type": { value: "{2}", map: { "0": "peq", "1": "low_shelf_6", "2": "low_shelf_12", "3": "high_shelf_6", "4": "high_shelf_12", "5": "hpf", "6": "lpf" } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):RoomEQ/Band/Bypass 0 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "room_eq.bands.{1:+1}.bypass": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):RoomEQ/Band/Frequency 0 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "room_eq.bands.{1:+1}.frequency": "{2}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):RoomEQ/Band/Gain 0 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "room_eq.bands.{1:+1}.gain": "{2}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):RoomEQ/Band/Q 0 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "room_eq.bands.{1:+1}.q": "{2}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):RoomEQ/Band/Type 0 ([0-9]+) (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "room_eq.bands.{1:+1}.type": { value: "{2}", map: { "0": "peq", "1": "low_shelf_6", "2": "low_shelf_12", "3": "high_shelf_6", "4": "high_shelf_12", "5": "hpf", "6": "lpf" } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) AMP:Ch/Delay/On 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "output.delay_on": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) AMP:Ch/Delay/Time 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "output.delay_time": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Oscillator/On 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "oscillator.on": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) (?:VXL|VXC):Oscillator/Level 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "oscillator.level": "{1}" }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) AMP:Ch/Mute 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "output.mute": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) AMP:Ch/Volume 0 0 (-?[0-9]+)(?: "(?:[^"\\]|\\.)*")?$'
+      state: { "output.volume": "{1}" }
+    - match: '^(?:OK|NOTIFY) event (?:VXL|VXC):(?:GetIpSetting) "(.*)"$'
+      state: { "network.ip_setting_source": "{1}" }
+    - match: '^(?:OK|NOTIFY) event (?:VXL|VXC):(?:SetIpSettingPcMode|GetIpSettingPcMode) "(.*)"$'
+      state: { "network.ip_mode": "{1}" }
+    - match: '^(?:OK|NOTIFY) event (?:VXL|VXC):(?:SetNextBootIpAddress|GetNextBootIpAddress) "(.*)"$'
+      state: { "network.next_boot_address": "{1}" }
+    - match: '^(?:OK|NOTIFY) event (?:VXL|VXC):(?:SetNextBootSubnetAddress|GetNextBootSubnetAddress) "(.*)"$'
+      state: { "network.next_boot_netmask": "{1}" }
+    - match: '^(?:OK|NOTIFY) event (?:VXL|VXC):(?:SetNextBootDefaultGateway|GetNextBootDefaultGateway) "(.*)"$'
+      state: { "network.next_boot_gateway": "{1}" }
+    - match: '^(?:OK|NOTIFY) event (?:VXL|VXC):(?:GetDefaultGateway|SetDefaultGateway) "(.*)"$'
+      state: { "network.gateway": "{1}" }
+    - match: '^(?:OK|NOTIFY) event (?:VXL|VXC):(?:GetUnitIDMode) "(.*)"$'
+      state: { "network.unit_id_mode": "{1}" }
+    - match: '^(?:OK|NOTIFY) event (?:VXL|VXC):(?:SetNextBootUnitID) "(.*)"$'
+      state: { "network.next_boot_unit_id": "{1}" }
+    - match: '^(?:OK|NOTIFY) event (?:VXL|VXC):(?:SetHostnameMode|GetHostnameMode) "(.*)"$'
+      state: { "network.hostname_mode": "{1}" }
+    - match: '^(?:OK|NOTIFY) event (?:VXL|VXC):(?:SetHostname|GetHostname) "(.*)"$'
+      state: { "network.hostname": "{1}" }
+    - match: '^NOTIFY mtr AMP:DigitalIn/Level((?: (?:level|gr))?((?: [0-9A-Fa-f]{2})+))$'
+      match_each: '([0-9A-Fa-f]{2})'
+      match_each_in: 2
+      state: { "meters.digital_in.{index:+1}": "{3:hex:-126}" }
+    - match: '^NOTIFY mtr (?:VXL|VXC):Compressor/OutputLevel((?: (?:level|gr))?((?: [0-9A-Fa-f]{2})+))$'
+      match_each: '([0-9A-Fa-f]{2})'
+      match_each_in: 2
+      state: { "meters.compressor_out.{index:+1}": "{3:hex:-126}" }
+    - match: '^NOTIFY mtr (?:VXL|VXC):Compressor/GR((?: (?:level|gr))?((?: [0-9A-Fa-f]{2})+))$'
+      match_each: '([0-9A-Fa-f]{2})'
+      match_each_in: 2
+      state: { "meters.compressor_gr.{index:+1}": "{3:hex:-126}" }
+    - match: '^NOTIFY mtr (?:VXL|VXC):Ducker/OutputLevel((?: (?:level|gr))?((?: [0-9A-Fa-f]{2})+))$'
+      match_each: '([0-9A-Fa-f]{2})'
+      match_each_in: 2
+      state: { "meters.ducker_out.{index:+1}": "{3:hex:-126}" }
+    - match: '^NOTIFY mtr (?:VXL|VXC):Ducker/GR((?: (?:level|gr))?((?: [0-9A-Fa-f]{2})+))$'
+      match_each: '([0-9A-Fa-f]{2})'
+      match_each_in: 2
+      state: { "meters.ducker_gr.{index:+1}": "{3:hex:-126}" }
+    - match: '^NOTIFY mtr AMP:Ch/OutputVoltage((?: (?:level|gr))?((?: [0-9A-Fa-f]{2})+))$'
+      match_each: '([0-9A-Fa-f]{2})'
+      match_each_in: 2
+      state: { "meters.output_voltage.{index:+1}": "{3:hex:-126}" }
+    - match: '^(?:OK|NOTIFY) devstatus runmode "(\w+)"$'
+      state: { "device.run_mode": "{1}" }
+    - match: '^(?:OK|NOTIFY) devstatus error "(\w+)"$'
+      state: { "device.error": "{1}" }
+    - match: '^OK devinfo protocolver "(.*)"$'
+      state: { "device.protocol_version": "{1}" }
+    - match: '^OK devinfo paramsetver "(.*)"$'
+      state: { "device.parameter_set_version": "{1}" }
+    - match: '^OK devinfo version "(.*)"$'
+      state: { "device.firmware": "{1}" }
+    - match: '^OK devinfo productname "(.*)"$'
+      state: { "device.product": "{1}" }
+    - match: '^OK devinfo serialno "(.*)"$'
+      state: { "device.serial": "{1}" }
+    - match: '^OK devinfo deviceid "(.*)"$'
+      state: { "device.device_id": "{1}" }
+    - match: '^OK devinfo manufacturer "(.*)"$'
+      state: { "device.manufacturer": "{1}" }
+    - match: '^OK devinfo devicename "(.*)"$'
+      state: { "device.name": "{1}" }
+    - match: '^NOTIFY set AMP:Identified 0 0 -?[0-9]+ "(.*)"$'
+      state: { "device.identifying": "{1}" }
+    - match: '^NOTIFY event AMP:Alert "([0-9A-Fa-f]+):(.*),(warning|error|fault)"$'
+      state: { 'alerts.last_number': '{1}', 'alerts.last_message': '{2}', 'alerts.last_severity': '{3}' }
