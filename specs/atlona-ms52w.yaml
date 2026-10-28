@@ -1,0 +1,650 @@
+spec: 1
+id: atlona-ms52w
+name: Atlona AT-OME-MS52W matrix switcher (Telnet JSON API)
+vendor: Atlona
+category: router
+
+# The AT-OME-MS52W's Telnet API (TCP 23, and the same commands on its RS-232
+# port at 9600 8N1): Command:Words with space-separated arguments, not case
+# sensitive, each ended by a carriage return, at least 500 ms apart; answered
+# by a JSON object holding "result" and "methodreturn" (the command echoed),
+# or for a few commands a line of text. OutputMode j is sent on connecting so
+# every JSON answer is one line. With Broadcast on (the default) the unit sends
+# its state changes as JSON events; they and the answers keep state current,
+# and the rest is polled.
+source:
+  - title: "AT-OME-MS52W Application Programming Interface, version 5 (May 2023), firmware 2.9.6, 40139-R5"
+    author: Atlona Inc.
+    url: https://atlona.com/pdf/AT-OME-MS52W_API.pdf
+    note: >
+      Manufacturer document, read from the Internet Archive's copy of Atlona's URL
+      (web.archive.org/web/20250317052913) since Atlona's PDF host refuses non-browser clients. RS-232 at
+      9600 N 8 1 (p.3); commands not case sensitive, CR after each command and CR LF after each answer, 500 ms
+      between commands, "Unknown command" for a wrong one (p.4); the command list (p.4-5) and each command's
+      syntax, ranges and example answer (p.6-41), among them OutputMode h, j and p (p.31) and SetBroadcast
+      (state changes sent over RS-232, Telnet and TCP 9000 when on, on by default, p.36).
+
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: cr
+  encoding: utf-8
+  timeout_ms: 3000
+  reply: expected
+  # Answers hold methodreturn, or are a line of text; broadcast events are
+  # JSON without one.
+  reply_match: 'methodreturn|^[A-Za-z\[]'
+  probe: "Misc:Model:Get"
+  pacing: { min_interval_ms: 500 }
+  serial:
+    baud_rate: 9600
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
+
+on_connect:
+  - send: "OutputMode j"
+    await_reply: true
+
+ports:
+  - { port: 23, protocol: tcp, role: control, when: "link tcp", note: "the Telnet API" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232, 3-pin captive screw" }
+
+maps:
+  hdcp: { "true": "1", "false": "0" }
+  relay: { "true": "1", "false": "0" }
+  power: { "true": "1", "false": "0" }
+  broadcast: { "true": "1", "false": "0" }
+  moderator: { "true": "1", "false": "0" }
+  matrix_mode: { "off": "0", matrix: "1", static: "2" }
+  output: { hdbaset: "0", hdmi: "1" }
+  input: { usb_c: "0", displayport: "1", hdmi_3: "2", hdmi_4: "3", byod: "4" }
+  usb_host: { host1: "1", host2: "2", remote: "3" }
+  usb_port: { host1: "1", host2: "2", remote: "3", usb_c: "4" }
+  usb_mode: { manual: MANUAL, autoswitch: AUTOSWITCH, follow: FOLLOW }
+  parity: { none: "0", odd: "1", even: "2" }
+  reset_network: { "true": " network", "false": "" }
+
+models:
+  - id: at-ome-ms52w
+    name: Atlona AT-OME-MS52W
+    supports: [get_bass, set_bass, get_treble, set_treble, get_audio_source, set_audio_source, get_mute, set_mute,
+      get_volume, set_volume, volume_up, volume_down, volume_step_up, volume_step_down, refresh_calendar, cec_power,
+      kick_byod, get_display_control, set_display_control, get_inputs, get_input, set_input, get_hdcp, set_hdcp,
+      get_input_state, get_route, set_route, get_matrix_mode, set_matrix_mode, get_display_power, set_display_power,
+      get_broadcast, set_broadcast, get_hostname, get_no_signal_timeout, get_temperature, get_model, get_versions,
+      get_moderator, set_moderator, get_moderator_status, moderator_kick, moderator_show, get_network, factory_reset,
+      restart, shutdown, get_relay_pulse, set_relay_pulse, get_relay, set_relay, usb_follow_input, get_usb_input,
+      set_usb_input, get_usb_mode, set_usb_mode, get_zone, set_zone, send_zone_command]
+    verification: none
+
+commands:
+  # ── Audio ────────────────────────────────────────────────────────────────
+  get_bass:
+    summary: Read the bass setting in dB (Audio:GetBass)
+    send: "Audio:GetBass"
+    expect: { matches: '"value":\s*(-?\d+)' }
+    returns: value
+  set_bass:
+    summary: Set the bass (Audio:SetBass)
+    params:
+      db: { type: int, min: -12, max: 15, required: true, label: Bass, description: "Bass in dB, -12 to 15." }
+    send: "Audio:SetBass {db}"
+    expect: { matches: '"success":\s*true' }
+    returns: ack
+  get_treble:
+    summary: Read the treble setting in dB (Audio:GetTreble)
+    send: "Audio:GetTreble"
+    expect: { matches: '"value":\s*(-?\d+)' }
+    returns: value
+  set_treble:
+    summary: Set the treble (Audio:SetTreble)
+    params:
+      db: { type: int, min: -12, max: 15, required: true, label: Treble, description: "Treble in dB, -12 to 15." }
+    send: "Audio:SetTreble {db}"
+    expect: { matches: '"success":\s*true' }
+    returns: ack
+  get_audio_source:
+    summary: Read the audio source, digital or analog (Audio:GetSource)
+    send: "Audio:GetSource"
+    expect: { matches: '"audiosource":\s*"(\w+)"' }
+    returns: value
+  set_audio_source:
+    summary: Set the audio source (Audio:SetSource)
+    params:
+      source: { type: enum, values: [digital, analog], required: true, label: Audio source, description: "The source's embedded digital audio, or the analog audio input." }
+    send: "Audio:SetSource {source}"
+    expect: { matches: '"success":\s*true' }
+    returns: ack
+  get_mute:
+    summary: Read the HDMI and analog output mutes (Audio:Mute:Get)
+    send: "Audio:Mute:Get"
+    expect: { matches: '"outputmute":\s*(\{[^}]*\})' }
+    returns: value
+  set_mute:
+    summary: Mute or unmute the HDMI or analog audio output (Audio:Mute:Set)
+    params:
+      output: { type: enum, values: [hdmi, analog], required: true, label: Output, description: "The HDMI output's audio or the analog audio output." }
+      muted: { type: bool, required: true, label: Muted, description: "True mutes the output." }
+    send: "Audio:Mute:Set {output} {muted}"
+    expect: { matches: '"success":\s*true' }
+    returns: ack
+  get_volume:
+    summary: Read the output volume in dB (Audio:Volume:Get)
+    send: "Audio:Volume:Get"
+    expect: { matches: '"value":\s*(-?\d+)' }
+    returns: value
+  set_volume:
+    summary: Set the output volume (Audio:Volume:Set)
+    params:
+      db: { type: int, min: -80, max: 0, required: true, label: Volume, description: "Output level in dB, -80 to 0." }
+    send: "Audio:Volume:Set {db}"
+    expect: { matches: '"success":\s*true' }
+    returns: ack
+  volume_up:
+    summary: Raise the output volume by a number of dB (Audio:Volume:Increase)
+    params:
+      db: &step_db { type: int, min: 1, max: 80, required: true, label: Step, description: "How many dB, 1 to 80." }
+    send: "Audio:Volume:Increase {db}"
+    expect: { matches: '"success":\s*true' }
+    returns: ack
+  volume_down:
+    summary: Lower the output volume by a number of dB (Audio:Volume:Decrease)
+    params: { db: *step_db }
+    send: "Audio:Volume:Decrease {db}"
+    expect: { matches: '"success":\s*true' }
+    returns: ack
+  volume_step_up:
+    summary: Raise the output volume by 1 dB (SetVol +)
+    send: "SetVol +"
+    expect: { matches: '"volume":\s*(-?\d+)' }
+    returns: value
+  volume_step_down:
+    summary: Lower the output volume by 1 dB (SetVol -)
+    send: "SetVol -"
+    expect: { matches: '"volume":\s*(-?\d+)' }
+    returns: value
+
+  # ── Video, display and inputs ────────────────────────────────────────────
+  refresh_calendar:
+    summary: Refresh the calendar (Calendar:Refresh)
+    send: "Calendar:Refresh"
+    expect: { matches: "methodreturn" }
+    returns: ack
+  cec_power:
+    summary: Turn the display on or off over CEC (CEC:Trig)
+    params:
+      output: &output { type: enum, values: [hdbaset, hdmi], required: true, label: Output, description: "The HDBaseT or the HDMI output." }
+      "on": { type: bool, required: true, label: Power on, description: "True sends power on, false power off." }
+    send: "CEC:Trig {output:map.output} {on:map.power}"
+    expect: { matches: '"success":\s*true' }
+    returns: ack
+  kick_byod:
+    summary: Disconnect the BYOD clients (Display:BYOD:Kick)
+    send: "Display:BYOD:Kick"
+    expect: { matches: '"success":\s*true' }
+    returns: ack
+  get_display_control:
+    summary: Read the IP address and port of the display the unit controls (Display:Control:IP:Get)
+    send: "Display:Control:IP:Get"
+    expect: { matches: '"ip":\s*"([^"]*)"' }
+    returns: value
+  set_display_control:
+    summary: Set the IP address and port of the display the unit controls (Display:Control:IP:Set)
+    params:
+      ip: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: IP address, description: "The display's IP address, dot-decimal." }
+      port: { type: int, min: 0, max: 65535, required: true, label: Port, description: "The display's control port." }
+    send: "Display:Control:IP:Set {ip} {port}"
+    expect: { matches: '"success":\s*true' }
+    returns: ack
+  get_inputs:
+    summary: Read every input's status (Display:Input:All:Get)
+    send: "Display:Input:All:Get"
+    expect: { matches: '"result":\s*(\{.*\})\s*,\s*"methodreturn"' }
+    returns: value
+  get_input:
+    summary: Read the active input (Display:Input:Get)
+    send: "Display:Input:Get"
+    expect: { matches: '"input":\s*"?(\w+)"?' }
+    returns: value
+  set_input:
+    summary: Select the active input (Display:Input:Set)
+    params:
+      input: &input { type: enum, values: [usb_c, displayport, hdmi_3, hdmi_4, byod], required: true, label: Input, description: "USB-C (port 1), DisplayPort (port 2), HDMI (port 3), HDMI (port 4) or BYOD wireless." }
+    send:
+      - "Display:Input:Set {input:map.input}"
+      - "Display:Input:Get"
+    expect: { matches: "methodreturn" }
+    returns: ack
+  get_hdcp:
+    summary: Read whether an input advertises HDCP (Display:Input:HDCP:State:Get)
+    params: { input: *input }
+    send: "Display:Input:HDCP:State:Get {input:map.input}"
+    expect: { matches: '"state":\s*(true|false)' }
+    returns: value
+  set_hdcp:
+    summary: Turn HDCP on or off for an input (Display:Input:HDCP:State:Set)
+    params:
+      input: *input
+      enabled: { type: bool, required: true, label: HDCP, description: "True advertises HDCP on the input." }
+    send:
+      - "Display:Input:HDCP:State:Set {input:map.input} {enabled:map.hdcp}"
+      - "Display:Input:HDCP:State:Get {input:map.input}"
+    expect: { matches: "methodreturn" }
+    returns: ack
+  get_input_state:
+    summary: Read whether an input has a valid source (Display:InputState:Get)
+    params: { input: *input }
+    send: "Display:InputState:Get {input:map.input}"
+    expect: { matches: '"state":\s*(true|false)' }
+    returns: value
+  get_route:
+    summary: Read the input on an output in Matrix Mode (Display:Matrix:Get)
+    params: { output: *output }
+    send: "Display:Matrix:Get {output:map.output}"
+    expect: { matches: '"input":\s*(\d+)' }
+    returns: value
+  set_route:
+    summary: Route an input to an output in Matrix Mode (Display:Matrix:Set)
+    params:
+      input: *input
+      output: *output
+    send:
+      - "Display:Matrix:Set {input:map.input} {output:map.output}"
+      - "Display:Matrix:Get {output:map.output}"
+    expect: { matches: "methodreturn" }
+    returns: ack
+  get_matrix_mode:
+    summary: Read the Matrix Mode (Display:Matrix:Mode:Get)
+    send: "Display:Matrix:Mode:Get"
+    expect: { matches: '"mode":\s*(true|false)' }
+    returns: value
+  set_matrix_mode:
+    summary: Turn Matrix Mode off, on, or on with a static route (Display:Matrix:Mode:Set)
+    params:
+      mode: { type: enum, values: ["off", matrix, static], required: true, label: Matrix Mode, description: "off disables Matrix Mode, matrix enables it, static enables it with a static route." }
+    send:
+      - "Display:Matrix:Mode:Set {mode:map.matrix_mode}"
+      - "Display:Matrix:Mode:Get"
+    expect: { matches: "methodreturn" }
+    returns: ack
+  get_display_power:
+    summary: Read whether the output display is on (Display:Minimal:Get)
+    send: "Display:Minimal:Get"
+    expect: { matches: "(?i)^(on|off|true|false)" }
+    returns: value
+  set_display_power:
+    summary: Turn the output display on or off (Display:Minimal:Set)
+    params:
+      "on": { type: bool, required: true, label: Display on, description: "True turns the display on." }
+    send:
+      - "Display:Minimal:Set {on:map.power}"
+      - "Display:Minimal:Get"
+    expect: { matches: "." }
+    returns: ack
+
+  # ── System ───────────────────────────────────────────────────────────────
+  get_broadcast:
+    summary: Read whether state changes are broadcast (GetBroadcast)
+    send: "GetBroadcast"
+    expect: { matches: "(?i)^(on|off)" }
+    returns: value
+  set_broadcast:
+    summary: Turn the broadcast of state changes on or off (SetBroadcast)
+    params:
+      enabled: { type: bool, required: true, label: Broadcast, description: "True sends every state change to the control ports." }
+    send: "SetBroadcast {enabled:map.broadcast}"
+    expect: { matches: "(?i)^broadcast (on|off)" }
+    returns: ack
+  get_hostname:
+    summary: Read the host name (GetHostName)
+    send: "GetHostName"
+    expect: { matches: '"hostname":\s*"([^"]*)"' }
+    returns: value
+  get_no_signal_timeout:
+    summary: Read the time without signal before the display is turned off (GetNoSignalTimeout)
+    send: "GetNoSignalTimeout"
+    expect: { matches: '"value":\s*(\d+)' }
+    returns: value
+  get_temperature:
+    summary: Read the internal temperature in degrees Celsius (Instruments:Temperature:Get)
+    send: "Instruments:Temperature:Get c"
+    expect: { matches: '"value":\s*(-?\d+(?:\.\d+)?)' }
+    returns: value
+  get_model:
+    summary: Read the model (Misc:Model:Get)
+    send: "Misc:Model:Get"
+    expect: { matches: '"model":\s*"([^"]*)"' }
+    returns: value
+  get_versions:
+    summary: Read the master and MCU firmware versions (Misc:Versions:Get)
+    send: "Misc:Versions:Get"
+    expect: { matches: '"versions":\s*(\{[^}]*\})' }
+    returns: value
+  get_network:
+    summary: Read the wired and wireless network interfaces (Net:GetInfo)
+    send: "Net:GetInfo"
+    expect: { matches: '"netinfo":\s*(\{.*\})\s*\}\s*,\s*"methodreturn"' }
+    returns: value
+  factory_reset:
+    summary: Reset to factory defaults, keeping or resetting the network settings (Platform:Reset)
+    params:
+      network: { type: bool, default: false, label: Reset network, description: "True also resets the network settings." }
+    send: "Platform:Reset all{network:map.reset_network}"
+    returns: none
+  restart:
+    summary: Reboot the unit (Platform:Restart)
+    send: "Platform:Restart"
+    returns: none
+  shutdown:
+    summary: Power the unit off before disconnecting its power (Platform:Shutdown)
+    send: "Platform:Shutdown"
+    returns: none
+
+  # ── Moderator mode (BYOD) ────────────────────────────────────────────────
+  get_moderator:
+    summary: Read whether Moderator mode is enabled (Moderator:Enable:Get)
+    send: "Moderator:Enable:Get"
+    expect: { matches: '"enable":\s*(true|false)' }
+    returns: value
+  set_moderator:
+    summary: Enable or disable Moderator mode (Moderator:Enable:Set)
+    params:
+      enabled: { type: bool, required: true, label: Moderator mode, description: "True enables Moderator mode." }
+    send: "Moderator:Enable:Set {enabled:map.moderator}"
+    expect: { matches: "methodreturn" }
+    returns: ack
+  get_moderator_status:
+    summary: Read Moderator mode's clients and the client shown (Moderator:Status:Get)
+    send: "Moderator:Status:Get"
+    expect: { matches: '"moderator":\s*(\{[^}]*\})' }
+    returns: value
+  moderator_kick:
+    summary: Remove a BYOD client (Moderator:Kick)
+    params:
+      client: &client { type: int, min: 0, max: 999999, required: true, label: Client, description: "The BYOD client's ID, as Moderator:Status:Get lists them." }
+    send: "Moderator:Kick {client}"
+    expect: { matches: "methodreturn" }
+    returns: ack
+  moderator_show:
+    summary: Show a BYOD client's cast (Moderator:Show)
+    params: { client: *client }
+    send: "Moderator:Show {client}"
+    expect: { matches: "methodreturn" }
+    returns: ack
+
+  # ── Relays, USB, RS-232 zones ────────────────────────────────────────────
+  get_relay_pulse:
+    summary: Read the relay pulse duration in seconds (Relay:PulseDuration:Get)
+    send: "Relay:PulseDuration:Get"
+    expect: { matches: '"duration":\s*(\d+)' }
+    returns: value
+  set_relay_pulse:
+    summary: Set the relay pulse duration (Relay:PulseDuration:Set)
+    params:
+      seconds: { type: int, min: 1, max: 60, required: true, label: Pulse, description: "Pulse duration in seconds, 1 to 60." }
+    send:
+      - "Relay:PulseDuration:Set {seconds}"
+      - "Relay:PulseDuration:Get"
+    expect: { matches: "methodreturn" }
+    returns: ack
+  get_relay:
+    summary: Read a relay's state (Relay:State:Get)
+    params:
+      relay: &relay { type: int, min: 0, max: 1, required: true, label: Relay, description: "The relay, 0 or 1." }
+    send: "Relay:State:Get {relay}"
+    expect: { matches: '"state":\s*(true|false)' }
+    returns: value
+  set_relay:
+    summary: Set a relay's state (Relay:State:Set)
+    params:
+      relay: *relay
+      closed: { type: bool, required: true, label: Closed, description: "True sets the relay's state to 1, false to 0." }
+    send:
+      - "Relay:State:Set {relay} {closed:map.relay}"
+      - "Relay:State:Get {relay}"
+    expect: { matches: "methodreturn" }
+    returns: ack
+  usb_follow_input:
+    summary: Tie a video input to a USB host for Follow USB mode (USBRouting:Follow:Input)
+    params:
+      input: { type: int, min: 1, max: 4, required: true, label: Video input, description: "The video input, 1 to 4." }
+      host: { type: enum, values: [host1, host2, remote], required: true, label: USB host, description: "USB host 1, USB host 2 or the remote host." }
+    send: "USBRouting:Follow:Input {input} {host:map.usb_host}"
+    expect: { matches: "methodreturn" }
+    returns: ack
+  get_usb_input:
+    summary: Read the USB host routed in Manual USB Routing mode (USBRouting:Input:Get)
+    send: "USBRouting:Input:Get"
+    expect: { matches: '"input":\s*(\d+)' }
+    returns: value
+  set_usb_input:
+    summary: Select the active USB host port (USBRouting:Input:Set)
+    params:
+      port: { type: enum, values: [host1, host2, remote, usb_c], required: true, label: USB host, description: "USB host 1, USB host 2, the remote host or USB-C." }
+    send:
+      - "USBRouting:Input:Set {port:map.usb_port}"
+      - "USBRouting:Input:Get"
+    expect: { matches: "methodreturn" }
+    returns: ack
+  get_usb_mode:
+    summary: Read the USB routing mode (USBRouting:Mode:Get)
+    send: "USBRouting:Mode:Get"
+    expect: { matches: '"mode":\s*"(\w+)"' }
+    returns: value
+  set_usb_mode:
+    summary: Set the USB routing mode (USBRouting:Mode:Set)
+    params:
+      mode: { type: enum, values: [manual, autoswitch, follow], required: true, label: USB routing, description: "Manual, automatic switching, or following the video input." }
+    send:
+      - "USBRouting:Mode:Set {mode:map.usb_mode}"
+      - "USBRouting:Mode:Get"
+    expect: { matches: "methodreturn" }
+    returns: ack
+  get_zone:
+    summary: Read an RS-232 zone's settings (Zone:PortParams)
+    params:
+      zone: &zone { type: int, min: 1, max: 2, required: true, label: Zone, description: "1 the RS-232 port, 2 the HDBaseT output's RS-232." }
+    send: "Zone:PortParams {zone}"
+    expect: { matches: '"params":\s*"([^"]*)"' }
+    returns: value
+  set_zone:
+    summary: Set an RS-232 zone's baud rate, data bits, parity and stop bits (Zone:PortSetup)
+    params:
+      zone: *zone
+      baud: { type: enum, values: ["9600", "19200", "38400", "57600", "115200"], required: true, label: Baud rate, description: "Baud rate, 9600 to 115200." }
+      data_bits: { type: int, min: 7, max: 8, default: 8, label: Data bits, description: "7 or 8 data bits." }
+      parity: { type: enum, values: [none, odd, even], default: none, label: Parity, description: "Parity, as the document numbers it 0, 1 and 2." }
+      stop_bits: { type: int, min: 0, max: 1, default: 1, label: Stop bit, description: "The stop bit value the document lists, 1 or 0." }
+    send:
+      - "Zone:PortSetup {zone} {baud} {data_bits} {parity:map.parity} {stop_bits}"
+      - "Zone:PortParams {zone}"
+    expect: { matches: "methodreturn" }
+    returns: ack
+  send_zone_command:
+    summary: Send a command out of an RS-232 zone (Zone:SendCmd)
+    params:
+      zone: *zone
+      command: { type: string, max_length: 256, required: true, label: Command, description: "The text to send to the device on the zone." }
+    send: "Zone:SendCmd {zone} {command}"
+    expect: { matches: "methodreturn" }
+    returns: ack
+
+state:
+  audio.bass_db:       { type: int, unit: dB, description: "Bass, -12 to 15" }
+  audio.treble_db:     { type: int, unit: dB, description: "Treble, -12 to 15" }
+  audio.source:        { type: string, description: "Audio source: digital or analog" }
+  audio.mute.hdmi:     { type: bool, description: "The HDMI output's audio is muted" }
+  audio.mute.analog:   { type: bool, description: "The analog audio output is muted" }
+  audio.volume_db:     { type: int, unit: dB, description: "Output volume, -80 to 0" }
+  display_control.ip:  { type: string, description: "IP address of the display the unit controls" }
+  display_control.port: { type: int, description: "Its control port" }
+  inputs.*.connected:  { type: bool, description: "The input has a valid source, keyed 0 (USB-C) to 4 (BYOD)" }
+  inputs.*.hdcp:       { type: bool, description: "The input advertises HDCP" }
+  inputs.*.type:       { type: string, description: "The BYOD input's protocol, such as airplay" }
+  active_input:        { type: string, description: "The active input: usb_c, displayport, hdmi_3, hdmi_4, byod, or unknown" }
+  active_input_type:   { type: string, description: "The active input's type, such as airplay for BYOD" }
+  outputs.*.input:     { type: string, description: "The input on an output in Matrix Mode, keyed hdbaset or hdmi" }
+  matrix_mode.enabled: { type: bool, description: "Matrix Mode is on" }
+  matrix_mode.subtype: { type: string, description: "The Matrix Mode, such as MATRIX_MODE_STATIC" }
+  display_power:       { type: bool, description: "The output display is on" }
+  broadcast:           { type: bool, description: "State changes are broadcast" }
+  hostname:            { type: string, description: "The unit's host name" }
+  no_signal_timeout_s: { type: int, unit: s, description: "Time without signal before the display is turned off" }
+  temperature_c:       { type: float, unit: "°C", description: "Internal temperature" }
+  model:               { type: string, description: "The model" }
+  versions.master:     { type: string, description: "Master firmware version" }
+  versions.mcu:        { type: string, description: "MCU firmware version" }
+  moderator.enabled:   { type: bool, description: "Moderator mode is on" }
+  moderator.active_index: { type: int, description: "The BYOD client shown, -1 for none" }
+  moderator.streams:   { type: string, description: "The BYOD clients' IDs, as the JSON array the unit sends" }
+  network.*.ip:        { type: string, description: "An interface's IP address, keyed eth0 or wlan0" }
+  network.*.netmask:   { type: string, description: "Its netmask" }
+  network.*.mac:       { type: string, description: "Its MAC address" }
+  network.*.mode:      { type: string, description: "Its mode (dynamic, static, access point)" }
+  network.wlan0.ssid:  { type: string, description: "The wireless access point's SSID" }
+  network.wlan0.channel: { type: int, description: "The wireless access point's channel" }
+  relay_pulse_s:       { type: int, unit: s, description: "Relay pulse duration" }
+  relays.*.closed:     { type: bool, description: "A relay's state is 1, keyed 0 or 1" }
+  usb.host:            { type: string, description: "The USB host routed in Manual USB Routing mode" }
+  usb.input:           { type: int, description: "The input tied to it" }
+  usb.mode:            { type: string, description: "USB routing mode: manual, autoswitch or follow" }
+  zones.*.params:      { type: string, description: "An RS-232 zone's settings as the unit gives them ([baud, data bits, parity, stop bits])" }
+
+telemetry:
+  poll:
+    - every_ms: 10000
+      send: ["Display:Input:Get", "Display:Input:All:Get", "Display:Matrix:Get 0", "Display:Matrix:Get 1",
+             "Audio:Volume:Get", "Audio:Mute:Get", "Display:Minimal:Get"]
+    - every_ms: 60000
+      send: ["Audio:GetBass", "Audio:GetTreble", "Audio:GetSource", "Display:Control:IP:Get", "Display:Matrix:Mode:Get",
+             "Display:Input:HDCP:State:Get 0", "Display:Input:HDCP:State:Get 1", "Display:Input:HDCP:State:Get 2",
+             "Display:Input:HDCP:State:Get 3", "Display:Input:HDCP:State:Get 4", "GetBroadcast", "GetHostName",
+             "GetNoSignalTimeout", "Instruments:Temperature:Get c", "Misc:Model:Get", "Misc:Versions:Get",
+             "Moderator:Status:Get", "Net:GetInfo", "Relay:PulseDuration:Get", "Relay:State:Get 0", "Relay:State:Get 1",
+             "USBRouting:Input:Get", "USBRouting:Mode:Get", "Zone:PortParams 1", "Zone:PortParams 2"]
+  updates:
+    - json_match: { "$.methodreturn": "(?i)^audio:\\s*getbass" }
+      json: { v: "$.result.bass.value" }
+      state: { audio.bass_db: "{v}" }
+    - json_match: { "$.methodreturn": "(?i)^audio:\\s*gettreble" }
+      json: { v: "$.result.treble.value" }
+      state: { audio.treble_db: "{v}" }
+    - json_match: { "$.methodreturn": "(?i)^audio:\\s*getsource" }
+      json: { v: "$.result.audiosource" }
+      state: { audio.source: "{v}" }
+    - json_match: { "$.methodreturn": "(?i)^audio:\\s*mute:\\s*get" }
+      json: { hdmi: "$.result.outputmute.hdmi", analog: "$.result.outputmute.analog" }
+      state: { audio.mute.hdmi: "{hdmi}", audio.mute.analog: "{analog}" }
+    - json_match: { "$.methodreturn": "(?i)^audio:\\s*volume:\\s*get" }
+      json: { v: "$.result.volume.value" }
+      state: { audio.volume_db: "{v}" }
+    # Increase, decrease and SetVol answer with the new level.
+    - json_match: { "$.methodreturn": "(?i)^(audio:\\s*volume:\\s*(increase|decrease)|setvol)" }
+      json: { v: "$.result.volume" }
+      state: { audio.volume_db: "{v}" }
+    - json_match: { "$.methodreturn": "(?i)^display:\\s*control:\\s*ip:\\s*get" }
+      json: { ip: "$.result.ip", port: "$.result.port" }
+      state: { display_control.ip: "{ip}", display_control.port: "{port}" }
+    - json_match: { "$.methodreturn": "(?i)^display:\\s*input:\\s*all:\\s*get" }
+      json_each: "$.result.*"
+      json: { status: "$.status", type: "$.type" }
+      state: { "inputs.{key}.connected": "{status}", "inputs.{key}.type": "{type}" }
+    - json_match: { "$.methodreturn": "(?i)^(display:\\s*)?input:\\s*get", "$.result.input": "^(\\d)$" }
+      json: { type: "$.result.type" }
+      state: { active_input: { value: "{2}", map: { "0": usb_c, "1": displayport, "2": hdmi_3, "3": hdmi_4, "4": byod } }, active_input_type: "{type}" }
+    - json_match: { "$.methodreturn": "(?i)^(display:\\s*)?input:\\s*get", "$.result.input": "^unknown$" }
+      json: {}
+      state: { active_input: "unknown", active_input_type: "" }
+    - json_match: { "$.methodreturn": "(?i)^display:\\s*input:\\s*hdcp:\\s*state:\\s*get\\s*(\\d)" }
+      json: { v: "$.result.state" }
+      state: { "inputs.{1}.hdcp": "{v}" }
+    - json_match: { "$.methodreturn": "(?i)^display:\\s*inputstate:\\s*get\\s*(\\d)" }
+      json: { v: "$.result.state" }
+      state: { "inputs.{1}.connected": "{v}" }
+    - json_match: { "$.methodreturn": "(?i)^display:\\s*matrix:\\s*get\\s*0", "$.result.input": "^(\\d)$" }
+      json: {}
+      state: { "outputs.hdbaset.input": { value: "{1}", map: { "0": usb_c, "1": displayport, "2": hdmi_3, "3": hdmi_4, "4": byod } } }
+    - json_match: { "$.methodreturn": "(?i)^display:\\s*matrix:\\s*get\\s*1", "$.result.input": "^(\\d)$" }
+      json: {}
+      state: { "outputs.hdmi.input": { value: "{1}", map: { "0": usb_c, "1": displayport, "2": hdmi_3, "3": hdmi_4, "4": byod } } }
+    - json_match: { "$.methodreturn": "(?i)^display:\\s*matrix:\\s*mode:\\s*get" }
+      json: { mode: "$.result.mode", subtype: "$.result.subtype" }
+      state: { matrix_mode.enabled: "{mode}", matrix_mode.subtype: "{subtype}" }
+    - match: "(?i)^(on|off|true|false)\\s*$"
+      request_match: '(?i)^Display:Minimal:Get$'
+      state: { display_power: { value: "{1:lower}", map: { "on": true, "off": false, "true": true, "false": false } } }
+    - match: "(?i)^(?:broadcast\\s+)?(on|off)\\s*$"
+      request_match: '(?i)^(GetBroadcast|SetBroadcast [01])$'
+      state: { broadcast: { value: "{1:lower}", map: { "on": true, "off": false } } }
+    - json_match: { "$.methodreturn": "(?i)^gethostname" }
+      json: { v: "$.result.hostname" }
+      state: { hostname: "{v}" }
+    - json_match: { "$.methodreturn": "(?i)^getnosignaltimeout" }
+      json: { v: "$.result.value" }
+      state: { no_signal_timeout_s: "{v}" }
+    - json_match: { "$.methodreturn": "(?i)^instruments:\\s*temperature:\\s*get(\\s*c)?\\s*$" }
+      json: { v: "$.result.value" }
+      state: { temperature_c: "{v}" }
+    - json_match: { "$.methodreturn": "(?i)^misc:\\s*model:\\s*get" }
+      json: { v: "$.result.model" }
+      state: { model: "{v}" }
+    - json_match: { "$.methodreturn": "(?i)^misc:\\s*versions:\\s*get" }
+      json: { master: "$.result.versions.master", mcu: "$.result.versions.mcu" }
+      state: { versions.master: "{master}", versions.mcu: "{mcu}" }
+    - json_match: { "$.methodreturn": "(?i)^moderator:\\s*enable:\\s*get" }
+      json: { v: "$.result.enable" }
+      state: { moderator.enabled: "{v}" }
+    # Moderator status, and the moderator event Moderator:Enable:Set and
+    # broadcast send.
+    - json_match: { "$.moderator.enabled": "^(true|false)$" }
+      json: { enabled: "$.moderator.enabled", index: "$.moderator.activeindex", streams: "$.moderator.streams" }
+      state: { moderator.enabled: "{enabled}", moderator.active_index: "{index}", moderator.streams: "{streams}" }
+    - json_match: { "$.event.moderator.enabled": "^(true|false)$" }
+      json: { enabled: "$.event.moderator.enabled", index: "$.event.moderator.activeindex", streams: "$.event.moderator.streams" }
+      state: { moderator.enabled: "{enabled}", moderator.active_index: "{index}", moderator.streams: "{streams}" }
+    - json_match: { "$.methodreturn": "(?i)^net:\\s*getinfo" }
+      json_each: "$.result.netinfo.*"
+      json: { ip: "$.ip", netmask: "$.netmask", mac: "$.mac", mode: "$.mode" }
+      state: { "network.{key}.ip": "{ip}", "network.{key}.netmask": "{netmask}", "network.{key}.mac": "{mac}", "network.{key}.mode": "{mode}" }
+    - json_match: { "$.methodreturn": "(?i)^net:\\s*getinfo" }
+      json: { ssid: "$.result.netinfo.wlan0.ap.ssid", channel: "$.result.netinfo.wlan0.ap.channel" }
+      state: { network.wlan0.ssid: "{ssid}", network.wlan0.channel: "{channel}" }
+    - json_match: { "$.methodreturn": "(?i)^relay:\\s*pulseduration:\\s*get" }
+      json: { v: "$.result.duration" }
+      state: { relay_pulse_s: "{v}" }
+    - json_match: { "$.methodreturn": "(?i)^relay:\\s*state:\\s*get\\s*([01])" }
+      json: { v: "$.result.state" }
+      state: { "relays.{1}.closed": "{v}" }
+    - json_match: { "$.methodreturn": "(?i)^usbrouting:\\s*input:\\s*get" }
+      json: { input: "$.result.input", host: "$.result.host" }
+      state: { usb.input: "{input}", usb.host: "{host}" }
+    - json_match: { "$.methodreturn": "(?i)^usbrouting:\\s*mode:\\s*get", "$.result.mode": "(?i)^(manual|autoswitch|follow)$" }
+      json: {}
+      state: { usb.mode: "{1:lower}" }
+    - json_match: { "$.methodreturn": "(?i)^zone:\\s*portparams\\s*([12])" }
+      json: { v: "$.result.params" }
+      state: { "zones.{1}.params": "{v}" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      factory_reset resets the unit at once, restart reboots it and shutdown powers it off; none of them is
+      answered.
+  - models: [all]
+    severity: info
+    text: >
+      OutputMode j is sent on connecting so every JSON answer arrives on one line; the document prints the
+      pretty form. Display:Minimal:Get, GetBroadcast, SetBroadcast and GetInputStates answer in plain text, and
+      the matches for them are inferred from the document's single examples. The 500 ms the document asks for
+      between commands is kept.
+  - models: [all]
+    severity: info
+    text: >
+      Inputs are numbered 0 (USB-C, port 1), 1 (DisplayPort, port 2), 2 and 3 (HDMI, ports 3 and 4) and 4 (BYOD)
+      and outputs 0 (HDBaseT) and 1 (HDMI), as the document numbers them. Matrix routing needs Matrix Mode on
+      (otherwise "Command Failure"). The document gives the parity values 0, 1 and 2 without naming them; none,
+      odd and even is inferred. Relay states are the document's 0 and 1, without saying which is closed.

@@ -276,6 +276,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether TCP 9000 on Omega switchers needs a login and answers like Telnet. ([specs/atlona-matrix.yaml:85](specs/atlona-matrix.yaml#L85))
 - [ ] Confirm All# is answered All# on PRO3 matrices and with the new routes on the H2H and PS62. ([specs/atlona-matrix.yaml:407](specs/atlona-matrix.yaml#L407))
 
+## atlona-ms52w — Atlona AT-OME-MS52W matrix switcher (Telnet JSON API)
+
+- [ ] Confirm the Telnet port (23) takes the commands with no login prompt, and that OutputMode j makes every JSON answer one line. ([specs/atlona-ms52w.yaml:48](specs/atlona-ms52w.yaml#L48))
+- [ ] Record the plain-text answers of Display:Minimal:Get, GetBroadcast and SetBroadcast, and whether Platform:Restart, Reset and Shutdown answer at all. ([specs/atlona-ms52w.yaml:641](specs/atlona-ms52w.yaml#L641))
+- [ ] Record what the unit broadcasts on a change (routing, input, volume) besides the moderator event, so rules can follow it. ([specs/atlona-ms52w.yaml:605](specs/atlona-ms52w.yaml#L605))
+- [ ] Confirm the parity numbering (0 none, 1 odd, 2 even) and which relay state is closed. ([specs/atlona-ms52w.yaml:649](specs/atlona-ms52w.yaml#L649))
+
 ## avolites-titan — Avolites Titan
 
 - [ ] Check the status code and body Titan returns for an invalid request (unknown handle, bad parameter), since any 200 counts as success here. ([specs/avolites-titan.yaml:1779](specs/avolites-titan.yaml#L1779))
