@@ -95,6 +95,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-boxcast", &["boxcast"]),
     ("vendor-brightsign", &["brightsign-dws", "brightsign-udp"]),
     ("vendor-brompton", &["brompton-tessera"]),
+    ("vendor-camstreamer", &["camstreamer"]),
     ("vendor-canon", &["canon-ptz"]),
     ("vendor-casparcg", &["casparcg"]),
     ("vendor-castr", &["castr"]),
