@@ -164,6 +164,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &[
             "generic-http",
             "generic-midi",
+            "generic-modbus",
             "generic-osc",
             "generic-ping",
             "generic-snmp",

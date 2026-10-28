@@ -1,0 +1,249 @@
+spec: 1
+id: generic-modbus
+name: Generic Modbus TCP server
+vendor: Generic (any Modbus TCP server or gateway, such as a PLC, a power meter, a UPS, an I/O module or a building controller)
+category: other
+implementation: native
+reason: >
+  Modbus TCP is binary: each request is an MBAP header (transaction id, protocol id, length, unit id) and a PDU
+  whose layout depends on its function code, answered by a response matched by transaction id or by an exception
+  response (the function code with its top bit set). Coils travel packed eight to a byte, values wider than a
+  register span several registers in an order the device chooses, poll lists are split into requests within the
+  protocol's quantity limits, and the device identification arrives in pieces that ask to be continued.
+
+source:
+  - title: "MODBUS Application Protocol Specification V1.1b3 (April 26, 2012)"
+    author: Modbus Organization
+    url: https://www.modbus.org/docs/Modbus_Application_Protocol_V1_1b3.pdf
+    note: >
+      The data model's four tables (§4.3) and 0-based addressing (§4.4); the function codes and their request and
+      response layouts: Read Coils 01 and Read Discrete Inputs 02 (1 to 2000 bits, packed LSB first), Read Holding
+      Registers 03 and Read Input Registers 04 (1 to 125), Write Single Coil 05 (FF00h on, 0000h off) and Write
+      Single Register 06 (echoed), Write Multiple Coils 15 (1 to 1968) and Write Multiple Registers 16 (1 to 123),
+      Read File Record 20 and Write File Record 21 (reference type 6, records 0 to 9999), Mask Write Register 22
+      ((content AND and_mask) OR (or_mask AND NOT and_mask)), Read/Write Multiple Registers 23 (write done before
+      the read; 1 to 125 read, 1 to 121 written), Read FIFO Queue 24 (up to 31 values) and Read Device
+      Identification 43/14 (basic, regular and extended categories, objects 0 to 6 named, more-follows and
+      next-object continuation) (§6); exception responses and codes 01 to 0B (§7). Functions 07, 08, 11, 12 and
+      17 are for serial lines only.
+  - title: "MODBUS Messaging on TCP/IP Implementation Guide V1.0b (October 24, 2006)"
+    author: Modbus Organization
+    url: https://www.modbus.org/docs/Modbus_Messaging_Implementation_Guide_V1_0b.pdf
+    note: >
+      TCP port 502 (§3.1.2); the MBAP header: transaction identifier echoed in the response, protocol identifier 0,
+      length counting the unit identifier and the PDU, unit identifier for a server behind a gateway (0xFF, or 0,
+      when the server is the TCP device itself) (§3.1.3); one connection carrying requests, and a client waiting
+      for each response with a timeout (§4.3).
+
+settings:
+  unit_id: { type: int, min: 0, max: 255, default: 1, label: Unit ID,
+             description: "The unit identifier requests go to and whose tables state keeps: the server behind a gateway, or the address the device answers to (often 1; 255 or 0 for some devices reached directly)." }
+  poll: { type: string, pattern: '^[A-Za-z0-9_=:,; -]*$', max_length: 65536, default: "", label: Polled tables,
+          description: "Ranges read into state at every poll, separated by commas or spaces, each [name=]table:address[:count][:format], where table is co, di, hr or ir, the address is 0-based, and a named register range is decoded as u16, i16, u32, i32, f32, u64, i64, f64 or string: temperature=ir:30:f32." }
+  poll_interval_ms: { type: int, min: 10, max: 86400000, default: 1000, label: Poll interval,
+                      description: "Milliseconds between reads of the polled ranges; with none, or for commands only, the longest silence before a liveness read." }
+  word_order: { type: enum, values: [big, little], default: big, label: Word order,
+                description: "The order of the registers of a value wider than one register: big puts the most significant register at the lowest address, little the least significant." }
+  timeout_ms: { type: int, min: 1, max: 60000, default: 2000, label: Timeout,
+                description: "Milliseconds to wait for each response; three unanswered in a row close the connection and open it again." }
+  liveness_address: { type: int, min: 0, max: 65535, default: 0, label: Liveness register,
+                      description: "The holding register read to check the server is there when nothing else is read; any answer, an exception included, counts." }
+
+ports:
+  - { port: 502, protocol: tcp, role: control }
+
+models:
+  - id: generic
+    name: "Any Modbus TCP server or gateway (give its address, and its port if not 502)"
+    supports: [read_coils, read_discrete_inputs, read_holding_registers, read_input_registers, read_value,
+               write_coil, write_coils, write_register, write_registers, write_value, mask_write_register,
+               read_write_registers, read_fifo_queue, read_file_record, write_file_record,
+               read_device_identification, refresh]
+    verification: none
+
+commands:
+  read_coils:
+    summary: Read Coils (01) and return their states as a list of booleans
+    params:
+      address: { type: int, min: 0, max: 65535, required: true, label: Address, description: "The first coil, 0-based as on the wire (coil 1 of a 1-based register map is address 0)." }
+      count: { type: int, min: 1, max: 2000, default: 1, label: Count, description: "How many coils to read." }
+      unit: { type: int, min: 0, max: 255, label: Unit ID, description: "The unit to ask; unset asks the device's unit_id, whose state is updated too." }
+    returns: value
+  read_discrete_inputs:
+    summary: Read Discrete Inputs (02) and return their states as a list of booleans
+    params:
+      address: { type: int, min: 0, max: 65535, required: true, label: Address, description: "The first discrete input, 0-based." }
+      count: { type: int, min: 1, max: 2000, default: 1, label: Count, description: "How many inputs to read." }
+      unit: { type: int, min: 0, max: 255, label: Unit ID, description: "The unit to ask; unset asks the device's unit_id." }
+    returns: value
+  read_holding_registers:
+    summary: Read Holding Registers (03) and return them as a list of numbers 0 to 65535
+    params:
+      address: { type: int, min: 0, max: 65535, required: true, label: Address, description: "The first holding register, 0-based (register 40001 of a 1-based map is address 0)." }
+      count: { type: int, min: 1, max: 125, default: 1, label: Count, description: "How many registers to read." }
+      unit: { type: int, min: 0, max: 255, label: Unit ID, description: "The unit to ask; unset asks the device's unit_id." }
+    returns: value
+  read_input_registers:
+    summary: Read Input Registers (04) and return them as a list of numbers 0 to 65535
+    params:
+      address: { type: int, min: 0, max: 65535, required: true, label: Address, description: "The first input register, 0-based (register 30001 of a 1-based map is address 0)." }
+      count: { type: int, min: 1, max: 125, default: 1, label: Count, description: "How many registers to read." }
+      unit: { type: int, min: 0, max: 255, label: Unit ID, description: "The unit to ask; unset asks the device's unit_id." }
+    returns: value
+  read_value:
+    summary: >
+      Read the registers one value takes (03 or 04) and return it decoded: a number, the text of a string, or "nan",
+      "inf" or "-inf" for a float that is not finite
+    params:
+      table: { type: enum, values: [holding, input], default: holding, label: Table, description: "Holding registers or input registers." }
+      address: { type: int, min: 0, max: 65535, required: true, label: Address, description: "The value's first register, 0-based." }
+      format: { type: enum, values: [u16, i16, u32, i32, f32, u64, i64, f64, string], default: u16, label: Format, description: "How the registers are read: unsigned or signed integers of 16, 32 or 64 bits, IEEE 754 floats of 32 or 64 bits, or two characters per register." }
+      count: { type: int, min: 1, max: 125, default: 1, label: String length, description: "Registers of a string; the other formats take their own width." }
+      word_order: { type: enum, values: [setting, big, little], default: setting, label: Word order, description: "The order of the registers of a wide value; setting uses the device's word_order." }
+      unit: { type: int, min: 0, max: 255, label: Unit ID, description: "The unit to ask; unset asks the device's unit_id." }
+    returns: value
+  write_coil:
+    summary: Write Single Coil (05), on or off; the echoed request confirms it
+    params:
+      address: { type: int, min: 0, max: 65535, required: true, label: Address, description: "The coil, 0-based." }
+      value: { type: bool, required: true, label: State, description: "True turns the coil on (FF00h), false off." }
+      unit: { type: int, min: 0, max: 255, label: Unit ID, description: "The unit to write; unset writes the device's unit_id, whose state is updated too." }
+    returns: ack
+  write_coils:
+    summary: Write Multiple Coils (15) from a list of states, starting at an address
+    params:
+      address: { type: int, min: 0, max: 65535, required: true, label: Address, description: "The first coil, 0-based." }
+      values: { type: string, pattern: '^[01truefalsTRUEFALSonfON ,;]+$', max_length: 12000, required: true, label: States, description: "1968 states at most, separated by commas or spaces, each 1 or 0 (or true and false, on and off)." }
+      unit: { type: int, min: 0, max: 255, label: Unit ID, description: "The unit to write; unset writes the device's unit_id." }
+    returns: ack
+  write_register:
+    summary: Write Single Register (06); the echoed request confirms it
+    params:
+      address: { type: int, min: 0, max: 65535, required: true, label: Address, description: "The holding register, 0-based." }
+      value: { type: int, min: -32768, max: 65535, required: true, label: Value, description: "The register's new content, 0 to 65535, or -32768 to -1 written as its 16-bit two's complement." }
+      unit: { type: int, min: 0, max: 255, label: Unit ID, description: "The unit to write; unset writes the device's unit_id." }
+    returns: ack
+  write_registers:
+    summary: Write Multiple Registers (16) from a list of values, starting at an address
+    params:
+      address: { type: int, min: 0, max: 65535, required: true, label: Address, description: "The first holding register, 0-based." }
+      values: { type: string, pattern: '^[0-9A-Fa-fxX ,;-]+$', max_length: 1000, required: true, label: Values, description: "123 register values at most, separated by commas or spaces, each 0 to 65535 (or 0x0000 to 0xFFFF), or -32768 to -1." }
+      unit: { type: int, min: 0, max: 255, label: Unit ID, description: "The unit to write; unset writes the device's unit_id." }
+    returns: ack
+  write_value:
+    summary: Encode one value in the format given and write its registers (16), the way read_value reads them
+    params:
+      address: { type: int, min: 0, max: 65535, required: true, label: Address, description: "The value's first holding register, 0-based." }
+      value: { type: float, required: true, label: Value, description: "The value; an integer format takes a whole number within its range." }
+      format: { type: enum, values: [u16, i16, u32, i32, f32, u64, i64, f64], default: u16, label: Format, description: "How the value is written: unsigned or signed integers of 16, 32 or 64 bits, or IEEE 754 floats of 32 or 64 bits." }
+      word_order: { type: enum, values: [setting, big, little], default: setting, label: Word order, description: "The order of the registers of a wide value; setting uses the device's word_order." }
+      unit: { type: int, min: 0, max: 255, label: Unit ID, description: "The unit to write; unset writes the device's unit_id." }
+    returns: ack
+  mask_write_register:
+    summary: >
+      Mask Write Register (22): the register becomes (content AND and_mask) OR (or_mask AND NOT and_mask), changing
+      single bits; the register is read back into state
+    params:
+      address: { type: int, min: 0, max: 65535, required: true, label: Address, description: "The holding register, 0-based." }
+      and_mask: { type: int, min: 0, max: 65535, required: true, label: AND mask, description: "Bits set here are kept from the register's content; clear bits are taken from or_mask." }
+      or_mask: { type: int, min: 0, max: 65535, required: true, label: OR mask, description: "The bits written where and_mask is clear." }
+      unit: { type: int, min: 0, max: 255, label: Unit ID, description: "The unit to write; unset writes the device's unit_id." }
+    returns: ack
+  read_write_registers:
+    summary: >
+      Read/Write Multiple Registers (23) in one transaction: the values are written first, then the registers read are
+      returned as a list
+    params:
+      address: { type: int, min: 0, max: 65535, required: true, label: Read address, description: "The first holding register to read, 0-based." }
+      count: { type: int, min: 1, max: 125, default: 1, label: Read count, description: "How many registers to read." }
+      write_address: { type: int, min: 0, max: 65535, required: true, label: Write address, description: "The first holding register to write, 0-based." }
+      values: { type: string, pattern: '^[0-9A-Fa-fxX ,;-]+$', max_length: 1000, required: true, label: Values, description: "121 register values at most to write, separated by commas or spaces, each 0 to 65535 or -32768 to -1." }
+      unit: { type: int, min: 0, max: 255, label: Unit ID, description: "The unit to ask; unset asks the device's unit_id." }
+    returns: value
+  read_fifo_queue:
+    summary: Read FIFO Queue (24) and return the queued registers as a list (31 at most), the count register excluded
+    params:
+      address: { type: int, min: 0, max: 65535, required: true, label: FIFO pointer address, description: "The FIFO's pointer register, 0-based, as the device documents it." }
+      unit: { type: int, min: 0, max: 255, label: Unit ID, description: "The unit to ask; unset asks the device's unit_id." }
+    returns: value
+  read_file_record:
+    summary: Read File Record (20) of one record range (reference type 6) and return its registers as a list
+    params:
+      file: { type: int, min: 1, max: 65535, required: true, label: File, description: "The file number." }
+      record: { type: int, min: 0, max: 9999, required: true, label: Record, description: "The first record (register) in the file." }
+      length: { type: int, min: 1, max: 124, default: 1, label: Length, description: "How many records to read." }
+      unit: { type: int, min: 0, max: 255, label: Unit ID, description: "The unit to ask; unset asks the device's unit_id." }
+    returns: value
+  write_file_record:
+    summary: Write File Record (21) of one record range (reference type 6); the echoed request confirms it
+    params:
+      file: { type: int, min: 1, max: 65535, required: true, label: File, description: "The file number." }
+      record: { type: int, min: 0, max: 9999, required: true, label: Record, description: "The first record (register) in the file." }
+      values: { type: string, pattern: '^[0-9A-Fa-fxX ,;-]+$', max_length: 1000, required: true, label: Values, description: "122 record values at most, separated by commas or spaces, each 0 to 65535 or -32768 to -1." }
+      unit: { type: int, min: 0, max: 255, label: Unit ID, description: "The unit to write; unset writes the device's unit_id." }
+    returns: ack
+  read_device_identification:
+    summary: >
+      Read Device Identification (43/14) of a category, following continuations, and return {conformity_level,
+      objects}: vendor_name, product_code, revision, vendor_url, product_name, model_name, user_application_name, and
+      other objects by number
+    params:
+      category: { type: enum, values: [basic, regular, extended], default: basic, label: Category, description: "basic asks objects 0 to 2, regular 0 to 127, extended every object the device has." }
+      unit: { type: int, min: 0, max: 255, label: Unit ID, description: "The unit to ask; unset asks the device's unit_id, whose state is updated too." }
+    returns: value
+  refresh:
+    summary: Read every polled range and the basic identification now
+    returns: ack
+
+state:
+  unit: { type: int, description: "The unit identifier whose tables state holds" }
+  coils.*: { type: bool, description: "A coil of the device's unit, keyed by its 0-based address, as last read or written" }
+  discrete_inputs.*: { type: bool, description: "A discrete input, keyed by its 0-based address, as last read" }
+  holding_registers.*: { type: int, description: "A holding register (0 to 65535), keyed by its 0-based address, as last read or written" }
+  input_registers.*: { type: int, description: "An input register (0 to 65535), keyed by its 0-based address, as last read" }
+  values.*.number: { type: float, description: "A named poll entry's value, for one value of a numeric format" }
+  values.*.text: { type: string, description: "A named poll entry's value, for the string format; also nan, inf or -inf for a float that is not finite" }
+  values.*.bool: { type: bool, description: "A named poll entry's value, for one coil or discrete input" }
+  values.*.list: { type: array, description: "A named poll entry's values, for a range of several values (numbers, booleans, or nan, inf and -inf as text)" }
+  poll_errors.*: { type: string, description: "The exception the server answered a poll entry with (keyed by its name, or table:address), until it reads again" }
+  device.vendor_name: { type: string, description: "Identification object 0: VendorName" }
+  device.product_code: { type: string, description: "Identification object 1: ProductCode" }
+  device.revision: { type: string, description: "Identification object 2: MajorMinorRevision" }
+  device.vendor_url: { type: string, description: "Identification object 3: VendorUrl" }
+  device.product_name: { type: string, description: "Identification object 4: ProductName" }
+  device.model_name: { type: string, description: "Identification object 5: ModelName" }
+  device.user_application_name: { type: string, description: "Identification object 6: UserApplicationName" }
+  device.conformity_level: { type: int, description: "The identification conformity level the server reports (01h basic to 83h extended with individual access)" }
+  device.objects.*: { type: string, description: "Other identification objects, keyed by object number in decimal, as text" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Addresses are the protocol's, 0-based: a device documenting holding register 40001 (or 400001) means address 0,
+      input register 30001 address 0, coil 1 address 0. Values are read and kept as the device stores them; a value
+      wider than one register is decoded in the order word_order says, which devices differ on and seldom document
+      in protocol terms.
+  - models: [all]
+    severity: info
+    text: >
+      Requests go one at a time, each waiting for its response or timeout_ms, which every server accepts; a server
+      answering slowly therefore slows the poll. Commands go ahead of polls. A range longer than one request allows
+      (125 registers, 2000 bits) is read in several requests; a named range must fit in one.
+  - models: [all]
+    severity: info
+    text: >
+      The tables in state are the device's unit_id's; a command naming another unit (a gateway's other servers) is
+      answered without changing state. A write's echo confirms it and updates state at once; the polled ranges it
+      touched, and a mask write's register, are read again.
+  - models: [all]
+    severity: info
+    text: >
+      Diagnostics (08), Read Exception Status (07), Get Comm Event Counter and Log (11, 12) and Report Server ID (17)
+      are serial-line functions the specification does not offer over TCP. Several sub-requests in one file record
+      request are not used: each command reads or writes one record range.
+  - models: [all]
+    severity: info
+    text: >
+      Opening for commands only polls nothing and reads no identification; a read of the liveness register after
+      poll_interval_ms of silence stays as the liveness check, since Modbus has no other sign of the server.
