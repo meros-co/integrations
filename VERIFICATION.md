@@ -2454,6 +2454,47 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that get-settings' stream-server entries report is-use and net-mode, as the example shows. ([spec](specs/magewell-ultra-stream.yaml#L1910))
 - [ ] Check that get-settings' send-file-cloud entries for FTP servers report proto, url, port, encryption, login-type and mode, and for YouTube privacy. ([spec](specs/magewell-ultra-stream.yaml#L1947))
 
+## matrox-monarch-hd — Matrox Monarch HD
+
+- [ ] Confirm the Control API accepts an HTTP Basic credential (the guide only shows `user:password@host`, wget and .NET `NetworkCredential`), or whether it challenges with Digest. ([specs/matrox-monarch-hd.yaml:48](specs/matrox-monarch-hd.yaml#L48))
+- [ ] Confirm HTTPS for the Control API is served on port 443 with the unit's self-issued certificate (the guide only says HTTPS is "also supported"). ([specs/matrox-monarch-hd.yaml:43](specs/matrox-monarch-hd.yaml#L43))
+- [ ] Confirm SetRTMP takes `SetRTMP,<url>,<stream>[,<username>,<password>]` with no spaces after the commas (the guide writes the arguments with spaces and without the command name). ([specs/matrox-monarch-hd.yaml:199](specs/matrox-monarch-hd.yaml#L199))
+- [ ] Confirm the unit percent-decodes query arguments (stream name, RTMP username and password are sent percent-encoded, a space as %20). ([specs/matrox-monarch-hd.yaml:213](specs/matrox-monarch-hd.yaml#L213))
+- [ ] Record the exact text of GetStatus replies (spacing after commas, line ending) and check the status rule reads them. ([specs/matrox-monarch-hd.yaml:270](specs/matrox-monarch-hd.yaml#L270))
+- [ ] Record GetRTSP's reply ("URL, name, port") and check it is three comma-separated fields: full URL, stream name, port. ([specs/matrox-monarch-hd.yaml:306](specs/matrox-monarch-hd.yaml#L306))
+- [ ] Record GetRTMP's reply ("Url name, stream name") and check it is two comma-separated fields. ([specs/matrox-monarch-hd.yaml:312](specs/matrox-monarch-hd.yaml#L312))
+- [ ] Record GetInputStatus replies for several inputs (interlaced, progressive, fractional and whole rates) and "No video input", and check the parse into connector, size, scan and rate. ([specs/matrox-monarch-hd.yaml:290](specs/matrox-monarch-hd.yaml#L290))
+- [ ] Record GetSerialNumber's reply and confirm it is the serial alone and holds a digit (the rule skips replies without one, such as RETRY). ([specs/matrox-monarch-hd.yaml:320](specs/matrox-monarch-hd.yaml#L320))
+- [ ] Check what GetStreamingVideoDataRate answers outside Stream-only mode (documented as FAILED) and that the last bit rate staying in state is acceptable. ([specs/matrox-monarch-hd.yaml:166](specs/matrox-monarch-hd.yaml#L166))
+- [ ] Check how often RETRY comes back with the 2-second GetStatus poll while the Command Center is open. ([specs/matrox-monarch-hd.yaml:377](specs/matrox-monarch-hd.yaml#L377))
+
+## matrox-monarch-hdx — Matrox Monarch HDX
+
+- [ ] Confirm the Control API accepts an HTTP Basic credential (the guide only shows `user:password@host`, wget and .NET `NetworkCredential`), or whether it challenges with Digest. ([specs/matrox-monarch-hdx.yaml:48](specs/matrox-monarch-hdx.yaml#L48))
+- [ ] Confirm HTTPS for the Control API is served on port 443 with the unit's self-issued certificate (the guide only says HTTPS is "also supported"). ([specs/matrox-monarch-hdx.yaml:43](specs/matrox-monarch-hdx.yaml#L43))
+- [ ] Confirm SetRTMP takes `SetRTMP,<encoder>,<url>,<stream>[,<username>,<password>]` with no spaces after the commas (the guide writes the arguments with spaces and without the command name). ([specs/matrox-monarch-hdx.yaml:195](specs/matrox-monarch-hdx.yaml#L195))
+- [ ] Confirm the unit percent-decodes query arguments (stream name, RTMP username and password are sent percent-encoded). ([specs/matrox-monarch-hdx.yaml:210](specs/matrox-monarch-hdx.yaml#L210))
+- [ ] Record the exact text of GetStatus replies (spacing after commas, line ending) and check the status rule reads them. ([specs/matrox-monarch-hdx.yaml:297](specs/matrox-monarch-hdx.yaml#L297))
+- [ ] Record GetRTSP,<n>'s reply ("URL, name, port") and check it is three comma-separated fields. ([specs/matrox-monarch-hdx.yaml:340](specs/matrox-monarch-hdx.yaml#L340))
+- [ ] Record GetRTMP,<n>'s reply ("Url name, stream name") and check it is two comma-separated fields. ([specs/matrox-monarch-hdx.yaml:346](specs/matrox-monarch-hdx.yaml#L346))
+- [ ] Record GetInputStatus replies for SDI and HDMI, with and without closed captions, and "No video input", and check the parse into connector, size, scan, rate and captions. ([specs/matrox-monarch-hdx.yaml:318](specs/matrox-monarch-hdx.yaml#L318))
+- [ ] Confirm GetAudioInput's reply ends with a period as the guide prints it ("AUDIO INPUT: ANALOG."), or not; the rule takes both. ([specs/matrox-monarch-hdx.yaml:357](specs/matrox-monarch-hdx.yaml#L357))
+- [ ] Check how often RETRY comes back with the 2-second GetStatus poll while the Command Center is open. ([specs/matrox-monarch-hdx.yaml:423](specs/matrox-monarch-hdx.yaml#L423))
+
+## matrox-monarch-lcs — Matrox Monarch LCS
+
+- [ ] Confirm the Control API accepts an HTTP Basic credential (the guide only shows `user:password@host`, wget and .NET `NetworkCredential`), or whether it challenges with Digest. ([specs/matrox-monarch-lcs.yaml:49](specs/matrox-monarch-lcs.yaml#L49))
+- [ ] Confirm HTTPS for the Control API is served on port 443 with the unit's self-issued certificate (the guide only says HTTPS is "also supported"). ([specs/matrox-monarch-lcs.yaml:44](specs/matrox-monarch-lcs.yaml#L44))
+- [ ] Confirm SetRTMP takes `SetRTMP,<encoder>,<url>,<stream>[,<username>,<password>]` with no spaces after the commas. ([specs/matrox-monarch-lcs.yaml:190](specs/matrox-monarch-lcs.yaml#L190))
+- [ ] Confirm SetBothRtmpPaths without credentials is `SetBothRtmpPaths,<url1>,<stream1>,<url2>,<stream2>` (the guide marks usernames and passwords optional but shows only the full form). ([specs/matrox-monarch-lcs.yaml:229](specs/matrox-monarch-lcs.yaml#L229))
+- [ ] Confirm the unit percent-decodes query arguments (stream names, credentials, the transfer destination and domain are sent percent-encoded; a UNC backslash as %5C). ([specs/matrox-monarch-lcs.yaml:328](specs/matrox-monarch-lcs.yaml#L328))
+- [ ] Confirm the crop argument of SetOperatingMode is accepted as TRUE or FALSE in upper case, as the guide writes it. ([specs/matrox-monarch-lcs.yaml:377](specs/matrox-monarch-lcs.yaml#L377))
+- [ ] Record the exact text of GetStatus replies and find out what FILETRANSFER:ON means (a transfer running, or the feature enabled). ([specs/matrox-monarch-lcs.yaml:425](specs/matrox-monarch-lcs.yaml#L425))
+- [ ] Record GetRTSP,<n> and GetRTMP,<n> replies and check they are the comma-separated fields the rules read. ([specs/matrox-monarch-lcs.yaml:468](specs/matrox-monarch-lcs.yaml#L468))
+- [ ] Record GetInputStatus replies in each operating mode, including one input without a signal, and check the per-input parse (inputs A and B separated by ";"). ([specs/matrox-monarch-lcs.yaml:446](specs/matrox-monarch-lcs.yaml#L446))
+- [ ] Record GetVideoInput's reply outside Single-isolated mode (the guide says input A's connector "and INPUT_B_HDMI") and GetAudioInput's (whether it names INPUT_A_SDI/HDMI or INPUT_A, and any final period). ([specs/matrox-monarch-lcs.yaml:482](specs/matrox-monarch-lcs.yaml#L482))
+- [ ] Check how often RETRY comes back with the 2-second GetStatus poll while the Command Center is open. ([specs/matrox-monarch-lcs.yaml:566](specs/matrox-monarch-lcs.yaml#L566))
+
 ## mediamtx — MediaMTX
 
 - [ ] Confirm a wrong Basic user or password, or an invalid JWT, is answered 401 (not 403) by the Control API, so it is taken as the terminal refusal. ([specs/mediamtx.yaml:128](specs/mediamtx.yaml#L128))
