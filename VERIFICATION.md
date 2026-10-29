@@ -3865,9 +3865,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## ross-xpression — Ross XPression (TCP)
 
-- [ ] Confirm take IDs are read padded or unpadded, including UNCUE and UPNEXT in the padded form. ([specs/ross-xpression.yaml:348](specs/ross-xpression.yaml#L348))
-- [ ] Check the take ID, layer, framebuffer, GPI and channel ranges. ([specs/ross-xpression.yaml:354](specs/ross-xpression.yaml#L354))
-- [ ] Check the syntax for RESUME with a tessera source name. ([specs/ross-xpression.yaml:399](specs/ross-xpression.yaml#L399))
+- [ ] Confirm take IDs are read padded or unpadded, including UNCUE and UPNEXT in the padded form. ([specs/ross-xpression.yaml:355](specs/ross-xpression.yaml#L355))
+- [ ] Check the take ID, layer, framebuffer, GPI and channel ranges. ([specs/ross-xpression.yaml:361](specs/ross-xpression.yaml#L361))
+- [ ] Check the syntax for RESUME with a tessera source name. ([specs/ross-xpression.yaml:406](specs/ross-xpression.yaml#L406))
 
 ## ross-xpression-udp — Ross XPression (UDP)
 
@@ -3875,7 +3875,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm one command per datagram, ended with CR LF, is accepted. ([specs/ross-xpression-udp.yaml:319](specs/ross-xpression-udp.yaml#L319))
 - [ ] Confirm take IDs are read padded or unpadded, including UNCUE and UPNEXT in the padded form. ([specs/ross-xpression-udp.yaml:372](specs/ross-xpression-udp.yaml#L372))
 - [ ] Check the take ID, layer, framebuffer, GPI and channel ranges. ([specs/ross-xpression-udp.yaml:378](specs/ross-xpression-udp.yaml#L378))
-- [ ] Check the syntax for RESUME with a tessera source name. ([specs/ross-xpression-udp.yaml:423](specs/ross-xpression-udp.yaml#L423))
+- [ ] Check the syntax for RESUME with a tessera source name. ([specs/ross-xpression-udp.yaml:430](specs/ross-xpression-udp.yaml#L430))
 
 ## rosstalk — RossTalk (switchers)
 
