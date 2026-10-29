@@ -2595,7 +2595,7 @@ impl Se2200 {
 
 enum Protocol {
     Processor(Box<Processor>),
-    Se2200(Se2200),
+    Se2200(Box<Se2200>),
     DvipOnly,
 }
 
@@ -2656,11 +2656,11 @@ impl DatavideoSwitcher {
             };
             Protocol::Processor(Box::new(Processor::new(family, link, &ctx, poll_ms)))
         } else if ctx.model == "se-2200" {
-            Protocol::Se2200(Se2200::new(
+            Protocol::Se2200(Box::new(Se2200::new(
                 Link::from_settings(&ctx, DVIP_PORT)?,
                 ctx.monitor,
                 poll_ms,
-            ))
+            )))
         } else if standalone {
             Protocol::DvipOnly
         } else {
