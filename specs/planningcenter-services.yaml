@@ -6,7 +6,8 @@ category: other
 
 # A cloud service, not a device on the venue network: the integration is
 # opened with host api.planningcenteronline.com on port 443, and follows one
-# plan's LIVE session, named by the service_type_id and plan_id settings. The
+# plan's LIVE session, named by the service_type_id and plan_id settings,
+# which may be chosen after opening. The
 # consumer owns the credential: a Personal Access Token (HTTP Basic with its
 # application id and secret), or OAuth tokens from its own sign-in, which the
 # core keeps fresh with the refresh token and reports as credentials events.
@@ -63,6 +64,23 @@ source:
       X-PCO-API-Request-Rate-Limit, -Rate-Period and -Rate-Count headers and
       HTTP 429 with Retry-After when exceeded. Versioning: an
       X-PCO-API-Version header, else the application's default version.
+  - title: Planning Center API documentation, Overview (Authentication, Current User; Specifying a User-Agent Header)
+    author: Planning Center
+    url: https://developer.planning.center/docs/#/overview/authentication/current-user
+    note: >
+      Manufacturer document, retrieved 2026-10-28. To identify the current
+      user, the /me endpoint in any application API (or /current/v2/me of
+      the Current API); in an application API it needs that application's
+      OAuth scope and applies the user's access and permissions there. The
+      Services API's /me is therefore /services/v2/me; its answer is taken
+      to be the Services Person resource (attributes from the Person vertex
+      of the 2018-11-01 documentation graph: first_name, last_name,
+      full_name, photo_thumbnail_url, plan_permissions, song_permissions,
+      media_permissions, can_view_all_people, can_edit_all_people). Every
+      request must carry a User-Agent naming the application (its name and
+      a link or contact address), and may be answered 403 without one. The
+      Organization vertex (the API root, /services/v2): name, owner_name,
+      time_zone, twenty_four_hour_time, date_format, ccli.
   - title: pco_api_oauth_example_sinatra_ruby (app.rb), MIT licence
     author: Planning Center (Ministry Centered Technologies)
     url: https://github.com/planningcenter/pco_api_oauth_example_sinatra_ruby
@@ -112,6 +130,8 @@ transport:
   refusal_status: [401]
   headers:
     X-PCO-API-Version: "2018-11-01"
+    # Planning Center wants every request to name the application.
+    User-Agent: "{settings.user_agent}"
   timeout_ms: 10000
   # The organization: answers any valid credential, and nothing else.
   probe: { method: GET, path: /services/v2 }
@@ -145,12 +165,18 @@ settings:
                pattern: "^(https://[^\\s]+|http://(localhost|127\\.0\\.0\\.1|\\[::1\\])(:[0-9]+)?(/[^\\s]*)?)?$",
                label: Token endpoint override,
                description: "A token endpoint to refresh at instead of Planning Center's, such as the consumer's own token proxy that holds the client secret; https, or http to this machine only. Empty uses Planning Center's." }
-  service_type_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+  user_agent: { type: string, max_length: 256, default: "Meros integrations (https://github.com/meros-co/integrations)",
+                label: User-Agent,
+                description: "The User-Agent sent with every request, naming the application: Planning Center asks for the application's name and a link or contact address, and may answer 403 without one." }
+  service_type_id: { type: string, pattern: "^[0-9]+$", max_length: 20,
+                     select: { command: list_service_types, id: $.id, label: $.attributes.name },
                      label: Service type ID,
-                     description: "The numeric id of the service type that holds the plan to follow, as in the plan's Planning Center URL or list_service_types." }
-  plan_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                     description: "The numeric id of the service type that holds the plan to follow, as in the plan's Planning Center URL or list_service_types; may be left empty on opening and chosen later with update_settings." }
+  plan_id: { type: string, pattern: "^[0-9]+$", max_length: 20,
+             select: { command: list_plans, id: $.id, label: $.attributes.title,
+                       params: { service_type_id: service_type_id } },
              label: Plan ID,
-             description: "The numeric id of the plan whose LIVE session is followed and controlled, as in the plan's Planning Center URL or list_plans." }
+             description: "The numeric id of the plan whose LIVE session is followed and controlled, as in the plan's Planning Center URL or list_plans; may be left empty on opening and chosen later with update_settings." }
 
 ports:
   - { port: 443, protocol: https, role: control, note: "the cloud API at api.planningcenteronline.com, opened by that host name" }
@@ -159,7 +185,7 @@ models:
   - id: services-v2
     name: Planning Center Services API v2 (version 2018-11-01)
     supports: [go_to_next_item, go_to_previous_item, toggle_control, get_live,
-               get_organization, list_service_types, list_live_controllers,
+               get_organization, get_me, list_service_types, list_live_controllers,
                list_plans, get_plan, get_next_plan, get_previous_plan,
                list_items, get_item, list_item_notes, list_plan_times,
                create_plan, update_plan, set_plan_title, delete_plan,
@@ -175,8 +201,8 @@ models:
     verification: none
     notes: >
       Version 2018-11-01 is the current version of the Services API. The
-      integration follows the plan named by its settings; to follow another
-      plan, open it again with that plan's ids.
+      integration follows the plan named by its settings, which may be
+      chosen after opening and changed with update_settings.
 
 commands:
   # ── LIVE control, on the plan the integration follows ────────────────────
@@ -212,6 +238,12 @@ commands:
   get_organization:
     summary: The organization the credential belongs to (Organization, the API root)
     send: { method: GET, path: /services/v2 }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_me:
+    summary: The person the credential acts as, in Services, with their permissions (the /me endpoint, a Person)
+    send: { method: GET, path: /services/v2/me }
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
@@ -839,8 +871,14 @@ quirks:
       api.planningcenteronline.com and port 443; it is reached over HTTPS and
       the certificate is checked against that name. The plan followed and
       controlled is the one named by the service_type_id and plan_id settings
-      (both in the plan's Planning Center URL); to follow another plan, open
-      the integration again with its ids. Reading commands take any ids.
+      (both in the plan's Planning Center URL). Both may be left empty on
+      opening: the organization, the signed-in person and the service types
+      are still read, list_service_types lists the service types to choose
+      from, and once service_type_id is set, list_plans (and the poll of
+      that type's future plans) the plans; each id chosen is passed with
+      update_settings, which reads what it names at once. Until plan_id is
+      set the LIVE commands fail saying so. Changing either follows another
+      plan without reopening. Reading commands take any ids.
 
   - models: [all]
     severity: warning
@@ -879,9 +917,11 @@ quirks:
       Planning Center limits the API to about 100 requests per 20 seconds
       per user (subject to change), shared by every application acting as
       that user, and answers 429 with Retry-After when it is exceeded; a 429
-      fails the command that met it. State is polled every 10 seconds with
-      four requests (the LIVE session, the plan, its items and its times),
-      about 8 per 20 seconds, plus a probe of the organization when the
+      fails the command that met it. The followed plan is polled every 10
+      seconds with four requests (the LIVE session, the plan, its items and
+      its times), about 8 per 20 seconds; the organization, the signed-in
+      person, the service types and the chosen service type's future plans
+      every 5 minutes; plus a probe of the organization when the
       integration has been idle for 10 seconds.
 
   - models: [all]
@@ -1044,21 +1084,50 @@ state:
   plans.*.plan_times.*.live_starts_at: { type: string, description: "Start as recorded by LIVE (PlanTime.live_starts_at)" }
   plans.*.plan_times.*.live_ends_at: { type: string, description: "End as recorded by LIVE (PlanTime.live_ends_at)" }
   service_types.*.name:     { type: string, description: "Service type name, keyed by service type id (ServiceType.name)" }
+  organization.id:          { type: string, description: "The organization's id (Organization, the API root)" }
+  organization.name:        { type: string, description: "The organization's name (Organization.name)" }
+  organization.owner_name:  { type: string, description: "The account owner's name (Organization.owner_name)" }
+  organization.time_zone:   { type: string, description: "The organization's time zone, as Planning Center names it (Organization.time_zone)" }
+  organization.twenty_four_hour_time: { type: bool, description: "Times are shown on a 24-hour clock (Organization.twenty_four_hour_time)" }
+  organization.date_format: { type: int, description: "The organization's date format, as Planning Center numbers it (Organization.date_format)" }
+  organization.ccli:        { type: string, description: "The organization's CCLI licence number (Organization.ccli)" }
+  me.id:                    { type: string, description: "The id of the person the credential acts as (/me, a Person)" }
+  me.first_name:            { type: string, description: "Their first name (Person.first_name)" }
+  me.last_name:             { type: string, description: "Their last name (Person.last_name)" }
+  me.full_name:             { type: string, description: "Their full name (Person.full_name)" }
+  me.photo_thumbnail_url:   { type: string, description: "Their photo, thumbnail size (Person.photo_thumbnail_url)" }
+  me.plan_permissions:      { type: string, description: "Their organization-wide plan permission: Archived, Scheduled Viewer, Viewer, Editor or Administrator (Person.plan_permissions)" }
+  me.song_permissions:      { type: string, description: "Their access to songs and arrangements (Person.song_permissions)" }
+  me.media_permissions:     { type: string, description: "Their access to media (Person.media_permissions)" }
+  me.can_view_all_people:   { type: bool, description: "They can see every person (Person.can_view_all_people)" }
+  me.can_edit_all_people:   { type: bool, description: "They can change every person (Person.can_edit_all_people)" }
 
 telemetry:
   # Planning Center pushes nothing the documentation describes, so the
   # followed plan is polled every 10 seconds; replies to the reading commands
   # and LIVE actions go through the same rules.
   poll:
-    every_ms: 10000
-    send:
-      - { method: GET, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}/live",
-          query: { include: "current_item_time,next_item_time" } }
-      - { method: GET, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}" }
-      - { method: GET, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}/items",
-          query: { per_page: "100", include: "song,arrangement,key" }, pages: *pages }
-      - { method: GET, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}/plan_times",
-          query: { per_page: "100" }, pages: *pages }
+    - name: plan
+      every_ms: 10000
+      send:
+        - { method: GET, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}/live",
+            query: { include: "current_item_time,next_item_time" } }
+        - { method: GET, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}" }
+        - { method: GET, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}/items",
+            query: { per_page: "100", include: "song,arrangement,key" }, pages: *pages }
+        - { method: GET, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}/plan_times",
+            query: { per_page: "100" }, pages: *pages }
+    # What the account offers, the choices for the settings: the
+    # organization, the signed-in person, the service types, and the chosen
+    # service type's future plans.
+    - name: account
+      every_ms: 300000
+      send:
+        - { method: GET, path: /services/v2 }
+        - { method: GET, path: /services/v2/me }
+        - { method: GET, path: /services/v2/service_types, query: { per_page: "100" }, pages: *pages }
+        - { method: GET, path: "/services/v2/service_types/{settings.service_type_id}/plans",
+            query: { filter: future, order: sort_date, per_page: "25" } }
   updates:
     # The Live resource: from a read, or the reply to a LIVE action.
     - path: '^/services/v2/service_types/\d+/plans/(\d+)/live(/(go_to_next_item|go_to_previous_item|toggle_control))?(\?.*)?$'
@@ -1355,6 +1424,51 @@ telemetry:
       json: {}
       then_send:
         - { method: GET, path: "/services/v2/service_types/{1}/plans/{2}/notes", query: { per_page: "100" }, pages: *pages }
+    # The organization (the API root): get_organization, the poll and the
+    # probe.
+    - path: '^/services/v2$'
+      json_match: { "$.data.type": "^Organization$" }
+      json:
+        id: "$.data.id"
+        name: "$.data.attributes.name"
+        owner: "$.data.attributes.owner_name"
+        zone: "$.data.attributes.time_zone"
+        clock24: "$.data.attributes.twenty_four_hour_time"
+        date_format: "$.data.attributes.date_format"
+        ccli: "$.data.attributes.ccli"
+      state:
+        organization.id: "{id}"
+        organization.name: "{name}"
+        organization.owner_name: "{owner}"
+        organization.time_zone: "{zone}"
+        organization.twenty_four_hour_time: "{clock24}"
+        organization.date_format: "{date_format}"
+        organization.ccli: "{ccli}"
+    # The person the credential acts as: get_me and the poll.
+    - path: '^/services/v2/me$'
+      json_match: { "$.data.type": "^Person$" }
+      json:
+        id: "$.data.id"
+        first: "$.data.attributes.first_name"
+        last: "$.data.attributes.last_name"
+        full: "$.data.attributes.full_name"
+        photo: "$.data.attributes.photo_thumbnail_url"
+        plans: "$.data.attributes.plan_permissions"
+        songs: "$.data.attributes.song_permissions"
+        media: "$.data.attributes.media_permissions"
+        view_all: "$.data.attributes.can_view_all_people"
+        edit_all: "$.data.attributes.can_edit_all_people"
+      state:
+        me.id: "{id}"
+        me.first_name: "{first}"
+        me.last_name: "{last}"
+        me.full_name: "{full}"
+        me.photo_thumbnail_url: "{photo}"
+        me.plan_permissions: "{plans}"
+        me.song_permissions: "{songs}"
+        me.media_permissions: "{media}"
+        me.can_view_all_people: "{view_all}"
+        me.can_edit_all_people: "{edit_all}"
     # The service types; a complete list (no next link) replaces the last,
     # by the rule after this one.
     - path: '^/services/v2/service_types(\?.*)?$'

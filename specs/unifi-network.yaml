@@ -32,8 +32,13 @@ transport:
 settings:
   token: { type: string, secret: true, max_length: 256, label: API key,
            description: "An API key created in the Network application's Integrations section on the console (Create New API Key), sent as X-API-Key." }
-  site_id: { type: string, required: true, pattern: '^[0-9A-Fa-f-]{36}$', max_length: 36, label: Site ID,
-             description: "The site this device reads and controls, as list_sites gives its id." }
+  site_id: { type: string, pattern: '^[0-9A-Fa-f-]{36}$', max_length: 36, label: Site ID,
+             select: { command: list_sites, items: $.data, id: $.id, label: $.name,
+                       clears: [devices, clients, device_tags, networks, wifi_broadcasts, firewall_zones,
+                                firewall_policies, acl_rules, dns_policies, traffic_matching_lists, vouchers, wans,
+                                vpn_servers, vpn_tunnels, radius_profiles, lags, mc_lag_domains, switch_stacks,
+                                acl_rule_order] },
+             description: "The site this device reads and controls, as list_sites gives its id; may be left empty on opening (the sites, the application and devices pending adoption are still read) and chosen later with update_settings, which reads the site at once and clears the last site's state." }
 
 ports:
   - { port: 443, protocol: https, role: control, note: "the UniFi console's web server" }
@@ -45,7 +50,7 @@ models:
     verification: none
     notes: >
       One device per site: devices, ports, clients and the site's configuration as the Network application reports
-      them. A switch's ports, PoE and uplinks are read through it; the application, not the switch, is reached.
+      them. The site may be chosen after opening, from sites.*. A switch's ports, PoE and uplinks are read through it; the application, not the switch, is reached.
 
 commands:
   list_countries:

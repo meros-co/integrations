@@ -186,9 +186,11 @@ settings:
                pattern: "^(https://[^\\s]+|http://(localhost|127\\.0\\.0\\.1|\\[::1\\])(:[0-9]+)?(/[^\\s]*)?)?$",
                label: Token endpoint override,
                description: "A token endpoint to refresh at instead of Twitch's, such as the consumer's own token proxy that holds the client secret; https, or http to this machine only. Empty uses Twitch's." }
-  broadcaster_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+  broadcaster_id: { type: string, pattern: "^[0-9]+$", max_length: 32,
+                    select: { command: get_user, id: $.id, label: $.display_name,
+                              clears: [channel, stream, chat, poll, prediction, moderation, channel_points, schedule] },
                     label: Broadcaster ID,
-                    description: "The numeric user ID of the channel acted on, which must be the signed-in user's own: user_id in the token validation answer, or id from get_user." }
+                    description: "The numeric user ID of the channel acted on, which must be the signed-in user's own: user_id in the token validation answer, or id from get_user; may be left empty on opening and set later with update_settings." }
 
 ports:
   - { port: 443, protocol: https, role: control, note: "the cloud API at api.twitch.tv, opened by that host name; token refreshes and the hourly token validation go to id.twitch.tv:443" }
@@ -1175,7 +1177,14 @@ quirks:
       443; it is reached over HTTPS and the certificate is checked against
       that name. It acts for the channel named by broadcaster_id, which must
       be the signed-in user's own: Twitch refuses channel, stream-key, ad,
-      raid and chat-setting changes for another channel.
+      raid and chat-setting changes for another channel. broadcaster_id may
+      be left empty on opening: the signed-in user (user.*) is still read by
+      the probe and get_user, whose id is the value to pass with
+      update_settings; until then the commands acting for the channel fail
+      saying so, nothing of the channel is polled and no EventSub
+      subscription is made. Setting it polls the channel at once and opens
+      EventSub again to subscribe for it; changing it clears the last
+      channel's state.
 
   - models: [all]
     severity: warning

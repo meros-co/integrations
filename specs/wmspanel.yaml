@@ -8,7 +8,7 @@ category: other
 # servers and reports their statistics: opened with host api.wmspanel.com on
 # port 443, it acts for the account its client ID and API key belong to.
 # Every call of the reference is a command; state follows one Nimble server
-# (the server_id setting): its status, live streams, re-publishing, MPEG-TS
+# (the server_id setting, which may be chosen after opening): its status, live streams, re-publishing, MPEG-TS
 # streams, transcoder scenarios and server-side tasks.
 
 source:
@@ -51,8 +51,11 @@ transport:
   scheme: https
   auth: none
   timeout_ms: 15000
-  # The followed server: one call that also checks the credentials.
-  probe: { method: GET, path: "/v1/server/{settings.server_id}", query: { client_id: "{settings.client_id}", api_key: "{settings.api_key}" } }
+  # The followed server: one call that also checks the credentials. Before
+  # a server is chosen, the account's servers.
+  probe:
+    - { method: GET, path: "/v1/server/{settings.server_id}", query: { client_id: "{settings.client_id}", api_key: "{settings.api_key}" } }
+    - { method: GET, path: /v1/server, query: { client_id: "{settings.client_id}", api_key: "{settings.api_key}" } }
 
 settings:
   client_id: { type: string, pattern: "^\\S+$", max_length: 256, required: true,
@@ -61,9 +64,11 @@ settings:
   api_key: { type: string, secret: true, pattern: "^\\S+$", max_length: 256, required: true,
              label: API key,
              description: "The API key generated with it; the calling host's address must be on the API whitelist." }
-  server_id: { type: string, pattern: "^[0-9a-f]{24}$", required: true,
+  server_id: { type: string, pattern: "^[0-9a-f]{24}$",
+               select: { command: list_servers, items: $.servers, id: $.id, label: $.name,
+                         clears: [live_streams, rtmp_republish, mpegts_incoming, mpegts_outgoing, transcoders, tasks] },
                label: Server,
-               description: "The Nimble server whose state is followed, its 24-character ID from list_servers or its page's URL." }
+               description: "The Nimble server whose state is followed, its 24-character ID from list_servers or its page's URL; may be left empty on opening and chosen later with update_settings." }
 
 ports:
   - { port: 443, protocol: https, role: control, note: "the cloud API at api.wmspanel.com, opened by that host name" }
@@ -2465,8 +2470,11 @@ quirks:
       WMSPanel allows 15,000 calls a day per account (reset at 00:00 UTC),
       polls included. The followed server and its live streams are read
       every minute (2 calls), its re-publish rules, MPEG-TS streams,
-      transcoder scenarios and tasks every 5 minutes (5 calls): about 4,300
-      calls a day, leaving the rest for commands. WMSPanel pushes nothing to
+      transcoder scenarios and tasks, and the account's servers, every 5
+      minutes (6 calls): about 4,600 calls a day, leaving the rest for
+      commands. With server_id left empty only the servers are read, until
+      one is chosen with update_settings, which reads it at once and clears
+      the last server's state. WMSPanel pushes nothing to
       this API (its push API posts to a URL the consumer runs). Live,
       per-second figures come better from the server's own native API (the
       nimble-streamer integration).
@@ -2573,6 +2581,8 @@ telemetry:
         - { method: GET, path: "/v1/server/{settings.server_id}/mpegts/outgoing", query: { client_id: "{settings.client_id}", api_key: "{settings.api_key}" } }
         - { method: GET, path: /v1/transcoder, query: { client_id: "{settings.client_id}", api_key: "{settings.api_key}", server_id: "{settings.server_id}" } }
         - { method: GET, path: "/v1/server/{settings.server_id}/tasks", query: { client_id: "{settings.client_id}", api_key: "{settings.api_key}" } }
+        # The account's servers, what server_id is chosen from.
+        - { method: GET, path: /v1/server, query: { client_id: "{settings.client_id}", api_key: "{settings.api_key}" } }
   updates:
     - path: "^/v1/server\\?"
       json_each: "$.servers"

@@ -6,8 +6,9 @@ category: other
 
 # A cloud service, not a device on the venue network: the integration is
 # opened with host www.googleapis.com on port 443 and follows one broadcast,
-# named by the broadcast_id setting. The consumer owns the credential: it
-# registers its own Google OAuth client, runs the sign-in, and passes the
+# named by the broadcast_id setting, which may be chosen after opening. The
+# consumer owns the credential: it registers its own Google OAuth client,
+# runs the sign-in, and passes the
 # tokens as settings; the core keeps the access token fresh with the refresh
 # token and reports new tokens as credentials events. The core never runs a
 # sign-in. Every request spends the consumer's Google Cloud project quota
@@ -202,9 +203,10 @@ settings:
                pattern: "^(https://[^\\s]+|http://(localhost|127\\.0\\.0\\.1|\\[::1\\])(:[0-9]+)?(/[^\\s]*)?)?$",
                label: Token endpoint override,
                description: "A token endpoint to refresh at instead of Google's, such as the consumer's own token proxy that holds the client secret; https, or http to this machine only. Empty uses Google's." }
-  broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
+  broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64,
+                  select: { command: list_broadcasts, id: $.id, label: $.snippet.title },
                   label: Broadcast ID,
-                  description: "The id of the broadcast to follow (also its video id), from YouTube Studio's URL or list_broadcasts." }
+                  description: "The id of the broadcast to follow (also its video id), from YouTube Studio's URL or list_broadcasts; may be left empty on opening and chosen later with update_settings." }
 
 ports:
   - { port: 443, protocol: https, role: control, note: "the cloud API at www.googleapis.com, opened by that host name" }
@@ -225,7 +227,8 @@ models:
     verification: none
     notes: >
       Live streaming must be enabled on the channel. The integration follows
-      the broadcast named by broadcast_id; the other commands take any ids.
+      the broadcast named by broadcast_id, which may be chosen after
+      opening; the commands take any ids.
 
 commands:
   # ── Broadcasts ───────────────────────────────────────────────────────────
@@ -691,7 +694,11 @@ quirks:
       A cloud service. Open the integration with host www.googleapis.com and
       port 443; it is reached over HTTPS and the certificate is checked
       against that name. The broadcast followed is the one named by the
-      broadcast_id setting; to follow another, open the integration again.
+      broadcast_id setting. It may be left empty on opening: the channel's
+      streams are then polled, list_broadcasts lists the broadcasts to
+      choose from, and the broadcast chosen is passed with update_settings,
+      which reads it at once. Changing it follows another broadcast without
+      reopening.
 
   - models: [all]
     severity: warning

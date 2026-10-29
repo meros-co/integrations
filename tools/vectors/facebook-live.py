@@ -243,3 +243,13 @@ telemetry(FB, "crossposting", settings=_FBS, inbound_http={
         "crossposted_broadcasts": {"10155832421509999": {"page_id": "106589754846067",
                                                          "page_name": "Crossposting Page B",
                                                          "status": "UNPUBLISHED"}}}}})
+
+# The Page the token acts for (get_page, and the probe): what page_id is set
+# to when it is left empty on opening.
+_PAGE = {"id": "1093482904102", "name": "Grace Church"}
+_fb("get_page", {}, "GET", _V + "/me?fields=id%2Cname",
+    http_reply={"status": 200, "body": json.dumps(_PAGE)},
+    expect_result={"ok": {"kind": "value", "value": _PAGE}})
+telemetry(FB, "page", settings={"token": "EAAGpagetoken"},
+          inbound_http={"path": _V + "/me?fields=id%2Cname", "body": json.dumps(_PAGE)},
+          expect_state={"page": {"id": "1093482904102", "name": "Grace Church"}})

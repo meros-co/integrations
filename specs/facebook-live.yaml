@@ -6,8 +6,9 @@ category: other
 
 # A cloud service, not a device on the venue network: the integration is
 # opened with host graph.facebook.com on port 443 and acts for one Facebook
-# Page, the page_id setting. The consumer owns the credential: it registers
-# its own Meta app, runs Facebook Login, exchanges the user's token for a
+# Page, the page_id setting (which may be set after opening: get_page and
+# the probe name the token's Page). The consumer owns the credential: it
+# registers its own Meta app, runs Facebook Login, exchanges the user's token for a
 # long-lived one and reads the Page's access token, which has no expiry, and
 # passes that Page access token as the token setting. Facebook has no refresh
 # grant for it, so the core sends it as a plain bearer token until Facebook
@@ -210,15 +211,17 @@ transport:
   refusal_json: { "$.error.code": "^(190|102)$" }
   timeout_ms: 10000
   # The token's own node (the Page, for a Page token): one call.
-  probe: { method: GET, path: "/{settings.api_version}/me", query: { fields: id } }
+  probe: { method: GET, path: "/{settings.api_version}/me", query: { fields: "id,name" } }
 
 settings:
   token: { type: string, secret: true, max_length: 4096, required: true,
            label: Page access token,
            description: "The Page access token read with a long-lived user token from the consumer's own Meta app (facebook-account's list_pages or get_page_token), which does not expire; Facebook has no way to refresh it, so a refused one needs a new login." }
-  page_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+  page_id: { type: string, pattern: "^[0-9]+$", max_length: 32,
+             select: { command: get_page, id: $.id, label: $.name,
+                       clears: [live_videos, polls, crosspost_pages] },
              label: Page ID,
-             description: "The numeric id of the Facebook Page the live videos belong to, the Page the token was issued for." }
+             description: "The numeric id of the Facebook Page the live videos belong to, the Page the token was issued for (get_page names it); may be left empty on opening and set later with update_settings." }
   api_version: { type: string, pattern: "^v[0-9]{1,3}\\.[0-9]$", default: "v26.0",
                  label: Graph API version,
                  description: "The Graph API version every request names, such as v26.0; each version is retired about two years after release, so move to a newer one before then." }
@@ -238,14 +241,23 @@ models:
                hide_comment, delete_comment, list_polls, get_poll, create_poll, create_quiz_poll,
                show_poll_voting, show_poll_results, close_poll, attach_poll_to_video, delete_poll,
                list_crosspost_pages, get_crossposting, set_crossposting, set_crossposting_actions,
-               request_crossposting, accept_crossposting]
+               request_crossposting, accept_crossposting, get_page]
     verification: none
     notes: >
-      Acts for the Page named by page_id with a Page access token. The Meta
+      Acts for the Page named by page_id with a Page access token; page_id
+      may be left empty on opening, and get_page (or the probe, into
+      page.*) names the token's Page to set it to. The Meta
       app needs the Live Video API feature (App Review and Business
       Verification) and the Page permissions in the quirks.
 
 commands:
+  # ── The Page ─────────────────────────────────────────────────────────────
+  get_page:
+    summary: The Page the token acts for, its id and name (GET /me with a Page access token)
+    send: { method: GET, path: "/{settings.api_version}/me", query: { fields: "id,name" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
   # ── Live videos ──────────────────────────────────────────────────────────
   list_live_videos:
     summary: The Page's live videos, newest first, with status, viewers and ingest health; no stream URLs (GET /{page-id}/live_videos, source owner)
@@ -1038,6 +1050,8 @@ state:
   polls.*.options.*.order:   { type: int, description: "The option's place in the poll" }
   polls.*.options.*.total_votes: { type: int, description: "Votes for the option" }
   polls.*.options.*.is_correct: { type: bool, description: "The option is the correct answer" }
+  page.id:                   { type: string, description: "The id of the Page the token acts for (get_page)" }
+  page.name:                 { type: string, description: "The Page's name (get_page)" }
   crosspost_pages.*.name:    { type: string, description: "A Page this Page has a crossposting relationship with, keyed by Page id" }
   crosspost_pages.*.allows_live_crossposts: { type: bool, description: "Live videos post there without that Page's approval" }
 
@@ -1052,6 +1066,10 @@ telemetry:
           query: { fields: "id,title,description,status,live_views,broadcast_start_time,seconds_left,permalink_url,ingest_streams{id,is_master,stream_health}",
                    source: owner, limit: "5" } }
   updates:
+    # The Page the token acts for (get_page).
+    - path: '^/v[0-9]+\.[0-9]+/me\?fields=id%2Cname$'
+      json: { id: "$.id", name: "$.name" }
+      state: { page.id: "{id}", page.name: "{name}" }
     - path: '^/v[0-9]+\.[0-9]+/[0-9]+/live_videos\?fields=id%2Ctitle'
       json_each: "$.data"
       json: &video

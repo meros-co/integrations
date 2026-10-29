@@ -257,3 +257,12 @@ telemetry(RS, "text-variables", settings=_RS_SET,
           inbound_http={"path": _R + "/text-variables", "body": _J({"ok": True, "message": "OK", "data": {"items": [
               {"key": "guest", "value": "Jane Doe"}, {"key": "show.name", "value": "News"}], "count": 2}, "meta": _META})},
           expect_state={"text_variables": {"guest": "Jane Doe", "show.name": "News"}})
+
+# The team's rundowns (the minute's poll, every page joined): the whole
+# list, what rundown_id is chosen from.
+telemetry(RS, "rundowns", settings={"token": "test-token"}, state_before={"rundowns": {"old": {"title": "Gone"}}},
+          inbound_http={"path": "/rundowns?limit=100", "body": _J({"ok": True, "message": "Returned 1 rundowns", "data": {
+              "items": [{"id": "YOmm4UG2SGSomuOci44c", "title": "Brave Show", "start_time": 1750024800000,
+                         "status": "approved"}], "has_more": False, "next_cursor": None}, "meta": _META})},
+          expect_state={"rundowns": {"YOmm4UG2SGSomuOci44c": {"title": "Brave Show", "start_time": 1750024800000,
+                                                              "status": "approved"}}})
