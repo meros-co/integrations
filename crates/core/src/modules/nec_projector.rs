@@ -1487,6 +1487,12 @@ impl NecProjector {
 
 impl Module for NecProjector {
     fn start(&mut self, cx: &mut Cx) {
+        if self.monitor {
+            // The model's input terminals, from the appendix's table: the
+            // protocol has no request listing them.
+            let names: Vec<&str> = self.family.inputs.iter().map(|(n, _)| *n).collect();
+            cx.state(json!({ "inputs": { "available": names } }));
+        }
         self.open_link(cx);
     }
 
@@ -2167,6 +2173,28 @@ mod tests {
             )
             .unwrap_err();
         assert!(matches!(err, CommandError::UnsupportedForModel { .. }));
+    }
+
+    #[test]
+    fn the_models_input_terminals_reach_state() {
+        let mut m = module("np4100", true);
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        assert_eq!(
+            state(&cx.take())["inputs"]["available"],
+            json!([
+                "computer",
+                "computer2",
+                "computer3",
+                "video",
+                "s_video",
+                "component"
+            ])
+        );
+        let mut m = module("np4100", false);
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        assert_eq!(state(&cx.take()), json!({}));
     }
 
     #[test]
