@@ -419,13 +419,19 @@ state:
   presentation.slide.item: { type: int, description: "Item number of the current slide: a unique id for the presentation's run, not its position" }
   presentation.slide.name: { type: string, description: "Current slide's name" }
   presentation.slide.title: { type: string, description: "Current slide's title" }
+  presentation.slides.*.name: { type: string, description: "A slide of the running presentation, keyed by its item number (the id go_to_slide takes): its name" }
+  presentation.slides.*.title: { type: string, description: "The slide's title" }
 
 telemetry:
   # OpenSong pushes over its websocket in a form the documentation does not
   # give: the status is polled every second.
   poll:
-    every_ms: 1000
-    send: [{ method: GET, path: /presentation/status }]
+    - every_ms: 1000
+      send: [{ method: GET, path: /presentation/status }]
+    # The running presentation's slides, which change when a set or song is
+    # presented or a song inserted.
+    - every_ms: 5000
+      send: [{ method: GET, path: /presentation/slide/list }]
   updates:
     - path: "^/presentation/status$"
       xml_each: presentation
@@ -443,6 +449,14 @@ telemetry:
         presentation.slide.item: "{itemnumber}"
         presentation.slide.name: "{name}"
         presentation.slide.title: "{title}"
+    # The slide list, each slide as the status gives one: <slide
+    # itemnumber="..."> with <name> and <title>.
+    - path: "^/presentation/slide/list$"
+      xml_each: slide
+      replace: presentation.slides
+      state:
+        presentation.slides.{itemnumber}.name: "{name}"
+        presentation.slides.{itemnumber}.title: "{title}"
 
 quirks:
   - models: [all]
@@ -462,9 +476,12 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      Only the status reply's XML is documented, so only it is read into
-      state; the slide list, songs, folders and sets are returned as the XML
-      OpenSong sends (get_slides, get_songs, get_song_folders, get_sets,
+      Only the status reply's XML is shown in the documentation. The slide
+      list, which the page says gives each slide's name, title and number, is
+      polled every 5 s and read as slide elements shaped like the status's
+      (an itemnumber attribute, name and title children), replacing
+      presentation.slides each time. Songs, folders and sets are returned as
+      the XML OpenSong sends (get_songs, get_song_folders, get_sets,
       get_set_slides) without state, their element names being undocumented.
       Slide previews and images (/presentation/slide/<item>/preview and
       /image) are JPEG, saved to a host file by save_slide_preview and
