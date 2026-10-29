@@ -650,7 +650,7 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
             else:
                 # On an address rule, the captures are the address's, then
                 # arg_match's in argument order.
-                sources = ([rule.get("match", "")] if "address" not in rule else
+                sources = ([rule.get("path", ""), rule.get("match", "")] if "address" not in rule else
                            [rule["address"]] + [p for _, p in sorted((rule.get("arg_match") or {}).items(),
                                                                      key=lambda kv: int(kv[0]))])
                 try:
@@ -1134,8 +1134,8 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
             # On a websocket, the message a reply answers (SPEC.md §2, ws).
             if "match" not in rule or transport_type not in ("line-tcp", "line-serial", "line-udp", "ws"):
                 errors.append(f"{where}: a request_match regex goes with match, on a line or websocket transport")
-        if "match_each" in rule and ("match" not in rule or "path" in rule) and "address" not in rule:
-            errors.append(f"{where}: match_each reads the rest of a message a match rule matched, "
+        if "match_each" in rule and "match" not in rule and "address" not in rule:
+            errors.append(f"{where}: match_each reads the rest of a message or body a match rule matched, "
                           "or a capture of an address rule")
         if "each_match" in rule and "json_each" not in rule:
             errors.append(f"{where}: each_match selects elements of json_each")
