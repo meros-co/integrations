@@ -50,3 +50,16 @@ telemetry(RX4, "output-input", inbound="ack,11,10,1,4\n",
 telemetry(RX4, "parameter", inbound="set,0,0,1,2\n", expect_state={"parameters": {"0-0-1": 2}})
 telemetry(RX4, "version", inbound="ver,XS-42H,1.30\n",
           expect_state={"device": {"model": "XS-42H", "version": "1.30"}})
+# Levels in dB, by Roland's 100 = 0.0 dB and 127 = +6.0 dB (p.10, p.23).
+rx4("set_mixer1_input_level_db", {"scene": 2, "input": 4, "level_db": 6.0}, "set,1,1,3,127\n")
+rx4("set_mixer1_input_level_current_db", {"input": 1, "level_db": 0.0}, "set,15,1,0,100\n")
+rx4("set_mixer1_level_db", {"scene": 10, "level_db": 3.0}, "set,9,2,0,114\n")
+rx4("set_mixer1_level_current_db", {"level_db": 1.0}, "set,15,2,0,105\n")
+rx4("set_mixer2_input_level_db", {"scene": 1, "input": 2, "level_db": 0.0}, "set,0,6,1,100\n")
+rx4("set_mixer2_input_level_current_db", {"input": 3, "level_db": 6.0}, "set,15,6,2,127\n")
+rx4("set_mixer2_level_db", {"scene": 5, "level_db": 2.0}, "set,4,7,0,109\n")
+rx4("set_mixer2_level_current_db", {"level_db": 0.0}, "set,15,7,0,100\n")
+rx4("set_input_level_db", {"scene": 1, "input": 1, "level_db": 6.0}, "set,0,1,0,127\n", **RX4_VP)
+rx4("set_input_level_current_db", {"input": 2, "level_db": 0.0}, "set,15,1,1,100\n", **RX4_VP)
+rx4("set_master_level_db", {"scene": 10, "level_db": 4.0}, "set,9,2,0,118\n", **RX4_VP)
+rx4("set_master_level_current_db", {"level_db": 0.0}, "set,15,2,0,100\n", **RX4_VP)

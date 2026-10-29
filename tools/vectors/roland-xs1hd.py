@@ -23,3 +23,7 @@ xs1("active_sense", {}, "\x02ACS;", device_reply="\x06", expect_result=XS1_OK)
 
 telemetry(XS1, "version", expect_connect_wire=["\x02VER;"], inbound="\x02VER:XS-1HD,1.01;",
           expect_state={"device": {"model": "XS-1HD", "version": "1.01"}})
+# Levels in dB, by Roland's 100 = 0.0 dB and 127 = +6.0 dB (p.6), rounded to
+# the unit's step.
+xs1("set_output_level_db", {"level_db": 6.0}, "\x02MVL:127;")
+xs1("set_channel_level_db", {"channel": 2, "level_db": 3.0}, "\x02CV2:114;")

@@ -89,7 +89,9 @@ models:
       - set_transition_time
       - auto
       - set_output_level
+      - set_output_level_db
       - set_channel_level
+      - set_channel_level_db
       - recall_memory
       - get_version
       - active_sense
@@ -97,6 +99,12 @@ models:
     notes: >
       Four inputs plus Color, four cross-points (XPT1-XPT4), four audio
       channels and an output level, 16 memories.
+
+conversions:
+  # XS-1HD Reference Manual p.6, Audio menu:
+  # 100 = 0.0 dB, 127 = +6.0 dB. Between 100 and 127 the level is taken as
+  # linear in dB; below 100 Roland gives no law.
+  level_db: { points: [[100, 0.0], [127, 6.0]] }
 
 commands:
   select_xpt:
@@ -125,8 +133,16 @@ commands:
   set_output_level:
     summary: "Set the output audio level, 0-127 (MVL)"
     params:
-      level: { type: int, min: 0, max: 127, required: true, label: Output level, description: "The output audio level, 0 to 127." }
+      level: { type: int, min: 0, max: 127, required: true, label: Output level, description: "The output audio level, 0 to 127; Roland gives 100 = 0.0 dB, 127 = +6.0 dB (XS-1HD Reference Manual p.6, Audio menu)." }
     send: "MVL:{level}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_output_level_db:
+    summary: "Set the output audio level in dB, 0.0 to +6.0 (MVL)"
+    params:
+      level_db: { type: float, min: 0.0, max: 6.0, required: true, label: Output level, description: "Level in dB from 0.0 to +6.0, converted to the unit's 100 to 127 by Roland's 100 = 0.0 dB, 127 = +6.0 dB (XS-1HD Reference Manual p.6, Audio menu); levels below 0 dB have no documented law, so are set with set_output_level." }
+    send: "MVL:{level_db:to.level_db:.0f}"
     expect: { contains: "\u0006" }
     returns: ack
 
@@ -134,8 +150,17 @@ commands:
     summary: "Set the level of audio channel 1-4, 0-127 (CV1-CV4)"
     params:
       channel: { type: int, min: 1, max: 4, required: true, label: Audio channel, description: "The audio channel, 1 to 4." }
-      level: { type: int, min: 0, max: 127, required: true, label: Level, description: "The channel's level, 0 to 127." }
+      level: { type: int, min: 0, max: 127, required: true, label: Level, description: "The channel's level, 0 to 127; Roland gives 100 = 0.0 dB, 127 = +6.0 dB (XS-1HD Reference Manual p.6, Audio menu)." }
     send: "CV{channel}:{level}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_channel_level_db:
+    summary: "Set the level of audio channel 1-4 in dB, 0.0 to +6.0 (CV1-CV4)"
+    params:
+      channel: { type: int, min: 1, max: 4, required: true, label: Audio channel, description: "The audio channel, 1 to 4." }
+      level_db: { type: float, min: 0.0, max: 6.0, required: true, label: Level, description: "Level in dB from 0.0 to +6.0, converted to the unit's 100 to 127 by Roland's 100 = 0.0 dB, 127 = +6.0 dB (XS-1HD Reference Manual p.6, Audio menu); levels below 0 dB have no documented law, so are set with set_channel_level." }
+    send: "CV{channel}:{level_db:to.level_db:.0f}"
     expect: { contains: "\u0006" }
     returns: ack
 
@@ -198,7 +223,9 @@ quirks:
     severity: info
     text: >
       API limits: the RS-232 commands read back nothing but the version
-      (VER), so state holds the model and version only. The cross-points,
+      (VER; Reference Manual p.10, received and sent commands: every other
+      command is answered ACK alone, and the unit sends nothing by itself
+      but ERR and XON/XOFF), so state holds the model and version only. The cross-points,
       the transition time, the audio levels and the memory last recalled
       cannot be read, nor the screen mode set; the connection is the only
       sign the unit is there, checked with ACS when idle.

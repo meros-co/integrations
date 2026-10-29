@@ -70,3 +70,7 @@ telemetry(R80, "output-status", inbound="OTS:3,2,16,1,4,0;",
 telemetry(R80, "key-lock", inbound="KLS:1,1,0,0,0,0,0,0,0,0,1;",
           expect_state={"panel_lock": True, "key_lock_modes": "1,0,0,0,0,0,0,0,0,1"})
 telemetry(R80, "version", inbound="VER:XS-82H,3.15;", expect_state={"device": {"model": "XS-82H", "version": "3.15"}})
+# Levels in dB, by Roland's 100 = 0.0 dB and 127 = +6.0 dB (p.6, p.8).
+r80("set_hdmi_input_level_db", {"input": 1, "level_db": 6.0}, "IDL:0,127;\r")
+r80("set_analog_input_level_db", {"input": 8, "level_db": 0.0}, "IAL:7,100;\r")
+r80("set_output_level_db", {"output": 2, "level_db": 3.0}, "OAL:1,114;\r")
