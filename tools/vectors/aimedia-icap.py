@@ -69,3 +69,14 @@ _ic("unsubscribe_email", {"email": "ops@example.com", "type": "DailyCaptionLog"}
     '{"emailaddr":"ops@example.com","subscriptiontype":"DailyCaptionLog"}')
 _ic("unsubscribe_email_user", {"email": "ops@example.com", "user": "encoder1"}, "DELETE", _B + "/emailnotices/subscriptions",
     '{"emailaddr":"ops@example.com","subscriptiontype":"UserAccount","useraccount":"encoder1"}')
+
+# The polled lists, kept whole as JSON text (their fields are not documented).
+telemetry(IC, "active-encoders", settings={"company": "acme", "username": "admin", "password": "secret"},
+          inbound_http={"path": "/api/1.0/acme/active-encoders", "body": '[{"username": "enc1"}]'},
+          expect_state={"active": {"encoders": '[{"username":"enc1"}]'}})
+telemetry(IC, "active-captioners", settings={"company": "acme", "username": "admin", "password": "secret"},
+          inbound_http={"path": "/api/1.0/acme/active-captioners", "body": '[]'},
+          expect_state={"active": {"captioners": '[]'}})
+telemetry(IC, "health", settings={"company": "acme", "username": "admin", "password": "secret"},
+          inbound_http={"path": "/api/1.0/health/overview", "body": '{"status": "ok"}'},
+          expect_state={"health": {"overview": '{"status":"ok"}'}})

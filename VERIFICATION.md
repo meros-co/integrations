@@ -102,10 +102,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## aimedia-icap — AI-Media / EEG iCap
 
-- [ ] Record the JSON replies of the list and get calls (users, access codes, active encoders and captioners, health), so the live encoders and captioners can be kept in state. ([specs/aimedia-icap.yaml:375](specs/aimedia-icap.yaml#L375))
-- [ ] Confirm the path of the access code PUT (the collection, as the spec sends it, or accesscodes/<code>). ([specs/aimedia-icap.yaml:384](specs/aimedia-icap.yaml#L384))
-- [ ] Record the body of a 401 for wrong credentials and for a CaptionCast without a paid account, so the two can be told apart. ([specs/aimedia-icap.yaml:384](specs/aimedia-icap.yaml#L384))
+- [ ] Record the JSON replies of the list and get calls (users, access codes, active encoders and captioners, health), so the live encoders and captioners can be kept in state. ([specs/aimedia-icap.yaml:402](specs/aimedia-icap.yaml#L402))
+- [ ] Confirm the path of the access code PUT (the collection, as the spec sends it, or accesscodes/<code>). ([specs/aimedia-icap.yaml:413](specs/aimedia-icap.yaml#L413))
+- [ ] Record the body of a 401 for wrong credentials and for a CaptionCast without a paid account, so the two can be told apart. ([specs/aimedia-icap.yaml:413](specs/aimedia-icap.yaml#L413))
 - [ ] Record the success statuses of POST and DELETE calls (200, 201 or 204 accepted). ([specs/aimedia-icap.yaml:106](specs/aimedia-icap.yaml#L106))
+- [ ] Record the JSON of active-encoders, active-captioners and health/overview, so their fields can be kept one by one rather than as JSON text. ([specs/aimedia-icap.yaml:403](specs/aimedia-icap.yaml#L403))
 
 ## aja-bridge-live — AJA BRIDGE LIVE
 
