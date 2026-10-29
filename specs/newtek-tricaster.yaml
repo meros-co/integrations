@@ -85,6 +85,7 @@ models:
                stop_streaming, ddr_play, ddr_stop, play_macro, stop_all_macros,
                shortcut, shortcut_with_value, trigger, set_datalink,
                play_macro_by_id, stop_macro, stop_macro_by_id, record_macro, stop_recording_macro, continue_paused_macro, media_play_toggle, media_previous_clip, media_next_clip, media_select_clip, media_select_preset, media_next_preset, media_previous_preset, media_set_speed, media_mark_in, media_mark_out, media_clear_marks, media_set_mode, media_show_on_switcher, set_source_volume, mute_source, refresh_file_browser,
+               transition_take, transition_auto, transition_auto_timed, set_tbar, select_transition, set_row_source, set_dsk_source, solo_source, set_source_trim, set_noise_gate, set_noise_gate_level, set_headphones_volume,
                net_shortcut, net_clip_store, net_clip_restore, net_clip_select, net_clip_move, net_clip_play, net_clip_play_from, net_clip_scrub, post_shortcut_xml, upload_file]
     verification: none
   - id: tricaster-8
@@ -94,6 +95,7 @@ models:
                stop_streaming, ddr_play, ddr_stop, play_macro, stop_all_macros,
                shortcut, shortcut_with_value, trigger, set_datalink,
                play_macro_by_id, stop_macro, stop_macro_by_id, record_macro, stop_recording_macro, continue_paused_macro, media_play_toggle, media_previous_clip, media_next_clip, media_select_clip, media_select_preset, media_next_preset, media_previous_preset, media_set_speed, media_mark_in, media_mark_out, media_clear_marks, media_set_mode, media_show_on_switcher, set_source_volume, mute_source, refresh_file_browser,
+               transition_take, transition_auto, transition_auto_timed, set_tbar, select_transition, set_row_source, set_dsk_source, solo_source, set_source_trim, set_noise_gate, set_noise_gate_level, set_headphones_volume,
                net_shortcut, net_clip_store, net_clip_restore, net_clip_select, net_clip_move, net_clip_play, net_clip_play_from, net_clip_scrub, post_shortcut_xml, upload_file]
     verification: none
   - id: vectar
@@ -103,8 +105,14 @@ models:
                stop_streaming, ddr_play, ddr_stop, play_macro, stop_all_macros,
                shortcut, shortcut_with_value, trigger, set_datalink,
                play_macro_by_id, stop_macro, stop_macro_by_id, record_macro, stop_recording_macro, continue_paused_macro, media_play_toggle, media_previous_clip, media_next_clip, media_select_clip, media_select_preset, media_next_preset, media_previous_preset, media_set_speed, media_mark_in, media_mark_out, media_clear_marks, media_set_mode, media_show_on_switcher, set_source_volume, mute_source, refresh_file_browser,
+               transition_take, transition_auto, transition_auto_timed, set_tbar, select_transition, set_row_source, set_dsk_source, solo_source, set_source_trim, set_noise_gate, set_noise_gate_level, set_headphones_volume,
                net_shortcut, net_clip_store, net_clip_restore, net_clip_select, net_clip_move, net_clip_play, net_clip_play_from, net_clip_scrub, post_shortcut_xml, upload_file]
     verification: none
+
+maps:
+  # The shortcut prefix of a layer (shortcuts_cfg.xml): none for every
+  # delegated layer, or _background, _dsk1 to _dsk4 and _ftb.
+  layer: { delegated: "", background: _background, dsk1: _dsk1, dsk2: _dsk2, dsk3: _dsk3, dsk4: _dsk4, ftb: _ftb }
 
 commands:
   take:
@@ -438,6 +446,118 @@ commands:
     expect: { status: 200 }
     returns: ack
 
+  transition_take:
+    summary: Take a switcher's delegated layers, or one layer, at once (<switcher>[_<layer>]_take, shortcuts_cfg.xml)
+    params:
+      switcher: { type: enum, values: [main, v1, v2, v3, v4, v5, v6, v7, v8], default: main, label: Switcher, description: "The main switcher, or M/E 1 to 8 (v1 to v8), as the shortcut prefix names it." }
+      layer: { type: enum, values: [delegated, background, dsk1, dsk2, dsk3, dsk4, ftb], default: delegated, label: Layer, description: "The layer to take: every delegated layer, the background, a DSK (a KEY on an M/E) from 1 to 4, or fade to black." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{switcher}{layer:map.layer}_take" } }
+    expect: { status: 200 }
+    returns: ack
+
+  transition_auto:
+    summary: Run an Auto on a switcher's delegated layers, or one layer (<switcher>[_<layer>]_auto, shortcuts_cfg.xml)
+    params:
+      switcher: { type: enum, values: [main, v1, v2, v3, v4, v5, v6, v7, v8], default: main, label: Switcher, description: "The main switcher, or M/E 1 to 8 (v1 to v8), as the shortcut prefix names it." }
+      layer: { type: enum, values: [delegated, background, dsk1, dsk2, dsk3, dsk4, ftb], default: delegated, label: Layer, description: "The layer to transition: every delegated layer, the background, a DSK (a KEY on an M/E) from 1 to 4, or fade to black." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{switcher}{layer:map.layer}_auto" } }
+    expect: { status: 200 }
+    returns: ack
+
+  transition_auto_timed:
+    summary: Run an Auto at a given duration, or change the duration of one running (<switcher>[_<layer>]_tbar_speed, shortcuts_cfg.xml)
+    params:
+      switcher: { type: enum, values: [main, v1, v2, v3, v4, v5, v6, v7, v8], default: main, label: Switcher, description: "The main switcher, or M/E 1 to 8 (v1 to v8), as the shortcut prefix names it." }
+      layer: { type: enum, values: [delegated, background, dsk1, dsk2, dsk3, dsk4, ftb], default: delegated, label: Layer, description: "The layer to transition: every delegated layer, the background, a DSK (a KEY on an M/E) from 1 to 4, or fade to black." }
+      seconds: { type: float, min: 0.0, max: 600.0, required: true, label: Duration, description: "The transition's duration in seconds." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{switcher}{layer:map.layer}_tbar_speed", value: "{seconds:.3f}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  set_tbar:
+    summary: Move a switcher's T-bar, or one layer's, to a position (<switcher>[_<layer>]_value, shortcuts_cfg.xml)
+    params:
+      switcher: { type: enum, values: [main, v1, v2, v3, v4, v5, v6, v7, v8], default: main, label: Switcher, description: "The main switcher, or M/E 1 to 8 (v1 to v8), as the shortcut prefix names it." }
+      layer: { type: enum, values: [delegated, background, dsk1, dsk2, dsk3, dsk4, ftb], default: delegated, label: Layer, description: "The T-bar of every delegated layer, or of one layer: the background, a DSK (a KEY on an M/E) from 1 to 4, or fade to black." }
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Position, description: "T-bar position from 0 (the start of the transition) to 1 (its end)." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{switcher}{layer:map.layer}_value", value: "{position:.4f}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  select_transition:
+    summary: Select a transition preset for a switcher's delegated layers, or one layer (<switcher>[_<layer>]_select_index, shortcuts_cfg.xml)
+    params:
+      switcher: { type: enum, values: [main, v1, v2, v3, v4, v5, v6, v7, v8], default: main, label: Switcher, description: "The main switcher, or M/E 1 to 8 (v1 to v8), as the shortcut prefix names it." }
+      layer: { type: enum, values: [delegated, background, dsk1, dsk2, dsk3, dsk4, ftb], default: delegated, label: Layer, description: "Every delegated layer, or one layer: the background, a DSK (a KEY on an M/E) from 1 to 4, or fade to black." }
+      index: { type: int, min: 0, max: 99, required: true, label: Transition, description: "The transition preset's place in the layer's transition bin, as the system numbers it (switcher_ui_effects lists the bins from effect0)." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{switcher}{layer:map.layer}_select_index", value: "{index}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  set_row_source:
+    summary: Select a source on a switcher row by its internal name (<switcher>_<row>_row_named_input, shortcuts_cfg.xml)
+    params:
+      switcher: { type: enum, values: [main, v1, v2, v3, v4, v5, v6, v7, v8], default: main, label: Switcher, description: "The main switcher, or M/E 1 to 8 (v1 to v8), as the shortcut prefix names it." }
+      row: { type: enum, values: [a, b, c, d], required: true, label: Row, description: "Row A (program on the main switcher), B (preview on the main switcher), or C or D on an M/E with four rows." }
+      source: { type: string, pattern: "^[a-z0-9_]+$", max_length: 32, required: true, label: Source, description: "Internal source name, such as input1, ddr1, gfx1 or bfr2." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{switcher}_{row}_row_named_input", value: "{source}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  set_dsk_source:
+    summary: Select the source of a DSK (a KEY on an M/E) by its internal name (<switcher>_dsk<n>_select_named_input, shortcuts_cfg.xml)
+    params:
+      switcher: { type: enum, values: [main, v1, v2, v3, v4, v5, v6, v7, v8], default: main, label: Switcher, description: "The main switcher, or M/E 1 to 8 (v1 to v8), as the shortcut prefix names it." }
+      dsk: { type: int, min: 1, max: 4, required: true, label: DSK, description: "DSK (KEY on an M/E), numbered from 1 as on the switcher." }
+      source: { type: string, pattern: "^[a-z0-9_]+$", max_length: 32, required: true, label: Source, description: "Internal source name, such as input1, ddr1, gfx1 or bfr2." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{switcher}_dsk{dsk}_select_named_input", value: "{source}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  solo_source:
+    summary: Solo or unsolo a source's audio (<source>_solo, shortcuts_cfg.xml)
+    params:
+      source: { type: string, pattern: "^[a-z0-9_]+$", max_length: 32, required: true, label: Source, description: "Audio source by internal name, such as input1, ddr1 or master." }
+      solo: { type: bool, required: true, label: Solo, description: "True solos the source and false unsolos it." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{source}_solo", value: "{solo}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  set_source_trim:
+    summary: Set a hardware input's trim in dB (<source>_trim, shortcuts_cfg.xml)
+    params:
+      source: { type: string, pattern: "^[a-z0-9_]+$", max_length: 32, required: true, label: Source, description: "Audio source by internal name, such as input1." }
+      trim: { type: float, min: -96.0, max: 96.0, required: true, label: Trim, description: "Input trim in dB, 0 for none." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{source}_trim", value: "{trim:.1f}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  set_noise_gate:
+    summary: Turn a source's noise gate on or off (<source>_enable_noisegate, shortcuts_cfg.xml)
+    params:
+      source: { type: string, pattern: "^[a-z0-9_]+$", max_length: 32, required: true, label: Source, description: "Audio source by internal name, such as input1." }
+      enabled: { type: bool, required: true, label: Noise gate, description: "True turns the noise gate on and false off." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{source}_enable_noisegate", value: "{enabled}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  set_noise_gate_level:
+    summary: Set a source's noise gate level (<source>_noisegate_level, shortcuts_cfg.xml)
+    params:
+      source: { type: string, pattern: "^[a-z0-9_]+$", max_length: 32, required: true, label: Source, description: "Audio source by internal name, such as input1." }
+      level: { type: float, min: -120.0, max: 120.0, required: true, label: Level, description: "Noise gate level, in the system's own units (shortcuts_cfg.xml gives none)." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{source}_noisegate_level", value: "{level:.2f}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  set_headphones_volume:
+    summary: Set the headphones level in dB (phones_volume, shortcuts_cfg.xml)
+    params:
+      level: { type: float, min: -96.0, max: 12.0, required: true, label: Level, description: "Headphones level in dB, 0 for unity." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "phones_volume", value: "{level:.1f}" } }
+    expect: { status: 200 }
+    returns: ack
+
   refresh_file_browser:
     summary: Have the filebrowser dictionary updated (request_filebrowser_update, shortcuts_cfg.xml)
     send: { method: GET, path: /v1/shortcut, query: { name: "request_filebrowser_update" } }
@@ -648,12 +768,79 @@ telemetry:
       replace: switcher.overlays
       state:
         "switcher.overlays.{z_order_position}.source": "{source}"
+    # Each overlay's own T-bar (guide p.169: <overlay><tbar position speed/>).
+    - path: "^/v1/dictionary\\?key=switcher$"
+      xml_each: overlay/tbar
+      state:
+        "switcher.overlays.{^z_order_position}.tbar.position": "{position}"
+        "switcher.overlays.{^z_order_position}.tbar.speed": "{speed}"
     # Every shortcut state the system reports: record and stream state, DDR
     # play state, source names (<input>_long_name), DSK values and more.
     - path: "^/v1/dictionary\\?key=shortcut_states$"
       xml_each: shortcut_state
       state:
         "shortcuts.{name}": "{value}"
+    # The same states read into switchers and audio sources, by the
+    # shortcut's prefix and suffix as shortcuts_cfg.xml names them (each
+    # <shortcut_state name="..." value="..."/> as the guide p.161 shows it):
+    # the main switcher (main) and M/Es 1 to 8 (v1 to v8), each with its
+    # T-bar (_value), Auto (_auto), speed (_speed) and transition preset
+    # (_select_index), for the delegated layers and for each layer
+    # (_background, _dsk1 to _dsk4, _ftb); its rows (_a_row to _d_row, by
+    # index and by internal name); each DSK's source (_select,
+    # _select_named_input); and each audio source's level, mute, solo, noise
+    # gate, latency, trim and connection type.
+    - match: '^\s*<shortcut_states\b'
+      match_each: '<shortcut_state\s+name="(main|v[1-8])_value"\s+value="([^"]*)"'
+      state: { "switchers.{1}.tbar": "{2}" }
+    - match: '^\s*<shortcut_states\b'
+      match_each: '<shortcut_state\s+name="(main|v[1-8])_(background|dsk[1-4]|ftb)_value"\s+value="([^"]*)"'
+      state: { "switchers.{1}.layers.{2}.tbar": "{3}" }
+    - match: '^\s*<shortcut_states\b'
+      match_each: '<shortcut_state\s+name="(main|v[1-8])_(dsk[1-4]|ftb)_value"\s+value="([01])(?:\.0*)?"'
+      state: { "switchers.{1}.layers.{2}.on_air": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: '^\s*<shortcut_states\b'
+      match_each: '<shortcut_state\s+name="(main|v[1-8])_auto"\s+value="([^"]*)"'
+      state: { "switchers.{1}.auto": { value: "{2}", map: { "true": true, "false": false, "True": true, "False": false, "TRUE": true, "FALSE": false, "1": true, "0": false } } }
+    - match: '^\s*<shortcut_states\b'
+      match_each: '<shortcut_state\s+name="(main|v[1-8])_(background|dsk[1-4]|ftb)_auto"\s+value="([^"]*)"'
+      state: { "switchers.{1}.layers.{2}.auto": { value: "{3}", map: { "true": true, "false": false, "True": true, "False": false, "TRUE": true, "FALSE": false, "1": true, "0": false } } }
+    - match: '^\s*<shortcut_states\b'
+      match_each: '<shortcut_state\s+name="(main|v[1-8])_speed"\s+value="([^"]*)"'
+      state: { "switchers.{1}.speed": "{2}" }
+    - match: '^\s*<shortcut_states\b'
+      match_each: '<shortcut_state\s+name="(main|v[1-8])_(background|dsk[1-4]|ftb)_speed"\s+value="([^"]*)"'
+      state: { "switchers.{1}.layers.{2}.speed": "{3}" }
+    - match: '^\s*<shortcut_states\b'
+      match_each: '<shortcut_state\s+name="(main|v[1-8])_select_index"\s+value="(-?\d+)"'
+      state: { "switchers.{1}.transition": "{2}" }
+    - match: '^\s*<shortcut_states\b'
+      match_each: '<shortcut_state\s+name="(main|v[1-8])_(background|dsk[1-4]|ftb)_select_index"\s+value="(-?\d+)"'
+      state: { "switchers.{1}.layers.{2}.transition": "{3}" }
+    - match: '^\s*<shortcut_states\b'
+      match_each: '<shortcut_state\s+name="(main|v[1-8])_([abcd])_row"\s+value="(-?\d+)"'
+      state: { "switchers.{1}.rows.{2}.index": "{3}" }
+    - match: '^\s*<shortcut_states\b'
+      match_each: '<shortcut_state\s+name="(main|v[1-8])_([abcd])_row_named_input"\s+value="([^"]*)"'
+      state: { "switchers.{1}.rows.{2}.source": "{3}" }
+    - match: '^\s*<shortcut_states\b'
+      match_each: '<shortcut_state\s+name="(main|v[1-8])_(dsk[1-4])_select"\s+value="(-?\d+)"'
+      state: { "switchers.{1}.layers.{2}.source_index": "{3}" }
+    - match: '^\s*<shortcut_states\b'
+      match_each: '<shortcut_state\s+name="(main|v[1-8])_(dsk[1-4])_select_named_input"\s+value="([^"]*)"'
+      state: { "switchers.{1}.layers.{2}.source": "{3}" }
+    - match: '^\s*<shortcut_states\b'
+      match_each: '<shortcut_state\s+name="(input\d+|ddr\d|gfx\d|sound|effects|master|aux\d|stream)_(volume|noisegate_level|audio_latency|trim)"\s+value="([^"]*)"'
+      state: { "audio.{1}.{2}": "{3}" }
+    - match: '^\s*<shortcut_states\b'
+      match_each: '<shortcut_state\s+name="(input\d+|ddr\d|gfx\d|sound|effects|master|aux\d|stream)_(mute|solo|enable_noisegate)"\s+value="([^"]*)"'
+      state: { "audio.{1}.{2}": { value: "{3}", map: { "true": true, "false": false, "True": true, "False": false, "TRUE": true, "FALSE": false, "1": true, "0": false } } }
+    - match: '^\s*<shortcut_states\b'
+      match_each: '<shortcut_state\s+name="(input\d+|ddr\d|gfx\d|sound|effects|master|aux\d|stream)_input_type"\s+value="([^"]*)"'
+      state: { "audio.{1}.input_type": "{2}" }
+    - match: '^\s*<shortcut_states\b'
+      match_each: '<shortcut_state\s+name="phones_volume"\s+value="([^"]*)"'
+      state: { "audio.phones.volume": "{1}" }
     # The buffer dictionary (guide p.70): the buffer on the main row first,
     # then each M/E's; the whole reply is kept too.
     - path: "^/v1/dictionary\\?key=buffer$"
@@ -729,6 +916,30 @@ state:
   switcher.tbar.position: { type: float, description: "Main T-bar position, 0 to 1" }
   switcher.tbar.speed: { type: float, description: "Main transition speed the system reports with the T-bar" }
   switcher.overlays.*.source: { type: string, description: "Source on each overlay (DSK), keyed by its z-order position from 0" }
+  switcher.overlays.*.tbar.position: { type: float, description: "The overlay's own T-bar position, 0 to 1: 1 with the overlay fully shown" }
+  switcher.overlays.*.tbar.speed: { type: float, description: "The overlay's transition speed, as the system reports it with its T-bar" }
+  switchers.*.tbar: { type: float, description: "T-bar position of the delegated layers, 0 to 1, keyed by switcher: main, or v1 to v8 for M/E 1 to 8 (the <switcher>_value shortcut state)" }
+  switchers.*.auto: { type: bool, description: "The switcher's Auto button lit, as the system reports it while an Auto runs (<switcher>_auto)" }
+  switchers.*.speed: { type: float, description: "The switcher's transition speed, as the system reports it (<switcher>_speed)" }
+  switchers.*.transition: { type: int, description: "Transition preset selected for the delegated layers, as the system numbers it (<switcher>_select_index)" }
+  switchers.*.rows.*.index: { type: int, description: "Source selected on a row, by index as the system numbers it (from 0), keyed a to d: on the main switcher a is program and b preview" }
+  switchers.*.rows.*.source: { type: string, description: "Source selected on the row, by internal name such as input1 or ddr1" }
+  switchers.*.layers.*.tbar: { type: float, description: "T-bar position of one layer, 0 to 1, keyed background, dsk1 to dsk4 (KEY 1 to 4 on an M/E) or ftb" }
+  switchers.*.layers.*.on_air: { type: bool, description: "For dsk1 to dsk4: the key fully on (its T-bar at 1, true) or off (at 0, false); for ftb: faded to black (true) or not (false). Kept as last reported while the layer's T-bar is between" }
+  switchers.*.layers.*.auto: { type: bool, description: "The layer's Auto lit, as while its Auto runs" }
+  switchers.*.layers.*.speed: { type: float, description: "The layer's transition speed, as the system reports it" }
+  switchers.*.layers.*.transition: { type: int, description: "Transition preset selected for the layer, as the system numbers it" }
+  switchers.*.layers.*.source_index: { type: int, description: "For dsk1 to dsk4: the key's source, by index as the system numbers it" }
+  switchers.*.layers.*.source: { type: string, description: "For dsk1 to dsk4: the key's source, by internal name" }
+  audio.*.volume: { type: float, unit: dB, description: "Audio level of a source or output, keyed by its internal name: input1 and up, ddr1 to ddr4, gfx1, gfx2, sound, effects, master, aux1 to aux3, stream" }
+  audio.*.mute: { type: bool, description: "Source or output muted" }
+  audio.*.solo: { type: bool, description: "Source soloed" }
+  audio.*.enable_noisegate: { type: bool, description: "Source's noise gate on" }
+  audio.*.noisegate_level: { type: float, description: "Source's noise gate level, in the system's own units" }
+  audio.*.audio_latency: { type: float, unit: frames, description: "Source's audio latency" }
+  audio.*.trim: { type: float, unit: dB, description: "Hardware input's trim" }
+  audio.*.input_type: { type: string, description: "Hardware input's connection type: mic, mic_single, mic_and_phantom, line, aes3, sdi_embedded or line_quad" }
+  audio.phones.volume: { type: float, unit: dB, description: "Headphones level (phones_volume)" }
   shortcuts.*:      { type: string, description: "Each shortcut state the system reports, keyed by its name: record_toggle, streaming_toggle, ddr1_play, input1_long_name and others" }
   buffers.main: { type: string, description: "The buffer selected on the main switcher row, such as BFR4" }
   buffers.xml: { type: string, description: "The whole buffer dictionary as the system sends it: the main row's and each M/E row's buffer selections" }
@@ -848,6 +1059,27 @@ quirks:
       read on connecting and when the system names it, after
       refresh_file_browser for instance, since a large media folder makes it
       long.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The switchers and audio state (and the commands for M/E rows, layers,
+      T-bars, transitions, DSK sources and audio) follow shortcuts_cfg.xml's
+      prefixes and suffixes, whose shortcuts with a state_type report their
+      state in the shortcut_states dictionary: <switcher>_value (the T-bar),
+      _auto, _speed, _select_index, _a_row to _d_row and their _named_input
+      forms, _dsk<n>_select and _select_named_input, and each audio source's
+      _volume (dB), _mute, _solo, _enable_noisegate, _noisegate_level,
+      _audio_latency (frames), _trim (dB) and _input_type. The guide documents
+      only the dictionary's element shape, not which states a system lists,
+      so a state the system does not list stays absent. Fade to black and a
+      DSK on air are read from the layer's T-bar: on at 1, off at 0. The guide
+      says the switcher dictionary carries each M/E's row sources and
+      overlays, but shows only the main switcher's, so M/E state comes from
+      shortcut_states. The audiomixer and audio_bins dictionaries, whose
+      content the guide does not show, stay whole under dictionaries; audio
+      meters come only on the VU websocket, whose messages it does not
+      document either.
 
   - models: [vectar]
     severity: info

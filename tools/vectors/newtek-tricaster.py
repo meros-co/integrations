@@ -6,8 +6,8 @@
 TC = "newtek-tricaster"
 
 
-def _tc(command, input, query):
-    http(TC, command, input, "GET", "/v1/shortcut?" + query)
+def _tc(command, input, query, **extra):
+    http(TC, command, input, "GET", "/v1/shortcut?" + query, **extra)
 
 
 _tc("play_macro_by_id", {"id": "a1b2c3d4-0000-4000-8000-000000000001"},
@@ -55,7 +55,8 @@ telemetry(TC, "switcher-overlays", inbound_http={
     state_before={"switcher": {"overlays": {"2": {"source": "GFX1"}}}},
     expect_state={"switcher": {"program": "BFR4", "preview": "gfx1", "effect": "C:\\Effects\\Fade.trans",
                                "tbar": {"position": 0.25, "speed": 0.5},
-                               "overlays": {"0": {"source": "V2"}, "1": {"source": "DDR1"}}}})
+                               "overlays": {"0": {"source": "V2", "tbar": {"position": 1.0, "speed": 0.0}},
+                                            "1": {"source": "DDR1", "tbar": {"position": 0.0, "speed": 0.0}}}}})
 _BUF = ('<buffers><main><buffer selection="BFR4"/></main>'
         '<me index="0"><row><buffer selection="BFR1"/></row></me>'
         '<me index="1"><row><buffer selection="BFR2"/></row></me></buffers>')
@@ -137,3 +138,57 @@ telemetry(TC, "product-color", inbound_http={
             '<session_color_format>CCIR709</session_color_format><session_color_coding>NTSC</session_color_coding>'
             '</product_information>'},
     expect_state={"product": {"model": "TC1"}, "session": {"color_format": "CCIR709", "color_coding": "NTSC"}})
+
+# Switcher layers, rows and DSK sources, and audio (shortcuts_cfg.xml's
+# prefixes and suffixes), as shortcuts with a value.
+_tc("transition_take", {"switcher": "v2", "layer": "dsk3"}, "name=v2_dsk3_take")
+_tc("transition_take", {}, "name=main_take", file="transition_take-defaults")
+_tc("transition_auto", {"layer": "ftb"}, "name=main_ftb_auto")
+_tc("transition_auto_timed", {"switcher": "v1", "seconds": 1.5}, "name=v1_tbar_speed&value=1.500")
+_tc("set_tbar", {"layer": "background", "position": 0.25}, "name=main_background_value&value=0.2500")
+_tc("select_transition", {"switcher": "v3", "index": 2}, "name=v3_select_index&value=2")
+_tc("set_row_source", {"switcher": "v1", "row": "c", "source": "input4"}, "name=v1_c_row_named_input&value=input4")
+_tc("set_dsk_source", {"dsk": 2, "source": "gfx1"}, "name=main_dsk2_select_named_input&value=gfx1")
+_tc("solo_source", {"source": "input3", "solo": True}, "name=input3_solo&value=true")
+_tc("set_source_trim", {"source": "input1", "trim": 6.0}, "name=input1_trim&value=6.0")
+_tc("set_noise_gate", {"source": "input1", "enabled": False}, "name=input1_enable_noisegate&value=false")
+_tc("set_noise_gate_level", {"source": "input1", "level": -40.0}, "name=input1_noisegate_level&value=-40.00")
+_tc("set_headphones_volume", {"level": -12.0}, "name=phones_volume&value=-12.0")
+
+# The shortcut_states dictionary read into switchers and audio (the element
+# shape from the guide p.161, the names from shortcuts_cfg.xml).
+_SS = ('<shortcut_states>'
+       '<shortcut_state name="main_value" value="0.500000" type="double" sender="unknown"/>'
+       '<shortcut_state name="main_auto" value="true" type="bool" sender="unknown"/>'
+       '<shortcut_state name="main_speed" value="1.000000" type="double" sender="unknown"/>'
+       '<shortcut_state name="main_select_index" value="3" type="int" sender="unknown"/>'
+       '<shortcut_state name="main_ftb_value" value="1.000000" type="double" sender="unknown"/>'
+       '<shortcut_state name="main_dsk1_value" value="0.000000" type="double" sender="unknown"/>'
+       '<shortcut_state name="main_dsk1_select_named_input" value="gfx1" type="string" sender="unknown"/>'
+       '<shortcut_state name="main_dsk1_select" value="41" type="int" sender="unknown"/>'
+       '<shortcut_state name="v1_a_row" value="3" type="int" sender="unknown"/>'
+       '<shortcut_state name="v1_a_row_named_input" value="input4" type="string" sender="unknown"/>'
+       '<shortcut_state name="v1_dsk2_value" value="0.400000" type="double" sender="unknown"/>'
+       '<shortcut_state name="v1_dsk2_auto" value="1" type="bool" sender="unknown"/>'
+       '<shortcut_state name="input1_volume" value="-6.000000" type="double" sender="unknown"/>'
+       '<shortcut_state name="input1_mute" value="false" type="bool" sender="unknown"/>'
+       '<shortcut_state name="input1_input_type" value="mic_and_phantom" type="string" sender="unknown"/>'
+       '<shortcut_state name="master_solo" value="0" type="bool" sender="unknown"/>'
+       '<shortcut_state name="phones_volume" value="-3.000000" type="double" sender="unknown"/>'
+       '</shortcut_states>')
+telemetry(TC, "shortcut-states-switchers", inbound_http={"path": "/v1/dictionary?key=shortcut_states", "body": _SS},
+          expect_state={
+              "shortcuts": {"main_value": "0.500000", "main_auto": "true", "main_speed": "1.000000",
+                            "main_select_index": "3", "main_ftb_value": "1.000000", "main_dsk1_value": "0.000000",
+                            "main_dsk1_select_named_input": "gfx1", "main_dsk1_select": "41", "v1_a_row": "3",
+                            "v1_a_row_named_input": "input4", "v1_dsk2_value": "0.400000", "v1_dsk2_auto": "1",
+                            "input1_volume": "-6.000000", "input1_mute": "false",
+                            "input1_input_type": "mic_and_phantom", "master_solo": "0", "phones_volume": "-3.000000"},
+              "switchers": {
+                  "main": {"tbar": 0.5, "auto": True, "speed": 1.0, "transition": 3,
+                           "layers": {"ftb": {"tbar": 1.0, "on_air": True},
+                                      "dsk1": {"tbar": 0.0, "on_air": False, "source": "gfx1", "source_index": 41}}},
+                  "v1": {"rows": {"a": {"index": 3, "source": "input4"}},
+                         "layers": {"dsk2": {"tbar": 0.4, "auto": True}}}},
+              "audio": {"input1": {"volume": -6.0, "mute": False, "input_type": "mic_and_phantom"},
+                        "master": {"solo": False}, "phones": {"volume": -3.0}}})

@@ -791,18 +791,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the camera accepts the subscribe request with type "request" (the PDF's Publish table repeats the Response table, type "response") and that every property subscribed is subscribable. ([specs/blackmagic-camera.yaml:2401](specs/blackmagic-camera.yaml#L2401))
 - [ ] Check that over HTTPS the websocket is served as wss on the same port, and whether it needs the same login. ([specs/blackmagic-camera.yaml:2396](specs/blackmagic-camera.yaml#L2396))
 - [ ] Check that a pushed property names its path without the /control/api/v1 base, as the document's tables show, so the value and the re-read go to the right path. ([specs/blackmagic-camera.yaml:2399](specs/blackmagic-camera.yaml#L2399))
-- [ ] Confirm a propertyValueChanged event carries the property's value in the format its REST GET returns (applied as that reply), and whether any event names only the property (then read again). ([specs/blackmagic-camera.yaml:2473](specs/blackmagic-camera.yaml#L2473))
-- [ ] Confirm the login scheme with "Enabled with security" (Basic sent, Digest answered if challenged). ([specs/blackmagic-camera.yaml:2859](specs/blackmagic-camera.yaml#L2859))
-- [ ] Check which API groups each camera model implements and whether missing ones answer 501 or 404. ([specs/blackmagic-camera.yaml:2865](specs/blackmagic-camera.yaml#L2865))
-- [ ] Check that 0.0-1.0 is the range for normalised values beyond audio level. ([specs/blackmagic-camera.yaml:2883](specs/blackmagic-camera.yaml#L2883))
-- [ ] Check the ranges the camera accepts for colour correction, playback speed, focus distance and aperture number, which are not limited here. ([specs/blackmagic-camera.yaml:2880](specs/blackmagic-camera.yaml#L2880))
-- [ ] Confirm the format filesystem path spelling (doformatSupportedFilesystems or doFormatSupportedFilesystems). ([specs/blackmagic-camera.yaml:2926](specs/blackmagic-camera.yaml#L2926))
-- [ ] Check what body PUT /monitoring/{displayName}/focusAssist accepts ({enabled} or mode, color and intensity). ([specs/blackmagic-camera.yaml:2935](specs/blackmagic-camera.yaml#L2935))
-- [ ] Check whether a clip path in a folder must be sent with "/" encoded as %2F. ([specs/blackmagic-camera.yaml:2948](specs/blackmagic-camera.yaml#L2948))
-- [ ] Check whether preset names for save_preset and delete_preset include the .cset extension. ([specs/blackmagic-camera.yaml:2949](specs/blackmagic-camera.yaml#L2949))
-- [ ] Confirm set_custom_platform is accepted with application/xml and the XML on one line. ([specs/blackmagic-camera.yaml:2961](specs/blackmagic-camera.yaml#L2961))
+- [ ] Confirm a propertyValueChanged event carries the property's value in the format its REST GET returns (applied as that reply), and whether any event names only the property (then read again). ([specs/blackmagic-camera.yaml:2474](specs/blackmagic-camera.yaml#L2474))
+- [ ] Confirm the login scheme with "Enabled with security" (Basic sent, Digest answered if challenged). ([specs/blackmagic-camera.yaml:2887](specs/blackmagic-camera.yaml#L2887))
+- [ ] Check which API groups each camera model implements and whether missing ones answer 501 or 404. ([specs/blackmagic-camera.yaml:2876](specs/blackmagic-camera.yaml#L2876))
+- [ ] Check that 0.0-1.0 is the range for normalised values beyond audio level. ([specs/blackmagic-camera.yaml:2911](specs/blackmagic-camera.yaml#L2911))
+- [ ] Check the ranges the camera accepts for colour correction, playback speed, focus distance and aperture number, which are not limited here. ([specs/blackmagic-camera.yaml:2908](specs/blackmagic-camera.yaml#L2908))
+- [ ] Confirm the format filesystem path spelling (doformatSupportedFilesystems or doFormatSupportedFilesystems). ([specs/blackmagic-camera.yaml:2920](specs/blackmagic-camera.yaml#L2920))
+- [ ] Check what body PUT /monitoring/{displayName}/focusAssist accepts ({enabled} or mode, color and intensity). ([specs/blackmagic-camera.yaml:2941](specs/blackmagic-camera.yaml#L2941))
+- [ ] Check whether a clip path in a folder must be sent with "/" encoded as %2F. ([specs/blackmagic-camera.yaml:2943](specs/blackmagic-camera.yaml#L2943))
+- [ ] Check whether preset names for save_preset and delete_preset include the .cset extension. ([specs/blackmagic-camera.yaml:2944](specs/blackmagic-camera.yaml#L2944))
+- [ ] Confirm set_custom_platform is accepted with application/xml and the XML on one line. ([specs/blackmagic-camera.yaml:2963](specs/blackmagic-camera.yaml#L2963))
 - [ ] Record what the camera advertises over mDNS besides its `<name>.local` host name (service types, TXT `class`). No public source names it, so mDNS discovery does not identify cameras. ([crates/core/src/mdns.rs:751](crates/core/src/mdns.rs#L751))
-- [ ] Confirm GET /media/workingset lists every slot, an empty one as null, so a card or drive taken out leaves media.devices at the next poll. ([specs/blackmagic-camera.yaml:2630](specs/blackmagic-camera.yaml#L2630))
+- [ ] Confirm GET /media/workingset lists every slot, an empty one as null, so a card or drive taken out leaves media.devices at the next poll. ([specs/blackmagic-camera.yaml:2653](specs/blackmagic-camera.yaml#L2653))
 - [ ] Confirm POST /presets takes the .cset file as the request body with a Content-Disposition header naming it (the document only implies this through its 400 answer), not a multipart/form-data part, and answers 200 with presetAdded. ([specs/blackmagic-camera.yaml:1697](specs/blackmagic-camera.yaml#L1697))
 
 ## blackmagic-hyperdeck — Blackmagic HyperDeck
@@ -1073,11 +1073,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## canon-ptz — Canon PTZ and pro video cameras (XC protocol)
 
-- [ ] Confirm every control.cgi key and value against a camera: they come from the Companion module, not from Canon's gated XC specification. ([specs/canon-ptz.yaml:1226](specs/canon-ptz.yaml#L1226))
+- [ ] Confirm every control.cgi key and value against a camera: they come from the Companion module, not from Canon's gated XC specification. ([specs/canon-ptz.yaml:1235](specs/canon-ptz.yaml#L1235))
 - [ ] Record what control.cgi, standby.cgi, preset/set and trace/control answer on success and on a refused value (status 200 assumed for success). ([specs/canon-ptz.yaml:219](specs/canon-ptz.yaml#L219))
-- [ ] Record a full info.cgi reply: the key:=value line format, line endings, and the values of f.standby, f.tally/f.tally.mode, shutter, iris, gain and ND. ([specs/canon-ptz.yaml:1129](specs/canon-ptz.yaml#L1129))
-- [ ] Check whether info.cgi reports program and preview tally separately, or only the last-set tally with its mode. ([specs/canon-ptz.yaml:1141](specs/canon-ptz.yaml#L1141))
-- [ ] On CR-N100, CR-N300, CR-N350 and CR-N400, check whether the iris value key is c.1.me.diaphragm (sent here) or me.diaphragm (sent by the Companion module). ([specs/canon-ptz.yaml:1265](specs/canon-ptz.yaml#L1265))
+- [ ] Record a full info.cgi reply: the key:=value line format, line endings, and the values of f.standby, f.tally/f.tally.mode, shutter, iris, gain and ND. ([specs/canon-ptz.yaml:1130](specs/canon-ptz.yaml#L1130))
+- [ ] Check whether info.cgi reports program and preview tally separately, or only the last-set tally with its mode. ([specs/canon-ptz.yaml:1142](specs/canon-ptz.yaml#L1142))
+- [ ] On CR-N100, CR-N300, CR-N350 and CR-N400, check whether the iris value key is c.1.me.diaphragm (sent here) or me.diaphragm (sent by the Companion module). ([specs/canon-ptz.yaml:1274](specs/canon-ptz.yaml#L1274))
 - [ ] Check the pan/tilt speed scale for pan.speed.dir and tilt.speed.dir (10-10000 assumed) and zoom.speed.dir (0-127). ([specs/canon-ptz.yaml:341](specs/canon-ptz.yaml#L341))
 - [ ] Check the units and ranges of the absolute pan, tilt and zoom positions in pan_tilt_zoom_to and zoom_to. ([specs/canon-ptz.yaml:452](specs/canon-ptz.yaml#L452))
 - [ ] Check that p.ptztime is in milliseconds (2000-99000) and p.ptzspeed 1-100. ([specs/canon-ptz.yaml:960](specs/canon-ptz.yaml#L960))
@@ -1086,6 +1086,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that on1 is the only "on" value of c.1.is. ([specs/canon-ptz.yaml:317](specs/canon-ptz.yaml#L317))
 - [ ] Check Digest authentication with an administrator account and with guest access, on firmware with HTTPS enabled. ([specs/canon-ptz.yaml:57](specs/canon-ptz.yaml#L57))
 - [ ] On the EOS C80 and XF605, confirm the XC protocol is enabled over the network the same way, and which commands they accept. ([specs/canon-ptz.yaml:305](specs/canon-ptz.yaml#L305))
+- [ ] Confirm that info.cgi lists each preset's name as p.<n>.name.utf8 and how an unnamed preset reads (empty or preset<n>). ([specs/canon-ptz.yaml:1223](specs/canon-ptz.yaml#L1223))
 
 ## casparcg — CasparCG Server
 
@@ -3191,23 +3192,27 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## newtek-tricaster — NewTek / Vizrt TriCaster and Vectar
 
-- [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:770](specs/newtek-tricaster.yaml#L770))
-- [ ] Confirm the login scheme (Basic sent, Digest answered if challenged). ([specs/newtek-tricaster.yaml:763](specs/newtek-tricaster.yaml#L763))
-- [ ] Confirm the change notification websocket is on the web port (the guide's text says 5951, its example the web port), whether it needs the Live Panel login, and whether it stays open without the client sending anything. ([specs/newtek-tricaster.yaml:599](specs/newtek-tricaster.yaml#L599))
-- [ ] Confirm each notification is the bare dictionary name, one per message, as the guide says. ([specs/newtek-tricaster.yaml:623](specs/newtek-tricaster.yaml#L623))
-- [ ] Record the ddr_playlist and ddr_timecode dictionaries, whose content the guide does not show, so clips and remaining times can be read into state rather than kept as XML; and check that polling ddr_timecode every second is safe on current Vizion software. ([specs/newtek-tricaster.yaml:673](specs/newtek-tricaster.yaml#L673))
-- [ ] Record the macros_list dictionary: confirm macro elements with a name attribute and find the id attribute's name. ([specs/newtek-tricaster.yaml:696](specs/newtek-tricaster.yaml#L696))
-- [ ] Check which of /version (the guide) and /v1/version answers on each software version. ([specs/newtek-tricaster.yaml:619](specs/newtek-tricaster.yaml#L619))
-- [ ] Record the buffer dictionary with several M/Es: check each M/E's index (from 0 as the guide's example shows, or from 1) and whether an M/E has more than one row of buffers. ([specs/newtek-tricaster.yaml:668](specs/newtek-tricaster.yaml#L668))
-- [ ] Check whether media_select_clip counts clips from 0 or 1. ([specs/newtek-tricaster.yaml:337](specs/newtek-tricaster.yaml#L337))
-- [ ] Check that the mode toggles take true or false as a value to set the mode rather than toggle it. ([specs/newtek-tricaster.yaml:404](specs/newtek-tricaster.yaml#L404))
-- [ ] Check the volume shortcut's value is dB, with one decimal accepted, and its range. ([specs/newtek-tricaster.yaml:423](specs/newtek-tricaster.yaml#L423))
-- [ ] Confirm the 3Play channel commands posted as XML through the net shortcut (<shortcut name="net1" value="clip_play" speed="1.000"/>) reach the 3Play, and how net_shortcut's shortcut_name key is written. ([specs/newtek-tricaster.yaml:447](specs/newtek-tricaster.yaml#L447))
-- [ ] Confirm the 3Play channel commands' number formats (three decimals sent for speed, position and distance) are accepted. ([specs/newtek-tricaster.yaml:514](specs/newtek-tricaster.yaml#L514))
-- [ ] Confirm POST /v1/file honours the Filename and Overwrite headers and answers with the stored file name as the body. ([specs/newtek-tricaster.yaml:569](specs/newtek-tricaster.yaml#L569))
-- [ ] Record the audiomixer, audio_bins, ndi_sources and filebrowser dictionaries, whose content the guide does not show, so they can be read into state rather than kept as XML. ([specs/newtek-tricaster.yaml:681](specs/newtek-tricaster.yaml#L681))
-- [ ] Confirm GET /v1/datalink lists every DataLink key as <data><key/><value/></data> elements. ([specs/newtek-tricaster.yaml:686](specs/newtek-tricaster.yaml#L686))
-- [ ] Confirm Vizrt Vectar and Viz Vectar Plus answer the same shortcuts, dictionaries and change notification websocket as a TriCaster, and their input count for the net commands. ([specs/newtek-tricaster.yaml:852](specs/newtek-tricaster.yaml#L852))
+- [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:981](specs/newtek-tricaster.yaml#L981))
+- [ ] Confirm the login scheme (Basic sent, Digest answered if challenged). ([specs/newtek-tricaster.yaml:974](specs/newtek-tricaster.yaml#L974))
+- [ ] Confirm the change notification websocket is on the web port (the guide's text says 5951, its example the web port), whether it needs the Live Panel login, and whether it stays open without the client sending anything. ([specs/newtek-tricaster.yaml:719](specs/newtek-tricaster.yaml#L719))
+- [ ] Confirm each notification is the bare dictionary name, one per message, as the guide says. ([specs/newtek-tricaster.yaml:743](specs/newtek-tricaster.yaml#L743))
+- [ ] Record the ddr_playlist and ddr_timecode dictionaries, whose content the guide does not show, so clips and remaining times can be read into state rather than kept as XML; and check that polling ddr_timecode every second is safe on current Vizion software. ([specs/newtek-tricaster.yaml:860](specs/newtek-tricaster.yaml#L860))
+- [ ] Record the macros_list dictionary: confirm macro elements with a name attribute and find the id attribute's name. ([specs/newtek-tricaster.yaml:883](specs/newtek-tricaster.yaml#L883))
+- [ ] Check which of /version (the guide) and /v1/version answers on each software version. ([specs/newtek-tricaster.yaml:739](specs/newtek-tricaster.yaml#L739))
+- [ ] Record the buffer dictionary with several M/Es: check each M/E's index (from 0 as the guide's example shows, or from 1) and whether an M/E has more than one row of buffers. ([specs/newtek-tricaster.yaml:855](specs/newtek-tricaster.yaml#L855))
+- [ ] Check whether media_select_clip counts clips from 0 or 1. ([specs/newtek-tricaster.yaml:345](specs/newtek-tricaster.yaml#L345))
+- [ ] Check that the mode toggles take true or false as a value to set the mode rather than toggle it. ([specs/newtek-tricaster.yaml:412](specs/newtek-tricaster.yaml#L412))
+- [ ] Check the volume shortcut's value is dB, with one decimal accepted, and its range. ([specs/newtek-tricaster.yaml:431](specs/newtek-tricaster.yaml#L431))
+- [ ] Confirm the 3Play channel commands posted as XML through the net shortcut (<shortcut name="net1" value="clip_play" speed="1.000"/>) reach the 3Play, and how net_shortcut's shortcut_name key is written. ([specs/newtek-tricaster.yaml:567](specs/newtek-tricaster.yaml#L567))
+- [ ] Confirm the 3Play channel commands' number formats (three decimals sent for speed, position and distance) are accepted. ([specs/newtek-tricaster.yaml:634](specs/newtek-tricaster.yaml#L634))
+- [ ] Confirm POST /v1/file honours the Filename and Overwrite headers and answers with the stored file name as the body. ([specs/newtek-tricaster.yaml:689](specs/newtek-tricaster.yaml#L689))
+- [ ] Record the audiomixer, audio_bins, ndi_sources and filebrowser dictionaries, whose content the guide does not show, so they can be read into state rather than kept as XML. ([specs/newtek-tricaster.yaml:868](specs/newtek-tricaster.yaml#L868))
+- [ ] Confirm GET /v1/datalink lists every DataLink key as <data><key/><value/></data> elements. ([specs/newtek-tricaster.yaml:873](specs/newtek-tricaster.yaml#L873))
+- [ ] Confirm Vizrt Vectar and Viz Vectar Plus answer the same shortcuts, dictionaries and change notification websocket as a TriCaster, and their input count for the net commands. ([specs/newtek-tricaster.yaml:1084](specs/newtek-tricaster.yaml#L1084))
+- [ ] Confirm that the shortcut_states dictionary lists the switcher states read from shortcuts_cfg.xml (<switcher>_value, _auto, _speed, _select_index, _a_row to _d_row and _named_input, _dsk<n>_select and _select_named_input) and the audio states (_volume, _mute, _solo, _enable_noisegate, _noisegate_level, _audio_latency, _trim, _input_type, phones_volume), with name before value as in the guide's example, and how booleans are written (true/false or 1/0). ([specs/newtek-tricaster.yaml:783](specs/newtek-tricaster.yaml#L783))
+- [ ] Confirm that fade to black is on with <switcher>_ftb_value at 1 and off at 0, that a DSK is on air with its _value at 1, and that _auto stays true while an Auto runs. ([specs/newtek-tricaster.yaml:800](specs/newtek-tricaster.yaml#L800))
+- [ ] Check whether _select_index and the row indexes count from 0 or 1, and the units of _speed, _noisegate_level and _tbar_speed's value (the file says seconds for _tbar_speed only). ([specs/newtek-tricaster.yaml:815](specs/newtek-tricaster.yaml#L815))
+- [ ] Capture the switcher dictionary of a system with M/Es, to read each M/E's row sources and overlays from it as well (the guide shows the main switcher only). ([specs/newtek-tricaster.yaml:773](specs/newtek-tricaster.yaml#L773))
 
 ## nimble-streamer — Nimble Streamer (native API)
 
@@ -3308,10 +3313,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## obsbot-tail — OBSBOT Tail 2 and Tail Air (OSC)
 
-- [ ] Check whether the camera sends its UDP replies to the sender's port or always to port 57120, and that replies arrive when the core sends from feedback_port 57120. ([specs/obsbot-tail.yaml:405](specs/obsbot-tail.yaml#L405))
-- [ ] Check that a Tail 2 answers GetDeviceInfo, GetZoomInfo and GetGimbalPosInfo, or only answers Connected with its full state (as a third-party integration reports), and which messages that state comes in. ([specs/obsbot-tail.yaml:412](specs/obsbot-tail.yaml#L412))
-- [ ] Check the DeviceInfo device type number a Tail 2 and a Tail Air report, and whether SetShutterSpeed takes 12.5, 6.25 and 2.5 in any form. ([specs/obsbot-tail.yaml:418](specs/obsbot-tail.yaml#L418))
-- [ ] Check that SetGimbalUp and SetGimbalLeft with speed 0 together stop a move in any direction. ([specs/obsbot-tail.yaml:425](specs/obsbot-tail.yaml#L425))
+- [ ] Check whether the camera sends its UDP replies to the sender's port or always to port 57120, and that replies arrive when the core sends from feedback_port 57120. ([specs/obsbot-tail.yaml:410](specs/obsbot-tail.yaml#L410))
+- [ ] Check that a Tail 2 answers GetDeviceInfo, GetZoomInfo and GetGimbalPosInfo, or only answers Connected with its full state (as a third-party integration reports), and which messages that state comes in. ([specs/obsbot-tail.yaml:417](specs/obsbot-tail.yaml#L417))
+- [ ] Check the DeviceInfo device type number a Tail 2 and a Tail Air report, and whether SetShutterSpeed takes 12.5, 6.25 and 2.5 in any form. ([specs/obsbot-tail.yaml:423](specs/obsbot-tail.yaml#L423))
+- [ ] Check that SetGimbalUp and SetGimbalLeft with speed 0 together stop a move in any direction. ([specs/obsbot-tail.yaml:430](specs/obsbot-tail.yaml#L430))
 
 ## obsidian-onyx — Obsidian ONYX (Telnet)
 
@@ -3633,6 +3638,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether the camera decodes percent-encoded names, stream keys and SRT settings. ([specs/ptzoptics.yaml:1801](specs/ptzoptics.yaml#L1801))
 - [ ] Record the values of the streaming, standby and privacy flags and the formats of the network and camera information replies, which are not documented. ([specs/ptzoptics.yaml:1397](specs/ptzoptics.yaml#L1397))
 - [ ] Check whether any HTTP query reports pan, tilt, zoom or focus position, power, time of flight, display info, the tracking overlay or the tracking start location (the document shows none; trackstart in get_image_conf may be the start location). ([specs/ptzoptics.yaml:1820](specs/ptzoptics.yaml#L1820))
+- [ ] Record the tally values get_tally_status reports besides Off, and what autotrack and trackswitch read while auto tracking is on (set as on/off, reported as a number, 0 in the example). ([specs/ptzoptics.yaml:1342](specs/ptzoptics.yaml#L1342))
 
 ## qlab — QLab
 
@@ -3692,10 +3698,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## red-rcp2 — RED DSMC3 cameras (RCP2 over WebSocket)
 
-- [ ] Check every message form, parameter id, value scale and enumeration in this spec against RED's RCP2 documents (behind a RED account login) or a camera; none comes from RED's own documentation. ([specs/red-rcp2.yaml:369](specs/red-rcp2.yaml#L369))
+- [ ] Check every message form, parameter id, value scale and enumeration in this spec against RED's RCP2 documents (behind a RED account login) or a camera; none comes from RED's own documentation. ([specs/red-rcp2.yaml:434](specs/red-rcp2.yaml#L434))
 - [ ] Record the camera's answers to rcp_config and rcp_get_types on connecting, and whether the WebSocket path is / on port 9998. ([specs/red-rcp2.yaml:58](specs/red-rcp2.yaml#L58))
 - [ ] Record an rcp_session message, to confirm its data is echoed back as it came, and how long the camera waits for the echo before dropping the connection. ([specs/red-rcp2.yaml:53](specs/red-rcp2.yaml#L53))
 - [ ] Confirm the RECORD_FORMAT numbers, the EXTERNAL_TALLY state, opacity, style and thickness numbers, the ISO and color temperature ranges, and the units of SENSOR_FRAME_RATE and EXPOSURE_ADJUST. ([specs/red-rcp2.yaml:275](specs/red-rcp2.yaml#L275))
+- [ ] Confirm the ACTIVE_POWER_IN_*, TEMPERATURE_* and AF_* parameter ids, their scales and units, and that rcp_get also subscribes (so each 30 s read is followed by an unsubscribe). ([specs/red-rcp2.yaml:335](specs/red-rcp2.yaml#L335))
 
 ## renewedvision-pvp — Renewed Vision PVP
 
@@ -3836,12 +3843,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## roland-xs1hd — Roland XS-1HD
 
 - [ ] Confirm ACS (obtain the status) is answered by a bare ACK and nothing else, as the liveness check assumes; the manual lists no ACS reply. ([specs/roland-xs1hd.yaml:39](specs/roland-xs1hd.yaml#L39))
+- [ ] Check that levels between 100 (0.0 dB) and 127 (+6.0 dB) are linear in dB, as the dB commands assume. ([specs/roland-xs1hd.yaml:107](specs/roland-xs1hd.yaml#L107))
 
 ## roland-xs42h — Roland XS-42H / VP-42H
 
-- [ ] Check whether the unit prompts before taking the password, and record the login exchange and what a wrong password produces. ([specs/roland-xs42h.yaml:354](specs/roland-xs42h.yaml#L354))
-- [ ] Check the dB scale of levels 0-127. ([specs/roland-xs42h.yaml:381](specs/roland-xs42h.yaml#L381))
+- [ ] Check whether the unit prompts before taking the password, and record the login exchange and what a wrong password produces. ([specs/roland-xs42h.yaml:480](specs/roland-xs42h.yaml#L480))
+- [ ] Check the dB scale of levels 0-127. ([specs/roland-xs42h.yaml:507](specs/roland-xs42h.yaml#L507))
 - [ ] Confirm the RS-232 port uses no flow control (not documented) and asks for no password. ([specs/roland-xs42h.yaml:39](specs/roland-xs42h.yaml#L39))
+- [ ] Check that levels between 100 (0.0 dB) and 127 (+6.0 dB) are linear in dB, as the dB commands assume. ([specs/roland-xs42h.yaml:128](specs/roland-xs42h.yaml#L128))
 
 ## roland-xs62s — Roland XS-62S
 
@@ -3851,11 +3860,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## roland-xs80h — Roland XS-82H/83H/84H
 
-- [ ] Check whether any line ending follows ";" over LAN. ([specs/roland-xs80h.yaml:564](specs/roland-xs80h.yaml#L564))
-- [ ] Check whether ITS, OTS, CTS, KLS and VER are followed by ACK;. ([specs/roland-xs80h.yaml:566](specs/roland-xs80h.yaml#L566))
-- [ ] Check whether a setting enables LAN control and whether a password applies. ([specs/roland-xs80h.yaml:584](specs/roland-xs80h.yaml#L584))
+- [ ] Check whether any line ending follows ";" over LAN. ([specs/roland-xs80h.yaml:606](specs/roland-xs80h.yaml#L606))
+- [ ] Check whether ITS, OTS, CTS, KLS and VER are followed by ACK;. ([specs/roland-xs80h.yaml:608](specs/roland-xs80h.yaml#L608))
+- [ ] Check whether a setting enables LAN control and whether a password applies. ([specs/roland-xs80h.yaml:626](specs/roland-xs80h.yaml#L626))
 - [ ] Drive an XS-8xH on RS-232C (link serial, FUNCTION RECEIVER) with no CR after the ";" and confirm the same replies as over LAN, with XON/XOFF. ([specs/roland-xs80h.yaml:48](specs/roland-xs80h.yaml#L48))
-- [ ] Confirm an XS-82H or XS-83H answers ITS and OTS for the inputs and outputs it lacks with an error, as for CTS. ([specs/roland-xs80h.yaml:510](specs/roland-xs80h.yaml#L510))
+- [ ] Confirm an XS-82H or XS-83H answers ITS and OTS for the inputs and outputs it lacks with an error, as for CTS. ([specs/roland-xs80h.yaml:552](specs/roland-xs80h.yaml#L552))
+- [ ] Check that levels between 100 (0.0 dB) and 127 (+6.0 dB) are linear in dB, as the dB commands assume. ([specs/roland-xs80h.yaml:198](specs/roland-xs80h.yaml#L198))
 
 ## ross-ultrix — Ross Ultrix (RossTalk)
 
@@ -4983,6 +4993,7 @@ Nothing specific is listed for these yet, but test results are still welcome: ge
 - [ ] Record the answers of /ctrl/tc, /ctrl/stream_setting?action=query, /ctrl/rtmp, /ctrl/srt, /ctrl/ndi, /ctrl/pt?action=query, /ctrl/network?action=info, /ctrl/card?action=present, /ctrl/preset?action=get_info and /ctrl/framing/all_status, so their fields can be read into state. ([specs/zcam.yaml:3191](specs/zcam.yaml#L3191))
 - [ ] Check the valid ranges of fspeed for /ctrl/lens zoom and focus, the pan/tilt speeds of action=pt, preset and trace numbers, and the framing fov, target_lost and placement values. ([specs/zcam.yaml:3191](specs/zcam.yaml#L3191))
 - [ ] Find out how a client logs in when the camera's user accounts or HTTPS authentication are on, and whether clip downloads need it. ([specs/zcam.yaml:3199](specs/zcam.yaml#L3199))
+- [ ] Record the answers of the temperature query, /ctrl/card?action=present, query_free and query_total, and /ctrl/nick_name, so their fields can be read into state (the HTTP protocol document gives none of them). ([specs/zcam.yaml:3159](specs/zcam.yaml#L3159))
 
 ## zerodensity-reality-hub — Zero Density Reality Hub
 
