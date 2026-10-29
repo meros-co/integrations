@@ -192,7 +192,7 @@ _YTF_REREAD = [f"get MIXER:Current/{a} {x} 0\n" for a, n in (
     ("Mono/Label/Name", 1), ("Mono/Label/Color", 1), ("MuteMaster/Label/Name", 6),
 ) for x in range(n)]
 _ytf_explicit("telemetry", "scene-current", inbound="NOTIFY sscurrent_ex scene_b 1\n", expect_state={"scenes": {"b": {"current": 1}}},
-              expect_then_send=_YTF_REREAD)
+              expect_then_send=["ssinfo_ex scene_b 1\n"] + _YTF_REREAD)
 _ytf_explicit("telemetry", "scene-current-reply", inbound="OK sscurrent_ex scene_a 3 unmodified\n",
               expect_state={"scenes": {"a": {"current": 3, "modified": False}}})
 # Scene step events: the console's scninfo list (MIXER:Lib/Scene/RecallInc, RecallDec); event form as Yamaha's DM7 document.
@@ -233,3 +233,13 @@ _ytf_explicit("telemetry", "error-reply-is-not-state", inbound="ERROR get Invali
 
 _ytf_vectors()
 _ytf_EXPLICIT.clear()
+
+# ── Meters and scene titles ───────────────────────────────────────────────
+# With the meters setting on, mtrstart for each meter of the console's list
+# goes first on connecting, before the reads (DME7 document 2-16 p.22). A
+# notification is a type word, then two hex digits per channel (3.2.3 p.10);
+# 00-7E are -126 to 0 dBFS, 7F OVER (5.1 p.50).
+telemetry('yamaha-tf', 'meters-subscribe', settings={'meters': True, 'meter_interval_ms': 200, 'meter_point': 'PreFader'}, expect_connect_wire=['mtrstart MIXER:Current/InCh/PreFader 200\n'], inbound='NOTIFY mtr MIXER:Current/InCh/PreFader level 7e 7F 00 6a\n', expect_state={'inputs': {'1': {'meter': 126, 'meter_db': 0.0}, '2': {'meter': 127}, '3': {'meter': 0, 'meter_db': -126.0}, '4': {'meter': 106, 'meter_db': -20.0}}})
+telemetry('yamaha-tf', 'meters-mono', inbound='NOTIFY mtr MIXER:Current/Meter/Mono/PostOn level 66\n', expect_state={'mono': {'meter': 102, 'meter_db': -24.0}})
+telemetry('yamaha-tf', 'scene-title', inbound='OK ssinfo_ex scene_b 12 "B12" "Band" "" user\n', expect_state={'scenes': {'b': {'list': {'12': {'number_text': 'B12', 'title': 'Band', 'comment': '', 'attribute': 'user'}}}}})
+telemetry('yamaha-tf', 'scene-stored-reads-title', inbound='OK ssupdate_ex scene_a 7\n', expect_state={}, expect_then_send=['ssinfo_ex scene_a 7\n'])

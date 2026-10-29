@@ -10,7 +10,10 @@ category: playback
 # message. BrightSign's sample control script (autorun.brs) gives a fixed set
 # of playback commands instead. Each command is one datagram with no line
 # ending; the player answers nothing to the sender, so commands are reported
-# unverified. The player's state is read over the Local DWS (brightsign-dws).
+# unverified. The sample control script broadcasts what it does (PLAY, STOP,
+# ENDP, its STATUS text...) to UDP 5001, which is listened on here for the
+# control-script model's state; the player's own state is read over the Local
+# DWS (brightsign-dws).
 source:
   - title: "UDP Event (BrightSign Author documentation)"
     author: BrightSign
@@ -40,15 +43,34 @@ source:
       PAUSE, RESUME, REBOOT, STOP, STOPCL, PLAY <file>, PLAYCL <file>, LOOP <file>, LOOPS <file>, SEARCH
       <file>, VOLUME <percent>, one per UDP datagram; the script it ships receives on UDP 5000 and sends its
       own messages to UDP 5001.
+  - title: "BrightSign sample Serial or UDP control script v3.01E (support/autorun.brs in the Companion module, MIT)"
+    url: "https://github.com/bitfocus/companion-module-brightsign-player/blob/master/support/autorun.brs"
+    note: >
+      Read 2026-10-28 to fill the gap BrightSign's page leaves (it says only that the script "provides feedback
+      when a command is received" and when a file is found or loops; its control_script_latest.zip link is
+      not public). Settings udpPortReceive 5000, udpPortSend 5001, udpDestinationAddress 255.255.255.255;
+      SendResponse sends each response followed by a line feed, prefixed "BS<ID> " when the script's ID is
+      not 0; on starting "Start" and "Control Script Version: <version>"; per command a code (STOP, STPC,
+      PLAY, PLYC, PLYS, LOOP, LOOPS, PAUS, RESU, FF, VERS, SRCH, VOLM, REBT...) then READY; ENDP and ENDL
+      when a file ends or loops, ATTR when the attract loop starts; NoFl and INVL for no or an invalid file;
+      VERSION answers "<model> : <firmware>"; STATUS answers the status text: Ready, Stopped, Paused, FF, RW,
+      Playing Attract, "Playing: <file>", "Looping: <file>", "Seamless Looping: <file>", "Stream: <url>";
+      FF and RW set the playback speed to 2 and -2.
 
 transport:
   type: line-udp
   port: 5000
   terminator: none
   reply: none
+  listen_port: { setting: feedback_port }
+
+settings:
+  feedback_port: { type: int, min: 1, max: 65535, default: 5001, label: Feedback port,
+                   description: "The local UDP port the sample control script sends its responses to (its udpPortSend, 5001 unless changed); empty to read nothing back." }
 
 ports:
   - { port: 5000, protocol: udp, role: control, note: "the presentation's UDP Receiver Port, or the sample control script's receive port; 5000 unless changed" }
+  - { port: 5001, protocol: udp, role: feedback, listener: core, setting: feedback_port, note: "where the sample control script broadcasts its responses (255.255.255.255:5001 unless changed)" }
 
 models:
   - id: presentation
@@ -58,7 +80,7 @@ models:
   - id: control-script
     name: BrightSign player running BrightSign's sample control script
     supports: [send_message, play, play_clear, loop, loop_seamless, stop, stop_clear, pause, resume, search,
-               set_volume, reboot]
+               set_volume, reboot, fast_forward, rewind, get_status, get_version]
     verification: none
 
 commands:
@@ -135,6 +157,22 @@ commands:
     summary: "Reboot the player (REBOOT)"
     send: "REBOOT"
     returns: none
+  fast_forward:
+    summary: "Play the video at double speed (FF)"
+    send: "FF"
+    returns: none
+  rewind:
+    summary: "Play the video backwards at double speed (RW)"
+    send: "RW"
+    returns: none
+  get_status:
+    summary: "Ask the script for its status text, read into playback state (STATUS)"
+    send: "STATUS"
+    returns: none
+  get_version:
+    summary: "Ask the script for the player's model and firmware, read into state (VERSION)"
+    send: "VERSION"
+    returns: none
 
 quirks:
   - models: [presentation]
@@ -149,8 +187,63 @@ quirks:
       The command texts and ports are those of BrightSign's sample control script as the Companion module
       describes it (receive on UDP 5000, its own messages to UDP 5001); the script's settings can change both.
       Its answers go to its configured destination, not back to the sender, and are not read here.
+  - models: [control-script]
+    severity: info
+    text: >
+      The script broadcasts its responses to UDP 5001 (udpDestinationAddress 255.255.255.255), not back to
+      the sender; feedback_port listens there, and each response is read by the player's address. STATUS is
+      asked every 5 seconds and again after each response that says the playback changed, so state follows
+      the script's own status text. The script does not report its volume, the file names a SEARCH or LIST
+      answers cannot be told from other responses, and the codes come from the v3.01E copy of the script
+      (BrightSign's current download is not public): a newer script may differ.
   - models: [all]
     severity: info
     text: >
-      UDP gives no acknowledgement: every command is reported unverified, and the player's state is read
-      with the brightsign-dws integration over its Local DWS.
+      UDP gives no acknowledgement: every command is reported unverified. A presentation's own UDP output
+      is whatever it is authored to send, so the presentation model reads nothing back; the player's state
+      is read with the brightsign-dws integration over its Local DWS.
+
+state:
+  playback.status: { type: string, description: "The control script's status text as STATUS answers it: Ready, Stopped, Paused, FF, RW, Playing Attract, or Playing, Looping, Seamless Looping or Stream, a colon and the file or URL" }
+  playback.state: { type: string, description: "The status as a word: ready, stopped, paused, fast_forward, rewind, playing_attract, playing, looping, seamless_looping or streaming" }
+  playback.file: { type: string, description: "The file (or stream URL) the status names; empty when it names none" }
+  last_response: { type: string, description: "The script's last response code without its BS<ID> prefix, such as PLAY, READY, ENDP or NoFl" }
+  last_event: { type: string, description: "The last end-of-media event: ENDP (a file ended), ENDL (it looped) or ATTR (the attract loop started)" }
+  player.model: { type: string, description: "The player's model, from the answer to VERSION" }
+  player.firmware: { type: string, description: "The player's firmware version, from the answer to VERSION" }
+  script.version: { type: string, description: "The control script's version, from the Control Script Version line it sends on starting" }
+
+telemetry:
+  poll:
+    - every_ms: 5000
+      send: [{ models: [control-script], message: "STATUS" }]
+    - every_ms: 3600000
+      send: [{ models: [control-script], message: "VERSION" }]
+  updates:
+    - models: [control-script]
+      match: '^(?:BS\d+ )?(Playing|Looping|Seamless Looping|Stream): (.+?)\s*$'
+      state:
+        playback.status: "{1}: {2}"
+        playback.state: { value: "{1}", map: { "Playing": "playing", "Looping": "looping", "Seamless Looping": "seamless_looping", "Stream": "streaming" } }
+        playback.file: "{2}"
+    - models: [control-script]
+      match: '^(?:BS\d+ )?(Ready|Stopped|Paused|FF|RW|Playing Attract)\s*$'
+      state:
+        playback.status: "{1}"
+        playback.state: { value: "{1}", map: { "Ready": "ready", "Stopped": "stopped", "Paused": "paused", "FF": "fast_forward", "RW": "rewind", "Playing Attract": "playing_attract" } }
+        playback.file: ""
+    - models: [control-script]
+      match: '^(?:BS\d+ )?(STOP|STPC|PLAY|PLYC|PLYS|LOOP|LOOPS|PAUS|RESU|FF|ENDP|ENDL|ATTR|READY|NoFl|INVL|SRCH|VOLM|VVOL|AVOL|VERS|REBT|Start)\s*$'
+      state: { last_response: "{1}" }
+    - models: [control-script]
+      match: '^(?:BS\d+ )?(STOP|STPC|PLAY|PLYC|PLYS|LOOP|LOOPS|PAUS|RESU|FF|ENDP|ENDL|ATTR)\s*$'
+      then_send: [{ models: [control-script], message: "STATUS" }]
+    - models: [control-script]
+      match: '^(?:BS\d+ )?(ENDP|ENDL|ATTR)\s*$'
+      state: { last_event: "{1}" }
+    - models: [control-script]
+      match: '^(?:BS\d+ )?(\S+) : (\S+)\s*$'
+      state: { player.model: "{1}", player.firmware: "{2}" }
+    - models: [control-script]
+      match: '^(?:BS\d+ )?Control Script Version: (\S+)\s*$'
+      state: { script.version: "{1}" }

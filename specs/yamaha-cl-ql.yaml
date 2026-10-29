@@ -88,6 +88,20 @@ transport:
   reply_match: '^(OK|OKm|ERROR) '
   probe: devstatus runmode
 
+conversions:
+  # Meter steps 00-7E are -126 to 0 dBFS, one dB a step; 7F is OVER (DME7
+  # Remote Control Protocol Specifications V1.1.0, 5.1 p.50).
+  yamaha_meter:
+    points: [[0, -126.0], [126, 0.0]]
+
+settings:
+  # Meters are a continuous stream, so they are asked for only when the
+  # operator turns them on.
+  meters: { type: bool, default: false, label: Meters,
+    description: "On asks the console for its meters (mtrstart) and keeps them in state in dBFS; off leaves them alone." }
+  meter_interval_ms: { type: int, min: 40, max: 10000, default: 100, label: Meter interval,
+    description: "Least time between meter notifications in milliseconds, 40 to 10000." }
+
 ports:
   - { port: 49280, protocol: tcp, role: control }
 
@@ -5951,10 +5965,13 @@ quirks:
       prmnum and prminfo <index> (the DME7 document's 3-14 and 3-15, also implemented by the RM
       series) appear to be answered by the consoles: the Companion module's parameter list is a
       console's prminfo answers. They are not typed here and no runtime catalogue is built from
-      them; get_parameter cannot send them because they take no address. Meter data (mtrstart and
-      NOTIFY mtr) is not typed: the list names one meter (MIXER:Current/Meter/Mix/PostOn), whose
-      values are hexadecimal and arrive as a variable-length list the format cannot map to per-
-      channel state.
+      them; get_parameter cannot send them because they take no address. Meters are kept in state with the meters setting on: Yamaha documents no console meter
+      addresses, so they are the console's own meter list (its mtrinfo answers, as recorded in the
+      Companion module's dump), asked for with mtrstart without the Meter segment as the Companion
+      module sends it; the notification's layout (a type word, then one two-digit hexadecimal value per
+      channel) and the dB table are the DME7 document's (3.2.3 p.10, 5.1 p.50), not a console document's. Scene titles are read with ssinfo_ex, as the Companion
+      module reads them for the current scene; the reply's layout is the DME7 document's ssinfo_ex (3-19
+      p.31).
   - models:
       - all
     severity: critical
@@ -5966,6 +5983,32 @@ quirks:
       console's read-only initial scene, so the range here starts at 1.
 
 state:
+  mixes.*.meter:
+    type: int
+    description: 'Mix bus meter as sent (MIXER:Current/Meter/Mix, post-ON; NOTIFY mtr), with the meters setting on: 0-126 for -126 to 0 dBFS, 127 OVER'
+  mixes.*.meter_db:
+    type: float
+    unit: dB
+    description: 'Mix bus meter in dBFS, -126 to 0, with the meters setting on; not written while the meter reads OVER (127), which meter says'
+  matrices.*.meter:
+    type: int
+    description: 'Matrix meter as sent (MIXER:Current/Meter/Mtrx, post-ON; NOTIFY mtr), with the meters setting on: 0-126 for -126 to 0 dBFS, 127 OVER'
+  matrices.*.meter_db:
+    type: float
+    unit: dB
+    description: 'Matrix meter in dBFS, -126 to 0, with the meters setting on; not written while the meter reads OVER (127), which meter says'
+  scene.list.*.number_text:
+    type: string
+    description: 'Scene number as the console shows it (ssinfo_ex); keyed by scene number, 0-300, every scene read on connecting'
+  scene.list.*.title:
+    type: string
+    description: 'Scene title, as sent with its escapes (ssinfo_ex); keyed by scene number, 0-300, every scene read on connecting'
+  scene.list.*.comment:
+    type: string
+    description: 'Scene comment, as sent with its escapes (ssinfo_ex); keyed by scene number, 0-300, every scene read on connecting'
+  scene.list.*.attribute:
+    type: string
+    description: 'Scene attribute: user for a stored scene, empty, preinst or reserve (ssinfo_ex); keyed by scene number, 0-300, every scene read on connecting'
   inputs.*.fader_level:
     type: int
     description: 'Input channel fader level (MIXER:Current/InCh/Fader/Level): hundredths of a dB, -32768 (-inf) to 1000 (+10 dB)'
@@ -6328,6 +6371,15 @@ state:
     description: 'Alert status: none, or flt/err/wrn alert text (devstatus error)'
 
 telemetry:
+  # With the meters setting on, the meters of the console's meter list
+  # (its mtrinfo answers) are asked for; notifications stop after 10
+  # seconds unless asked again (DME7 document 2-16 p.22), so they are
+  # asked again every 9.
+  subscribe:
+    send:
+      - { when_set: meters, message: "mtrstart MIXER:Current/Mix/PostOn {settings.meter_interval_ms}" }
+      - { when_set: meters, message: "mtrstart MIXER:Current/Mtrx/PostOn {settings.meter_interval_ms}" }
+    every_ms: 9000
   poll:
     send:
       - devinfo productname
@@ -7076,7 +7128,332 @@ telemetry:
       - get MIXER:Current/Cue/FaderCueRelease 0 0
       - get MIXER:Current/Cue/OutputLevel 0 0
       - get MIXER:Current/Cue/ActiveCue 0 0
+      - ssinfo_ex MIXER:Lib/Scene 0
+      - ssinfo_ex MIXER:Lib/Scene 1
+      - ssinfo_ex MIXER:Lib/Scene 2
+      - ssinfo_ex MIXER:Lib/Scene 3
+      - ssinfo_ex MIXER:Lib/Scene 4
+      - ssinfo_ex MIXER:Lib/Scene 5
+      - ssinfo_ex MIXER:Lib/Scene 6
+      - ssinfo_ex MIXER:Lib/Scene 7
+      - ssinfo_ex MIXER:Lib/Scene 8
+      - ssinfo_ex MIXER:Lib/Scene 9
+      - ssinfo_ex MIXER:Lib/Scene 10
+      - ssinfo_ex MIXER:Lib/Scene 11
+      - ssinfo_ex MIXER:Lib/Scene 12
+      - ssinfo_ex MIXER:Lib/Scene 13
+      - ssinfo_ex MIXER:Lib/Scene 14
+      - ssinfo_ex MIXER:Lib/Scene 15
+      - ssinfo_ex MIXER:Lib/Scene 16
+      - ssinfo_ex MIXER:Lib/Scene 17
+      - ssinfo_ex MIXER:Lib/Scene 18
+      - ssinfo_ex MIXER:Lib/Scene 19
+      - ssinfo_ex MIXER:Lib/Scene 20
+      - ssinfo_ex MIXER:Lib/Scene 21
+      - ssinfo_ex MIXER:Lib/Scene 22
+      - ssinfo_ex MIXER:Lib/Scene 23
+      - ssinfo_ex MIXER:Lib/Scene 24
+      - ssinfo_ex MIXER:Lib/Scene 25
+      - ssinfo_ex MIXER:Lib/Scene 26
+      - ssinfo_ex MIXER:Lib/Scene 27
+      - ssinfo_ex MIXER:Lib/Scene 28
+      - ssinfo_ex MIXER:Lib/Scene 29
+      - ssinfo_ex MIXER:Lib/Scene 30
+      - ssinfo_ex MIXER:Lib/Scene 31
+      - ssinfo_ex MIXER:Lib/Scene 32
+      - ssinfo_ex MIXER:Lib/Scene 33
+      - ssinfo_ex MIXER:Lib/Scene 34
+      - ssinfo_ex MIXER:Lib/Scene 35
+      - ssinfo_ex MIXER:Lib/Scene 36
+      - ssinfo_ex MIXER:Lib/Scene 37
+      - ssinfo_ex MIXER:Lib/Scene 38
+      - ssinfo_ex MIXER:Lib/Scene 39
+      - ssinfo_ex MIXER:Lib/Scene 40
+      - ssinfo_ex MIXER:Lib/Scene 41
+      - ssinfo_ex MIXER:Lib/Scene 42
+      - ssinfo_ex MIXER:Lib/Scene 43
+      - ssinfo_ex MIXER:Lib/Scene 44
+      - ssinfo_ex MIXER:Lib/Scene 45
+      - ssinfo_ex MIXER:Lib/Scene 46
+      - ssinfo_ex MIXER:Lib/Scene 47
+      - ssinfo_ex MIXER:Lib/Scene 48
+      - ssinfo_ex MIXER:Lib/Scene 49
+      - ssinfo_ex MIXER:Lib/Scene 50
+      - ssinfo_ex MIXER:Lib/Scene 51
+      - ssinfo_ex MIXER:Lib/Scene 52
+      - ssinfo_ex MIXER:Lib/Scene 53
+      - ssinfo_ex MIXER:Lib/Scene 54
+      - ssinfo_ex MIXER:Lib/Scene 55
+      - ssinfo_ex MIXER:Lib/Scene 56
+      - ssinfo_ex MIXER:Lib/Scene 57
+      - ssinfo_ex MIXER:Lib/Scene 58
+      - ssinfo_ex MIXER:Lib/Scene 59
+      - ssinfo_ex MIXER:Lib/Scene 60
+      - ssinfo_ex MIXER:Lib/Scene 61
+      - ssinfo_ex MIXER:Lib/Scene 62
+      - ssinfo_ex MIXER:Lib/Scene 63
+      - ssinfo_ex MIXER:Lib/Scene 64
+      - ssinfo_ex MIXER:Lib/Scene 65
+      - ssinfo_ex MIXER:Lib/Scene 66
+      - ssinfo_ex MIXER:Lib/Scene 67
+      - ssinfo_ex MIXER:Lib/Scene 68
+      - ssinfo_ex MIXER:Lib/Scene 69
+      - ssinfo_ex MIXER:Lib/Scene 70
+      - ssinfo_ex MIXER:Lib/Scene 71
+      - ssinfo_ex MIXER:Lib/Scene 72
+      - ssinfo_ex MIXER:Lib/Scene 73
+      - ssinfo_ex MIXER:Lib/Scene 74
+      - ssinfo_ex MIXER:Lib/Scene 75
+      - ssinfo_ex MIXER:Lib/Scene 76
+      - ssinfo_ex MIXER:Lib/Scene 77
+      - ssinfo_ex MIXER:Lib/Scene 78
+      - ssinfo_ex MIXER:Lib/Scene 79
+      - ssinfo_ex MIXER:Lib/Scene 80
+      - ssinfo_ex MIXER:Lib/Scene 81
+      - ssinfo_ex MIXER:Lib/Scene 82
+      - ssinfo_ex MIXER:Lib/Scene 83
+      - ssinfo_ex MIXER:Lib/Scene 84
+      - ssinfo_ex MIXER:Lib/Scene 85
+      - ssinfo_ex MIXER:Lib/Scene 86
+      - ssinfo_ex MIXER:Lib/Scene 87
+      - ssinfo_ex MIXER:Lib/Scene 88
+      - ssinfo_ex MIXER:Lib/Scene 89
+      - ssinfo_ex MIXER:Lib/Scene 90
+      - ssinfo_ex MIXER:Lib/Scene 91
+      - ssinfo_ex MIXER:Lib/Scene 92
+      - ssinfo_ex MIXER:Lib/Scene 93
+      - ssinfo_ex MIXER:Lib/Scene 94
+      - ssinfo_ex MIXER:Lib/Scene 95
+      - ssinfo_ex MIXER:Lib/Scene 96
+      - ssinfo_ex MIXER:Lib/Scene 97
+      - ssinfo_ex MIXER:Lib/Scene 98
+      - ssinfo_ex MIXER:Lib/Scene 99
+      - ssinfo_ex MIXER:Lib/Scene 100
+      - ssinfo_ex MIXER:Lib/Scene 101
+      - ssinfo_ex MIXER:Lib/Scene 102
+      - ssinfo_ex MIXER:Lib/Scene 103
+      - ssinfo_ex MIXER:Lib/Scene 104
+      - ssinfo_ex MIXER:Lib/Scene 105
+      - ssinfo_ex MIXER:Lib/Scene 106
+      - ssinfo_ex MIXER:Lib/Scene 107
+      - ssinfo_ex MIXER:Lib/Scene 108
+      - ssinfo_ex MIXER:Lib/Scene 109
+      - ssinfo_ex MIXER:Lib/Scene 110
+      - ssinfo_ex MIXER:Lib/Scene 111
+      - ssinfo_ex MIXER:Lib/Scene 112
+      - ssinfo_ex MIXER:Lib/Scene 113
+      - ssinfo_ex MIXER:Lib/Scene 114
+      - ssinfo_ex MIXER:Lib/Scene 115
+      - ssinfo_ex MIXER:Lib/Scene 116
+      - ssinfo_ex MIXER:Lib/Scene 117
+      - ssinfo_ex MIXER:Lib/Scene 118
+      - ssinfo_ex MIXER:Lib/Scene 119
+      - ssinfo_ex MIXER:Lib/Scene 120
+      - ssinfo_ex MIXER:Lib/Scene 121
+      - ssinfo_ex MIXER:Lib/Scene 122
+      - ssinfo_ex MIXER:Lib/Scene 123
+      - ssinfo_ex MIXER:Lib/Scene 124
+      - ssinfo_ex MIXER:Lib/Scene 125
+      - ssinfo_ex MIXER:Lib/Scene 126
+      - ssinfo_ex MIXER:Lib/Scene 127
+      - ssinfo_ex MIXER:Lib/Scene 128
+      - ssinfo_ex MIXER:Lib/Scene 129
+      - ssinfo_ex MIXER:Lib/Scene 130
+      - ssinfo_ex MIXER:Lib/Scene 131
+      - ssinfo_ex MIXER:Lib/Scene 132
+      - ssinfo_ex MIXER:Lib/Scene 133
+      - ssinfo_ex MIXER:Lib/Scene 134
+      - ssinfo_ex MIXER:Lib/Scene 135
+      - ssinfo_ex MIXER:Lib/Scene 136
+      - ssinfo_ex MIXER:Lib/Scene 137
+      - ssinfo_ex MIXER:Lib/Scene 138
+      - ssinfo_ex MIXER:Lib/Scene 139
+      - ssinfo_ex MIXER:Lib/Scene 140
+      - ssinfo_ex MIXER:Lib/Scene 141
+      - ssinfo_ex MIXER:Lib/Scene 142
+      - ssinfo_ex MIXER:Lib/Scene 143
+      - ssinfo_ex MIXER:Lib/Scene 144
+      - ssinfo_ex MIXER:Lib/Scene 145
+      - ssinfo_ex MIXER:Lib/Scene 146
+      - ssinfo_ex MIXER:Lib/Scene 147
+      - ssinfo_ex MIXER:Lib/Scene 148
+      - ssinfo_ex MIXER:Lib/Scene 149
+      - ssinfo_ex MIXER:Lib/Scene 150
+      - ssinfo_ex MIXER:Lib/Scene 151
+      - ssinfo_ex MIXER:Lib/Scene 152
+      - ssinfo_ex MIXER:Lib/Scene 153
+      - ssinfo_ex MIXER:Lib/Scene 154
+      - ssinfo_ex MIXER:Lib/Scene 155
+      - ssinfo_ex MIXER:Lib/Scene 156
+      - ssinfo_ex MIXER:Lib/Scene 157
+      - ssinfo_ex MIXER:Lib/Scene 158
+      - ssinfo_ex MIXER:Lib/Scene 159
+      - ssinfo_ex MIXER:Lib/Scene 160
+      - ssinfo_ex MIXER:Lib/Scene 161
+      - ssinfo_ex MIXER:Lib/Scene 162
+      - ssinfo_ex MIXER:Lib/Scene 163
+      - ssinfo_ex MIXER:Lib/Scene 164
+      - ssinfo_ex MIXER:Lib/Scene 165
+      - ssinfo_ex MIXER:Lib/Scene 166
+      - ssinfo_ex MIXER:Lib/Scene 167
+      - ssinfo_ex MIXER:Lib/Scene 168
+      - ssinfo_ex MIXER:Lib/Scene 169
+      - ssinfo_ex MIXER:Lib/Scene 170
+      - ssinfo_ex MIXER:Lib/Scene 171
+      - ssinfo_ex MIXER:Lib/Scene 172
+      - ssinfo_ex MIXER:Lib/Scene 173
+      - ssinfo_ex MIXER:Lib/Scene 174
+      - ssinfo_ex MIXER:Lib/Scene 175
+      - ssinfo_ex MIXER:Lib/Scene 176
+      - ssinfo_ex MIXER:Lib/Scene 177
+      - ssinfo_ex MIXER:Lib/Scene 178
+      - ssinfo_ex MIXER:Lib/Scene 179
+      - ssinfo_ex MIXER:Lib/Scene 180
+      - ssinfo_ex MIXER:Lib/Scene 181
+      - ssinfo_ex MIXER:Lib/Scene 182
+      - ssinfo_ex MIXER:Lib/Scene 183
+      - ssinfo_ex MIXER:Lib/Scene 184
+      - ssinfo_ex MIXER:Lib/Scene 185
+      - ssinfo_ex MIXER:Lib/Scene 186
+      - ssinfo_ex MIXER:Lib/Scene 187
+      - ssinfo_ex MIXER:Lib/Scene 188
+      - ssinfo_ex MIXER:Lib/Scene 189
+      - ssinfo_ex MIXER:Lib/Scene 190
+      - ssinfo_ex MIXER:Lib/Scene 191
+      - ssinfo_ex MIXER:Lib/Scene 192
+      - ssinfo_ex MIXER:Lib/Scene 193
+      - ssinfo_ex MIXER:Lib/Scene 194
+      - ssinfo_ex MIXER:Lib/Scene 195
+      - ssinfo_ex MIXER:Lib/Scene 196
+      - ssinfo_ex MIXER:Lib/Scene 197
+      - ssinfo_ex MIXER:Lib/Scene 198
+      - ssinfo_ex MIXER:Lib/Scene 199
+      - ssinfo_ex MIXER:Lib/Scene 200
+      - ssinfo_ex MIXER:Lib/Scene 201
+      - ssinfo_ex MIXER:Lib/Scene 202
+      - ssinfo_ex MIXER:Lib/Scene 203
+      - ssinfo_ex MIXER:Lib/Scene 204
+      - ssinfo_ex MIXER:Lib/Scene 205
+      - ssinfo_ex MIXER:Lib/Scene 206
+      - ssinfo_ex MIXER:Lib/Scene 207
+      - ssinfo_ex MIXER:Lib/Scene 208
+      - ssinfo_ex MIXER:Lib/Scene 209
+      - ssinfo_ex MIXER:Lib/Scene 210
+      - ssinfo_ex MIXER:Lib/Scene 211
+      - ssinfo_ex MIXER:Lib/Scene 212
+      - ssinfo_ex MIXER:Lib/Scene 213
+      - ssinfo_ex MIXER:Lib/Scene 214
+      - ssinfo_ex MIXER:Lib/Scene 215
+      - ssinfo_ex MIXER:Lib/Scene 216
+      - ssinfo_ex MIXER:Lib/Scene 217
+      - ssinfo_ex MIXER:Lib/Scene 218
+      - ssinfo_ex MIXER:Lib/Scene 219
+      - ssinfo_ex MIXER:Lib/Scene 220
+      - ssinfo_ex MIXER:Lib/Scene 221
+      - ssinfo_ex MIXER:Lib/Scene 222
+      - ssinfo_ex MIXER:Lib/Scene 223
+      - ssinfo_ex MIXER:Lib/Scene 224
+      - ssinfo_ex MIXER:Lib/Scene 225
+      - ssinfo_ex MIXER:Lib/Scene 226
+      - ssinfo_ex MIXER:Lib/Scene 227
+      - ssinfo_ex MIXER:Lib/Scene 228
+      - ssinfo_ex MIXER:Lib/Scene 229
+      - ssinfo_ex MIXER:Lib/Scene 230
+      - ssinfo_ex MIXER:Lib/Scene 231
+      - ssinfo_ex MIXER:Lib/Scene 232
+      - ssinfo_ex MIXER:Lib/Scene 233
+      - ssinfo_ex MIXER:Lib/Scene 234
+      - ssinfo_ex MIXER:Lib/Scene 235
+      - ssinfo_ex MIXER:Lib/Scene 236
+      - ssinfo_ex MIXER:Lib/Scene 237
+      - ssinfo_ex MIXER:Lib/Scene 238
+      - ssinfo_ex MIXER:Lib/Scene 239
+      - ssinfo_ex MIXER:Lib/Scene 240
+      - ssinfo_ex MIXER:Lib/Scene 241
+      - ssinfo_ex MIXER:Lib/Scene 242
+      - ssinfo_ex MIXER:Lib/Scene 243
+      - ssinfo_ex MIXER:Lib/Scene 244
+      - ssinfo_ex MIXER:Lib/Scene 245
+      - ssinfo_ex MIXER:Lib/Scene 246
+      - ssinfo_ex MIXER:Lib/Scene 247
+      - ssinfo_ex MIXER:Lib/Scene 248
+      - ssinfo_ex MIXER:Lib/Scene 249
+      - ssinfo_ex MIXER:Lib/Scene 250
+      - ssinfo_ex MIXER:Lib/Scene 251
+      - ssinfo_ex MIXER:Lib/Scene 252
+      - ssinfo_ex MIXER:Lib/Scene 253
+      - ssinfo_ex MIXER:Lib/Scene 254
+      - ssinfo_ex MIXER:Lib/Scene 255
+      - ssinfo_ex MIXER:Lib/Scene 256
+      - ssinfo_ex MIXER:Lib/Scene 257
+      - ssinfo_ex MIXER:Lib/Scene 258
+      - ssinfo_ex MIXER:Lib/Scene 259
+      - ssinfo_ex MIXER:Lib/Scene 260
+      - ssinfo_ex MIXER:Lib/Scene 261
+      - ssinfo_ex MIXER:Lib/Scene 262
+      - ssinfo_ex MIXER:Lib/Scene 263
+      - ssinfo_ex MIXER:Lib/Scene 264
+      - ssinfo_ex MIXER:Lib/Scene 265
+      - ssinfo_ex MIXER:Lib/Scene 266
+      - ssinfo_ex MIXER:Lib/Scene 267
+      - ssinfo_ex MIXER:Lib/Scene 268
+      - ssinfo_ex MIXER:Lib/Scene 269
+      - ssinfo_ex MIXER:Lib/Scene 270
+      - ssinfo_ex MIXER:Lib/Scene 271
+      - ssinfo_ex MIXER:Lib/Scene 272
+      - ssinfo_ex MIXER:Lib/Scene 273
+      - ssinfo_ex MIXER:Lib/Scene 274
+      - ssinfo_ex MIXER:Lib/Scene 275
+      - ssinfo_ex MIXER:Lib/Scene 276
+      - ssinfo_ex MIXER:Lib/Scene 277
+      - ssinfo_ex MIXER:Lib/Scene 278
+      - ssinfo_ex MIXER:Lib/Scene 279
+      - ssinfo_ex MIXER:Lib/Scene 280
+      - ssinfo_ex MIXER:Lib/Scene 281
+      - ssinfo_ex MIXER:Lib/Scene 282
+      - ssinfo_ex MIXER:Lib/Scene 283
+      - ssinfo_ex MIXER:Lib/Scene 284
+      - ssinfo_ex MIXER:Lib/Scene 285
+      - ssinfo_ex MIXER:Lib/Scene 286
+      - ssinfo_ex MIXER:Lib/Scene 287
+      - ssinfo_ex MIXER:Lib/Scene 288
+      - ssinfo_ex MIXER:Lib/Scene 289
+      - ssinfo_ex MIXER:Lib/Scene 290
+      - ssinfo_ex MIXER:Lib/Scene 291
+      - ssinfo_ex MIXER:Lib/Scene 292
+      - ssinfo_ex MIXER:Lib/Scene 293
+      - ssinfo_ex MIXER:Lib/Scene 294
+      - ssinfo_ex MIXER:Lib/Scene 295
+      - ssinfo_ex MIXER:Lib/Scene 296
+      - ssinfo_ex MIXER:Lib/Scene 297
+      - ssinfo_ex MIXER:Lib/Scene 298
+      - ssinfo_ex MIXER:Lib/Scene 299
+      - ssinfo_ex MIXER:Lib/Scene 300
   updates:
+    # Meters (NOTIFY mtr): two hexadecimal digits a meter, in the order
+    # of the console's channels (DME7 document 3.2.3 p.10, 5.1 p.50).
+    - match: '^NOTIFY mtr MIXER:Current/(?:Meter/)?Mix(?:/[A-Za-z]+)? [a-z][a-z0-9+]*((?: [0-9A-Fa-f]{2})+)\s*$'
+      match_each: '([0-9A-Fa-f]{2})'
+      match_each_in: 1
+      state:
+        mixes.{index:+1}.meter: '{2:hex}'
+        mixes.{index:+1}.meter_db: '{2:hex:from.yamaha_meter}'
+    - match: '^NOTIFY mtr MIXER:Current/(?:Meter/)?Mtrx(?:/[A-Za-z]+)? [a-z][a-z0-9+]*((?: [0-9A-Fa-f]{2})+)\s*$'
+      match_each: '([0-9A-Fa-f]{2})'
+      match_each_in: 1
+      state:
+        matrices.{index:+1}.meter: '{2:hex}'
+        matrices.{index:+1}.meter_db: '{2:hex:from.yamaha_meter}'
+    # Scene titles (ssinfo_ex, DME7 document 3-19 p.31), read on connecting
+    # and again for a scene stored or made current.
+    - match: '^OK ssinfo(?:_ex)? MIXER:Lib/Scene (\d+) "((?:[^"\\]|\\.)*)" "((?:[^"\\]|\\.)*)" "((?:[^"\\]|\\.)*)" (\w+)\s*$'
+      state:
+        scene.list.{1}.number_text: '{2}'
+        scene.list.{1}.title: '{3}'
+        scene.list.{1}.comment: '{4}'
+        scene.list.{1}.attribute: '{5}'
+    - match: '^(?:OK|NOTIFY) (?:sscurrent_ex|ssrecall_ex|ssupdate_ex) MIXER:Lib/Scene (\d+)(?: .*)?$'
+      then_send: ['ssinfo_ex MIXER:Lib/Scene {1}']
     - match: ^OK devinfo productname "?([^"]*?)"?\s*$
       state:
         device.product_name: '{1}'

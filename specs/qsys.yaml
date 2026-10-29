@@ -533,6 +533,9 @@ state:
   controls.*.value:         { type: float, description: "A named control's Value, keyed by its name. A number for most controls; QSC documents Value as a number, string or boolean, so a consumer must accept all three" }
   controls.*.string:        { type: string, description: "The control's String, its text form such as \"-12.0dB\"" }
   controls.*.position:      { type: float, description: "The control's Position, 0 to 1 within its range, when reported" }
+  design.components.*.type:   { type: string, description: "Type of a named component of the running design (Component.GetComponents), keyed by component name: gain, snapshot_controller, ...; read on connecting and when the design changes, while monitored" }
+  design.components.*.id:     { type: string, description: "The component's ID (Component.GetComponents), where the Core gives one" }
+  design.components.*.controls: { type: array, description: "Names of the component's controls (Component.GetControls), the names component commands take; read with the component list" }
   components.*.*.value:     { type: float, description: "A named component's control Value, keyed by component name then control name (control names may contain dots, such as \"ent.xfade.gain\"; they are single keys). Number, string or boolean" }
   components.*.*.string:    { type: string, description: "The component control's String" }
   components.*.*.position:  { type: float, description: "The component control's Position, 0 to 1" }
@@ -665,3 +668,13 @@ quirks:
     text: >
       Emulation answers only while the design is open and in Emulate mode in Q-SYS Designer; whether PA
       Router paging and Loop Player file playback behave in emulation as on a Core is not documented.
+  - models: [all]
+    severity: info
+    text: >
+      While monitored, the design's named components and each one's control names are read into
+      design.components on connecting and when the design changes (Component.GetComponents, then
+      Component.GetControls for each), so a consumer has every name a component command takes; their
+      values are not kept from that read. Named Controls outside components and snapshot names cannot be
+      listed: QRC's methods (Q-SYS Help, QRC Commands) read Named Controls only by the names given, and
+      Snapshot.Load and Snapshot.Save take a bank's name and a snapshot's number; snapshot banks appear in
+      design.components as snapshot_controller components.

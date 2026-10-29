@@ -27,3 +27,28 @@ _bu("resume", {}, "RESUME", C)
 _bu("search", {"file": "intro.mp4"}, "SEARCH intro.mp4", C)
 _bu("set_volume", {"percent": 80}, "VOLUME 80", C)
 _bu("reboot", {}, "REBOOT", C)
+_bu("fast_forward", {}, "FF", C)
+_bu("rewind", {}, "RW", C)
+_bu("get_status", {}, "STATUS", C)
+_bu("get_version", {}, "VERSION", C)
+
+# The sample control script's responses, broadcast to UDP 5001 with a line
+# feed, as SendResponse writes them (v3.01E).
+telemetry(BU, "status-playing", model=C, inbound_hex=hexs(b"Playing: INTRO.MP4\n"),
+          expect_state={"playback": {"status": "Playing: INTRO.MP4", "state": "playing", "file": "INTRO.MP4"}})
+telemetry(BU, "status-seamless", model=C, inbound_hex=hexs(b"BS3 Seamless Looping: LOOP.MP4\n"),
+          expect_state={"playback": {"status": "Seamless Looping: LOOP.MP4", "state": "seamless_looping",
+                                     "file": "LOOP.MP4"}})
+telemetry(BU, "status-stopped", model=C, inbound_hex=hexs(b"Stopped\n"),
+          expect_state={"playback": {"status": "Stopped", "state": "stopped", "file": ""}})
+telemetry(BU, "status-attract", model=C, inbound_hex=hexs(b"Playing Attract\n"),
+          expect_state={"playback": {"status": "Playing Attract", "state": "playing_attract", "file": ""}})
+telemetry(BU, "code-play", model=C, inbound_hex=hexs(b"PLAY\n"),
+          expect_state={"last_response": "PLAY"}, expect_then_send=["STATUS"])
+telemetry(BU, "code-ended", model=C, inbound_hex=hexs(b"BS3 ENDP\n"),
+          expect_state={"last_response": "ENDP", "last_event": "ENDP"}, expect_then_send=["STATUS"])
+telemetry(BU, "code-ready", model=C, inbound_hex=hexs(b"READY\n"), expect_state={"last_response": "READY"})
+telemetry(BU, "version", model=C, inbound_hex=hexs(b"XD1034 : 8.5.47\n"),
+          expect_state={"player": {"model": "XD1034", "firmware": "8.5.47"}})
+telemetry(BU, "script-version", model=C, inbound_hex=hexs(b"Control Script Version: v3.01E\n"),
+          expect_state={"script": {"version": "v3.01E"}})
