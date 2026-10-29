@@ -116,8 +116,8 @@ telemetry(CH, "project-list", inbound="*P\\PROJECT_LIST\\News\\Sports\\\\\r\n",
 telemetry(CH, "scene-list", request="P\\SCENE_LIST\\\\",
           inbound="*P\\SCENE_LIST\\LowerThird\\HeadShot\\Scoreboard\\\\\r\n",
           expect_state={"scenes": {"LowerThird": True, "HeadShot": True, "Scoreboard": True}},
-          expect_then_send=["P\\SCENE_STATE\\1\\LowerThird\\\\", "P\\SCENE_STATE\\1\\HeadShot\\\\",
-                            "P\\SCENE_STATE\\1\\Scoreboard\\\\"])
+          expect_then_send=["P\\SCENE_STATE\\1\\LowerThird\\\\\r\n", "P\\SCENE_STATE\\1\\HeadShot\\\\\r\n",
+                            "P\\SCENE_STATE\\1\\Scoreboard\\\\\r\n"])
 telemetry(CH, "scene-state", request="P\\SCENE_STATE\\2\\1000\\\\",
           inbound="*P\\SCENE_STATE\\Loaded\\Playing\\\\\r\n",
           expect_state={"channels": {"2": {"scenes": {"1000": {"state": "Loaded\\Playing"}}}}})
