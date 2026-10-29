@@ -46,7 +46,7 @@ use super::samsung_mdc_table::DEFS;
 use crate::catalog::Params;
 use crate::module::{
     CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, SerialPort, TcpInput, TlsTarget,
+    Outcome, PollStamps, SerialPort, TcpInput, TlsTarget,
 };
 
 /// MDC over RJ45 (§1.2.2).
@@ -529,6 +529,8 @@ pub(crate) struct SamsungMdc {
     displays: Vec<u8>,
     primary: u8,
     monitor: bool,
+    /// When each poll was last answered (`polled.<group>`, SPEC.md §8).
+    stamps: PollStamps,
     poll_every: Millis,
     refresh_every: Millis,
     by_name: HashMap<&'static str, (usize, bool)>,
@@ -591,6 +593,7 @@ impl SamsungMdc {
             displays,
             primary,
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             poll_every: num("poll_interval_s", 5) * 1000,
             refresh_every: num("refresh_interval_s", 300) * 1000,
             by_name,
@@ -943,7 +946,12 @@ impl SamsungMdc {
         };
         let decoded = decode(layouts, body);
         match &decoded {
-            Some(values) => self.apply(cx, def, job.id, index, values),
+            Some(values) => {
+                self.apply(cx, def, job.id, index, values);
+                if job.poll && self.monitor {
+                    self.stamps.answered(cx, "status");
+                }
+            }
             None if !layouts.is_empty() => cx.log(
                 Level::Debug,
                 format!(

@@ -28,7 +28,7 @@ use serde_json::{json, Map, Value};
 use crate::catalog::Params;
 use crate::module::{
     Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext,
-    Outcome, TcpInput,
+    Outcome, PollStamps, TcpInput,
 };
 
 const SOCKET: Key = "kissbox";
@@ -107,6 +107,8 @@ pub(crate) struct KissBox {
     bind: Option<IpAddr>,
     cards: Vec<Card>,
     monitor: bool,
+    /// When each poll was last answered (`polled.<group>`, SPEC.md §8).
+    stamps: PollStamps,
     poll_every: Millis,
     open: bool,
     reachable: bool,
@@ -166,6 +168,7 @@ impl KissBox {
             bind,
             cards,
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             poll_every: s
                 .get("poll_interval_ms")
                 .and_then(Value::as_u64)
@@ -336,6 +339,9 @@ impl KissBox {
             let (r, sent_at) = self.in_flight.take().expect("in flight");
             cx.cancel_timer(REPLY_TIMER);
             cx.round_trip(cx.now().saturating_sub(sent_at));
+            if r.command.is_none() && self.monitor && self.poll_every > 0 {
+                self.stamps.answered(cx, "status");
+            }
             if let Some(id) = r.command {
                 let value = match channel {
                     Some(_) => json!(values[0]),

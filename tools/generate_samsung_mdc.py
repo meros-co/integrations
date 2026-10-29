@@ -964,6 +964,9 @@ def single_value(d):
         f.kind != "flags" for l in d.ack for f in l if f.is_value)
 
 
+POLLED = '  polled.status: { type: int, unit: s, description: "When the status poll (every poll_interval_s, and the slow reads every refresh_interval_s) was last answered, in Unix seconds: the polled state is as old as this" }\n'
+
+
 def state_yaml():
     seen = {}
     for d in DEFS:
@@ -1135,7 +1138,7 @@ def spec_text():
             if d.set is not None:
                 led.add(set_name(d))
     return (HEADER + "\n" + models_yaml(names, led) + "\ncommands:\n" + "\n".join(cmds) + "\n\n" + QUIRKS
-            + "\nstate:\n" + "\n".join(state_yaml()) + "\n")
+            + "\nstate:\n" + POLLED + "\n".join(state_yaml()) + "\n")
 
 
 # ── The Rust table ──────────────────────────────────────────────────────────

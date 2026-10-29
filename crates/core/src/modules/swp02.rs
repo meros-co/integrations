@@ -45,7 +45,7 @@ use serde_json::{json, Value};
 use crate::catalog::Params;
 use crate::module::{
     CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, TcpInput,
+    Outcome, PollStamps, TcpInput,
 };
 
 const SOCKET: Key = "swp02";
@@ -186,6 +186,8 @@ struct Job {
 pub(crate) struct Swp02 {
     link: Link,
     monitor: bool,
+    /// When each poll was last answered (`polled.<group>`, SPEC.md §8).
+    stamps: PollStamps,
     destinations: u16,
     poll_ms: Millis,
     open: bool,
@@ -222,6 +224,7 @@ impl Swp02 {
         Ok(Swp02 {
             link,
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             destinations: num("destinations", 16).clamp(1, 1024) as u16,
             poll_ms: num("poll_ms", 1_000).max(100),
             open: false,
@@ -351,6 +354,9 @@ impl Swp02 {
             let (job, sent_at) = self.in_flight.take().expect("in flight");
             cx.cancel_timer(REPLY_TIMER);
             cx.round_trip(cx.now().saturating_sub(sent_at));
+            if job.id.is_none() && result.is_ok() && self.monitor {
+                self.stamps.answered(cx, "status");
+            }
             if let Some(id) = job.id {
                 cx.complete(id, result);
             }
@@ -572,12 +578,16 @@ mod tests {
             .collect()
     }
 
+    /// The state the actions report, without the poll's `polled` stamp.
     fn state(actions: &[Action]) -> Value {
         let mut merged = json!({});
         for a in actions {
             if let Action::State(p) = a {
                 merge_patch(&mut merged, p);
             }
+        }
+        if let Some(m) = merged.as_object_mut() {
+            m.remove("polled");
         }
         merged
     }

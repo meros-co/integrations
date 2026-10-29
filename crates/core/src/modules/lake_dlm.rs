@@ -42,7 +42,8 @@ use serde_json::{json, Map, Value};
 
 use crate::catalog::Params;
 use crate::module::{
-    Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext,
+    Outcome, PollStamps,
 };
 
 const SOCKET: Key = "dlm";
@@ -282,6 +283,8 @@ pub(crate) struct LakeDlm {
     family: Family,
     model: String,
     monitor: bool,
+    /// When each poll was last answered (`polled.<group>`, SPEC.md §8).
+    stamps: PollStamps,
     meter_poll: Millis,
     parameter_poll: Millis,
     configuration_poll: Millis,
@@ -323,6 +326,7 @@ impl LakeDlm {
             family: Family::of(&ctx.model),
             model: ctx.model.clone(),
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             meter_poll: ms("meter_poll_ms", 1_000),
             parameter_poll: ms("parameter_poll_ms", 5_000),
             configuration_poll: ms("configuration_poll_ms", 60_000),
@@ -921,10 +925,22 @@ impl LakeDlm {
                     }
                 }
             }
-            Why::Read { path, parse, .. } => {
+            Why::Read {
+                path,
+                parse,
+                config,
+            } => {
                 if let Reply::Text { text, .. } = &reply {
                     if let Some(v) = parse_value(&strip_echo(&request.text, text), parse) {
                         cx.state(nest(&path, v));
+                        if self.monitor {
+                            let group = if config {
+                                "configuration"
+                            } else {
+                                "parameters"
+                            };
+                            self.stamps.answered(cx, group);
+                        }
                     }
                 }
             }
@@ -944,6 +960,9 @@ impl LakeDlm {
                 if let Reply::Text { payload, .. } = &reply {
                     if let Some(patch) = decode_meters(kind, payload) {
                         cx.state(patch);
+                        if self.monitor {
+                            self.stamps.answered(cx, "meters");
+                        }
                     }
                 }
             }

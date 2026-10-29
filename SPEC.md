@@ -2390,11 +2390,16 @@ names are unique (`tools/validate.py` checks both). Pushed state
 connection's `alive` events say it is heard from. A device opened for
 commands only polls nothing and has none. Every native module that polls
 keeps the same keys with `module::PollStamps`, declared in its spec's
-`state`: `polled.status` for a status poll (projectors, OBS, NovaStar,
-SNMP devices, generic HTTP), and a name for what it reads otherwise
+`state`: `polled.status` for a status poll (projectors, displays, OBS,
+NovaStar, SNMP, Modbus, NTP and generic HTTP devices, switchers, routers,
+power and I/O devices), one key per group where a module polls at
+several rates (Lake's `parameters`, `configuration` and `meters`; AIM's
+`status` and `slow`), and a name for what it reads otherwise
 (`polled.ping`, `polled.properties` of a Sony camera, `polled.levels` of
 AES70 level sensors, `polled.nodes` for Art-Net's ArtPollReply,
-`polled.metering` of Spectera, `polled.xml` of vMix).
+`polled.metering` of Spectera, `polled.xml` of vMix). A module whose state
+is pushed and whose periodic read only repeats it (Shure's refresh,
+Resolume's composition refresh, NMOS event transports) has none.
 
 A `subscribe` or `poll` item can be limited to installations that turn on
 a setting with `when_set`, as an `on_connect` step can (§2): it is sent

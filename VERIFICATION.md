@@ -60,8 +60,8 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## adder-aim — Adder AdderLink Infinity Manager (AIM API)
 
-- [ ] Check what the AIM answers a request with an ended or unknown token: the integration logs in again only when the error's message names the login, the token or the session, since appendix K documents no code for it. ([specs/adder-aim.yaml:314](specs/adder-aim.yaml#L314))
-- [ ] Check on AIM 5.10 that get_devices for receivers lists a current connection with an empty con_end_time, as the example shows, so receivers.<id>.connected is right, and that pages past 1000 devices come as total_devices says. ([specs/adder-aim.yaml:309](specs/adder-aim.yaml#L309))
+- [ ] Check what the AIM answers a request with an ended or unknown token: the integration logs in again only when the error's message names the login, the token or the session, since appendix K documents no code for it. ([specs/adder-aim.yaml:316](specs/adder-aim.yaml#L316))
+- [ ] Check on AIM 5.10 that get_devices for receivers lists a current connection with an empty con_end_time, as the example shows, so receivers.<id>.connected is right, and that pages past 1000 devices come as total_devices says. ([specs/adder-aim.yaml:311](specs/adder-aim.yaml#L311))
 
 ## adder-xdip — Adder XDIP receivers
 
@@ -1420,18 +1420,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## datavideo-switcher — Datavideo switchers (DVIP and RS-232)
 
-- [ ] Confirm port 5009's answer (a real-time port, 0xaa55ffff when none is free) and that the pair it names is held while connected; check which pair the RMC-260 panel takes on the SE-1200MU. ([specs/datavideo-switcher.yaml:859](specs/datavideo-switcher.yaml#L859))
-- [ ] Confirm the real-time port's first packet: whether it lists every control or only the non-zero ones (state is rebuilt against zeros), that later packets carry only changes, and that answering each with a null packet keeps it flowing. ([specs/datavideo-switcher.yaml:867](specs/datavideo-switcher.yaml#L867))
-- [ ] Confirm a GET_CONTROL reply on the command port: pairs in the order asked, and the two trailing zero words of 5.3's example; and that SET_CONTROL is answered OK even for a read-only control. ([specs/datavideo-switcher.yaml:867](specs/datavideo-switcher.yaml#L867))
-- [ ] Record the source codes each bus takes on each model (program, keyers, aux, multiviewer), the SE-4000's inputs (8) and the SE-1200MU's (the document's tables list 1-4), against the documents' conflicting tables. ([specs/datavideo-switcher.yaml:877](specs/datavideo-switcher.yaml#L877))
-- [ ] Confirm the SE-3200/SE-4000 bus tally numbering 30-43 and free space 44 (the documents repeat 23-30), and the Ethernet input numbering (freeze mode 6) over the RS-232 supplement's (5). ([specs/datavideo-switcher.yaml:884](specs/datavideo-switcher.yaml#L884))
-- [ ] Record the types and values of the audio section, GPI, output mode and system preference controls, which the documents leave undescribed, and how memory.flags reads. ([specs/datavideo-switcher.yaml:890](specs/datavideo-switcher.yaml#L890))
-- [ ] Confirm names are UTF-16LE, GET_INPUT_NAME's input numbering (from 0 assumed), and the file transfer: GET_FILE_DATA chunk size and end, STORE_FILE_DATA's chunk numbering and size word, FILE_EVENT; and the mini picture's layout. ([specs/datavideo-switcher.yaml:900](specs/datavideo-switcher.yaml#L900))
-- [ ] Confirm the RS-232 70/F0 control IDs and values are little-endian, the SE-1200MU's speed (19200 in 2019, 57600 in 2017) and the SE-4000's status byte bits. ([specs/datavideo-switcher.yaml:908](specs/datavideo-switcher.yaml#L908))
-- [ ] Confirm the HS-1300 takes the SE-1200MU's Ethernet protocol and the HS-4000 the SE-4000's, and their control tables. ([specs/datavideo-switcher.yaml:920](specs/datavideo-switcher.yaml#L920))
-- [ ] Confirm the SE-2200's DVIP board takes the serial blocks over TCP 5002 inside DVIP's length header and answers the same way; the T-bar's range; status byte 4 bit 4 as PinP 2 preview; and the 'ignored' status outside PC CTRL mode. ([specs/datavideo-switcher.yaml:925](specs/datavideo-switcher.yaml#L925))
-- [ ] Confirm DVIP UDP packets' length counts the whole packet (or leaves out the type byte), replies come back to the sender's port, vendor and product IDs are big-endian, and which switchers answer the UDP management commands and presets. ([specs/datavideo-switcher.yaml:934](specs/datavideo-switcher.yaml#L934))
-- [ ] Check whether the SE-650 (and the HS-1300 over DVIP TCP) takes switching commands over DVIP and where Datavideo documents them. ([specs/datavideo-switcher.yaml:941](specs/datavideo-switcher.yaml#L941))
+- [ ] Confirm port 5009's answer (a real-time port, 0xaa55ffff when none is free) and that the pair it names is held while connected; check which pair the RMC-260 panel takes on the SE-1200MU. ([specs/datavideo-switcher.yaml:860](specs/datavideo-switcher.yaml#L860))
+- [ ] Confirm the real-time port's first packet: whether it lists every control or only the non-zero ones (state is rebuilt against zeros), that later packets carry only changes, and that answering each with a null packet keeps it flowing. ([specs/datavideo-switcher.yaml:868](specs/datavideo-switcher.yaml#L868))
+- [ ] Confirm a GET_CONTROL reply on the command port: pairs in the order asked, and the two trailing zero words of 5.3's example; and that SET_CONTROL is answered OK even for a read-only control. ([specs/datavideo-switcher.yaml:868](specs/datavideo-switcher.yaml#L868))
+- [ ] Record the source codes each bus takes on each model (program, keyers, aux, multiviewer), the SE-4000's inputs (8) and the SE-1200MU's (the document's tables list 1-4), against the documents' conflicting tables. ([specs/datavideo-switcher.yaml:878](specs/datavideo-switcher.yaml#L878))
+- [ ] Confirm the SE-3200/SE-4000 bus tally numbering 30-43 and free space 44 (the documents repeat 23-30), and the Ethernet input numbering (freeze mode 6) over the RS-232 supplement's (5). ([specs/datavideo-switcher.yaml:885](specs/datavideo-switcher.yaml#L885))
+- [ ] Record the types and values of the audio section, GPI, output mode and system preference controls, which the documents leave undescribed, and how memory.flags reads. ([specs/datavideo-switcher.yaml:891](specs/datavideo-switcher.yaml#L891))
+- [ ] Confirm names are UTF-16LE, GET_INPUT_NAME's input numbering (from 0 assumed), and the file transfer: GET_FILE_DATA chunk size and end, STORE_FILE_DATA's chunk numbering and size word, FILE_EVENT; and the mini picture's layout. ([specs/datavideo-switcher.yaml:901](specs/datavideo-switcher.yaml#L901))
+- [ ] Confirm the RS-232 70/F0 control IDs and values are little-endian, the SE-1200MU's speed (19200 in 2019, 57600 in 2017) and the SE-4000's status byte bits. ([specs/datavideo-switcher.yaml:909](specs/datavideo-switcher.yaml#L909))
+- [ ] Confirm the HS-1300 takes the SE-1200MU's Ethernet protocol and the HS-4000 the SE-4000's, and their control tables. ([specs/datavideo-switcher.yaml:921](specs/datavideo-switcher.yaml#L921))
+- [ ] Confirm the SE-2200's DVIP board takes the serial blocks over TCP 5002 inside DVIP's length header and answers the same way; the T-bar's range; status byte 4 bit 4 as PinP 2 preview; and the 'ignored' status outside PC CTRL mode. ([specs/datavideo-switcher.yaml:926](specs/datavideo-switcher.yaml#L926))
+- [ ] Confirm DVIP UDP packets' length counts the whole packet (or leaves out the type byte), replies come back to the sender's port, vendor and product IDs are big-endian, and which switchers answer the UDP management commands and presets. ([specs/datavideo-switcher.yaml:935](specs/datavideo-switcher.yaml#L935))
+- [ ] Check whether the SE-650 (and the HS-1300 over DVIP TCP) takes switching commands over DVIP and where Datavideo documents them. ([specs/datavideo-switcher.yaml:942](specs/datavideo-switcher.yaml#L942))
 
 ## dbaudio — d&b audiotechnik amplifiers
 
@@ -2000,8 +2000,8 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## generic-modbus — Generic Modbus TCP server
 
-- [ ] Check the word_order setting against devices that document 32-bit floats and integers in either register order (a power meter, a PLC), and that 0-based addressing matches devices that document 1-based 4xxxx and 3xxxx registers. ([specs/generic-modbus.yaml:220](specs/generic-modbus.yaml#L220))
-- [ ] Check that servers answer a liveness read of a register they lack with an exception rather than silence, and that common Modbus TCP to RTU gateways answer for the unit IDs behind them without stalling the single outstanding request. ([specs/generic-modbus.yaml:245](specs/generic-modbus.yaml#L245))
+- [ ] Check the word_order setting against devices that document 32-bit floats and integers in either register order (a power meter, a PLC), and that 0-based addressing matches devices that document 1-based 4xxxx and 3xxxx registers. ([specs/generic-modbus.yaml:221](specs/generic-modbus.yaml#L221))
+- [ ] Check that servers answer a liveness read of a register they lack with an exception rather than silence, and that common Modbus TCP to RTU gateways answer for the unit IDs behind them without stalling the single outstanding request. ([specs/generic-modbus.yaml:246](specs/generic-modbus.yaml#L246))
 
 ## generic-mqtt — Generic MQTT broker client
 
@@ -2010,7 +2010,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## generic-ntp — NTP server status (RFC 5905 client request)
 
-- [ ] Check against a GPS time server (a TimeMachines TM2000A, a Meinberg) that the stratum, reference ID and offset agree with the server's own display. ([specs/generic-ntp.yaml:47](specs/generic-ntp.yaml#L47))
+- [ ] Check against a GPS time server (a TimeMachines TM2000A, a Meinberg) that the stratum, reference ID and offset agree with the server's own display. ([specs/generic-ntp.yaml:48](specs/generic-ntp.yaml#L48))
 
 ## generic-ping — Network presence (ping) and Wake-on-LAN
 
@@ -2624,7 +2624,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## kissbox-io — KissBox IO3CC and IO8CC I/O card frames
 
-- [ ] Check where a frame on the UDP firmware sends its answers to reads: to the destination port set in the Editor as a broadcast (as the core expects, listening on feedback_port), or back to the sender's port. ([specs/kissbox-io.yaml:109](specs/kissbox-io.yaml#L109))
+- [ ] Check where a frame on the UDP firmware sends its answers to reads: to the destination port set in the Editor as a broadcast (as the core expects, listening on feedback_port), or back to the sender's port. ([specs/kissbox-io.yaml:110](specs/kissbox-io.yaml#L110))
 - [ ] Check that input change notifications use the all channel status (A1h) or single channel status (A3h) layout, which the protocol document does not state for notifications. ([specs/kissbox-io.yaml:7](specs/kissbox-io.yaml#L7))
 
 ## kramer-p3000 — Kramer Protocol 3000
@@ -2667,22 +2667,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## labgruppen-lake — Lab.gruppen Lake (DLM)
 
-- [ ] Confirm a frame answers `Dev.Network.ID?` sent to its address with the broadcast id and class 0, and that the answer's source id is its frame id. ([specs/labgruppen-lake.yaml:768](specs/labgruppen-lake.yaml#L768))
-- [ ] Confirm dynamic port mode: a packet to UDP 6016 is answered to the sending port, so the core works beside Lake Controller. ([specs/labgruppen-lake.yaml:763](specs/labgruppen-lake.yaml#L763))
-- [ ] Record the exact text of a get's answer (the value alone, or the command echoed) for one-value and several-value gets, such as `Mod.Out.Gain?A 1` and `Dev.LoadPilot.Readings?1`. ([specs/labgruppen-lake.yaml:806](specs/labgruppen-lake.yaml#L806))
-- [ ] Check labels and preset names with spaces are accepted as the last argument (`Mod.Out.Label=A 1 Main Left`, `Dev.Preset.Store!1 Show A`). ([specs/labgruppen-lake.yaml:743](specs/labgruppen-lake.yaml#L743))
-- [ ] Check the acknowledgement codes a frame really sends for a bad parameter and an unknown path (-3 to -6 in the document's misaligned table). ([specs/labgruppen-lake.yaml:819](specs/labgruppen-lake.yaml#L819))
-- [ ] Check `Dev.MD.FullBin?3` answers with the 108-byte version 3 structure as the payload alone, with no text before it, and the same for `?2` on a PLM and the LM structure. ([specs/labgruppen-lake.yaml:812](specs/labgruppen-lake.yaml#L812))
-- [ ] Check the RMS gain reduction scale (0.1 dB a step, as read here, or 0.5 dB as one table says). ([specs/labgruppen-lake.yaml:812](specs/labgruppen-lake.yaml#L812))
-- [ ] Confirm the D 10:4L, D 20:4L and D 40:4L answer DLM as the other D Series, and note their model names from `Dev.ModelName?`. ([specs/labgruppen-lake.yaml:838](specs/labgruppen-lake.yaml#L838))
-- [ ] Check whether `Dev.NetworkIPConf?` (as the document spells it) or `Dev.Network.IPConf?` answers, and whether the PLM 20000Q takes `Dev.PTG2.Active` (the example) or `Dev.PTG.Active` (the heading), for the set and the configuration round's read. ([specs/labgruppen-lake.yaml:832](specs/labgruppen-lake.yaml#L832))
-- [ ] Note how many polled requests a second a frame takes before it falls behind, and whether a full parameter round every 5 s, and the configuration round (about 300 reads on a D Series with six channels a module) every minute, disturb Lake Controller. ([specs/labgruppen-lake.yaml:774](specs/labgruppen-lake.yaml#L774))
-- [ ] Confirm a frame does not reset on any typed command on firmware before 2.50 (the Lake Controller 8 known issue about invalid DLM messages). ([specs/labgruppen-lake.yaml:750](specs/labgruppen-lake.yaml#L750))
-- [ ] Record the answers of the several-value gets and check their word order: `Dev.Fuse.NominalCurrent?` (nominal, actual), `Dev.LoadPilot.Signal?`, `Threshold?` and `Readings?`, `Dev.Router.InputTypSel?` with a Dante name holding spaces, `Dev.Dante.BreakIn?` for a probe, `Mod.Out.Phase?` (polarity, lock) and `Mod.Out.AmpVPL?` (desired, minimum, maximum, actual). ([specs/labgruppen-lake.yaml:798](specs/labgruppen-lake.yaml#L798))
-- [ ] Record `Dev.Route?` and the LM's `Dev.Out.Route?` answers: the character for a position not routed (read as anything but X), and whether `Dev.Route?` separates positions with spaces. ([specs/labgruppen-lake.yaml:798](specs/labgruppen-lake.yaml#L798))
-- [ ] Check `Dev.PTG.Impedance?` without a channel answers all four impedances on a PLM, with `?` for a channel not measured. ([specs/labgruppen-lake.yaml:798](specs/labgruppen-lake.yaml#L798))
+- [ ] Confirm a frame answers `Dev.Network.ID?` sent to its address with the broadcast id and class 0, and that the answer's source id is its frame id. ([specs/labgruppen-lake.yaml:766](specs/labgruppen-lake.yaml#L766))
+- [ ] Confirm dynamic port mode: a packet to UDP 6016 is answered to the sending port, so the core works beside Lake Controller. ([specs/labgruppen-lake.yaml:760](specs/labgruppen-lake.yaml#L760))
+- [ ] Record the exact text of a get's answer (the value alone, or the command echoed) for one-value and several-value gets, such as `Mod.Out.Gain?A 1` and `Dev.LoadPilot.Readings?1`. ([specs/labgruppen-lake.yaml:809](specs/labgruppen-lake.yaml#L809))
+- [ ] Check labels and preset names with spaces are accepted as the last argument (`Mod.Out.Label=A 1 Main Left`, `Dev.Preset.Store!1 Show A`). ([specs/labgruppen-lake.yaml:746](specs/labgruppen-lake.yaml#L746))
+- [ ] Check the acknowledgement codes a frame really sends for a bad parameter and an unknown path (-3 to -6 in the document's misaligned table). ([specs/labgruppen-lake.yaml:822](specs/labgruppen-lake.yaml#L822))
+- [ ] Check `Dev.MD.FullBin?3` answers with the 108-byte version 3 structure as the payload alone, with no text before it, and the same for `?2` on a PLM and the LM structure. ([specs/labgruppen-lake.yaml:809](specs/labgruppen-lake.yaml#L809))
+- [ ] Check the RMS gain reduction scale (0.1 dB a step, as read here, or 0.5 dB as one table says). ([specs/labgruppen-lake.yaml:809](specs/labgruppen-lake.yaml#L809))
+- [ ] Confirm the D 10:4L, D 20:4L and D 40:4L answer DLM as the other D Series, and note their model names from `Dev.ModelName?`. ([specs/labgruppen-lake.yaml:841](specs/labgruppen-lake.yaml#L841))
+- [ ] Check whether `Dev.NetworkIPConf?` (as the document spells it) or `Dev.Network.IPConf?` answers, and whether the PLM 20000Q takes `Dev.PTG2.Active` (the example) or `Dev.PTG.Active` (the heading), for the set and the configuration round's read. ([specs/labgruppen-lake.yaml:835](specs/labgruppen-lake.yaml#L835))
+- [ ] Note how many polled requests a second a frame takes before it falls behind, and whether a full parameter round every 5 s, and the configuration round (about 300 reads on a D Series with six channels a module) every minute, disturb Lake Controller. ([specs/labgruppen-lake.yaml:771](specs/labgruppen-lake.yaml#L771))
+- [ ] Confirm a frame does not reset on any typed command on firmware before 2.50 (the Lake Controller 8 known issue about invalid DLM messages). ([specs/labgruppen-lake.yaml:753](specs/labgruppen-lake.yaml#L753))
+- [ ] Record the answers of the several-value gets and check their word order: `Dev.Fuse.NominalCurrent?` (nominal, actual), `Dev.LoadPilot.Signal?`, `Threshold?` and `Readings?`, `Dev.Router.InputTypSel?` with a Dante name holding spaces, `Dev.Dante.BreakIn?` for a probe, `Mod.Out.Phase?` (polarity, lock) and `Mod.Out.AmpVPL?` (desired, minimum, maximum, actual). ([specs/labgruppen-lake.yaml:801](specs/labgruppen-lake.yaml#L801))
+- [ ] Record `Dev.Route?` and the LM's `Dev.Out.Route?` answers: the character for a position not routed (read as anything but X), and whether `Dev.Route?` separates positions with spaces. ([specs/labgruppen-lake.yaml:801](specs/labgruppen-lake.yaml#L801))
+- [ ] Check `Dev.PTG.Impedance?` without a channel answers all four impedances on a PLM, with `?` for a channel not measured. ([specs/labgruppen-lake.yaml:801](specs/labgruppen-lake.yaml#L801))
 - [ ] Check `Dev.Out.Route=` on an LM takes - for a position not routed, as `set_output_route_lm` sends it. ([specs/labgruppen-lake.yaml:350](specs/labgruppen-lake.yaml#L350))
-- [ ] Check which models answer `Dev.AesLoopTermination?` (the document lists PLM+, PLM and LM, not D Series), `Dev.Dante.SlaveOnly?` and `Dev.Network.Redund?` (PLM 4.33, LM 2.30), and what an older firmware answers to a read it lacks. ([specs/labgruppen-lake.yaml:774](specs/labgruppen-lake.yaml#L774))
+- [ ] Check which models answer `Dev.AesLoopTermination?` (the document lists PLM+, PLM and LM, not D Series), `Dev.Dante.SlaveOnly?` and `Dev.Network.Redund?` (PLM 4.33, LM 2.30), and what an older firmware answers to a read it lacks. ([specs/labgruppen-lake.yaml:771](specs/labgruppen-lake.yaml#L771))
 
 ## labgruppen-nlb60e — Lab.gruppen NLB 60E (NomadLink)
 
@@ -3083,10 +3083,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## middle-atlantic-racklink — Middle Atlantic RackLink power (control protocol)
 
-- [ ] Check the status change registration: its length byte (the document says 6 while listing six data bytes), which bit is "bit 1", and that the unit then pushes outlet, contact, sequence, EPO and reading changes. ([specs/middle-atlantic-racklink.yaml:268](specs/middle-atlantic-racklink.yaml#L268))
+- [ ] Check the status change registration: its length byte (the document says 6 while listing six data bytes), which bit is "bit 1", and that the unit then pushes outlet, contact, sequence, EPO and reading changes. ([specs/middle-atlantic-racklink.yaml:269](specs/middle-atlantic-racklink.yaml#L269))
 - [ ] Check the sequencing response's subcommand (the document shows 0x01 where a response would be 0x10) and its states. ([specs/middle-atlantic-racklink.yaml:127](specs/middle-atlantic-racklink.yaml#L127))
 - [ ] Check the current energy management state response (0x60): occupancy first and a letter per outlet (INFOCOMM 4:2012) or 16 letters (I-00472). ([specs/middle-atlantic-racklink.yaml:168](specs/middle-atlantic-racklink.yaml#L168))
-- [ ] Check the temperature's unit in sensor readings and thresholds (the log gives Fahrenheit). ([specs/middle-atlantic-racklink.yaml:282](specs/middle-atlantic-racklink.yaml#L282))
+- [ ] Check the temperature's unit in sensor readings and thresholds (the log gives Fahrenheit). ([specs/middle-atlantic-racklink.yaml:283](specs/middle-atlantic-racklink.yaml#L283))
 - [ ] Check how often the unit pings and that answering each ping keeps the connection, on Select, Premium and Premium+. ([specs/middle-atlantic-racklink.yaml:9](specs/middle-atlantic-racklink.yaml#L9))
 - [ ] Check RS-232 on a Premium: the same messages at 9600 8N1, and whether it needs the login. ([specs/middle-atlantic-racklink.yaml:53](specs/middle-atlantic-racklink.yaml#L53))
 
@@ -3607,9 +3607,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## probel-swp02 — Probel / Grass Valley SW-P-02 routers
 
-- [ ] Confirm SW-P-02 over TCP carries the same messages as the serial line, with nothing added, and find the port routers and gateways use. ([specs/probel-swp02.yaml:142](specs/probel-swp02.yaml#L142))
-- [ ] Check that a router answers within the 1 s timeout, and what a router that does not implement a command (the salvo) sends. ([specs/probel-swp02.yaml:114](specs/probel-swp02.yaml#L114))
-- [ ] Record what multiplier bit 3 means on each router tested (bad source, crosspoint updates disabled, or unused). ([specs/probel-swp02.yaml:134](specs/probel-swp02.yaml#L134))
+- [ ] Confirm SW-P-02 over TCP carries the same messages as the serial line, with nothing added, and find the port routers and gateways use. ([specs/probel-swp02.yaml:143](specs/probel-swp02.yaml#L143))
+- [ ] Check that a router answers within the 1 s timeout, and what a router that does not implement a command (the salvo) sends. ([specs/probel-swp02.yaml:115](specs/probel-swp02.yaml#L115))
+- [ ] Record what multiplier bit 3 means on each router tested (bad source, crosspoint updates disabled, or unused). ([specs/probel-swp02.yaml:135](specs/probel-swp02.yaml#L135))
 - [ ] On an NK-3RD, confirm odd parity is needed and that CONNECTED is broadcast after a take. ([specs/probel-swp02.yaml:62](specs/probel-swp02.yaml#L62))
 
 ## probel-swp08 — Probel / Grass Valley SW-P-08 routers
@@ -4536,7 +4536,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## timemachines-clock — TimeMachines clocks, timers and time servers (Locator Protocol API)
 
-- [ ] Record a clock's 40-byte status and confirm bytes 20 to 39 (alarm, days, digits value, WiFi signal, name). ([specs/timemachines-clock.yaml:260](specs/timemachines-clock.yaml#L260))
+- [ ] Record a clock's 40-byte status and confirm bytes 20 to 39 (alarm, days, digits value, WiFi signal, name). ([specs/timemachines-clock.yaml:261](specs/timemachines-clock.yaml#L261))
 - [ ] Confirm the clock answers from port 7372 to the sender's port, and answers every control request with 'A'. ([specs/timemachines-clock.yaml:30](specs/timemachines-clock.yaml#L30))
 - [ ] Record what Get Program and Get Active Program answer. ([specs/timemachines-clock.yaml:168](specs/timemachines-clock.yaml#L168))
 - [ ] Confirm Load Program's second byte is 4Fh as the guide writes, and that the steps are the same 32-byte structure as Store Program's. ([specs/timemachines-clock.yaml:183](specs/timemachines-clock.yaml#L183))

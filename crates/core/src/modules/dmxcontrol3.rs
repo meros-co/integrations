@@ -60,7 +60,7 @@ use crate::catalog::Params;
 use crate::grpc::{self, CallId, Client, Response, Status};
 use crate::module::{
     CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
-    TcpInput, TlsTarget,
+    PollStamps, TcpInput, TlsTarget,
 };
 
 pub(crate) const PORT: u16 = 17475;
@@ -516,6 +516,8 @@ pub(crate) struct Dmx3 {
     session_header: String,
     timeout: Millis,
     monitor: bool,
+    /// When each poll was last answered (`polled.<group>`, SPEC.md §8).
+    stamps: PollStamps,
     watch_properties: bool,
     dmx_out: (i64, i64),
     dmx_in: (i64, i64),
@@ -579,6 +581,7 @@ impl Dmx3 {
             session_header: text(s, "session_header", "sessionid").to_ascii_lowercase(),
             timeout: int(s, "timeout_ms", 10_000).max(1) as Millis,
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             watch_properties: s
                 .get("watch_property_values")
                 .and_then(Value::as_bool)
@@ -1168,6 +1171,11 @@ impl Dmx3 {
             Purpose::Read(read) => {
                 let read = *read;
                 self.read_answer(cx, read, &value);
+                if self.monitor
+                    && (READS_EVERY_TICK.contains(&read) || READS_EVERY_OTHER_TICK.contains(&read))
+                {
+                    self.stamps.answered(cx, "status");
+                }
             }
             Purpose::Setting { path } => {
                 let path = path.clone();
