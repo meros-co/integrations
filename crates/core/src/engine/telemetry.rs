@@ -216,6 +216,11 @@ enum Matcher {
         /// (Millumin's `/millumin/info` names what changed in a string);
         /// their captures follow the address's.
         arg_match: Vec<(usize, Regex)>,
+        /// `request_match`: only a reply to an OSC query whose address
+        /// matches it (DiGiCo's `/.../?` queries, answered on the address
+        /// the console also pushes on), its captures numbered on after the
+        /// address's and `arg_match`'s.
+        request: Option<Regex>,
         /// `match_each` with `match_each_in`: the rule matches once for each
         /// match of this regex along the text of that capture (an address's
         /// or `arg_match`'s): a list inside a string argument (WING's node
@@ -768,6 +773,15 @@ pub(crate) enum Inbound<'a> {
         types: &'a str,
         args: &'a [Value],
     },
+    /// An OSC message taken as the reply to a query, with the address of
+    /// the message it answers: an OSC message to every address rule, and
+    /// to an address rule's `request_match`.
+    OscAnswer {
+        address: &'a str,
+        types: &'a str,
+        args: &'a [Value],
+        request: &'a str,
+    },
     /// A JSON message received on a websocket.
     Json(&'a Value),
     /// An HTTP reply, with the path and query it answered and the request's
@@ -1024,6 +1038,10 @@ impl Telemetry {
                         .and_then(Value::as_str)
                         .map(str::to_string),
                     arg_match: arg_selectors(rule.get("arg_match"))?,
+                    request: match rule.get("request_match") {
+                        Some(r @ Value::String(_)) => Some(regex(r, "request_match")?),
+                        _ => None,
+                    },
                     text_each: match rule.get("match_each") {
                         None => None,
                         Some(r) => Some((
@@ -1292,8 +1310,22 @@ impl Telemetry {
         cleared: &mut Value,
     ) -> Option<Value> {
         // A reply is text to the text rules; its request is for request_match.
+        let answered;
         let (message, request) = match message {
             Inbound::Answer { text, request } => (&Inbound::Text(text), Some(*request)),
+            Inbound::OscAnswer {
+                address,
+                types,
+                args,
+                request,
+            } => {
+                answered = Inbound::Osc {
+                    address,
+                    types,
+                    args,
+                };
+                (&answered, Some(*request))
+            }
             other => (other, None),
         };
         // `blob_each` reads a blob's bytes as they came, even ones that
@@ -1590,6 +1622,7 @@ impl Telemetry {
                         json_arg,
                         arg_types,
                         arg_match,
+                        request: asked,
                         text_each,
                         blob_each,
                         select: selectors,
@@ -1611,6 +1644,18 @@ impl Telemetry {
                     let mut base = captures(&caps);
                     if !select_args(args, arg_match, &mut base) {
                         continue;
+                    }
+                    // `request_match`: a reply to a query whose address
+                    // matches, never a message the device pushed.
+                    if let Some(asked) = asked {
+                        let Some(request_caps) = request.and_then(|r| asked.captures(r)) else {
+                            continue;
+                        };
+                        let numbered = base.len();
+                        for (i, v) in captures(&request_caps) {
+                            let n: usize = i.parse().unwrap_or(0);
+                            base.push(((n + numbered).to_string(), v));
+                        }
                     }
                     let reads_json = !json.is_empty() || !selectors.is_empty() || each.is_some();
                     let doc = match reads_json {
@@ -2892,6 +2937,55 @@ mod tests {
         // Without its request, a bare value is nothing.
         assert_eq!(t.apply(&Inbound::Text("1")), None);
         assert_eq!(answer("1", "Subnet.Status ?").0, None);
+    }
+
+    #[test]
+    fn an_osc_reply_is_read_with_the_query_it_answers() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"address": "^/Input_Channels/(\\d+)/name$",
+                 "state": {"inputs.{1}.name": "{arg0}"}},
+                {"address": "^/Input_Channels/(\\d+)/name$",
+                 "request_match": "^/Input_Channels/(\\d+)/name/\\?$",
+                 "then_send": [{"address": "/Input_Channels/{2:+1}/name/?"}]},
+            ]})),
+            &state(json!({"inputs.*.name": {"type": "string", "description": "x"}})),
+            Conversions::new(),
+        )
+        .unwrap();
+        let args = [json!("Kick")];
+        let mut triggers = Vec::new();
+        let patch = t.apply_into(
+            &Inbound::OscAnswer {
+                address: "/Input_Channels/4/name",
+                types: "s",
+                args: &args,
+                request: "/Input_Channels/4/name/?",
+            },
+            &mut triggers,
+            &mut json!({}),
+        );
+        assert_eq!(patch, Some(json!({"inputs": {"4": {"name": "Kick"}}})));
+        assert_eq!(triggers.len(), 1);
+        assert_eq!(triggers[0].params["2"], json!(4));
+        // The same message pushed, or answering another query, reads only
+        // into state.
+        let mut triggers = Vec::new();
+        let pushed = Inbound::Osc {
+            address: "/Input_Channels/4/name",
+            types: "s",
+            args: &args,
+        };
+        assert!(t.apply_into(&pushed, &mut triggers, &mut json!({})).is_some());
+        assert!(triggers.is_empty());
+        let other = Inbound::OscAnswer {
+            address: "/Input_Channels/4/name",
+            types: "s",
+            args: &args,
+            request: "/Console/Name/?",
+        };
+        assert!(t.apply_into(&other, &mut triggers, &mut json!({})).is_some());
+        assert!(triggers.is_empty());
     }
 
     #[test]

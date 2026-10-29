@@ -431,6 +431,22 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         engine.offer_answer(&mut cx, text.trim_end(), request);
     } else if let Some(text) = v.get("inbound").and_then(Value::as_str) {
         engine.tcp(&mut cx, "device", TcpInput::Data(text.as_bytes().to_vec()));
+    } else if let (Some(h), Some(request)) = (
+        v.get("inbound_hex").and_then(Value::as_str),
+        v.get("request").and_then(Value::as_str),
+    ) {
+        // An OSC reply, with the address of the query it answers.
+        for message in super::osc::decode(&unhex(h)) {
+            engine.offer(
+                &mut cx,
+                &super::telemetry::Inbound::OscAnswer {
+                    address: &message.address,
+                    types: &message.types,
+                    args: &message.args,
+                    request,
+                },
+            );
+        }
     } else if let Some(h) = v.get("inbound_hex").and_then(Value::as_str) {
         // Beside a stream or HTTP transport, a datagram is OSC feedback on
         // `telemetry.osc`'s port.

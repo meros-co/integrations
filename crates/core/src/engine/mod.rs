@@ -912,7 +912,8 @@ struct InFlight {
     /// (`expect.replies`), and those taken so far for the message in flight.
     replies: usize,
     taken: Vec<String>,
-    /// The text of the line message now awaiting its reply.
+    /// The text of the line message now awaiting its reply, or the address
+    /// of the OSC message.
     request_text: Option<String>,
     expect: Map<String, Value>,
     returns: String,
@@ -2633,9 +2634,12 @@ impl SpecEngine {
             // pushed change) is not its reply.
             None => match &job.item {
                 Some(Value::String(address)) if osc => Some(OscReply::Exact(address.clone())),
+                // A template too: a `then_send` query names the address its
+                // captures give, each value matched literally.
                 Some(Value::Object(o)) if osc => match o.get("reply_address") {
                     Some(Value::String(re)) => Some(OscReply::Pattern(
-                        Regex::new(re).map_err(|e| format!("reply_address: {e}"))?,
+                        Regex::new(&render(re, &values, |s| regex::escape(s))?)
+                            .map_err(|e| format!("reply_address: {e}"))?,
                     )),
                     _ => None,
                 },
@@ -2922,7 +2926,12 @@ impl SpecEngine {
             let Some(flight) = self.current.as_mut() else {
                 return;
             };
-            flight.request_text = text;
+            // On OSC, the address sent: what an address rule's
+            // `request_match` reads of the query a reply answers.
+            flight.request_text = match (&text, &outgoing) {
+                (None, Outgoing::Bytes(_)) if self.transport.is_osc() => Some(pace.clone()),
+                _ => text,
+            };
             // A request to an endpoint goes to another server: not paced.
             let groups = (!matches!(&outgoing, Outgoing::Http(_, route) if *route != Route::Main))
                 .then(|| self.pacer.groups_of(&pace));
@@ -4872,19 +4881,35 @@ impl SpecEngine {
 
     fn inbound_osc(&mut self, cx: &mut Cx, packet: &[u8]) {
         for message in osc::decode(packet) {
-            self.offer(
-                cx,
-                &telemetry::Inbound::Osc {
-                    address: &message.address,
-                    types: &message.types,
-                    args: &message.args,
-                },
-            );
             let matches = match self.current.as_ref().and_then(|f| f.awaiting.as_ref()) {
                 Some(Await::Osc(None)) => true,
                 Some(Await::Osc(Some(reply))) => reply.matches(&message.address),
                 _ => false,
             };
+            // The reply to the query in flight is offered with the address
+            // it was sent to, for a rule that reads only replies to queries.
+            let request = matches
+                .then(|| self.current.as_ref().and_then(|f| f.request_text.clone()))
+                .flatten();
+            match &request {
+                Some(request) => self.offer(
+                    cx,
+                    &telemetry::Inbound::OscAnswer {
+                        address: &message.address,
+                        types: &message.types,
+                        args: &message.args,
+                        request,
+                    },
+                ),
+                None => self.offer(
+                    cx,
+                    &telemetry::Inbound::Osc {
+                        address: &message.address,
+                        types: &message.types,
+                        args: &message.args,
+                    },
+                ),
+            }
             if matches {
                 self.reply(cx, Reply::Osc { args: message.args });
             } else {
