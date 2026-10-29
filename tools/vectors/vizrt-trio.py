@@ -74,3 +74,12 @@ telemetry(VT, "profile", request="channelcontrol:get_active_profile", inbound="S
 telemetry(VT, "version", request="main:get_version", inbound="4.6.0.12345\n",
           expect_state={"system": {"version": "4.6.0.12345"}})
 telemetry(VT, "error-is-no-name", request="show:get_show_name", inbound="ERROR: no show\n", expect_state={})
+telemetry(VT, "pages", request="show:get_pages", inbound="1000 1010 2000\n",
+          state_before={"show": {"pages": {"3": "3000"}}},
+          expect_state={"show": {"pages": {"0": "1000", "1": "1010", "2": "2000"}}})
+telemetry(VT, "templates", request="show:get_templates", inbound="5000,5010\n",
+          expect_state={"show": {"templates": {"0": "5000", "1": "5010"}}})
+telemetry(VT, "viz-channels", request="channelcontrol:list_viz_channels", inbound="PGM, PVW\n",
+          expect_state={"channels": {"viz": {"0": "PGM", "1": "PVW"}}})
+telemetry(VT, "pages-error", request="show:get_pages", inbound="ERROR: no show\n",
+          state_before={"show": {"pages": {"0": "1000"}}}, expect_state={"show": {"pages": {"0": "1000"}}})
