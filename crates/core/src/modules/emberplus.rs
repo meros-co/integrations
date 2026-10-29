@@ -108,6 +108,9 @@ struct Elem {
     nullable: bool,
     stream: Option<i64>,
     descriptor: Option<glow::StreamDescription>,
+    /// The last string value, kept for signal labels (a parameter under a
+    /// matrix's label base path may be reported before the matrix).
+    text: Option<String>,
     // Functions.
     arguments: Option<Vec<glow::TupleItem>>,
     // Matrices.
@@ -137,6 +140,7 @@ impl Elem {
             nullable: false,
             stream: None,
             descriptor: None,
+            text: None,
             arguments: None,
             matrix_type: 0,
             addressing: 0,
@@ -348,6 +352,12 @@ impl Patch {
         connections.insert(target.to_string(), v);
     }
 
+    /// `elements.<matrix>.label_layers.<layer>`, made if new.
+    fn label_layer(&mut self, matrix: &[u32], layer: usize) -> &mut Map<String, Value> {
+        let layers = Patch::object(self.elem(matrix), "label_layers");
+        Patch::object(layers, &layer.to_string())
+    }
+
     fn flush(&mut self, cx: &mut Cx) {
         if !self.0.is_empty() {
             cx.state(Value::Object(std::mem::take(&mut self.0)));
@@ -494,6 +504,11 @@ pub(crate) struct EmberPlus {
     /// change between sessions), else by numeric path.
     subscriptions: BTreeSet<String>,
     subscribed_now: HashSet<Vec<u32>>,
+    /// Matrix signal labels (Ember+ 1.1, Label): each label's base path to
+    /// the matrices and label layers (indices into their `labels`) it
+    /// serves. Under a base path, node 1 holds a string parameter per
+    /// target and node 2 one per source, numbered as the signal.
+    label_bases: HashMap<Vec<u32>, Vec<(Vec<u32>, usize)>>,
     touched: Vec<Vec<u32>>,
     last_heard: Millis,
     keepalive_sent: Option<Millis>,
@@ -539,6 +554,7 @@ impl EmberPlus {
             next_invocation: 1,
             subscriptions: BTreeSet::new(),
             subscribed_now: HashSet::new(),
+            label_bases: HashMap::new(),
             touched: Vec::new(),
             last_heard: 0,
             keepalive_sent: None,
@@ -921,6 +937,7 @@ impl EmberPlus {
         self.dir_timed_out.clear();
         self.on_demand.clear();
         self.subscribed_now.clear();
+        self.label_bases.clear();
         // The full walk finds every subscribed element; the others look for
         // them, walking only their branches.
         self.restore = if self.settings.walk == Walk::Full {
@@ -1229,6 +1246,12 @@ impl EmberPlus {
         if let Some(v) = &c.value {
             let value = json_of(v);
             p.put(path, "value", value.clone());
+            if let Glow::String(text) = v {
+                if let Some(e) = self.tree.get_mut(path) {
+                    e.text = Some(text.clone());
+                }
+                self.signal_label(p, path, text);
+            }
             if let Some(i) = self.sets.iter().position(|w| w.path == path) {
                 let w = self.sets.remove(i);
                 cx.round_trip(cx.now().saturating_sub(w.sent_at));
@@ -1237,6 +1260,66 @@ impl EmberPlus {
             }
         }
         self.answered(cx, path);
+    }
+
+    /// A string parameter's value: when it lies under a label base path's
+    /// targets (1) or sources (2) node, it is that signal's label in every
+    /// matrix layer the base path serves.
+    fn signal_label(&mut self, p: &mut Patch, path: &[u32], text: &str) {
+        let [base @ .., side, signal] = path else {
+            return;
+        };
+        let side = match side {
+            1 => "targets",
+            2 => "sources",
+            _ => return,
+        };
+        let Some(users) = self.label_bases.get(base) else {
+            return;
+        };
+        for (matrix, layer) in users {
+            let sides = Patch::object(p.label_layer(matrix, *layer), side);
+            sides.insert(signal.to_string(), json!(text));
+        }
+    }
+
+    /// A matrix's labels: note each base path, give each layer its
+    /// description and the labels already known under it, and, when
+    /// matrices are walked, ask for the label nodes the walk would not
+    /// reach (they lie outside the matrix, at any depth).
+    fn matrix_labels(&mut self, p: &mut Patch, matrix: &[u32], labels: &[glow::Label]) {
+        for users in self.label_bases.values_mut() {
+            users.retain(|(m, _)| m != matrix);
+        }
+        self.label_bases.retain(|_, users| !users.is_empty());
+        for (layer, label) in labels.iter().enumerate() {
+            p.label_layer(matrix, layer)
+                .insert("description".into(), json!(label.description));
+            self.label_bases
+                .entry(label.base_path.clone())
+                .or_default()
+                .push((matrix.to_vec(), layer));
+            for (side, name) in [(1u32, "targets"), (2u32, "sources")] {
+                let mut node = label.base_path.clone();
+                node.push(side);
+                let known: Vec<(u32, String)> = self
+                    .tree
+                    .range(node.clone()..)
+                    .take_while(|(k, _)| k.starts_with(&node))
+                    .filter(|(k, _)| k.len() == node.len() + 1)
+                    .filter_map(|(k, e)| Some((*k.last()?, e.text.clone()?)))
+                    .collect();
+                if !known.is_empty() {
+                    let sides = Patch::object(p.label_layer(matrix, layer), name);
+                    for (signal, text) in known {
+                        sides.insert(signal.to_string(), json!(text));
+                    }
+                }
+                if self.monitor && self.settings.walk != Walk::Lazy && self.settings.walk_matrices {
+                    self.enqueue(node);
+                }
+            }
+        }
     }
 
     fn matrix(&mut self, cx: &mut Cx, p: &mut Patch, path: &[u32], m: &glow::Matrix) {
@@ -1298,11 +1381,13 @@ impl EmberPlus {
                 p.put(path, "gain_parameter_number", json!(v));
             }
             if let Some(labels) = &c.labels {
-                let labels: Vec<Value> = labels
+                let list: Vec<Value> = labels
                     .iter()
                     .map(|l| json!({"base_path": key(&l.base_path), "description": l.description}))
                     .collect();
-                p.put(path, "labels", Value::Array(labels));
+                p.put(path, "labels", Value::Array(list));
+                let labels = labels.clone();
+                self.matrix_labels(p, path, &labels);
             }
             if let Some(v) = &c.schema_identifiers {
                 p.put(
@@ -2522,6 +2607,89 @@ mod tests {
             completed(&a, 4),
             Some(Err(CommandError::InvalidParams { .. }))
         ));
+    }
+
+    #[test]
+    fn matrix_labels_are_read_into_the_matrix() {
+        let (mut m, mut st) = walked(json!({}));
+        let label = |number: u32, text: &str| {
+            param(
+                number,
+                ParameterContents {
+                    value: Some(Glow::String(text.into())),
+                    ..Default::default()
+                },
+            )
+        };
+        // A source label reported before the matrix names its base path.
+        let a = feed(
+            &mut m,
+            40,
+            Root::Elements(vec![node(
+                Id::Path(vec![1, 6, 2]),
+                None,
+                Some(vec![label(1, "Mic 2")]),
+            )]),
+        );
+        state(&mut st, &a);
+        let labelled = Root::Elements(vec![Element::Matrix(Matrix {
+            id: Id::Path(vec![1, 4]),
+            contents: Some(MatrixContents {
+                labels: Some(vec![glow::Label {
+                    base_path: vec![1, 6],
+                    description: "Primary".into(),
+                }]),
+                ..Default::default()
+            }),
+            children: None,
+            targets: None,
+            sources: None,
+            connections: None,
+        })]);
+        let a = feed(&mut m, 50, labelled);
+        state(&mut st, &a);
+        let layer = &st["elements"]["1.4"]["label_layers"]["0"];
+        assert_eq!(layer["description"], "Primary");
+        assert_eq!(layer["sources"]["1"], "Mic 2");
+        // The label nodes are asked for: targets (1), and sources (2), whose
+        // node was reported with its children already.
+        assert!(sent(&a).contains(&Root::Elements(vec![Element::Node(Node {
+            id: Id::Path(vec![1, 6, 1]),
+            contents: None,
+            children: Some(vec![get_dir(-1)])
+        })])));
+        assert!(m.dir_requested.contains(&vec![1, 6, 2]));
+        let a = feed(
+            &mut m,
+            60,
+            Root::Elements(vec![node(
+                Id::Path(vec![1, 6, 1]),
+                None,
+                Some(vec![label(0, "Cam 1"), label(3, "Cam 4")]),
+            )]),
+        );
+        state(&mut st, &a);
+        let layer = &st["elements"]["1.4"]["label_layers"]["0"];
+        assert_eq!(layer["targets"]["0"], "Cam 1");
+        assert_eq!(layer["targets"]["3"], "Cam 4");
+        // A label changed (by set_parameter or another consumer) follows.
+        let a = feed(
+            &mut m,
+            70,
+            Root::Elements(vec![Element::Parameter(Parameter {
+                id: Id::Path(vec![1, 6, 1, 3]),
+                contents: Some(ParameterContents {
+                    value: Some(Glow::String("Wide".into())),
+                    ..Default::default()
+                }),
+                children: None,
+            })]),
+        );
+        state(&mut st, &a);
+        assert_eq!(
+            st["elements"]["1.4"]["label_layers"]["0"]["targets"]["3"],
+            "Wide"
+        );
     }
 
     #[test]
