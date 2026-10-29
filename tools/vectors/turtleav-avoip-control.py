@@ -131,3 +131,63 @@ telemetry(TA, "status-chazy", inbound=_CHAZY_STATUS, model="chazy-control", expe
 # The block is one reply, its fences left out.
 ta("get_status", {}, "GET STATUS", **DW, device_reply=_DARWIN_STATUS,
    expect_result={"ok": {"kind": "value", "value": "\n".join(_DARWIN_LINES)}})
+
+# ── Telemetry: name replies (DARWIN §3.2 and §4.2) ──
+telemetry(TA, "decoder-name", inbound="[SUCCESS]Set decoder 001 name:TEST1.\r\n",
+          expect_state={"decoders": {"1": {"name": "TEST1"}}})
+telemetry(TA, "encoder-name", inbound="[SUCCESS]Set encoder 001 name:TEST1.\r\n",
+          expect_state={"encoders": {"1": {"name": "TEST1"}}})
+
+# ── Telemetry: GET DEC / ENC STATUS blocks (DARWIN §3.33 and §4.24, CHAZY §3.35 and §4.24 examples) ──
+_DARWIN_DEC = "".join(line + "\r\n" for line in [
+    _FENCE,
+    "               IP Control Box DARWIN CONTROL Decoder Info",
+    "               FW Version: 2.03.19",
+    "Out Net HPD Ver Mode Res Rotate Name",
+    "003 On Off 1.10.03 MX 01 1                          Decoder 003",
+    "     >>Fr Vid/IR_/Ser/USB           MCast",
+    "     001 000/000/000/000            On",
+    "     >>ASPECT OSP IR BTN LED SGEn/Br/Bit",
+    "         Maintain SNK On On                9      Off /9/8n1",
+    _FENCE])
+telemetry(TA, "decoder-status-darwin", inbound=_DARWIN_DEC, model="darwin-control", expect_state={
+    "decoders": {"3": {"online": True, "hdmi": False, "firmware": "1.10.03", "mode": "MX", "resolution": 1,
+                       "rotation": 90, "name": "Decoder 003"}}})
+_DARWIN_ENC = "".join(line + "\r\n" for line in [
+    _FENCE,
+    "                     IP Control Box DARWIN CONTROL Encoder Info",
+    "                     FW Version: 2.03.19",
+    "In Net Sig Ver EDID Aud MCast Name",
+    "001 On Off 2.00.06 DF000 HDMI On                         Encoder 001",
+    "    >>LED SGEn/Br/Bit",
+    "         9     Off /9/8n1",
+    _FENCE])
+telemetry(TA, "encoder-status-darwin", inbound=_DARWIN_ENC, model="darwin-control", expect_state={
+    "encoders": {"1": {"online": True, "signal": False, "firmware": "2.00.06", "edid": "DF000", "audio_input": "HDMI",
+                       "multicast": True, "name": "Encoder 001"}}})
+_CHAZY_DEC = "".join(line + "\r\n" for line in [
+    _FENCE,
+    "                CHAZY CONTROL Decoder Info",
+    "                FW Version: 1.00.17",
+    "ID Type Net HPD Ver                  Mode Res Rotate Name",
+    "001 Gen 2 On Off 3.01.17 MX 00 0                               Decoder 001",
+    "     >>Fix Vid /Aud /IR /Ser /USB /CEC MCast Video Mute",
+    "                000 /000 /000 /000 /000 /000 On On Off",
+    "     >>Sel Vid /Aud /IR /Ser /USB /CEC",
+    "                013 /013 /013 /013 /013 /013",
+    _FENCE])
+telemetry(TA, "decoder-status-chazy", inbound=_CHAZY_DEC, model="chazy-control", expect_state={
+    "decoders": {"1": {"type": "Gen 2", "online": True, "hdmi": False, "firmware": "3.01.17", "mode": "MX",
+                       "resolution": 0, "rotation": 0, "name": "Decoder 001"}}})
+_CHAZY_ENC = "".join(line + "\r\n" for line in [
+    _FENCE,
+    "                CHAZY CONTROL Encoder Info",
+    "                FW Version: 1.00.17",
+    "ID Type Net Sig Ver                  EDID Aud MCast Name",
+    "001 Gen 2 On On 3.00.01 DF000 HDMI On                     Encoder 001",
+    "     >>Fix Arc",
+    "                000",
+    _FENCE])
+telemetry(TA, "encoder-status-chazy", inbound=_CHAZY_ENC, model="chazy-control", expect_state={
+    "encoders": {"1": {"type": "Gen 2", "online": True, "signal": True, "firmware": "3.00.01", "edid": "DF000",
+                       "audio_input": "HDMI", "multicast": True, "name": "Encoder 001"}}})

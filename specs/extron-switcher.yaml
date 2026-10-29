@@ -2526,6 +2526,7 @@ quirks:
 
 state:
   device.model:                 { type: string, description: "Model from the copyright banner, such as IN1808 IPCP SA" }
+  device.temperature:           { type: float, unit: "°C", description: "Internal temperature in degrees Celsius (Esc 20STAT), asked every 30 seconds" }
   device.firmware:              { type: string, description: "Firmware version from the copyright banner" }
   device.part_number:           { type: string, description: "Part number from the copyright banner or the N query, such as 60-1615-02" }
   device.login:                 { type: string, description: "Access level granted at login: Administrator or User" }
@@ -2616,9 +2617,16 @@ telemetry:
   # request_match also read a query's bare reply, tied to the query it answers. Signal presence is
   # read on connecting, and changes to it are pushed (IN1808 guide p.53). N (the part number) is
   # asked by both families; its reply queues the family's own queries for every other setting.
+  # The internal temperature changes without a notification: it is asked every 30 s.
   poll:
-    send: ["\x1b0LS", "X", "\x1bPSAV", "N"]
+    - send: ["\x1b0LS", "X", "\x1bPSAV", "N"]
+    - every_ms: 30000
+      send: ["\x1b20STAT"]
   updates:
+    # Esc 20STAT: the internal temperature in degrees Celsius, tagged or bare.
+    - match: '^(?:20Stat\s*)?0*(\d+(?:\.\d)?)$'
+      request_match: '^\x1b20STAT$'
+      state: { device.temperature: "{1}" }
     # The copyright banner sent on connecting (IN1808 guide p.52, IN1608 guide p.42).
     - match: '^\(c\) Copyright \d{4}, Extron Electronics,? (.+?), V(\d+\.\d+), (60-\d+-\d+)$'
       state: { device.model: "{1}", device.firmware: "{2}", device.part_number: "{3}" }

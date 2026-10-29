@@ -366,6 +366,10 @@ EXTENSION_COMMANDS = {
         "list_files", "download_file", "upload_file", "delete_file", "rename_file",
         "create_folder", "cancel_transfer",
     },
+    "nmos-query-websocket": {
+        "connect_receiver", "disconnect_receiver", "stage_receiver", "stage_sender",
+        "get_receiver_active", "get_sender_active",
+    },
     "ultimatte-preset-archive": {
         "export_presets", "import_presets", "export_preset", "import_preset",
         "export_settings", "import_settings",

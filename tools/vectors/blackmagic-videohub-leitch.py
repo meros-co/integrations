@@ -48,3 +48,8 @@ telemetry(VL, "salvo-cleared", request="@ B:C", inbound=">",
           state_before={"salvo": {"1": {"input": 2}}}, expect_state={})
 telemetry(VL, "status-reporting-on", request="@ ?", inbound=">", expect_state={"status_reporting": True})
 telemetry(VL, "status-reporting-off", request="@ !", inbound=">", expect_state={"status_reporting": False})
+# The model's documented size, written when the prompt answers the empty line sent on connecting.
+telemetry(VL, "size", request="", inbound=">", model="smart-videohub-40x40",
+          expect_state={"device": {"inputs": 40, "outputs": 40}})
+telemetry(VL, "size-universal", request="", inbound=">", model="universal-videohub-288",
+          expect_state={"device": {"inputs": 288, "outputs": 288}})

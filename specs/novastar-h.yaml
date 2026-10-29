@@ -761,6 +761,30 @@ state:
   device.serial: { type: string, description: "Device serial number" }
   device.software_version: { type: string, description: "Software version, such as 1.9.7.0.S1.T1" }
   device.main_model_id: { type: int, description: "Main control card model ID" }
+  device.name: { type: string, description: "Device name (device/readDetail name)" }
+  device.ready: { type: bool, description: "The device is ready; false while it is busy (readDetail status: 1 ready, 0 busy)" }
+  device.model_id: { type: int, description: "Device model ID (readDetail modelId)" }
+  device.protocol_version: { type: string, description: "Protocol version (readDetail protoVersion)" }
+  device.main_card_state: { type: int, description: "Primary dual control card: 0 not installed, 1 primary and normal, 2 backup and normal (mainState)" }
+  device.backup_card_state: { type: int, description: "Backup dual control card, coded as main_card_state (deputyState)" }
+  device.temperature: { type: float, unit: "°C", description: "Device (backboard) temperature, as readDetail's backboardTemperature gives it; the documentation names no unit, degrees Celsius taken" }
+  device.temperature_abnormal: { type: bool, description: "Temperature status abnormal (readDetail temp 1)" }
+  device.cpu_status: { type: int, description: "CPU status as readDetail gives it (cpuStatus; 0 in the documented example, the values are not described)" }
+  device.memory_status: { type: int, description: "Memory status as readDetail gives it (memStatus; 0 in the documented example, the values are not described)" }
+  device.ethernet_status: { type: int, description: "Ethernet status as readDetail gives it (ethernetStatus; 1 in the documented example, the values are not described)" }
+  device.usb_signal: { type: bool, description: "The main control card's USB port has a signal (usbStatus 1)" }
+  device.mac: { type: string, description: "The device's MAC address (MAC)" }
+  genlock.enabled: { type: bool, description: "Genlock is on (genlock.enable)" }
+  genlock.type: { type: int, description: "Genlock function: 0 genlock, 1 input, 2 freerun (genlock.type)" }
+  genlock.input: { type: int, description: "Input used as the genlock source, an inputs key (genlock.inputId)" }
+  genlock.external_signal: { type: bool, description: "An external genlock signal is present (genlock.extSignal 1)" }
+  power_supplies.*.connected: { type: bool, description: "A power supply, keyed by powerId (0 main, 1 backup; up to 3 on the H15): connected (iSignal 1)" }
+  fans.*.abnormal: { type: bool, description: "A fan, keyed by fanId: abnormal (status 1); false when normal" }
+  slots.*.card_type: { type: int, description: "A card slot, keyed by slotId: the card type, 0 none, 1 input, 2 output, 3 sender, 4 MVR, 5 central control (cardType)" }
+  slots.*.model_id: { type: int, description: "Model ID of the card in the slot" }
+  slots.*.status: { type: int, description: "Card online status: 0 abnormal, 1 normal, 2 cannot go online (communication timeout), 3 and 4 a dual 4K input card in the wrong slot, 5 golden" }
+  slots.*.work_status: { type: int, description: "Card working status: 0 normal, 1 invalid (workStatus)" }
+  slots.*.serial: { type: string, description: "The card's serial number (sn)" }
   screens.*.name: { type: string, description: "Screen name, keyed by screenId" }
   screens.*.preset: { type: int, description: "Preset playing on the screen, -1 for none" }
   screens.*.brightness: { type: int, unit: "%", description: "Screen brightness, 0 to 100 (screen detail's brightness)" }
@@ -893,7 +917,8 @@ quirks:
     severity: info
     text: >
       State is polled (poll_ms, 5 s by default): the initialisation status,
-      the screen list, inputs, outputs, background images and signal source
+      the device's details (health: temperature, fans, power supplies, card
+      slots, control cards, genlock; device/readDetail), the screen list, inputs, outputs, background images and signal source
       playlists, and for each screen its details (screen/readDetail), layers,
       presets, current preset, preset groups and the preset group playing,
       six requests per screen and six more each round; raise poll_ms for a

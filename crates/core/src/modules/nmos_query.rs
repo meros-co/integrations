@@ -28,13 +28,15 @@
 //! address is the registry's to give: it is used as given when it is `ws` or
 //! `wss`, with the bearer token where one is set.
 //!
-//! A device opened for commands only runs without this module (it only keeps
-//! state current), so it creates no subscription.
+//! A device opened for commands only creates no subscription. The IS-05
+//! commands (`nmos_connect`) are answered either way: they find each Node's
+//! Connection API through the registry and make the connection there.
 
 use std::net::IpAddr;
 
 use serde_json::{json, Value};
 
+use super::nmos_connect::Connector;
 use crate::catalog::Params;
 use crate::engine::SpecEngine;
 use crate::module::{
@@ -91,6 +93,9 @@ pub(crate) struct NmosQuery {
     secure: bool,
     subs: Vec<Subscription>,
     next_id: RequestId,
+    /// False: opened for commands only, so nothing is subscribed.
+    monitor: bool,
+    connector: Connector,
 }
 
 /// What a grain tells: resources set and ids gone.
@@ -161,10 +166,14 @@ impl NmosQuery {
             v4 => v4.to_string(),
         });
         let default_port = if scheme == "https" { 443 } else { 80 };
+        let origin = format!("{scheme}://{host}:{}", ctx.port.unwrap_or(default_port));
+        let version = setting("query_version").unwrap_or_else(|| "v1.3".into());
         NmosQuery {
             engine,
-            origin: format!("{scheme}://{host}:{}", ctx.port.unwrap_or(default_port)),
-            version: setting("query_version").unwrap_or_else(|| "v1.3".into()),
+            connector: Connector::new(origin.clone(), version.clone(), setting("token")),
+            monitor: ctx.monitor,
+            origin,
+            version,
             token: setting("token"),
             rate: ctx
                 .settings
@@ -298,13 +307,20 @@ impl NmosQuery {
 impl Module for NmosQuery {
     fn start(&mut self, cx: &mut Cx) {
         self.engine.start(cx);
+        if !self.monitor {
+            return;
+        }
         for i in 0..self.subs.len() {
             self.create(cx, i);
         }
     }
 
     fn command(&mut self, cx: &mut Cx, id: CommandId, name: &str, params: &Params) {
-        self.engine.command(cx, id, name, params);
+        if Connector::answers(name) {
+            self.connector.command(cx, id, name, params);
+        } else {
+            self.engine.command(cx, id, name, params);
+        }
     }
 
     fn datagram(&mut self, cx: &mut Cx, socket: Key, from: std::net::SocketAddr, data: &[u8]) {
@@ -330,6 +346,9 @@ impl Module for NmosQuery {
     }
 
     fn http_response(&mut self, cx: &mut Cx, id: RequestId, result: Result<HttpResponse, String>) {
+        if Connector::owns(id) {
+            return self.connector.http_response(cx, id, result);
+        }
         if id < OWN_IDS {
             return self.engine.http_response(cx, id, result);
         }
@@ -372,6 +391,7 @@ impl Module for NmosQuery {
             cx.cancel_timer(s.timer);
             s.phase = Phase::Stopped;
         }
+        self.connector.stop(cx);
         self.engine.stop(cx);
     }
 }

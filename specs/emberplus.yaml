@@ -190,6 +190,9 @@ state:
   elements.*.parameters_location:         { type: string, description: "Numeric path of the node holding the matrix's target, source and connection parameters" }
   elements.*.gain_parameter_number:       { type: int, description: "N:N matrix: number of the connection gain parameter under parameters_location" }
   elements.*.labels:                      { type: array, description: "[{base_path, description}]: nodes holding signal label parameters" }
+  elements.*.label_layers.*.description:  { type: string, description: "Matrix: a label layer's description (its Label.description), keyed by its place in labels from 0" }
+  elements.*.label_layers.*.targets.*:    { type: string, description: "Matrix: the label of a target in that layer, keyed by target number (the string parameter <base_path>.1.<target>)" }
+  elements.*.label_layers.*.sources.*:    { type: string, description: "Matrix: the label of a source in that layer, keyed by source number (the string parameter <base_path>.2.<source>)" }
   elements.*.targets:                     { type: array, description: "Non-linear matrix: target numbers" }
   elements.*.sources:                     { type: array, description: "Non-linear matrix: source numbers" }
   elements.*.connections.*.sources:       { type: array, description: "Sources connected to the target, keyed by target number" }
@@ -198,6 +201,16 @@ state:
   elements.*.result:                      { type: array, description: "Function result tuple as [{type, name}]" }
 
 quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Matrix signal labels (Ember+ 1.1 Matrix Extensions, Label; "Requesting Labels"): a matrix's labels name
+      nodes holding a "targets" node (1) and a "sources" node (2), each with one string parameter per signal,
+      numbered as the signal. The module copies those parameters into the matrix's label_layers.<n>.targets
+      and .sources as they are reported, and in full and depth modes with walk_matrices asks for both nodes
+      when the matrix names them, wherever they lie in the tree. A label is renamed by setting its parameter
+      (set_parameter on <base_path>.1.<target> or .2.<source>), the specification's "Changing Labels"; in lazy
+      mode, or opened for commands only, labels are read only once those nodes are asked for (get_directory).
   - models: [all]
     severity: warning
     text: >

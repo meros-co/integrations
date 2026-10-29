@@ -450,16 +450,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## barco-eventmaster — Barco Event Master
 
-- [ ] Confirm JSON-RPC requests are accepted at the root path / on port 9999, since the documents give no request path. ([specs/barco-eventmaster.yaml:1396](specs/barco-eventmaster.yaml#L1396))
-- [ ] Check which key activateDestGroup by name accepts, destGrpName (sent) or destGrName. ([specs/barco-eventmaster.yaml:1446](specs/barco-eventmaster.yaml#L1446))
-- [ ] Confirm the user key list method is listUserKeys (not listUserKey), what it returns, and that recallUserKey accepts the key userkeyName. ([specs/barco-eventmaster.yaml:1453](specs/barco-eventmaster.yaml#L1453))
-- [ ] Record the actual reply shape of powerStatus and of listCues, which the documents leave open. ([specs/barco-eventmaster.yaml:1462](specs/barco-eventmaster.yaml#L1462))
-- [ ] Check which test pattern numbers exist beyond 0 (off), 3 (colour bars) and 5 (grid). ([specs/barco-eventmaster.yaml:1465](specs/barco-eventmaster.yaml#L1465))
-- [ ] Check what cue_transport (pause or stop with type alone and no cue id) applies to. ([specs/barco-eventmaster.yaml:1550](specs/barco-eventmaster.yaml#L1550))
-- [ ] On Encore3, check what the ApiExtControl flag in getFrameSettings means and whether it blocks API calls. ([specs/barco-eventmaster.yaml:1521](specs/barco-eventmaster.yaml#L1521))
-- [ ] Check what error codes and messages come back in result.success and the JSON-RPC error member, since none are documented. ([specs/barco-eventmaster.yaml:1412](specs/barco-eventmaster.yaml#L1412))
-- [ ] Confirm the subscribe command is accepted with the port sent as a string. ([specs/barco-eventmaster.yaml:1500](specs/barco-eventmaster.yaml#L1500))
-- [ ] Confirm getFrameSettings lists every slot of the frame, and listSources, listInputs, listStill and listOperators with no parameters list every one: each such answer replaces cards, sources, inputs, stills or operators. ([specs/barco-eventmaster.yaml:1295](specs/barco-eventmaster.yaml#L1295))
+- [ ] Confirm JSON-RPC requests are accepted at the root path / on port 9999, since the documents give no request path. ([specs/barco-eventmaster.yaml:1417](specs/barco-eventmaster.yaml#L1417))
+- [ ] Check which key activateDestGroup by name accepts, destGrpName (sent) or destGrName. ([specs/barco-eventmaster.yaml:1467](specs/barco-eventmaster.yaml#L1467))
+- [ ] Confirm the user key list method is listUserKeys (not listUserKey), what it returns, and that recallUserKey accepts the key userkeyName. ([specs/barco-eventmaster.yaml:1474](specs/barco-eventmaster.yaml#L1474))
+- [ ] Record the actual reply shape of powerStatus and of listCues, which the documents leave open. ([specs/barco-eventmaster.yaml:1483](specs/barco-eventmaster.yaml#L1483))
+- [ ] Check which test pattern numbers exist beyond 0 (off), 3 (colour bars) and 5 (grid). ([specs/barco-eventmaster.yaml:1486](specs/barco-eventmaster.yaml#L1486))
+- [ ] Check what cue_transport (pause or stop with type alone and no cue id) applies to. ([specs/barco-eventmaster.yaml:1572](specs/barco-eventmaster.yaml#L1572))
+- [ ] On Encore3, check what the ApiExtControl flag in getFrameSettings means and whether it blocks API calls. ([specs/barco-eventmaster.yaml:1543](specs/barco-eventmaster.yaml#L1543))
+- [ ] Check what error codes and messages come back in result.success and the JSON-RPC error member, since none are documented. ([specs/barco-eventmaster.yaml:1433](specs/barco-eventmaster.yaml#L1433))
+- [ ] Confirm the subscribe command is accepted with the port sent as a string. ([specs/barco-eventmaster.yaml:1522](specs/barco-eventmaster.yaml#L1522))
+- [ ] Confirm getFrameSettings lists every slot of the frame, and listSources, listInputs, listStill and listOperators with no parameters list every one: each such answer replaces cards, sources, inputs, stills or operators. ([specs/barco-eventmaster.yaml:1307](specs/barco-eventmaster.yaml#L1307))
 - [ ] Confirm reading listContent for every screen destination every 10 seconds (after listDestinations) is acceptable on a processor with many screens, and that listContent's Layers, BGLyr and Transition arrays match the Doc 8.2 example on E2, S3, EX and Encore3. ([specs/barco-eventmaster.yaml:1175](specs/barco-eventmaster.yaml#L1175))
 - [ ] Record a listCues reply: the documents give no cue object, and the cue's id and Name are read as the other lists hold them. ([specs/barco-eventmaster.yaml:1248](specs/barco-eventmaster.yaml#L1248))
 
@@ -514,15 +514,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Pulse 2.10 and later, port 9090 refuses connections until protocols.jsonrpc.port-raw.enable is turned on (LCD/OSD, Prospector or the API over 9091), and a network-domain factory reset turns it off again. ([specs/barco-pulse.yaml:4926](specs/barco-pulse.yaml#L4926))
 - [ ] authenticate with a correct PIN code answers result true, and what a wrong code answers (false, or a JSON-RPC error). ([specs/barco-pulse.yaml:156](specs/barco-pulse.yaml#L156))
 - [ ] An unauthenticated end-user connection on 9090 or 9091 can read, set and call everything this spec uses, on Pulse 2.10 with user.authenticationrequired on. ([specs/barco-pulse.yaml:4949](specs/barco-pulse.yaml#L4949))
-- [ ] property.get of one property name (string form) answers the bare value in "result" for strings, numbers, booleans and objects. ([specs/barco-pulse.yaml:6303](specs/barco-pulse.yaml#L6303))
+- [ ] property.get of one property name (string form) answers the bare value in "result" for strings, numbers, booleans and objects. ([specs/barco-pulse.yaml:6305](specs/barco-pulse.yaml#L6305))
 - [ ] property.subscribe with an array that names a property missing or unavailable in the current state either subscribes the rest or fails as a whole. ([specs/barco-pulse.yaml:5094](specs/barco-pulse.yaml#L5094))
-- [ ] Subscriptions survive a system.state change (standby to on) or must be made again; this spec re-subscribes on every state change and on modelupdated. ([specs/barco-pulse.yaml:6370](specs/barco-pulse.yaml#L6370))
-- [ ] property.changed lists each changed property as a single-member object in params.property, several in one push included. ([specs/barco-pulse.yaml:6298](specs/barco-pulse.yaml#L6298))
+- [ ] Subscriptions survive a system.state change (standby to on) or must be made again; this spec re-subscribes on every state change and on modelupdated. ([specs/barco-pulse.yaml:6378](specs/barco-pulse.yaml#L6378))
+- [ ] property.changed lists each changed property as a single-member object in params.property, several in one push included. ([specs/barco-pulse.yaml:6300](specs/barco-pulse.yaml#L6300))
 - [ ] Properties the catalogs type as {base int or float, hints} (optics.*.target, illumination.sources.*.power, image.stereo.darktime, image.processing.transportdelay.desired) are set and pushed as plain numbers. ([specs/barco-pulse.yaml:4985](specs/barco-pulse.yaml#L4985))
 - [ ] A motor target outside optics.<axis>.minposition..maxposition is refused with an error rather than clamped. ([specs/barco-pulse.yaml:2642](specs/barco-pulse.yaml#L2642))
-- [ ] environment.getcontrolblocks Sensor/Temperature and Sensor/Speed answer a dictionary whose keys start with "environment." on every family. ([specs/barco-pulse.yaml:6353](specs/barco-pulse.yaml#L6353))
-- [ ] statistics.listcounters answers objects of name, plain-integer value and unit. ([specs/barco-pulse.yaml:6359](specs/barco-pulse.yaml#L6359))
-- [ ] The arguments the notification.emitted/dismissed and profile.profileactivated signals carry (the catalogs do not document them). ([specs/barco-pulse.yaml:6364](specs/barco-pulse.yaml#L6364))
+- [ ] environment.getcontrolblocks Sensor/Temperature and Sensor/Speed answer a dictionary whose keys start with "environment." on every family. ([specs/barco-pulse.yaml:6361](specs/barco-pulse.yaml#L6361))
+- [ ] statistics.listcounters answers objects of name, plain-integer value and unit. ([specs/barco-pulse.yaml:6367](specs/barco-pulse.yaml#L6367))
+- [ ] The arguments the notification.emitted/dismissed and profile.profileactivated signals carry (the catalogs do not document them). ([specs/barco-pulse.yaml:6372](specs/barco-pulse.yaml#L6372))
 - [ ] Introspecting image confirms there is no freeze property or method on any family. ([specs/barco-pulse.yaml:4962](specs/barco-pulse.yaml#L4962))
 - [ ] Which properties and methods answer -32000 in standby (shutter, optics, illumination), and that the re-reads after the state change fill them in. ([specs/barco-pulse.yaml:4973](specs/barco-pulse.yaml#L4973))
 - [ ] The connector and source object names the catalogs list (hdmi, displayport1, l1hdmi, l2displayporta ...) match real units of each family. ([specs/barco-pulse.yaml:4993](specs/barco-pulse.yaml#L4993))
@@ -534,6 +534,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] reset_all answers the list of domains it resets, and whether it resets the network and user domains, which can cut the connection. ([specs/barco-pulse.yaml:3544](specs/barco-pulse.yaml#L3544))
 - [ ] Confirm the UDM, F70, F80, F90, HDX 4K and XDL serve the file endpoints the I600 and UDX catalogs list (logs, EDID, black level, blend, warp and test pattern files, license registration, LCD and OSD captures, splash screen upload), and which of them also serve the UDX's source image and camera downloads. ([specs/barco-pulse.yaml:4759](specs/barco-pulse.yaml#L4759))
 - [ ] Confirm what the file endpoints answer to a multipart upload (status and body), and that the part's file name may be any name with the right extension. ([specs/barco-pulse.yaml:4850](specs/barco-pulse.yaml#L4850))
+- [ ] image.testpattern.listinternal and image.testpattern.nosignal.list answer their lists in "result" as JSON, as the other list methods do, and on which models each is available. ([specs/barco-pulse.yaml:4218](specs/barco-pulse.yaml#L4218))
 
 ## barco-rlm-w14 — Barco RLM-W14
 
@@ -554,6 +555,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Unit of warp rotation -20 to +20. ([specs/barco-rlm-w14.yaml:1642](specs/barco-rlm-w14.yaml#L1642))
 - [ ] The effect of control_port network (marked obsolete) and eco_network_power on RS-232 control. ([specs/barco-rlm-w14.yaml:1130](specs/barco-rlm-w14.yaml#L1130))
 - [ ] Whether the projector has a network (TCP) form of these commands. ([specs/barco-rlm-w14.yaml:2563](specs/barco-rlm-w14.yaml#L2563))
+- [ ] What op errcode answers while nothing is wrong (NA, 0, or the last error), since 0 is documented as over temperature inlet. ([specs/barco-rlm-w14.yaml:2566](specs/barco-rlm-w14.yaml#L2566))
 
 ## behringer-wing — Behringer WING
 
@@ -710,13 +712,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## birddog-converters — BirdDog converters and decoders
 
-- [ ] Which converter firmware first serves API 2.0, and whether Studio and Mini units on older firmware answer /about with API 1.0's {"Version":"1.0"}. ([specs/birddog-converters.yaml:1091](specs/birddog-converters.yaml#L1091))
-- [ ] Check /about's Format value on each converter (Studio, Mini, Flex Encode, Flex Decode, WP Encode, WP Decode, 4KHDMI/SDI, QUAD, PLAY) and what Flex 4K BACKPACK and Pod report. ([specs/birddog-converters.yaml:1098](specs/birddog-converters.yaml#L1098))
-- [ ] Confirm POST /connectTo with only {"sourceName": ...} switches the decoder on every converter, and whether ChNum in the query selects the channel on QUAD and dual-channel 4K HDMI/SDI. ([specs/birddog-converters.yaml:1081](specs/birddog-converters.yaml#L1081))
-- [ ] Check which keys /decodestatus returns (the document's example and parameter table differ), and its reply in encode mode. ([specs/birddog-converters.yaml:1074](specs/birddog-converters.yaml#L1074))
-- [ ] Check the odd DEVICE SUPPORT cells: /encodeTransport on Flex Decode and QUAD, decode NDIAudio on Wallplate Output and 4K HDMI/SDI, StreamName and NDIGroup on Wallplate Input. ([specs/birddog-converters.yaml:1071](specs/birddog-converters.yaml#L1071))
-- [ ] Check whether single-key POST bodies with ChNum are accepted on /encodesetup and /decodesetup, or the whole object must be sent. ([specs/birddog-converters.yaml:1082](specs/birddog-converters.yaml#L1082))
-- [ ] Check /operationmode's values on 4K QUAD with the 2x2 mode. ([specs/birddog-converters.yaml:1106](specs/birddog-converters.yaml#L1106))
+- [ ] Which converter firmware first serves API 2.0, and whether Studio and Mini units on older firmware answer /about with API 1.0's {"Version":"1.0"}. ([specs/birddog-converters.yaml:1111](specs/birddog-converters.yaml#L1111))
+- [ ] Check /about's Format value on each converter (Studio, Mini, Flex Encode, Flex Decode, WP Encode, WP Decode, 4KHDMI/SDI, QUAD, PLAY) and what Flex 4K BACKPACK and Pod report. ([specs/birddog-converters.yaml:1118](specs/birddog-converters.yaml#L1118))
+- [ ] Confirm POST /connectTo with only {"sourceName": ...} switches the decoder on every converter, and whether ChNum in the query selects the channel on QUAD and dual-channel 4K HDMI/SDI. ([specs/birddog-converters.yaml:1101](specs/birddog-converters.yaml#L1101))
+- [ ] Check which keys /decodestatus returns (the document's example and parameter table differ), and its reply in encode mode. ([specs/birddog-converters.yaml:1094](specs/birddog-converters.yaml#L1094))
+- [ ] Check the odd DEVICE SUPPORT cells: /encodeTransport on Flex Decode and QUAD, decode NDIAudio on Wallplate Output and 4K HDMI/SDI, StreamName and NDIGroup on Wallplate Input. ([specs/birddog-converters.yaml:1091](specs/birddog-converters.yaml#L1091))
+- [ ] Check whether single-key POST bodies with ChNum are accepted on /encodesetup and /decodesetup, or the whole object must be sent. ([specs/birddog-converters.yaml:1102](specs/birddog-converters.yaml#L1102))
+- [ ] Check /operationmode's values on 4K QUAD with the 2x2 mode. ([specs/birddog-converters.yaml:1126](specs/birddog-converters.yaml#L1126))
 
 ## blackmagic-atem — Blackmagic ATEM
 
@@ -1680,14 +1682,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## emberplus — Ember+
 
-- [ ] Check the device's Ember+ port, since the module's default of 9000 is a common choice, not a standard. ([specs/emberplus.yaml:199](specs/emberplus.yaml#L199))
-- [ ] Check whether the provider repeats the DTD and application bytes in each packet of a multi-packet message, and that it accepts the module's header in every packet. ([specs/emberplus.yaml:234](specs/emberplus.yaml#L234))
-- [ ] Confirm the provider accepts DTD version 2.50 sent as 0x32 0x02. ([specs/emberplus.yaml:233](specs/emberplus.yaml#L233))
-- [ ] Confirm the module's rule for knowing a GetDirectory has been answered holds with the provider in use, especially one that splits a directory across messages. ([specs/emberplus.yaml:248](specs/emberplus.yaml#L248))
-- [ ] Check what value a trigger parameter expects. ([specs/emberplus.yaml:269](specs/emberplus.yaml#L269))
-- [ ] Check whether connect and disconnect matrix operations work on 1:N matrices, and which disposition values the provider returns. ([specs/emberplus.yaml:274](specs/emberplus.yaml#L274))
-- [ ] Confirm the FieldFlags values (prose) and connections 5 are accepted. ([specs/emberplus.yaml:258](specs/emberplus.yaml#L258))
-- [ ] Confirm StreamCollection and StreamEntry tags and the templateReference tag match the provider. ([specs/emberplus.yaml:224](specs/emberplus.yaml#L224))
+- [ ] Check the device's Ember+ port, since the module's default of 9000 is a common choice, not a standard. ([specs/emberplus.yaml:202](specs/emberplus.yaml#L202))
+- [ ] Check whether the provider repeats the DTD and application bytes in each packet of a multi-packet message, and that it accepts the module's header in every packet. ([specs/emberplus.yaml:247](specs/emberplus.yaml#L247))
+- [ ] Confirm the provider accepts DTD version 2.50 sent as 0x32 0x02. ([specs/emberplus.yaml:246](specs/emberplus.yaml#L246))
+- [ ] Confirm the module's rule for knowing a GetDirectory has been answered holds with the provider in use, especially one that splits a directory across messages. ([specs/emberplus.yaml:261](specs/emberplus.yaml#L261))
+- [ ] Check what value a trigger parameter expects. ([specs/emberplus.yaml:282](specs/emberplus.yaml#L282))
+- [ ] Check whether connect and disconnect matrix operations work on 1:N matrices, and which disposition values the provider returns. ([specs/emberplus.yaml:287](specs/emberplus.yaml#L287))
+- [ ] Confirm the FieldFlags values (prose) and connections 5 are accepted. ([specs/emberplus.yaml:271](specs/emberplus.yaml#L271))
+- [ ] Confirm StreamCollection and StreamEntry tags and the templateReference tag match the provider. ([specs/emberplus.yaml:237](specs/emberplus.yaml#L237))
 - [ ] Opened for commands only, check that an Unsubscribe on a looked-up node (or as a bare command at the root) ends the value subscription its GetDirectory created. ([crates/core/src/modules/emberplus.rs:35](crates/core/src/modules/emberplus.rs#L35))
 
 ## epiphan-pearl — Epiphan Pearl-2, Pearl Mini, Pearl Nano and Pearl Nexus
@@ -2233,20 +2235,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that get_static_bindings with an empty body returns every binding. ([specs/kiloview-avx.yaml:1711](specs/kiloview-avx.yaml#L1711))
 - [ ] Confirm that upload_icon takes multipart/form-data. The document types icon_file as a file but writes its example as JSON. ([specs/kiloview-avx.yaml:1169](specs/kiloview-avx.yaml#L1169))
 - [ ] Find out what modify_icons (ids only) changes. ([specs/kiloview-avx.yaml:1190](specs/kiloview-avx.yaml#L1190))
-- [ ] Find out the list key in the panel output configuration reply: cfg_outputs (the table) or outputs (the example). Both are read. ([specs/kiloview-avx.yaml:3138](specs/kiloview-avx.yaml#L3138))
+- [ ] Find out the list key in the panel output configuration reply: cfg_outputs (the table) or outputs (the example). Both are read. ([specs/kiloview-avx.yaml:3143](specs/kiloview-avx.yaml#L3143))
 - [ ] Check that the topology status reply has no code field, and whether it names its links edges (the example) or wires (the table). ([specs/kiloview-avx.yaml:1276](specs/kiloview-avx.yaml#L1276))
 - [ ] Check whether the watched-ports reply comes bare or wrapped in {code, message, data}. Both are read. ([specs/kiloview-avx.yaml:1523](specs/kiloview-avx.yaml#L1523))
-- [ ] Confirm that the time offset is in hours. ([specs/kiloview-avx.yaml:2135](specs/kiloview-avx.yaml#L2135))
-- [ ] Confirm that the switch and system temperatures are in degrees Celsius. ([specs/kiloview-avx.yaml:2457](specs/kiloview-avx.yaml#L2457))
-- [ ] Confirm the reading of the misaligned PTP columns: de_mainclock, average_delay, upstream_equipment and upstream_port. ([specs/kiloview-avx.yaml:2149](specs/kiloview-avx.yaml#L2149))
-- [ ] Find out whether a preset's apply flag means "available" or "applied". ([specs/kiloview-avx.yaml:2158](specs/kiloview-avx.yaml#L2158))
-- [ ] Find the units of PoE power, voltage and current. ([specs/kiloview-avx.yaml:2495](specs/kiloview-avx.yaml#L2495))
-- [ ] Find out what the network status flag means (12.8.2). ([specs/kiloview-avx.yaml:2589](specs/kiloview-avx.yaml#L2589))
-- [ ] Confirm that a panel output's input_id 0 means no input. ([specs/kiloview-avx.yaml:2256](specs/kiloview-avx.yaml#L2256))
-- [ ] Confirm that a panel's other_inputs are all the inputs not in it. ([specs/kiloview-avx.yaml:3063](specs/kiloview-avx.yaml#L3063))
+- [ ] Confirm that the time offset is in hours. ([specs/kiloview-avx.yaml:2140](specs/kiloview-avx.yaml#L2140))
+- [ ] Confirm that the switch and system temperatures are in degrees Celsius. ([specs/kiloview-avx.yaml:2462](specs/kiloview-avx.yaml#L2462))
+- [ ] Confirm the reading of the misaligned PTP columns: de_mainclock, average_delay, upstream_equipment and upstream_port. ([specs/kiloview-avx.yaml:2154](specs/kiloview-avx.yaml#L2154))
+- [ ] Find out whether a preset's apply flag means "available" or "applied". ([specs/kiloview-avx.yaml:2163](specs/kiloview-avx.yaml#L2163))
+- [ ] Find the units of PoE power, voltage and current. ([specs/kiloview-avx.yaml:2500](specs/kiloview-avx.yaml#L2500))
+- [ ] Find out what the network status flag means (12.8.2). ([specs/kiloview-avx.yaml:2594](specs/kiloview-avx.yaml#L2594))
+- [ ] Confirm that a panel output's input_id 0 means no input. ([specs/kiloview-avx.yaml:2261](specs/kiloview-avx.yaml#L2261))
+- [ ] Confirm that a panel's other_inputs are all the inputs not in it. ([specs/kiloview-avx.yaml:3068](specs/kiloview-avx.yaml#L3068))
 - [ ] Check that set_dhcp with gateway type default accepts an empty gateway ip. ([specs/kiloview-avx.yaml:1680](specs/kiloview-avx.yaml#L1680))
 - [ ] Check that get_alarms with alarm_levels=1&2&3 returns every alarm event. ([specs/kiloview-avx.yaml:1797](specs/kiloview-avx.yaml#L1797))
-- [ ] Check that enabling a panel on the physical front panel changes the front panel list. ([specs/kiloview-avx.yaml:4113](specs/kiloview-avx.yaml#L4113))
+- [ ] Check that enabling a panel on the physical front panel changes the front panel list. ([specs/kiloview-avx.yaml:4118](specs/kiloview-avx.yaml#L4118))
 - [ ] Find out the virtual NIC interface type values. The example shows static; the VLAN list shows dhcp and manual. ([specs/kiloview-avx.yaml:531](specs/kiloview-avx.yaml#L531))
 
 ## kiloview-cube-r1 — Kiloview CUBE R1
@@ -3155,7 +3157,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm commands sent with ID1 and ID2 as 00h are answered when a control ID is set on the projector, and whether TCP 7142 keeps an idle connection open or closes it. ([specs/nec-projector.yaml:840](specs/nec-projector.yaml#L840))
 - [ ] Measure how long POWER ON and POWER OFF take to answer (15 s is allowed). ([specs/nec-projector.yaml:840](specs/nec-projector.yaml#L840))
 - [ ] Confirm each model's input terminal codes, which differ by family (HDMI is 1Ah on the older models and A1h on the newer). ([specs/nec-projector.yaml:845](specs/nec-projector.yaml#L845))
-- [ ] Find what the two names the aspect table gives one code mean (02h WIDE SCREEN and 16:9, CINEMA and 16:9; 06h ZOOM and FULL), and which of 06h and 0Ch, 05h and 0Fh an NP-PX651X takes for 16:10 and AUTO. ([specs/nec-projector.yaml:1197](specs/nec-projector.yaml#L1197))
+- [ ] Find what the two names the aspect table gives one code mean (02h WIDE SCREEN and 16:9, CINEMA and 16:9; 06h ZOOM and FULL), and which of 06h and 0Ch, 05h and 0Fh an NP-PX651X takes for 16:10 and AUTO. ([specs/nec-projector.yaml:1198](specs/nec-projector.yaml#L1198))
 - [ ] Check that 037-6 sends kilograms little-endian: the manual's example for 2460.06375 kg prints 9Ch 90h where 2460 is 9Ch 09h. ([specs/nec-projector.yaml:919](specs/nec-projector.yaml#L919))
 - [ ] Check that 053-1 and 060-1 values are signed 16-bit (negative lens shift positions, picture minimums). ([specs/nec-projector.yaml:948](specs/nec-projector.yaml#L948))
 - [ ] Check how a one-lamp or laser model answers 037-4 for lamp 2 and for the remaining life on 2024 models. ([specs/nec-projector.yaml:913](specs/nec-projector.yaml#L913))
@@ -3240,14 +3242,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## nmos-registry — AMWA NMOS registry (IS-04 Query API)
 
-- [ ] Check against a registry (nmos-cpp's and a vendor's) that GET /x-nmos/query answers as the liveness probe. ([specs/nmos-registry.yaml:35](specs/nmos-registry.yaml#L35))
-- [ ] Check that a registry answers the subscription POST with a ws_href the core can reach (a registry behind NAT or naming a host name), and that the first grain on each websocket is the whole list. ([specs/nmos-registry.yaml:39](specs/nmos-registry.yaml#L39))
-- [ ] Check that a registry accepts max_update_rate_ms 0 and 100, and how it batches changes at 100. ([specs/nmos-registry.yaml:60](specs/nmos-registry.yaml#L60))
-- [ ] Record a registry's default page size for the get_ commands, and check query_resources with basic queries and paging. ([specs/nmos-registry.yaml:202](specs/nmos-registry.yaml#L202))
-- [ ] Check that a registry answers create_subscription with 200 for an existing identical subscription and 201 for a new one. ([specs/nmos-registry.yaml:231](specs/nmos-registry.yaml#L231))
-- [ ] Check that a grain deleting a resource carries its id in path (and pre), as the module reads it. ([specs/nmos-registry.yaml:365](specs/nmos-registry.yaml#L365))
+- [ ] Check against a registry (nmos-cpp's and a vendor's) that GET /x-nmos/query answers as the liveness probe. ([specs/nmos-registry.yaml:46](specs/nmos-registry.yaml#L46))
+- [ ] Check that a registry answers the subscription POST with a ws_href the core can reach (a registry behind NAT or naming a host name), and that the first grain on each websocket is the whole list. ([specs/nmos-registry.yaml:50](specs/nmos-registry.yaml#L50))
+- [ ] Check that a registry accepts max_update_rate_ms 0 and 100, and how it batches changes at 100. ([specs/nmos-registry.yaml:71](specs/nmos-registry.yaml#L71))
+- [ ] Record a registry's default page size for the get_ commands, and check query_resources with basic queries and paging. ([specs/nmos-registry.yaml:220](specs/nmos-registry.yaml#L220))
+- [ ] Check that a registry answers create_subscription with 200 for an existing identical subscription and 201 for a new one. ([specs/nmos-registry.yaml:249](specs/nmos-registry.yaml#L249))
+- [ ] Check that a grain deleting a resource carries its id in path (and pre), as the module reads it. ([specs/nmos-registry.yaml:430](specs/nmos-registry.yaml#L430))
 - [ ] Check what an mDNS browse of _nmos-query._tcp finds on a network with several registries (TXT pri), and whether registries advertise only by unicast DNS-SD there. ([crates/core/src/mdns.rs:258](crates/core/src/mdns.rs#L258))
 - [ ] Check a unicast DNS-SD browse of _nmos-query._tcp against a site's DNS server (PTR, SRV, TXT and A answered in turn or together), and that the host's own DNS servers and domains are the ones asked on Windows, macOS and Linux. ([crates/core/src/dns_sd.rs:344](crates/core/src/dns_sd.rs#L344))
+- [ ] A Node's Connection API accepts the registry's IS-10 bearer token, and answers a PATCH of staged with 200 and the staged parameters. ([specs/nmos-registry.yaml:282](specs/nmos-registry.yaml#L282))
+- [ ] A Sender's manifest_href serves its SDP as text that can be passed as the receiver's transport_file, and a Sender without one is connected by sender_id alone. ([specs/nmos-registry.yaml:282](specs/nmos-registry.yaml#L282))
 
 ## novastar-central-control — NovaStar COEX central control protocol
 
@@ -3261,7 +3265,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which API generation each model and firmware answers: the current OpenAPI paths (/api/v1/screen/..., /api/v1/preset/...) or the 2023 manual's (/api/v1/device/screen/..., /api/v1/device/currentpreset). ([specs/novastar-coex.yaml:1161](specs/novastar-coex.yaml#L1161))
 - [ ] Confirm that the endpoints the OpenAPI pages list without /api/v1 (internal source, colour correction, 3D emitter, sync source, identify, controller name, no-signal image, thermal amount) answer with the prefix. ([specs/novastar-coex.yaml:2158](specs/novastar-coex.yaml#L2158))
 - [ ] Record the displayMode numbers the display state read reports for blackout and freeze. ([specs/novastar-coex.yaml:2166](specs/novastar-coex.yaml#L2166))
-- [ ] Check whether requests need the Device-Key header shown in the OpenAPI examples. ([specs/novastar-coex.yaml:2237](specs/novastar-coex.yaml#L2237))
+- [ ] Check whether requests need the Device-Key header shown in the OpenAPI examples. ([specs/novastar-coex.yaml:2242](specs/novastar-coex.yaml#L2242))
 - [ ] Record the screenID format (the examples here assume a braced GUID-like string) and that a one-element screenIdList acts on that screen only. ([specs/novastar-coex.yaml:213](specs/novastar-coex.yaml#L213))
 - [ ] Check switch_layer_source in send-only and all-in-one modes, and what layer IDs each mode uses. ([specs/novastar-coex.yaml:452](specs/novastar-coex.yaml#L452))
 - [ ] Record the colour component range of set_test_pattern (0-4095 in the 2023 example, gray 0-255 in OpenAPI) and how to return from a test pattern to the input. ([specs/novastar-coex.yaml:622](specs/novastar-coex.yaml#L622))
@@ -3269,7 +3273,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether set_working_mode to all-in-one (3) works through the API. ([specs/novastar-coex.yaml:947](specs/novastar-coex.yaml#L947))
 - [ ] Confirm MX30 and MX20 answer the same API as the MX40 Pro. ([specs/novastar-coex.yaml:68](specs/novastar-coex.yaml#L68))
 - [ ] Confirm /api/v1/screen/output/display/state lists every canvas: each poll replaces canvases. ([specs/novastar-coex.yaml:1284](specs/novastar-coex.yaml#L1284))
-- [ ] Record the envelope of each list read, which the OpenAPI pages leave out: displayparams and cabinet count as data.list, screen output, schedules, input sources, cabinets and multifunction cards as a data array, presets as data.screenPresetList. ([specs/novastar-coex.yaml:2229](specs/novastar-coex.yaml#L2229))
+- [ ] Record the envelope of each list read, which the OpenAPI pages leave out: displayparams and cabinet count as data.list, screen output, schedules, input sources, cabinets and multifunction cards as a data array, presets as data.screenPresetList. ([specs/novastar-coex.yaml:2234](specs/novastar-coex.yaml#L2234))
 - [ ] Confirm GET /api/v1/screen/output answers one element per screen in a data array, keyed by screenid, and not a single object. ([specs/novastar-coex.yaml:1455](specs/novastar-coex.yaml#L1455))
 - [ ] Confirm InputPortConfig in GET /api/v1/device/input is an array (the page types it as an object) and that its logicId is the source ID the input commands take. ([specs/novastar-coex.yaml:1602](specs/novastar-coex.yaml#L1602))
 - [ ] Confirm a preset's state in GET /api/v1/preset is true for the applied preset only, so current_preset follows recall_preset. ([specs/novastar-coex.yaml:1421](specs/novastar-coex.yaml#L1421))
@@ -3278,26 +3282,28 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the cabinet IDs of GET /api/v1/device/cabinet (id), GET /api/v1/screen (cabinetID) and the monitoring read (CabinetID) are the same numbers. ([specs/novastar-coex.yaml:1626](specs/novastar-coex.yaml#L1626))
 - [ ] Record what a receiving card's nextCabinetLinkStatus.linkStatus true means (disconnected or connected). ([specs/novastar-coex.yaml:1773](specs/novastar-coex.yaml#L1773))
 - [ ] Confirm a multifunction card's linkStatus is the string "0" or "1" (the page types it as a string). ([specs/novastar-coex.yaml:1822](specs/novastar-coex.yaml#L1822))
-- [ ] Check that the layer window, border and crop values of GET /api/v1/screen change only from VMP, and whether any undocumented endpoint writes them or creates and removes layers. ([specs/novastar-coex.yaml:2213](specs/novastar-coex.yaml#L2213))
-- [ ] Check whether any read reports the settings the API only writes (brightness limit, colour correction, 3D LUT, 3D emitter, time, per-cabinet test pattern, mapping, thermal compensation, no-signal image). ([specs/novastar-coex.yaml:2198](specs/novastar-coex.yaml#L2198))
+- [ ] Check that the layer window, border and crop values of GET /api/v1/screen change only from VMP, and whether any undocumented endpoint writes them or creates and removes layers. ([specs/novastar-coex.yaml:2218](specs/novastar-coex.yaml#L2218))
+- [ ] Check whether any read reports the settings the API only writes (brightness limit, colour correction, 3D LUT, 3D emitter, time, per-cabinet test pattern, mapping, thermal compensation, no-signal image). ([specs/novastar-coex.yaml:2203](specs/novastar-coex.yaml#L2203))
 
 ## novastar-h — NovaStar H series
 
-- [ ] Confirm that unencrypted requests signed with Base64(md5(timeStamp + pId)) are accepted with encryption off for the requestor, and how far the time may drift before error 11. ([specs/novastar-h.yaml:862](specs/novastar-h.yaml#L862))
+- [ ] Confirm that unencrypted requests signed with Base64(md5(timeStamp + pId)) are accepted with encryption off for the requestor, and how far the time may drift before error 11. ([specs/novastar-h.yaml:886](specs/novastar-h.yaml#L886))
 - [ ] Confirm the OpenAPI listens on port 8000 (the documentation's example address) on every model. ([specs/novastar-h.yaml:47](specs/novastar-h.yaml#L47))
-- [ ] Check which deviceId to send (0 in most examples, 1 on the brightness pages). ([specs/novastar-h.yaml:887](specs/novastar-h.yaml#L887))
-- [ ] Record whether the splicer pushes notifications (the change history mentions a websocket for layer z-order) and on which address. ([specs/novastar-h.yaml:905](specs/novastar-h.yaml#L905))
-- [ ] Check set_screen_bkg's enable sense (documented 0 on, 1 off), and what screen/readDetail's Bkg.enable reports after each. ([specs/novastar-h.yaml:770](specs/novastar-h.yaml#L770))
+- [ ] Check which deviceId to send (0 in most examples, 1 on the brightness pages). ([specs/novastar-h.yaml:911](specs/novastar-h.yaml#L911))
+- [ ] Record whether the splicer pushes notifications (the change history mentions a websocket for layer z-order) and on which address. ([specs/novastar-h.yaml:930](specs/novastar-h.yaml#L930))
+- [ ] Check set_screen_bkg's enable sense (documented 0 on, 1 off), and what screen/readDetail's Bkg.enable reports after each. ([specs/novastar-h.yaml:794](specs/novastar-h.yaml#L794))
 - [ ] Check update_input_crop with the documented field spelling heigth. ([specs/novastar-h.yaml:283](specs/novastar-h.yaml#L283))
-- [ ] Capture a screen/readDetail reply (the page gives only its schema) and confirm brightness, gamma, Ftb, Freeze, Bkg, outputMode.size and mosaic, screen3D, Osd and OsdImage are where the module reads them. ([specs/novastar-h.yaml:897](specs/novastar-h.yaml#L897))
-- [ ] Confirm Ftb.enable is 1 while a screen is faded to black and 0 once screen_ftb brings it back. ([specs/novastar-h.yaml:768](specs/novastar-h.yaml#L768))
-- [ ] Check screen/readDetail's gamma after set_screen_gamma with a decimal (the schema types it as an integer). ([specs/novastar-h.yaml:767](specs/novastar-h.yaml#L767))
-- [ ] Check the scale of an input's timing.refreshRate (60 in the example, documented as frame rate x100). ([specs/novastar-h.yaml:815](specs/novastar-h.yaml#L815))
-- [ ] Check the sourceType a layer reports for an input (1 in the examples and on the write page, 2 on the list page). ([specs/novastar-h.yaml:790](specs/novastar-h.yaml#L790))
-- [ ] Check that an input's slotId, interfaceType and sourceType from input/readList, sent as they are in set_layer_source's body with its inputId, put that input on the layer. ([specs/novastar-h.yaml:816](specs/novastar-h.yaml#L816))
-- [ ] Capture an input's crops array with a cropped source (the example's is empty) and confirm each element has cropId, name, x, y, width and height. ([specs/novastar-h.yaml:829](specs/novastar-h.yaml#L829))
-- [ ] Confirm bkg/readAllList and input/readSourceList answer in data (not body), as their examples show. ([specs/novastar-h.yaml:897](specs/novastar-h.yaml#L897))
-- [ ] Check that polling six requests per screen at 5 s does not load the splicer, and whether a slower default is wiser. ([specs/novastar-h.yaml:899](specs/novastar-h.yaml#L899))
+- [ ] Capture a screen/readDetail reply (the page gives only its schema) and confirm brightness, gamma, Ftb, Freeze, Bkg, outputMode.size and mosaic, screen3D, Osd and OsdImage are where the module reads them. ([specs/novastar-h.yaml:922](specs/novastar-h.yaml#L922))
+- [ ] Confirm Ftb.enable is 1 while a screen is faded to black and 0 once screen_ftb brings it back. ([specs/novastar-h.yaml:792](specs/novastar-h.yaml#L792))
+- [ ] Check screen/readDetail's gamma after set_screen_gamma with a decimal (the schema types it as an integer). ([specs/novastar-h.yaml:791](specs/novastar-h.yaml#L791))
+- [ ] Check the scale of an input's timing.refreshRate (60 in the example, documented as frame rate x100). ([specs/novastar-h.yaml:839](specs/novastar-h.yaml#L839))
+- [ ] Check the sourceType a layer reports for an input (1 in the examples and on the write page, 2 on the list page). ([specs/novastar-h.yaml:814](specs/novastar-h.yaml#L814))
+- [ ] Check that an input's slotId, interfaceType and sourceType from input/readList, sent as they are in set_layer_source's body with its inputId, put that input on the layer. ([specs/novastar-h.yaml:840](specs/novastar-h.yaml#L840))
+- [ ] Capture an input's crops array with a cropped source (the example's is empty) and confirm each element has cropId, name, x, y, width and height. ([specs/novastar-h.yaml:853](specs/novastar-h.yaml#L853))
+- [ ] Confirm bkg/readAllList and input/readSourceList answer in data (not body), as their examples show. ([specs/novastar-h.yaml:922](specs/novastar-h.yaml#L922))
+- [ ] Check that polling six requests per screen at 5 s does not load the splicer, and whether a slower default is wiser. ([specs/novastar-h.yaml:924](specs/novastar-h.yaml#L924))
+- [ ] The unit of device/readDetail backboardTemperature (taken as degrees Celsius), and the meaning of cpuStatus, memStatus and ethernetStatus. ([specs/novastar-h.yaml:770](specs/novastar-h.yaml#L770))
+- [ ] device/readDetail status is the device busy/ready flag (1 ready) inside body, apart from the envelope status, and powerList, fanList and slotList list every power supply, fan and slot. ([specs/novastar-h.yaml:765](specs/novastar-h.yaml#L765))
 
 ## obs-studio — OBS Studio (obs-websocket 5)
 
@@ -3582,24 +3588,24 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## probel-swp02 — Probel / Grass Valley SW-P-02 routers
 
-- [ ] Confirm SW-P-02 over TCP carries the same messages as the serial line, with nothing added, and find the port routers and gateways use. ([specs/probel-swp02.yaml:139](specs/probel-swp02.yaml#L139))
+- [ ] Confirm SW-P-02 over TCP carries the same messages as the serial line, with nothing added, and find the port routers and gateways use. ([specs/probel-swp02.yaml:142](specs/probel-swp02.yaml#L142))
 - [ ] Check that a router answers within the 1 s timeout, and what a router that does not implement a command (the salvo) sends. ([specs/probel-swp02.yaml:114](specs/probel-swp02.yaml#L114))
-- [ ] Record what multiplier bit 3 means on each router tested (bad source, crosspoint updates disabled, or unused). ([specs/probel-swp02.yaml:135](specs/probel-swp02.yaml#L135))
+- [ ] Record what multiplier bit 3 means on each router tested (bad source, crosspoint updates disabled, or unused). ([specs/probel-swp02.yaml:134](specs/probel-swp02.yaml#L134))
 - [ ] On an NK-3RD, confirm odd parity is needed and that CONNECTED is broadcast after a take. ([specs/probel-swp02.yaml:62](specs/probel-swp02.yaml#L62))
 
 ## probel-swp08 — Probel / Grass Valley SW-P-08 routers
 
-- [ ] Confirm the TCP port in use (2008 assumed; SW-P-08 over IP leaves it to the controller's configuration). ([specs/probel-swp08.yaml:489](specs/probel-swp08.yaml#L489))
+- [ ] Confirm the TCP port in use (2008 assumed; SW-P-08 over IP leaves it to the controller's configuration). ([specs/probel-swp08.yaml:498](specs/probel-swp08.yaml#L498))
 - [ ] Confirm matrix and level 1 are wire 0 on each controller family, and 1 on System 2. ([specs/probel-swp08.yaml:430](specs/probel-swp08.yaml#L430))
-- [ ] Check what a controller sends after a connect to a protected destination (nothing is assumed, so it times out). ([specs/probel-swp08.yaml:445](specs/probel-swp08.yaml#L445))
-- [ ] Check that a controller acknowledges DUAL CONTROLLER STATUS REQUEST (08) with DLE ACK even when it does not implement it, since that ACK is the liveness check. ([specs/probel-swp08.yaml:461](specs/probel-swp08.yaml#L461))
-- [ ] Check whether a controller NAKs commands it does not implement, answers INVALID MESSAGE (99), or stays silent. ([specs/probel-swp08.yaml:472](specs/probel-swp08.yaml#L472))
-- [ ] Check which device numbers a remote client may protect with, and that PROTECT CONNECTED reports state 3 (OEM) with that device. ([specs/probel-swp08.yaml:502](specs/probel-swp08.yaml#L502))
-- [ ] Confirm the protect tally dump request (19) layout: matrix/level byte then a two-byte first destination. ([specs/probel-swp08.yaml:550](specs/probel-swp08.yaml#L550))
-- [ ] Confirm the tie-line connect (111) bytes 7 and 8 are the source association number. ([specs/probel-swp08.yaml:550](specs/probel-swp08.yaml#L550))
-- [ ] Check whether CONNECTED messages follow a salvo go on XD and Eclipse routers (Issue 30 says none; go-acp reports controllers that expect them). ([specs/probel-swp08.yaml:523](specs/probel-swp08.yaml#L523))
-- [ ] On dual controllers over IP, record the unsolicited DUAL CONTROLLER STATUS RESPONSE on a changeover. ([specs/probel-swp08.yaml:495](specs/probel-swp08.yaml#L495))
-- [ ] Record name responses with name counts below 16, where a community parser reports the names starting one byte later. ([specs/probel-swp08.yaml:541](specs/probel-swp08.yaml#L541))
+- [ ] Check what a controller sends after a connect to a protected destination (nothing is assumed, so it times out). ([specs/probel-swp08.yaml:454](specs/probel-swp08.yaml#L454))
+- [ ] Check that a controller acknowledges DUAL CONTROLLER STATUS REQUEST (08) with DLE ACK even when it does not implement it, since that ACK is the liveness check. ([specs/probel-swp08.yaml:470](specs/probel-swp08.yaml#L470))
+- [ ] Check whether a controller NAKs commands it does not implement, answers INVALID MESSAGE (99), or stays silent. ([specs/probel-swp08.yaml:481](specs/probel-swp08.yaml#L481))
+- [ ] Check which device numbers a remote client may protect with, and that PROTECT CONNECTED reports state 3 (OEM) with that device. ([specs/probel-swp08.yaml:511](specs/probel-swp08.yaml#L511))
+- [ ] Confirm the protect tally dump request (19) layout: matrix/level byte then a two-byte first destination. ([specs/probel-swp08.yaml:559](specs/probel-swp08.yaml#L559))
+- [ ] Confirm the tie-line connect (111) bytes 7 and 8 are the source association number. ([specs/probel-swp08.yaml:559](specs/probel-swp08.yaml#L559))
+- [ ] Check whether CONNECTED messages follow a salvo go on XD and Eclipse routers (Issue 30 says none; go-acp reports controllers that expect them). ([specs/probel-swp08.yaml:532](specs/probel-swp08.yaml#L532))
+- [ ] On dual controllers over IP, record the unsolicited DUAL CONTROLLER STATUS RESPONSE on a changeover. ([specs/probel-swp08.yaml:504](specs/probel-swp08.yaml#L504))
+- [ ] Record name responses with name counts below 16, where a community parser reports the names starting one byte later. ([specs/probel-swp08.yaml:550](specs/probel-swp08.yaml#L550))
 - [ ] On Ultrix, confirm the SW-P-08 server port (8910) and how the Protocol Variant setting answers general and extended commands. ([specs/probel-swp08.yaml:198](specs/probel-swp08.yaml#L198))
 - [ ] On an NK-3RD, confirm matrix 0 and level 0 on the wire address NK level 1, and that no tally dump is answered. ([specs/probel-swp08.yaml:213](specs/probel-swp08.yaml#L213))
 
@@ -4558,12 +4564,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## turtleav-avoip-control — Turtle AV DARWIN and CHAZY controllers
 
-- [ ] Check the line ending (CR LF sent), whether Telnet on port 23 negotiates options, prints a banner or asks for a login, and whether it echoes commands. ([specs/turtleav-avoip-control.yaml:676](specs/turtleav-avoip-control.yaml#L676))
-- [ ] Check CHAZY Control Pro's acknowledgement texts: whether they start with [SUCCESS] and [ERROR]. ([specs/turtleav-avoip-control.yaml:686](specs/turtleav-avoip-control.yaml#L686))
-- [ ] Check whether the status blocks between = lines end in a way a client can find, so state could be read rather than kept from replies. ([specs/turtleav-avoip-control.yaml:665](specs/turtleav-avoip-control.yaml#L665))
+- [ ] Check the line ending (CR LF sent), whether Telnet on port 23 negotiates options, prints a banner or asks for a login, and whether it echoes commands. ([specs/turtleav-avoip-control.yaml:745](specs/turtleav-avoip-control.yaml#L745))
+- [ ] Check CHAZY Control Pro's acknowledgement texts: whether they start with [SUCCESS] and [ERROR]. ([specs/turtleav-avoip-control.yaml:755](specs/turtleav-avoip-control.yaml#L755))
+- [ ] Check whether the status blocks between = lines end in a way a client can find, so state could be read rather than kept from replies. ([specs/turtleav-avoip-control.yaml:732](specs/turtleav-avoip-control.yaml#L732))
 - [ ] Capture GET STATUS on a DARWIN Control and a CHAZY Control and confirm the block opens and ends with lines of = signs as the documents' examples show (DARWIN with two opening lines), with nothing after the closing line, so it frames as one message. ([specs/turtleav-avoip-control.yaml:59](specs/turtleav-avoip-control.yaml#L59))
-- [ ] Confirm the status tables' columns are separated by spaces as the examples print them (the encoder and decoder rows read here: In/ENC, EDID, IP, NET/Sig and Out/DEC, FromIn/From, IP, NET/HDMI, Res, Mode, Osp), that EDID names always start with a letter, and that the IP addresses are zero-padded with no spaces; the columns are parsed from the documents' examples only. ([specs/turtleav-avoip-control.yaml:570](specs/turtleav-avoip-control.yaml#L570))
-- [ ] Confirm reading GET STATUS every 10 seconds is acceptable on a controller with many encoders and decoders, and record how long the block takes to arrive. ([specs/turtleav-avoip-control.yaml:552](specs/turtleav-avoip-control.yaml#L552))
+- [ ] Confirm the status tables' columns are separated by spaces as the examples print them (the encoder and decoder rows read here: In/ENC, EDID, IP, NET/Sig and Out/DEC, FromIn/From, IP, NET/HDMI, Res, Mode, Osp), that EDID names always start with a letter, and that the IP addresses are zero-padded with no spaces; the columns are parsed from the documents' examples only. ([specs/turtleav-avoip-control.yaml:577](specs/turtleav-avoip-control.yaml#L577))
+- [ ] Confirm reading GET STATUS every 10 seconds is acceptable on a controller with many encoders and decoders, and record how long the block takes to arrive. ([specs/turtleav-avoip-control.yaml:555](specs/turtleav-avoip-control.yaml#L555))
+- [ ] GET DEC 0 STATUS and GET ENC 0 STATUS answer one block listing every decoder or encoder with the rows of the documented single-device example, the name running to the end of the line. ([specs/turtleav-avoip-control.yaml:552](specs/turtleav-avoip-control.yaml#L552))
+- [ ] The Rotate column of GET DEC STATUS is the rotation code (0 none, 1 90, 2 180, 3 270 degrees) that set_decoder_rotate writes. ([specs/turtleav-avoip-control.yaml:650](specs/turtleav-avoip-control.yaml#L650))
 
 ## turtleav-bt-wallplate — Turtle AV Dante Bluetooth wall plate
 
@@ -4600,17 +4608,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## tvone-coriomaster — tvONE CORIOmaster
 
-- [ ] Record how a failed command answers (an "!Error" line is assumed) and what a wrong login answers. ([specs/tvone-coriomaster.yaml:1027](specs/tvone-coriomaster.yaml#L1027))
+- [ ] Record how a failed command answers (an "!Error" line is assumed) and what a wrong login answers. ([specs/tvone-coriomaster.yaml:1080](specs/tvone-coriomaster.yaml#L1080))
 - [ ] Confirm that the unit greets a connection with a caret prompt that needs no reply, and that login() before any other command is enough. ([specs/tvone-coriomaster.yaml:60](specs/tvone-coriomaster.yaml#L60))
 - [ ] Confirm that every command, including methods and StartBatch/EndBatch, ends with exactly one "!Done" line after its value lines. ([specs/tvone-coriomaster.yaml:46](specs/tvone-coriomaster.yaml#L46))
-- [ ] Record the exact form of the WINDOW, PRESET, STBD and CANVAS event lines (spaces after the commas vary in the reference). ([specs/tvone-coriomaster.yaml:816](specs/tvone-coriomaster.yaml#L816))
-- [ ] Check what happens when a second client (CORIOgrapher) connects while this one is connected. ([specs/tvone-coriomaster.yaml:1019](specs/tvone-coriomaster.yaml#L1019))
-- [ ] Confirm that On and Off are accepted for HFlip, VFlip, SCFTB and the shrink animations, and whether Yes and No are also accepted. ([specs/tvone-coriomaster.yaml:264](specs/tvone-coriomaster.yaml#L264))
-- [ ] Confirm the Windows, Canvases, Layouts and Stbds lists answer one "Windows.Window<n> = <...>" line per entry, and record whether windows that are not in use (FREE) are listed too. ([specs/tvone-coriomaster.yaml:807](specs/tvone-coriomaster.yaml#L807))
-- [ ] Confirm a preset take or storyboard changes window properties without echoing them, and that PRESET COMPLETE follows every take (the windows are read again on it). ([specs/tvone-coriomaster.yaml:820](specs/tvone-coriomaster.yaml#L820))
-- [ ] Record the CANVAS PROPERTY_CHANGED value forms (AudioFollowWindow as Window1 or 1) and whether STBDCURRENT_CHANGED ends with a comma. ([specs/tvone-coriomaster.yaml:835](specs/tvone-coriomaster.yaml#L835))
-- [ ] Confirm a set echoes "<path> = <value>" before "!Done" for every window, canvas and layout property, so state follows this connection's commands without a read. ([specs/tvone-coriomaster.yaml:1066](specs/tvone-coriomaster.yaml#L1066))
-- [ ] Record the values Layout<n>.Mode takes (Normal shown, not documented). ([specs/tvone-coriomaster.yaml:940](specs/tvone-coriomaster.yaml#L940))
+- [ ] Record the exact form of the WINDOW, PRESET, STBD and CANVAS event lines (spaces after the commas vary in the reference). ([specs/tvone-coriomaster.yaml:860](specs/tvone-coriomaster.yaml#L860))
+- [ ] Check what happens when a second client (CORIOgrapher) connects while this one is connected. ([specs/tvone-coriomaster.yaml:1072](specs/tvone-coriomaster.yaml#L1072))
+- [ ] Confirm that On and Off are accepted for HFlip, VFlip, SCFTB and the shrink animations, and whether Yes and No are also accepted. ([specs/tvone-coriomaster.yaml:279](specs/tvone-coriomaster.yaml#L279))
+- [ ] Confirm the Windows, Canvases, Layouts and Stbds lists answer one "Windows.Window<n> = <...>" line per entry, and record whether windows that are not in use (FREE) are listed too. ([specs/tvone-coriomaster.yaml:851](specs/tvone-coriomaster.yaml#L851))
+- [ ] Confirm a preset take or storyboard changes window properties without echoing them, and that PRESET COMPLETE follows every take (the windows are read again on it). ([specs/tvone-coriomaster.yaml:864](specs/tvone-coriomaster.yaml#L864))
+- [ ] Record the CANVAS PROPERTY_CHANGED value forms (AudioFollowWindow as Window1 or 1) and whether STBDCURRENT_CHANGED ends with a comma. ([specs/tvone-coriomaster.yaml:879](specs/tvone-coriomaster.yaml#L879))
+- [ ] Confirm a set echoes "<path> = <value>" before "!Done" for every window, canvas and layout property, so state follows this connection's commands without a read. ([specs/tvone-coriomaster.yaml:1119](specs/tvone-coriomaster.yaml#L1119))
+- [ ] Record the values Layout<n>.Mode takes (Normal shown, not documented). ([specs/tvone-coriomaster.yaml:984](specs/tvone-coriomaster.yaml#L984))
+- [ ] Slots answers "Slots.Slot<n> = <...>" or "= NO CARD" per slot, Slot<n> lists Cardtype and "Slot<n>.In<n> = <...>" per input, and Slot<n>.In<n> its properties, with or without the "Slots." prefix. ([specs/tvone-coriomaster.yaml:831](specs/tvone-coriomaster.yaml#L831))
+- [ ] Slot<n>.In<n>.Alias = <name> sets an input alias (input_alias) and is answered with the echo and !Done. ([specs/tvone-coriomaster.yaml:106](specs/tvone-coriomaster.yaml#L106))
 
 ## twitch — Twitch
 

@@ -1280,8 +1280,20 @@ telemetry:
     # listSources: the only list whose elements hold InputCfgVideoStatus.
     - path: "^/$"
       json_each: "$.result.response"
-      json: { id: "$.id", status: "$.InputCfgVideoStatus", freeze: "$.Freeze", src_type: "$.SrcType" }
+      each_match: { "$.InputCfgVideoStatus": "^-?[0-9]+$" }
+      json: { id: "$.id", status: "$.InputCfgVideoStatus", freeze: "$.Freeze", src_type: "$.SrcType", name: "$.Name",
+              h: "$.HSize", v: "$.VSize", input_cfg: "$.InputCfgIndex", still: "$.StillIndex", dest: "$.DestIndex",
+              user_key: "$.UserKeyIndex", mode_3d: "$.Mode3D", capacity: "$.Capacity" }
       state:
+        "sources.{id}.name": "{name}"
+        "sources.{id}.width": "{h}"
+        "sources.{id}.height": "{v}"
+        "sources.{id}.input_config": "{input_cfg}"
+        "sources.{id}.still": "{still}"
+        "sources.{id}.destination": "{dest}"
+        "sources.{id}.user_key": "{user_key}"
+        "sources.{id}.mode_3d": "{mode_3d}"
+        "sources.{id}.capacity": "{capacity}"
         "sources.{id}.video_status":
           value: "{status}"
           map: { "0": invalid, "1": valid, "2": format_mismatch, "3": out_of_range, "4": no_sync }
@@ -1378,6 +1390,15 @@ state:
   aux.*.stream_mode: { type: int, description: "Aux destination AuxStreamMode, as the processor reports it" }
   aux.*.preview_source: { type: int, description: "Source id in the aux destination's preview (listAuxContent)" }
   aux.*.program_source: { type: int, description: "Source id in the aux destination's program (listAuxContent)" }
+  sources.*.name: { type: string, description: "Source name, keyed by its 0-based id (listSources Name)" }
+  sources.*.width: { type: int, unit: px, description: "Source width (HSize)" }
+  sources.*.height: { type: int, unit: px, description: "Source height (VSize)" }
+  sources.*.input_config: { type: int, description: "Input configuration the source comes from (InputCfgIndex), -1 for none" }
+  sources.*.still: { type: int, description: "Still store index of a still source (StillIndex), as listSources gives it" }
+  sources.*.destination: { type: int, description: "Destination index of a destination source (DestIndex), -1 for none" }
+  sources.*.user_key: { type: int, description: "User key index (UserKeyIndex), -1 for none" }
+  sources.*.mode_3d: { type: int, description: "3D mode as listSources gives it (Mode3D)" }
+  sources.*.capacity: { type: int, description: "Source capacity as listSources gives it (Capacity)" }
   sources.*.video_status: { type: string, description: "Input video status: valid, invalid, format_mismatch, out_of_range or no_sync" }
   sources.*.frozen: { type: bool, description: "Source is frozen" }
   sources.*.type: { type: string, description: "Source type: input or still" }
@@ -1487,8 +1508,9 @@ quirks:
       destination's layers, backgrounds and transitions (listContent, read
       for every screen the destination list names), the presets and the cues
       are polled every 10 seconds and kept in state, each list replaced
-      whole. Source, still, operator and user key names are not tracked;
-      read them with the list commands, whose value is the whole list. A
+      whole, as are the sources with their names, sizes and origins.
+      Still, operator and user key names are not tracked; read them with
+      the list commands, whose value is the whole list. A
       cue's fields are not documented: its id and Name are read as the other
       lists hold them.
 
