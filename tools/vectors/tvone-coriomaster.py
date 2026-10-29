@@ -160,3 +160,19 @@ telemetry(TV1, "preset-remove-event", inbound="!Event PRESET, REMOVE,3\r\n",
           expect_state={"presets": {"4": {"name": "two", "canvas": "Canvas1", "duration": 1000}}})
 telemetry(TV1, "preset-edit-reread", inbound="Preset.NameRead = side_by_side\r\n", expect_state={},
           expect_then_send=["Preset.PresetList()\r\n"])
+
+# Slots and inputs (Commands 411, Slots Commands: the Slots list, Slot4 and Slot4.In1 examples).
+_tv("input_alias", {"slot": 4, "input": 1, "alias": "s4i1"}, "Slot4.In1.Alias = s4i1")
+telemetry(TV1, "slots-list", inbound="Slots.Slot4 = <...>\r\n", expect_state={"slots": {"4": {"card": True}}},
+          expect_then_send=["Slot4\r\n"])
+telemetry(TV1, "slots-no-card", inbound="Slots.Slot5 = NO CARD\r\n",
+          state_before={"slots": {"5": {"card": True, "card_type": "DVI_U 2-in"}}}, expect_state={"slots": {}})
+telemetry(TV1, "slot-card", inbound="Slot4.Cardtype = DVI_U 2-in\r\nSlot4.In1 = <...>\r\n",
+          expect_state={"slots": {"4": {"card_type": "DVI_U 2-in"}}}, expect_then_send=["Slot4.In1\r\n"])
+telemetry(TV1, "slot-input", inbound=(
+    "Slot4.In1.FullName = In1\r\nSlot4.In1.Status = OK\r\nSlot4.In1.Alias = s4i1\r\n"
+    "Slot4.In1.WindowList = Window1,Window2\r\nSlot4.In1.TypeChoice = DVI\r\n"
+    "Slot4.In1.Set_Resolution = 640x480p60\r\nSlot4.In1.Measured_Resolution = 640x480p60\r\n"),
+    expect_state={"slots": {"4": {"inputs": {"1": {
+        "full_name": "In1", "status": "OK", "alias": "s4i1", "windows": "Window1,Window2", "type": "DVI",
+        "set_resolution": "640x480p60", "measured_resolution": "640x480p60"}}}}})
