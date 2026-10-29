@@ -5635,6 +5635,8 @@ telemetry:
         - '{"jsonrpc":"2.0","method":"image.connector.list","id":1}'
         - '{"jsonrpc":"2.0","method":"image.window.list","id":1}'
         - '{"jsonrpc":"2.0","method":"image.testpattern.list","id":1}'
+        - { models: [udm, udx, f70], message: '{"jsonrpc":"2.0","method":"image.testpattern.listinternal","id":1}' }
+        - { models: [i600, f70], message: '{"jsonrpc":"2.0","method":"image.testpattern.nosignal.list","id":1}' }
         - '{"jsonrpc":"2.0","method":"image.processing.warp.file.list","id":1}'
         - '{"jsonrpc":"2.0","method":"image.processing.blend.file.list","id":1}'
         - '{"jsonrpc":"2.0","method":"image.processing.blacklevel.file.list","id":1}'
@@ -6323,6 +6325,12 @@ telemetry:
       request_match: '^\{"jsonrpc":"2\.0","method":"image\.testpattern\.list","id":1\}$'
       state: { image.testpattern.patterns: "{1}" }
     - match: '(?s)"result"\s*:\s*(\{.*\}|\[.*\])\s*(?:,[^{}\[\]]*)?\}\s*$'
+      request_match: '^\{"jsonrpc":"2\.0","method":"image\.testpattern\.listinternal","id":1\}$'
+      state: { image.testpattern.internal_patterns: "{1}" }
+    - match: '(?s)"result"\s*:\s*(\{.*\}|\[.*\])\s*(?:,[^{}\[\]]*)?\}\s*$'
+      request_match: '^\{"jsonrpc":"2\.0","method":"image\.testpattern\.nosignal\.list","id":1\}$'
+      state: { image.testpattern.nosignal.patterns: "{1}" }
+    - match: '(?s)"result"\s*:\s*(\{.*\}|\[.*\])\s*(?:,[^{}\[\]]*)?\}\s*$'
       request_match: '^\{"jsonrpc":"2\.0","method":"image\.processing\.warp\.file\.list","id":1\}$'
       state: { image.processing.warp.files: "{1}" }
     - match: '(?s)"result"\s*:\s*(\{.*\}|\[.*\])\s*(?:,[^{}\[\]]*)?\}\s*$'
@@ -6718,6 +6726,8 @@ telemetry:
       then_send:
         - '{"jsonrpc":"2.0","method":"image.testpattern.list","id":1}'
         - '{"jsonrpc":"2.0","method":"image.testpattern.file.list","id":1}'
+        - { models: [udm, udx, f70], message: '{"jsonrpc":"2.0","method":"image.testpattern.listinternal","id":1}' }
+        - { models: [i600, f70], message: '{"jsonrpc":"2.0","method":"image.testpattern.nosignal.list","id":1}' }
     - json_match: { "$.method": "^signal\\.callback$" }
       json_each: "$.params.signal[*].*"
       each_match: { "$^": '^\{"image\.processing\.warp\.file\.listchanged":' }
@@ -7431,6 +7441,8 @@ state:
   image.connectors: { type: string, description: "The connector names image.connector.list answers, as a JSON array." }
   image.windows: { type: string, description: "The window names image.window.list answers, as a JSON array." }
   image.testpattern.patterns: { type: string, description: "The test patterns image.testpattern.list answers (name, id, location and more), as a JSON array." }
+  image.testpattern.internal_patterns: { type: string, description: "The internal test patterns image.testpattern.listinternal answers, as the JSON text the projector sends; read on connecting, every poll and when a test pattern is added, removed or changed." }
+  image.testpattern.nosignal.patterns: { type: string, description: "The patterns available as the no-signal pattern, as the JSON text image.testpattern.nosignal.list answers; read on connecting, every poll and when a test pattern is added, removed or changed." }
   image.processing.warp.files: { type: string, description: "The warp grid files on the projector, as the JSON array image.processing.warp.file.list answers." }
   image.processing.blend.files: { type: string, description: "The blend mask files on the projector, as the JSON array image.processing.blend.file.list answers." }
   image.processing.blacklevel.files: { type: string, description: "The black level mask files on the projector, as the JSON array image.processing.blacklevel.file.list answers." }
