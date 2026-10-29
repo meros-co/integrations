@@ -34,11 +34,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## 7thsense-delta — 7thSense Delta Media Server
 
-- [ ] Confirm names in double quotes are taken where the reference writes 'name' in single quotes (LOAD, GOTOMARKER, SEQUENCE). ([specs/7thsense-delta.yaml:637](specs/7thsense-delta.yaml#L637))
+- [ ] Confirm names in double quotes are taken where the reference writes 'name' in single quotes (LOAD, GOTOMARKER, SEQUENCE). ([specs/7thsense-delta.yaml:641](specs/7thsense-delta.yaml#L641))
 - [ ] Confirm the OK or BAD line comes after a command's data lines (STATUS, LISTSHOWS, GLOBALVARGET), and how GLOBALVARGET and SEQUENCESTATUS answer. ([specs/7thsense-delta.yaml:618](specs/7thsense-delta.yaml#L618))
 - [ ] Check the play and boolean words GOTOFRAME/GOTOMARKER take (play), CLIPSEARCH and MARKERSEARCH take (play=true/false), and PAUSESEQUENCE, MEDIAENABLE, ARTNET and SETTIMELINEVISIBILITY take (y/n). ([specs/7thsense-delta.yaml:610](specs/7thsense-delta.yaml#L610))
-- [ ] Check the separator spacing of the STATUS lines on current versions (the example shows SERVER  :, FILE   : and CURRENTFRAME:), and whether the label is LICENCE or LICENSE and OTHERDRIVE or OTHERDRIVES. ([specs/7thsense-delta.yaml:661](specs/7thsense-delta.yaml#L661))
-- [ ] Confirm what a follower answers to the leader-only commands (PLAY, CUE, GOTOFRAME...). ([specs/7thsense-delta.yaml:624](specs/7thsense-delta.yaml#L624))
+- [ ] Check the separator spacing of the STATUS lines on current versions (the example shows SERVER  :, FILE   : and CURRENTFRAME:), and whether the label is LICENCE or LICENSE and OTHERDRIVE or OTHERDRIVES. ([specs/7thsense-delta.yaml:665](specs/7thsense-delta.yaml#L665))
+- [ ] Confirm what a follower answers to the leader-only commands (PLAY, CUE, GOTOFRAME...). ([specs/7thsense-delta.yaml:628](specs/7thsense-delta.yaml#L628))
+- [ ] Record the lines LISTMARKERS, LISTSHOWS, LISTSEQUENCES, SEQUENCESTATUS and GLOBALVARLIST send before their OK, so markers, shows, sequences and variables can be read into state. ([specs/7thsense-delta.yaml:620](specs/7thsense-delta.yaml#L620))
 
 ## ableton-live — Ableton Live (AbletonOSC)
 
