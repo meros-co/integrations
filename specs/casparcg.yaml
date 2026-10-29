@@ -1275,6 +1275,9 @@ state:
   channels.*.layers.*.frame: { type: int, description: "Frames the layer has been active" }
   channels.*.layers.*.type: { type: string, description: "Type of what plays on the layer (transition, or the producer's)" }
   channels.*.layers.*.background_type: { type: string, description: "Type of what is loaded in the layer's background (empty when nothing is)" }
+  channels.*.layers.*.background_clip: { type: string, description: "Clip this connection loaded into the layer's background with LOADBG, as it was sent (AMCP escapes kept); an empty string once PLAY has moved it to the foreground" }
+  channels.*.layers.*.templates.*.name: { type: string, description: "Template this connection added to the template layer (cg layer, from 0) with CG ADD, as it was sent (AMCP escapes kept); removed by CG STOP, CG REMOVE, CG CLEAR and CLEAR" }
+  channels.*.layers.*.templates.*.playing: { type: bool, description: "Whether the template on the cg layer is playing: true after CG ADD with play-on-load or CG PLAY, false after an ADD without it" }
   channels.*.layers.*.profiler.actual: { type: float, description: "Seconds the layer took for its last frame" }
   channels.*.layers.*.profiler.expected: { type: float, description: "Seconds the layer has for each frame" }
   channels.*.layers.*.paused: { type: bool, description: "Whether the layer is paused" }
@@ -1401,6 +1404,12 @@ telemetry:
     - { match: "^202 CLEAR OK$", request_match: "^CLEAR (\\d+)$", state: { "channels.{1}.layers": { delete: true } } }
     - { match: "^202 STOP OK$", request_match: "^STOP (\\d+)-(\\d+)$", state: { "channels.{1}.layers.{2}.file": { delete: true } } }
     - { match: "^202 MIXER OK$", request_match: "^MIXER (\\d+)-(\\d+) CLEAR$", state: { "channels.{1}.layers.{2}.mixer": { delete: true } } }
+    - { match: "^202 LOADBG OK$", request_match: '^LOADBG (\d+)-(\d+) "((?:[^"\\]|\\.)*)"', state: { "channels.{1}.layers.{2}.background_clip": "{3}" } }
+    - { match: "^202 PLAY OK$", request_match: '^PLAY (\d+)-(\d+)$', state: { "channels.{1}.layers.{2}.background_clip": "" } }
+    - { match: "^202 CG OK$", request_match: '^CG (\d+)-(\d+) ADD (\d+) "((?:[^"\\]|\\.)*)" ([01])(?: |$)', state: { "channels.{1}.layers.{2}.templates.{3}.name": "{4}", "channels.{1}.layers.{2}.templates.{3}.playing": { value: "{5}", map: { "0": false, "1": true } } } }
+    - { match: "^202 CG OK$", request_match: '^CG (\d+)-(\d+) PLAY (\d+)$', state: { "channels.{1}.layers.{2}.templates.{3}.playing": "true" } }
+    - { match: "^202 CG OK$", request_match: '^CG (\d+)-(\d+) (?:STOP|REMOVE) (\d+)$', state: { "channels.{1}.layers.{2}.templates.{3}": { delete: true } } }
+    - { match: "^202 CG OK$", request_match: '^CG (\d+)-(\d+) CLEAR$', state: { "channels.{1}.layers.{2}.templates": { delete: true } } }
     - { match: "^202 MIXER OK$", request_match: "^MIXER (\\d+) CLEAR$", state: { "channels.{1}.mixer": { delete: true } } }
     - { address: "^/channel/(\\d+)/format$", state: { "channels.{1}.format": "{arg0}" } }
     - { address: "^/channel/(\\d+)/profiler/time$", state: { "channels.{1}.profiler.actual": "{arg0}", "channels.{1}.profiler.expected": "{arg1}" } }
@@ -1515,6 +1524,21 @@ quirks:
       earlier servers do (a quoted name and more fields). FLS and DATA LIST
       lines are kept as the server sends them, their columns not being
       documented beyond FLS's "font name and font path".
+  - models: [all]
+    severity: warning
+    text: >
+      The templates on each template host layer, whether they play, and the
+      clip loaded into a layer's background are kept from this connection's
+      own CG ADD, PLAY, STOP, REMOVE and CLEAR, LOADBG, PLAY and CLEAR
+      answers: AMCP pushes no such change and OSC carries only a Flash host's
+      file (host/path), with no addresses for HTML templates, cg layers or
+      the background's clip (OSC Protocol page). What another client adds,
+      plays or removes, a template ending by itself, and a background
+      started by AUTO are not seen. CG INFO and INFO for a layer answer XML
+      whose layout the AMCP page does not document, so they are not read
+      into state; their text is returned. The answers "202 CG OK" and "202
+      LOADBG OK" are taken from the documented form "202 <command> OK" (the
+      batching example's "202 PLAY OK").
   - models: [all]
     severity: info
     text: >

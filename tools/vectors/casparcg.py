@@ -244,6 +244,24 @@ telemetry(CG, "mixer-clear-layer", inbound="202 MIXER OK", request="MIXER 1-3 CL
 telemetry(CG, "mixer-clear-channel", inbound="202 MIXER OK", request="MIXER 1 CLEAR",
           state_before={"channels": {"1": {"format": "PAL", "mixer": {"master_volume": 0.5}}}},
           expect_state={"channels": {"1": {"format": "PAL"}}})
+telemetry(CG, "loadbg", inbound="202 LOADBG OK", request='LOADBG 1-10 "AMB" LOOP CUT 0 linear RIGHT SEEK 0',
+          expect_state={"channels": {"1": {"layers": {"10": {"background_clip": "AMB"}}}}})
+telemetry(CG, "play-background", inbound="202 PLAY OK", request="PLAY 1-10",
+          state_before={"channels": {"1": {"layers": {"10": {"background_clip": "AMB"}}}}},
+          expect_state={"channels": {"1": {"layers": {"10": {"background_clip": ""}}}}})
+telemetry(CG, "cg-add", inbound="202 CG OK", request='CG 1-20 ADD 1 "svtnews/info" 0 "<templateData/>"',
+          expect_state={"channels": {"1": {"layers": {"20": {"templates": {"1": {"name": "svtnews/info", "playing": False}}}}}}})
+telemetry(CG, "cg-add-playing", inbound="202 CG OK", request='CG 1-20 ADD 2 "lower_third" 1',
+          expect_state={"channels": {"1": {"layers": {"20": {"templates": {"2": {"name": "lower_third", "playing": True}}}}}}})
+telemetry(CG, "cg-play", inbound="202 CG OK", request="CG 1-20 PLAY 1",
+          state_before={"channels": {"1": {"layers": {"20": {"templates": {"1": {"name": "x", "playing": False}}}}}}},
+          expect_state={"channels": {"1": {"layers": {"20": {"templates": {"1": {"name": "x", "playing": True}}}}}}})
+telemetry(CG, "cg-stop", inbound="202 CG OK", request="CG 1-20 STOP 1",
+          state_before={"channels": {"1": {"layers": {"20": {"templates": {"1": {"name": "x"}, "2": {"name": "y"}}}}}}},
+          expect_state={"channels": {"1": {"layers": {"20": {"templates": {"2": {"name": "y"}}}}}}})
+telemetry(CG, "cg-clear", inbound="202 CG OK", request="CG 1-20 CLEAR",
+          state_before={"channels": {"1": {"layers": {"20": {"paused": False, "templates": {"1": {"name": "x"}}}}}}},
+          expect_state={"channels": {"1": {"layers": {"20": {"paused": False}}}}})
 
 
 def mixer_state(name, request, value, layer_state=None, channel_state=None):

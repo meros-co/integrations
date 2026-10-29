@@ -223,3 +223,20 @@ telemetry(A, "not-json", inbound_http={
     "path": "/config?action=get&paramid=eParamID_TransportState",
     "body": "<html><head><title>404 Not Found</title></head></html>"},
     expect_state={})
+
+# The clip list, as api.txt's /clips example gives it (keys not quoted).
+telemetry(A, "clips", inbound_http={"path": "/clips", "body":
+    '[ \n   { clipname: "Clip1ATK2.MOV", timestamp: "09/18/09 02:25:01", fourcc: "apch", width: "720", height: "486", framecount: "474", framerate: "29.97", interlace: "0" },\n'
+    '   { clipname: "Clip1ATK43.mov", timestamp: "12/14/09 20:11:30", fourcc: "apcn", width: "1920", height: "1080", framecount: "2334", framerate: "29.97", interlace: "1" }\n];\n'},
+    state_before={"clips": {"Gone.mov": {"frames": 1}}},
+    expect_state={"clips": {
+        "Clip1ATK2.MOV": {"timestamp": "09/18/09 02:25:01", "fourcc": "apch", "width": 720, "height": 486,
+                          "frames": 474, "frame_rate": "29.97", "interlaced": False, "index": 0},
+        "Clip1ATK43.mov": {"timestamp": "12/14/09 20:11:30", "fourcc": "apcn", "width": 1920, "height": 1080,
+                           "frames": 2334, "frame_rate": "29.97", "interlaced": True, "index": 1}}})
+telemetry(A, "clips-empty", inbound_http={"path": "/clips", "body": "[\n];\n"},
+    state_before={"clips": {"Gone.mov": {"frames": 1}}}, expect_state={})
+telemetry(A, "clips-encoded-name", inbound_http={"path": "/clips", "body":
+    '[ { clipname: "My%20Clip.mov", timestamp: "09/18/09 02:25:01", fourcc: "apch", width: "720", height: "486", framecount: "1", framerate: "25", interlace: "0" } ];'},
+    expect_state={"clips": {"My Clip.mov": {"timestamp": "09/18/09 02:25:01", "fourcc": "apch", "width": 720, "height": 486,
+                                            "frames": 1, "frame_rate": "25", "interlaced": False, "index": 0}}})

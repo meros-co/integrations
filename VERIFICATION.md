@@ -34,11 +34,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## 7thsense-delta — 7thSense Delta Media Server
 
-- [ ] Confirm names in double quotes are taken where the reference writes 'name' in single quotes (LOAD, GOTOMARKER, SEQUENCE). ([specs/7thsense-delta.yaml:637](specs/7thsense-delta.yaml#L637))
+- [ ] Confirm names in double quotes are taken where the reference writes 'name' in single quotes (LOAD, GOTOMARKER, SEQUENCE). ([specs/7thsense-delta.yaml:641](specs/7thsense-delta.yaml#L641))
 - [ ] Confirm the OK or BAD line comes after a command's data lines (STATUS, LISTSHOWS, GLOBALVARGET), and how GLOBALVARGET and SEQUENCESTATUS answer. ([specs/7thsense-delta.yaml:618](specs/7thsense-delta.yaml#L618))
 - [ ] Check the play and boolean words GOTOFRAME/GOTOMARKER take (play), CLIPSEARCH and MARKERSEARCH take (play=true/false), and PAUSESEQUENCE, MEDIAENABLE, ARTNET and SETTIMELINEVISIBILITY take (y/n). ([specs/7thsense-delta.yaml:610](specs/7thsense-delta.yaml#L610))
-- [ ] Check the separator spacing of the STATUS lines on current versions (the example shows SERVER  :, FILE   : and CURRENTFRAME:), and whether the label is LICENCE or LICENSE and OTHERDRIVE or OTHERDRIVES. ([specs/7thsense-delta.yaml:661](specs/7thsense-delta.yaml#L661))
-- [ ] Confirm what a follower answers to the leader-only commands (PLAY, CUE, GOTOFRAME...). ([specs/7thsense-delta.yaml:624](specs/7thsense-delta.yaml#L624))
+- [ ] Check the separator spacing of the STATUS lines on current versions (the example shows SERVER  :, FILE   : and CURRENTFRAME:), and whether the label is LICENCE or LICENSE and OTHERDRIVE or OTHERDRIVES. ([specs/7thsense-delta.yaml:665](specs/7thsense-delta.yaml#L665))
+- [ ] Confirm what a follower answers to the leader-only commands (PLAY, CUE, GOTOFRAME...). ([specs/7thsense-delta.yaml:628](specs/7thsense-delta.yaml#L628))
+- [ ] Record the lines LISTMARKERS, LISTSHOWS, LISTSEQUENCES, SEQUENCESTATUS and GLOBALVARLIST send before their OK, so markers, shows, sequences and variables can be read into state. ([specs/7thsense-delta.yaml:620](specs/7thsense-delta.yaml#L620))
 
 ## ableton-live — Ableton Live (AbletonOSC)
 
@@ -101,10 +102,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## aimedia-icap — AI-Media / EEG iCap
 
-- [ ] Record the JSON replies of the list and get calls (users, access codes, active encoders and captioners, health), so the live encoders and captioners can be kept in state. ([specs/aimedia-icap.yaml:375](specs/aimedia-icap.yaml#L375))
-- [ ] Confirm the path of the access code PUT (the collection, as the spec sends it, or accesscodes/<code>). ([specs/aimedia-icap.yaml:384](specs/aimedia-icap.yaml#L384))
-- [ ] Record the body of a 401 for wrong credentials and for a CaptionCast without a paid account, so the two can be told apart. ([specs/aimedia-icap.yaml:384](specs/aimedia-icap.yaml#L384))
+- [ ] Record the JSON replies of the list and get calls (users, access codes, active encoders and captioners, health), so the live encoders and captioners can be kept in state. ([specs/aimedia-icap.yaml:402](specs/aimedia-icap.yaml#L402))
+- [ ] Confirm the path of the access code PUT (the collection, as the spec sends it, or accesscodes/<code>). ([specs/aimedia-icap.yaml:413](specs/aimedia-icap.yaml#L413))
+- [ ] Record the body of a 401 for wrong credentials and for a CaptionCast without a paid account, so the two can be told apart. ([specs/aimedia-icap.yaml:413](specs/aimedia-icap.yaml#L413))
 - [ ] Record the success statuses of POST and DELETE calls (200, 201 or 204 accepted). ([specs/aimedia-icap.yaml:106](specs/aimedia-icap.yaml#L106))
+- [ ] Record the JSON of active-encoders, active-captioners and health/overview, so their fields can be kept one by one rather than as JSON text. ([specs/aimedia-icap.yaml:403](specs/aimedia-icap.yaml#L403))
 
 ## aja-bridge-live — AJA BRIDGE LIVE
 
@@ -133,18 +135,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## aja-kipro — AJA Ki Pro
 
-- [ ] Confirm that an event connection id expires when no wait_for_config_events is made within a minute, and that the extension's back-to-back waits keep it alive over a long session. ([specs/aja-kipro.yaml:1457](specs/aja-kipro.yaml#L1457))
-- [ ] Check how the unit answers wait_for_config_events with an expired connection id (status code and body), since AJA does not document it and the extension reconnects on anything that is not a 2xx JSON array. ([specs/aja-kipro.yaml:1473](specs/aja-kipro.yaml#L1473))
-- [ ] Confirm which URL opens the event connection on each model and firmware, /json (AJA examples) or /config (2021 guide). ([specs/aja-kipro.yaml:1469](specs/aja-kipro.yaml#L1469))
-- [ ] On a Ki Pro GO and Ultra, check desc.json for eParamID_TransportState, eParamID_CurrentClip, eParamID_DisplayTimecode and eParamID_MediaState, and whether the 30-second poll errors on them. ([specs/aja-kipro.yaml:1500](specs/aja-kipro.yaml#L1500))
-- [ ] On Ultra models, confirm the accepted range and format of eParamID_TransportRequestedSpeed (three decimals such as -1.500) for variable speed play. ([specs/aja-kipro.yaml:1547](specs/aja-kipro.yaml#L1547))
-- [ ] On Ultra Plus and 12G, confirm that set_sdi_monitor_channel works when sent with paramid= (AJA's chapter 6 URL omits it). ([specs/aja-kipro.yaml:1575](specs/aja-kipro.yaml#L1575))
-- [ ] On Ki Pro, Mini and Rack, check whether the deprecated /clips listing still uses unquoted JSON keys. ([specs/aja-kipro.yaml:1537](specs/aja-kipro.yaml#L1537))
-- [ ] Check that a get of each input and monitor parameter answers its value as the descriptor's number, and that a change made on the unit (front panel, preset recall) arrives as an event for eParamID_VideoInput_1, eParamID_SDIMonitorChannel, eParamID_HDMIOutChannel and the others now kept in state. ([specs/aja-kipro.yaml:1284](specs/aja-kipro.yaml#L1284))
-- [ ] On a GO, find the ids of the channel 2 to 4 inputs in desc.json (only eParamID_VideoInput_1 and eParamID_AudioInput_1 are documented), and on Ultra Plus and 12G the values of eParamID_EncodeChannels other than 1. ([specs/aja-kipro.yaml:1374](specs/aja-kipro.yaml#L1374))
-- [ ] Check whether reading eParamID_RegisterRecall answers the last preset recalled, which AJA does not document. ([specs/aja-kipro.yaml:1483](specs/aja-kipro.yaml#L1483))
+- [ ] Confirm that an event connection id expires when no wait_for_config_events is made within a minute, and that the extension's back-to-back waits keep it alive over a long session. ([specs/aja-kipro.yaml:1482](specs/aja-kipro.yaml#L1482))
+- [ ] Check how the unit answers wait_for_config_events with an expired connection id (status code and body), since AJA does not document it and the extension reconnects on anything that is not a 2xx JSON array. ([specs/aja-kipro.yaml:1498](specs/aja-kipro.yaml#L1498))
+- [ ] Confirm which URL opens the event connection on each model and firmware, /json (AJA examples) or /config (2021 guide). ([specs/aja-kipro.yaml:1494](specs/aja-kipro.yaml#L1494))
+- [ ] On a Ki Pro GO and Ultra, check desc.json for eParamID_TransportState, eParamID_CurrentClip, eParamID_DisplayTimecode and eParamID_MediaState, and whether the 30-second poll errors on them. ([specs/aja-kipro.yaml:1529](specs/aja-kipro.yaml#L1529))
+- [ ] On Ultra models, confirm the accepted range and format of eParamID_TransportRequestedSpeed (three decimals such as -1.500) for variable speed play. ([specs/aja-kipro.yaml:1578](specs/aja-kipro.yaml#L1578))
+- [ ] On Ultra Plus and 12G, confirm that set_sdi_monitor_channel works when sent with paramid= (AJA's chapter 6 URL omits it). ([specs/aja-kipro.yaml:1606](specs/aja-kipro.yaml#L1606))
+- [ ] On Ki Pro, Mini and Rack, check whether the deprecated /clips listing still uses unquoted JSON keys. ([specs/aja-kipro.yaml:1562](specs/aja-kipro.yaml#L1562))
+- [ ] Check that a get of each input and monitor parameter answers its value as the descriptor's number, and that a change made on the unit (front panel, preset recall) arrives as an event for eParamID_VideoInput_1, eParamID_SDIMonitorChannel, eParamID_HDMIOutChannel and the others now kept in state. ([specs/aja-kipro.yaml:1286](specs/aja-kipro.yaml#L1286))
+- [ ] On a GO, find the ids of the channel 2 to 4 inputs in desc.json (only eParamID_VideoInput_1 and eParamID_AudioInput_1 are documented), and on Ultra Plus and 12G the values of eParamID_EncodeChannels other than 1. ([specs/aja-kipro.yaml:1391](specs/aja-kipro.yaml#L1391))
+- [ ] Check whether reading eParamID_RegisterRecall answers the last preset recalled, which AJA does not document. ([specs/aja-kipro.yaml:1508](specs/aja-kipro.yaml#L1508))
 - [ ] Confirm upload_clip's PUT /media answers 200 within the 60 s the command waits after the last byte (the guide shows the answer, not when it comes). ([specs/aja-kipro.yaml:911](specs/aja-kipro.yaml#L911))
 - [ ] Confirm download_clip's GET /media/<file> works on the original Ki Pro, Ki Pro Mini and Ki Pro Rack (the guide documents it for the Ki Pro GO and Ultra models), and what any model answers outside Data - LAN mode. ([specs/aja-kipro.yaml:897](specs/aja-kipro.yaml#L897))
+- [ ] Confirm /clips on Ki Pro, Mini and Rack answers its clips in the order and form api.txt shows (clipname, timestamp, fourcc, width, height, framecount, framerate, interlace), with the file name URL encoded. ([specs/aja-kipro.yaml:1567](specs/aja-kipro.yaml#L1567))
 
 ## aja-kumo — AJA KUMO
 
@@ -286,7 +289,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the Remote Command Service listens on TCP 45678 and takes each command as a line ended by CR LF; the user guide does not say. ([specs/arkaos-mediamaster.yaml:49](specs/arkaos-mediamaster.yaml#L49))
 - [ ] Compare the command texts with those MediaMaster's TELNET tab shows (Cue:<n>, Controller:Play, Fullscreen:On, Properties:Mixing, View:Remote Player...), on MediaMaster 6 and later. ([specs/arkaos-mediamaster.yaml:68](specs/arkaos-mediamaster.yaml#L68))
 - [ ] Check whether the service ever answers (an acknowledgement or an error), and whether the cue player's state can be read in any way. ([specs/arkaos-mediamaster.yaml:12](specs/arkaos-mediamaster.yaml#L12))
-- [ ] Check what Controller:Final15 and Controller:Final30 do. ([specs/arkaos-mediamaster.yaml:164](specs/arkaos-mediamaster.yaml#L164))
+- [ ] Check what Controller:Final15 and Controller:Final30 do. ([specs/arkaos-mediamaster.yaml:170](specs/arkaos-mediamaster.yaml#L170))
 
 ## artnet — Art-Net 4 network
 
@@ -1092,15 +1095,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## casparcg — CasparCG Server
 
-- [ ] Confirm the reply framing on 2.3 and later: 200 followed by lines and a blank line, 201 and 400 by exactly one line, 202 and the other errors alone, including for a 200 that lists nothing. ([specs/casparcg.yaml:1441](specs/casparcg.yaml#L1441))
-- [ ] Check that LOADBG, LOAD and PLAY accept the transition sent in full when none is wanted (CUT 0 linear RIGHT) and SEEK 0, and that LOOP and AUTO may sit where they are sent. ([specs/casparcg.yaml:1457](specs/casparcg.yaml#L1457))
-- [ ] Confirm that 2.3 and later send OSC to each AMCP client's address on the configured default-port (6250), with no predefined client needed. ([specs/casparcg.yaml:1465](specs/casparcg.yaml#L1465))
-- [ ] Record the OSC addresses a 2.3 or later server sends for a layer playing a file, an image and an HTML template (with or without a foreground/ segment, and whether background, paused, loop, host and profiler messages still exist), and fix the rules to match. ([specs/casparcg.yaml:1477](specs/casparcg.yaml#L1477))
-- [ ] Check where DEFER goes in a MIXER command with a tween (after the tween, as sent here) and what a read answers for a deferred change before MIXER COMMIT. ([specs/casparcg.yaml:1499](specs/casparcg.yaml#L1499))
-- [ ] Check the code and layout of MIXER CHROMA's read answer (201 and nine values, or the example's 202) and of the other MIXER reads. ([specs/casparcg.yaml:1504](specs/casparcg.yaml#L1504))
-- [ ] Check what CALL LOOP, CALL SEEK, START and LENGTH answer (201 CALL OK and a value, or 202). ([specs/casparcg.yaml:1548](specs/casparcg.yaml#L1548))
-- [ ] Check PING's answer on 2.3 and later (PONG alone, or with a code). ([specs/casparcg.yaml:1555](specs/casparcg.yaml#L1555))
-- [ ] Record TLS, FLS and DATA LIST answers on 2.3 and later, so their lines can be read into fields. ([specs/casparcg.yaml:1514](specs/casparcg.yaml#L1514))
+- [ ] Confirm the reply framing on 2.3 and later: 200 followed by lines and a blank line, 201 and 400 by exactly one line, 202 and the other errors alone, including for a 200 that lists nothing. ([specs/casparcg.yaml:1450](specs/casparcg.yaml#L1450))
+- [ ] Check that LOADBG, LOAD and PLAY accept the transition sent in full when none is wanted (CUT 0 linear RIGHT) and SEEK 0, and that LOOP and AUTO may sit where they are sent. ([specs/casparcg.yaml:1466](specs/casparcg.yaml#L1466))
+- [ ] Confirm that 2.3 and later send OSC to each AMCP client's address on the configured default-port (6250), with no predefined client needed. ([specs/casparcg.yaml:1474](specs/casparcg.yaml#L1474))
+- [ ] Record the OSC addresses a 2.3 or later server sends for a layer playing a file, an image and an HTML template (with or without a foreground/ segment, and whether background, paused, loop, host and profiler messages still exist), and fix the rules to match. ([specs/casparcg.yaml:1486](specs/casparcg.yaml#L1486))
+- [ ] Check where DEFER goes in a MIXER command with a tween (after the tween, as sent here) and what a read answers for a deferred change before MIXER COMMIT. ([specs/casparcg.yaml:1508](specs/casparcg.yaml#L1508))
+- [ ] Check the code and layout of MIXER CHROMA's read answer (201 and nine values, or the example's 202) and of the other MIXER reads. ([specs/casparcg.yaml:1513](specs/casparcg.yaml#L1513))
+- [ ] Check what CALL LOOP, CALL SEEK, START and LENGTH answer (201 CALL OK and a value, or 202). ([specs/casparcg.yaml:1572](specs/casparcg.yaml#L1572))
+- [ ] Check PING's answer on 2.3 and later (PONG alone, or with a code). ([specs/casparcg.yaml:1579](specs/casparcg.yaml#L1579))
+- [ ] Record TLS, FLS and DATA LIST answers on 2.3 and later, so their lines can be read into fields. ([specs/casparcg.yaml:1523](specs/casparcg.yaml#L1523))
+- [ ] Confirm CG ADD, PLAY, STOP, REMOVE and CLEAR answer 202 CG OK, LOADBG 202 LOADBG OK and a bare PLAY 202 PLAY OK, so the template and background state is kept. ([specs/casparcg.yaml:1530](specs/casparcg.yaml#L1530))
+- [ ] Record the XML CG INFO and INFO <channel>-<layer> answer on 2.3 and later, so templates loaded by other clients can be read into state. ([specs/casparcg.yaml:1530](specs/casparcg.yaml#L1530))
 
 ## castr — Castr
 
@@ -1153,9 +1158,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## characterworks — CharacterWorks
 
-- [ ] Confirm the request path (/) and content type (application/json) the Remote Control Server accepts. ([specs/characterworks.yaml:348](specs/characterworks.yaml#L348))
-- [ ] Record what a command does without a channel, and whether other channel names (more live channels) exist. ([specs/characterworks.yaml:339](specs/characterworks.yaml#L339))
-- [ ] Confirm the row selection action is select_data_source_rows (the document's examples write source). ([specs/characterworks.yaml:344](specs/characterworks.yaml#L344))
+- [ ] Confirm the request path (/) and content type (application/json) the Remote Control Server accepts. ([specs/characterworks.yaml:352](specs/characterworks.yaml#L352))
+- [ ] Record what a command does without a channel, and whether other channel names (more live channels) exist. ([specs/characterworks.yaml:343](specs/characterworks.yaml#L343))
+- [ ] Confirm the row selection action is select_data_source_rows (the document's examples write source). ([specs/characterworks.yaml:348](specs/characterworks.yaml#L348))
 - [ ] Record the HTTP status of a failure reply (the spec reads the result field, whatever the status). ([specs/characterworks.yaml:329](specs/characterworks.yaml#L329))
 
 ## christie-1dlp — Christie 1DLP projectors
@@ -1276,12 +1281,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## chyron-prime — Chyron PRIME (Intelligent Interface)
 
-- [ ] Record the default serial line settings of an Intelligent Interface COM connection (9600 8N1, no flow control assumed). ([specs/chyron-prime.yaml:764](specs/chyron-prime.yaml#L764))
+- [ ] Record the default serial line settings of an Intelligent Interface COM connection (9600 8N1, no flow control assumed). ([specs/chyron-prime.yaml:772](specs/chyron-prime.yaml#L772))
 - [ ] Confirm each reply ends with CR LF, and record the replies to the B commands (AN, AV, QS, QL, TH, SL, SA, SX, MX, CO, CS, SI, QE); the spec takes a reply to start with * or an eight-digit error code. ([specs/chyron-prime.yaml:62](specs/chyron-prime.yaml#L62))
 - [ ] Record what PRIME answers to the default heartbeat (two backslashes). ([specs/chyron-prime.yaml:39](specs/chyron-prime.yaml#L39))
-- [ ] Check that a buffer of * and a layer expression of * are accepted wherever the spec sends them (play_all with channel *, clear with layer *). ([specs/chyron-prime.yaml:189](specs/chyron-prime.yaml#L189))
+- [ ] Check that a buffer of * and a layer expression of * are accepted wherever the spec sends them (play_all with channel *, clear with layer *). ([specs/chyron-prime.yaml:192](specs/chyron-prime.yaml#L192))
 - [ ] Record the External Update X command PRIME sends, so it can be read into state. ([specs/chyron-prime.yaml:63](specs/chyron-prime.yaml#L63))
-- [ ] Check that the UTF-8 encoding setting of the connection carries non-ASCII text correctly. ([specs/chyron-prime.yaml:761](specs/chyron-prime.yaml#L761))
+- [ ] Check that the UTF-8 encoding setting of the connection carries non-ASCII text correctly. ([specs/chyron-prime.yaml:769](specs/chyron-prime.yaml#L769))
+- [ ] Confirm SCENE_STATE answers *P\SCENE_STATE\<state>\\ for a scene name as SCENE_LIST gives it, without its project path. ([specs/chyron-prime.yaml:790](specs/chyron-prime.yaml#L790))
+
+## citp-msex — CITP/MSEX media servers
+
+- [ ] With ArKaos MediaMaster Pro, check that it sends a 1.0 SInf on connecting, ignores CInf, and answers MSEX 1.1 GELI, GEIn, GETh and GVSr as the specification lays them out. ([specs/citp-msex.yaml:193](specs/citp-msex.yaml#L193))
+- [ ] Check that servers send LSta regularly even while no layer changes, since 15 s without a message reopens the connection. ([specs/citp-msex.yaml:185](specs/citp-msex.yaml#L185))
+- [ ] Check that a media server's PLoc names its MSEX listening port, and that its StFr preview frames (JPEG or fJPG) arrive on 239.224.0.180 or 224.0.0.180 port 4809 after RqSt. ([specs/citp-msex.yaml:205](specs/citp-msex.yaml#L205))
 
 ## clock-8001 — Clock-8001
 
@@ -1391,18 +1403,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## dataton-watchout7 — Dataton WATCHOUT 7
 
-- [ ] Capture /api-docs/openapi.json from a node and check success statuses (200 assumed), error bodies, and the response shapes of /info, /v0/state, /v0/timelines, /v0/cues and /v0/inputs. ([specs/dataton-watchout7.yaml:434](specs/dataton-watchout7.yaml#L434))
-- [ ] Confirm the /v2/sse event shape {"kind", "value"} without event names (from Bitfocus's Companion module), and the playbackState, timelineCountdowns and showRevision value shapes. ([specs/dataton-watchout7.yaml:442](specs/dataton-watchout7.yaml#L442))
+- [ ] Capture /api-docs/openapi.json from a node and check success statuses (200 assumed), error bodies, and the response shapes of /info, /v0/state, /v0/timelines, /v0/cues and /v0/inputs. ([specs/dataton-watchout7.yaml:467](specs/dataton-watchout7.yaml#L467))
+- [ ] Confirm the /v2/sse event shape {"kind", "value"} without event names (from Bitfocus's Companion module), and the playbackState, timelineCountdowns and showRevision value shapes. ([specs/dataton-watchout7.yaml:475](specs/dataton-watchout7.yaml#L475))
 - [ ] Check whether /v0/play needs a JSON body (current guide) or plays every timeline with none (older page). ([specs/dataton-watchout7.yaml:174](specs/dataton-watchout7.yaml#L174))
 - [ ] Check the node restart path on port 3017: /v0/services/restart (Dataton) or /v0/restart (Companion module). ([specs/dataton-watchout7.yaml:332](specs/dataton-watchout7.yaml#L332))
 - [ ] Record what the Process Manager on port 3017 answers to /v0/shutdown, /v0/reboot and /v0/services/restart (HTTP 200 assumed, no body documented), and whether it answers before the node goes down. ([specs/dataton-watchout7.yaml:338](specs/dataton-watchout7.yaml#L338))
 - [ ] Confirm the Process Manager on port 3017 takes no authentication and is served on every node, including a node running the Director, and from which WATCHOUT 7 release (assumed for the pre-7.8 model too). ([specs/dataton-watchout7.yaml:70](specs/dataton-watchout7.yaml#L70))
-- [ ] Check what restart_node_services restarts (the Operative, the Director, or every WATCHOUT service) and how long playback stops. ([specs/dataton-watchout7.yaml:459](specs/dataton-watchout7.yaml#L459))
-- [ ] Check the type of showRevision's value (a string is assumed). ([specs/dataton-watchout7.yaml:417](specs/dataton-watchout7.yaml#L417))
+- [ ] Check what restart_node_services restarts (the Operative, the Director, or every WATCHOUT service) and how long playback stops. ([specs/dataton-watchout7.yaml:498](specs/dataton-watchout7.yaml#L498))
+- [ ] Check the type of showRevision's value (a string is assumed). ([specs/dataton-watchout7.yaml:444](specs/dataton-watchout7.yaml#L444))
 - [ ] Check how names with spaces or non-ASCII characters are encoded in /v0/cue-group-state/by-name/{group}/{variant}. ([specs/dataton-watchout7.yaml:257](specs/dataton-watchout7.yaml#L257))
-- [ ] Record the shape of GET /v0/state ({clockTime, timelines: [{id, playbackStatus}]} bare, or under value as in the event stream, are both read) and confirm it lists every timeline of the show, stopped ones included: each read replaces the timelines state. ([specs/dataton-watchout7.yaml:364](specs/dataton-watchout7.yaml#L364))
-- [ ] Confirm showRevision is sent when a timeline is added to or removed from the show (it triggers the re-read of /v0/state), and whether /v2/sse sends the whole playback state when it opens. ([specs/dataton-watchout7.yaml:407](specs/dataton-watchout7.yaml#L407))
+- [ ] Record the shape of GET /v0/state ({clockTime, timelines: [{id, playbackStatus}]} bare, or under value as in the event stream, are both read) and confirm it lists every timeline of the show, stopped ones included: each read replaces the timelines state. ([specs/dataton-watchout7.yaml:365](specs/dataton-watchout7.yaml#L365))
+- [ ] Confirm showRevision is sent when a timeline is added to or removed from the show (it triggers the re-read of /v0/state), and whether /v2/sse sends the whole playback state when it opens. ([specs/dataton-watchout7.yaml:408](specs/dataton-watchout7.yaml#L408))
 - [ ] Confirm POST /v0/showfile takes the .watch file as the raw request body with Content-Type application/octet-stream, answers 200, and that showName names the loaded show; and record whether WATCHOUT 7 before 7.8 has it. ([specs/dataton-watchout7.yaml:318](specs/dataton-watchout7.yaml#L318))
+- [ ] Record /v0/show's shape (show.timelines keyed by id with name and cues keyed by id with name and start, showName, show.hosts) against the node's OpenAPI document, and whether a show revision event carries the revision bare or as value.revision. ([specs/dataton-watchout7.yaml:481](specs/dataton-watchout7.yaml#L481))
 
 ## datavideo-switcher — Datavideo switchers (DVIP and RS-232)
 
@@ -2200,13 +2213,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## joy-playdeck — PLAYDECK
 
-- [ ] Confirm a running PLAYDECK answers the REST API on 11411 as the OpenAPI document describes (the document says the implementation may follow the contract later), and which PLAYDECK version first serves it. ([specs/joy-playdeck.yaml:59](specs/joy-playdeck.yaml#L59))
-- [ ] Confirm control routes answer 200 with {"ok": true} (ActionResponse), and what a channel outside the licence answers (404 with an ErrorResponse is documented). ([specs/joy-playdeck.yaml:111](specs/joy-playdeck.yaml#L111))
-- [ ] Record the units of the status numbers BlockPosition, BlockDuration, BlockRemain, ClipPosition, ClipDuration, ClipRemain, ScheduleRemain and AutoplayRemain (seconds assumed), BlockProgress and ClipProgress (0 to 1 or percent), and BlockEnd, ClipEnd, ScheduleTime and AutoplayTime (Unix time assumed). ([specs/joy-playdeck.yaml:680](specs/joy-playdeck.yaml#L680))
-- [ ] Record the value of OverlayActiveN and ActionActiveN while a button is active (kept as text as it arrives), and confirm the keys are absent while it is not. ([specs/joy-playdeck.yaml:792](specs/joy-playdeck.yaml#L792))
-- [ ] Confirm a position request with a marker and an empty timestamp seeks to the marker (the schema requires timestamp, so an empty one is sent beside the marker). ([specs/joy-playdeck.yaml:369](specs/joy-playdeck.yaml#L369))
-- [ ] Confirm that blocks and clips in the project are listed in playlist order, so their place from 1 is the block and clip number the cue, play and select routes take. ([specs/joy-playdeck.yaml:1244](specs/joy-playdeck.yaml#L1244))
-- [ ] Confirm POST /api/v1/commands accepts args given as strings for numeric arguments (the schema says numbers as strings are fine) and what it answers an unknown command with. ([specs/joy-playdeck.yaml:491](specs/joy-playdeck.yaml#L491))
+- [ ] Confirm a running PLAYDECK answers the REST API on 11411 as the OpenAPI document describes (the document says the implementation may follow the contract later), and which PLAYDECK version first serves it. ([specs/joy-playdeck.yaml:68](specs/joy-playdeck.yaml#L68))
+- [ ] Confirm control routes answer 200 with {"ok": true} (ActionResponse), and what a channel outside the licence answers (404 with an ErrorResponse is documented). ([specs/joy-playdeck.yaml:120](specs/joy-playdeck.yaml#L120))
+- [ ] Confirm the units of the status numbers: BlockPosition, BlockDuration, BlockRemain, ClipPosition, ClipDuration, ClipRemain, ScheduleRemain and AutoplayRemain in seconds, BlockProgress and ClipProgress in percent (0 to 100), and BlockEnd, ClipEnd, ScheduleTime and AutoplayTime in Unix seconds (taken from the Companion module, the contract giving none). ([specs/joy-playdeck.yaml:1416](specs/joy-playdeck.yaml#L1416))
+- [ ] Record the value of OverlayActiveN and ActionActiveN while a button is active (kept as text as it arrives), and confirm the keys are absent while it is not. ([specs/joy-playdeck.yaml:801](specs/joy-playdeck.yaml#L801))
+- [ ] Confirm a position request with a marker and an empty timestamp seeks to the marker (the schema requires timestamp, so an empty one is sent beside the marker). ([specs/joy-playdeck.yaml:378](specs/joy-playdeck.yaml#L378))
+- [ ] Confirm that blocks and clips in the project are listed in playlist order, so their place from 1 is the block and clip number the cue, play and select routes take. ([specs/joy-playdeck.yaml:1253](specs/joy-playdeck.yaml#L1253))
+- [ ] Confirm POST /api/v1/commands accepts args given as strings for numeric arguments (the schema says numbers as strings are fine) and what it answers an unknown command with. ([specs/joy-playdeck.yaml:500](specs/joy-playdeck.yaml#L500))
 
 ## jvc-camera — JVC camcorders and PTZ cameras (Camcorder Web API)
 
@@ -3027,14 +3040,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that the JSON-RPC websocket answers {"jsonrpc":"2.0","id":1,"method":"state"} with the whole tree under result, then pushes updates without a subscription, and that it takes the web application's credentials when authentication is on. ([specs/megapixel-helios.yaml:520](specs/megapixel-helios.yaml#L520))
 - [ ] Check that basic access is accepted when authentication is on, or that the processor's digest challenge is answered. ([specs/megapixel-helios.yaml:83](specs/megapixel-helios.yaml#L83))
 - [ ] Confirm that upload_still is answered 200 with the new still at the top level ($.id), as 3.4.5 shows, and which image types and sizes the still store accepts. ([specs/megapixel-helios.yaml:632](specs/megapixel-helios.yaml#L632))
-- [ ] Confirm that a PATCH out of range answers 200 with the unchanged value, as the document says, on current firmware. ([specs/megapixel-helios.yaml:2844](specs/megapixel-helios.yaml#L2844))
+- [ ] Confirm that a PATCH out of range answers 200 with the unchanged value, as the document says, on current firmware. ([specs/megapixel-helios.yaml:2916](specs/megapixel-helios.yaml#L2916))
 - [ ] Record the ranges of display gains, output adjustment gain, gamma, lift, offset and saturation, which the document does not give. ([specs/megapixel-helios.yaml:199](specs/megapixel-helios.yaml#L199))
 - [ ] Confirm that a group's gains are keyed r, g, b and i, its mask l, t, b and r, and its test pattern colour r, g, b and a, and record their ranges (0-1 or 0-255). ([specs/megapixel-helios.yaml:362](specs/megapixel-helios.yaml#L362))
 - [ ] Confirm that blackClipping can be written (it is in the processor's data and fixtures, not the API tables). ([specs/megapixel-helios.yaml:191](specs/megapixel-helios.yaml#L191))
 - [ ] Check whether redundancy mode accepts manual and single, which sys.fixtures lists beside none, failover and seamless. ([specs/megapixel-helios.yaml:286](specs/megapixel-helios.yaml#L286))
-- [ ] List the test pattern type names the processor accepts. ([specs/megapixel-helios.yaml:2917](specs/megapixel-helios.yaml#L2917))
+- [ ] List the test pattern type names the processor accepts. ([specs/megapixel-helios.yaml:3005](specs/megapixel-helios.yaml#L3005))
 - [ ] Check that a receiver's x, y and groupId can be written by MAC address. ([specs/megapixel-helios.yaml:426](specs/megapixel-helios.yaml#L426))
-- [ ] Record the status of a successful preset apply (200 is assumed) and of hide_still (204 is assumed, as for show). ([specs/megapixel-helios.yaml:458](specs/megapixel-helios.yaml#L458))
+- [ ] Record the status of a successful preset apply (200 is assumed) and of hide_still (204 is assumed, as for show). ([specs/megapixel-helios.yaml:605](specs/megapixel-helios.yaml#L605))
+- [ ] Check that the processor's receivers appear under dev.receivers keyed by MAC address in the state result and in updates, with the fields the 6.1.4 table lists. ([specs/megapixel-helios.yaml:704](specs/megapixel-helios.yaml#L704))
 
 ## meros-camera — Meros Camera
 
@@ -3402,9 +3416,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the API's default port (8082; the page also says 8080 once) and where it is enabled and the key set in OpenSong's settings. ([specs/opensong.yaml:37](specs/opensong.yaml#L37))
 - [ ] Confirm that percent-encoded names (spaces as %20, commas as %2C) in path segments and param:value parts are decoded by OpenSong, and what a POST answers on success (status 200 with an XML response is assumed). ([specs/opensong.yaml:168](specs/opensong.yaml#L168))
 - [ ] Record the screen mode codes and names in the status for black, white, hide, logo and freeze (only N, normal, is documented). ([specs/opensong.yaml:417](specs/opensong.yaml#L417))
-- [ ] Confirm the status reply while no presentation runs carries presentation running="0" with no children. ([specs/opensong.yaml:431](specs/opensong.yaml#L431))
+- [ ] Confirm the status reply while no presentation runs carries presentation running="0" with no children. ([specs/opensong.yaml:437](specs/opensong.yaml#L437))
 - [ ] Check whether an alert message may hold a slash once percent-encoded (refused here), and which characters OpenSong's path parsing otherwise rejects. ([specs/opensong.yaml:397](specs/opensong.yaml#L397))
 - [ ] Record the XML of the slide list, song list, song folders, set list and set slide list, so they can be read into state. ([specs/opensong.yaml:73](specs/opensong.yaml#L73))
+- [ ] Record the slide list's XML (/presentation/slide/list): whether each slide is a slide element with an itemnumber attribute and name and title children, as the status's is. ([specs/opensong.yaml:479](specs/opensong.yaml#L479))
 
 ## osc-listener — OSC received from any sender
 
@@ -3540,14 +3555,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## pixotope — Pixotope
 
 - [ ] Record the Gateway's HTTP answer bodies (to a Set, a Get, a Call, and a Call that times out), so replies can be read into state. ([specs/pixotope.yaml:341](specs/pixotope.yaml#L341))
-- [ ] Check that ~LOCAL~-Engine addresses the Engine on the Gateway's machine, as the Editor's examples write it. ([specs/pixotope.yaml:353](specs/pixotope.yaml#L353))
+- [ ] Check that ~LOCAL~-Engine addresses the Engine on the Gateway's machine, as the Editor's examples write it. ([specs/pixotope.yaml:360](specs/pixotope.yaml#L360))
 - [ ] Check which API version the URL should carry for current releases (24.1.0 is used by default). ([specs/pixotope.yaml:81](specs/pixotope.yaml#L81))
 - [ ] Confirm the Store answers a Get of State.General.FrameRate, used as the liveness probe. ([specs/pixotope.yaml:77](specs/pixotope.yaml#L77))
 - [ ] Confirm a client subscribes on 16201 and publishes on 16202 (the page labels 16201 the subscriber and 16202 the publisher, and its example connects a PUB socket to 16202). ([specs/pixotope.yaml:90](specs/pixotope.yaml#L90))
-- [ ] Confirm the Data Hub speaks ZMTP 3.0 or later with the NULL mechanism (no CURVE when Pixotope's encryption is off) and takes ZMTP 3.0 subscription messages. ([specs/pixotope.yaml:372](specs/pixotope.yaml#L372))
-- [ ] Confirm services broadcast their Updates to BROADCAST with Source and Name in the topic, in that order after Type and Target, so the subscription prefix and the rule match them. ([specs/pixotope.yaml:374](specs/pixotope.yaml#L374))
-- [ ] Confirm Log messages are published with a Source, and that a topic beginning {"Type":"Log" reaches them. ([specs/pixotope.yaml:376](specs/pixotope.yaml#L376))
-- [ ] Confirm the Store answers a Get of State published with RespondTo set to the client name by an Update to that name holding the whole state, and where RespondTo goes in a Get's topic. ([specs/pixotope.yaml:380](specs/pixotope.yaml#L380))
+- [ ] Confirm the Data Hub speaks ZMTP 3.0 or later with the NULL mechanism (no CURVE when Pixotope's encryption is off) and takes ZMTP 3.0 subscription messages. ([specs/pixotope.yaml:380](specs/pixotope.yaml#L380))
+- [ ] Confirm services broadcast their Updates to BROADCAST with Source and Name in the topic, in that order after Type and Target, so the subscription prefix and the rule match them. ([specs/pixotope.yaml:382](specs/pixotope.yaml#L382))
+- [ ] Confirm Log messages are published with a Source, and that a topic beginning {"Type":"Log" reaches them. ([specs/pixotope.yaml:385](specs/pixotope.yaml#L385))
+- [ ] Confirm the Store answers a Get of State published with RespondTo set to the client name by an Update to that name holding the whole state, and where RespondTo goes in a Get's topic. ([specs/pixotope.yaml:394](specs/pixotope.yaml#L394))
+- [ ] Check that Calls published on the Data Hub reach <machine>-Engine with the machine setting's ~LOCAL~ (the Gateway resolves it; the Data Hub may not), and that their CallResults come back to the client name. ([specs/pixotope.yaml:347](specs/pixotope.yaml#L347))
 
 ## pjlink — PJLink
 
@@ -3893,9 +3909,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## ross-xpression — Ross XPression (TCP)
 
-- [ ] Confirm take IDs are read padded or unpadded, including UNCUE and UPNEXT in the padded form. ([specs/ross-xpression.yaml:348](specs/ross-xpression.yaml#L348))
-- [ ] Check the take ID, layer, framebuffer, GPI and channel ranges. ([specs/ross-xpression.yaml:354](specs/ross-xpression.yaml#L354))
-- [ ] Check the syntax for RESUME with a tessera source name. ([specs/ross-xpression.yaml:399](specs/ross-xpression.yaml#L399))
+- [ ] Confirm take IDs are read padded or unpadded, including UNCUE and UPNEXT in the padded form. ([specs/ross-xpression.yaml:355](specs/ross-xpression.yaml#L355))
+- [ ] Check the take ID, layer, framebuffer, GPI and channel ranges. ([specs/ross-xpression.yaml:361](specs/ross-xpression.yaml#L361))
+- [ ] Check the syntax for RESUME with a tessera source name. ([specs/ross-xpression.yaml:406](specs/ross-xpression.yaml#L406))
 
 ## ross-xpression-udp — Ross XPression (UDP)
 
@@ -3903,7 +3919,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm one command per datagram, ended with CR LF, is accepted. ([specs/ross-xpression-udp.yaml:319](specs/ross-xpression-udp.yaml#L319))
 - [ ] Confirm take IDs are read padded or unpadded, including UNCUE and UPNEXT in the padded form. ([specs/ross-xpression-udp.yaml:372](specs/ross-xpression-udp.yaml#L372))
 - [ ] Check the take ID, layer, framebuffer, GPI and channel ranges. ([specs/ross-xpression-udp.yaml:378](specs/ross-xpression-udp.yaml#L378))
-- [ ] Check the syntax for RESUME with a tessera source name. ([specs/ross-xpression-udp.yaml:423](specs/ross-xpression-udp.yaml#L423))
+- [ ] Check the syntax for RESUME with a tessera source name. ([specs/ross-xpression-udp.yaml:430](specs/ross-xpression-udp.yaml#L430))
 
 ## rosstalk — RossTalk (switchers)
 
@@ -4365,11 +4381,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## spx-graphics — SPX Graphics Controller
 
-- [ ] Record what SPX Production and SPX Broadcast answer for a wrong or missing API key (SPX Solo's code answers 200 with {"error": ...}). ([specs/spx-graphics.yaml:518](specs/spx-graphics.yaml#L518))
-- [ ] Record the reply of rundown/get on SPX Broadcast and confirm it is the rundown file (templates with itemID, onair as "true"/"false", playserver, playchannel, playlayer, webplayout, relpath, out, DataFields). ([specs/spx-graphics.yaml:534](specs/spx-graphics.yaml#L534))
-- [ ] Record the replies of getprojects, getrundowns, allrundowns, gettemplates, getlayerstate and getFileList, so more of them can be kept in state. ([specs/spx-graphics.yaml:539](specs/spx-graphics.yaml#L539))
-- [ ] Check whether the commercial editions answer the controller commands with 200 and the same JSON as SPX Solo, and the status of an unknown item id. ([specs/spx-graphics.yaml:516](specs/spx-graphics.yaml#L516))
+- [ ] Record what SPX Production and SPX Broadcast answer for a wrong or missing API key (SPX Solo's code answers 200 with {"error": ...}). ([specs/spx-graphics.yaml:538](specs/spx-graphics.yaml#L538))
+- [ ] Record the reply of rundown/get on SPX Broadcast and confirm it is the rundown file (templates with itemID, onair as "true"/"false", playserver, playchannel, playlayer, webplayout, relpath, out, DataFields). ([specs/spx-graphics.yaml:554](specs/spx-graphics.yaml#L554))
+- [ ] Record the replies of getprojects, getrundowns, allrundowns, gettemplates, getlayerstate and getFileList, so more of them can be kept in state. ([specs/spx-graphics.yaml:559](specs/spx-graphics.yaml#L559))
+- [ ] Check whether the commercial editions answer the controller commands with 200 and the same JSON as SPX Solo, and the status of an unknown item id. ([specs/spx-graphics.yaml:536](specs/spx-graphics.yaml#L536))
 - [ ] Check that a load_rundown file value with its slash percent-encoded (%2F) is read as project/rundown. ([specs/spx-graphics.yaml:195](specs/spx-graphics.yaml#L195))
+- [ ] Confirm getrundowns?project= answers an array of rundown names on SPX Broadcast, and rundown/load answers {APIcmd: RundownLoad, file} as SPX's open code does. ([specs/spx-graphics.yaml:560](specs/spx-graphics.yaml#L560))
 
 ## stagetimer — Stagetimer
 
@@ -4774,11 +4791,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## vizrt-trio — Vizrt Viz Trio
 
-- [ ] Record what Viz Trio sends back for a command with no result (nothing, an empty line, or an acknowledgement); the spec waits for nothing. ([specs/vizrt-trio.yaml:910](specs/vizrt-trio.yaml#L910))
-- [ ] Record what a read answers when its result is empty (page:getpagename with no page read, playlist:get_current with none): an empty line, or nothing. ([specs/vizrt-trio.yaml:930](specs/vizrt-trio.yaml#L930))
+- [ ] Record what Viz Trio sends back for a command with no result (nothing, an empty line, or an acknowledgement); the spec waits for nothing. ([specs/vizrt-trio.yaml:939](specs/vizrt-trio.yaml#L939))
+- [ ] Record what a read answers when its result is empty (page:getpagename with no page read, playlist:get_current with none): an empty line, or nothing. ([specs/vizrt-trio.yaml:959](specs/vizrt-trio.yaml#L959))
 - [ ] Confirm a command ended by a line feed alone is accepted (the documents say a new line; some clients send CR LF). ([specs/vizrt-trio.yaml:54](specs/vizrt-trio.yaml#L54))
-- [ ] Check how boolean arguments are written (true/false as sent here, or 1/0) for page:fire, page:fire_all and goto_manual_graphics_mode. ([specs/vizrt-trio.yaml:267](specs/vizrt-trio.yaml#L267))
-- [ ] Check how arguments holding spaces are quoted when they are not the last one (channel and page names). ([specs/vizrt-trio.yaml:920](specs/vizrt-trio.yaml#L920))
+- [ ] Check how boolean arguments are written (true/false as sent here, or 1/0) for page:fire, page:fire_all and goto_manual_graphics_mode. ([specs/vizrt-trio.yaml:270](specs/vizrt-trio.yaml#L270))
+- [ ] Check how arguments holding spaces are quoted when they are not the last one (channel and page names). ([specs/vizrt-trio.yaml:949](specs/vizrt-trio.yaml#L949))
+- [ ] Record how show:get_pages and show:get_templates separate their names (spaces, commas or line breaks) and what they answer for an empty show. ([specs/vizrt-trio.yaml:969](specs/vizrt-trio.yaml#L969))
 
 ## vmix — vMix
 

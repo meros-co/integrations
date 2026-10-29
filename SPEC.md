@@ -2730,6 +2730,28 @@ SAMPLE TALKER_POSITIONS ... >`; only the first is a meter list:
 `{index}` takes offsets as a number does, so a list numbered from 1 keys its
 state from 1. A group that took no part in the match gives no items.
 
+#### Lists in a text reply
+
+An HTTP reply that holds a list but is not JSON or XML is read item by item
+the same way: `match_each` on a `path` + `match` rule goes along the rest of
+the body after what `match` matched, or, with `match_each_in`, along that
+capture, numbered across the path's captures and then the text's. The item
+captures are numbered on after both, `{index}` is the item's place from 0,
+and `replace` and `then_send` work as for any rule. A Ki Pro answers `GET
+/clips` with an array whose keys are not quoted (`{ clipname:
+"Clip1ATK2.MOV", ... }`), which no JSON rule reads:
+
+```yaml
+    - path: "^/clips$"
+      match: '^\s*\['
+      match_each: 'clipname:\s*"([^"]*)"\s*,\s*timestamp:\s*"([^"]*)"'
+      replace: clips
+      state: { "clips.{1:key}.timestamp": "{2}" }
+```
+
+The body must match `match` for the rule to apply, so an empty list (`[ ]`)
+still replaces what was there.
+
 #### Poll replies on another address
 
 An OSC query is answered on its own address by most devices. ETC Eos answers

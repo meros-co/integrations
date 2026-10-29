@@ -1,0 +1,209 @@
+spec: 1
+id: citp-msex
+name: CITP/MSEX media server status (layers, element libraries, thumbnails, preview)
+vendor: CITP (Controller Interface Transport Protocol)
+category: playback
+implementation: native
+reason: >
+  CITP is binary: every message carries a 20-byte little-endian header with its size and fragment numbers, and
+  MSEX messages a version of their own whose layout changes between MSEX 1.0, 1.1 and 1.2, with null-terminated
+  single-byte and UTF-16 strings and counted arrays inside. The version spoken is settled by what the server
+  answers (a 1.2 SInf in answer to CInf, or a 1.0 SInf on connecting), the element libraries are read level by
+  level from what each answer lists, a server without a known port is found by its multicast PINF/PLoc, and the
+  preview's frames arrive as multicast StFr messages, JPEG or JPEG in fragments to join.
+
+source:
+  - title: "CITP protocol suite specification, revision 2020-11-27 (MSEX 1.2)"
+    author: Lars Wernlund (LewLight AB), maintainer of CITP
+    url: https://bitbucket.org/lars_wernlund/citp/downloads/master_2020-11-27.pdf
+    note: >
+      The specification's own repository, which citp-protocol.org (now lewlight.com/citp-protocol) points to.
+      Used for: 1.3-1.6 (a lighting console's behaviour: PNam and CInf on connecting, SInf and LSta received,
+      GELI for all libraries, GVSr; a media server's PLoc with its listening port), 2.1 (little-endian, null-
+      terminated ucs1 and ucs2 strings), 3.1.1 (the CITP header: cookie, version 1.0, request index, message size,
+      fragment count and index, content type), 4.1-4.2.2 (the PINF header, PNam and PLoc; multicast 239.224.0.180,
+      formerly 224.0.0.180, port 4809), 9 (MSEX versions, the highest common version, the mandatory CInf, SInf,
+      LSta and Nack, image formats), 9.1.1 (the MSEX header), 9.2.1-9.2.3 (CInf, SInf 1.0 and 1.2, Nack), 9.3.1
+      (LSta 1.0 and 1.2 with its flags), 9.4 (library identifiers, element types 1-9, serial numbers, DMX
+      ranges) and 9.4.1-9.4.7 (GELI, ELIn, ELUp, GEIn, MEIn, EEIn, GLEI in each version), 9.5.1-9.5.4 (GELT,
+      ELTh, GETh, EThn), 9.6.1-9.6.4 (GVSr, VSrc, RqSt, StFr 1.0 and 1.2 and the fragment preamble of fJPG).
+  - title: "ArKaos MediaMaster 6 User Guide, MSEX Implementation (Pro Edition Only), p.15"
+    author: ArKaos
+    url: "https://cdn.inmusicbrands.com/arkaos/downloads/ArKaos_MediaMaster_6_User_Guide.pdf"
+    note: >
+      Manufacturer document, read 2026-10-28: MediaMaster Pro speaks MSEX 1.1, with media, effects, cues,
+      crossfades, masks, blend presets, effect presets and image presets, thumbnails and live preview of
+      visuals; the status summary shows whether MSEX is running (p.20).
+
+settings:
+  client_name: { type: string, default: "CITP client", max_length: 64, pattern: '^[ -~]*$', label: Client name,
+                 description: "The name this connection gives the media server in its PINF/PNam, as a console's name appears there." }
+  msex_version: { type: enum, values: [auto, "1.0", "1.1", "1.2"], default: auto, label: MSEX version,
+                  description: "The MSEX version requests are sent in: auto takes 1.2 from a server whose SInf is 1.2 or later and 1.1 from an older one; a version forces it." }
+  bind_address: { type: string, pattern: '^[0-9A-Fa-f.:]*$', max_length: 45, default: "", label: Bind address,
+                  description: "The local address of the interface on the media server's network, for the multicast group the server's PLoc and preview frames arrive on; empty listens where the core binds." }
+  stream_source: { type: int, min: 0, max: 65535, label: Preview source,
+                   description: "The video source the live preview shows, by the id the server lists in video_sources; unset shows the first it lists." }
+  stream_width: { type: int, min: 1, max: 65535, default: 640, label: Preview width,
+                  description: "The smallest frame width asked of the server for the preview, in pixels; the server may send a larger one." }
+  stream_height: { type: int, min: 1, max: 65535, default: 360, label: Preview height,
+                   description: "The smallest frame height asked of the server for the preview, in pixels." }
+  stream_fps: { type: int, min: 1, max: 255, default: 10, label: Preview frame rate,
+                description: "The lowest frame rate asked of the server for the preview, in frames per second." }
+
+ports:
+  - { port: null, protocol: tcp, role: control, when: "port given, or learnt from the server's PLoc",
+      note: "The media server's CITP listening port: MSEX has no standard port; when none is given the server's PINF/PLoc names it" }
+  - { port: 4809, protocol: udp, role: discovery, listener: core,
+      note: "PINF/PLoc on multicast 239.224.0.180 and 224.0.0.180, heard while the port is not known" }
+  - { port: 4809, protocol: udp, role: feedback, listener: core,
+      note: "MSEX/StFr preview frames on the same multicast groups, heard while the live stream is watched" }
+
+models:
+  - id: media-server
+    name: Any media server speaking CITP/MSEX 1.0, 1.1 or 1.2
+    supports: &all [refresh_libraries, read_library, get_video_sources, get_library_thumbnail, get_element_thumbnail]
+    verification: none
+  - id: arkaos-mediamaster-pro
+    name: ArKaos MediaMaster Pro (MSEX 1.1)
+    supports: *all
+    verification: none
+    notes: >
+      MediaMaster's MSEX is in the Pro edition only; it speaks MSEX 1.1, so its SInf is the 1.0 form and requests
+      go as 1.1.
+
+commands:
+  refresh_libraries:
+    summary: Read every element library of every type again, level by level, with their elements and the video sources; answered when all are read
+    returns: ack
+  read_library:
+    summary: Read one library's sub-libraries and elements again (GELI and GEIn); answered when both are read
+    params:
+      library_type: &type { type: enum, values: [media, effects, cues, crossfades, masks, blend_presets, effect_presets, image_presets, meshes],
+                            required: true, label: Library type,
+                            description: "The kind of element the library holds, as MSEX numbers them from 1 (media) to 9 (3D meshes)." }
+      library: &library { type: string, pattern: '^[0-9]{1,3}(-[0-9]{1,3}){0,2}$', required: true, label: Library,
+                          description: "The library's identifier as state keys it: one to three 0-based indexes joined by -, such as 1 or 1-4 (MSEX 1.0 libraries are a single number)." }
+    returns: ack
+  get_video_sources:
+    summary: Read the video sources the server can stream (GVSr), answered with the list (id, name, output, layer, width, height)
+    returns: value
+  get_library_thumbnail:
+    summary: Read a library's thumbnail (GELT), answered with {library_type, library, format, width, height, data} where data is the image in base64
+    params:
+      library_type: *type
+      library: *library
+      format: &format { type: enum, values: [jpeg, png, rgb8], default: jpeg, label: Format,
+                        description: "The image format asked for: jpeg, png (MSEX 1.2) or rgb8, raw red, green and blue bytes for each pixel." }
+      width: &width { type: int, min: 1, max: 65535, default: 128, label: Width, description: "The preferred thumbnail width in pixels." }
+      height: &height { type: int, min: 1, max: 65535, default: 72, label: Height, description: "The preferred thumbnail height in pixels." }
+      preserve_aspect: &aspect { type: bool, default: true, label: Keep aspect ratio,
+                                 description: "Keep the image's aspect ratio, taking width and height as the largest size." }
+    returns: value
+  get_element_thumbnail:
+    summary: Read an element's thumbnail (GETh), answered with {library_type, library, element, format, width, height, data} where data is the image in base64
+    params:
+      library_type: *type
+      library: *library
+      element: { type: int, min: 0, max: 255, required: true, label: Element,
+                  description: "The element's 0-based number in its library, as state keys it." }
+      format: *format
+      width: *width
+      height: *height
+      preserve_aspect: *aspect
+    returns: value
+
+streams:
+  live:
+    format: jpeg
+    summary: "A video source of the media server (stream_source, or the first it lists), while watched: subscribed with MSEX/RqSt every 3 s and received as StFr multicast frames"
+
+state:
+  server.peer_name: { type: string, description: "The display name the server gives in its PINF/PNam" }
+  server.product: { type: string, description: "The product's display name (SInf ProductName)" }
+  server.version: { type: string, description: "The product's version, major.minor or major.minor.bugfix (SInf)" }
+  server.uuid: { type: string, description: "The server's UUID (MSEX 1.2 SInf)" }
+  server.msex_versions: { type: string, description: "The MSEX versions the server supports, comma-separated (MSEX 1.2 SInf), or the SInf's own version from an older server" }
+  server.msex_version: { type: string, description: "The MSEX version this connection sends its requests in" }
+  server.library_types: { type: string, description: "The library types the server offers, comma-separated (MSEX 1.2 SInf)" }
+  server.thumbnail_formats: { type: string, description: "The thumbnail formats the server offers, in its order of preference (MSEX 1.2 SInf): jpeg, png, rgb8" }
+  server.stream_formats: { type: string, description: "The preview frame formats the server offers, in its order of preference (MSEX 1.2 SInf): jpeg, png, rgb8, fjpg, fpng" }
+  server.layer_count: { type: int, description: "Number of layers the server reports (SInf)" }
+  peer.type: { type: string, description: "The kind of peer its PINF/PLoc names: MediaServer, LightingConsole or Visualizer (heard while the multicast group is joined)" }
+  peer.name: { type: string, description: "The display name in the server's PLoc" }
+  peer.state: { type: string, description: "The display state in the server's PLoc, such as Idle or Running" }
+  peer.port: { type: int, description: "The TCP port the server's PLoc says it listens on; 0 when it does not" }
+  layers.*.dmx_source: { type: string, description: "A layer, numbered from 1 (MSEX's 0-based layer number plus one): the DMX source controlling it, as a connection string such as ArtNet/0/0/1 (SInf)" }
+  layers.*.output: { type: int, description: "The physical video output the layer is on, numbered from 1 (LSta)" }
+  layers.*.library_type: { type: string, description: "The library type of the layer's current media (LSta; media before MSEX 1.2)" }
+  layers.*.library: { type: string, description: "The library of the layer's current media, keyed as the libraries are (LSta)" }
+  layers.*.media_number: { type: int, description: "The current media's number in its library (LSta)" }
+  layers.*.media_name: { type: string, description: "The current media's name (LSta)" }
+  layers.*.position: { type: int, description: "The current media's position, in frames (LSta)" }
+  layers.*.length: { type: int, description: "The current media's length, in frames (LSta)" }
+  layers.*.fps: { type: int, unit: fps, description: "The current media's frame rate (LSta)" }
+  layers.*.flags: { type: int, description: "The layer status flags as LSta sends them, the bits below together" }
+  layers.*.playing: { type: bool, description: "The media is playing (flag 0x0001)" }
+  layers.*.reverse: { type: bool, description: "It plays in reverse (0x0002, MSEX 1.2)" }
+  layers.*.looping: { type: bool, description: "It loops (0x0004, MSEX 1.2)" }
+  layers.*.bouncing: { type: bool, description: "It bounces back and forth (0x0008, MSEX 1.2)" }
+  layers.*.random: { type: bool, description: "It plays in random order (0x0010, MSEX 1.2)" }
+  layers.*.paused: { type: bool, description: "It is paused (0x0020, MSEX 1.2)" }
+  libraries.*.*.name: { type: string, description: "An element library, keyed by type (media, effects, cues, crossfades, masks, blend_presets, effect_presets, image_presets, meshes) and identifier (0-based indexes joined by -): its name" }
+  libraries.*.*.serial: { type: int, description: "The library's serial number, which rises when it or anything in it changes (MSEX 1.2)" }
+  libraries.*.*.dmx_min: { type: int, description: "The lowest DMX value selecting the library" }
+  libraries.*.*.dmx_max: { type: int, description: "The highest DMX value selecting the library" }
+  libraries.*.*.library_count: { type: int, description: "Number of sub-libraries in the library" }
+  libraries.*.*.element_count: { type: int, description: "Number of elements in the library" }
+  libraries.*.*.elements.*.name: { type: string, description: "An element of the library, keyed by its 0-based number: its name" }
+  libraries.*.*.elements.*.serial: { type: int, description: "The element's serial number, which rises when it changes (MSEX 1.2)" }
+  libraries.*.*.elements.*.dmx_min: { type: int, description: "The lowest DMX value selecting the element" }
+  libraries.*.*.elements.*.dmx_max: { type: int, description: "The highest DMX value selecting the element" }
+  libraries.*.*.elements.*.version: { type: int, unit: s, description: "The element's version, in Unix seconds (media and generic elements)" }
+  libraries.*.*.elements.*.width: { type: int, unit: px, description: "A media element's width" }
+  libraries.*.*.elements.*.height: { type: int, unit: px, description: "A media element's height" }
+  libraries.*.*.elements.*.length: { type: int, description: "A media element's length, in frames" }
+  libraries.*.*.elements.*.fps: { type: int, unit: fps, description: "A media element's frame rate" }
+  libraries.*.*.elements.*.parameters.*: { type: string, description: "An effect's parameter names, in order from 0" }
+  video_sources.*.name: { type: string, description: "A video source the server can stream, keyed by its id: its display name (VSrc)" }
+  video_sources.*.output: { type: int, description: "The physical output the source shows, numbered from 1; 0 when it is not an output" }
+  video_sources.*.layer: { type: int, description: "The layer the source shows, numbered from 1; 0 when it is not a layer" }
+  video_sources.*.without_effects: { type: bool, description: "The source is shown without effects" }
+  video_sources.*.width: { type: int, unit: px, description: "The source's full width" }
+  video_sources.*.height: { type: int, unit: px, description: "The source's full height" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      MSEX reports and browses; it does not play anything. A console selects media and controls layers over DMX
+      (the layer's DMX source, kept in state), which is the Art-Net or sACN integrations' work, and ArKaos
+      MediaMaster's own remote player control is the arkaos-mediamaster integration's.
+  - models: [all]
+    severity: info
+    text: >
+      Layer status comes from the LSta the server sends about four times a second: a layer's state changes only
+      when something in it does. The element libraries are read on connecting (each type the server offers in
+      MSEX 1.2, the eight types of MSEX 1.1 before), each level as the one above lists it, then each library's
+      elements, and read again where the server's ELUp says they changed; a library its parent's list no longer
+      holds leaves state. refresh_libraries and read_library read them again on demand.
+  - models: [all]
+    severity: warning
+    text: >
+      A server older than MSEX 1.2 states no version beyond its 1.0 SInf: auto then sends MSEX 1.1 requests, the
+      version ArKaos MediaMaster Pro names; set msex_version to 1.0 for a server that knows only 1.0. A 1.0 SInf is
+      waited on for 1 s before the libraries are read, in case a 1.2 server answers CInf with its own.
+  - models: [all]
+    severity: info
+    text: >
+      Requests go one at a time; one unanswered for 5 s is given up (a command then times out). A server answers
+      a request it does not support with Nack from MSEX 1.2, which fails the command; an older one stays silent.
+      A connection that hears nothing for 15 s (no LSta) is opened again, after 1 s doubling to 30 s.
+  - models: [all]
+    severity: info
+    text: >
+      Without a port, the core joins the PINF multicast groups (239.224.0.180 and the older 224.0.0.180, UDP
+      4809) and connects to the port in the PLoc from the device's address. The live preview asks for JPEG
+      frames (RqSt, renewed every 3 s for 5 s) and publishes JPEG and fragmented JPEG (fJPG) frames; a server
+      that sends only PNG or RGB8 frames gives no preview. MSEX 1.0 servers send BGR thumbnails where rgb8 is
+      asked for.

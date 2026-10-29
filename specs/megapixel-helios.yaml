@@ -685,15 +685,87 @@ telemetry:
   # {<changed part of the tree>}}. On opening it, the core asks for the whole
   # tree with the state method; the result has the same shape under
   # $.result. HTTP replies to the commands (GET and PATCH of /api/v1/public)
-  # carry the tree too. Nothing is polled. Receivers and switches are keyed by
-  # MAC address, which a JSON path cannot name in advance, so only their
-  # counts and alerts are kept; groups 0-7, inputs hdmi1-2 and sdi1-4, output
-  # ports 1-8 and input ports 1-4 are read by their keys.
+  # carry the tree too. Only the presets and stills are polled. Receivers,
+  # keyed by MAC address, are gone through member by member; groups 0-7,
+  # inputs hdmi1-2 and sdi1-4, output ports 1-8 and input ports 1-4 are read
+  # by their keys.
   websocket:
     path: /api/v1/public/rpc/websocket
     send:
       - '{"jsonrpc":"2.0","id":1,"method":"state"}'
+  # The saved configurations and the still store are not part of the tree
+  # and are not pushed: they are read every 30 s (Public API 3.3.1, 3.4.1).
+  poll:
+    every_ms: 30000
+    send:
+      - { method: GET, path: /api/v1/presets/list }
+      - { method: GET, path: /api/v1/media }
   updates:
+    # Receivers, keyed by MAC address (Public API 6.1.4): from the whole
+    # tree the websocket's state method answers (which replaces them), from
+    # its updates, from HTTP replies and from an applied configuration.
+    - json_match: { "$.id": "^1$", "$.result.dev.receivers": "^\\{" }
+      json_each: "$.result.dev.receivers.*"
+      json: { group: "$.groupId", x: "$.x", y: "$.y", port: "$.distroBoxPort", port_mac: "$.distroBoxMac",
+              switch: "$.switchId", switch_port: "$.switchPort", alerts: "$.alertsCount", severity: "$.alertsSeverity" }
+      replace: receivers
+      state:
+        "receivers.{key:key}.group": "{group}"
+        "receivers.{key:key}.x": "{x}"
+        "receivers.{key:key}.y": "{y}"
+        "receivers.{key:key}.output_port": "{port}"
+        "receivers.{key:key}.output_port_mac": "{port_mac}"
+        "receivers.{key:key}.switch": "{switch}"
+        "receivers.{key:key}.switch_port": "{switch_port}"
+        "receivers.{key:key}.alerts_count": "{alerts}"
+        "receivers.{key:key}.alerts_severity": "{severity}"
+    - json_match: { "$.method": "^update$" }
+      json_each: "$.params.dev.receivers.*"
+      json: { group: "$.groupId", x: "$.x", y: "$.y", port: "$.distroBoxPort", port_mac: "$.distroBoxMac",
+              switch: "$.switchId", switch_port: "$.switchPort", alerts: "$.alertsCount", severity: "$.alertsSeverity" }
+      state:
+        "receivers.{key:key}.group": "{group}"
+        "receivers.{key:key}.x": "{x}"
+        "receivers.{key:key}.y": "{y}"
+        "receivers.{key:key}.output_port": "{port}"
+        "receivers.{key:key}.output_port_mac": "{port_mac}"
+        "receivers.{key:key}.switch": "{switch}"
+        "receivers.{key:key}.switch_port": "{switch_port}"
+        "receivers.{key:key}.alerts_count": "{alerts}"
+        "receivers.{key:key}.alerts_severity": "{severity}"
+    - path: "^/api/v1/(public(\\?.*)?|presets/(\\d+/)?apply)$"
+      json_each: "$.dev.receivers.*"
+      json: { group: "$.groupId", x: "$.x", y: "$.y", port: "$.distroBoxPort", port_mac: "$.distroBoxMac",
+              switch: "$.switchId", switch_port: "$.switchPort", alerts: "$.alertsCount", severity: "$.alertsSeverity" }
+      state:
+        "receivers.{key:key}.group": "{group}"
+        "receivers.{key:key}.x": "{x}"
+        "receivers.{key:key}.y": "{y}"
+        "receivers.{key:key}.output_port": "{port}"
+        "receivers.{key:key}.output_port_mac": "{port_mac}"
+        "receivers.{key:key}.switch": "{switch}"
+        "receivers.{key:key}.switch_port": "{switch_port}"
+        "receivers.{key:key}.alerts_count": "{alerts}"
+        "receivers.{key:key}.alerts_severity": "{severity}"
+    - path: "^/api/v1/presets/list$"
+      json_match: { "$.presets": "^\\[" }
+      json_each: "$.presets"
+      json: { id: "$.id", name: "$.presetName", created: "$.createdAt", updated: "$.updatedAt" }
+      replace: presets
+      state:
+        presets.{id}.name: "{name}"
+        presets.{id}.created: "{created}"
+        presets.{id}.updated: "{updated}"
+    - path: "^/api/v1/media$"
+      json_match: { "$.media": "^\\[" }
+      json_each: "$.media"
+      json: { id: "$.id", name: "$.name", file: "$.media", created: "$.createdAt", updated: "$.updatedAt" }
+      replace: stills
+      state:
+        stills.{id}.name: "{name}"
+        stills.{id}.file: "{file}"
+        stills.{id}.created: "{created}"
+        stills.{id}.updated: "{updated}"
     # HTTP replies (GET and PATCH)
     - path: "^/api/v1/public(\\?.*)?$"
       json:
@@ -2904,6 +2976,22 @@ telemetry:
         sys.ip_address: "{v57}"
 
 state:
+  receivers.*.group: { type: int, description: "Group a receiver (display device, keyed by MAC address) belongs to, 0 to 7, or -1 for none" }
+  receivers.*.x: { type: int, unit: px, description: "The receiver's x position on the processor's canvas" }
+  receivers.*.y: { type: int, unit: px, description: "The receiver's y position on the processor's canvas" }
+  receivers.*.output_port: { type: int, description: "HELIOS output port the receiver is connected to" }
+  receivers.*.output_port_mac: { type: string, description: "MAC address of the HELIOS output port the receiver is connected to" }
+  receivers.*.switch: { type: string, description: "Key (MAC address) of the distribution switch the receiver hangs off, if any" }
+  receivers.*.switch_port: { type: int, description: "Switch output port the receiver is connected to" }
+  receivers.*.alerts_count: { type: int, description: "Number of the receiver's alerts" }
+  receivers.*.alerts_severity: { type: int, description: "Most severe of the receiver's alerts, as a syslog level (2 critical, 3 error, 4 warning, 5 notice); -1 when it has none" }
+  presets.*.name: { type: string, description: "A saved configuration (preset), keyed by its id (the id recall_preset takes): its name (presetName)" }
+  presets.*.created: { type: string, description: "When the saved configuration was created, ISO 8601 in the processor's time" }
+  presets.*.updated: { type: string, description: "When the saved configuration was last updated, ISO 8601 in the processor's time" }
+  stills.*.name: { type: string, description: "A still in the still store, keyed by its id (the id show_still takes): its displayed name" }
+  stills.*.file: { type: string, description: "The still's internal file name on the processor" }
+  stills.*.created: { type: string, description: "When the still was added, ISO 8601 in the processor's time" }
+  stills.*.updated: { type: string, description: "When the still was last updated, ISO 8601 in the processor's time" }
   display.blackout: { type: bool, description: "The display is blacked out" }
   display.freeze: { type: bool, description: "The display is frozen" }
   display.brightness: { type: float, unit: percent, description: "Display brightness" }

@@ -73,3 +73,12 @@ telemetry(OS, "status-stopped", inbound_http={"path": "/presentation/status", "b
 # Downloads saved to the host file named (never written by a vector).
 osv("save_slide_preview", {"item": 12, "to": {"file": "s12.jpg"}}, "GET", "/presentation/slide/12/preview")
 osv("save_slide_image", {"item": 12, "to": {"file": "s12.jpg"}}, "GET", "/presentation/slide/12/image")
+
+# The slide list, each slide shaped as the status's slide element.
+telemetry(OS, "slide-list", inbound_http={"path": "/presentation/slide/list", "body":
+    '<?xml version="1.0" encoding="UTF-8"?><response resource="presentation" action="slide" identifier="list">'
+    '<slides><slide itemnumber="4"><name>V1</name><title>Amazing Grace</title></slide>'
+    '<slide itemnumber="7"><name>C</name><title>Amazing Grace</title></slide></slides></response>'},
+    state_before={"presentation": {"slides": {"2": {"name": "Old"}}}},
+    expect_state={"presentation": {"slides": {"4": {"name": "V1", "title": "Amazing Grace"},
+                                              "7": {"name": "C", "title": "Amazing Grace"}}}})

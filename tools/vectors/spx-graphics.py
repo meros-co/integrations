@@ -137,4 +137,14 @@ telemetry(SPX, "not-in-solo", inbound_http={"path": "/api/v1/rundown/get?apikey=
 telemetry(SPX, "projects", model="spx-broadcast",
           inbound_http={"path": "/api/v1/getprojects?apikey=", "body": '["MyProject","News"]'},
           state_before={"projects": {"Old": True}},
-          expect_state={"projects": {"MyProject": True, "News": True}})
+          expect_state={"projects": {"MyProject": True, "News": True}},
+          expect_then_send=[{"method": "GET", "target": "/api/v1/getrundowns?project=MyProject&apikey="},
+                            {"method": "GET", "target": "/api/v1/getrundowns?project=News&apikey="}])
+
+# Each project's rundowns, read after the project list.
+telemetry(SPX, "rundowns", inbound_http={"path": "/api/v1/getrundowns?project=My%20Show&apikey=", "body": '["Opening", "News"]'},
+          state_before={"rundowns": {"My Show": {"Old": True}}},
+          expect_state={"rundowns": {"My Show": {"Opening": True, "News": True}}})
+telemetry(SPX, "rundown-loaded", inbound_http={"path": "/api/v1/rundown/load?file=MyFirstProject%2FMyFirstRundown&apikey=",
+          "body": '{"info": "Sent request to SPX Controller.", "APIcmd": "RundownLoad", "file": "MyFirstProject/MyFirstRundown", "apikey": ""}'},
+          expect_state={"rundown": {"project": "MyFirstProject", "name": "MyFirstRundown"}})

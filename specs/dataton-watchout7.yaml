@@ -359,6 +359,7 @@ telemetry:
   poll:
     send:
       - { method: GET, path: /v0/state }
+      - { method: GET, path: /v0/show }
     every_ms: 60000
   updates:
     # /v0/state: its shape is served only by the node; it is taken to be the
@@ -407,6 +408,32 @@ telemetry:
       # The show changed: timelines may have been added or removed.
       then_send:
         - { method: GET, path: /v0/state }
+        - { method: GET, path: /v0/show }
+    - json_match: { "$.data.kind": "^showRevision$" }
+      json: { revision: "$.data.value.revision" }
+      state: { show.revision: "{revision}" }
+    # /v0/show: the timelines and their cues, keyed by id, with their names
+    # (the shape Companion's module reads: {show: {timelines: {<id>: {name,
+    # cues: {<id>: {name, start}}}}, hosts}, showName}).
+    - path: "^/v0/show$"
+      json_match: { "$.show.timelines": "^\\{" }
+      json_each: "$.show.timelines.*"
+      json: { name: "$.name" }
+      replace: show.timelines
+      state:
+        "show.timelines.{key:key}.name": "{name}"
+    - path: "^/v0/show$"
+      json_each: "$.show.timelines.*.cues.*"
+      json: { name: "$.name", start: "$.start" }
+      state:
+        "show.timelines.{^key:key}.cues.{key:key}.name": "{name}"
+        "show.timelines.{^key:key}.cues.{key:key}.start_ms": "{start}"
+    - path: "^/v0/show$"
+      json: { name: "$.showName", director: "$.show.hosts.director", assets: "$.show.hosts.asset_manager" }
+      state:
+        show.name: "{name}"
+        show.hosts.director: "{director}"
+        show.hosts.asset_manager: "{assets}"
 
 state:
   timelines.*.status:     { type: string, description: "Playback status of a timeline, keyed by timeline id: run, pause or stop" }
@@ -415,6 +442,12 @@ state:
   countdowns.*.delta_ms:  { type: int, unit: ms, description: "Time to (negative after) the cue" }
   countdowns.*.status:    { type: string, description: "Countdown status: Pre, Last10, Last5 or Reached" }
   show.revision:          { type: string, description: "Revision of the show, which changes whenever the show is edited or replaced" }
+  show.name:              { type: string, description: "Name of the current show" }
+  show.hosts.director:    { type: string, description: "The node running the Director, as the show names it" }
+  show.hosts.asset_manager: { type: string, description: "The node running the Asset Manager, as the show names it" }
+  show.timelines.*.name:  { type: string, description: "A timeline's name, keyed by timeline id" }
+  show.timelines.*.cues.*.name: { type: string, description: "A cue's name, keyed by timeline id and cue id (the ids jump_to_cue takes)" }
+  show.timelines.*.cues.*.start_ms: { type: int, unit: ms, description: "Where the cue starts on its timeline, in ms" }
 
 quirks:
   - models: [all]
@@ -445,7 +478,13 @@ quirks:
       every timeline (/v0/state) is read on connecting, whenever the show
       revision changes and every minute, and replaces the timelines state, so a
       timeline removed from the show leaves it then; the shape of /v0/state
-      is taken to match the stream's playback state.
+      is taken to match the stream's playback state. The show (/v0/show) is
+      read on connecting, whenever the revision changes and every minute,
+      for the show's name, its timelines and their cues with names and start
+      times, which replace show.timelines each time; its shape is also the
+      one Companion's module reads, Dataton giving it only in the node's
+      OpenAPI document. A show revision is read either as the value itself
+      or as its revision member.
   - models: [all]
     severity: info
     text: >

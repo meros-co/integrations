@@ -115,7 +115,15 @@ telemetry(CH, "project-list", inbound="*P\\PROJECT_LIST\\News\\Sports\\\\\r\n",
           expect_state={"projects": {"News": True, "Sports": True}})
 telemetry(CH, "scene-list", request="P\\SCENE_LIST\\\\",
           inbound="*P\\SCENE_LIST\\LowerThird\\HeadShot\\Scoreboard\\\\\r\n",
-          expect_state={"scenes": {"LowerThird": True, "HeadShot": True, "Scoreboard": True}})
+          expect_state={"scenes": {"LowerThird": True, "HeadShot": True, "Scoreboard": True}},
+          expect_then_send=["P\\SCENE_STATE\\1\\LowerThird\\\\\r\n", "P\\SCENE_STATE\\1\\HeadShot\\\\\r\n",
+                            "P\\SCENE_STATE\\1\\Scoreboard\\\\\r\n"])
+telemetry(CH, "scene-state", request="P\\SCENE_STATE\\2\\1000\\\\",
+          inbound="*P\\SCENE_STATE\\Loaded\\Playing\\\\\r\n",
+          expect_state={"channels": {"2": {"scenes": {"1000": {"state": "Loaded\\Playing"}}}}})
+telemetry(CH, "scene-state-closed", request="P\\SCENE_STATE\\1\\LowerThird\\\\",
+          inbound="*P\\SCENE_STATE\\Closed\\\\\r\n",
+          expect_state={"channels": {"1": {"scenes": {"LowerThird": {"state": "Closed"}}}}})
 telemetry(CH, "clip-list", inbound="*P\\CLIP_LIST\\Opener\\Closer\\\\\r\n",
           expect_state={"clips": {"Opener": True, "Closer": True}})
 telemetry(CH, "empty-clip-list", inbound="*P\\CLIP_LIST\\\\\r\n", state_before={"clips": {"Opener": True}},
