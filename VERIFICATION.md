@@ -2187,13 +2187,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## joy-playdeck — PLAYDECK
 
-- [ ] Confirm a running PLAYDECK answers the REST API on 11411 as the OpenAPI document describes (the document says the implementation may follow the contract later), and which PLAYDECK version first serves it. ([specs/joy-playdeck.yaml:59](specs/joy-playdeck.yaml#L59))
-- [ ] Confirm control routes answer 200 with {"ok": true} (ActionResponse), and what a channel outside the licence answers (404 with an ErrorResponse is documented). ([specs/joy-playdeck.yaml:111](specs/joy-playdeck.yaml#L111))
-- [ ] Record the units of the status numbers BlockPosition, BlockDuration, BlockRemain, ClipPosition, ClipDuration, ClipRemain, ScheduleRemain and AutoplayRemain (seconds assumed), BlockProgress and ClipProgress (0 to 1 or percent), and BlockEnd, ClipEnd, ScheduleTime and AutoplayTime (Unix time assumed). ([specs/joy-playdeck.yaml:680](specs/joy-playdeck.yaml#L680))
-- [ ] Record the value of OverlayActiveN and ActionActiveN while a button is active (kept as text as it arrives), and confirm the keys are absent while it is not. ([specs/joy-playdeck.yaml:792](specs/joy-playdeck.yaml#L792))
-- [ ] Confirm a position request with a marker and an empty timestamp seeks to the marker (the schema requires timestamp, so an empty one is sent beside the marker). ([specs/joy-playdeck.yaml:369](specs/joy-playdeck.yaml#L369))
-- [ ] Confirm that blocks and clips in the project are listed in playlist order, so their place from 1 is the block and clip number the cue, play and select routes take. ([specs/joy-playdeck.yaml:1244](specs/joy-playdeck.yaml#L1244))
-- [ ] Confirm POST /api/v1/commands accepts args given as strings for numeric arguments (the schema says numbers as strings are fine) and what it answers an unknown command with. ([specs/joy-playdeck.yaml:491](specs/joy-playdeck.yaml#L491))
+- [ ] Confirm a running PLAYDECK answers the REST API on 11411 as the OpenAPI document describes (the document says the implementation may follow the contract later), and which PLAYDECK version first serves it. ([specs/joy-playdeck.yaml:68](specs/joy-playdeck.yaml#L68))
+- [ ] Confirm control routes answer 200 with {"ok": true} (ActionResponse), and what a channel outside the licence answers (404 with an ErrorResponse is documented). ([specs/joy-playdeck.yaml:120](specs/joy-playdeck.yaml#L120))
+- [ ] Confirm the units of the status numbers: BlockPosition, BlockDuration, BlockRemain, ClipPosition, ClipDuration, ClipRemain, ScheduleRemain and AutoplayRemain in seconds, BlockProgress and ClipProgress in percent (0 to 100), and BlockEnd, ClipEnd, ScheduleTime and AutoplayTime in Unix seconds (taken from the Companion module, the contract giving none). ([specs/joy-playdeck.yaml:1416](specs/joy-playdeck.yaml#L1416))
+- [ ] Record the value of OverlayActiveN and ActionActiveN while a button is active (kept as text as it arrives), and confirm the keys are absent while it is not. ([specs/joy-playdeck.yaml:801](specs/joy-playdeck.yaml#L801))
+- [ ] Confirm a position request with a marker and an empty timestamp seeks to the marker (the schema requires timestamp, so an empty one is sent beside the marker). ([specs/joy-playdeck.yaml:378](specs/joy-playdeck.yaml#L378))
+- [ ] Confirm that blocks and clips in the project are listed in playlist order, so their place from 1 is the block and clip number the cue, play and select routes take. ([specs/joy-playdeck.yaml:1253](specs/joy-playdeck.yaml#L1253))
+- [ ] Confirm POST /api/v1/commands accepts args given as strings for numeric arguments (the schema says numbers as strings are fine) and what it answers an unknown command with. ([specs/joy-playdeck.yaml:500](specs/joy-playdeck.yaml#L500))
 
 ## jvc-camera — JVC camcorders and PTZ cameras (Camcorder Web API)
 
