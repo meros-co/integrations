@@ -617,3 +617,9 @@ V.append({'spec': BP, 'command': 'upload_blend_file', 'input': {'file': 'QUJD', 
 V.append({'spec': BP, 'command': 'upload_warp_file', 'input': {'file': 'QUJD', 'filename': 'x.dat'}, 'expect_request': {'method': 'POST', 'port': 80, 'target': '/api/image/processing/warp/file/transfer', 'body_hex': _BPB, 'content_type': _BPC}})
 V.append({'spec': BP, 'command': 'upload_test_pattern', 'input': {'file': 'QUJD', 'filename': 'x.dat'}, 'expect_request': {'method': 'POST', 'port': 80, 'target': '/api/image/testpattern/file/transfer', 'body_hex': _BPB, 'content_type': _BPC}})
 V.append({'spec': BP, 'command': 'upload_splash_screen', 'input': {'file': 'QUJD', 'filename': 'x.dat'}, 'expect_request': {'method': 'POST', 'port': 80, 'target': '/api/ui/splashscreen/file', 'body_hex': _BPB, 'content_type': _BPC}})
+telemetry(BP, 'internal-test-patterns', request='{"jsonrpc":"2.0","method":"image.testpattern.listinternal","id":1}', model='udx',
+          inbound='{"jsonrpc":"2.0","result":[{"id":"crosshatch","name":"Crosshatch"}],"id":1}',
+          expect_state={'image': {'testpattern': {'internal_patterns': '[{"id":"crosshatch","name":"Crosshatch"}]'}}})
+telemetry(BP, 'nosignal-patterns', request='{"jsonrpc":"2.0","method":"image.testpattern.nosignal.list","id":1}', model='i600',
+          inbound='{"jsonrpc":"2.0","result":["black","logo"],"id":1}',
+          expect_state={'image': {'testpattern': {'nosignal': {'patterns': '["black","logo"]'}}}})

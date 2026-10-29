@@ -2854,6 +2854,28 @@ SAMPLE TALKER_POSITIONS ... >`; only the first is a meter list:
 `{index}` takes offsets as a number does, so a list numbered from 1 keys its
 state from 1. A group that took no part in the match gives no items.
 
+#### Lists in a text reply
+
+An HTTP reply that holds a list but is not JSON or XML is read item by item
+the same way: `match_each` on a `path` + `match` rule goes along the rest of
+the body after what `match` matched, or, with `match_each_in`, along that
+capture, numbered across the path's captures and then the text's. The item
+captures are numbered on after both, `{index}` is the item's place from 0,
+and `replace` and `then_send` work as for any rule. A Ki Pro answers `GET
+/clips` with an array whose keys are not quoted (`{ clipname:
+"Clip1ATK2.MOV", ... }`), which no JSON rule reads:
+
+```yaml
+    - path: "^/clips$"
+      match: '^\s*\['
+      match_each: 'clipname:\s*"([^"]*)"\s*,\s*timestamp:\s*"([^"]*)"'
+      replace: clips
+      state: { "clips.{1:key}.timestamp": "{2}" }
+```
+
+The body must match `match` for the rule to apply, so an empty list (`[ ]`)
+still replaces what was there.
+
 #### Poll replies on another address
 
 An OSC query is answered on its own address by most devices. ETC Eos answers
@@ -3507,8 +3529,8 @@ extension: panasonic-update-notification
 The extension is a small Rust module that wraps the spec engine. The set is
 closed and each is named in the spec, so it is never hidden. Most only keep
 state current, and a device opened for commands only runs without them. One
-that answers commands of its own (Ultimatte's preset archive) runs either
-way: the spec declares those commands with their parameters and `returns`
+that answers commands of its own (Ultimatte's preset archive, an NMOS
+registry's IS-05 commands) runs either way: the spec declares those commands with their parameters and `returns`
 and no `send`, and `tools/validate.py` checks that the spec declares every
 command the extension answers and gives none of them a message. A transfer
 that can outlast a command's timeout answers at once with `{transfer,
@@ -3523,7 +3545,7 @@ events, as the ATEM's do.
 | `resolume-push` | Resolume Arena and Avenue's websocket API (`ws://host:port/api/v1`): reads the composition Resolume sends on connecting and after each structural change into state keyed by unique id (composition, layers, columns, clips, decks, layer groups, and the effects in their chains), subscribes to every parameter that state shows with `{"action":"subscribe","parameter":"/parameter/by-id/<id>"}`, and applies each `parameter_subscribed` and `parameter_update`. A new composition is diffed against the last: removed items leave state and are unsubscribed, new ones are subscribed. Reads the composition again over REST after a deck switch, after a structural command of the session's own, and as a slow safety refresh (`composition_refresh_s`) for a deck's `closed`, which is not a parameter. Reopens the websocket after 1 s doubling to 30 s |
 | `hyperdeck-ftp` | Blackmagic HyperDeck's FTP server (TCP 21, `ftp_port`; anonymous unless `ftp_username` is set) for the files on its media: `list_files` (MLSD, or LIST in the Unix or DOS form), `delete_file`, `rename_file`, `create_folder`, each answered when done on a connection of its own, and `download_file` and `upload_file`, one at a time in the background on another, with `cancel_transfer`. Passive data connections (PASV, EPSV over IPv6) always go to the control connection's peer, whatever address the reply names. An upload's or a rename's target is checked with SIZE first and replaced only with `overwrite`; a download is checked against SIZE. Each connection logs in, works and quits; a reply is waited for 15 s, a transfer may be silent 30 s |
 | `ma-msc-ethernet` | MA Lighting's MIDI Show Control via Ethernet (grandMA2): listens on UDP `msc_port` (6000 to 6100; shared, each datagram taken by the console it came from) for the console's MSC Out, each message `GMA\0MSC\0`, a 4-byte little-endian length of the whole message, then the MSC SysEx, and offers each message to the spec's telemetry rules as one line of text: `MSC <command> device=<n> format=<hex>`, then `cue=`, `list=` and `path=` (the cue data's fields), `fade=<seconds>` (frames at 24 per second) before them for TIMED_GO, `fader=<n> page=<n> value=<0-16383>` for SET (fader from 1), `macro=<n>` for FIRE, or `data=<hex>`; a command MA does not list is `CMD_<hex>`. A new `msc_port` rebuilds the module |
-| `nmos-query-websocket` | An AMWA NMOS registry's Query API subscriptions (IS-04): creates a non-persistent subscription for each resource type (`POST /x-nmos/query/<query_version>/subscriptions`), opens the websocket its answer names in `ws_href` (with the bearer token, where set), and offers each grain to the spec's telemetry rules as JSON: `{"nmos": <type>, "op": "sync", "items": [...]}` for the first on a websocket (every resource, which the spec replaces), `{"nmos": <type>, "op": "set", "items": [...]}` for resources added or changed, and `{"nmos": <type>, "op": "delete", "ids": [...]}` for those gone. Subscribes again when a websocket closes, after 1 s doubling to 30 s |
+| `nmos-query-websocket` | An AMWA NMOS registry's Query API subscriptions (IS-04): creates a non-persistent subscription for each resource type (`POST /x-nmos/query/<query_version>/subscriptions`), opens the websocket its answer names in `ws_href` (with the bearer token, where set), and offers each grain to the spec's telemetry rules as JSON: `{"nmos": <type>, "op": "sync", "items": [...]}` for the first on a websocket (every resource, which the spec replaces), `{"nmos": <type>, "op": "set", "items": [...]}` for resources added or changed, and `{"nmos": <type>, "op": "delete", "ids": [...]}` for those gone. Subscribes again when a websocket closes, after 1 s doubling to 30 s. It also answers the IS-05 commands `connect_receiver`, `disconnect_receiver`, `stage_receiver`, `stage_sender`, `get_receiver_active` and `get_sender_active` (whether or not the device is monitored): it reads the Receiver or Sender and its Device from the Query API, takes the Device's `urn:x-nmos:control:sr-ctrl/<version>` control (the highest version) as the Node's Connection API, for `connect_receiver` reads the Sender's `manifest_href` as the transport file, and sends `PATCH .../single/<receivers or senders>/<id>/staged` (an immediate activation for connect and disconnect) or `GET .../active` there, with the bearer token where set; the answer is the command's value |
 | `nmos-event-transports` | An AMWA NMOS Node's IS-07 event transports: lists the Node's Senders every 30 s, reads the active IS-05 parameters of each whose transport is `urn:x-nmos:transport:websocket` or `urn:x-nmos:transport:mqtt` (and enabled), and listens where each publishes. Senders sharing a `connection_uri` share one websocket, sent a `subscription` command naming every `ext_is_07_source_id` and a `health` command every 5 s, and reopened when silent 12 s (with the bearer token where `connection_authorization` is true); Senders sharing a broker share one MQTT 3.1.1 connection (TLS for `secure-mqtt`, `mqtt_username` and `mqtt_password` where `broker_authorization` is true), subscribed at QoS 0 to each `broker_topic` and `connection_status_broker_topic`. Offers each `state`, `reboot` and `shutdown` message to the rules as it is, and each connection status as `{"message_type": "connection_status", "active", "sender_id"}`. Reopens what closes after 1 s doubling to 30 s |
 | `wing-meters` | Behringer WING's meters, which its OSC tree does not carry: with the `meters` setting on, connects to the native interface (TCP 2222), selects channel 3 and asks for every channel, aux, bus, main, matrix and DCA meter under one report id, to `meter_port` of this host (UDP, a shared port routed by the console's address), renewing the request every 4 s as meter data stops after 5. Each block, the report id then big-endian words in 1/256 dB, is kept as `<strips>.<n>.meters.<meter>`. Reconnects after 1 s doubling to 30 s |
 | `ultimatte-preset-archive` | Blackmagic Ultimatte 12's binary settings channel (TCP 9996, `archive_port`), which the vendor's Smart Remote 4 and Software Control use for Archive All and Restore: `export_presets` reads every preset of the FILE LIST the unit last sent on its text port, and its `GPISettings` and `SavedSettings`, one request per connection, into a zip in Archive All's layout on the host; `import_presets` writes such a zip's presets in name order, then `GPISettings`, then `SavedSettings`, stopping at the first refusal; `export_preset`, `import_preset`, `export_settings` and `import_settings` move one of them to or from a host file. A connection that does not open, or a read the unit drops unanswered, is tried once more after 250 ms |

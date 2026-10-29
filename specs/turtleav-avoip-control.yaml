@@ -549,9 +549,16 @@ commands:
 telemetry:
   # GET STATUS lists every encoder and decoder of the project; it is read on
   # connecting and every 10 seconds, so changes made elsewhere are seen.
+  # GET DEC 0 STATUS and GET ENC 0 STATUS (DARWIN §3.33 and §4.24, CHAZY §3.35 and
+  # §4.24: 0 is every decoder or encoder) add the names, versions, rotation and audio
+  # input, which change less often.
   poll:
-    send: [GET STATUS]
-    every_ms: 10000
+    - every_ms: 10000
+      send: [GET STATUS]
+    - every_ms: 30000
+      send:
+        - { models: [darwin-control, chazy-control], message: GET DEC 0 STATUS }
+        - { models: [darwin-control, chazy-control], message: GET ENC 0 STATUS }
   updates:
     # GET STATUS (DARWIN §2.2 and CHAZY §2.2 examples): one block, the title,
     # then tables of whitespace-separated columns.
@@ -626,6 +633,60 @@ telemetry:
     - match: '^\[SUCCESS\]Apply preset: (.+)\.$'
       state:
         walls.last_preset: '{1}'
+    # SET DEC/ENC NAME replies (DARWIN §3.2 and §4.2, CHAZY §3.2 and §4.2).
+    - match: '^\[SUCCESS\]Set (decoder|encoder) (\d+) name:(.*)\.$'
+      state:
+        '{1}s.{2}.name': '{3}'
+    # GET DEC STATUS, DARWIN: Out Net HPD Ver Mode Res Rotate Name (§3.33 example).
+    - models: [darwin-control]
+      header: ^\s*IP Control Box \S+ CONTROL Decoder Info\s*$
+      each_line: ^\s*(\d{3})\s+(On|Off)\s+(On|Off)\s+(\d+(?:\.\d+)+)\s+(\S+)\s+(\d+)\s+([0-3])\s+(\S.*?)\s*$
+      state:
+        decoders.{1}.online: {value: '{2}', map: {'On': true, 'Off': false}}
+        decoders.{1}.hdmi: {value: '{3}', map: {'On': true, 'Off': false}}
+        decoders.{1}.firmware: '{4}'
+        decoders.{1}.mode: '{5}'
+        decoders.{1}.resolution: '{6}'
+        decoders.{1}.rotation: {value: '{7}', map: {'0': 0, '1': 90, '2': 180, '3': 270}}
+        decoders.{1}.name: '{8}'
+    # GET DEC STATUS, CHAZY: ID Type Net HPD Ver Mode Res Rotate Name (§3.35 example).
+    - models: [chazy-control]
+      header: ^\s*\S+ CONTROL Decoder Info\s*$
+      each_line: ^\s*(\d{3})\s+(Gen \d+)\s+(On|Off)\s+(On|Off)\s+(\d+(?:\.\d+)+)\s+(\S+)\s+(\d+)\s+([0-3])\s+(\S.*?)\s*$
+      state:
+        decoders.{1}.type: '{2}'
+        decoders.{1}.online: {value: '{3}', map: {'On': true, 'Off': false}}
+        decoders.{1}.hdmi: {value: '{4}', map: {'On': true, 'Off': false}}
+        decoders.{1}.firmware: '{5}'
+        decoders.{1}.mode: '{6}'
+        decoders.{1}.resolution: '{7}'
+        decoders.{1}.rotation: {value: '{8}', map: {'0': 0, '1': 90, '2': 180, '3': 270}}
+        decoders.{1}.name: '{9}'
+    # GET ENC STATUS, DARWIN: In Net Sig Ver EDID Aud MCast Name (§4.24 example).
+    - models: [darwin-control]
+      header: ^\s*IP Control Box \S+ CONTROL Encoder Info\s*$
+      each_line: ^\s*(\d{3})\s+(On|Off)\s+(On|Off)\s+(\d+(?:\.\d+)+)\s+(\S+)\s+(\S+)\s+(On|Off)\s+(\S.*?)\s*$
+      state:
+        encoders.{1}.online: {value: '{2}', map: {'On': true, 'Off': false}}
+        encoders.{1}.signal: {value: '{3}', map: {'On': true, 'Off': false}}
+        encoders.{1}.firmware: '{4}'
+        encoders.{1}.edid: '{5}'
+        encoders.{1}.audio_input: '{6}'
+        encoders.{1}.multicast: {value: '{7}', map: {'On': true, 'Off': false}}
+        encoders.{1}.name: '{8}'
+    # GET ENC STATUS, CHAZY: ID Type Net Sig Ver EDID Aud MCast Name (§4.24 example).
+    - models: [chazy-control]
+      header: ^\s*\S+ CONTROL Encoder Info\s*$
+      each_line: ^\s*(\d{3})\s+(Gen \d+)\s+(On|Off)\s+(On|Off)\s+(\d+(?:\.\d+)+)\s+(\S+)\s+(\S+)\s+(On|Off)\s+(\S.*?)\s*$
+      state:
+        encoders.{1}.type: '{2}'
+        encoders.{1}.online: {value: '{3}', map: {'On': true, 'Off': false}}
+        encoders.{1}.signal: {value: '{4}', map: {'On': true, 'Off': false}}
+        encoders.{1}.firmware: '{5}'
+        encoders.{1}.edid: '{6}'
+        encoders.{1}.audio_input: '{7}'
+        encoders.{1}.multicast: {value: '{8}', map: {'On': true, 'Off': false}}
+        encoders.{1}.name: '{9}'
 
 state:
   controller.firmware:  {type: string, description: 'The controller''s firmware version (GET STATUS)'}
@@ -638,17 +699,23 @@ state:
   encoders.*.online:    {type: bool, description: 'The encoder is on the network (NET)'}
   encoders.*.signal:    {type: bool, description: 'The encoder has an input signal (Sig)'}
   encoders.*.audio_format: {type: string, description: 'DARWIN: the encoder''s audio format, such as PCM'}
+  encoders.*.name:      {type: string, description: 'The encoder''s name (GET ENC STATUS, and this session''s renames); Encoder 001 by default'}
+  encoders.*.firmware:  {type: string, description: 'The encoder''s firmware version (GET ENC STATUS Ver)'}
+  encoders.*.audio_input: {type: string, description: 'The encoder''s audio input as GET ENC STATUS lists it (Aud), such as HDMI'}
+  encoders.*.multicast: {type: bool, description: 'The encoder streams multicast (GET ENC STATUS MCast)'}
   decoders.*.type:      {type: string, description: 'CHAZY: the decoder''s generation, such as Gen 2, keyed by decoder ID'}
   decoders.*.ip:        {type: string, description: 'The decoder''s IP address, zero-padded as the status lists it'}
   decoders.*.online:    {type: bool, description: 'The decoder is on the network (NET)'}
   decoders.*.hdmi:      {type: bool, description: 'A display is connected to the decoder''s HDMI output (HDMI)'}
   decoders.*.resolution: {type: int, description: 'The decoder''s output resolution code, as set_decoder_resolution takes it'}
   decoders.*.mode:      {type: string, description: 'The decoder''s mode, such as MX (matrix), as the status lists it'}
+  decoders.*.name:      {type: string, description: 'The decoder''s name (GET DEC STATUS, and this session''s renames); Decoder 001 by default'}
+  decoders.*.firmware:  {type: string, description: 'The decoder''s firmware version (GET DEC STATUS Ver)'}
   decoders.*.osp:       {type: string, description: 'DARWIN: the decoder''s output scaling (Osp), such as SNK, as the status lists it'}
   decoders.*.source:    {type: int, description: 'Encoder routed to the decoder, 0 for none, keyed by decoder ID: from GET STATUS and this session''s routes'}
   decoders.*.output:    {type: bool, description: 'Decoder HDMI output on, from this session''s last change'}
   decoders.*.mute:      {type: bool, description: 'Decoder output muted (black), from this session''s last change'}
-  decoders.*.rotation:  {type: int, description: 'Decoder output rotation in degrees, from this session''s last change'}
+  decoders.*.rotation:  {type: int, unit: degrees, description: 'Decoder output rotation in degrees: 0, 90, 180 or 270 (GET DEC STATUS Rotate code, and this session''s changes)'}
   walls.last_preset:    {type: string, description: 'The video wall preset last applied by this session, as the controller names it'}
 
 quirks:
@@ -666,9 +733,11 @@ quirks:
       on connecting and every 10 seconds, and its encoder and decoder tables update state,
       so changes made from the web interface or another client are seen within 10 seconds;
       nothing is pushed. The columns are read as the documents' examples print them
-      (whitespace between columns); the LAN and Telnet tables are not read. The per-device
-      blocks (GET DEC STATUS, GET ENC STATUS) are not offered. CHAZY Control Pro gives no
-      status example, so its state still holds only this session's own changes.
+      (whitespace between columns); the LAN and Telnet tables are not read. GET DEC 0
+      STATUS and GET ENC 0 STATUS (every decoder and encoder) are read every 30 seconds for
+      names, versions, rotation and audio input; their indented sub-rows (locks, mute,
+      pause, pins) name no device and are not read. CHAZY Control Pro gives no status
+      example, so its state still holds only this session's own changes.
 
   - models: [all]
     severity: warning

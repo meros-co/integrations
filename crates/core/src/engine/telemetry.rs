@@ -266,7 +266,16 @@ enum Matcher {
     /// `match`: the path's captures, then the text's, numbered on after
     /// them. For CGI devices that answer `key=value` lines whose keys other
     /// replies share (Panasonic's `status=1` from both RTMP and SRT).
-    HttpText { path: Regex, re: Regex },
+    /// With `each` (`match_each`), the rule matches once for each match of
+    /// that regex along the rest of the body after what `re` matched, or
+    /// along capture `each_in` (`match_each_in`, numbered across the path's
+    /// and the text's): a list in a body that is not JSON (Ki Pro's /clips).
+    HttpText {
+        path: Regex,
+        re: Regex,
+        each: Option<Regex>,
+        each_in: Option<usize>,
+    },
     /// `quiet_ms`: no message. The rule's values are assigned once per
     /// connection, when the stream has been silent this long after the
     /// device last sent anything: the end of a status dump the device does
@@ -985,6 +994,16 @@ impl Telemetry {
                 Matcher::HttpText {
                     path: regex(p, "path")?,
                     re: regex(m, "match")?,
+                    each: match rule.get("match_each") {
+                        Some(r) => Some(regex(r, "match_each")?),
+                        None => None,
+                    },
+                    each_in: match rule.get("match_each_in") {
+                        None => None,
+                        Some(n) => Some(n.as_u64().filter(|n| *n >= 1).ok_or(
+                            "telemetry: match_each_in is a capture group of path or match, from 1",
+                        )? as usize),
+                    },
                 }
             } else if let Some(m) = rule.get("match") {
                 Matcher::Message {
@@ -1457,6 +1476,8 @@ impl Telemetry {
                     Matcher::HttpText {
                         path: re,
                         re: text_re,
+                        each,
+                        each_in,
                     },
                     Inbound::Http { path, body, .. },
                 ) => {
@@ -1466,7 +1487,8 @@ impl Telemetry {
                     let Ok(text) = std::str::from_utf8(body) else {
                         continue;
                     };
-                    let Some(text_caps) = text_re.captures(text.trim_end()) else {
+                    let text = text.trim_end();
+                    let Some(text_caps) = text_re.captures(text) else {
                         continue;
                     };
                     let mut values = captures(&caps);
@@ -1476,7 +1498,28 @@ impl Telemetry {
                         values.push(((n + offset).to_string(), v));
                     }
                     self.clear(rule, &values, cleared);
-                    any |= self.matched(rule, &values, &mut patch, triggers);
+                    let Some(each) = each else {
+                        any |= self.matched(rule, &values, &mut patch, triggers);
+                        continue;
+                    };
+                    // Each item along the rest of the body, or along the
+                    // capture `match_each_in` names (the path's, then the
+                    // text's); a group that took part in no match has none.
+                    let rest = match each_in {
+                        Some(n) if *n <= offset => caps.get(*n).map_or("", |m| m.as_str()),
+                        Some(n) => text_caps.get(*n - offset).map_or("", |m| m.as_str()),
+                        None => &text[text_caps.get(0).map_or(0, |m| m.end())..],
+                    };
+                    let numbered = offset + text_caps.len() - 1;
+                    for (index, item) in each.captures_iter(rest).enumerate() {
+                        let mut values = values.clone();
+                        for (i, v) in captures(&item) {
+                            let n: usize = i.parse().unwrap_or(0);
+                            values.push(((n + numbered).to_string(), v));
+                        }
+                        values.push(("index".to_string(), Value::from(index)));
+                        any |= self.matched(rule, &values, &mut patch, triggers);
+                    }
                 }
                 (Matcher::HttpXml { path: re, element }, Inbound::Http { path, body, .. }) => {
                     let Some(caps) = re.captures(path) else {
@@ -3372,6 +3415,60 @@ mod tests {
         // text message never reaches a path rule.
         assert_eq!(reply("/cgi-bin/get_ts_status", b"status=1\r\n"), None);
         assert_eq!(t.apply(&Inbound::Text("status=1")), None);
+    }
+
+    #[test]
+    fn a_list_in_a_text_reply_is_read_item_by_item() {
+        // Ki Pro's /clips: an array whose keys are not quoted, so not JSON.
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"path": "^/(clips)$", "match": "^\\s*\\[",
+                 "match_each": "clipname: \"([^\"]*)\", framecount: \"(\\d+)\"",
+                 "replace": "clips",
+                 "state": {"{1}.{2:key}.frames": "{3}", "clips.{2:key}.index": "{index}"}},
+                {"path": "^/list$", "match": "^items=\\[(.*)\\] end", "match_each": "(\\w+),?",
+                 "match_each_in": 1, "state": {"items.{index}": "{2}"}},
+            ]})),
+            &state(json!({
+                "clips.*.frames": {"type": "int", "description": "x"},
+                "clips.*.index": {"type": "int", "description": "x"},
+                "items.*": {"type": "string", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let apply = |path: &'static str, body: &'static [u8]| {
+            let mut cleared = json!({});
+            let patch = t.apply_into(
+                &Inbound::Http {
+                    path,
+                    headers: &[],
+                    body,
+                    request: None,
+                },
+                &mut Vec::new(),
+                &mut cleared,
+            );
+            (cleared, patch)
+        };
+        let (cleared, patch) = apply(
+            "/clips",
+            b"[\n { clipname: \"A.MOV\", framecount: \"474\" },\n { clipname: \"B.mov\", framecount: \"12\" }\n];\n",
+        );
+        assert_eq!(cleared, json!({"clips": null}));
+        assert_eq!(
+            patch,
+            Some(
+                json!({"clips": {"A.MOV": {"frames": 474, "index": 0}, "B.mov": {"frames": 12, "index": 1}}})
+            )
+        );
+        // An empty list still replaces the last one.
+        let (cleared, patch) = apply("/clips", b"[ ];");
+        assert_eq!(cleared, json!({"clips": null}));
+        assert_eq!(patch, None);
+        // Along a capture only: the words after it are not items.
+        let (_, patch) = apply("/list", b"items=[a,b] end c d");
+        assert_eq!(patch, Some(json!({"items": {"0": "a", "1": "b"}})));
     }
 
     #[test]

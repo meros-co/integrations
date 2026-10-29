@@ -57,6 +57,7 @@ const TIMEOUT: Millis = 5_000;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Read {
     InitStatus,
+    DeviceDetail,
     Screens,
     ScreenDetail(i64),
     Layers(i64),
@@ -74,6 +75,7 @@ impl Read {
     fn path(self) -> &'static str {
         match self {
             Read::InitStatus => "main/initStatus",
+            Read::DeviceDetail => "device/readDetail",
             Read::Screens => "screen/readList",
             Read::ScreenDetail(_) => "screen/readDetail",
             Read::Layers(_) => "layer/detailList",
@@ -248,6 +250,39 @@ fn elements<'a>(src: &'a Value, pointer: &str) -> &'a [Value] {
         .map(Vec::as_slice)
         .unwrap_or(&[])
 }
+
+/// device/readDetail: the device's health and identity (H OpenAPI, Devices,
+/// Read Device Detailed Information).
+const DEVICE_FIELDS: &[(&str, &str, Kind)] = &[
+    ("name", "/name", Kind::Text),
+    ("ready", "/status", Kind::Bool),
+    ("model_id", "/modelId", Kind::Int),
+    ("protocol_version", "/protoVersion", Kind::Text),
+    ("main_card_state", "/mainState", Kind::Int),
+    ("backup_card_state", "/deputyState", Kind::Int),
+    ("temperature", "/backboardTemperature", Kind::Float),
+    ("temperature_abnormal", "/temp", Kind::Bool),
+    ("cpu_status", "/cpuStatus", Kind::Int),
+    ("memory_status", "/memStatus", Kind::Int),
+    ("ethernet_status", "/ethernetStatus", Kind::Int),
+    ("usb_signal", "/usbStatus", Kind::Bool),
+    ("mac", "/MAC", Kind::Text),
+];
+
+const GENLOCK_FIELDS: &[(&str, &str, Kind)] = &[
+    ("enabled", "/genlock/enable", Kind::Bool),
+    ("type", "/genlock/type", Kind::Int),
+    ("input", "/genlock/inputId", Kind::Int),
+    ("external_signal", "/genlock/extSignal", Kind::Bool),
+];
+
+const SLOT_FIELDS: &[(&str, &str, Kind)] = &[
+    ("card_type", "/cardType", Kind::Int),
+    ("model_id", "/modelId", Kind::Int),
+    ("status", "/status", Kind::Int),
+    ("work_status", "/workStatus", Kind::Int),
+    ("serial", "/sn", Kind::Text),
+];
 
 const SCREEN_FIELDS: &[(&str, &str, Kind)] = &[
     ("name", "/general/name", Kind::Text),
@@ -568,6 +603,7 @@ impl NovastarH {
         self.read(cx, Read::InitStatus);
         if self.monitor {
             for read in [
+                Read::DeviceDetail,
                 Read::Screens,
                 Read::Inputs,
                 Read::Outputs,
@@ -644,6 +680,43 @@ impl NovastarH {
                 );
                 if !device.is_empty() {
                     cx.state(json!({ "device": device }));
+                }
+            }
+            Read::DeviceDetail => {
+                let device = pick(body, DEVICE_FIELDS);
+                if !device.is_empty() {
+                    cx.state(json!({ "device": device }));
+                }
+                let genlock = pick(body, GENLOCK_FIELDS);
+                if !genlock.is_empty() {
+                    cx.state(json!({ "genlock": genlock }));
+                }
+                // Lists of power supplies, fans and card slots, each keyed by
+                // its id and replaced whole.
+                for (at, pointer, id, fields) in [
+                    (
+                        "power_supplies",
+                        "/powerList",
+                        "/powerId",
+                        &[("connected", "/iSignal", Kind::Bool)][..],
+                    ),
+                    (
+                        "fans",
+                        "/fanList",
+                        "/fanId",
+                        &[("abnormal", "/status", Kind::Bool)][..],
+                    ),
+                    ("slots", "/slotList", "/slotId", SLOT_FIELDS),
+                ] {
+                    if body.pointer(pointer).and_then(Value::as_array).is_none() {
+                        continue;
+                    }
+                    let items = Self::keyed(elements(body, pointer), id, fields)
+                        .into_iter()
+                        .map(|(k, v)| (k, Value::Object(v)))
+                        .collect();
+                    let items = self.list(at, items);
+                    cx.state(json!({ at: items }));
                 }
             }
             Read::Screens => {
@@ -1068,6 +1141,7 @@ mod tests {
             paths,
             [
                 "main/initStatus",
+                "device/readDetail",
                 "screen/readList",
                 "input/readList",
                 "output/readList",
@@ -1122,6 +1196,46 @@ mod tests {
         assert!(cx
             .take()
             .contains(&Action::State(json!({"screens": {"0": {"preset": 1}}}))));
+    }
+
+    #[test]
+    fn the_poll_reads_the_devices_health() {
+        let mut m = NovastarH::with(context(true), 0);
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        let sent = requests(&cx.take());
+        let detail = sent
+            .iter()
+            .find(|s| s.1.ends_with("device/readDetail"))
+            .unwrap();
+        assert_eq!(detail.2["body"], json!({"deviceId": 0}));
+        let mut cx = Cx::new(10);
+        // The documented example, cut down, with the table's fields it leaves out.
+        m.http_response(&mut cx, detail.0, reply(json!({"body": {
+            "MAC": "be-27-73-a0-68-b6", "cpuStatus": 0, "deviceId": 0, "ethernetStatus": 1, "memStatus": 0,
+            "modelId": 29965, "name": "", "protoVersion": "1.0.0.0", "status": 1, "mainState": 1, "deputyState": 0,
+            "backboardTemperature": 41, "temp": 0, "usbStatus": 0,
+            "fanList": [{"fanId": 0, "status": 0}, {"fanId": 1, "status": 1}],
+            "genlock": {"deviceId": 0, "enable": 0, "extSignal": 0, "inputId": 0, "type": 0},
+            "powerList": [{"iSignal": 1, "powerId": 0}],
+            "slotList": [{"cardType": 1, "modelId": 29953, "slotId": 0, "sn": "0000000000000000", "status": 1, "workStatus": 0}]
+        }, "msg": "Success", "sign": "", "status": 0})));
+        let a = cx.take();
+        assert!(a.contains(&Action::State(json!({"device": {
+            "name": "", "ready": true, "model_id": 29965, "protocol_version": "1.0.0.0", "main_card_state": 1,
+            "backup_card_state": 0, "temperature": 41.0, "temperature_abnormal": false, "cpu_status": 0,
+            "memory_status": 0, "ethernet_status": 1, "usb_signal": false, "mac": "be-27-73-a0-68-b6"}}))));
+        assert!(a.contains(&Action::State(
+            json!({"genlock": {"enabled": false, "type": 0, "input": 0, "external_signal": false}})
+        )));
+        assert!(a.contains(&Action::State(
+            json!({"power_supplies": {"0": {"connected": true}}})
+        )));
+        assert!(a.contains(&Action::State(
+            json!({"fans": {"0": {"abnormal": false}, "1": {"abnormal": true}}})
+        )));
+        assert!(a.contains(&Action::State(json!({"slots": {"0": {
+            "card_type": 1, "model_id": 29953, "status": 1, "work_status": 0, "serial": "0000000000000000"}}}))));
     }
 
     #[test]

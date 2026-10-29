@@ -724,3 +724,9 @@ telemetry(K, "detail-in1604", inbound="Hdet2*070\r\n", model="in1604-hd",
           expect_state={"inputs": {"2": {"detail": 70}}})
 telemetry(K, "auto-image-in1604", inbound="Img1*1\r\n", model="in1604-hd",
           expect_state={"inputs": {"1": {"auto_image": True}}})
+
+# The internal temperature, asked every 30 s (IN1808 p.84: Esc 20STAT, tagged 20Stat).
+telemetry(K, "temperature", inbound="20Stat 41\r\n", request=E + "20STAT", model="in1808-series",
+          expect_state={"device": {"temperature": 41.0}})
+telemetry(K, "temperature-bare", inbound="038\r\n", request=E + "20STAT", model="in1604-hd",
+          expect_state={"device": {"temperature": 38.0}})

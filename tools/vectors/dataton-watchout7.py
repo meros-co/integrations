@@ -80,7 +80,7 @@ telemetry(WO7, "countdowns", inbound_sse={"data": json.dumps({"kind": "timelineC
           expect_state={"countdowns": {"1": {"cue": 42, "delta_ms": 4200, "status": "Last5"}}})
 telemetry(WO7, "show-revision", inbound_sse={"data": json.dumps({"kind": "showRevision", "value": "17"})},
           expect_state={"show": {"revision": "17"}},
-          expect_then_send=[{"method": "GET", "target": "/v0/state"}])
+          expect_then_send=[{"method": "GET", "target": "/v0/state"}, {"method": "GET", "target": "/v0/show"}])
 
 # ── Telemetry: /v0/state, the whole playback state ──
 # Timeline 3 was removed from the show: the read replaces the timelines.
@@ -97,3 +97,17 @@ telemetry(WO7, "state-empty", inbound_http={"path": "/v0/state", "body": json.du
     "clockTime": 1759400060000, "timelines": []})},
           state_before={"timelines": {"1": {"status": "run"}}},
           expect_state={"clock_time_ms": 1759400060000})
+
+# /v0/show: the show's timelines and cues by id, with their names.
+telemetry(WO7, "show", inbound_http={"path": "/v0/show", "body": json.dumps({
+    "showName": "Gala", "show": {"hosts": {"director": "NODE-1", "asset_manager": "NODE-2"},
+    "timelines": {"1": {"name": "Main", "cues": {"10": {"name": "Intro", "start": 0}, "11": {"name": "Logo", "start": 5000}}},
+                  "2": {"name": "Loop", "cues": {}}}}})},
+    state_before={"show": {"timelines": {"9": {"name": "Gone"}}}},
+    expect_state={"show": {"name": "Gala", "hosts": {"director": "NODE-1", "asset_manager": "NODE-2"},
+                           "timelines": {"1": {"name": "Main", "cues": {"10": {"name": "Intro", "start_ms": 0},
+                                                                         "11": {"name": "Logo", "start_ms": 5000}}},
+                                         "2": {"name": "Loop"}}}})
+telemetry(WO7, "show-revision-object", inbound_sse={"data": json.dumps({"kind": "showRevision", "value": {"revision": "r42"}})},
+    expect_state={"show": {"revision": "r42"}},
+    expect_then_send=[{"method": "GET", "target": "/v0/state"}, {"method": "GET", "target": "/v0/show"}])

@@ -366,6 +366,33 @@ commands:
     expect: *ok
     returns: ack
 
+state:
+  active.encoders: { type: string, description: "The company's encoders active now, as compact JSON text exactly as GET active-encoders answers (its fields are not documented)" }
+  active.captioners: { type: string, description: "The company's captioners active now, as compact JSON text exactly as GET active-captioners answers" }
+  health.overview: { type: string, description: "iCap's system health overview, as compact JSON text exactly as GET health/overview answers" }
+
+telemetry:
+  # Nothing is pushed. Who is on air (the active encoders and captioners) is
+  # read every 15 s and iCap's health every minute; the documents give no
+  # reply fields, so each answer is kept whole as JSON text.
+  poll:
+    - every_ms: 15000
+      send:
+        - { method: GET, path: "/api/1.0/{settings.company}/active-encoders" }
+        - { method: GET, path: "/api/1.0/{settings.company}/active-captioners" }
+    - every_ms: 60000
+      send:
+        - { method: GET, path: /api/1.0/health/overview }
+  updates:
+    - path: "^/api/1.0/[^/]+/active-encoders$"
+      json: { body: "$" }
+      state: { active.encoders: "{body}" }
+    - path: "^/api/1.0/[^/]+/active-captioners$"
+      json: { body: "$" }
+      state: { active.captioners: "{body}" }
+    - path: "^/api/1.0/health/overview$"
+      json: { body: "$" }
+      state: { health.overview: "{body}" }
 quirks:
   - models: [all]
     severity: warning
@@ -373,8 +400,10 @@ quirks:
       A production cloud service: every request goes to AI-Media's iCap over
       the public internet with the company's administrator credentials. The
       documents do not show the replies' JSON, so reads return the reply as
-      it is and nothing is kept in state; the live encoders and captioners are
-      read with list_active_encoders and list_active_captioners.
+      it is. The live encoders and captioners (every 15 s) and the health
+      overview (every minute) are polled into state, each answer kept whole
+      as JSON text since its fields are not documented; the other lists
+      (users, access codes, logs) are read with their commands.
   - models: [all]
     severity: info
     text: >

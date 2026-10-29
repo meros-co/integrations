@@ -60,6 +60,8 @@ mod barco_projection_table;
 mod bss_london;
 #[cfg(feature = "christie-pandorasbox")]
 mod christie_pandorasbox;
+#[cfg(feature = "citp-msex")]
+mod citp;
 #[cfg(any(feature = "cyberpower-pdu", feature = "cyberpower-ups"))]
 mod cps_traps;
 #[cfg(feature = "cyberpower-pdu")]
@@ -147,6 +149,8 @@ mod nec_display;
 mod nec_projector;
 #[cfg(feature = "nec-projector")]
 mod nec_projector_models;
+#[cfg(feature = "nmos-registry")]
+mod nmos_connect;
 #[cfg(feature = "nmos-node")]
 mod nmos_events;
 #[cfg(feature = "nmos-node")]
@@ -331,6 +335,10 @@ pub(crate) fn construct(
         if extension == Some("hyperdeck-ftp") {
             return Ok(Box::new(hyperdeck_ftp::HyperdeckFtp::new(engine, &context)));
         }
+        #[cfg(feature = "nmos-registry")]
+        if extension == Some("nmos-query-websocket") {
+            return Ok(Box::new(nmos_query::NmosQuery::new(engine, &context)));
+        }
         // The other native extensions only keep state current, so a device
         // opened for commands only runs on the engine alone.
         let extension = if context.monitor { extension } else { None };
@@ -356,10 +364,6 @@ pub(crate) fn construct(
             Some("ma-msc-ethernet") => Ok(Box::new(ma_msc::MaMsc::new(engine, &context))),
             #[cfg(feature = "behringer-wing")]
             Some("wing-meters") => Ok(Box::new(wing_meters::WingMeters::new(engine, &context))),
-            #[cfg(feature = "nmos-registry")]
-            Some("nmos-query-websocket") => {
-                Ok(Box::new(nmos_query::NmosQuery::new(engine, &context)))
-            }
             Some(other) => Err(format!("no native extension '{other}'")),
         };
     }
@@ -411,6 +415,8 @@ pub(crate) fn construct(
         "sacn" => Ok(Box::new(sacn::Sacn::new(context)?)),
         #[cfg(feature = "posistagenet")]
         "posistagenet" => Ok(Box::new(posistagenet::Psn::new(context)?)),
+        #[cfg(feature = "citp-msex")]
+        "citp-msex" => Ok(Box::new(citp::Citp::new(context)?)),
         #[cfg(feature = "adder-aim")]
         "adder-aim" => Ok(Box::new(adder_aim::AdderAim::new(context)?)),
         #[cfg(feature = "integ-jnior")]

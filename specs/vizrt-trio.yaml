@@ -56,6 +56,9 @@ transport:
   timeout_ms: 5000
   probe: "main:get_version"
 
+settings:
+  read_show_lists: { type: bool, default: true, label: Read show lists, description: "Poll the current show's page and template lists into state; turn off for a show with no pages or templates, whose empty answers Viz Trio sends as no line at all." }
+
 ports:
   - { port: 6200, protocol: tcp, role: control, note: "Viz Trio's macro command server; -macro-port moves it" }
 
@@ -880,7 +883,12 @@ telemetry:
     - every_ms: 2000
       send: ["trio:check_channels_status"]
     - every_ms: 15000
-      send: ["show:get_show_name", "channelcontrol:get_active_profile"]
+      send:
+        - "show:get_show_name"
+        - "channelcontrol:get_active_profile"
+        - "channelcontrol:list_viz_channels"
+        - { when_set: read_show_lists, message: "show:get_pages" }
+        - { when_set: read_show_lists, message: "show:get_templates" }
     - every_ms: 60000
       send: ["main:get_version"]
   updates:
@@ -896,12 +904,33 @@ telemetry:
     - match: *result
       request_match: '^main:get_version$'
       state: { system.version: "{1}" }
+    - match: *result
+      request_match: '^show:get_pages$'
+      match_each: '([^\s,]+)'
+      match_each_in: 1
+      replace: show.pages
+      state: { "show.pages.{index}": "{2}" }
+    - match: *result
+      request_match: '^show:get_templates$'
+      match_each: '([^\s,]+)'
+      match_each_in: 1
+      replace: show.templates
+      state: { "show.templates.{index}": "{2}" }
+    - match: *result
+      request_match: '^channelcontrol:list_viz_channels$'
+      match_each: '\s*([^,]+?)\s*(?:,|$)'
+      match_each_in: 1
+      replace: channels.viz
+      state: { "channels.viz.{index}": "{2}" }
 
 state:
   channels.connected: { type: bool, description: "Whether every program and preview channel of the profile, Viz and video, is connected" }
   show.name: { type: string, description: "Name of the current show" }
   channels.profile: { type: string, description: "Active channel profile" }
   system.version: { type: string, description: "Viz Trio's version string" }
+  show.pages.*: { type: string, description: "A page of the current show, by its name (usually its number), in the order show:get_pages lists them, from 0" }
+  show.templates.*: { type: string, description: "A template of the current show, in the order show:get_templates lists them, from 0" }
+  channels.viz.*: { type: string, description: "A Viz channel of the active profile, in the order list_viz_channels gives them, from 0" }
 
 quirks:
   - models: [all]
@@ -934,6 +963,20 @@ quirks:
       commands, such reads time out when the answer is empty. Viz Trio pushes nothing on the macro socket but errors. A get of
       the concept, variant or a context variable returns a value only after a
       set command set it (Viz Trio's own rule).
+  - models: [all]
+    severity: warning
+    text: >
+      The current show's pages and templates are polled every 15 s while
+      read_show_lists is on. The guide says only that show:get_pages and
+      show:get_templates return "a list"; they are read as one line of names
+      separated by spaces or commas, as get_playlists (spaces) and
+      list_viz_channels (commas) are documented. An empty list answers no
+      line, which times the poll out and resets the connection, so a show
+      without pages or templates wants read_show_lists off; groups and
+      playlists, which a show often has none of, are commands only. Which
+      page is on air, armed or last taken cannot be read: the guide's
+      command overview has no command returning it, and Viz Trio pushes
+      nothing but errors on the socket.
   - models: [all]
     severity: critical
     text: >

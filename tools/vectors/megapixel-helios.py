@@ -187,3 +187,33 @@ telemetry(MH, "preset-applied", inbound_http={"path": "/api/v1/presets/3/apply",
             "ingest": {"testPattern": {"enabled": False}}}})},
     expect_state={"display": {"brightness": 5.7, "cct": 6504.0, "gamma": 2.4, "blackout": False},
                   "ingest": {"test_pattern": {"enabled": False}}})
+
+# The saved configurations and the still store, polled (3.3.1, 3.4.1).
+telemetry(MH, "presets", inbound_http={"path": "/api/v1/presets/list", "body": json.dumps({"presets": _MH_PRESETS})},
+          state_before={"presets": {"9": {"name": "Gone"}}},
+          expect_state={"presets": {"3": {"name": "Global Settings", "created": "2021-01-05T20:36:42.227Z",
+                                          "updated": "2021-01-05T20:36:42.227Z"}}})
+telemetry(MH, "stills", inbound_http={"path": "/api/v1/media", "body": json.dumps({"media": [
+    {"id": 26, "name": "VGA-no-signal-image.jpeg",
+     "media": "525ee11685561e223d65018d170820184b4e284a0c128be5919f043dd117eac1.jpeg", "details": "{}",
+     "createdAt": "2022-07-15T04:12:44.156Z", "updatedAt": "2022-07-15T04:12:44.156Z"}]})},
+          expect_state={"stills": {"26": {"name": "VGA-no-signal-image.jpeg",
+                                          "file": "525ee11685561e223d65018d170820184b4e284a0c128be5919f043dd117eac1.jpeg",
+                                          "created": "2022-07-15T04:12:44.156Z", "updated": "2022-07-15T04:12:44.156Z"}}})
+
+# Receivers by MAC address (6.1.4): the whole tree replaces them; updates add.
+_RX = {"groupId": 2, "x": 0, "y": 128, "distroBoxPort": 3, "distroBoxMac": "58:98:6f:00:00:01",
+       "switchId": "", "switchPort": 0, "alertsCount": 0, "alertsSeverity": -1}
+_RX_STATE = {"group": 2, "x": 0, "y": 128, "output_port": 3, "output_port_mac": "58:98:6f:00:00:01",
+             "switch": "", "switch_port": 0, "alerts_count": 0, "alerts_severity": -1}
+telemetry(MH, "receivers-state", inbound_ws=json.dumps({"jsonrpc": "2.0", "id": 1, "result": {"dev": {"receivers": {
+    "58:98:6f:00:01:7d": _RX}}}}),
+          state_before={"receivers": {"58:98:6f:00:09:99": {"group": 1}}},
+          expect_state={"receivers": {"58:98:6f:00:01:7d": _RX_STATE}})
+telemetry(MH, "receivers-update", inbound_ws=json.dumps({"jsonrpc": "2.0", "method": "update", "params": {"dev": {"receivers": {
+    "58:98:6f:00:01:7d": {"groupId": 5}}}}}),
+          state_before={"receivers": {"58:98:6f:00:01:7d": {"group": 2, "x": 0}}},
+          expect_state={"receivers": {"58:98:6f:00:01:7d": {"group": 5, "x": 0}}})
+telemetry(MH, "receivers-http", inbound_http={"path": "/api/v1/public?dev.receivers", "body": json.dumps({"dev": {"receivers": {
+    "58:98:6f:00:01:7d": {"x": 256, "y": 0}}}})},
+          expect_state={"receivers": {"58:98:6f:00:01:7d": {"x": 256, "y": 0}}})
