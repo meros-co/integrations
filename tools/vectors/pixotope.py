@@ -78,7 +78,10 @@ V.append({"spec": PX, "command": "is_ready", "input": {}, "settings": {"machine"
 # and the message, compact JSON as the "How to control a Pixotope service"
 # example sends them. On connecting, the read of State the Store answers.
 _PX_GET = ['{"Type":"Get","Target":"Store","RespondTo":"ExternalControl","Name":"State"}', '{}']
-telemetry(PX, "update-number", expect_connect_zmq=[_PX_GET],
+_PX_CALLS = [['{"Type":"Call","Target":"~LOCAL~-Engine","RespondTo":"ExternalControl","Method":"%s"}' % m, '{"Params":{}}']
+             for m in ("GetAvailableSequenceAssets", "AvalancheGetAvailableAssets", "AvalancheGetAllChannelDetails",
+                       "GetVersion", "IsReady")]
+telemetry(PX, "update-number", expect_connect_zmq=[_PX_GET] + _PX_CALLS,
           inbound_zmq=['{"Type":"Update","Target":"BROADCAST","Source":"Store","Name":"State.General.FrameRate"}',
                        '{"Value":50}'],
           expect_state={"services": {"Store": {"values": {"State.General.FrameRate": "50"}}}})
@@ -97,3 +100,14 @@ telemetry(PX, "log-with-code",
 telemetry(PX, "log-without-code",
           inbound_zmq=['{"Type":"Log","Target":"BROADCAST","Source":"Store"}', '{"Message":"Show saved"}'],
           expect_state={"services": {"Store": {"log": {"message": "Show saved", "code": ""}}}})
+
+# The Engine's answers to the Calls published on connecting.
+telemetry(PX, "call-result-sequences",
+          inbound_zmq=['{"Type":"CallResult","Target":"ExternalControl","ExecutedOn":"RenderMachine1-Engine","Method":"GetAvailableSequenceAssets"}',
+                       '{"Result":{"Sequences":["/Game/Seq/Intro","/Game/Seq/Outro"]}}'],
+          expect_state={"services": {"RenderMachine1-Engine": {"calls": {
+              "GetAvailableSequenceAssets": '{"Sequences":["/Game/Seq/Intro","/Game/Seq/Outro"]}'}}}})
+telemetry(PX, "call-result-failure",
+          inbound_zmq=['{"Type":"CallResult","Target":"ExternalControl","ExecutedOn":"RenderMachine1-Engine","Method":"IsReady"}',
+                       '{"Failure":"Unknown method name."}'],
+          expect_state={})

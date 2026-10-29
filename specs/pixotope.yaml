@@ -343,7 +343,14 @@ quirks:
       State comes from the Data Hub instead: every Update a service
       broadcasts (and the Store's answer to the read of State published on
       connecting) is kept as JSON text under services.<service>.values.<name>,
-      and each service's last Log under services.<service>.log. Updates named
+      and each service's last Log under services.<service>.log. What the
+      Engine publishes no Update for (its sequence assets, Motion Design
+      assets and channel details, versions and readiness) is asked for with
+      Calls on the Data Hub on connecting and every 30 s, answered to this
+      client as CallResults and kept as JSON text under
+      services.<machine>-Engine.calls.<method>; the Store's state is read
+      again at the same time. A Call that fails answers Failure, which is not
+      kept. Updates named
       LOWPRIO_ may be dropped by the Data Hub under load. A Call the target
       service does not answer within the timeout (1000 ms by default) fails.
   - models: [all]
@@ -363,6 +370,7 @@ quirks:
 
 state:
   services.*.values.*: { type: string, description: "The last value a service published for a name, as the Value carries it: text as it is, anything else (a number, true/false, an object) as compact JSON; keyed by the service (the Update's Source, such as Store or RenderMachine1-Engine) and the name (a dotted state path such as State.General.FrameRate, kept as one key)" }
+  services.*.calls.*: { type: string, description: "The Result of the service's last answer to a Call this client publishes on connecting and every 30 s, as compact JSON, keyed by the service that ran it (ExecutedOn, such as RenderMachine1-Engine) and the method: GetAvailableSequenceAssets, AvalancheGetAvailableAssets, AvalancheGetAllChannelDetails, GetVersion or IsReady" }
   services.*.log.message: { type: string, description: "The text of the last Log message the service published" }
   services.*.log.code: { type: string, description: "The upper-case code of the service's last Log message; empty when it gave none" }
 
@@ -373,15 +381,30 @@ telemetry:
       topics:
         - '{"Type":"Update","Target":"BROADCAST"'
         - '{"Type":"Update","Target":"{settings.client_name}"'
+        - '{"Type":"CallResult","Target":"{settings.client_name}"'
         - '{"Type":"Log"'
+    # On connecting and every 30 s: the Store's whole state, and the Engine's
+    # lists (sequences, Motion Design assets and channels), versions and
+    # readiness, which it publishes no Update for; each Call is answered to
+    # this client with a CallResult (Message Schema page).
     publish:
       port: 16202
+      every_ms: 30000
       send:
         - ['{"Type":"Get","Target":"Store","RespondTo":"{settings.client_name}","Name":"State"}', '{}']
+        - ['{"Type":"Call","Target":"{settings.machine}-Engine","RespondTo":"{settings.client_name}","Method":"GetAvailableSequenceAssets"}', '{"Params":{}}']
+        - ['{"Type":"Call","Target":"{settings.machine}-Engine","RespondTo":"{settings.client_name}","Method":"AvalancheGetAvailableAssets"}', '{"Params":{}}']
+        - ['{"Type":"Call","Target":"{settings.machine}-Engine","RespondTo":"{settings.client_name}","Method":"AvalancheGetAllChannelDetails"}', '{"Params":{}}']
+        - ['{"Type":"Call","Target":"{settings.machine}-Engine","RespondTo":"{settings.client_name}","Method":"GetVersion"}', '{"Params":{}}']
+        - ['{"Type":"Call","Target":"{settings.machine}-Engine","RespondTo":"{settings.client_name}","Method":"IsReady"}', '{"Params":{}}']
   updates:
     - json_match: { "$.frames[0].Type": "^Update$", "$.frames[0].Source": "^(.+)$", "$.frames[0].Name": "^(.+)$" }
       json: { value: "$.frames[1].Value" }
       state: { "services.{1:key}.values.{2:key}": "{value}" }
+    - json_match: { "$.frames[0].Type": "^CallResult$", "$.frames[0].ExecutedOn": "^(.+)$",
+                    "$.frames[0].Method": "^(GetAvailableSequenceAssets|AvalancheGetAvailableAssets|AvalancheGetAllChannelDetails|GetVersion|IsReady)$" }
+      json: { result: "$.frames[1].Result" }
+      state: { "services.{1:key}.calls.{2}": "{result}" }
     - json_match: { "$.frames[0].Type": "^Log$", "$.frames[0].Source": "^(.+)$" }
       json: { message: "$.frames[1].Message" }
       state: { "services.{1:key}.log.message": "{message}", "services.{1:key}.log.code": "" }

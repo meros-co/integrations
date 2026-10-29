@@ -3522,14 +3522,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## pixotope — Pixotope
 
 - [ ] Record the Gateway's HTTP answer bodies (to a Set, a Get, a Call, and a Call that times out), so replies can be read into state. ([specs/pixotope.yaml:341](specs/pixotope.yaml#L341))
-- [ ] Check that ~LOCAL~-Engine addresses the Engine on the Gateway's machine, as the Editor's examples write it. ([specs/pixotope.yaml:353](specs/pixotope.yaml#L353))
+- [ ] Check that ~LOCAL~-Engine addresses the Engine on the Gateway's machine, as the Editor's examples write it. ([specs/pixotope.yaml:360](specs/pixotope.yaml#L360))
 - [ ] Check which API version the URL should carry for current releases (24.1.0 is used by default). ([specs/pixotope.yaml:81](specs/pixotope.yaml#L81))
 - [ ] Confirm the Store answers a Get of State.General.FrameRate, used as the liveness probe. ([specs/pixotope.yaml:77](specs/pixotope.yaml#L77))
 - [ ] Confirm a client subscribes on 16201 and publishes on 16202 (the page labels 16201 the subscriber and 16202 the publisher, and its example connects a PUB socket to 16202). ([specs/pixotope.yaml:90](specs/pixotope.yaml#L90))
-- [ ] Confirm the Data Hub speaks ZMTP 3.0 or later with the NULL mechanism (no CURVE when Pixotope's encryption is off) and takes ZMTP 3.0 subscription messages. ([specs/pixotope.yaml:372](specs/pixotope.yaml#L372))
-- [ ] Confirm services broadcast their Updates to BROADCAST with Source and Name in the topic, in that order after Type and Target, so the subscription prefix and the rule match them. ([specs/pixotope.yaml:374](specs/pixotope.yaml#L374))
-- [ ] Confirm Log messages are published with a Source, and that a topic beginning {"Type":"Log" reaches them. ([specs/pixotope.yaml:376](specs/pixotope.yaml#L376))
-- [ ] Confirm the Store answers a Get of State published with RespondTo set to the client name by an Update to that name holding the whole state, and where RespondTo goes in a Get's topic. ([specs/pixotope.yaml:380](specs/pixotope.yaml#L380))
+- [ ] Confirm the Data Hub speaks ZMTP 3.0 or later with the NULL mechanism (no CURVE when Pixotope's encryption is off) and takes ZMTP 3.0 subscription messages. ([specs/pixotope.yaml:380](specs/pixotope.yaml#L380))
+- [ ] Confirm services broadcast their Updates to BROADCAST with Source and Name in the topic, in that order after Type and Target, so the subscription prefix and the rule match them. ([specs/pixotope.yaml:382](specs/pixotope.yaml#L382))
+- [ ] Confirm Log messages are published with a Source, and that a topic beginning {"Type":"Log" reaches them. ([specs/pixotope.yaml:385](specs/pixotope.yaml#L385))
+- [ ] Confirm the Store answers a Get of State published with RespondTo set to the client name by an Update to that name holding the whole state, and where RespondTo goes in a Get's topic. ([specs/pixotope.yaml:394](specs/pixotope.yaml#L394))
+- [ ] Check that Calls published on the Data Hub reach <machine>-Engine with the machine setting's ~LOCAL~ (the Gateway resolves it; the Data Hub may not), and that their CallResults come back to the client name. ([specs/pixotope.yaml:347](specs/pixotope.yaml#L347))
 
 ## pjlink — PJLink
 
