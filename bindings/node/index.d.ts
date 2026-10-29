@@ -31,7 +31,8 @@ export interface DiscoverRequest {
   /**
    * Discovery protocols: 'mcp' (Sennheiser G3/G4), 'ssdp' (Sony cameras),
    * 'pjlink' (PJLink projectors), 'mdns' (Blackmagic ATEM, Videohub,
-   * HyperDeck, SmartView and MultiView, and Meros Cameras). Empty means
+   * HyperDeck, SmartView and MultiView, and Meros Cameras), 'umbra'
+   * (DMXControl 3's Umbra servers). Empty means
    * every protocol that finds a device in this core's catalogue; naming one
    * that finds none is an error.
    */

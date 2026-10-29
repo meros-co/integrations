@@ -154,10 +154,11 @@ class Core:
         Protocols: "mcp" (Sennheiser G3/G4), "ssdp" (Sony cameras), "pjlink"
         (PJLink projectors), "mdns" (Blackmagic ATEM, Videohub, HyperDeck,
         SmartView and MultiView, and Meros Cameras), "dns-sd" (NMOS
-        registries in unicast DNS); none means every protocol that finds a
-        device in this core's catalogue. Hints are addresses where devices
-        were last seen; "dns_servers" and "dns_domains" replace the host's
-        own DNS servers and domains for a "dns-sd" scan. Found devices arrive as {"event": "discovered", ...}
+        registries in unicast DNS), "umbra" (DMXControl 3's Umbra servers);
+        none means every protocol that finds a device in this core's
+        catalogue. Hints are addresses where devices were last seen;
+        "dns_servers" and "dns_domains" replace the host's own DNS servers and
+        domains for a "dns-sd" scan. Found devices arrive as {"event": "discovered", ...}
         events."""
         result = json.loads(self._native.discover(json.dumps(request)))
         if "error" in result:

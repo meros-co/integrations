@@ -830,6 +830,7 @@ fn open_broker(cx: &mut Cx, i: usize, b: &MqttBroker) {
                 server_name: b.broker.host.clone(),
                 accept_invalid_certs: true,
                 preamble: None,
+                alpn: Vec::new(),
             },
         );
     } else {

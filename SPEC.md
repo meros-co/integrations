@@ -3333,6 +3333,43 @@ frames this watcher missed since its last. Only a device implemented natively,
 or through a native extension that publishes frames, can declare `streams`; the
 spec engine publishes none.
 
+### gRPC
+
+A device that speaks gRPC (protobuf messages over HTTP/2) is a native
+module, which the core gives three shared parts. Each is sans-IO like the
+rest of a module: the module opens the connection, writes what the part
+returns and feeds it what arrives.
+
+- **Protobuf** (`crate::protobuf`): a protocol's messages and enums as
+  static tables (`Schema`), which the integration's generator in `tools/`
+  writes from the vendor's `.proto` files, so nothing is compiled from them
+  at build time. A message is encoded from, and decoded to, JSON: field names
+  in snake_case (the `.proto` spelling is taken too when encoding), enums by
+  value name, bytes as base64, maps as objects; decoding writes every
+  singular scalar field at its proto3 default when the message leaves it
+  out, and every list and map, so a decoded message always has the same
+  keys. Unknown fields are skipped; nothing caps a message's size.
+- **HTTP/2** (`crate::http2`, with HPACK in `crate::hpack`): a client
+  connection (RFC 9113) with prior knowledge over TCP, or over TLS with ALPN
+  `h2` (`TlsTarget::alpn`, which any native module can set): settings, flow
+  control both ways (windows of 16 MiB for the connection and 1 MiB per
+  stream, topped up as they are used), frames up to the peer's maximum,
+  CONTINUATION, padding, PING (its ack is the module's liveness check and
+  round trip), RST_STREAM and GOAWAY, and the peer's limit on concurrent
+  streams. Header blocks are decoded in full (static and dynamic tables,
+  Huffman); this side sends literals that index nothing.
+- **gRPC** (`crate::grpc`): unary, server-streaming, client-streaming and
+  bidirectional calls to `/package.Service/Method`, each with its own
+  metadata, as the gRPC over HTTP2 protocol document lays them out:
+  length-prefixed messages, the status from `grpc-status` and
+  `grpc-message` (or from the HTTP status, a reset or a GOAWAY, as the
+  document maps them). Calls beyond the server's stream limit wait their
+  turn. Nothing is compressed, and a compressed answer fails its call.
+  Deadlines are the module's, which cancels a call it no longer waits for.
+
+DMXControl 3 (`dmxcontrol3`) is built on them. A spec cannot drive gRPC: its
+messages need the schema the format does not carry.
+
 ### Native extensions
 
 A spec-driven device can name one native `extension` for a single thing the

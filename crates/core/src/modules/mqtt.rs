@@ -585,6 +585,7 @@ impl Mqtt {
                     server_name,
                     accept_invalid_certs: self.accept_invalid_certs,
                     preamble: None,
+                    alpn: Vec::new(),
                 },
             ),
             Transport::Ws | Transport::Wss => {

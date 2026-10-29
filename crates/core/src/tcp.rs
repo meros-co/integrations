@@ -131,8 +131,10 @@ async fn handshake(
     if let Some(preamble) = &target.preamble {
         read_preamble(&mut tcp, preamble).await?;
     }
-    let connector =
-        tokio_rustls::TlsConnector::from(crate::tls::client_config(target.accept_invalid_certs));
+    let connector = tokio_rustls::TlsConnector::from(crate::tls::client_config_alpn(
+        target.accept_invalid_certs,
+        &target.alpn,
+    ));
     match tokio::time::timeout(HANDSHAKE_TIMEOUT, connector.connect(name, tcp)).await {
         Ok(Ok(s)) => Ok(s),
         Ok(Err(e)) => Err(crate::tls::describe(&e)),
@@ -463,6 +465,7 @@ mod tests {
             server_name: "127.0.0.1".into(),
             accept_invalid_certs,
             preamble: None,
+            alpn: Vec::new(),
         }
     }
 

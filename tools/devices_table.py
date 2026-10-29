@@ -51,6 +51,7 @@ NATIVE = {
     "dbaudio": "OCP.1 over TCP 30013 or 50014 by model",
     "dhd-ecp": "ECP 16-byte blocks over TCP 2008",
     "digitalprojection-insight-laser": "Binary messages over TCP 43728, or an RS-232 port",
+    "dmxcontrol3": "gRPC over HTTP/2 to Umbra on TCP 17475 or TLS 17476 (UDP 17474 discovery)",
     "emberplus": "Ember+ (S101) over TCP",
     "focusrite-rednet": "OCP.1 over TCP (the device's port)",
     "generic-http": "HTTP or HTTPS",

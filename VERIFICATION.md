@@ -1633,6 +1633,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the size, creationDate and lastWriteDate units of media/list (uint64 strings; the epoch of the dates is not documented), and whether provision overwrites a file already at the destination. ([specs/disguise.yaml:2413](specs/disguise.yaml#L2413))
 - [ ] Confirm the proof of play subscription to one dictionary of subsystem:ProofOfPlaySubsystem (getRecords, called if it is a method, and getRecentRecords(n)), that it is available without enabling anything, and which release added it. ([specs/disguise.yaml:1350](specs/disguise.yaml#L1350))
 
+## dmxcontrol3 — DMXControl 3
+
+- [ ] Log in and run a command: confirm the session ID is accepted in the `sessionid` metadata header; if every call after the login is refused (UNAUTHENTICATED or PERMISSION_DENIED), capture the DMXControl GUI's calls and record the header it uses. ([specs/dmxcontrol3.yaml:147](specs/dmxcontrol3.yaml#L147))
+- [ ] With network_id empty, confirm DMXCNetService.GetUmbraNetworkInfo answers before logging in and that its umbraServer network ID is the one Login expects; record what Login answers with a wrong network ID. ([specs/dmxcontrol3.yaml:62](specs/dmxcontrol3.yaml#L62))
+- [ ] Confirm Login accepts this client's program information (type ExternalTool, host name set to the client name, no IP addresses), and that DMXControl's network explorer lists it under client_name. ([specs/dmxcontrol3.yaml:61](specs/dmxcontrol3.yaml#L61))
+- [ ] On TCP 17476, confirm Umbra serves TLS with ALPN h2, and whether its certificate is self-signed (accept_invalid_certs on by default). ([specs/dmxcontrol3.yaml:60](specs/dmxcontrol3.yaml#L60))
+- [ ] Record how often Umbra pings on the Ping call, whether it echoes this client's own pings back, and confirm the client stays connected well past five minutes. ([specs/dmxcontrol3.yaml:153](specs/dmxcontrol3.yaml#L153))
+- [ ] For each Get-style command taking id (GetRequest's requestId), confirm what the ID names, especially get_cuelist_progress, get_dmx_interface_enabled, get_possible_items and the rdm_* commands. ([specs/dmxcontrol3.yaml:173](specs/dmxcontrol3.yaml#L173))
+- [ ] Confirm what a command given no user context acts in, and how bind_user_context's password hash is computed. ([specs/dmxcontrol3.yaml:179](specs/dmxcontrol3.yaml#L179))
+- [ ] Confirm the change streams carry the whole object (not only the properties changed), that a list read with an empty ID filter returns every object, and that cue, attachable, project and action-node changes are followed by the re-reads described. ([specs/dmxcontrol3.yaml:192](specs/dmxcontrol3.yaml#L192))
+- [ ] Confirm DevicePropertyChangeRequest takes the property IDs of the devices' beams, that a new request on the same call replaces the subscription, and how GetDMXRequest numbers its channel ranges (from 0 or 1, across universes). ([specs/dmxcontrol3.yaml:198](specs/dmxcontrol3.yaml#L198))
+- [ ] Confirm global_function with set_value false reads the function named and answers its state, for blackout, freeze, fog state and highlight. ([specs/dmxcontrol3.yaml:1271](specs/dmxcontrol3.yaml#L1271))
+- [ ] Confirm ConfirmedResponse and error messages use {0}-style placeholders filled from their parameters. ([specs/dmxcontrol3.yaml:165](specs/dmxcontrol3.yaml#L165))
+- [ ] Confirm Umbra announces itself as an UmbraUdpBroadcast to 225.68.67.3 on UDP 17474, how often, and which IP and port it names. ([specs/dmxcontrol3.yaml:74](specs/dmxcontrol3.yaml#L74))
+
 ## dtvideolabs-playbackpro-plus — PlaybackPro Plus
 
 - [ ] Check the TCP port on PlaybackPro Plus 3.8 (7000 in its guide) and on Plus X (4647), and whether the UDP port takes the same commands. ([specs/dtvideolabs-playbackpro-plus.yaml:416](specs/dtvideolabs-playbackpro-plus.yaml#L416))

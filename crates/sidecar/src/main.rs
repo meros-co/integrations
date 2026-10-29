@@ -44,9 +44,10 @@
 //! | DELETE /v1/files/{file}      |                                       | {deleted: true}            |
 //!
 //! `/v1/discover` takes `protocols` among `mcp` (Sennheiser G3/G4), `ssdp`
-//! (Sony cameras), `pjlink` (PJLink projectors) and `mdns` (Blackmagic ATEM,
+//! (Sony cameras), `pjlink` (PJLink projectors), `mdns` (Blackmagic ATEM,
 //! Videohub, HyperDeck, SmartView and MultiView, Meros Cameras, and RTP-MIDI
-//! sessions) and `dns-sd` (NMOS registries advertised in unicast DNS); none
+//! sessions), `dns-sd` (NMOS registries advertised in unicast DNS) and
+//! `umbra` (DMXControl 3's Umbra servers); none
 //! means every protocol that finds a device in the service's catalogue.
 //! `hints` are addresses where devices were last seen; `dns_servers` and
 //! `dns_domains` replace the host's own DNS servers and domains for a
