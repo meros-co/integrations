@@ -1278,6 +1278,8 @@ telemetry:
       - { method: GET, path: /config, query: { action: get, paramid: eParamID_TransportState } }
       - { method: GET, path: /config, query: { action: get, paramid: eParamID_CurrentClip } }
       - { method: GET, path: /config, query: { action: get, paramid: eParamID_MediaState } }
+      # The clip list of Ki Pro, Mini and Rack (api.txt's /clips).
+      - { models: [kipro, kipro-mini, kipro-rack], method: GET, path: /clips }
       # The inputs, monitor selections and media format each model documents.
       - { models: [kipro], method: GET, path: /config, query: { action: get, paramid: eParamID_VideoInSelect } }
       - { models: [kipro], method: GET, path: /config, query: { action: get, paramid: eParamID_AudioInSelect } }
@@ -1314,6 +1316,21 @@ telemetry:
       state:
         media.state: "{name}"
         media.data_lan: { value: "{code}", map: { "0": false, "1": true } }
+    # /clips answers an array whose keys are not quoted (api.txt), so it is
+    # read as text, one clip at a time; the list replaces the last one.
+    - path: "^/clips$"
+      match: '^\s*\['
+      match_each: '\{\s*clipname:\s*"([^"]*)"\s*,\s*timestamp:\s*"([^"]*)"\s*,\s*fourcc:\s*"([^"]*)"\s*,\s*width:\s*"(\d+)"\s*,\s*height:\s*"(\d+)"\s*,\s*framecount:\s*"(\d+)"\s*,\s*framerate:\s*"([^"]*)"\s*,\s*interlace:\s*"([01])"'
+      replace: clips
+      state:
+        "clips.{1:url_decode:key}.timestamp": "{2}"
+        "clips.{1:url_decode:key}.fourcc": "{3}"
+        "clips.{1:url_decode:key}.width": "{4}"
+        "clips.{1:url_decode:key}.height": "{5}"
+        "clips.{1:url_decode:key}.frames": "{6}"
+        "clips.{1:url_decode:key}.frame_rate": "{7}"
+        "clips.{1:url_decode:key}.interlaced": { value: "{8}", map: { "0": false, "1": true } }
+        "clips.{1:url_decode:key}.index": "{index}"
     - path: "^/config\\?action=get&paramid=eParamID_StoragePath$"
       json: { path: "$.value" }
       state: { media.storage_path: "{path}" }
@@ -1409,6 +1426,14 @@ state:
   transport.state_code: { type: int, description: "eParamID_TransportState's numeric value (AJA's api.txt: 3 is Playing Forward)" }
   timecode.display: { type: string, description: "Displayed timecode, HH:MM:SS:FF" }
   clip.current: { type: string, description: "Current clip's name" }
+  clips.*.timestamp: { type: string, description: "When the clip was recorded, as the unit gives it (MM/DD/YY hh:mm:ss), keyed by file name (Ki Pro, Mini and Rack)" }
+  clips.*.fourcc: { type: string, description: "The clip's codec as a QuickTime four-character code (apch ProRes 422 HQ, apcn ProRes 422 ...)" }
+  clips.*.width: { type: int, description: "The clip's frame width in pixels" }
+  clips.*.height: { type: int, description: "The clip's frame height in pixels" }
+  clips.*.frames: { type: int, description: "Frames in the clip" }
+  clips.*.frame_rate: { type: string, description: "The clip's frame rate in frames per second, as the unit writes it (29.97)" }
+  clips.*.interlaced: { type: bool, description: "Whether the clip is interlaced" }
+  clips.*.index: { type: int, description: "The clip's place in the list the unit gives, from 0" }
   media.state: { type: string, description: "Media state as the recorder names it: Record-Play or Data - LAN" }
   media.data_lan: { type: bool, description: "True in Data - LAN (transfer) mode, false in Record-Play mode" }
   media.storage_path: { type: string, description: "Path clips are recorded to and played from, such as /mnt/S1/AJA" }
@@ -1538,8 +1563,14 @@ quirks:
     text: >
       get_clips, delete_clip and select_next_slot use interfaces AJA's
       api.txt marks deprecated ("will continue to operate in support of
-      existing clients"). Its /clips example uses unquoted JSON keys, so the
-      listing is returned as the reply text, not parsed. AJA's playlist.py and play_with_clipname.py
+      existing clients"). Its /clips example uses unquoted JSON keys, so
+      get_clips returns the listing as text, and the clip list in state is
+      read from it item by item, every 30 s with the other polls and after
+      each get_clips; a clip whose fields come in another order is not
+      read. The file names are URL encoded on the wire (api.txt) and kept
+      decoded. Ki Pro GO and Ultra document no clip listing (AJA REST API
+      chapters 4 to 6 give only /media/<file> to download a clip by name),
+      so their state has none. AJA's playlist.py and play_with_clipname.py
       send their sets as form POSTs to /config; this spec uses the current
       GET form, and play_with_clipname.py's eParamID_GotToClip is a typo for
       eParamID_GoToClip (go_to_clipname.py).

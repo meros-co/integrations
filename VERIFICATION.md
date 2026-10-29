@@ -133,18 +133,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## aja-kipro — AJA Ki Pro
 
-- [ ] Confirm that an event connection id expires when no wait_for_config_events is made within a minute, and that the extension's back-to-back waits keep it alive over a long session. ([specs/aja-kipro.yaml:1457](specs/aja-kipro.yaml#L1457))
-- [ ] Check how the unit answers wait_for_config_events with an expired connection id (status code and body), since AJA does not document it and the extension reconnects on anything that is not a 2xx JSON array. ([specs/aja-kipro.yaml:1473](specs/aja-kipro.yaml#L1473))
-- [ ] Confirm which URL opens the event connection on each model and firmware, /json (AJA examples) or /config (2021 guide). ([specs/aja-kipro.yaml:1469](specs/aja-kipro.yaml#L1469))
-- [ ] On a Ki Pro GO and Ultra, check desc.json for eParamID_TransportState, eParamID_CurrentClip, eParamID_DisplayTimecode and eParamID_MediaState, and whether the 30-second poll errors on them. ([specs/aja-kipro.yaml:1500](specs/aja-kipro.yaml#L1500))
-- [ ] On Ultra models, confirm the accepted range and format of eParamID_TransportRequestedSpeed (three decimals such as -1.500) for variable speed play. ([specs/aja-kipro.yaml:1547](specs/aja-kipro.yaml#L1547))
-- [ ] On Ultra Plus and 12G, confirm that set_sdi_monitor_channel works when sent with paramid= (AJA's chapter 6 URL omits it). ([specs/aja-kipro.yaml:1575](specs/aja-kipro.yaml#L1575))
-- [ ] On Ki Pro, Mini and Rack, check whether the deprecated /clips listing still uses unquoted JSON keys. ([specs/aja-kipro.yaml:1537](specs/aja-kipro.yaml#L1537))
-- [ ] Check that a get of each input and monitor parameter answers its value as the descriptor's number, and that a change made on the unit (front panel, preset recall) arrives as an event for eParamID_VideoInput_1, eParamID_SDIMonitorChannel, eParamID_HDMIOutChannel and the others now kept in state. ([specs/aja-kipro.yaml:1284](specs/aja-kipro.yaml#L1284))
-- [ ] On a GO, find the ids of the channel 2 to 4 inputs in desc.json (only eParamID_VideoInput_1 and eParamID_AudioInput_1 are documented), and on Ultra Plus and 12G the values of eParamID_EncodeChannels other than 1. ([specs/aja-kipro.yaml:1374](specs/aja-kipro.yaml#L1374))
-- [ ] Check whether reading eParamID_RegisterRecall answers the last preset recalled, which AJA does not document. ([specs/aja-kipro.yaml:1483](specs/aja-kipro.yaml#L1483))
+- [ ] Confirm that an event connection id expires when no wait_for_config_events is made within a minute, and that the extension's back-to-back waits keep it alive over a long session. ([specs/aja-kipro.yaml:1482](specs/aja-kipro.yaml#L1482))
+- [ ] Check how the unit answers wait_for_config_events with an expired connection id (status code and body), since AJA does not document it and the extension reconnects on anything that is not a 2xx JSON array. ([specs/aja-kipro.yaml:1498](specs/aja-kipro.yaml#L1498))
+- [ ] Confirm which URL opens the event connection on each model and firmware, /json (AJA examples) or /config (2021 guide). ([specs/aja-kipro.yaml:1494](specs/aja-kipro.yaml#L1494))
+- [ ] On a Ki Pro GO and Ultra, check desc.json for eParamID_TransportState, eParamID_CurrentClip, eParamID_DisplayTimecode and eParamID_MediaState, and whether the 30-second poll errors on them. ([specs/aja-kipro.yaml:1525](specs/aja-kipro.yaml#L1525))
+- [ ] On Ultra models, confirm the accepted range and format of eParamID_TransportRequestedSpeed (three decimals such as -1.500) for variable speed play. ([specs/aja-kipro.yaml:1578](specs/aja-kipro.yaml#L1578))
+- [ ] On Ultra Plus and 12G, confirm that set_sdi_monitor_channel works when sent with paramid= (AJA's chapter 6 URL omits it). ([specs/aja-kipro.yaml:1606](specs/aja-kipro.yaml#L1606))
+- [ ] On Ki Pro, Mini and Rack, check whether the deprecated /clips listing still uses unquoted JSON keys. ([specs/aja-kipro.yaml:1562](specs/aja-kipro.yaml#L1562))
+- [ ] Check that a get of each input and monitor parameter answers its value as the descriptor's number, and that a change made on the unit (front panel, preset recall) arrives as an event for eParamID_VideoInput_1, eParamID_SDIMonitorChannel, eParamID_HDMIOutChannel and the others now kept in state. ([specs/aja-kipro.yaml:1286](specs/aja-kipro.yaml#L1286))
+- [ ] On a GO, find the ids of the channel 2 to 4 inputs in desc.json (only eParamID_VideoInput_1 and eParamID_AudioInput_1 are documented), and on Ultra Plus and 12G the values of eParamID_EncodeChannels other than 1. ([specs/aja-kipro.yaml:1391](specs/aja-kipro.yaml#L1391))
+- [ ] Check whether reading eParamID_RegisterRecall answers the last preset recalled, which AJA does not document. ([specs/aja-kipro.yaml:1508](specs/aja-kipro.yaml#L1508))
 - [ ] Confirm upload_clip's PUT /media answers 200 within the 60 s the command waits after the last byte (the guide shows the answer, not when it comes). ([specs/aja-kipro.yaml:911](specs/aja-kipro.yaml#L911))
 - [ ] Confirm download_clip's GET /media/<file> works on the original Ki Pro, Ki Pro Mini and Ki Pro Rack (the guide documents it for the Ki Pro GO and Ultra models), and what any model answers outside Data - LAN mode. ([specs/aja-kipro.yaml:897](specs/aja-kipro.yaml#L897))
+- [ ] Confirm /clips on Ki Pro, Mini and Rack answers its clips in the order and form api.txt shows (clipname, timestamp, fourcc, width, height, framecount, framerate, interlace), with the file name URL encoded. ([specs/aja-kipro.yaml:1567](specs/aja-kipro.yaml#L1567))
 
 ## aja-kumo — AJA KUMO
 
