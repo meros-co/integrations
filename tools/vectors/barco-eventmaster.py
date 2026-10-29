@@ -358,8 +358,12 @@ telemetry(BM, "sources", inbound_http={"path": "/", "request": {"params": {}, "m
         {"id": 1, "Name": "Still1", "HSize": 1920, "VSize": 1080, "SrcType": 1, "InputCfgIndex": -1, "StillIndex": 0,
          "DestIndex": -1, "UserKeyIndex": -1, "Mode3D": 0, "Freeze": 0, "Capacity": 1, "InputCfgVideoStatus": 1}]}})},
     state_before={"sources": {"7": {"video_status": "valid", "type": "input"}}},
-    expect_state={"sources": {"0": {"video_status": "no_sync", "frozen": True, "type": "input"},
-                              "1": {"video_status": "valid", "frozen": False, "type": "still"}}})
+    expect_state={"sources": {"0": {"video_status": "no_sync", "frozen": True, "type": "input", "name": "InSource1",
+                                    "width": 3840, "height": 1080, "input_config": -1, "still": 0, "destination": -1,
+                                    "user_key": -1, "mode_3d": 0, "capacity": 2},
+                              "1": {"video_status": "valid", "frozen": False, "type": "still", "name": "Still1",
+                                    "width": 1920, "height": 1080, "input_config": -1, "still": 0, "destination": -1,
+                                    "user_key": -1, "mode_3d": 0, "capacity": 1}}})
 # listSources filtered by type lists only some sources: nothing is replaced.
 telemetry(BM, "sources-filtered", inbound_http={
     "path": "/", "request": {"params": {"type": 1}, "method": "listSources", "id": "1234", "jsonrpc": "2.0"},
@@ -367,7 +371,7 @@ telemetry(BM, "sources-filtered", inbound_http={
         {"id": 1, "Name": "Still1", "SrcType": 1, "Freeze": 0, "InputCfgVideoStatus": 1}]}})},
     state_before={"sources": {"0": {"video_status": "no_sync", "frozen": True, "type": "input"}}},
     expect_state={"sources": {"0": {"video_status": "no_sync", "frozen": True, "type": "input"},
-                              "1": {"video_status": "valid", "frozen": False, "type": "still"}}})
+                              "1": {"video_status": "valid", "frozen": False, "type": "still", "name": "Still1"}}})
 # listPresets holds none of the fields the source rule reads: no state.
 telemetry(BM, "presets-ignored", inbound_http={"path": "/", "body": json.dumps({"jsonrpc": "2.0", "id": "1234", "result": {
     "success": 0, "response": PRESETS}})}, expect_state={})
