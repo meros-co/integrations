@@ -967,6 +967,8 @@ def per_model_checks(doc: dict, model_ids: set) -> list[str]:
                ("on_connect", doc.get("on_connect")),
                # Update rules naming `models` (SPEC.md §8, Rules per model).
                ("telemetry.updates", telemetry.get("updates"))]
+    places += [(f"telemetry.updates[{i}].then_send", rule.get("then_send"))
+               for i, rule in enumerate(telemetry.get("updates") or []) if isinstance(rule, dict)]
     for where, send in places:
         for i, item in enumerate(items_of(send)):
             if isinstance(item, dict) and "models" in item:
@@ -979,8 +981,9 @@ def per_model_checks(doc: dict, model_ids: set) -> list[str]:
             if isinstance(item, dict) and "session" in item and transport.get("type") != "http":
                 errors.append(f"{where}[{i}]: session applies to http requests")
             if isinstance(item, dict) and "when_set" in item and where != "on_connect":
-                if not where.startswith(("telemetry.poll", "telemetry.subscribe")):
-                    errors.append(f"{where}[{i}]: when_set applies to on_connect steps and telemetry poll and subscribe items")
+                if not (where.startswith(("telemetry.poll", "telemetry.subscribe")) or where.endswith(".then_send")):
+                    errors.append(f"{where}[{i}]: when_set applies to on_connect steps and telemetry poll, "
+                                  "subscribe and then_send items")
                 elif item["when_set"] not in (doc.get("settings") or {}):
                     errors.append(f"{where}[{i}]: when_set names unknown setting '{item['when_set']}'")
     for model in doc.get("models", []):
@@ -1072,13 +1075,18 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
     groups = poll_groups(telemetry)
     if len(groups) > 4:
         errors.append("telemetry.poll: at most 4 poll groups")
-    for where, group in groups:
-        for i, item in enumerate(items_of(group.get("send"))):
+    # A reply_address is a regex, and a template over the item's values (a
+    # then_send query's captures), each value matched literally.
+    queries = [(where, group.get("send")) for where, group in groups]
+    queries += [(f"telemetry.updates[{i}].then_send", rule.get("then_send"))
+                for i, rule in enumerate(telemetry.get("updates") or [])]
+    for where, send in queries:
+        for i, item in enumerate(items_of(send)):
             if isinstance(item, dict) and "reply_address" in item:
                 if transport_type not in ("osc-udp", "osc-tcp"):
                     errors.append(f"{where}[{i}]: reply_address needs an OSC transport")
                 try:
-                    re.compile(item["reply_address"])
+                    re.compile(PLACEHOLDER.sub("0", item["reply_address"]))
                 except re.error as e:
                     errors.append(f"{where}[{i}].reply_address: {e}")
 
@@ -1135,9 +1143,13 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                 re.compile(asked)
             except re.error as e:
                 errors.append(f"{where}.request_match: {e}")
-            # On a websocket, the message a reply answers (SPEC.md §2, ws).
-            if "match" not in rule or transport_type not in ("line-tcp", "line-serial", "line-udp", "ws"):
-                errors.append(f"{where}: a request_match regex goes with match, on a line or websocket transport")
+            # On a websocket, the message a reply answers (SPEC.md §2, ws);
+            # on OSC, the address of the query a reply answers.
+            line = "match" in rule and transport_type in ("line-tcp", "line-serial", "line-udp", "ws")
+            osc = "address" in rule and transport_type in ("osc-udp", "osc-tcp")
+            if not (line or osc):
+                errors.append(f"{where}: a request_match regex goes with match, on a line or websocket "
+                              "transport, or with address, on an OSC transport")
         if "match_each" in rule and "match" not in rule and "address" not in rule:
             errors.append(f"{where}: match_each reads the rest of a message or body a match rule matched, "
                           "or a capture of an address rule")

@@ -87,6 +87,70 @@ fn lookup(name: &str) -> Option<(&'static str, Kind)> {
         .map(|i| (COMMANDS[i].1, COMMANDS[i].2))
 }
 
+/// Each series' inputs, by the values set_input_select takes, as its control
+/// command list's INPUT SELECT rows give them (the rows the list marks for
+/// the series). Sorted by model id.
+#[rustfmt::skip]
+const INPUTS: &[(&str, &[&str])] = &[
+    ("pt-cmz50", &["RG1", "HD1", "HD2", "NWP", "MV1", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD"]),
+    ("pt-dz13k-ds12k-dw11k-dz10k", &["RG1", "RG2", "VID", "DVI", "HD1", "SD1", "SD2"]),
+    ("pt-dz21k2-ds20k2-dw17k2-dz16k2-dz21k-dz20k-dz16k-dw17k", &["RG1", "RG2", "VID", "SVD", "DVI", "HD1", "SD1", "SD2", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD"]),
+    ("pt-dz780-dw750-dx820", &["RG1", "RG2", "VID", "DVI", "HD1", "SD1", "DL1", "DL1:HD1", "DL1:HD2", "DL1:PC1", "DL1:PC2", "DL1:SVD", "DL1:VID"]),
+    ("pt-dz870-dw830-dx100", &["RG1", "RG2", "VID", "DL1", "DVI", "HD1", "SD1", "DL1:HD1", "DL1:HD2", "DL1:PC1", "DL1:PC2", "DL1:SVD", "DL1:VID"]),
+    ("pt-ex12k", &["PC1", "PC2", "RG1", "RG2", "VID", "SVD", "DVI", "HD1", "SCT", "AU1,RG1", "AU2,RG1", "AU1,VID", "AU2,VID", "AU1,SVD", "AU2,SVD", "AU1,RG2", "AU2,RG2", "AU1,SCT", "AU2,SCT", "AU1,DVI", "AU2,DVI", "AU1,SD1", "AU2,SD1", "AU1,SD2", "AU2,SD2"]),
+    ("pt-ex16k", &["PC1", "PC2", "RG1", "RG2", "VID", "SVD", "DVI", "HD1", "SCT", "AU1,RG1", "AU2,RG1", "AU1,VID", "AU2,VID", "AU1,SVD", "AU2,SVD", "AU1,RG2", "AU2,RG2", "AU1,SCT", "AU2,SCT", "AU1,DVI", "AU2,DVI", "AU1,SD1", "AU2,SD1", "AU1,SD2", "AU2,SD2"]),
+    ("pt-ez590", &["RG1", "RG2", "VID", "HD1", "HD2", "NWP", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD"]),
+    ("pt-ez770z-ez770zl", &["RG1", "RG2", "VID", "SVD", "DVI", "HD1", "DP1", "DL1", "DL1:HD1", "DL1:HD2", "DL1:PC1", "DL1:PC2", "DL1:SVD", "DL1:VID"]),
+    ("pt-frq50", &["RG1", "HD1", "HD2", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD"]),
+    ("pt-frq60", &["RG1", "HD1", "HD2", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD"]),
+    ("pt-frz55", &["RG1", "RG2", "VID", "HD1", "HD2", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2"]),
+    ("pt-frz60-frz50", &["RG1", "RG2", "VID", "HD1", "HD2", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2"]),
+    ("pt-htq20", &["HD1", "HD2", "SD1", "DM1,SD1", "DM1,DL1", "DM1,WP1", "DM1,TP1", "DM1,OP1", "DM1,OP2", "DM1,MP1", "DM1,DL1:PC1", "DM1,DL1:PC2", "DM1,DL1:VID", "DM1,DL1:HD1", "DM1,DL1:HD2", "DM1,DL1:SVD"]),
+    ("pt-jx200", &["HD1", "PA1", "MC1", "MV1", "SI1"]),
+    ("pt-lb425", &["RG1", "RG2", "VID", "SVD", "CP1", "HD1", "NWP", "MV1", "UD1"]),
+    ("pt-lb426", &["RG1", "RG2", "VID", "HD1", "HD2", "NWP", "MV1"]),
+    ("pt-lmz460", &["RG1", "RG2", "HD1", "HD2", "NWP", "MV1"]),
+    ("pt-lrz35", &["RG1", "RG2", "VID", "HD1", "HD2"]),
+    ("pt-mz16k", &["RG1", "DVI", "HD1", "SD1", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD"]),
+    ("pt-mz20k", &["HD1", "HD2", "SD1", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD"]),
+    ("pt-mz770-mz670", &["RG1", "RG2", "VID", "HD1", "HD2", "NWP", "PA1", "MC1", "MV1", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD"]),
+    ("pt-mz880", &["RG1", "RG2", "HD1", "HD3", "DL1", "DL1:PC1", "DL1:HD1", "DL1:HD2"]),
+    ("pt-mz882", &["RG1", "RG2", "HD1", "HD2", "HD3", "DL1", "DL1:PC1", "DL1:HD1", "DL1:HD2"]),
+    ("pt-rcq10", &["DVI", "HD1", "SD1", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD", "AU1,SD1", "AU1,SD2", "AU1,SD3", "AU1,SD4", "AU1,HD1", "AU1,HD2", "AU1,DV1", "AU1,DV2", "AU1,DP1", "AU1,DP2", "AU1,OP1", "AU1,OP2"]),
+    ("pt-req15", &["HD1", "HD2", "DP1", "DM1,SD1", "DM1,DL1", "DM1,WP1", "DM1,TP1", "DM1,OP1", "DM1,OP2", "DM1,DL1:PC1", "DM1,DL1:PC2", "DM1,DL1:VID", "DM1,DL1:HD1", "DM1,DL1:HD2", "DM1,DL1:SVD"]),
+    ("pt-rez15", &["HD1", "HD2", "DP1", "DM1,SD1", "DM1,DL1", "DM1,WP1", "DM1,TP1", "DM1,OP1", "DM1,OP2", "DM1,DL1:PC1", "DM1,DL1:PC2", "DM1,DL1:VID", "DM1,DL1:HD1", "DM1,DL1:HD2", "DM1,DL1:SVD"]),
+    ("pt-rq25k", &["HD1", "HD2", "DP1", "DM1,SD1", "DM1,DL1", "DM1,WP1", "DM1,TP1", "DM1,OP1", "DM1,OP2", "DM1,DL1:PC1", "DM1,DL1:PC2", "DM1,DL1:VID", "DM1,DL1:HD1", "DM1,DL1:HD2", "DM1,DL1:SVD"]),
+    ("pt-rq32k", &["RG1", "RG2", "VID", "SVD", "DVI", "HD1", "SD1", "SD2", "SD3", "SD4", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD", "AU1,SD1", "AU1,SD2", "AU1,SD3", "AU1,SD4", "AU2,SD1", "AU2,SD2", "AU2,SD3", "AU2,SD4", "AU1,HD1", "AU1,HD2", "AU2,HD3", "AU2,HD4", "AU1,DV1", "AU1,DV2", "AU2,DV3", "AU2,DV4", "AU1,DP1", "AU1,DP2", "AU2,DP3", "AU2,DP4", "AU1,OP1", "AU1,OP2", "AU2,OP1", "AU2,OP2"]),
+    ("pt-rq35k", &["DVI", "HD1", "SD1", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD", "AU1,SD1", "AU1,SD2", "AU1,SD3", "AU1,SD4", "AU2,SD1", "AU2,SD2", "AU2,SD3", "AU2,SD4", "AU1,HD1", "AU1,HD2", "AU2,HD3", "AU2,HD4", "AU1,DV1", "AU1,DV2", "AU2,DV3", "AU2,DV4", "AU1,DP1", "AU1,DP2", "AU2,DP3", "AU2,DP4", "AU1,OP1", "AU1,OP2", "AU2,OP1", "AU2,OP2"]),
+    ("pt-rq35k2", &["DVI", "HD1", "SD1", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD", "AU1,SD1", "AU1,SD2", "AU1,SD3", "AU1,SD4", "AU2,SD1", "AU2,SD2", "AU2,SD3", "AU2,SD4", "AU1,HD1", "AU1,HD2", "AU2,HD3", "AU2,HD4", "AU1,DV1", "AU1,DV2", "AU2,DV3", "AU2,DV4", "AU1,DP1", "AU1,DP2", "AU2,DP3", "AU2,DP4", "AU1,OP1", "AU1,OP2", "AU2,OP1", "AU2,OP2"]),
+    ("pt-rq45k", &["HD1", "HD2", "SD1", "DM1,SD1", "DM1,DL1", "DM1,WP1", "DM1,TP1", "DM1,OP1", "DM1,OP2", "DM1,DL1:PC1", "DM1,DL1:PC2", "DM1,DL1:VID", "DM1,DL1:HD1", "DM1,DL1:HD2", "DM1,DL1:SVD"]),
+    ("pt-rq50k", &["DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD", "AU1,SD1", "AU1,SD2", "AU1,SD3", "AU1,SD4", "AU2,SD1", "AU2,SD2", "AU2,SD3", "AU2,SD4", "AU1,HD1", "AU1,HD2", "AU2,HD3", "AU2,HD4", "AU1,DV1", "AU1,DV2", "AU2,DV3", "AU2,DV4", "AU1,DP1", "AU1,DP2", "AU2,DP3", "AU2,DP4", "AU1,OP1", "AU1,OP2", "AU2,OP1", "AU2,OP2"]),
+    ("pt-rq7", &["HD1", "HD2", "DL1", "DM1,SD1", "DM1,DL1", "DM1,WP1", "DM1,TP1", "DM1,OP1", "DM1,OP2", "DM1,DL1:PC1", "DM1,DL1:PC2", "DM1,DL1:VID", "DM1,DL1:HD2", "DM1,DL1:SVD"]),
+    ("pt-rz120", &["RG1", "RG2", "DVI", "HD1", "SD1", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD"]),
+    ("pt-rz14k", &["HD1", "HD2", "DP1", "DM1,SD1", "DM1,DL1", "DM1,WP1", "DM1,TP1", "DM1,OP1", "DM1,OP2", "DM1,DL1:PC1", "DM1,DL1:PC2", "DM1,DL1:VID", "DM1,DL1:HD1", "DM1,DL1:HD2", "DM1,DL1:SVD"]),
+    ("pt-rz16k", &["RG1", "RG2", "VID", "SVD", "DVI", "HD1", "SD1", "SD2", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD"]),
+    ("pt-rz470-rw430-rz475-frz370c-frw330c", &["PC1", "PC2", "RG1", "RG2", "VID", "DVI", "HD1", "DL1", "DL1:HD1", "DL1:HD2", "DL1:PC1", "DL1:PC2", "DL1:SVD", "DL1:VID"]),
+    ("pt-rz570-rz575", &["RG1", "RG2", "VID", "DVI", "HD1", "HD2", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2"]),
+    ("pt-rz970-rw930-rx110", &["RG1", "RG2", "VID", "SVD", "DVI", "HD1", "SD1", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD"]),
+    ("pt-rz990", &["RG1", "RG2", "DVI", "HD1", "SD1", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD"]),
+    ("pt-tmz400", &["RG1", "RG2", "HD1", "HD2", "NWP", "MV1"]),
+    ("pt-vmq85", &["HD1", "HD2", "NWP", "MV1", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD"]),
+    ("pt-vmz60-vmz50-vmz40-vmw60-vmw50", &["RG1", "RG2", "VID", "HD1", "HD2", "NWP", "MV1", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD"]),
+    ("pt-vmz71", &["RG1", "RG2", "HD1", "HD2", "NWP", "MV1", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD"]),
+    ("pt-vmz82", &["RG1", "HD1", "HD2", "NWP", "MV1", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD"]),
+    ("pt-vw360", &["RG1", "RG2", "VID", "HD1", "HD2", "NWP", "MV1", "UD1"]),
+    ("pt-vz575n-vw535n-vx605n-vz570-vw530-vx600-vz470", &["RG1", "RG2", "VID", "HD1", "HD2", "NWP", "PA1", "MC1", "MV1", "DL1", "DL1:RG1", "DL1:RG2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD"]),
+    ("pt-vz585n-vz580-vw545n-vw540-vx615n-vx610n", &["RG1", "RG2", "VID", "HD1", "HD2", "NWP", "PA1", "MC1", "MV1", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID", "DL1:HD1", "DL1:HD2", "DL1:SVD"]),
+];
+
+/// The model's inputs from INPUTS; none for an unknown model.
+fn model_inputs(model: &str) -> &'static [&'static str] {
+    INPUTS
+        .binary_search_by(|(m, _)| (*m).cmp(model))
+        .map(|i| INPUTS[i].1)
+        .unwrap_or(&[])
+}
+
 #[derive(Debug, Clone)]
 struct Job {
     command: Option<CommandId>,
@@ -129,6 +193,8 @@ pub(crate) struct PanasonicProjector {
     monitor: bool,
     /// The model's queries: (query, state key).
     reads: Vec<(&'static str, &'static str)>,
+    /// The model's inputs, as set_input_select takes them.
+    inputs: &'static [&'static str],
     phase: Phase,
     port_open: bool,
     reachable: bool,
@@ -168,6 +234,7 @@ impl PanasonicProjector {
         let text = |k: &str, d: &str| s.get(k).and_then(Value::as_str).unwrap_or(d).to_string();
         let link = Link::from_settings(&ctx, DEFAULT_PORT)?;
         let mut m = PanasonicProjector::with(link, reads, ctx.monitor);
+        m.inputs = model_inputs(&model.id);
         m.id = text("projector_id", "ZZ");
         m.user = text("username", "dispadmin");
         m.password = text("password", "");
@@ -187,6 +254,7 @@ impl PanasonicProjector {
             password: String::new(),
             monitor,
             reads,
+            inputs: &[],
             phase: Phase::Idle,
             port_open: false,
             reachable: false,
@@ -543,6 +611,11 @@ fn invalid(message: impl Into<String>) -> CommandError {
 
 impl Module for PanasonicProjector {
     fn start(&mut self, cx: &mut Cx) {
+        if self.monitor && !self.inputs.is_empty() {
+            // The series' inputs, from its control command list: no query
+            // lists the inputs a projector has.
+            cx.state(json!({ "inputs": { "available": self.inputs } }));
+        }
         cx.connection(Connection::Connecting);
         if let Some(port) = self.serial.clone() {
             self.phase = Phase::Opening;
@@ -941,6 +1014,34 @@ mod tests {
             key: PACE,
             after: LIGHTING_GAP
         }));
+    }
+
+    #[test]
+    fn the_input_table_is_sorted() {
+        for pair in INPUTS.windows(2) {
+            assert!(pair[0].0 < pair[1].0, "{} then {}", pair[0].0, pair[1].0);
+        }
+    }
+
+    #[test]
+    fn the_series_inputs_reach_state() {
+        let mut m = tcp_module(true, "");
+        m.inputs = model_inputs("pt-rz120");
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        assert_eq!(
+            state(&cx.take())["inputs"]["available"],
+            json!([
+                "RG1", "RG2", "DVI", "HD1", "SD1", "DL1", "DL1:PC1", "DL1:PC2", "DL1:VID",
+                "DL1:HD1", "DL1:HD2", "DL1:SVD"
+            ])
+        );
+        let mut m = tcp_module(false, "");
+        m.inputs = model_inputs("pt-rz120");
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        assert!(state(&cx.take()).get("inputs").is_none());
+        assert!(model_inputs("pt-unknown").is_empty());
     }
 
     #[test]

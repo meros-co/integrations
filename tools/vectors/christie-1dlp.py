@@ -601,6 +601,11 @@ _c("enter_service_mode", {"password": "service"}, "(#UID \"service,service\")", 
 telemetry(C1, "status-items", inbound='(SST!017 "10 Hours" "Lamp 1 Hours")',
           expect_state={"status": {"sst": '017 "10 Hours" "Lamp 1 Hours"',
                                    "items": {"17": {"value": "10 Hours", "name": "Lamp 1 Hours"}}}})
+# E Series SST? reply item 0, as printed (two spaces after the item number).
+telemetry(C1, "status-model-name", inbound='(SST!000  "DWU670-E" "Model Name")',
+          expect_state={"status": {"sst": '000  "DWU670-E" "Model Name"',
+                                   "items": {"0": {"value": "DWU670-E", "name": "Model Name"}}},
+                        "device": {"model": "DWU670-E"}})
 telemetry(C1, "lamp-info", inbound="(LIF+LP1H!534)", expect_state={"lamp": {"info": {"LP1H": 534}}})
 telemetry(C1, "image-overscan", inbound="(OVS!2)", expect_state={"image": {"overscan": 2}})
 telemetry(C1, "image-pixel-track", inbound="(#PXT 50)", expect_state={"image": {"pixel_track": 50}})

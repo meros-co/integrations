@@ -3130,8 +3130,10 @@ telemetry:
     - match: '^\(#?GUP\+SHUT(?:!\s*0*|\s*)([01])[\s)]'
       state: { "group.SHUT": { value: "{1}", map: { "0": false, "1": true } } }
 
-    - match: '^\(SST!\s*(\d+) "([^"]*)" "([^"]*)"\)$'
+    - match: '^\(SST!\s*(\d+)\s+"([^"]*)" "([^"]*)"\)$'
       state: { "status.items.{1}.value": "{2}", "status.items.{1}.name": "{3}" }
+    - match: '^\(SST!\s*\d+\s+"([^"]*)" "Model Name"\)$'
+      state: { "device.model": "{1}" }
     - match: '^\(LIF\+(LP[12T][HR])!\s*(\d+)[\s)]'
       state: { "lamp.info.{1}": "{2}" }
     - match: '^\(#?OVS(?:!\s*|\s*)(-?\d+)[\s)]'
@@ -3190,6 +3192,7 @@ state:
   status.laser_diodes.*: { type: "string", description: "An LDI reply text (voltage, current, temperature), keyed by laser diode bank number" }
   source.main.info.*: { type: "string", description: "An MIF reply text, keyed by item (ACTS, APRT, CLSP, HREF, PIXC, RESL, SGFT, SYNC, VREF)" }
   source.secondary.info.*: { type: "string", description: "An SIF reply text, keyed by item" }
+  device.model: { type: "string", description: "Model name from the SST? status item \"Model Name\" (item 0 on the E Series, as \"DWU670-E\")" }
   device.info.*: { type: "string", description: "A PIF reply text, keyed by item: MDLN model, SNUM serial number, NERS native resolution, LOCK, STBM, WHEE, CFVS" }
   device.component_versions.*: { type: "string", description: "A PIF+FWV# reply text, keyed by component character" }
   input.main: { type: "int", description: "Active main input number (see set_input)" }
@@ -3452,6 +3455,15 @@ quirks:
       available only in service mode (enter_service_mode); outside it the projector answers PIF requests
       with an error. FVI (firmware) and ILI (hours) need no service mode. CWI (wheel index) also requires
       service mode.
+  - models: [all]
+    severity: info
+    text: >
+      No request lists the projector's inputs. The SIN (Select Input) section of each reference (HS Series
+      2K 020-103716-02 p. 81, and the same section in the other references; Captiva DWU500S p. 19; E Series
+      "(SIN) INPUT/SOURCE CHANGE" p. 34) documents only selecting and reading the active input, with the
+      family's input numbers in its value list, given in set_input's description. The E Series SST? reply
+      names the model in its "Model Name" item, kept in device.model; on the DLP families the model name is
+      PIF+MDLN?, which needs service mode, so it is not polled.
   - models: [hs-2k, hs-2k-gen1, hs-4k, hs-4k10, gs-2k, inspire, jazz, korus]
     severity: info
     text: >

@@ -2272,8 +2272,8 @@ telemetry:
 A group is a poll like any other: its items are queries, queued one at a
 time, and an item still waiting from its last round is not queued again.
 
-A `subscribe` or `poll` item can be limited to installations that turn on
-a setting with `when_set`, as an `on_connect` step can (§2): it is sent
+A `subscribe`, `poll` or `then_send` item can be limited to installations
+that turn on a setting with `when_set`, as an `on_connect` step can (§2): it is sent
 only while that setting is set (not empty, and not `false`), decided from
 the settings current each time it would go, so `update_settings` turns it
 on and off. A console's meters, a continuous stream, are asked for only
@@ -2292,7 +2292,8 @@ telemetry:
 ```
 
 `tools/validate.py` checks that the setting exists and that `when_set`
-stands only on `on_connect` steps and `subscribe` and `poll` items.
+stands only on `on_connect` steps and `subscribe`, `poll` and `then_send`
+items.
 Over HTTP this is the way to read something less often; a `subscribe` with
 `every_ms` is sent again at its interval too, and older specs use it so, but
 its items are not kept from piling up behind a slow device.
@@ -2688,6 +2689,27 @@ are read for each function its list names:
       state: { "functions.{2}.status": "{1}" }
 ```
 
+An OSC device that answers a query on the address it also pushes changes
+on names the query on an `address` rule the same way: `request_match` is
+then a regex over the address of the query a reply answers, and the rule
+matches only a message taken as that query's reply (a poll item or
+`then_send` query, on its own address or its `reply_address`), never one the
+device pushed. Its captures are numbered on after the address's and
+`arg_match`'s. A DiGiCo console answers `/Input_Channels/4/Channel_Input/name/?`
+on `/Input_Channels/4/Channel_Input/name`, which it also sends when the
+channel is renamed; reading the next channel only after a query keeps a
+rename from reading every channel after it again:
+
+```yaml
+    - address: "^/Input_Channels/(\\d+)/Channel_Input/name$"
+      request_match: '^/Input_Channels/(\d+)/Channel_Input/name/\?$'
+      then_send:
+        - { address: "/Input_Channels/{2:+1}/Channel_Input/name/?", reply_address: "^/Input_Channels/{2:+1}/Channel_Input/name$" }
+```
+
+A telemetry vector for such a rule gives `request`, the address of the
+query, beside its `inbound_hex`.
+
 With `then_send` (below, "Re-reads on a push"), a reply can have more read: the NLB's VDN table
 names each amplifier, and each name has that amplifier's status, power and
 mutes read in turn.
@@ -2766,7 +2788,10 @@ arrives on, as an RE2-safe regex, and waits for a message matching it:
       - { address: /eos/get/cuelist/1, reply_address: "^/eos/out/get/cuelist/1/list/0/\\d+$" }
 ```
 
-`reply_address` is for poll items on OSC transports. Because such a reply
+`reply_address` is for poll and `then_send` items on OSC transports. It is a
+template too, over the item's values, each matched literally: a `then_send`
+query names the address its rule's captures give (`{2:+1}`), and a brace
+the regex itself needs is written `\{`. Because such a reply
 names what it answers, a query that is never answered (a cue list that does
 not exist) times out without the stream being reset, and the next query goes;
 the same holds for commands with `expect.address` on `osc-tcp` and for
