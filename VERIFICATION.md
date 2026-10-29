@@ -3385,7 +3385,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the status reply while no presentation runs carries presentation running="0" with no children. ([specs/opensong.yaml:437](specs/opensong.yaml#L437))
 - [ ] Check whether an alert message may hold a slash once percent-encoded (refused here), and which characters OpenSong's path parsing otherwise rejects. ([specs/opensong.yaml:397](specs/opensong.yaml#L397))
 - [ ] Record the XML of the slide list, song list, song folders, set list and set slide list, so they can be read into state. ([specs/opensong.yaml:73](specs/opensong.yaml#L73))
-- [ ] Record the slide list's XML (/presentation/slide/list): whether each slide is a slide element with an itemnumber attribute and name and title children, as the status's is. ([specs/opensong.yaml:81](specs/opensong.yaml#L81))
+- [ ] Record the slide list's XML (/presentation/slide/list): whether each slide is a slide element with an itemnumber attribute and name and title children, as the status's is. ([specs/opensong.yaml:479](specs/opensong.yaml#L479))
 
 ## osc-listener — OSC received from any sender
 
