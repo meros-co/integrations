@@ -77,27 +77,27 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## aes70 — AES70 / OCA devices
 
-- [ ] Check the device's OCP.1 port (AES70 assigns none) and which transports it accepts: TCP, UDP, WebSocket (and its path), or only secure OCP.1. ([specs/aes70.yaml:401](specs/aes70.yaml#L401))
-- [ ] Check whether the device sends OcaDelay's delay time (OcaTimeInterval) as a 32-bit or a 64-bit float, and that set_delay written at that width is accepted. ([specs/aes70.yaml:460](specs/aes70.yaml#L460))
-- [ ] Confirm the device answers the controller's keep-alive with keep-alives of its own at that interval, so a device opened for commands only is reported connected within one interval, and whether it accepts the millisecond form for an interval that is not whole seconds. ([specs/aes70.yaml:466](specs/aes70.yaml#L466))
-- [ ] Confirm the device sends keep-alives while idle, so it is not dropped after three intervals of quiet, and that it closes the connection itself after three intervals without the controller's. ([specs/aes70.yaml:474](specs/aes70.yaml#L474))
-- [ ] Confirm AddSubscription (3.1 on object 4) for an object's PropertyChanged event, with subscriber method 1.1 of object 4096, an empty context, delivery mode 1 and an empty destination, is accepted, and that changes then arrive as notifications carrying the property id, value and change type (record which PDU type, 2 or 5). ([specs/aes70.yaml:481](specs/aes70.yaml#L481))
-- [ ] Check that GetMembers (3.5) answers on every block, how long a full walk takes on a large device (a DS100 or an amplifier with many channels), and whether 32 requests in flight at once is too many for it. ([specs/aes70.yaml:490](specs/aes70.yaml#L490))
-- [ ] Check that roles are unique within each block and contain no '/', so role paths are unambiguous. ([specs/aes70.yaml:498](specs/aes70.yaml#L498))
-- [ ] Confirm that a role path lookup when opened for commands only (GetMembers and GetRole level by level) works, and that GetClassIdentification (1.1) answers for an object addressed by number. ([specs/aes70.yaml:504](specs/aes70.yaml#L504))
-- [ ] Check what a setter answers for a value out of range (ParameterOutOfRange, or a clamped value notified) and for a locked object, and record the status codes seen. ([specs/aes70.yaml:512](specs/aes70.yaml#L512))
-- [ ] Confirm the bounded getters (OcaGain GetGain, OcaSwitch GetPosition, OcaDelay GetDelayTime, the numeric basic actuators, OcaLevelSensor GetReading) return the value, minimum and maximum in that order. ([specs/aes70.yaml:359](specs/aes70.yaml#L359))
-- [ ] Confirm the basic sensors (OcaBooleanSensor to OcaStringSensor) answer GetReading (5.1) with the reading, and the numeric ones also the minimum and maximum, as the basic actuators' GetSetting does; Focusrite's RedNet8 chart has OcaInt8Sensor status objects. ([specs/aes70.yaml:376](specs/aes70.yaml#L376))
-- [ ] Check level sensor readings: the unit (dBFS or dBu) and range, and whether polling every sensor once a second is acceptable on a device with many meters. ([specs/aes70.yaml:521](specs/aes70.yaml#L521))
-- [ ] Confirm the device manager getters: ModelGUID (3.2) as 8 bytes, ModelDescription (3.6) as three strings, State (3.13) as a 16-bit set, and which optional ones (DeviceRevisionID 3.20) the device implements. ([specs/aes70.yaml:386](specs/aes70.yaml#L386))
+- [ ] Check the device's OCP.1 port (AES70 assigns none) and which transports it accepts: TCP, UDP, WebSocket (and its path), or only secure OCP.1. ([specs/aes70.yaml:402](specs/aes70.yaml#L402))
+- [ ] Check whether the device sends OcaDelay's delay time (OcaTimeInterval) as a 32-bit or a 64-bit float, and that set_delay written at that width is accepted. ([specs/aes70.yaml:461](specs/aes70.yaml#L461))
+- [ ] Confirm the device answers the controller's keep-alive with keep-alives of its own at that interval, so a device opened for commands only is reported connected within one interval, and whether it accepts the millisecond form for an interval that is not whole seconds. ([specs/aes70.yaml:467](specs/aes70.yaml#L467))
+- [ ] Confirm the device sends keep-alives while idle, so it is not dropped after three intervals of quiet, and that it closes the connection itself after three intervals without the controller's. ([specs/aes70.yaml:475](specs/aes70.yaml#L475))
+- [ ] Confirm AddSubscription (3.1 on object 4) for an object's PropertyChanged event, with subscriber method 1.1 of object 4096, an empty context, delivery mode 1 and an empty destination, is accepted, and that changes then arrive as notifications carrying the property id, value and change type (record which PDU type, 2 or 5). ([specs/aes70.yaml:482](specs/aes70.yaml#L482))
+- [ ] Check that GetMembers (3.5) answers on every block, how long a full walk takes on a large device (a DS100 or an amplifier with many channels), and whether 32 requests in flight at once is too many for it. ([specs/aes70.yaml:491](specs/aes70.yaml#L491))
+- [ ] Check that roles are unique within each block and contain no '/', so role paths are unambiguous. ([specs/aes70.yaml:499](specs/aes70.yaml#L499))
+- [ ] Confirm that a role path lookup when opened for commands only (GetMembers and GetRole level by level) works, and that GetClassIdentification (1.1) answers for an object addressed by number. ([specs/aes70.yaml:505](specs/aes70.yaml#L505))
+- [ ] Check what a setter answers for a value out of range (ParameterOutOfRange, or a clamped value notified) and for a locked object, and record the status codes seen. ([specs/aes70.yaml:513](specs/aes70.yaml#L513))
+- [ ] Confirm the bounded getters (OcaGain GetGain, OcaSwitch GetPosition, OcaDelay GetDelayTime, the numeric basic actuators, OcaLevelSensor GetReading) return the value, minimum and maximum in that order. ([specs/aes70.yaml:360](specs/aes70.yaml#L360))
+- [ ] Confirm the basic sensors (OcaBooleanSensor to OcaStringSensor) answer GetReading (5.1) with the reading, and the numeric ones also the minimum and maximum, as the basic actuators' GetSetting does; Focusrite's RedNet8 chart has OcaInt8Sensor status objects. ([specs/aes70.yaml:377](specs/aes70.yaml#L377))
+- [ ] Check level sensor readings: the unit (dBFS or dBu) and range, and whether polling every sensor once a second is acceptable on a device with many meters. ([specs/aes70.yaml:522](specs/aes70.yaml#L522))
+- [ ] Confirm the device manager getters: ModelGUID (3.2) as 8 bytes, ModelDescription (3.6) as three strings, State (3.13) as a 16-bit set, and which optional ones (DeviceRevisionID 3.20) the device implements. ([specs/aes70.yaml:387](specs/aes70.yaml#L387))
 - [ ] Check a role or label with non-ASCII characters: OCP.1 string lengths are taken to count Unicode characters, not bytes. ([crates/core/src/modules/aes70_codec.rs:244](crates/core/src/modules/aes70_codec.rs#L244))
-- [ ] Record the class ids of a vendor's proprietary objects (d&b, Powersoft, stagebox preamps) and whether they derive from the standard classes, so they are read and followed. ([specs/aes70.yaml:358](specs/aes70.yaml#L358))
-- [ ] On a device that speaks OCP.1 over UDP, confirm it ignores nothing after the controller's first keep-alive, answers in one PDU per datagram to the controller's address and port, sends its notifications there too, and accepts PDUs of up to 1452 bytes. ([specs/aes70.yaml:408](specs/aes70.yaml#L408))
-- [ ] On a device that speaks OCP.1 over a WebSocket, note its path and port, confirm it accepts the AES70-OCP.1 subprotocol (or needs ws_subprotocol off), answers keep-alives sent over the WebSocket, and, over wss, what certificate it presents. ([specs/aes70.yaml:418](specs/aes70.yaml#L418))
-- [ ] On a device that offers secure OCP.1, note its port and transport (_ocasec._tcp or _ocasec._udp), confirm it negotiates TLS_DHE_PSK_WITH_AES_128_CBC_SHA over TLS 1.2 (or DTLS 1.2) and sends the identity hint OCA-PSK, which identity it expects (OCA-PSK or its own), and how its pre-shared key is set and shown (hex, and its length). ([specs/aes70.yaml:427](specs/aes70.yaml#L427))
-- [ ] Record the Diffie-Hellman group size a secure device offers (at least 2048 bits is required; a 1024-bit group is refused) and whether it agrees to the extended master secret and encrypt-then-MAC. ([specs/aes70.yaml:427](specs/aes70.yaml#L427))
-- [ ] Confirm that a wrong key or identity shows as a refused handshake (and which alert the device sends), and that the device answers the keep-alive sent first inside the secure session as it does over TCP. ([specs/aes70.yaml:427](specs/aes70.yaml#L427))
-- [ ] On a device that speaks secure OCP.1 over DTLS, confirm it takes one OCP.1 PDU per record and datagram and answers the same way, whether it asks for a cookie, and that it sends its flight again when the controller's is lost. ([specs/aes70.yaml:444](specs/aes70.yaml#L444))
+- [ ] Record the class ids of a vendor's proprietary objects (d&b, Powersoft, stagebox preamps) and whether they derive from the standard classes, so they are read and followed. ([specs/aes70.yaml:359](specs/aes70.yaml#L359))
+- [ ] On a device that speaks OCP.1 over UDP, confirm it ignores nothing after the controller's first keep-alive, answers in one PDU per datagram to the controller's address and port, sends its notifications there too, and accepts PDUs of up to 1452 bytes. ([specs/aes70.yaml:409](specs/aes70.yaml#L409))
+- [ ] On a device that speaks OCP.1 over a WebSocket, note its path and port, confirm it accepts the AES70-OCP.1 subprotocol (or needs ws_subprotocol off), answers keep-alives sent over the WebSocket, and, over wss, what certificate it presents. ([specs/aes70.yaml:419](specs/aes70.yaml#L419))
+- [ ] On a device that offers secure OCP.1, note its port and transport (_ocasec._tcp or _ocasec._udp), confirm it negotiates TLS_DHE_PSK_WITH_AES_128_CBC_SHA over TLS 1.2 (or DTLS 1.2) and sends the identity hint OCA-PSK, which identity it expects (OCA-PSK or its own), and how its pre-shared key is set and shown (hex, and its length). ([specs/aes70.yaml:428](specs/aes70.yaml#L428))
+- [ ] Record the Diffie-Hellman group size a secure device offers (at least 2048 bits is required; a 1024-bit group is refused) and whether it agrees to the extended master secret and encrypt-then-MAC. ([specs/aes70.yaml:428](specs/aes70.yaml#L428))
+- [ ] Confirm that a wrong key or identity shows as a refused handshake (and which alert the device sends), and that the device answers the keep-alive sent first inside the secure session as it does over TCP. ([specs/aes70.yaml:428](specs/aes70.yaml#L428))
+- [ ] On a device that speaks secure OCP.1 over DTLS, confirm it takes one OCP.1 PDU per record and datagram and answers the same way, whether it asks for a cookie, and that it sends its flight again when the controller's is lost. ([specs/aes70.yaml:445](specs/aes70.yaml#L445))
 
 ## aimedia-icap — AI-Media / EEG iCap
 
@@ -269,17 +269,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Confirm which models implement rPDU2 (AP84xx, AP86xx, AP88xx, AP89xx, APDU9xxx) and which only rPDU (AP78xx, AP79xx); the FAQ names only AP86XX/AP89XX for rPDU2. ([specs/apc-rack-pdu.yaml:37](specs/apc-rack-pdu.yaml#L37))
 - [ ] Walk a 2G PDU and check every table is keyed by a single integer index, as the MIB declares, and that a metered PDU lists no switched outlet rows. ([specs/apc-rack-pdu.yaml:41](specs/apc-rack-pdu.yaml#L41))
-- [ ] Check an outlet's control command reads back as immediate_on or immediate_off after a SET, and when a delayed action's result shows in the switched status table. ([specs/apc-rack-pdu.yaml:1052](specs/apc-rack-pdu.yaml#L1052))
-- [ ] Check the units taken from the MIB's descriptions (tenths of amps, hundredths of kilowatts, tenths of kilowatt-hours) against the PDU's display. ([specs/apc-rack-pdu.yaml:1047](specs/apc-rack-pdu.yaml#L1047))
-- [ ] Receive a v1 trap from the PDU (an outlet turned off) and check its snmpTrapOID is enterprises.318.0.n and is named. ([specs/apc-rack-pdu.yaml:1059](specs/apc-rack-pdu.yaml#L1059))
+- [ ] Check an outlet's control command reads back as immediate_on or immediate_off after a SET, and when a delayed action's result shows in the switched status table. ([specs/apc-rack-pdu.yaml:1053](specs/apc-rack-pdu.yaml#L1053))
+- [ ] Check the units taken from the MIB's descriptions (tenths of amps, hundredths of kilowatts, tenths of kilowatt-hours) against the PDU's display. ([specs/apc-rack-pdu.yaml:1048](specs/apc-rack-pdu.yaml#L1048))
+- [ ] Receive a v1 trap from the PDU (an outlet turned off) and check its snmpTrapOID is enterprises.318.0.n and is named. ([specs/apc-rack-pdu.yaml:1060](specs/apc-rack-pdu.yaml#L1060))
 - [ ] Check a first-generation PDU (AP79xx) answers GETBULK walks of the rPDU group over v2c, or needs v1. ([specs/apc-rack-pdu.yaml:44](specs/apc-rack-pdu.yaml#L44))
 
 ## apc-ups — APC UPS (SNMP)
 
 - [ ] Walk a Smart-UPS with a Network Management Card 2 or 3 and check which groups it fills, and that every table is keyed by single integer indexes as the MIB declares. ([specs/apc-ups.yaml:36](specs/apc-ups.yaml#L36))
-- [ ] Check that upsAdvControlUpsOff and the other control objects read back their idle value (no_turn_ups_off) after a SET, and when a graceful turn-off shows in upsBasicOutputStatus. ([specs/apc-ups.yaml:1629](specs/apc-ups.yaml#L1629))
-- [ ] Check the units taken from the MIB's descriptions (tenths of volts in the high-precision objects, TimeTicks runtimes) against the UPS's display. ([specs/apc-ups.yaml:1624](specs/apc-ups.yaml#L1624))
-- [ ] Receive a v1 trap (on battery, then back on line) and check it is named and that the poll after it shows the change. ([specs/apc-ups.yaml:1636](specs/apc-ups.yaml#L1636))
+- [ ] Check that upsAdvControlUpsOff and the other control objects read back their idle value (no_turn_ups_off) after a SET, and when a graceful turn-off shows in upsBasicOutputStatus. ([specs/apc-ups.yaml:1630](specs/apc-ups.yaml#L1630))
+- [ ] Check the units taken from the MIB's descriptions (tenths of volts in the high-precision objects, TimeTicks runtimes) against the UPS's display. ([specs/apc-ups.yaml:1625](specs/apc-ups.yaml#L1625))
+- [ ] Receive a v1 trap (on battery, then back on line) and check it is named and that the poll after it shows the change. ([specs/apc-ups.yaml:1637](specs/apc-ups.yaml#L1637))
 
 ## arkaos-mediamaster — ArKaos MediaMaster
 
@@ -290,11 +290,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## artnet — Art-Net 4 network
 
-- [ ] Check that nodes ignore ArtAddress fields sent as 0x7F (no change) and act on those with bit 7 set, and that 0 resets a field to the physical switch. ([specs/artnet.yaml:433](specs/artnet.yaml#L433))
-- [ ] Check which universes a node expects ArtDmx for when a port's SwIn and SwOut differ, and that nodes answer an ArtPoll unicast to them without targeted mode. ([specs/artnet.yaml:433](specs/artnet.yaml#L433))
-- [ ] Check that ArtCommand receivers read the ESTA code high byte first (SwoutText, SwinText with 0xFFFF are unaffected). ([specs/artnet.yaml:433](specs/artnet.yaml#L433))
-- [ ] Check that consoles and DMX-Workshop list the core's own ArtPollReply (OEM 0x00FF, IP 0.0.0.0 without a bind address) without complaint. ([specs/artnet.yaml:410](specs/artnet.yaml#L410))
-- [ ] On a node, check that set_node_input_enabled, node_command and the set_node_* commands are each answered with an ArtPollReply within 3 s. ([specs/artnet.yaml:394](specs/artnet.yaml#L394))
+- [ ] Check that nodes ignore ArtAddress fields sent as 0x7F (no change) and act on those with bit 7 set, and that 0 resets a field to the physical switch. ([specs/artnet.yaml:434](specs/artnet.yaml#L434))
+- [ ] Check which universes a node expects ArtDmx for when a port's SwIn and SwOut differ, and that nodes answer an ArtPoll unicast to them without targeted mode. ([specs/artnet.yaml:434](specs/artnet.yaml#L434))
+- [ ] Check that ArtCommand receivers read the ESTA code high byte first (SwoutText, SwinText with 0xFFFF are unaffected). ([specs/artnet.yaml:434](specs/artnet.yaml#L434))
+- [ ] Check that consoles and DMX-Workshop list the core's own ArtPollReply (OEM 0x00FF, IP 0.0.0.0 without a bind address) without complaint. ([specs/artnet.yaml:411](specs/artnet.yaml#L411))
+- [ ] On a node, check that set_node_input_enabled, node_command and the set_node_* commands are each answered with an ArtPollReply within 3 s. ([specs/artnet.yaml:395](specs/artnet.yaml#L395))
 
 ## atlona-matrix — Atlona matrix switchers and switchers
 
@@ -1351,9 +1351,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## cyberpower-ups — CyberPower UPS (SNMP)
 
 - [ ] Walk a UPS through an RMCARD205 and an RMCARD305 and check which groups each fills, and that every table is keyed by single integer indexes. ([specs/cyberpower-ups.yaml:33](specs/cyberpower-ups.yaml#L33))
-- [ ] Check that the UPS control objects read back their idle value after a SET, and when a turn-off or sleep shows in the output status. ([specs/cyberpower-ups.yaml:697](specs/cyberpower-ups.yaml#L697))
-- [ ] Check the units taken from the MIB's descriptions against the UPS's display. ([specs/cyberpower-ups.yaml:692](specs/cyberpower-ups.yaml#L692))
-- [ ] Receive a v1 trap (on battery, then back on line) and check it is named and that the poll after it shows the change. ([specs/cyberpower-ups.yaml:703](specs/cyberpower-ups.yaml#L703))
+- [ ] Check that the UPS control objects read back their idle value after a SET, and when a turn-off or sleep shows in the output status. ([specs/cyberpower-ups.yaml:698](specs/cyberpower-ups.yaml#L698))
+- [ ] Check the units taken from the MIB's descriptions against the UPS's display. ([specs/cyberpower-ups.yaml:693](specs/cyberpower-ups.yaml#L693))
+- [ ] Receive a v1 trap (on battery, then back on line) and check it is named and that the poll after it shows the change. ([specs/cyberpower-ups.yaml:704](specs/cyberpower-ups.yaml#L704))
 
 ## dahua-ptz — Dahua and Amcrest PTZ cameras (HTTP CGI, public subset)
 
@@ -1420,18 +1420,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## dbaudio — d&b audiotechnik amplifiers
 
-- [ ] On each model (especially the D25, 25D, D90 and 5DM, which d&b's Q-SYS plug-in added last), confirm the named objects answer at the numbers built from the plug-in's tables, and record the class GetClassIdentification reports for each. ([specs/dbaudio.yaml:638](specs/dbaudio.yaml#L638))
-- [ ] Confirm the OCP.1 port on each family (30013 on the D80, D20, 30D and 10D, 50014 on the others) and on older firmware, and whether any amplifier also speaks OCP.1 over UDP or a WebSocket. ([specs/dbaudio.yaml:647](specs/dbaudio.yaml#L647))
-- [ ] Read device.model_guid on each model and check the manufacturer code and model byte against the list in the quirk. ([specs/dbaudio.yaml:655](specs/dbaudio.yaml#L655))
-- [ ] Check that subscriptions to the named objects are accepted and changes made in R1 or on the front panel arrive by notification, and whether a walk of the root block finds the same objects, and under which roles. ([specs/dbaudio.yaml:662](specs/dbaudio.yaml#L662))
-- [ ] Load an AmpPreset with load_amp_preset and backup_and_load_amp_preset and confirm the backup lands in 13 to 15; check what AmpPreset/Selected, AmpPreset/Modified and AmpPreset <n>/Stored report, and that the preset names can be written. ([specs/dbaudio.yaml:670](specs/dbaudio.yaml#L670))
-- [ ] Confirm identify (method 5.2 with 0x0200, then 0) makes the amplifier wink and stop, and that the Wink object's Active (4.1) follows it. ([specs/dbaudio.yaml:678](specs/dbaudio.yaml#L678))
-- [ ] In each 2-way active and mix top/sub output mode, check which channel's objects the pair answers to and what writing the second channel's does. ([specs/dbaudio.yaml:684](specs/dbaudio.yaml#L684))
-- [ ] Check the delay's reported minimum and maximum, and what Filter1, Filter2 and Filter3 do and accept with a few loudspeaker setups. ([specs/dbaudio.yaml:690](specs/dbaudio.yaml#L690))
-- [ ] On a D80 and D20, confirm the input mode positions 1 to 5 and which routing switches answer in each. ([specs/dbaudio.yaml:696](specs/dbaudio.yaml#L696))
-- [ ] Confirm switching load or input monitoring off and on again clears its errors, and what DeviceErrorText and ErrorText hold. ([specs/dbaudio.yaml:703](specs/dbaudio.yaml#L703))
-- [ ] Check the Headroom meter's unit and range, and how often the ISP, GR and OVL sensors notify under programme. ([specs/dbaudio.yaml:710](specs/dbaudio.yaml#L710))
-- [ ] On a DS10 and DS100, find the OCP.1 port and walk the tree: record its roles and classes so they can be named here. ([specs/dbaudio.yaml:716](specs/dbaudio.yaml#L716))
+- [ ] On each model (especially the D25, 25D, D90 and 5DM, which d&b's Q-SYS plug-in added last), confirm the named objects answer at the numbers built from the plug-in's tables, and record the class GetClassIdentification reports for each. ([specs/dbaudio.yaml:639](specs/dbaudio.yaml#L639))
+- [ ] Confirm the OCP.1 port on each family (30013 on the D80, D20, 30D and 10D, 50014 on the others) and on older firmware, and whether any amplifier also speaks OCP.1 over UDP or a WebSocket. ([specs/dbaudio.yaml:648](specs/dbaudio.yaml#L648))
+- [ ] Read device.model_guid on each model and check the manufacturer code and model byte against the list in the quirk. ([specs/dbaudio.yaml:656](specs/dbaudio.yaml#L656))
+- [ ] Check that subscriptions to the named objects are accepted and changes made in R1 or on the front panel arrive by notification, and whether a walk of the root block finds the same objects, and under which roles. ([specs/dbaudio.yaml:663](specs/dbaudio.yaml#L663))
+- [ ] Load an AmpPreset with load_amp_preset and backup_and_load_amp_preset and confirm the backup lands in 13 to 15; check what AmpPreset/Selected, AmpPreset/Modified and AmpPreset <n>/Stored report, and that the preset names can be written. ([specs/dbaudio.yaml:671](specs/dbaudio.yaml#L671))
+- [ ] Confirm identify (method 5.2 with 0x0200, then 0) makes the amplifier wink and stop, and that the Wink object's Active (4.1) follows it. ([specs/dbaudio.yaml:679](specs/dbaudio.yaml#L679))
+- [ ] In each 2-way active and mix top/sub output mode, check which channel's objects the pair answers to and what writing the second channel's does. ([specs/dbaudio.yaml:685](specs/dbaudio.yaml#L685))
+- [ ] Check the delay's reported minimum and maximum, and what Filter1, Filter2 and Filter3 do and accept with a few loudspeaker setups. ([specs/dbaudio.yaml:691](specs/dbaudio.yaml#L691))
+- [ ] On a D80 and D20, confirm the input mode positions 1 to 5 and which routing switches answer in each. ([specs/dbaudio.yaml:697](specs/dbaudio.yaml#L697))
+- [ ] Confirm switching load or input monitoring off and on again clears its errors, and what DeviceErrorText and ErrorText hold. ([specs/dbaudio.yaml:704](specs/dbaudio.yaml#L704))
+- [ ] Check the Headroom meter's unit and range, and how often the ISP, GR and OVL sensors notify under programme. ([specs/dbaudio.yaml:711](specs/dbaudio.yaml#L711))
+- [ ] On a DS10 and DS100, find the OCP.1 port and walk the tree: record its roles and classes so they can be named here. ([specs/dbaudio.yaml:717](specs/dbaudio.yaml#L717))
 - [ ] Confirm set_device_time (SetDeviceTimeNTP, 3.2, on object 9 or 10 by family) sets the amplifier's clock. ([specs/dbaudio.yaml:579](specs/dbaudio.yaml#L579))
 
 ## denon-dn500av — Denon Professional DN-500AV
@@ -1722,8 +1722,8 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## epson-projector — Epson projectors (ESC/VP21)
 
-- [ ] Confirm the projector's answer to the ESC/VP.net connect header (its first ten bytes "ESC/VP.net" are all the module checks), and how a projector set to Protected or with a Monitor Password answers it. ([specs/epson-projector.yaml:4075](specs/epson-projector.yaml#L4075))
-- [ ] Check whether TCP 3629 keeps an idle connection open, and how the projector answers a second connection. ([specs/epson-projector.yaml:4075](specs/epson-projector.yaml#L4075))
+- [ ] Confirm the projector's answer to the ESC/VP.net connect header (its first ten bytes "ESC/VP.net" are all the module checks), and how a projector set to Protected or with a Monitor Password answers it. ([specs/epson-projector.yaml:4076](specs/epson-projector.yaml#L4076))
+- [ ] Check whether TCP 3629 keeps an idle connection open, and how the projector answers a second connection. ([specs/epson-projector.yaml:4076](specs/epson-projector.yaml#L4076))
 - [ ] Confirm the reply's colon comes at the start of a line, after CR, for every query, including QC? (four lines) and SOURCELIST?. ([specs/epson-projector.yaml:2554](specs/epson-projector.yaml#L2554))
 - [ ] Find which serial speeds each model offers (SPEED lists 9600-57600 on the models that have it). ([specs/epson-projector.yaml:56](specs/epson-projector.yaml#L56))
 - [ ] Measure power on and power off answer times on laser models (110 s is allowed). ([specs/epson-projector.yaml:2490](specs/epson-projector.yaml#L2490))
@@ -1928,12 +1928,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## focusrite-rednet — Focusrite RedNet (AES70)
 
-- [ ] Note the OCP.1 port a RedNet unit advertises as _oca._tcp once AES70 is enabled in RedNet Control, and check it accepts OCP.1 on plain TCP. ([specs/focusrite-rednet.yaml:414](specs/focusrite-rednet.yaml#L414))
-- [ ] On an MP8R, check which object numbers and roles the firmware uses: the implementation chart's (0x01nn00pp, GComp-n, IpLvl-n) or the virtual device's (4352 + 256 per channel, TrimEnable-n, Lvl-n). ([specs/focusrite-rednet.yaml:421](specs/focusrite-rednet.yaml#L421))
-- [ ] Check the switch positions: Phase-n 1 inverts, Impedance-n 0 is 10 kOhm, Pad-n 1 is -20 dB, and the unit-wide Identify, FP Lock and Preferred Master switches take 1 for on. ([specs/focusrite-rednet.yaml:430](specs/focusrite-rednet.yaml#L430))
-- [ ] Read the PSU, network and clock leader sensors on a unit and note what each value means. ([specs/focusrite-rednet.yaml:443](specs/focusrite-rednet.yaml#L443))
-- [ ] On a RedNet 4, RedNet 1 or 2, check the roles match the virtual device's lists (Source-n positions mic, line, DI; Link1-2 to Link7-8; Fan). ([specs/focusrite-rednet.yaml:430](specs/focusrite-rednet.yaml#L430))
-- [ ] Walk an A16R MkII, D16R MkII or X2P with AES70 enabled and record its object tree, so their controls can be named. ([specs/focusrite-rednet.yaml:414](specs/focusrite-rednet.yaml#L414))
+- [ ] Note the OCP.1 port a RedNet unit advertises as _oca._tcp once AES70 is enabled in RedNet Control, and check it accepts OCP.1 on plain TCP. ([specs/focusrite-rednet.yaml:415](specs/focusrite-rednet.yaml#L415))
+- [ ] On an MP8R, check which object numbers and roles the firmware uses: the implementation chart's (0x01nn00pp, GComp-n, IpLvl-n) or the virtual device's (4352 + 256 per channel, TrimEnable-n, Lvl-n). ([specs/focusrite-rednet.yaml:422](specs/focusrite-rednet.yaml#L422))
+- [ ] Check the switch positions: Phase-n 1 inverts, Impedance-n 0 is 10 kOhm, Pad-n 1 is -20 dB, and the unit-wide Identify, FP Lock and Preferred Master switches take 1 for on. ([specs/focusrite-rednet.yaml:431](specs/focusrite-rednet.yaml#L431))
+- [ ] Read the PSU, network and clock leader sensors on a unit and note what each value means. ([specs/focusrite-rednet.yaml:444](specs/focusrite-rednet.yaml#L444))
+- [ ] On a RedNet 4, RedNet 1 or 2, check the roles match the virtual device's lists (Source-n positions mic, line, DI; Link1-2 to Link7-8; Fan). ([specs/focusrite-rednet.yaml:431](specs/focusrite-rednet.yaml#L431))
+- [ ] Walk an A16R MkII, D16R MkII or X2P with AES70 enabled and record its object tree, so their controls can be named. ([specs/focusrite-rednet.yaml:415](specs/focusrite-rednet.yaml#L415))
 
 ## focusrite-rednet-rcp — Focusrite RedNet MP8R (Yamaha RCP)
 
@@ -2000,20 +2000,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## generic-ping — Network presence (ping) and Wake-on-LAN
 
 - [ ] Check that network adapters with a SecureOn password take it as 4 or 6 bytes right after the sixteen MAC repetitions (from practice, not AMD's paper). ([specs/generic-ping.yaml:66](specs/generic-ping.yaml#L66))
-- [ ] Check on macOS that an unprivileged ICMP datagram socket keeps the identifier sent and prefixes IPv4 echo replies with their IP header, as the core allows for (only Windows was run here; Linux and macOS builds were compiled, not run). ([specs/generic-ping.yaml:120](specs/generic-ping.yaml#L120))
-- [ ] Check on Linux with net.ipv4.ping_group_range including the core's group that echo replies arrive, and that outside it the socket is refused and auto falls back to TCP. ([specs/generic-ping.yaml:120](specs/generic-ping.yaml#L120))
-- [ ] Check that typical show hosts (consoles, media servers, displays) answer a connection to a closed port with a reset rather than dropping it, which a TCP probe counts as reachable. ([specs/generic-ping.yaml:127](specs/generic-ping.yaml#L127))
+- [ ] Check on macOS that an unprivileged ICMP datagram socket keeps the identifier sent and prefixes IPv4 echo replies with their IP header, as the core allows for (only Windows was run here; Linux and macOS builds were compiled, not run). ([specs/generic-ping.yaml:121](specs/generic-ping.yaml#L121))
+- [ ] Check on Linux with net.ipv4.ping_group_range including the core's group that echo replies arrive, and that outside it the socket is refused and auto falls back to TCP. ([specs/generic-ping.yaml:121](specs/generic-ping.yaml#L121))
+- [ ] Check that typical show hosts (consoles, media servers, displays) answer a connection to a closed port with a reset rather than dropping it, which a TCP probe counts as reachable. ([specs/generic-ping.yaml:128](specs/generic-ping.yaml#L128))
 - [ ] Check Wake-on-LAN through a router forwarding directed broadcasts to a subnet's broadcast address in wol_address. ([specs/generic-ping.yaml:62](specs/generic-ping.yaml#L62))
 
 ## generic-snmp — Generic SNMP agent
 
-- [ ] Check AES-192 and AES-256 against agents that implement draft-blumenthal-aes-usm-04 (Net-SNMP's AES-192/AES-256), with SHA-1 and MD5 users whose keys are extended, and confirm which agents use the draft-reeder extension instead. ([specs/generic-snmp.yaml:255](specs/generic-snmp.yaml#L255))
+- [ ] Check AES-192 and AES-256 against agents that implement draft-blumenthal-aes-usm-04 (Net-SNMP's AES-192/AES-256), with SHA-1 and MD5 users whose keys are extended, and confirm which agents use the draft-reeder extension instead. ([specs/generic-snmp.yaml:256](specs/generic-snmp.yaml#L256))
 - [ ] Check CBC-DES privacy against a real agent (only the core's own round trip and the RFC 3414 §8 salt layout are tested). ([specs/generic-snmp.yaml:91](specs/generic-snmp.yaml#L91))
 - [ ] Check v3 informs from a real sender: that it discovers local_engine_id from the unknownEngineIDs report, then authenticates against this receiver's clock (boots 1, time from opening). ([specs/generic-snmp.yaml:115](specs/generic-snmp.yaml#L115))
-- [ ] Check v3 traps from a real agent are accepted with keys localized to its engine, without the timeliness check. ([specs/generic-snmp.yaml:248](specs/generic-snmp.yaml#L248))
-- [ ] Check a v1 agent's trap through the shared notification port, and the snmpTrapOID derived from it (RFC 3584 §3.1) against what Net-SNMP's snmptrapd shows. ([specs/generic-snmp.yaml:220](specs/generic-snmp.yaml#L220))
+- [ ] Check v3 traps from a real agent are accepted with keys localized to its engine, without the timeliness check. ([specs/generic-snmp.yaml:249](specs/generic-snmp.yaml#L249))
+- [ ] Check a v1 agent's trap through the shared notification port, and the snmpTrapOID derived from it (RFC 3584 §3.1) against what Net-SNMP's snmptrapd shows. ([specs/generic-snmp.yaml:221](specs/generic-snmp.yaml#L221))
 - [ ] Check how agents of PDUs, UPSs and switches answer a polling GET over v1 when one object is missing (noSuchName and the error index), and a GET too big for them (tooBig), which the core splits. ([specs/generic-snmp.yaml:105](specs/generic-snmp.yaml#L105))
-- [ ] Check agents that encode unsigned values (Counter32, Gauge32, TimeTicks) without the leading zero byte their top bit needs; the core reads them as unsigned. ([specs/generic-snmp.yaml:241](specs/generic-snmp.yaml#L241))
+- [ ] Check agents that encode unsigned values (Counter32, Gauge32, TimeTicks) without the leading zero byte their top bit needs; the core reads them as unsigned. ([specs/generic-snmp.yaml:242](specs/generic-snmp.yaml#L242))
 
 ## grandma2 — MA Lighting grandMA2
 
@@ -3156,7 +3156,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm commands sent with ID1 and ID2 as 00h are answered when a control ID is set on the projector, and whether TCP 7142 keeps an idle connection open or closes it. ([specs/nec-projector.yaml:840](specs/nec-projector.yaml#L840))
 - [ ] Measure how long POWER ON and POWER OFF take to answer (15 s is allowed). ([specs/nec-projector.yaml:840](specs/nec-projector.yaml#L840))
 - [ ] Confirm each model's input terminal codes, which differ by family (HDMI is 1Ah on the older models and A1h on the newer). ([specs/nec-projector.yaml:845](specs/nec-projector.yaml#L845))
-- [ ] Find what the two names the aspect table gives one code mean (02h WIDE SCREEN and 16:9, CINEMA and 16:9; 06h ZOOM and FULL), and which of 06h and 0Ch, 05h and 0Fh an NP-PX651X takes for 16:10 and AUTO. ([specs/nec-projector.yaml:1197](specs/nec-projector.yaml#L1197))
+- [ ] Find what the two names the aspect table gives one code mean (02h WIDE SCREEN and 16:9, CINEMA and 16:9; 06h ZOOM and FULL), and which of 06h and 0Ch, 05h and 0Fh an NP-PX651X takes for 16:10 and AUTO. ([specs/nec-projector.yaml:1198](specs/nec-projector.yaml#L1198))
 - [ ] Check that 037-6 sends kilograms little-endian: the manual's example for 2460.06375 kg prints 9Ch 90h where 2460 is 9Ch 09h. ([specs/nec-projector.yaml:919](specs/nec-projector.yaml#L919))
 - [ ] Check that 053-1 and 060-1 values are signed 16-bit (negative lens shift positions, picture minimums). ([specs/nec-projector.yaml:948](specs/nec-projector.yaml#L948))
 - [ ] Check how a one-lamp or laser model answers 037-4 for lamp 2 and for the remaining life on 2024 models. ([specs/nec-projector.yaml:913](specs/nec-projector.yaml#L913))
@@ -3284,33 +3284,33 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## novastar-h — NovaStar H series
 
-- [ ] Confirm that unencrypted requests signed with Base64(md5(timeStamp + pId)) are accepted with encryption off for the requestor, and how far the time may drift before error 11. ([specs/novastar-h.yaml:862](specs/novastar-h.yaml#L862))
+- [ ] Confirm that unencrypted requests signed with Base64(md5(timeStamp + pId)) are accepted with encryption off for the requestor, and how far the time may drift before error 11. ([specs/novastar-h.yaml:863](specs/novastar-h.yaml#L863))
 - [ ] Confirm the OpenAPI listens on port 8000 (the documentation's example address) on every model. ([specs/novastar-h.yaml:47](specs/novastar-h.yaml#L47))
-- [ ] Check which deviceId to send (0 in most examples, 1 on the brightness pages). ([specs/novastar-h.yaml:887](specs/novastar-h.yaml#L887))
-- [ ] Record whether the splicer pushes notifications (the change history mentions a websocket for layer z-order) and on which address. ([specs/novastar-h.yaml:905](specs/novastar-h.yaml#L905))
-- [ ] Check set_screen_bkg's enable sense (documented 0 on, 1 off), and what screen/readDetail's Bkg.enable reports after each. ([specs/novastar-h.yaml:770](specs/novastar-h.yaml#L770))
+- [ ] Check which deviceId to send (0 in most examples, 1 on the brightness pages). ([specs/novastar-h.yaml:888](specs/novastar-h.yaml#L888))
+- [ ] Record whether the splicer pushes notifications (the change history mentions a websocket for layer z-order) and on which address. ([specs/novastar-h.yaml:906](specs/novastar-h.yaml#L906))
+- [ ] Check set_screen_bkg's enable sense (documented 0 on, 1 off), and what screen/readDetail's Bkg.enable reports after each. ([specs/novastar-h.yaml:771](specs/novastar-h.yaml#L771))
 - [ ] Check update_input_crop with the documented field spelling heigth. ([specs/novastar-h.yaml:283](specs/novastar-h.yaml#L283))
-- [ ] Capture a screen/readDetail reply (the page gives only its schema) and confirm brightness, gamma, Ftb, Freeze, Bkg, outputMode.size and mosaic, screen3D, Osd and OsdImage are where the module reads them. ([specs/novastar-h.yaml:897](specs/novastar-h.yaml#L897))
-- [ ] Confirm Ftb.enable is 1 while a screen is faded to black and 0 once screen_ftb brings it back. ([specs/novastar-h.yaml:768](specs/novastar-h.yaml#L768))
-- [ ] Check screen/readDetail's gamma after set_screen_gamma with a decimal (the schema types it as an integer). ([specs/novastar-h.yaml:767](specs/novastar-h.yaml#L767))
-- [ ] Check the scale of an input's timing.refreshRate (60 in the example, documented as frame rate x100). ([specs/novastar-h.yaml:815](specs/novastar-h.yaml#L815))
-- [ ] Check the sourceType a layer reports for an input (1 in the examples and on the write page, 2 on the list page). ([specs/novastar-h.yaml:790](specs/novastar-h.yaml#L790))
-- [ ] Check that an input's slotId, interfaceType and sourceType from input/readList, sent as they are in set_layer_source's body with its inputId, put that input on the layer. ([specs/novastar-h.yaml:816](specs/novastar-h.yaml#L816))
-- [ ] Capture an input's crops array with a cropped source (the example's is empty) and confirm each element has cropId, name, x, y, width and height. ([specs/novastar-h.yaml:829](specs/novastar-h.yaml#L829))
-- [ ] Confirm bkg/readAllList and input/readSourceList answer in data (not body), as their examples show. ([specs/novastar-h.yaml:897](specs/novastar-h.yaml#L897))
-- [ ] Check that polling six requests per screen at 5 s does not load the splicer, and whether a slower default is wiser. ([specs/novastar-h.yaml:899](specs/novastar-h.yaml#L899))
+- [ ] Capture a screen/readDetail reply (the page gives only its schema) and confirm brightness, gamma, Ftb, Freeze, Bkg, outputMode.size and mosaic, screen3D, Osd and OsdImage are where the module reads them. ([specs/novastar-h.yaml:898](specs/novastar-h.yaml#L898))
+- [ ] Confirm Ftb.enable is 1 while a screen is faded to black and 0 once screen_ftb brings it back. ([specs/novastar-h.yaml:769](specs/novastar-h.yaml#L769))
+- [ ] Check screen/readDetail's gamma after set_screen_gamma with a decimal (the schema types it as an integer). ([specs/novastar-h.yaml:768](specs/novastar-h.yaml#L768))
+- [ ] Check the scale of an input's timing.refreshRate (60 in the example, documented as frame rate x100). ([specs/novastar-h.yaml:816](specs/novastar-h.yaml#L816))
+- [ ] Check the sourceType a layer reports for an input (1 in the examples and on the write page, 2 on the list page). ([specs/novastar-h.yaml:791](specs/novastar-h.yaml#L791))
+- [ ] Check that an input's slotId, interfaceType and sourceType from input/readList, sent as they are in set_layer_source's body with its inputId, put that input on the layer. ([specs/novastar-h.yaml:817](specs/novastar-h.yaml#L817))
+- [ ] Capture an input's crops array with a cropped source (the example's is empty) and confirm each element has cropId, name, x, y, width and height. ([specs/novastar-h.yaml:830](specs/novastar-h.yaml#L830))
+- [ ] Confirm bkg/readAllList and input/readSourceList answer in data (not body), as their examples show. ([specs/novastar-h.yaml:898](specs/novastar-h.yaml#L898))
+- [ ] Check that polling six requests per screen at 5 s does not load the splicer, and whether a slower default is wiser. ([specs/novastar-h.yaml:900](specs/novastar-h.yaml#L900))
 
 ## obs-studio — OBS Studio (obs-websocket 5)
 
-- [ ] Record the fields of the scene item, filter, input, transition and output objects in GetSceneItemList, GetSourceFilterList, GetInputList, GetSceneTransitionList and GetOutputList replies (sceneItemId, sceneItemBlendMode, filterSettings, unversionedInputKind, transitionFixed, outputWidth and the rest): the protocol description names the arrays but not their members. ([specs/obs-studio.yaml:1106](specs/obs-studio.yaml#L1106))
-- [ ] Check that InputVolumeMeters arrives every 50 ms listing only active inputs, including when none is active, since an input it stops listing loses its levels. ([specs/obs-studio.yaml:1181](specs/obs-studio.yaml#L1181))
-- [ ] Check which input kinds answer GetMediaInputStatus (the media source, VLC source and image slide show are assumed) and what other inputs reply. ([specs/obs-studio.yaml:1184](specs/obs-studio.yaml#L1184))
-- [ ] Check that RecordStateChanged carries outputPath only on stop, and that RecordFileChanged fires on each split. ([specs/obs-studio.yaml:1143](specs/obs-studio.yaml#L1143))
-- [ ] Check GetReplayBufferStatus's refusal when the profile has no replay buffer, and that the replay buffer state is read again after a profile change. ([specs/obs-studio.yaml:1145](specs/obs-studio.yaml#L1145))
-- [ ] Check that the stream service settings name the server "server" for both rtmp_common and rtmp_custom. ([specs/obs-studio.yaml:1160](specs/obs-studio.yaml#L1160))
-- [ ] Check the units of GetStats' memoryUsage and availableDiskSpace (MB assumed). ([specs/obs-studio.yaml:1162](specs/obs-studio.yaml#L1162))
-- [ ] Check that no event follows set_scene_item_blend_mode, set_input_deinterlace_mode, set_scene_scene_transition_override or set_video_settings, which are read back after the command instead. ([specs/obs-studio.yaml:1217](specs/obs-studio.yaml#L1217))
-- [ ] Check that GetCurrentSceneTransitionCursor follows the studio-mode T-bar while it is dragged in OBS or held part-way by set_t_bar_position with release off, that dragging the T-bar sends SceneTransitionStarted, and that the cursor reads 1.0 once an interrupted transition stops. ([specs/obs-studio.yaml:1128](specs/obs-studio.yaml#L1128))
+- [ ] Record the fields of the scene item, filter, input, transition and output objects in GetSceneItemList, GetSourceFilterList, GetInputList, GetSceneTransitionList and GetOutputList replies (sceneItemId, sceneItemBlendMode, filterSettings, unversionedInputKind, transitionFixed, outputWidth and the rest): the protocol description names the arrays but not their members. ([specs/obs-studio.yaml:1107](specs/obs-studio.yaml#L1107))
+- [ ] Check that InputVolumeMeters arrives every 50 ms listing only active inputs, including when none is active, since an input it stops listing loses its levels. ([specs/obs-studio.yaml:1182](specs/obs-studio.yaml#L1182))
+- [ ] Check which input kinds answer GetMediaInputStatus (the media source, VLC source and image slide show are assumed) and what other inputs reply. ([specs/obs-studio.yaml:1185](specs/obs-studio.yaml#L1185))
+- [ ] Check that RecordStateChanged carries outputPath only on stop, and that RecordFileChanged fires on each split. ([specs/obs-studio.yaml:1144](specs/obs-studio.yaml#L1144))
+- [ ] Check GetReplayBufferStatus's refusal when the profile has no replay buffer, and that the replay buffer state is read again after a profile change. ([specs/obs-studio.yaml:1146](specs/obs-studio.yaml#L1146))
+- [ ] Check that the stream service settings name the server "server" for both rtmp_common and rtmp_custom. ([specs/obs-studio.yaml:1161](specs/obs-studio.yaml#L1161))
+- [ ] Check the units of GetStats' memoryUsage and availableDiskSpace (MB assumed). ([specs/obs-studio.yaml:1163](specs/obs-studio.yaml#L1163))
+- [ ] Check that no event follows set_scene_item_blend_mode, set_input_deinterlace_mode, set_scene_scene_transition_override or set_video_settings, which are read back after the command instead. ([specs/obs-studio.yaml:1218](specs/obs-studio.yaml#L1218))
+- [ ] Check that GetCurrentSceneTransitionCursor follows the studio-mode T-bar while it is dragged in OBS or held part-way by set_t_bar_position with release off, that dragging the T-bar sends SceneTransitionStarted, and that the cursor reads 1.0 once an interrupted transition stops. ([specs/obs-studio.yaml:1129](specs/obs-studio.yaml#L1129))
 
 ## obsbot-tail — OBSBOT Tail 2 and Tail Air (OSC)
 
@@ -3477,9 +3477,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the projector closes the connection after every answer on all series, and how quickly it accepts the next connection. ([specs/panasonic-projector.yaml:9094](specs/panasonic-projector.yaml#L9094))
 - [ ] Confirm a set command's network reply echoes the command after "00" (as "00PON"), and the serial reply is the bare data without "00". ([specs/panasonic-projector.yaml:9094](specs/panasonic-projector.yaml#L9094))
 - [ ] Check which serial speeds the older series offer (the PT-RZ120's menu gives 9600, 19200 and 38400). ([specs/panasonic-projector.yaml:57](specs/panasonic-projector.yaml#L57))
-- [ ] Check that commands addressed to ZZ are answered with RESPONSE (ID ALL) off on a single projector. ([specs/panasonic-projector.yaml:16368](specs/panasonic-projector.yaml#L16368))
-- [ ] Check whether commands over the network also need the 60 s after the light source lights that the RS-232C section asks for (the core waits only on the serial port), and whether a power read during lighting answers 001 (the core starts the 60 s when it first reads on after standby). ([specs/panasonic-projector.yaml:16369](specs/panasonic-projector.yaml#L16369))
-- [ ] Check the older section-per-command lists against a projector where their titles and bytes disagree (GMFI2 printed GMFI1, QJB as QJK, QFI as QEI, and value conflicts such as SHIFT -327 and -127). ([specs/panasonic-projector.yaml:16353](specs/panasonic-projector.yaml#L16353))
+- [ ] Check that commands addressed to ZZ are answered with RESPONSE (ID ALL) off on a single projector. ([specs/panasonic-projector.yaml:16369](specs/panasonic-projector.yaml#L16369))
+- [ ] Check whether commands over the network also need the 60 s after the light source lights that the RS-232C section asks for (the core waits only on the serial port), and whether a power read during lighting answers 001 (the core starts the 60 s when it first reads on after standby). ([specs/panasonic-projector.yaml:16370](specs/panasonic-projector.yaml#L16370))
+- [ ] Check the older section-per-command lists against a projector where their titles and bytes disagree (GMFI2 printed GMFI1, QJB as QJK, QFI as QEI, and value conflicts such as SHIFT -327 and -127). ([specs/panasonic-projector.yaml:16354](specs/panasonic-projector.yaml#L16354))
 - [ ] Confirm QPW codes other than 000 and 001 that some series may return (warm-up, cooling). ([specs/panasonic-projector.yaml:9094](specs/panasonic-projector.yaml#L9094))
 
 ## phabrix-qx — PHABRIX Qx (REST API)
@@ -4045,16 +4045,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## sennheiser-spectera — Sennheiser Spectera
 
-- [ ] Confirm the API accepts controlSennheiser with the device password on firmware 1.4.x, and whether the user api works on any firmware yet. ([specs/sennheiser-spectera.yaml:539](specs/sennheiser-spectera.yaml#L539))
-- [ ] Note how long the Base Station blocks an address after bad credentials, so the terminal refusal can be weighed against it. ([specs/sennheiser-spectera.yaml:539](specs/sennheiser-spectera.yaml#L539))
-- [ ] Confirm the first notification of each collection after it is added is the whole list, and that later ones are the changed item alone on the collection's path (fixed lists) or on the item's path (links, mobile devices). ([specs/sennheiser-spectera.yaml:591](specs/sennheiser-spectera.yaml#L591))
-- [ ] Confirm a created audio link is notified as {} and then in full, and a deleted one as null. ([specs/sennheiser-spectera.yaml:591](specs/sennheiser-spectera.yaml#L591))
-- [ ] Check the Base Station sends nothing on an idle stream, and that a version check after 3 s of quiet never counts against its connection limit or trips a 503. ([specs/sennheiser-spectera.yaml:612](specs/sennheiser-spectera.yaml#L612))
-- [ ] Confirm a PUT to a mobile device without its type is refused, and that one naming the type with only the changed field is applied. ([specs/sennheiser-spectera.yaml:605](specs/sennheiser-spectera.yaml#L605))
-- [ ] Check how long an open WebUI waits before deleting an audio link no mobile device uses (documented as about 5 s). ([specs/sennheiser-spectera.yaml:578](specs/sennheiser-spectera.yaml#L578))
-- [ ] Check polling /api/audio/metering at the chosen interval while subscribed elsewhere does not disturb the stream. ([specs/sennheiser-spectera.yaml:599](specs/sennheiser-spectera.yaml#L599))
-- [ ] On firmware 1.3.x (API 17.0), check which subscriptions are refused (the aoip status, metering) and whether the rest still subscribe in their batch. ([specs/sennheiser-spectera.yaml:619](specs/sennheiser-spectera.yaml#L619))
-- [ ] Confirm bandwidthMode 10000 is accepted but never transmits, as the release notes say, which is why set_rf_bandwidth offers 6000 and 8000 only. ([specs/sennheiser-spectera.yaml:559](specs/sennheiser-spectera.yaml#L559))
+- [ ] Confirm the API accepts controlSennheiser with the device password on firmware 1.4.x, and whether the user api works on any firmware yet. ([specs/sennheiser-spectera.yaml:540](specs/sennheiser-spectera.yaml#L540))
+- [ ] Note how long the Base Station blocks an address after bad credentials, so the terminal refusal can be weighed against it. ([specs/sennheiser-spectera.yaml:540](specs/sennheiser-spectera.yaml#L540))
+- [ ] Confirm the first notification of each collection after it is added is the whole list, and that later ones are the changed item alone on the collection's path (fixed lists) or on the item's path (links, mobile devices). ([specs/sennheiser-spectera.yaml:592](specs/sennheiser-spectera.yaml#L592))
+- [ ] Confirm a created audio link is notified as {} and then in full, and a deleted one as null. ([specs/sennheiser-spectera.yaml:592](specs/sennheiser-spectera.yaml#L592))
+- [ ] Check the Base Station sends nothing on an idle stream, and that a version check after 3 s of quiet never counts against its connection limit or trips a 503. ([specs/sennheiser-spectera.yaml:613](specs/sennheiser-spectera.yaml#L613))
+- [ ] Confirm a PUT to a mobile device without its type is refused, and that one naming the type with only the changed field is applied. ([specs/sennheiser-spectera.yaml:606](specs/sennheiser-spectera.yaml#L606))
+- [ ] Check how long an open WebUI waits before deleting an audio link no mobile device uses (documented as about 5 s). ([specs/sennheiser-spectera.yaml:579](specs/sennheiser-spectera.yaml#L579))
+- [ ] Check polling /api/audio/metering at the chosen interval while subscribed elsewhere does not disturb the stream. ([specs/sennheiser-spectera.yaml:600](specs/sennheiser-spectera.yaml#L600))
+- [ ] On firmware 1.3.x (API 17.0), check which subscriptions are refused (the aoip status, metering) and whether the rest still subscribe in their batch. ([specs/sennheiser-spectera.yaml:620](specs/sennheiser-spectera.yaml#L620))
+- [ ] Confirm bandwidthMode 10000 is accepted but never transmits, as the release notes say, which is why set_rf_bandwidth offers 6000 and 8000 only. ([specs/sennheiser-spectera.yaml:560](specs/sennheiser-spectera.yaml#L560))
 
 ## sennheiser-tc-bar — Sennheiser TeamConnect Bar S / Bar M
 
@@ -4339,16 +4339,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## sony-camera — Sony cameras
 
-- [ ] Check which settings the 500 ms after an exposure mode change really covers (the reference says shooting parameters; the core holds every property change and step control, counted from the camera's answer). ([specs/sony-camera.yaml:2968](specs/sony-camera.yaml#L2968))
-- [ ] Check user base look numbering on each body: whether properties.D0C7 lists the plain number 1-16 or the user-LUT form (0x0100 plus the number), and that select, delete and PPLUT commands hit the intended look. ([specs/sony-camera.yaml:3187](specs/sony-camera.yaml#L3187))
-- [ ] Check zoom and focus preset slot numbering: that slot 0 is the first preset, matching save_zoom_focus_position, before relying on set_preset_zoom_only. ([specs/sony-camera.yaml:2609](specs/sony-camera.yaml#L2609))
+- [ ] Check which settings the 500 ms after an exposure mode change really covers (the reference says shooting parameters; the core holds every property change and step control, counted from the camera's answer). ([specs/sony-camera.yaml:2969](specs/sony-camera.yaml#L2969))
+- [ ] Check user base look numbering on each body: whether properties.D0C7 lists the plain number 1-16 or the user-LUT form (0x0100 plus the number), and that select, delete and PPLUT commands hit the intended look. ([specs/sony-camera.yaml:3188](specs/sony-camera.yaml#L3188))
+- [ ] Check zoom and focus preset slot numbering: that slot 0 is the first preset, matching save_zoom_focus_position, before relying on set_preset_zoom_only. ([specs/sony-camera.yaml:2610](specs/sony-camera.yaml#L2610))
 - [ ] Check the display-list mapping: that base look, AE level offset, scene file, creative look and stream destination names come from the list types the module uses and match what the camera shows. ([crates/core/src/modules/sony_camera_info.rs:94](crates/core/src/modules/sony_camera_info.rs#L94))
 - [ ] Check long shutter speeds in the 32/32 numerator-over-denominator properties (Shutter Speed Setting and Current Value): the reference fixes the denominator at 10 for long exposures only in the 16/16 property, so check that a value such as 2.5" sent as tenths of a second matches the camera's listed values. ([crates/core/src/modules/sony_camera_props.rs:31](crates/core/src/modules/sony_camera_props.rs#L31))
 - [ ] On a Camera Control PTP 2 body (ILCE-7M3), check which way a positive exposure_step moves for iris, shutter speed, ISO and exposure and flash compensation. ([specs/sony-camera.yaml:2084](specs/sony-camera.yaml#L2084))
-- [ ] On ILCE-7CM2, ILCE-7CR and ILX-LR1 firmware 1.00, check that focus.indication follows the AF status events. ([specs/sony-camera.yaml:3040](specs/sony-camera.yaml#L3040))
+- [ ] On ILCE-7CM2, ILCE-7CR and ILX-LR1 firmware 1.00, check that focus.indication follows the AF status events. ([specs/sony-camera.yaml:3041](specs/sony-camera.yaml#L3041))
 - [ ] Opened for commands only, confirm the camera tolerates GetDeviceInfo once a second as the liveness check. ([crates/core/src/modules/sony_camera.rs:48](crates/core/src/modules/sony_camera.rs#L48))
-- [ ] Record the unit of Recording Duration (0xD120) while a movie records (seconds, frames or another count), so recording.duration can state it; the reference gives none. ([specs/sony-camera.yaml:2717](specs/sony-camera.yaml#L2717))
-- [ ] Check what the range of Custom WB Capture Frame Size (0xD26C) holds (the frame's width and height as the maximum, or something else), since the property has no current value and the reference describes only the packing. ([specs/sony-camera.yaml:2685](specs/sony-camera.yaml#L2685))
+- [ ] Record the unit of Recording Duration (0xD120) while a movie records (seconds, frames or another count), so recording.duration can state it; the reference gives none. ([specs/sony-camera.yaml:2718](specs/sony-camera.yaml#L2718))
+- [ ] Check what the range of Custom WB Capture Frame Size (0xD26C) holds (the frame's width and height as the maximum, or something else), since the property has no current value and the reference describes only the packing. ([specs/sony-camera.yaml:2686](specs/sony-camera.yaml#L2686))
 
 ## sounddevices-pixnet — Sound Devices / Video Devices PIX and 970 (PIXNET)
 
@@ -4668,9 +4668,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## ups-mib — UPS over SNMP (UPS-MIB, RFC 1628)
 
 - [ ] Walk an Eaton Network-M2 or Network-M3 card and a CyberPower RMCARD and check which UPS-MIB groups each fills. ([specs/ups-mib.yaml:39](specs/ups-mib.yaml#L39))
-- [ ] Start a quick battery test with set_test_id and check the card accepts upsTestSpinLock written back with upsTestId, and refuses it when the lock changed. ([specs/ups-mib.yaml:287](specs/ups-mib.yaml#L287))
-- [ ] Check that a UPS cancels a counting-down shutdown when -1 is written to upsShutdownAfterDelay. ([specs/ups-mib.yaml:283](specs/ups-mib.yaml#L283))
-- [ ] Receive upsTrapOnBattery and upsTrapAlarmEntryAdded from a card, and check the alarm table is replaced as alarms come and go. ([specs/ups-mib.yaml:302](specs/ups-mib.yaml#L302))
+- [ ] Start a quick battery test with set_test_id and check the card accepts upsTestSpinLock written back with upsTestId, and refuses it when the lock changed. ([specs/ups-mib.yaml:288](specs/ups-mib.yaml#L288))
+- [ ] Check that a UPS cancels a counting-down shutdown when -1 is written to upsShutdownAfterDelay. ([specs/ups-mib.yaml:284](specs/ups-mib.yaml#L284))
+- [ ] Receive upsTrapOnBattery and upsTrapAlarmEntryAdded from a card, and check the alarm table is replaced as alarms come and go. ([specs/ups-mib.yaml:303](specs/ups-mib.yaml#L303))
 
 ## vaddio-roboshot — Vaddio RoboSHOT PTZ cameras (Telnet API)
 

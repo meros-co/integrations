@@ -71,7 +71,7 @@ use super::sony_camera_ptpip::{
 use crate::catalog::Params;
 use crate::module::{
     CommandError, CommandId, Connection, Cx, FileInput, Key, Level, Millis, Module, OpenContext,
-    Outcome, SshTunnel, TcpInput,
+    Outcome, PollStamps, SshTunnel, TcpInput,
 };
 
 #[path = "sony_camera_files.rs"]
@@ -611,6 +611,8 @@ pub(crate) struct SonyCamera {
     /// False: opened for commands only, so the properties are read only
     /// when a command needs them.
     monitor: bool,
+    /// When each poll was last answered (`polled.properties`, SPEC.md §8).
+    stamps: PollStamps,
     /// Commands only: the handshake's last operations are queued, so the
     /// session is ready once they have gone.
     handshake_queued: bool,
@@ -941,6 +943,7 @@ impl SonyCamera {
             cautions: 0,
             live: live::Live::new(live_interval, keep_live, transfer_interval),
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             handshake_queued: false,
             props_fresh: false,
             awaiting_props: Vec::new(),
@@ -1525,6 +1528,9 @@ impl SonyCamera {
                             self.apply(cx, list);
                             // A full read by `refresh`.
                             self.props_fresh |= !diff;
+                            if self.monitor {
+                                self.stamps.answered(cx, "properties");
+                            }
                         }
                         Err(e) => cx.log(Level::Warning, format!("unreadable property set: {e}")),
                     }

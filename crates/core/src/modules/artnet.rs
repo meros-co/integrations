@@ -36,7 +36,8 @@ use serde_json::{json, Map, Value};
 
 use crate::catalog::Params;
 use crate::module::{
-    Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext,
+    Outcome, PollStamps,
 };
 
 pub(crate) const PORT: u16 = 0x1936;
@@ -647,6 +648,8 @@ pub(crate) struct ArtNet {
     receive: Receive,
     receive_interval: Millis,
     monitor: bool,
+    /// When each poll was last answered (`polled.nodes`, SPEC.md §8).
+    stamps: PollStamps,
     listening: bool,
     retry_after: Millis,
     nodes: BTreeMap<(Ipv4Addr, u8), Node>,
@@ -727,6 +730,7 @@ impl ArtNet {
             receive: parse_receive(setting_str(s, "receive").unwrap_or(""))?,
             receive_interval: setting_int(s, "receive_interval_ms").unwrap_or(100).max(0) as Millis,
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             listening: false,
             retry_after: RETRY_MIN,
             nodes: BTreeMap::new(),
@@ -1111,6 +1115,9 @@ impl ArtNet {
             cx.log(Level::Debug, format!("short ArtPollReply from {from}"));
             return;
         };
+        if self.monitor {
+            self.stamps.answered(cx, "nodes");
+        }
         // Replies go to the node's address and the port it gives; the
         // specification fixes that port at 6454, so a node giving none is
         // reached there.

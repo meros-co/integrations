@@ -58,7 +58,7 @@ use serde_json::{json, Map, Value};
 use crate::catalog::Params;
 use crate::module::{
     Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext,
-    Outcome, TcpInput, WsInput, WsRequest,
+    Outcome, PollStamps, TcpInput, WsInput, WsRequest,
 };
 
 #[path = "aes70_classes.rs"]
@@ -385,6 +385,8 @@ pub(crate) struct Aes70 {
     /// The name the device was opened by, for a wss URL and certificate.
     host_name: Option<String>,
     monitor: bool,
+    /// When each poll was last answered (`polled.levels`, SPEC.md §8).
+    stamps: PollStamps,
     settings: Settings,
     deframer: codec::Deframer,
     /// The transport carries PDUs: connected, and for tls and dtls the
@@ -441,6 +443,7 @@ impl Aes70 {
             device: SocketAddr::new(ctx.host, port),
             host_name: ctx.host_name.clone(),
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             settings: Settings::from(&ctx.settings),
             deframer: codec::Deframer::default(),
             socket_open: false,
@@ -1897,6 +1900,9 @@ impl Aes70 {
                 }
                 if ok {
                     self.put_reply(cx, ono, prop, &params);
+                    if poll {
+                        self.stamps.answered(cx, "levels");
+                    }
                 } else {
                     cx.log(
                         Level::Debug,

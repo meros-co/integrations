@@ -2388,9 +2388,13 @@ nothing times them. The catalogue adds `polled.<group>` to the spec's
 names are unique (`tools/validate.py` checks both). Pushed state
 (subscriptions, a push websocket, an event stream) has no stamp: the
 connection's `alive` events say it is heard from. A device opened for
-commands only polls nothing and has none. A native module that polls may
-keep the same keys, declared in its spec's `state` (see [Native
-modules](#native-modules)).
+commands only polls nothing and has none. Every native module that polls
+keeps the same keys with `module::PollStamps`, declared in its spec's
+`state`: `polled.status` for a status poll (projectors, OBS, NovaStar,
+SNMP devices, generic HTTP), and a name for what it reads otherwise
+(`polled.ping`, `polled.properties` of a Sony camera, `polled.levels` of
+AES70 level sensors, `polled.nodes` for Art-Net's ArtPollReply,
+`polled.metering` of Spectera, `polled.xml` of vMix).
 
 A `subscribe` or `poll` item can be limited to installations that turn on
 a setting with `when_set`, as an `on_connect` step can (§2): it is sent
