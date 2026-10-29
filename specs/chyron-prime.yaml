@@ -70,6 +70,9 @@ transport:
     stop_bits: { default: 1, values: [1, 2] }
     flow_control: none
 
+settings:
+  scene_state_channel: { type: int, min: 1, max: 99, default: 1, label: Scene state channel, description: "Output channel whose state of every scene of the project is read after each scene list, numbered from 1 as PRIME counts them." }
+
 ports:
   - { port: null, protocol: tcp, role: control, when: "link tcp",
       note: "The Intelligent Interface connection's TCP port, set in PRIME's Automation Settings; PRIME has no default" }
@@ -741,6 +744,10 @@ telemetry:
       match_each: '([^\\]+)\\'
       replace: scenes
       state: { "scenes.{1:key}": "true" }
+      then_send: ['P\SCENE_STATE\\{settings.scene_state_channel}\\{1}\\']
+    - match: '^\*P\\SCENE_STATE\\(.*?)\\?\\$'
+      request_match: '^P\\SCENE_STATE\\(\d+)\\(.+)\\\\$'
+      state: { "channels.{2}.scenes.{3:key}.state": "{1}" }
     - match: '^\*P\\ ?CLIP_LIST\\'
       match_each: '([^\\]+)\\'
       replace: clips
@@ -750,6 +757,7 @@ state:
   projects.*: { type: bool, description: "Each project PRIME knows (opened at least once), keyed by name; always true" }
   scenes.*: { type: bool, description: "Each scene of the current project, keyed by name; always true" }
   clips.*: { type: bool, description: "Each clip of the current project, keyed by name; always true" }
+  channels.*.scenes.*.state: { type: string, description: "A scene's state on an output channel, keyed by channel and scene name, as SCENE_STATE answers it: Closed, Loaded, Playing, Loaded\\Playing (loaded on Preview and playing on Program) or NonExistent" }
 
 quirks:
   - models: [all]
@@ -779,7 +787,12 @@ quirks:
       pushes nothing over Intelligent Interface except External Update X
       commands, whose format is not documented, and the replies to the B
       queries are not documented either: those commands return the reply as
-      text. A scene's state on a channel is read with get_scene_state.
+      text. After each scene list, every scene's state on the channel
+      scene_state_channel names is read with SCENE_STATE and kept under
+      channels.<n>.scenes; get_scene_state reads it on any channel, and its
+      answer is kept the same way. A scene that leaves the project keeps its
+      last state there until the device is opened again. B\QS and B\QL
+      answer in a form the guide does not document, so they stay text.
   - models: [all]
     severity: info
     text: >

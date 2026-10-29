@@ -1275,12 +1275,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## chyron-prime — Chyron PRIME (Intelligent Interface)
 
-- [ ] Record the default serial line settings of an Intelligent Interface COM connection (9600 8N1, no flow control assumed). ([specs/chyron-prime.yaml:764](specs/chyron-prime.yaml#L764))
+- [ ] Record the default serial line settings of an Intelligent Interface COM connection (9600 8N1, no flow control assumed). ([specs/chyron-prime.yaml:772](specs/chyron-prime.yaml#L772))
 - [ ] Confirm each reply ends with CR LF, and record the replies to the B commands (AN, AV, QS, QL, TH, SL, SA, SX, MX, CO, CS, SI, QE); the spec takes a reply to start with * or an eight-digit error code. ([specs/chyron-prime.yaml:62](specs/chyron-prime.yaml#L62))
 - [ ] Record what PRIME answers to the default heartbeat (two backslashes). ([specs/chyron-prime.yaml:39](specs/chyron-prime.yaml#L39))
-- [ ] Check that a buffer of * and a layer expression of * are accepted wherever the spec sends them (play_all with channel *, clear with layer *). ([specs/chyron-prime.yaml:189](specs/chyron-prime.yaml#L189))
+- [ ] Check that a buffer of * and a layer expression of * are accepted wherever the spec sends them (play_all with channel *, clear with layer *). ([specs/chyron-prime.yaml:192](specs/chyron-prime.yaml#L192))
 - [ ] Record the External Update X command PRIME sends, so it can be read into state. ([specs/chyron-prime.yaml:63](specs/chyron-prime.yaml#L63))
-- [ ] Check that the UTF-8 encoding setting of the connection carries non-ASCII text correctly. ([specs/chyron-prime.yaml:761](specs/chyron-prime.yaml#L761))
+- [ ] Check that the UTF-8 encoding setting of the connection carries non-ASCII text correctly. ([specs/chyron-prime.yaml:769](specs/chyron-prime.yaml#L769))
+- [ ] Confirm SCENE_STATE answers *P\SCENE_STATE\<state>\\ for a scene name as SCENE_LIST gives it, without its project path. ([specs/chyron-prime.yaml:790](specs/chyron-prime.yaml#L790))
 
 ## clock-8001 — Clock-8001
 
