@@ -47,7 +47,13 @@ pub mod events;
 #[cfg(test)]
 mod facebook_account_session_tests;
 mod files;
+#[cfg(feature = "dmxcontrol3")]
+mod grpc;
+#[cfg(feature = "dmxcontrol3")]
+mod hpack;
 mod http;
+#[cfg(feature = "dmxcontrol3")]
+mod http2;
 mod icmp;
 pub mod json;
 #[cfg(feature = "sennheiser-ew-g3-g4")]
@@ -78,6 +84,8 @@ mod oauth_session_tests;
 mod oauth_validate_session_tests;
 #[cfg(feature = "pjlink")]
 mod pjlink_discovery;
+#[cfg(feature = "dmxcontrol3")]
+mod protobuf;
 mod serial;
 #[cfg(test)]
 mod serial_session_tests;
@@ -95,6 +103,8 @@ mod tcp;
 mod tcp_listen;
 mod tls;
 mod udp;
+#[cfg(feature = "dmxcontrol3")]
+mod umbra_discovery;
 mod ws;
 mod yaml;
 mod zmtp;

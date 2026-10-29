@@ -194,6 +194,10 @@ pub struct TlsTarget {
     /// is read and checked first; anything else fails the handshake with a
     /// reason starting `tls:`. `None` starts the handshake at once.
     pub preamble: Option<Vec<u8>>,
+    /// The application protocols offered in the handshake (ALPN, RFC 7301),
+    /// in order of preference, such as `h2` for HTTP/2 and gRPC; none when
+    /// empty.
+    pub alpn: Vec<String>,
 }
 
 /// A serial port a module asks the session to open: RS-232, RS-422 or a USB
