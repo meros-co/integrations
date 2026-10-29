@@ -73,13 +73,21 @@ models:
       - get_scene
       - get_output_input
       - set_mixer1_input_level
+      - set_mixer1_input_level_db
       - set_mixer1_input_level_current
+      - set_mixer1_input_level_current_db
       - set_mixer1_level
+      - set_mixer1_level_db
       - set_mixer1_level_current
+      - set_mixer1_level_current_db
       - set_mixer2_input_level
+      - set_mixer2_input_level_db
       - set_mixer2_input_level_current
+      - set_mixer2_input_level_current_db
       - set_mixer2_level
+      - set_mixer2_level_db
       - set_mixer2_level_current
+      - set_mixer2_level_current_db
       - set_parameter
       - get_parameter
       - get_version
@@ -98,9 +106,13 @@ models:
       - set_layer_input
       - set_layer_input_current
       - set_input_level
+      - set_input_level_db
       - set_input_level_current
+      - set_input_level_current_db
       - set_master_level
+      - set_master_level_db
       - set_master_level_current
+      - set_master_level_current_db
       - set_parameter
       - get_parameter
       - get_version
@@ -108,6 +120,12 @@ models:
     notes: >
       Four HDMI inputs, four layers, one audio mixer, ten scenes. No output
       routing commands (p.29).
+
+conversions:
+  # XS-42H Reference Manual p.10 and p.23, Audio menu:
+  # 100 = 0.0 dB, 127 = +6.0 dB. Between 100 and 127 the level is taken as
+  # linear in dB; below 100 Roland gives no law.
+  level_db: { points: [[100, 0.0], [127, 6.0]] }
 
 commands:
   set_transition_time:
@@ -155,8 +173,18 @@ commands:
     params:
       scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
       input: { type: int, min: 1, max: 4, required: true, label: Mixer input, description: "Audio Mixer 1 input channel, from 1 to 4." }
-      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); Roland gives 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu)." }
     send: "set,{scene:-1},1,{input:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mixer1_input_level_db:
+    summary: "Adjust an input channel volume of Audio Mixer 1 in dB, 0.0 to +6.0, in a scene 1-10 (set,scene,1,input)"
+    params:
+      scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
+      input: { type: int, min: 1, max: 4, required: true, label: Mixer input, description: "Audio Mixer 1 input channel, from 1 to 4." }
+      level_db: { type: float, min: 0.0, max: 6.0, required: true, label: Volume, description: "Level in dB from 0.0 to +6.0, converted to the unit's 100 to 127 by Roland's 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu); levels below 0 dB have no documented law, so are set with set_mixer1_input_level." }
+    send: "set,{scene:-1},1,{input:-1},{level_db:to.level_db:.0f}"
     expect: { contains: "ack," }
     returns: ack
 
@@ -164,8 +192,17 @@ commands:
     summary: "Adjust an input channel volume of Audio Mixer 1, 0-127, in the current scene (set,15,1,input)"
     params:
       input: { type: int, min: 1, max: 4, required: true, label: Mixer input, description: "Audio Mixer 1 input channel, from 1 to 4." }
-      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); Roland gives 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu)." }
     send: "set,15,1,{input:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mixer1_input_level_current_db:
+    summary: "Adjust an input channel volume of Audio Mixer 1 in dB, 0.0 to +6.0, in the current scene (set,15,1,input)"
+    params:
+      input: { type: int, min: 1, max: 4, required: true, label: Mixer input, description: "Audio Mixer 1 input channel, from 1 to 4." }
+      level_db: { type: float, min: 0.0, max: 6.0, required: true, label: Volume, description: "Level in dB from 0.0 to +6.0, converted to the unit's 100 to 127 by Roland's 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu); levels below 0 dB have no documented law, so are set with set_mixer1_input_level_current." }
+    send: "set,15,1,{input:-1},{level_db:to.level_db:.0f}"
     expect: { contains: "ack," }
     returns: ack
 
@@ -173,16 +210,33 @@ commands:
     summary: "Adjust the overall volume of Audio Mixer 1, 0-127, in a scene 1-10 (set,scene,2,0)"
     params:
       scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
-      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); Roland gives 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu)." }
     send: "set,{scene:-1},2,0,{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mixer1_level_db:
+    summary: "Adjust the overall volume of Audio Mixer 1 in dB, 0.0 to +6.0, in a scene 1-10 (set,scene,2,0)"
+    params:
+      scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
+      level_db: { type: float, min: 0.0, max: 6.0, required: true, label: Volume, description: "Level in dB from 0.0 to +6.0, converted to the unit's 100 to 127 by Roland's 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu); levels below 0 dB have no documented law, so are set with set_mixer1_level." }
+    send: "set,{scene:-1},2,0,{level_db:to.level_db:.0f}"
     expect: { contains: "ack," }
     returns: ack
 
   set_mixer1_level_current:
     summary: "Adjust the overall volume of Audio Mixer 1, 0-127, in the current scene (set,15,2,0)"
     params:
-      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); Roland gives 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu)." }
     send: "set,15,2,0,{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mixer1_level_current_db:
+    summary: "Adjust the overall volume of Audio Mixer 1 in dB, 0.0 to +6.0, in the current scene (set,15,2,0)"
+    params:
+      level_db: { type: float, min: 0.0, max: 6.0, required: true, label: Volume, description: "Level in dB from 0.0 to +6.0, converted to the unit's 100 to 127 by Roland's 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu); levels below 0 dB have no documented law, so are set with set_mixer1_level_current." }
+    send: "set,15,2,0,{level_db:to.level_db:.0f}"
     expect: { contains: "ack," }
     returns: ack
 
@@ -191,8 +245,18 @@ commands:
     params:
       scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
       input: { type: int, min: 1, max: 4, required: true, label: Mixer input, description: "Audio Mixer 2 input channel, from 1 to 4." }
-      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); Roland gives 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu)." }
     send: "set,{scene:-1},6,{input:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mixer2_input_level_db:
+    summary: "Adjust an input channel volume of Audio Mixer 2 in dB, 0.0 to +6.0, in a scene 1-10 (set,scene,6,input)"
+    params:
+      scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
+      input: { type: int, min: 1, max: 4, required: true, label: Mixer input, description: "Audio Mixer 2 input channel, from 1 to 4." }
+      level_db: { type: float, min: 0.0, max: 6.0, required: true, label: Volume, description: "Level in dB from 0.0 to +6.0, converted to the unit's 100 to 127 by Roland's 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu); levels below 0 dB have no documented law, so are set with set_mixer2_input_level." }
+    send: "set,{scene:-1},6,{input:-1},{level_db:to.level_db:.0f}"
     expect: { contains: "ack," }
     returns: ack
 
@@ -200,8 +264,17 @@ commands:
     summary: "Adjust an input channel volume of Audio Mixer 2, 0-127, in the current scene (set,15,6,input)"
     params:
       input: { type: int, min: 1, max: 4, required: true, label: Mixer input, description: "Audio Mixer 2 input channel, from 1 to 4." }
-      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); Roland gives 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu)." }
     send: "set,15,6,{input:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mixer2_input_level_current_db:
+    summary: "Adjust an input channel volume of Audio Mixer 2 in dB, 0.0 to +6.0, in the current scene (set,15,6,input)"
+    params:
+      input: { type: int, min: 1, max: 4, required: true, label: Mixer input, description: "Audio Mixer 2 input channel, from 1 to 4." }
+      level_db: { type: float, min: 0.0, max: 6.0, required: true, label: Volume, description: "Level in dB from 0.0 to +6.0, converted to the unit's 100 to 127 by Roland's 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu); levels below 0 dB have no documented law, so are set with set_mixer2_input_level_current." }
+    send: "set,15,6,{input:-1},{level_db:to.level_db:.0f}"
     expect: { contains: "ack," }
     returns: ack
 
@@ -209,16 +282,33 @@ commands:
     summary: "Adjust the overall volume of Audio Mixer 2, 0-127, in a scene 1-10 (set,scene,7,0)"
     params:
       scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
-      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); Roland gives 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu)." }
     send: "set,{scene:-1},7,0,{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mixer2_level_db:
+    summary: "Adjust the overall volume of Audio Mixer 2 in dB, 0.0 to +6.0, in a scene 1-10 (set,scene,7,0)"
+    params:
+      scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
+      level_db: { type: float, min: 0.0, max: 6.0, required: true, label: Volume, description: "Level in dB from 0.0 to +6.0, converted to the unit's 100 to 127 by Roland's 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu); levels below 0 dB have no documented law, so are set with set_mixer2_level." }
+    send: "set,{scene:-1},7,0,{level_db:to.level_db:.0f}"
     expect: { contains: "ack," }
     returns: ack
 
   set_mixer2_level_current:
     summary: "Adjust the overall volume of Audio Mixer 2, 0-127, in the current scene (set,15,7,0)"
     params:
-      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); Roland gives 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu)." }
     send: "set,15,7,0,{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mixer2_level_current_db:
+    summary: "Adjust the overall volume of Audio Mixer 2 in dB, 0.0 to +6.0, in the current scene (set,15,7,0)"
+    params:
+      level_db: { type: float, min: 0.0, max: 6.0, required: true, label: Volume, description: "Level in dB from 0.0 to +6.0, converted to the unit's 100 to 127 by Roland's 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu); levels below 0 dB have no documented law, so are set with set_mixer2_level_current." }
+    send: "set,15,7,0,{level_db:to.level_db:.0f}"
     expect: { contains: "ack," }
     returns: ack
 
@@ -265,8 +355,18 @@ commands:
     params:
       scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
       input: { type: int, min: 1, max: 4, required: true, label: Input, description: "Audio input channel, from 1 to 4." }
-      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); Roland gives 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu)." }
     send: "set,{scene:-1},1,{input:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_input_level_db:
+    summary: "Adjust an input channel volume in dB, 0.0 to +6.0, in a scene 1-10 (set,scene,1,input)"
+    params:
+      scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
+      input: { type: int, min: 1, max: 4, required: true, label: Input, description: "Audio input channel, from 1 to 4." }
+      level_db: { type: float, min: 0.0, max: 6.0, required: true, label: Volume, description: "Level in dB from 0.0 to +6.0, converted to the unit's 100 to 127 by Roland's 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu); levels below 0 dB have no documented law, so are set with set_input_level." }
+    send: "set,{scene:-1},1,{input:-1},{level_db:to.level_db:.0f}"
     expect: { contains: "ack," }
     returns: ack
 
@@ -274,8 +374,17 @@ commands:
     summary: "Adjust an input channel volume, 0-127, in the current scene (set,15,1,input)"
     params:
       input: { type: int, min: 1, max: 4, required: true, label: Input, description: "Audio input channel, from 1 to 4." }
-      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); Roland gives 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu)." }
     send: "set,15,1,{input:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_input_level_current_db:
+    summary: "Adjust an input channel volume in dB, 0.0 to +6.0, in the current scene (set,15,1,input)"
+    params:
+      input: { type: int, min: 1, max: 4, required: true, label: Input, description: "Audio input channel, from 1 to 4." }
+      level_db: { type: float, min: 0.0, max: 6.0, required: true, label: Volume, description: "Level in dB from 0.0 to +6.0, converted to the unit's 100 to 127 by Roland's 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu); levels below 0 dB have no documented law, so are set with set_input_level_current." }
+    send: "set,15,1,{input:-1},{level_db:to.level_db:.0f}"
     expect: { contains: "ack," }
     returns: ack
 
@@ -283,16 +392,33 @@ commands:
     summary: "Adjust the overall volume, 0-127, in a scene 1-10 (set,scene,2,0)"
     params:
       scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
-      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); Roland gives 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu)." }
     send: "set,{scene:-1},2,0,{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_master_level_db:
+    summary: "Adjust the overall volume in dB, 0.0 to +6.0, in a scene 1-10 (set,scene,2,0)"
+    params:
+      scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
+      level_db: { type: float, min: 0.0, max: 6.0, required: true, label: Volume, description: "Level in dB from 0.0 to +6.0, converted to the unit's 100 to 127 by Roland's 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu); levels below 0 dB have no documented law, so are set with set_master_level." }
+    send: "set,{scene:-1},2,0,{level_db:to.level_db:.0f}"
     expect: { contains: "ack," }
     returns: ack
 
   set_master_level_current:
     summary: "Adjust the overall volume, 0-127, in the current scene (set,15,2,0)"
     params:
-      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); Roland gives 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu)." }
     send: "set,15,2,0,{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_master_level_current_db:
+    summary: "Adjust the overall volume in dB, 0.0 to +6.0, in the current scene (set,15,2,0)"
+    params:
+      level_db: { type: float, min: 0.0, max: 6.0, required: true, label: Volume, description: "Level in dB from 0.0 to +6.0, converted to the unit's 100 to 127 by Roland's 100 = 0.0 dB, 127 = +6.0 dB (XS-42H Reference Manual p.10 and p.23, Audio menu); levels below 0 dB have no documented law, so are set with set_master_level_current." }
+    send: "set,15,2,0,{level_db:to.level_db:.0f}"
     expect: { contains: "ack," }
     returns: ack
 

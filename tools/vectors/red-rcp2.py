@@ -62,3 +62,20 @@ telemetry(RD, "parameters", inbound_ws='{"type":"rcp_cur_parameters","parameters
           expect_state={"supported_parameters": '["RCP_PARAM_ISO","RCP_PARAM_ND"]'})
 telemetry(RD, "session", inbound_ws='{"type":"rcp_session","status":"open","data":12345}', expect_state={},
           expect_then_send=['{"type":"rcp_session","data":12345}'])
+# The power input, board temperatures and autofocus, kept by name too.
+telemetry(RD, "power-percent",
+          inbound_ws='{"type":"rcp_cur_int","id":"ACTIVE_POWER_IN_PERCENT","cur":{"val":76},"display":{"str":"76%"}}',
+          expect_state={"parameters": {"ACTIVE_POWER_IN_PERCENT": {"value": 76, "display": "76%"}},
+                        "power": {"percent": {"value": 76, "display": "76%"}}})
+telemetry(RD, "power-type-text",
+          inbound_ws='{"type":"rcp_cur_str","id":"ACTIVE_POWER_IN_TYPE","display":{"str":"V-Mount"}}',
+          expect_state={"parameters": {"ACTIVE_POWER_IN_TYPE": {"display": "V-Mount"}},
+                        "power": {"type": {"display": "V-Mount"}}})
+telemetry(RD, "temperature",
+          inbound_ws='{"type":"rcp_cur_int","id":"TEMPERATURE_PS","cur":{"val":52},"display":{"str":"52C"}}',
+          expect_state={"parameters": {"TEMPERATURE_PS": {"value": 52, "display": "52C"}},
+                        "temperatures": {"ps": {"value": 52, "display": "52C"}}})
+telemetry(RD, "autofocus-state",
+          inbound_ws='{"type":"rcp_cur_int","id":"AF_STATE","cur":{"val":1},"display":{"str":"Tracking"}}',
+          expect_state={"parameters": {"AF_STATE": {"value": 1, "display": "Tracking"}},
+                        "autofocus": {"state": {"value": 1, "display": "Tracking"}}})

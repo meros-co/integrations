@@ -69,8 +69,11 @@ models:
       - route_audio
       - set_output_off
       - set_hdmi_input_level
+      - set_hdmi_input_level_db
       - set_analog_input_level
+      - set_analog_input_level_db
       - set_output_level
+      - set_output_level_db
       - set_hdmi_input_mute
       - set_analog_input_mute
       - set_output_mute
@@ -112,8 +115,11 @@ models:
       - route_audio
       - set_output_off
       - set_hdmi_input_level
+      - set_hdmi_input_level_db
       - set_analog_input_level
+      - set_analog_input_level_db
       - set_output_level
+      - set_output_level_db
       - set_hdmi_input_mute
       - set_analog_input_mute
       - set_output_mute
@@ -155,8 +161,11 @@ models:
       - route_audio
       - set_output_off
       - set_hdmi_input_level
+      - set_hdmi_input_level_db
       - set_analog_input_level
+      - set_analog_input_level_db
       - set_output_level
+      - set_output_level_db
       - set_hdmi_input_mute
       - set_analog_input_mute
       - set_output_mute
@@ -181,6 +190,12 @@ models:
     verification: none
     notes: >
       Eight inputs and 4 outputs; the manual writes the output ranges for four.
+
+conversions:
+  # XS-82H/83H/84H Reference Manual p.6 and p.8, INPUT LEVEL and OUTPUT LEVEL:
+  # 0 = -INF dB, 100 = 0.0 dB, 127 = +6.0 dB. Between 100 and 127 the level is taken as
+  # linear in dB; below 100 Roland gives no law.
+  level_db: { points: [[100, 0.0], [127, 6.0]] }
 
 commands:
   set_input_type:
@@ -304,8 +319,17 @@ commands:
     summary: "Level of HDMI INPUT audio of input 1-8, 0-127 (IDL)"
     params:
       input: { type: int, min: 1, max: 8, required: true, label: Input, description: "Input channel, 1 to 8 as on the panel." }
-      level: { type: int, min: 0, max: 127, required: true, label: Level, description: "HDMI INPUT audio level, 0 to 127 as on the unit." }
+      level: { type: int, min: 0, max: 127, required: true, label: Level, description: "HDMI INPUT audio level, 0 to 127 as on the unit; Roland gives 0 = -INF dB, 100 = 0.0 dB, 127 = +6.0 dB (XS-82H/83H/84H Reference Manual p.6 and p.8, INPUT LEVEL and OUTPUT LEVEL)." }
     send: "IDL:{input:-1},{level};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_hdmi_input_level_db:
+    summary: "Level of HDMI INPUT audio of input 1-8 in dB, 0.0 to +6.0 (IDL)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true, label: Input, description: "Input channel, 1 to 8 as on the panel." }
+      level_db: { type: float, min: 0.0, max: 6.0, required: true, label: Level, description: "Level in dB from 0.0 to +6.0, converted to the unit's 100 to 127 by Roland's 100 = 0.0 dB, 127 = +6.0 dB (XS-82H/83H/84H Reference Manual p.6 and p.8, INPUT LEVEL and OUTPUT LEVEL); levels below 0 dB have no documented law, so are set with set_hdmi_input_level." }
+    send: "IDL:{input:-1},{level_db:to.level_db:.0f};"
     expect: { contains: "ACK;" }
     returns: ack
 
@@ -313,8 +337,17 @@ commands:
     summary: "Level of AUDIO INPUT audio of input 1-8, 0-127 (IAL)"
     params:
       input: { type: int, min: 1, max: 8, required: true, label: Input, description: "Input channel, 1 to 8 as on the panel." }
-      level: { type: int, min: 0, max: 127, required: true, label: Level, description: "AUDIO INPUT (analogue) audio level, 0 to 127 as on the unit." }
+      level: { type: int, min: 0, max: 127, required: true, label: Level, description: "AUDIO INPUT (analogue) audio level, 0 to 127 as on the unit; Roland gives 0 = -INF dB, 100 = 0.0 dB, 127 = +6.0 dB (XS-82H/83H/84H Reference Manual p.6 and p.8, INPUT LEVEL and OUTPUT LEVEL)." }
     send: "IAL:{input:-1},{level};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_analog_input_level_db:
+    summary: "Level of AUDIO INPUT audio of input 1-8 in dB, 0.0 to +6.0 (IAL)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true, label: Input, description: "Input channel, 1 to 8 as on the panel." }
+      level_db: { type: float, min: 0.0, max: 6.0, required: true, label: Level, description: "Level in dB from 0.0 to +6.0, converted to the unit's 100 to 127 by Roland's 100 = 0.0 dB, 127 = +6.0 dB (XS-82H/83H/84H Reference Manual p.6 and p.8, INPUT LEVEL and OUTPUT LEVEL); levels below 0 dB have no documented law, so are set with set_analog_input_level." }
+    send: "IAL:{input:-1},{level_db:to.level_db:.0f};"
     expect: { contains: "ACK;" }
     returns: ack
 
@@ -322,8 +355,17 @@ commands:
     summary: "Audio output level of output 1-4, 0-127 (OAL)"
     params:
       output: { type: int, min: 1, max: 4, required: true, label: Output, description: "Output channel, 1 to 4 as on the panel." }
-      level: { type: int, min: 0, max: 127, required: true, label: Level, description: "Audio output level, 0 to 127 as on the unit." }
+      level: { type: int, min: 0, max: 127, required: true, label: Level, description: "Audio output level, 0 to 127 as on the unit; Roland gives 0 = -INF dB, 100 = 0.0 dB, 127 = +6.0 dB (XS-82H/83H/84H Reference Manual p.6 and p.8, INPUT LEVEL and OUTPUT LEVEL)." }
     send: "OAL:{output:-1},{level};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output_level_db:
+    summary: "Audio output level of output 1-4 in dB, 0.0 to +6.0 (OAL)"
+    params:
+      output: { type: int, min: 1, max: 4, required: true, label: Output, description: "Output channel, 1 to 4 as on the panel." }
+      level_db: { type: float, min: 0.0, max: 6.0, required: true, label: Level, description: "Level in dB from 0.0 to +6.0, converted to the unit's 100 to 127 by Roland's 100 = 0.0 dB, 127 = +6.0 dB (XS-82H/83H/84H Reference Manual p.6 and p.8, INPUT LEVEL and OUTPUT LEVEL); levels below 0 dB have no documented law, so are set with set_output_level." }
+    send: "OAL:{output:-1},{level_db:to.level_db:.0f};"
     expect: { contains: "ACK;" }
     returns: ack
 

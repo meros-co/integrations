@@ -2398,7 +2398,7 @@ telemetry:
     # REST GET returns (p.73), is read as that GET's reply.
     as_reply: { path: "$.data.property", body: "$.data.value", prefix: /control/api/v1 }
     send:
-      - '{"type":"request","data":{"action":"subscribe","properties":["/transports/0","/transports/0/record","/transports/0/play","/transports/0/stop","/transports/0/playback","/transports/0/timecode","/transports/0/timecode/source","/transports/0/clipIndex","/camera/tallyStatus","/camera/power","/camera/power/displayMode","/camera/colorBars","/camera/programFeedDisplay","/camera/timingReferenceLock","/lens/iris","/lens/zoom","/lens/focus","/video/iso","/video/gain","/video/whiteBalance","/video/whiteBalanceTint","/video/ndFilter","/video/ndFilter/displayMode","/video/shutter","/video/shutter/measurement","/video/autoExposure","/video/detailSharpening","/video/detailSharpeningLevel","/colorCorrection/lift","/colorCorrection/gamma","/colorCorrection/gain","/colorCorrection/offset","/colorCorrection/contrast","/colorCorrection/color","/colorCorrection/lumaContribution","/presets/active","/media/active","/media/workingset","/system/codecFormat","/system/videoFormat","/system/format","/slates/nextClip","/monitoring/focusAssist","/monitoring/frameGuideRatio","/monitoring/safeAreaPercent","/audio/channel/0/level","/audio/channel/0/input","/audio/channel/0/phantomPower","/audio/channel/0/padding","/audio/channel/0/lowCutFilter","/audio/channel/0/available","/audio/channel/1/level","/audio/channel/1/input","/audio/channel/1/phantomPower","/audio/channel/1/padding","/audio/channel/1/lowCutFilter","/audio/channel/1/available"]}}'
+      - '{"type":"request","data":{"action":"subscribe","properties":["/transports/0","/transports/0/record","/transports/0/play","/transports/0/stop","/transports/0/playback","/transports/0/timecode","/transports/0/timecode/source","/transports/0/clipIndex","/camera/tallyStatus","/camera/power","/camera/power/displayMode","/camera/colorBars","/camera/programFeedDisplay","/camera/timingReferenceLock","/lens/iris","/lens/zoom","/lens/focus","/video/iso","/video/gain","/video/whiteBalance","/video/whiteBalanceTint","/video/ndFilter","/video/ndFilter/displayMode","/video/shutter","/video/shutter/measurement","/video/autoExposure","/video/detailSharpening","/video/detailSharpeningLevel","/colorCorrection/lift","/colorCorrection/gamma","/colorCorrection/gain","/colorCorrection/offset","/colorCorrection/contrast","/colorCorrection/color","/colorCorrection/lumaContribution","/presets","/presets/active","/media/active","/media/workingset","/system/codecFormat","/system/videoFormat","/system/format","/slates/nextClip","/monitoring/focusAssist","/monitoring/frameGuideRatio","/monitoring/safeAreaPercent","/audio/channel/0/level","/audio/channel/0/input","/audio/channel/0/phantomPower","/audio/channel/0/padding","/audio/channel/0/lowCutFilter","/audio/channel/0/available","/audio/channel/1/level","/audio/channel/1/input","/audio/channel/1/phantomPower","/audio/channel/1/padding","/audio/channel/1/lowCutFilter","/audio/channel/1/available"]}}'
   # Everything subscribed is read on connecting and again every minute, as a
   # safety net should the websocket not open; the livestream, which is not a
   # websocket property, every ten seconds.
@@ -2443,6 +2443,7 @@ telemetry:
         - { method: GET, path: /control/api/v1/colorCorrection/contrast }
         - { method: GET, path: /control/api/v1/colorCorrection/color }
         - { method: GET, path: /control/api/v1/colorCorrection/lumaContribution }
+        - { method: GET, path: /control/api/v1/presets }
         - { method: GET, path: /control/api/v1/presets/active }
         - { method: GET, path: /control/api/v1/media/active }
         - { method: GET, path: /control/api/v1/media/workingset }
@@ -2526,6 +2527,21 @@ telemetry:
     - path: "^/control/api/v1/camera/power/displayMode$"
       json: { mode: "$.mode" }
       state: { camera.power.display_mode: "{mode}" }
+    # Each connected battery (GET /camera/power, p.64), by its place in the
+    # batteries array from 1; the list is replaced whole, and each status
+    # flag is kept as a boolean keyed by the flag's documented text.
+    - path: "^/control/api/v1/camera/power$"
+      json_each: "$.batteries"
+      json: { millivolt: "$.milliVolt", percent: "$.chargeRemainingPercent", flags: "$.statusFlags" }
+      replace: camera.power.batteries
+      state:
+        "camera.power.batteries.{index:+1}.millivolt": "{millivolt}"
+        "camera.power.batteries.{index:+1}.charge_percent": "{percent}"
+        "camera.power.batteries.{index:+1}.status_flags": "{flags}"
+    - path: "^/control/api/v1/camera/power$"
+      json_each: "$.batteries[*].statusFlags"
+      json: { flag: "$" }
+      state: { "camera.power.batteries.{^index:+1}.flags.{flag:key}": "true" }
     - path: "^/control/api/v1/camera/colorBars$"
       json: { enabled: "$.enabled" }
       state: { camera.color_bars: "{enabled}" }
@@ -2618,6 +2634,13 @@ telemetry:
     - path: "^/control/api/v1/presets/active$"
       json: { preset: "$.preset" }
       state: { presets.active: "{preset}" }
+    # The preset files on the camera (GET /presets, p.43), the list replaced
+    # whole, by place from 1.
+    - path: "^/control/api/v1/presets$"
+      json_each: "$.presets"
+      json: { name: "$" }
+      replace: presets.list
+      state: { "presets.list.{index:+1}": "{name}" }
     - path: "^/control/api/v1/media/active$"
       json: { index: "$.workingsetIndex", device: "$.deviceName" }
       state:
@@ -2754,6 +2777,10 @@ state:
   camera.power.source:          { type: string, description: "Battery, AC, Fiber, USB or POE" }
   camera.power.millivolt:       { type: int, unit: mV, description: "Supply voltage, rounded to 100 mV" }
   camera.power.display_mode:    { type: string, description: "Percentage or Voltage" }
+  camera.power.batteries.*.millivolt: { type: int, unit: mV, description: "Each connected battery's voltage, rounded to 100 mV, keyed by its place in the camera's batteries list from 1" }
+  camera.power.batteries.*.charge_percent: { type: int, unit: percent, description: "The battery's remaining charge" }
+  camera.power.batteries.*.status_flags: { type: string, description: "The battery's status flags as the camera lists them, as JSON text" }
+  camera.power.batteries.*.flags.*: { type: bool, description: "Each status flag the battery reports, keyed by its documented text: Unknown Battery Status, Battery Is Present, Battery Is Charging, Battery Percentage Is Low, Battery Voltage Is Low, Battery Is Critically Low, Charge Remaining Percentage Is Estimated, Battery Communications Is Active or Battery Is Connected; true while reported (the list is replaced whole)" }
   camera.color_bars:            { type: bool, description: "Colour bars shown" }
   camera.program_feed_display:  { type: bool, description: "Program feed shown" }
   camera.timing_reference_locked: { type: bool, description: "Locked to the timing reference" }
@@ -2789,6 +2816,7 @@ state:
   color.saturation:             { type: float, description: "Saturation adjustment" }
   color.luma_contribution:      { type: float, description: "Luma contribution" }
   presets.active:               { type: string, description: "Active preset with its .cset extension, or 'default'" }
+  presets.list.*:               { type: string, description: "Each preset file on the camera (.cset), keyed by its place in the camera's list from 1" }
   media.active.index:           { type: int, description: "Working set index of the active media device" }
   media.active.device:          { type: string, description: "Device name of the active media device" }
   media.devices.*.volume:       { type: string, description: "Volume name, keyed by the media device's internal name" }
@@ -2908,8 +2936,8 @@ quirks:
       not subscribed (they need the display names or channel count first) and
       update only when the matching get command is sent, or when the camera
       pushes a change of them anyway. The websocket opens as wss when the
-      scheme is https, ws otherwise. Each battery's level (camera/power batteries array) is
-      not in the state.
+      scheme is https, ws otherwise. Each connected battery (the camera/power
+      batteries array) and the preset files (/presets) are in the state too.
 
   - models: [all]
     severity: info

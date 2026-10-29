@@ -1120,6 +1120,7 @@ state:
   pan_tilt.status: { type: string, description: "Pan/tilt platform status as the camera reports it" }
   preset.last: { type: int, description: "The preset recalled last" }
   preset.count: { type: int, description: "How many presets the camera has" }
+  preset.names.*: { type: string, description: "Each preset's name as the camera stores it (UTF-8), keyed by preset number from 1; the camera reports an unnamed preset as empty or as preset<n>" }
 
 telemetry:
   # info.cgi answers every setting as key:=value lines. Each rule picks one
@@ -1215,6 +1216,14 @@ telemetry:
       state: { "preset.last": "{1}" }
     - match: "(?m)^p\\.count:=(\\d+)\\r?$"
       state: { "preset.count": "{1}" }
+    # Each preset's name, p.<n>.name.utf8 (the Companion module's
+    # polling.js), from an info.cgi reply (the one that lists p.count); the
+    # list is replaced whole on each such reply.
+    - match: '(?s)^((?:.*\n)?p\.count:=\d+.*)$'
+      match_each: '(?m)^p\.(\d+)\.name\.utf8:=([^\r\n]*?)\r?$'
+      match_each_in: 1
+      replace: preset.names
+      state: { "preset.names.{2}": "{3}" }
 
 quirks:
   - models: [all]

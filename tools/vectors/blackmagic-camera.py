@@ -410,7 +410,21 @@ _bt("clip-index", "/transports/0/clipIndex", '{"clipIndex":1}', {"transport": {"
 _bt("tally", "/camera/tallyStatus", '{"status":"Preview"}', {"camera": {"tally": "Preview"}})
 _bt("power", "/camera/power",
     '{"source":"Battery","milliVolt":14800,"batteries":[{"milliVolt":14800,"chargeRemainingPercent":80,"statusFlags":["Battery Is Present"]}]}',
-    {"camera": {"power": {"source": "Battery", "millivolt": 14800}}})
+    {"camera": {"power": {"source": "Battery", "millivolt": 14800,
+                          "batteries": {"1": {"millivolt": 14800, "charge_percent": 80,
+                                              "status_flags": '["Battery Is Present"]',
+                                              "flags": {"Battery Is Present": True}}}}}})
+# Two batteries, the second charging; a battery gone since is removed.
+telemetry(BC, "power-batteries", inbound_http={"path": _P + "/camera/power", "body":
+          '{"source":"AC","milliVolt":12000,"batteries":[{"milliVolt":16200,"chargeRemainingPercent":100,'
+          '"statusFlags":[]},{"milliVolt":14100,"chargeRemainingPercent":35,'
+          '"statusFlags":["Battery Is Present","Battery Is Charging"]}]}'},
+          state_before={"camera": {"power": {"batteries": {"3": {"millivolt": 13000}}}}},
+          expect_state={"camera": {"power": {"source": "AC", "millivolt": 12000, "batteries": {
+              "1": {"millivolt": 16200, "charge_percent": 100, "status_flags": "[]"},
+              "2": {"millivolt": 14100, "charge_percent": 35,
+                    "status_flags": '["Battery Is Present","Battery Is Charging"]',
+                    "flags": {"Battery Is Present": True, "Battery Is Charging": True}}}}}})
 _bt("power-display-mode", "/camera/power/displayMode", '{"mode":"Percentage"}', {"camera": {"power": {"display_mode": "Percentage"}}})
 _bt("color-bars", "/camera/colorBars", '{"enabled":true}', {"camera": {"color_bars": True}})
 _bt("program-feed-display", "/camera/programFeedDisplay", '{"enabled":false}', {"camera": {"program_feed_display": False}})
@@ -445,6 +459,8 @@ _bt("color-hue-saturation", "/colorCorrection/color", '{"hue":0.1,"saturation":1
     {"color": {"hue": 0.1, "saturation": 1.3}})
 _bt("color-luma-contribution", "/colorCorrection/lumaContribution", '{"lumaContribution":0.75}',
     {"color": {"luma_contribution": 0.75}})
+_bt("presets", "/presets", '{"presets":["Studio A.cset","Wide.cset"]}',
+    {"presets": {"list": {"1": "Studio A.cset", "2": "Wide.cset"}}})
 _bt("active-preset", "/presets/active", '{"preset":"Studio A.cset"}', {"presets": {"active": "Studio A.cset"}})
 _bt("active-media", "/media/active", '{"workingsetIndex":0,"deviceName":"cfast1"}',
     {"media": {"active": {"index": 0, "device": "cfast1"}}})
@@ -512,7 +528,7 @@ _BC_SUBS = ["/transports/0", "/transports/0/record", "/transports/0/play", "/tra
             "/video/shutter/measurement", "/video/autoExposure", "/video/detailSharpening",
             "/video/detailSharpeningLevel", "/colorCorrection/lift", "/colorCorrection/gamma",
             "/colorCorrection/gain", "/colorCorrection/offset", "/colorCorrection/contrast",
-            "/colorCorrection/color", "/colorCorrection/lumaContribution", "/presets/active", "/media/active",
+            "/colorCorrection/color", "/colorCorrection/lumaContribution", "/presets", "/presets/active", "/media/active",
             "/media/workingset", "/system/codecFormat", "/system/videoFormat", "/system/format",
             "/slates/nextClip", "/monitoring/focusAssist", "/monitoring/frameGuideRatio",
             "/monitoring/safeAreaPercent"] + [
