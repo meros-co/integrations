@@ -131,3 +131,9 @@ telemetry(CN, "picture", inbound_http={"path": _INFO_PATH, "body":
     expect_state={"pedestal": -3, "sharpness": 10, "noise_reduction": 4,
                   "white_balance": {"mode": "kelvin", "kelvin": 5600, "r_gain": 5, "b_gain": -5},
                   "color_bars": False, "pan_tilt": {"status": "normal"}, "preset": {"last": 3, "count": 100}})
+# Preset names (p.<n>.name.utf8) from an info.cgi reply listing p.count; the
+# list is replaced whole, so a preset no longer listed goes.
+telemetry(CN, "preset-names", inbound_http={"path": _INFO_PATH, "body":
+    "p:=2\np.count:=100\np.1.name.utf8:=Pulpit wide\np.2.name.utf8:=Choir\np.3.name.utf8:=\n"},
+    state_before={"preset": {"names": {"9": "Old"}}},
+    expect_state={"preset": {"last": 2, "count": 100, "names": {"1": "Pulpit wide", "2": "Choir", "3": ""}}})
