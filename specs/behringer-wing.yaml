@@ -30,6 +30,18 @@ source:
     note: >
       Meros. Reads /ch/N/name on UDP 2223. Not yet run against hardware.
 
+# Meters are not in the OSC tree: the console sends them only on its native
+# interface (p.96-97), which the wing-meters extension speaks.
+extension: wing-meters
+
+settings:
+  # Meters are a continuous stream, so they are asked for only when the
+  # operator turns them on.
+  meters: { type: bool, default: false, label: Meters,
+    description: "On asks the console for the meters of every channel, aux, bus, main, matrix and DCA on its native interface (TCP 2222) and keeps them in state in dB; off leaves them alone." }
+  meter_port: { type: int, min: 1, max: 65535, default: 2224, label: Meter port,
+    description: "UDP port of this host the console sends meter blocks to, 1 to 65535; it must be free and reachable from the console." }
+
 transport:
   type: osc-udp
   port: 2223
@@ -39,6 +51,8 @@ transport:
 
 ports:
   - { port: 2223, protocol: udp, role: control }
+  - { port: 2222, protocol: tcp, role: control, when: "meters true", note: "native interface, channel 3: meter requests" }
+  - { port: 2224, protocol: udp, role: feedback, listener: core, setting: meter_port, when: "meters true" }
 
 models:
   - id: wing
@@ -8422,6 +8436,17 @@ commands:
 
 quirks:
   - models: [all]
+    severity: info
+    text: >
+      Meters come on the native interface, not over OSC (p.96-97). With the meters setting on, the core
+      connects to TCP 2222, asks on channel 3 for every channel, aux, bus, main, matrix and DCA under one
+      report id, with this host's meter_port as the UDP port, and renews the request every 4 seconds
+      (meter data stops after 5). The document lists what each strip sends (Table 5) but not how many
+      words each kind of strip takes; eight words per channel, aux, bus, main and matrix (input and output
+      left and right, gate key and gain, dynamics key and gain) and four per DCA (pre- and post-fader left
+      and right) are read in that order. The meter port is any free port of this host; 2224 is this
+      spec's choice, not the vendor's.
+  - models: [all]
     severity: warning
     text: >
       The console does not echo a set (Remote Protocols p.22), so sets report
@@ -8878,6 +8903,50 @@ quirks:
       scene.
 
 state:
+  "channels.*.meters.input_left": { type: float, unit: dB, description: "Channel input meter, left, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "channels.*.meters.input_right": { type: float, unit: dB, description: "Channel input meter, right, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "channels.*.meters.output_left": { type: float, unit: dB, description: "Channel output meter, left, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "channels.*.meters.output_right": { type: float, unit: dB, description: "Channel output meter, right, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "channels.*.meters.gate_key": { type: float, unit: dB, description: "Channel gate key (side-chain) meter, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "channels.*.meters.dyn_key": { type: float, unit: dB, description: "Channel dynamics key (side-chain) meter, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "auxes.*.meters.input_left": { type: float, unit: dB, description: "Aux input input meter, left, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "auxes.*.meters.input_right": { type: float, unit: dB, description: "Aux input input meter, right, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "auxes.*.meters.output_left": { type: float, unit: dB, description: "Aux input output meter, left, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "auxes.*.meters.output_right": { type: float, unit: dB, description: "Aux input output meter, right, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "auxes.*.meters.gate_key": { type: float, unit: dB, description: "Aux input gate key (side-chain) meter, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "auxes.*.meters.dyn_key": { type: float, unit: dB, description: "Aux input dynamics key (side-chain) meter, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "buses.*.meters.input_left": { type: float, unit: dB, description: "Bus input meter, left, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "buses.*.meters.input_right": { type: float, unit: dB, description: "Bus input meter, right, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "buses.*.meters.output_left": { type: float, unit: dB, description: "Bus output meter, left, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "buses.*.meters.output_right": { type: float, unit: dB, description: "Bus output meter, right, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "buses.*.meters.gate_key": { type: float, unit: dB, description: "Bus gate key (side-chain) meter, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "buses.*.meters.dyn_key": { type: float, unit: dB, description: "Bus dynamics key (side-chain) meter, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "mains.*.meters.input_left": { type: float, unit: dB, description: "Main input meter, left, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "mains.*.meters.input_right": { type: float, unit: dB, description: "Main input meter, right, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "mains.*.meters.output_left": { type: float, unit: dB, description: "Main output meter, left, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "mains.*.meters.output_right": { type: float, unit: dB, description: "Main output meter, right, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "mains.*.meters.gate_key": { type: float, unit: dB, description: "Main gate key (side-chain) meter, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "mains.*.meters.dyn_key": { type: float, unit: dB, description: "Main dynamics key (side-chain) meter, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "matrices.*.meters.input_left": { type: float, unit: dB, description: "Matrix input meter, left, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "matrices.*.meters.input_right": { type: float, unit: dB, description: "Matrix input meter, right, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "matrices.*.meters.output_left": { type: float, unit: dB, description: "Matrix output meter, left, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "matrices.*.meters.output_right": { type: float, unit: dB, description: "Matrix output meter, right, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "matrices.*.meters.gate_key": { type: float, unit: dB, description: "Matrix gate key (side-chain) meter, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "matrices.*.meters.dyn_key": { type: float, unit: dB, description: "Matrix dynamics key (side-chain) meter, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "channels.*.meters.gate_gain": { type: float, description: "Channel gate gain reduction with the meters setting on, as the value sent divided by 256: for most plugin models 1.0 is 20 dB of gain reduction, the standard WING gate 60 dB (p.96)" }
+  "channels.*.meters.dyn_gain": { type: float, description: "Channel dynamics gain reduction with the meters setting on, as the value sent divided by 256: for most plugin models 1.0 is 20 dB of gain reduction, the standard WING gate 60 dB (p.96)" }
+  "auxes.*.meters.gate_gain": { type: float, description: "Aux input gate gain reduction with the meters setting on, as the value sent divided by 256: for most plugin models 1.0 is 20 dB of gain reduction, the standard WING gate 60 dB (p.96)" }
+  "auxes.*.meters.dyn_gain": { type: float, description: "Aux input dynamics gain reduction with the meters setting on, as the value sent divided by 256: for most plugin models 1.0 is 20 dB of gain reduction, the standard WING gate 60 dB (p.96)" }
+  "buses.*.meters.gate_gain": { type: float, description: "Bus gate gain reduction with the meters setting on, as the value sent divided by 256: for most plugin models 1.0 is 20 dB of gain reduction, the standard WING gate 60 dB (p.96)" }
+  "buses.*.meters.dyn_gain": { type: float, description: "Bus dynamics gain reduction with the meters setting on, as the value sent divided by 256: for most plugin models 1.0 is 20 dB of gain reduction, the standard WING gate 60 dB (p.96)" }
+  "mains.*.meters.gate_gain": { type: float, description: "Main gate gain reduction with the meters setting on, as the value sent divided by 256: for most plugin models 1.0 is 20 dB of gain reduction, the standard WING gate 60 dB (p.96)" }
+  "mains.*.meters.dyn_gain": { type: float, description: "Main dynamics gain reduction with the meters setting on, as the value sent divided by 256: for most plugin models 1.0 is 20 dB of gain reduction, the standard WING gate 60 dB (p.96)" }
+  "matrices.*.meters.gate_gain": { type: float, description: "Matrix gate gain reduction with the meters setting on, as the value sent divided by 256: for most plugin models 1.0 is 20 dB of gain reduction, the standard WING gate 60 dB (p.96)" }
+  "matrices.*.meters.dyn_gain": { type: float, description: "Matrix dynamics gain reduction with the meters setting on, as the value sent divided by 256: for most plugin models 1.0 is 20 dB of gain reduction, the standard WING gate 60 dB (p.96)" }
+  "dcas.*.meters.pre_fader_left": { type: float, unit: dB, description: "DCA pre-fader left meter, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "dcas.*.meters.pre_fader_right": { type: float, unit: dB, description: "DCA pre-fader right meter, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "dcas.*.meters.post_fader_left": { type: float, unit: dB, description: "DCA post-fader left meter, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
+  "dcas.*.meters.post_fader_right": { type: float, unit: dB, description: "DCA post-fader right meter, with the meters setting on (native interface, p.97), in dB from the 1/256 dB value sent" }
   "channels.*.fader": { type: float, description: "Fader level in dB, -144 (-oo) to +10" }
   "channels.*.mute": { type: bool, description: "Muted" }
   "channels.*.name": { type: string, description: "Strip name, 16 characters at most" }

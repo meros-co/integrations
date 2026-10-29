@@ -356,3 +356,12 @@ _ypm_explicit("telemetry", "error-status", inbound='NOTIFY devstatus error "wrn/
 
 _ypm_vectors()
 _ypm_EXPLICIT.clear()
+
+# ── Meters and scene titles ───────────────────────────────────────────────
+# With the meters setting on, mtrstart for each meter of the console's list
+# goes first on connecting, before the reads (DME7 document 2-16 p.22). A
+# notification is a type word, then two hex digits per channel (3.2.3 p.10);
+# 00-7E are -126 to 0 dBFS, 7F OVER (5.1 p.50).
+telemetry('yamaha-rivage', 'meters-subscribe', settings={'meters': True, 'meter_interval_ms': 200}, expect_connect_wire=['mtrstart MIXER:Current/Mix/PostOn 200\n'], inbound='NOTIFY mtr MIXER:Current/Mix/PostOn level 7e 7F 00 6a\n', expect_state={'mixes': {'1': {'meter': 126, 'meter_db': 0.0}, '2': {'meter': 127}, '3': {'meter': 0, 'meter_db': -126.0}, '4': {'meter': 106, 'meter_db': -20.0}}})
+telemetry('yamaha-rivage', 'scene-title', inbound='OK ssinfot_ex MIXER:Lib/Scene "12.50" "12.50" "Encore" "" user\n', expect_state={'scene': {'list': {'12.50': {'number_text': '12.50', 'title': 'Encore', 'comment': '', 'attribute': 'user'}}}})
+telemetry('yamaha-rivage', 'scene-recalled-reads-title', inbound='OK ssrecallt_ex MIXER:Lib/Scene "3.00"\n', expect_state={'scene': {'current': '3.00'}}, expect_then_send=['ssinfot_ex MIXER:Lib/Scene "3.00"\n'])

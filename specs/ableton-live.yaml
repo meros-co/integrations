@@ -2464,15 +2464,15 @@ state:
   tracks.*.is_visible: { type: bool, description: "The track is visible (not inside a folded group), as last read" }
   tracks.*.mute: { type: bool, description: "Track muted (its Track Activator off)" }
   tracks.*.name: { type: string, description: "Track name" }
-  tracks.*.output_meter_left: { type: float, description: "Output meter, left channel, 0 to 1" }
-  tracks.*.output_meter_level: { type: float, description: "Output meter, both channels, 0 to 1" }
-  tracks.*.output_meter_right: { type: float, description: "Output meter, right channel, 0 to 1" }
+  tracks.*.output_meter_left: { type: float, description: "Smoothed momentary peak of the left channel's output meter, 0.0 to 1.0 as Live gives it (Live Object Model, Track); Live documents no dB scale for it" }
+  tracks.*.output_meter_level: { type: float, description: "Hold peak of the track's output meter (the louder channel, held 1 second), 0.0 to 1.0 as Live gives it (Live Object Model, Track); Live documents no dB scale for it" }
+  tracks.*.output_meter_right: { type: float, description: "Smoothed momentary peak of the right channel's output meter, 0.0 to 1.0 as Live gives it, the meter Live shows (Live Object Model, Track); Live documents no dB scale for it" }
   tracks.*.output_routing_channel: { type: string, description: "Output routing channel, by display name, as last read" }
   tracks.*.output_routing_type: { type: string, description: "Output routing type, by display name (\"Master\"), as last read" }
   tracks.*.panning: { type: float, description: "Mixer pan, -1 (left) to 1 (right)" }
   tracks.*.playing_slot_index: { type: int, description: "Clip slot whose clip is playing, from 1; 0 when none, -1 when the stop button was fired" }
   tracks.*.solo: { type: bool, description: "Track soloed" }
-  tracks.*.volume: { type: float, description: "Mixer volume as the fader's parameter value, 0 to 1 (0.85 is 0 dB)" }
+  tracks.*.volume: { type: float, description: "Mixer volume as the fader's parameter value, 0 to 1; Live documents no dB law for it (0.85 is 0 dB on Live's fader, by observation)" }
   tracks.*.num_devices: { type: int, description: "Number of devices on the track, as last read" }
   tracks.*.sends.*.level: { type: float, description: "Send level, 0 to 1, as last read or set here (sends are not listened to)" }
   tracks.*.slots.*.controls_other_clips: { type: bool, description: "A group slot whose fire launches clips of the grouped tracks" }
@@ -3115,3 +3115,12 @@ quirks:
       Live loads another Set is not documented. On /live/startup every listener is
       registered and the Set read again; after loading a Set without it, call
       resync.
+  - models: [all]
+    severity: info
+    text: >
+      Levels are kept as Live gives them, without dB: the Live Object Model gives a track's output
+      meters as 0.0 to 1.0 with no scale (Track: output_meter_left, output_meter_right,
+      output_meter_level) and the mixer's volume and sends as DeviceParameter values with no range or
+      law (MixerDevice), and AbletonOSC sends the raw values. 0.85 reading 0 dB on Live's volume fader
+      is observed behaviour, not documented; Live's own dB text for a mixer parameter is not offered by
+      AbletonOSC.

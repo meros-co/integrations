@@ -65,6 +65,14 @@ fn answer(core: &mut CoreState, req: &Value) -> Vec<Value> {
             "Status": {"Code": 0, "String": "OK"}
         }))],
         "NoOp" => vec![ok(json!(true))],
+        // QRC Commands, Component.GetComponents and Component.GetControls.
+        "Component.GetComponents" => vec![ok(json!([
+            {"Name": "Gain1", "Type": "gain", "Properties": []}
+        ]))],
+        "Component.GetControls" => vec![ok(json!({"Name": req["params"]["Name"], "Controls": [
+            {"Name": "gain", "Type": "Float", "Value": -12.0, "String": "-12.0dB", "Position": 0.8},
+            {"Name": "mute", "Type": "Boolean", "Value": 0.0, "String": "unmuted", "Position": 0.0}
+        ]}))],
         "ChangeGroup.AddControl" => {
             for c in req["params"]["Controls"].as_array().unwrap() {
                 core.group.push(c.as_str().unwrap().to_string());
@@ -204,6 +212,12 @@ async fn qrc_end_to_end() {
         s["engine"]["platform"] == "Core 510i" && s["engine"]["state"] == "Active"
     })
     .await;
+    // The design's components and their control names, names only.
+    wait_for_state(&core, id, |s| {
+        s["design"]["components"]["Gain1"] == json!({"type": "gain", "controls": ["gain", "mute"]})
+    })
+    .await;
+    assert!(core.snapshot(id).unwrap().state["components"].is_null());
 
     // A change group of one named control; AutoPoll starts by itself and its
     // first result reports the control.
@@ -251,10 +265,12 @@ async fn qrc_end_to_end() {
     let sent = requests(&log.lock().unwrap().clone());
     let methods: Vec<&str> = sent.iter().map(|r| r["method"].as_str().unwrap()).collect();
     assert_eq!(
-        &methods[..6],
+        &methods[..8],
         [
             "Logon",
             "StatusGet",
+            "Component.GetComponents",
+            "Component.GetControls",
             "ChangeGroup.AddControl",
             "ChangeGroup.AutoPoll",
             "Control.Set",
@@ -266,9 +282,10 @@ async fn qrc_end_to_end() {
         json!({"jsonrpc": "2.0", "id": 1, "method": "Logon",
             "params": {"User": "control", "Password": "1234"}})
     );
-    assert_eq!(sent[3]["params"], json!({"Id": "meros", "Rate": 0.5}));
+    assert_eq!(sent[3]["params"], json!({"Name": "Gain1"}));
+    assert_eq!(sent[5]["params"], json!({"Id": "meros", "Rate": 0.5}));
     assert_eq!(
-        sent[4]["params"],
+        sent[6]["params"],
         json!({"Name": "MainGain", "Value": -12.0, "Ramp": 1.5})
     );
     core.close(id).await;

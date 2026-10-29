@@ -64,6 +64,20 @@ transport:
   reply_match: '^(OK|OKm|ERROR) '
   probe: devstatus runmode
 
+conversions:
+  # Meter steps 00-7E are -126 to 0 dBFS, one dB a step; 7F is OVER (DME7
+  # Remote Control Protocol Specifications V1.1.0, 5.1 p.50).
+  yamaha_meter:
+    points: [[0, -126.0], [126, 0.0]]
+
+settings:
+  # Meters are a continuous stream, so they are asked for only when the
+  # operator turns them on.
+  meters: { type: bool, default: false, label: Meters,
+    description: "On asks the console for its meters (mtrstart) and keeps them in state in dBFS; off leaves them alone." }
+  meter_interval_ms: { type: int, min: 40, max: 10000, default: 100, label: Meter interval,
+    description: "Least time between meter notifications in milliseconds, 40 to 10000." }
+
 ports:
   - { port: 49280, protocol: tcp, role: control }
 
@@ -11256,9 +11270,14 @@ quirks:
       time (the DME7 document adds one second), freeing the slot after a controller vanishes; without
       it a half-open connection can block new ones (DME7 spec 2-8 p.15). After it is set the controller
       must send something, a command or a lone LF, within the interval, which this spec cannot schedule;
-      use it only where the host sends traffic regularly. Meter data (mtrstart and NOTIFY mtr) is not
-      covered: Yamaha documents no console meter addresses and the format cannot map a variable-length
-      meter list to per-channel state.
+      use it only where the host sends traffic regularly. Meters are kept in state with the meters setting on: Yamaha documents no console meter
+      addresses, so they are the console's own meter list (its mtrinfo answers, as recorded in the
+      Companion module's dump), asked for with mtrstart without the Meter segment as the Companion
+      module sends it; the notification's layout (a type word, then one two-digit hexadecimal value per
+      channel) and the dB table are the DME7 document's (3.2.3 p.10, 5.1 p.50), not a console document's. Scene titles are read with ssinfot_ex MIXER:Lib/Scene, as the Companion
+      module reads them for the current scene; the reply's layout is the DME7 document's ssinfo_ex (3-19
+      p.31). Scene numbers are text (x.xx) with no list of the scenes stored, so only the scenes made current or
+      recalled are read.
   - models:
       - all
     severity: warning
@@ -11302,6 +11321,32 @@ quirks:
       the MonitorMix PIN and has no query here, so the PIN is never read back or stored.
 
 state:
+  mixes.*.meter:
+    type: int
+    description: 'Mix bus meter as sent (MIXER:Current/Meter/Mix, post-ON; NOTIFY mtr), with the meters setting on: 0-126 for -126 to 0 dBFS, 127 OVER'
+  mixes.*.meter_db:
+    type: float
+    unit: dB
+    description: 'Mix bus meter in dBFS, -126 to 0, with the meters setting on; not written while the meter reads OVER (127), which meter says'
+  matrices.*.meter:
+    type: int
+    description: 'Matrix meter as sent (MIXER:Current/Meter/Mtrx, post-ON; NOTIFY mtr), with the meters setting on: 0-126 for -126 to 0 dBFS, 127 OVER'
+  matrices.*.meter_db:
+    type: float
+    unit: dB
+    description: 'Matrix meter in dBFS, -126 to 0, with the meters setting on; not written while the meter reads OVER (127), which meter says'
+  scene.list.*.number_text:
+    type: string
+    description: 'Scene number as the console shows it (ssinfo_ex); keyed by scene number as text (x.xx), for the scenes read: the current or recalled one'
+  scene.list.*.title:
+    type: string
+    description: 'Scene title, as sent with its escapes (ssinfo_ex); keyed by scene number as text (x.xx), for the scenes read: the current or recalled one'
+  scene.list.*.comment:
+    type: string
+    description: 'Scene comment, as sent with its escapes (ssinfo_ex); keyed by scene number as text (x.xx), for the scenes read: the current or recalled one'
+  scene.list.*.attribute:
+    type: string
+    description: 'Scene attribute: user for a stored scene, empty, preinst or reserve (ssinfo_ex); keyed by scene number as text (x.xx), for the scenes read: the current or recalled one'
   cue.*.active:
     type: string
     description: 'Active cue (Table 1) (MIXER:Current/Cue/ActiveCue): one of the listed strings'
@@ -12160,6 +12205,15 @@ state:
     description: 'Alert status: none, or flt/err/wrn alert text (devstatus error)'
 
 telemetry:
+  # With the meters setting on, the meters of the console's meter list
+  # (its mtrinfo answers) are asked for; notifications stop after 10
+  # seconds unless asked again (DME7 document 2-16 p.22), so they are
+  # asked again every 9.
+  subscribe:
+    send:
+      - { when_set: meters, message: "mtrstart MIXER:Current/Mix/PostOn {settings.meter_interval_ms}" }
+      - { when_set: meters, message: "mtrstart MIXER:Current/Mtrx/PostOn {settings.meter_interval_ms}" }
+    every_ms: 9000
   poll:
     send:
       - devinfo productname
@@ -13464,6 +13518,30 @@ telemetry:
       - get MIXER:Current/St/Label/Name 2 0
       - get MIXER:Current/St/Label/Name 3 0
   updates:
+    # Meters (NOTIFY mtr): two hexadecimal digits a meter, in the order
+    # of the console's channels (DME7 document 3.2.3 p.10, 5.1 p.50).
+    - match: '^NOTIFY mtr MIXER:Current/(?:Meter/)?Mix(?:/[A-Za-z]+)? [a-z][a-z0-9+]*((?: [0-9A-Fa-f]{2})+)\s*$'
+      match_each: '([0-9A-Fa-f]{2})'
+      match_each_in: 1
+      state:
+        mixes.{index:+1}.meter: '{2:hex}'
+        mixes.{index:+1}.meter_db: '{2:hex:from.yamaha_meter}'
+    - match: '^NOTIFY mtr MIXER:Current/(?:Meter/)?Mtrx(?:/[A-Za-z]+)? [a-z][a-z0-9+]*((?: [0-9A-Fa-f]{2})+)\s*$'
+      match_each: '([0-9A-Fa-f]{2})'
+      match_each_in: 1
+      state:
+        matrices.{index:+1}.meter: '{2:hex}'
+        matrices.{index:+1}.meter_db: '{2:hex:from.yamaha_meter}'
+    # Scene titles (ssinfot_ex, the text-numbered form of ssinfo_ex, DME7
+    # document 3-19 p.31), read for the scene made current or recalled.
+    - match: '^OK ssinfot?(?:_ex)? MIXER:Lib/Scene "?([0-9]{1,3}\.[0-9]{2})"? "((?:[^"\\]|\\.)*)" "((?:[^"\\]|\\.)*)" "((?:[^"\\]|\\.)*)" (\w+)\s*$'
+      state:
+        scene.list.{1:key}.number_text: '{2}'
+        scene.list.{1:key}.title: '{3}'
+        scene.list.{1:key}.comment: '{4}'
+        scene.list.{1:key}.attribute: '{5}'
+    - match: '^(?:OK|NOTIFY) (?:sscurrentt_ex|ssrecallt_ex) MIXER:Lib/Scene "?([0-9]{1,3}\.[0-9]{2})"?(?: .*)?$'
+      then_send: ['ssinfot_ex MIXER:Lib/Scene "{1}"']
     - match: ^OK devinfo productname "?([^"]*?)"?\s*$
       state:
         device.product_name: '{1}'
