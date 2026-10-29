@@ -1,10 +1,21 @@
 spec: 1
 id: nmos-registry
-name: AMWA NMOS registry (IS-04 Query API, with websocket subscriptions)
+name: AMWA NMOS registry (IS-04 Query API with websocket subscriptions, IS-05 connections through it)
 vendor: AMWA (NMOS specifications; any NMOS registry)
 category: router
 
 source:
+  - title: AMWA IS-05 NMOS Device Connection Management Specification v1.1.2
+    author: Advanced Media Workflow Association (AMWA)
+    url: https://specs.amwa.tv/is-05/v1.1.2/
+    note: >
+      Apache 2.0 specification, for the IS-05 commands the extension answers:
+      APIs/ConnectionAPI.raml (single/receivers and single/senders, their
+      staged PATCH and active GET), receiver-stage-schema.json and
+      sender-stage-schema.json, activation-schema.json (activate_immediate),
+      and docs "Interoperability - IS-04" (the Device's
+      urn:x-nmos:control:sr-ctrl/<version> control naming the Connection API,
+      and the Sender's manifest_href as its transport file).
   - title: AMWA IS-04 NMOS Discovery and Registration Specification v1.3.3
     author: Advanced Media Workflow Association (AMWA)
     url: https://specs.amwa.tv/is-04/v1.3.3/
@@ -67,6 +78,7 @@ settings:
 
 ports:
   - { port: null, protocol: http, role: control, note: "the Query API port has no standard number: it is given when the registry is opened, from its _nmos-query._tcp SRV record or its configuration" }
+  - { port: null, protocol: http, role: control, note: "each Node's Connection API (IS-05), at the address its Device's sr-ctrl control names, for the IS-05 commands; and a Sender's manifest_href for its transport file" }
   - { port: null, protocol: ws, role: push, note: "each subscription's websocket, at the ws_href the registry names (usually the Query API's port)" }
   - { port: 5353, protocol: udp, role: discovery, note: "mDNS / DNS-SD: _nmos-query._tcp" }
   - { port: 53, protocol: udp, role: discovery, note: "unicast DNS-SD: _nmos-query._tcp in the site's DNS domain, asked of its DNS servers" }
@@ -91,6 +103,12 @@ models:
       - get_subscription
       - create_subscription
       - delete_subscription
+      - connect_receiver
+      - disconnect_receiver
+      - stage_receiver
+      - stage_sender
+      - get_receiver_active
+      - get_sender_active
     verification: none
     notes: >
       A registry of any vendor, such as nmos-cpp's, Sony's NMOS registry or
@@ -256,6 +274,53 @@ commands:
     expect: { status: [200, 204] }
     returns: ack
     # QueryAPI.raml: 204, or 403 for a non-persistent subscription
+
+  # IS-05 on each Node, answered by the nmos-query-websocket extension: it
+  # finds the Node's Connection API through the registry (the resource's
+  # Device and its urn:x-nmos:control:sr-ctrl control) and makes the request
+  # there. The registry's receivers state follows through its subscription.
+  connect_receiver:
+    summary: "Connect a Receiver to a Sender at once: finds the Receiver's Connection API and the Sender's transport file (manifest_href) through the registry, then PATCH staged with activate_immediate (IS-05); returns the staged parameters the Node answers"
+    params:
+      receiver_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Receiver id, description: "The Receiver to connect, a UUID as receivers.<id> in state lists it." }
+      sender_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Sender id, description: "The Sender to receive, a UUID as senders.<id> in state lists it." }
+    returns: value
+  disconnect_receiver:
+    summary: "Disconnect a Receiver at once (no Sender, master enable off) on its Node's Connection API, found through the registry; returns the staged parameters the Node answers"
+    params:
+      receiver_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Receiver id, description: "The Receiver to disconnect, a UUID as receivers.<id> in state lists it." }
+    returns: value
+  stage_receiver:
+    summary: "Stage a Receiver's parameters and activation as the IS-05 receiver-stage-schema gives them (scheduled activations, transport parameters, cancelling one) on its Node, found through the registry"
+    params:
+      receiver_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Receiver id, description: "The Receiver to change, a UUID as receivers.<id> in state lists it." }
+      staged: { type: json, required: true, label: Staged parameters,
+        description: "The PATCH body in the shape of the IS-05 receiver-stage-schema: sender_id, master_enable, activation, transport_file and transport_params." }
+    returns: value
+  stage_sender:
+    summary: "Stage a Sender's parameters and activation as the IS-05 sender-stage-schema gives them (master enable, receiver_id, transport parameters) on its Node, found through the registry"
+    params:
+      sender_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Sender id, description: "The Sender to change, a UUID as senders.<id> in state lists it." }
+      staged: { type: json, required: true, label: Staged parameters,
+        description: "The PATCH body in the shape of the IS-05 sender-stage-schema: receiver_id, master_enable, activation and transport_params." }
+    returns: value
+  get_receiver_active:
+    summary: "Read a Receiver's active IS-05 parameters (GET single/receivers/{id}/active) on its Node, found through the registry"
+    params:
+      receiver_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Receiver id, description: "The Receiver to read, a UUID as receivers.<id> in state lists it." }
+    returns: value
+  get_sender_active:
+    summary: "Read a Sender's active IS-05 parameters (GET single/senders/{id}/active) on its Node, found through the registry"
+    params:
+      sender_id: { type: string, required: true, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        label: Sender id, description: "The Sender to read, a UUID as senders.<id> in state lists it." }
+    returns: value
 telemetry:
   # The nmos-query-websocket extension subscribes to each resource type and
   # offers every update as {"nmos": <type>, "op": sync, set or delete, ...}:
@@ -517,9 +582,11 @@ quirks:
       DNS-SD over the site's DNS servers (dns-sd). State comes from six
       non-persistent websocket subscriptions, one per resource type; each starts
       with the whole list, so a reconnection leaves nothing stale. The Query API
-      is read only: connections are made on each Node with nmos-node, whose
-      address and Connection API are in nodes.*.api_endpoints and
-      devices.*.controls.
+      is read only: the IS-05 commands (connect_receiver and the rest) find each
+      Node's Connection API through the registry, from the resource's Device's
+      controls, and make the connection there, so routing needs no device per
+      Node; a Node can also be opened with nmos-node for its full IS-05, IS-07
+      and IS-08 control.
 
   - models: [all]
     severity: info

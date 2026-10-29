@@ -147,6 +147,8 @@ mod nec_display;
 mod nec_projector;
 #[cfg(feature = "nec-projector")]
 mod nec_projector_models;
+#[cfg(feature = "nmos-registry")]
+mod nmos_connect;
 #[cfg(feature = "nmos-node")]
 mod nmos_events;
 #[cfg(feature = "nmos-node")]
@@ -331,6 +333,10 @@ pub(crate) fn construct(
         if extension == Some("hyperdeck-ftp") {
             return Ok(Box::new(hyperdeck_ftp::HyperdeckFtp::new(engine, &context)));
         }
+        #[cfg(feature = "nmos-registry")]
+        if extension == Some("nmos-query-websocket") {
+            return Ok(Box::new(nmos_query::NmosQuery::new(engine, &context)));
+        }
         // The other native extensions only keep state current, so a device
         // opened for commands only runs on the engine alone.
         let extension = if context.monitor { extension } else { None };
@@ -356,10 +362,6 @@ pub(crate) fn construct(
             Some("ma-msc-ethernet") => Ok(Box::new(ma_msc::MaMsc::new(engine, &context))),
             #[cfg(feature = "behringer-wing")]
             Some("wing-meters") => Ok(Box::new(wing_meters::WingMeters::new(engine, &context))),
-            #[cfg(feature = "nmos-registry")]
-            Some("nmos-query-websocket") => {
-                Ok(Box::new(nmos_query::NmosQuery::new(engine, &context)))
-            }
             Some(other) => Err(format!("no native extension '{other}'")),
         };
     }
