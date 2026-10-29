@@ -4339,11 +4339,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## spx-graphics — SPX Graphics Controller
 
-- [ ] Record what SPX Production and SPX Broadcast answer for a wrong or missing API key (SPX Solo's code answers 200 with {"error": ...}). ([specs/spx-graphics.yaml:518](specs/spx-graphics.yaml#L518))
-- [ ] Record the reply of rundown/get on SPX Broadcast and confirm it is the rundown file (templates with itemID, onair as "true"/"false", playserver, playchannel, playlayer, webplayout, relpath, out, DataFields). ([specs/spx-graphics.yaml:534](specs/spx-graphics.yaml#L534))
-- [ ] Record the replies of getprojects, getrundowns, allrundowns, gettemplates, getlayerstate and getFileList, so more of them can be kept in state. ([specs/spx-graphics.yaml:539](specs/spx-graphics.yaml#L539))
-- [ ] Check whether the commercial editions answer the controller commands with 200 and the same JSON as SPX Solo, and the status of an unknown item id. ([specs/spx-graphics.yaml:516](specs/spx-graphics.yaml#L516))
+- [ ] Record what SPX Production and SPX Broadcast answer for a wrong or missing API key (SPX Solo's code answers 200 with {"error": ...}). ([specs/spx-graphics.yaml:538](specs/spx-graphics.yaml#L538))
+- [ ] Record the reply of rundown/get on SPX Broadcast and confirm it is the rundown file (templates with itemID, onair as "true"/"false", playserver, playchannel, playlayer, webplayout, relpath, out, DataFields). ([specs/spx-graphics.yaml:554](specs/spx-graphics.yaml#L554))
+- [ ] Record the replies of getprojects, getrundowns, allrundowns, gettemplates, getlayerstate and getFileList, so more of them can be kept in state. ([specs/spx-graphics.yaml:559](specs/spx-graphics.yaml#L559))
+- [ ] Check whether the commercial editions answer the controller commands with 200 and the same JSON as SPX Solo, and the status of an unknown item id. ([specs/spx-graphics.yaml:536](specs/spx-graphics.yaml#L536))
 - [ ] Check that a load_rundown file value with its slash percent-encoded (%2F) is read as project/rundown. ([specs/spx-graphics.yaml:195](specs/spx-graphics.yaml#L195))
+- [ ] Confirm getrundowns?project= answers an array of rundown names on SPX Broadcast, and rundown/load answers {APIcmd: RundownLoad, file} as SPX's open code does. ([specs/spx-graphics.yaml:560](specs/spx-graphics.yaml#L560))
 
 ## stagetimer — Stagetimer
 

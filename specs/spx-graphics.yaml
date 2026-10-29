@@ -489,6 +489,23 @@ telemetry:
       json: { name: "$" }
       replace: projects
       state: { "projects.{name:key}": "true" }
+      # Each project's rundowns, by name.
+      then_send:
+        - { method: GET, path: /api/v1/getrundowns, query: { project: "{name}", apikey: "{settings.apikey}" } }
+    - path: "^/api/v1/getrundowns\\?project=([^&]*)"
+      json_match: { "$": "^\\[" }
+      json_each: "$"
+      json: { name: "$" }
+      replace: "rundowns.{1:url_decode:key}"
+      state: { "rundowns.{1:url_decode:key}.{name:key}": "true" }
+    # rundown/load answers {info, APIcmd: RundownLoad, file: "Project/Rundown"}
+    # (SPX's routes-api-v1.js): the rundown this connection opened.
+    - path: "^/api/v1/rundown/load"
+      json_match: { "$.APIcmd": "^RundownLoad$", "$.file": "^([^/]*)/(.*)$" }
+      json: {}
+      state:
+        rundown.project: "{1}"
+        rundown.name: "{2}"
 
 state:
   system.product: { type: string, description: "Product name SPX reports, such as SPX Solo" }
@@ -508,6 +525,9 @@ state:
   rundown.items.*.out: { type: string, description: "How the item leaves: manual, or a duration" }
   rundown.items.*.fields.*: { type: string, description: "Value of each template field (f0, f1, ...) of the item" }
   projects.*: { type: bool, description: "Each project SPX holds, keyed by name; always true" }
+  rundowns.*.*: { type: bool, description: "Each rundown of each project, keyed by project and rundown name (getrundowns); always true" }
+  rundown.project: { type: string, description: "Project of the rundown this connection last opened with load_rundown" }
+  rundown.name: { type: string, description: "Name of the rundown this connection last opened with load_rundown, without .json" }
 
 quirks:
   - models: [all]
@@ -537,7 +557,13 @@ quirks:
       itemID, onair ("true" or "false"), playserver, playchannel, playlayer,
       webplayout, relpath, out and DataFields. Items without an itemID are not
       kept. The page warns that getlayerstate may not show templates loaded
-      through the API, so it is a command, not state.
+      through the API, so it is a command, not state. Each project's rundowns are
+      read after each project list (getrundowns). Neither rundown/get nor any
+      other read names the rundown open in the controller (the rundown file
+      holds its items, not its name), so rundown.project and rundown.name
+      come from the answer to this connection's own load_rundown (on every
+      edition, {"APIcmd": "RundownLoad", "file": "Project/Rundown"}); a
+      rundown opened in SPX's own interface is not seen.
   - models: [all]
     severity: critical
     text: >
