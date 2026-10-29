@@ -199,8 +199,11 @@ def check_template(
             if decl is None:
                 errors.append(f"{where}: unknown setting '{key}'")
                 continue
+            # A selection setting (`select`): what names it waits until it is
+            # chosen (SPEC.md §2, Settings chosen after signing in).
             always_present = (
                 decl.get("required") or "default" in decl or key == conditional_setting
+                or "select" in decl
             )
         else:
             decl = params.get(name)
@@ -1632,6 +1635,70 @@ def expand_serial(doc: dict) -> list[str]:
     return errors
 
 
+def names_setting(item, name: str) -> bool:
+    """Whether a message names `{settings.<name>}` (with or without
+    directives)."""
+    text = item if isinstance(item, str) else json.dumps(item)
+    return re.search(r"\{settings\." + re.escape(name) + r"[}:]", text) is not None
+
+
+def select_checks(doc: dict) -> list[str]:
+    """Settings chosen after signing in (`select`, SPEC.md §2): optional, with
+    a command listing the choices that works before they are chosen."""
+    errors = []
+    settings = doc.get("settings") or {}
+    commands = doc.get("commands") or {}
+    for name, setting in settings.items():
+        select = (setting or {}).get("select")
+        if select is None:
+            continue
+        where = f"settings.{name}.select"
+        if setting.get("required") or "default" in setting:
+            errors.append(f"settings.{name}: a select setting is chosen after opening; neither required nor given a default")
+        command = commands.get(select.get("command"))
+        if command is None:
+            errors.append(f"{where}: no command '{select.get('command')}'")
+            continue
+        if doc.get("implementation") != "native" and names_setting(command.get("send"), name):
+            errors.append(f"{where}: '{select['command']}' names the setting it lists the choices for")
+        if command.get("returns") != "value":
+            errors.append(f"{where}: '{select['command']}' must return the list (returns: value)")
+        if "id_match" in select:
+            try:
+                if re.compile(select["id_match"]).groups < 1:
+                    errors.append(f"{where}.id_match: the id is its first group")
+            except re.error as exc:
+                errors.append(f"{where}.id_match: {exc}")
+        state = doc.get("state") or {}
+        for path in select.get("clears") or []:
+            if not any(k == path or k.startswith(path + ".") for k in state):
+                errors.append(f"{where}.clears: '{path}' is no declared state")
+        for param, other in (select.get("params") or {}).items():
+            if param not in (command.get("params") or {}):
+                errors.append(f"{where}.params: '{select['command']}' has no parameter '{param}'")
+            if other not in settings or other == name:
+                errors.append(f"{where}.params: '{other}' is not another setting")
+        if not any(select["command"] in (m.get("supports") or []) for m in doc.get("models") or []):
+            errors.append(f"{where}: no model supports '{select['command']}'")
+    return errors
+
+
+def polled_checks(doc: dict) -> list[str]:
+    """`polled.<group>` is the core's own state (SPEC.md §8): a spec declares
+    none, and its poll groups' names are unique."""
+    errors = []
+    native = doc.get("implementation") == "native"
+    if not native and any(k == "polled" or k.startswith("polled.") for k in (doc.get("state") or {})):
+        errors.append("state: polled.* is the core's own; leave it out")
+    poll = (doc.get("telemetry") or {}).get("poll")
+    if isinstance(poll, list):
+        names = [g.get("name") or str(i + 1) for i, g in enumerate(poll)]
+        for n in set(names):
+            if names.count(n) > 1:
+                errors.append(f"telemetry.poll: two groups named '{n}'")
+    return errors
+
+
 def label_checks(doc: dict) -> list[str]:
     """Every parameter and setting has a label and a description (SPEC.md §4)."""
     errors = []
@@ -1686,7 +1753,7 @@ def main() -> int:
 
         errors = expand_serial(doc)
         errors += cross_field_checks(doc, rel) + port_checks(doc) + serial_checks(doc) + midi_checks(doc) + label_checks(doc)
-        errors += pacing_checks(doc) + acknowledge_checks(doc)
+        errors += pacing_checks(doc) + acknowledge_checks(doc) + select_checks(doc) + polled_checks(doc)
 
         # Spec ids are the consumer-facing contract; they must be unique.
         spec_id = doc["id"]

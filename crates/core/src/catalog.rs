@@ -146,6 +146,10 @@ pub struct CommandSpec {
     pub send: Option<Value>,
     #[serde(default, skip_serializing)]
     pub expect: Option<Value>,
+    /// The selection settings (`select`) the command's messages name: it
+    /// fails until each is chosen. Worked out from the spec, not declared.
+    #[serde(default, skip_deserializing, skip_serializing_if = "Vec::is_empty")]
+    pub needs: Vec<String>,
     /// How long each of the command's messages may wait for its answer, in
     /// place of the transport's timeout: a firmware upload or a slow
     /// operation the vendor documents (SPEC.md §4, "Timeouts").
@@ -198,6 +202,87 @@ pub struct ParamSpec {
     /// not declare it on a setting itself.
     #[serde(default, skip_deserializing, skip_serializing_if = "Option::is_none")]
     pub default_by_model: Option<BTreeMap<String, Value>>,
+    /// A setting that picks one of the account's things (a broadcast, a
+    /// channel, a plan): it may be left empty when the device is opened, and
+    /// `command` lists the choices (SPEC.md §2, "Settings chosen after
+    /// signing in").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub select: Option<Select>,
+}
+
+/// A selection setting's choices (SPEC.md §2, "Settings chosen after
+/// signing in"): the command listing them, and where each choice's id and
+/// name are in its result.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Select {
+    /// The command that lists the choices; it does not name the setting, so
+    /// it works before the setting is chosen.
+    pub command: String,
+    /// The JSON path of the array of choices in the command's result; the
+    /// result itself when left out (an array, or one object, one choice).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub items: Option<String>,
+    /// The JSON path of a choice's id, the setting's value, in each choice.
+    pub id: String,
+    /// A regex whose first group is the id within the text at `id`, for a
+    /// service that names a thing by a path (Vimeo's `/live_events/123`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id_match: Option<String>,
+    /// The JSON path of the name a person chooses by, in each element.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// The command's parameters that take the value of another setting,
+    /// chosen first: parameter name to setting name.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub params: BTreeMap<String, String>,
+    /// State that belongs to the thing chosen and is not keyed by it: each
+    /// path, and everything under it, leaves state when the choice changes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub clears: Vec<String>,
+}
+
+/// Whether a `send` item, probe or message names `{settings.<name>}`.
+pub(crate) fn names_setting(item: &Value, name: &str) -> bool {
+    let text = match item {
+        Value::String(s) => std::borrow::Cow::Borrowed(s.as_str()),
+        other => std::borrow::Cow::Owned(other.to_string()),
+    };
+    let needle = format!("{{settings.{name}");
+    text.match_indices(&needle)
+        .any(|(at, _)| matches!(text.as_bytes().get(at + needle.len()), Some(b'}' | b':')))
+}
+
+/// Each poll group's key under `polled` in state (SPEC.md §8, "When each
+/// poll group was last answered"): its `name`, or its place from 1.
+pub(crate) fn poll_group_names(telemetry: Option<&Value>) -> Vec<String> {
+    match telemetry.and_then(|t| t.get("poll")) {
+        Some(Value::Array(groups)) => groups
+            .iter()
+            .enumerate()
+            .map(|(i, g)| {
+                g.get("name")
+                    .and_then(Value::as_str)
+                    .map_or_else(|| (i + 1).to_string(), str::to_string)
+            })
+            .collect(),
+        Some(_) => vec!["1".into()],
+        None => Vec::new(),
+    }
+}
+
+/// Whether a spec-driven transport waits for the answer to each poll item,
+/// so a poll group's answers can be timed: HTTP and OSC over TCP always, a
+/// line or OSC transport whose device answers, a websocket whose replies
+/// `reply_match` tells from its pushes.
+pub(crate) fn polls_answered(transport: &Value) -> bool {
+    let reply = transport.get("reply").and_then(Value::as_str);
+    match transport.get("type").and_then(Value::as_str) {
+        Some("http" | "osc-tcp") => true,
+        Some("line-tcp" | "line-serial") => reply != Some("none"),
+        Some("osc-udp" | "line-udp") => reply == Some("to-source"),
+        Some("ws") => reply != Some("none") && transport.get("reply_match").is_some(),
+        _ => false,
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -338,7 +423,138 @@ impl DeviceSpec {
     pub(crate) fn from_yaml(text: &str) -> Result<DeviceSpec, String> {
         let mut spec: DeviceSpec = crate::yaml::from_str(text).map_err(|e| e.to_string())?;
         spec.expand_serial()?;
+        spec.expand_select()?;
+        spec.expand_polled()?;
         Ok(spec)
+    }
+
+    /// The settings chosen after signing in (`select`): each is checked, and
+    /// each command lists those its messages name in `needs`.
+    fn expand_select(&mut self) -> Result<(), String> {
+        let selects: Vec<(String, Select)> = self
+            .settings
+            .iter()
+            .filter_map(|(n, s)| s.select.clone().map(|sel| (n.clone(), sel)))
+            .collect();
+        for (name, select) in &selects {
+            let setting = &self.settings[name];
+            if setting.required || setting.default.is_some() {
+                return Err(format!(
+                    "settings.{name}: a select setting is chosen after opening, so it is \
+                     neither required nor given a default"
+                ));
+            }
+            let command = self.commands.get(&select.command).ok_or_else(|| {
+                format!("settings.{name}.select: no command '{}'", select.command)
+            })?;
+            if command.returns != "value" {
+                return Err(format!(
+                    "settings.{name}.select: '{}' must return the list (returns: value)",
+                    select.command
+                ));
+            }
+            if command
+                .send
+                .as_ref()
+                .is_some_and(|s| names_setting(s, name))
+            {
+                return Err(format!(
+                    "settings.{name}.select: '{}' names the setting it lists the choices for",
+                    select.command
+                ));
+            }
+            if let Some(pattern) = &select.id_match {
+                let re = Regex::new(pattern)
+                    .map_err(|e| format!("settings.{name}.select.id_match: {e}"))?;
+                if re.captures_len() < 2 {
+                    return Err(format!(
+                        "settings.{name}.select.id_match: the id is its first group"
+                    ));
+                }
+            }
+            for path in &select.clears {
+                let declared = self.state.keys().any(|k| {
+                    k == path
+                        || k.strip_prefix(path.as_str())
+                            .is_some_and(|rest| rest.starts_with('.'))
+                });
+                if !declared {
+                    return Err(format!(
+                        "settings.{name}.select.clears: '{path}' is no declared state"
+                    ));
+                }
+            }
+            for (param, from) in &select.params {
+                if !command.params.contains_key(param) {
+                    return Err(format!(
+                        "settings.{name}.select.params: '{}' has no parameter '{param}'",
+                        select.command
+                    ));
+                }
+                if !self.settings.contains_key(from) || from == name {
+                    return Err(format!(
+                        "settings.{name}.select.params: '{from}' is not another setting"
+                    ));
+                }
+            }
+        }
+        for command in self.commands.values_mut() {
+            let Some(send) = &command.send else { continue };
+            command.needs = selects
+                .iter()
+                .filter(|(n, _)| names_setting(send, n))
+                .map(|(n, _)| n.clone())
+                .collect();
+        }
+        Ok(())
+    }
+
+    /// The `polled.<group>` state of a spec-driven device whose transport
+    /// waits for each poll item's answer (SPEC.md §8).
+    fn expand_polled(&mut self) -> Result<(), String> {
+        if self.transport.is_some()
+            && self
+                .state
+                .keys()
+                .any(|k| k == "polled" || k.starts_with("polled."))
+        {
+            return Err("state: polled.* is the core's own; leave it out".into());
+        }
+        let Some(transport) = self.transport.as_ref() else {
+            return Ok(());
+        };
+        if !polls_answered(transport) {
+            return Ok(());
+        }
+        let telemetry = self.telemetry.as_ref();
+        let groups: Vec<Value> = match telemetry.and_then(|t| t.get("poll")) {
+            Some(Value::Array(g)) => g.clone(),
+            Some(one) => vec![one.clone()],
+            None => Vec::new(),
+        };
+        let names = poll_group_names(telemetry);
+        for (name, group) in names.iter().zip(&groups) {
+            let every = match group.get("every_ms").and_then(Value::as_u64) {
+                Some(ms) => format!("polled every {ms} ms"),
+                None => "read once on connecting".into(),
+            };
+            let key = format!("polled.{name}");
+            if self.state.contains_key(&key) {
+                return Err(format!("telemetry.poll: two groups named '{name}'"));
+            }
+            self.state.insert(
+                key,
+                StateField {
+                    kind: "int".into(),
+                    unit: Some("s".into()),
+                    description: format!(
+                        "When the poll group {name} ({every}) was last answered, in Unix \
+                         seconds: its data is as old as this"
+                    ),
+                },
+            );
+        }
+        Ok(())
     }
 
     /// The `serial` block of a `line-tcp` transport: the same protocol on a
@@ -805,6 +1021,7 @@ fn setting(kind: ParamType, label: &str, description: &str) -> ParamSpec {
         multiline: false,
         negative_infinity: false,
         default_by_model: None,
+        select: None,
     }
 }
 

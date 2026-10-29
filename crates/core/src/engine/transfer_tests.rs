@@ -204,7 +204,8 @@ fn a_paged_poll_replaces_its_list_once_with_every_page() {
         .take()
         .into_iter()
         .filter_map(|x| match x {
-            Action::State(s) => Some(s),
+            // The poll group's `polled` stamp aside (select_tests).
+            Action::State(s) if s.get("polled").is_none() => Some(s),
             _ => None,
         })
         .collect();

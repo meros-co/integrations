@@ -1190,6 +1190,30 @@ impl Cx {
     }
 }
 
+/// When each of a module's polls was last answered, kept in state as
+/// `polled.<group>` in whole Unix seconds, as the spec engine keeps it for a
+/// spec's poll groups (SPEC.md §8, "When each poll group was last
+/// answered"). A stamp is reported only when it moves on, so a poll answered
+/// many times a second reports once a second. The module's spec declares
+/// each `polled.<group>` it keeps in its `state`.
+#[derive(Debug, Default)]
+pub struct PollStamps {
+    last: Vec<(&'static str, u64)>,
+}
+
+impl PollStamps {
+    /// A poll of `group` was answered now.
+    pub fn answered(&mut self, cx: &mut Cx, group: &'static str) {
+        let now = cx.unix_millis() / 1000;
+        match self.last.iter_mut().find(|(g, _)| *g == group) {
+            Some((_, at)) if *at == now => return,
+            Some((_, at)) => *at = now,
+            None => self.last.push((group, now)),
+        }
+        cx.state(serde_json::json!({ "polled": { group: now } }));
+    }
+}
+
 /// A device protocol implementation.
 ///
 /// Commands reaching [`Module::command`] have already been checked against the

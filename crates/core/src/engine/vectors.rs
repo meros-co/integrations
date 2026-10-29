@@ -418,6 +418,11 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     // What the connection queued (polls) is dropped, so what the message
     // queues (`then_send`) is all that is left.
     engine.queue.clear();
+    // A message played as the answer to the poll item in flight shows the
+    // rules' state, not the poll group's `polled` stamp (SPEC.md §8).
+    if let Some(flight) = engine.current.as_mut() {
+        flight.job.group = None;
+    }
     // The engine knows the state the message arrives on, so a list read
     // again unchanged is reported as no change.
     if let (Some(mirror), Some(before)) = (engine.mirror.as_mut(), v.get("state_before")) {

@@ -68,6 +68,9 @@ asks for nothing but what commands and its connection check need, so it
 doesn't take a subscription slot the device has few of (a Behringer WING has
 one). Each device's most recent request-to-reply time is reported as
 `latency_ms` on its snapshot and `alive` events.
+Each polled group of state has a `polled.<group>` key, when the core last
+had an answer to it in Unix seconds, so a consumer can tell fresh data from
+stale.
 
 **Settings and credentials** belong to the consumer, and the core persists
 nothing. A device's settings can be changed while it is open with
@@ -83,6 +86,13 @@ signs the user in again and passes the new tokens with `update_settings`. A
 product that cannot ship its client secret points the `token_url` setting at
 its own token proxy. Where a service requires the token to be checked on a
 schedule (Twitch: on start and hourly), the core does that too.
+
+A cloud service that follows one of an account's things (a YouTube broadcast,
+a Twitch channel, a Planning Center plan) can be opened before it is chosen:
+such a setting carries `select` in the catalogue, naming the command that
+lists the choices. Until it is set, the commands that need it fail saying so
+(each command lists the settings it `needs`) and only account-level state is
+read; setting it with `update_settings` reads the choice at once.
 
 A consumer never calls a platform's API itself, sign-in aside. Facebook Live
 acts for a Page with that Page's access token, which the core also gets: the
