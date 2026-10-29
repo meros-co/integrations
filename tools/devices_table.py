@@ -67,6 +67,7 @@ NATIVE = {
     "generic-websocket": "Text, bytes or JSON over WebSocket (ws or wss)",
     "aes67-sap": "SAP with SDP on multicast UDP 9875 (239.255.255.255); hears and announces",
     "christie-pandorasbox": "Pandoras Box Automation binary messages over TCP 6211",
+    "citp-msex": "CITP/MSEX over TCP (the server's port, or the one its multicast PLoc names); preview frames on multicast UDP 4809",
     "epson-projector": "ESC/VP21 over ESC/VP.net (TCP 3629) or a serial port",
     "labgruppen-lake": "DLM over UDP 6016 (or 6015, answers on 6004)",
     "http-listener": "HTTP/1.1 requests from any sender (webhooks); receives",

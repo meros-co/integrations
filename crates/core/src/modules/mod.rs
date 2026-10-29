@@ -60,6 +60,8 @@ mod barco_projection_table;
 mod bss_london;
 #[cfg(feature = "christie-pandorasbox")]
 mod christie_pandorasbox;
+#[cfg(feature = "citp-msex")]
+mod citp;
 #[cfg(any(feature = "cyberpower-pdu", feature = "cyberpower-ups"))]
 mod cps_traps;
 #[cfg(feature = "cyberpower-pdu")]
@@ -405,6 +407,8 @@ pub(crate) fn construct(
         "sacn" => Ok(Box::new(sacn::Sacn::new(context)?)),
         #[cfg(feature = "posistagenet")]
         "posistagenet" => Ok(Box::new(posistagenet::Psn::new(context)?)),
+        #[cfg(feature = "citp-msex")]
+        "citp-msex" => Ok(Box::new(citp::Citp::new(context)?)),
         #[cfg(feature = "adder-aim")]
         "adder-aim" => Ok(Box::new(adder_aim::AdderAim::new(context)?)),
         #[cfg(feature = "integ-jnior")]

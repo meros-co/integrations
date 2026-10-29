@@ -289,7 +289,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the Remote Command Service listens on TCP 45678 and takes each command as a line ended by CR LF; the user guide does not say. ([specs/arkaos-mediamaster.yaml:49](specs/arkaos-mediamaster.yaml#L49))
 - [ ] Compare the command texts with those MediaMaster's TELNET tab shows (Cue:<n>, Controller:Play, Fullscreen:On, Properties:Mixing, View:Remote Player...), on MediaMaster 6 and later. ([specs/arkaos-mediamaster.yaml:68](specs/arkaos-mediamaster.yaml#L68))
 - [ ] Check whether the service ever answers (an acknowledgement or an error), and whether the cue player's state can be read in any way. ([specs/arkaos-mediamaster.yaml:12](specs/arkaos-mediamaster.yaml#L12))
-- [ ] Check what Controller:Final15 and Controller:Final30 do. ([specs/arkaos-mediamaster.yaml:164](specs/arkaos-mediamaster.yaml#L164))
+- [ ] Check what Controller:Final15 and Controller:Final30 do. ([specs/arkaos-mediamaster.yaml:170](specs/arkaos-mediamaster.yaml#L170))
 
 ## artnet — Art-Net 4 network
 
@@ -1285,6 +1285,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the External Update X command PRIME sends, so it can be read into state. ([specs/chyron-prime.yaml:63](specs/chyron-prime.yaml#L63))
 - [ ] Check that the UTF-8 encoding setting of the connection carries non-ASCII text correctly. ([specs/chyron-prime.yaml:769](specs/chyron-prime.yaml#L769))
 - [ ] Confirm SCENE_STATE answers *P\SCENE_STATE\<state>\\ for a scene name as SCENE_LIST gives it, without its project path. ([specs/chyron-prime.yaml:790](specs/chyron-prime.yaml#L790))
+
+## citp-msex — CITP/MSEX media servers
+
+- [ ] With ArKaos MediaMaster Pro, check that it sends a 1.0 SInf on connecting, ignores CInf, and answers MSEX 1.1 GELI, GEIn, GETh and GVSr as the specification lays them out. ([specs/citp-msex.yaml:193](specs/citp-msex.yaml#L193))
+- [ ] Check that servers send LSta regularly even while no layer changes, since 15 s without a message reopens the connection. ([specs/citp-msex.yaml:185](specs/citp-msex.yaml#L185))
+- [ ] Check that a media server's PLoc names its MSEX listening port, and that its StFr preview frames (JPEG or fJPG) arrive on 239.224.0.180 or 224.0.0.180 port 4809 after RqSt. ([specs/citp-msex.yaml:205](specs/citp-msex.yaml#L205))
 
 ## clock-8001 — Clock-8001
 
