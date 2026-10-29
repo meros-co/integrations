@@ -138,7 +138,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that an event connection id expires when no wait_for_config_events is made within a minute, and that the extension's back-to-back waits keep it alive over a long session. ([specs/aja-kipro.yaml:1482](specs/aja-kipro.yaml#L1482))
 - [ ] Check how the unit answers wait_for_config_events with an expired connection id (status code and body), since AJA does not document it and the extension reconnects on anything that is not a 2xx JSON array. ([specs/aja-kipro.yaml:1498](specs/aja-kipro.yaml#L1498))
 - [ ] Confirm which URL opens the event connection on each model and firmware, /json (AJA examples) or /config (2021 guide). ([specs/aja-kipro.yaml:1494](specs/aja-kipro.yaml#L1494))
-- [ ] On a Ki Pro GO and Ultra, check desc.json for eParamID_TransportState, eParamID_CurrentClip, eParamID_DisplayTimecode and eParamID_MediaState, and whether the 30-second poll errors on them. ([specs/aja-kipro.yaml:1525](specs/aja-kipro.yaml#L1525))
+- [ ] On a Ki Pro GO and Ultra, check desc.json for eParamID_TransportState, eParamID_CurrentClip, eParamID_DisplayTimecode and eParamID_MediaState, and whether the 30-second poll errors on them. ([specs/aja-kipro.yaml:1529](specs/aja-kipro.yaml#L1529))
 - [ ] On Ultra models, confirm the accepted range and format of eParamID_TransportRequestedSpeed (three decimals such as -1.500) for variable speed play. ([specs/aja-kipro.yaml:1578](specs/aja-kipro.yaml#L1578))
 - [ ] On Ultra Plus and 12G, confirm that set_sdi_monitor_channel works when sent with paramid= (AJA's chapter 6 URL omits it). ([specs/aja-kipro.yaml:1606](specs/aja-kipro.yaml#L1606))
 - [ ] On Ki Pro, Mini and Rack, check whether the deprecated /clips listing still uses unquoted JSON keys. ([specs/aja-kipro.yaml:1562](specs/aja-kipro.yaml#L1562))
@@ -3044,7 +3044,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether redundancy mode accepts manual and single, which sys.fixtures lists beside none, failover and seamless. ([specs/megapixel-helios.yaml:286](specs/megapixel-helios.yaml#L286))
 - [ ] List the test pattern type names the processor accepts. ([specs/megapixel-helios.yaml:3005](specs/megapixel-helios.yaml#L3005))
 - [ ] Check that a receiver's x, y and groupId can be written by MAC address. ([specs/megapixel-helios.yaml:426](specs/megapixel-helios.yaml#L426))
-- [ ] Record the status of a successful preset apply (200 is assumed) and of hide_still (204 is assumed, as for show). ([specs/megapixel-helios.yaml:458](specs/megapixel-helios.yaml#L458))
+- [ ] Record the status of a successful preset apply (200 is assumed) and of hide_still (204 is assumed, as for show). ([specs/megapixel-helios.yaml:605](specs/megapixel-helios.yaml#L605))
 - [ ] Check that the processor's receivers appear under dev.receivers keyed by MAC address in the state result and in updates, with the fields the 6.1.4 table lists. ([specs/megapixel-helios.yaml:704](specs/megapixel-helios.yaml#L704))
 
 ## meros-camera — Meros Camera
