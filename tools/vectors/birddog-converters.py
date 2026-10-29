@@ -136,3 +136,16 @@ _tel("analog-audio", "/analogaudiosetup", '{"AnalogAudioInGain":"80","AnalogAudi
      {"audio": {"in_gain": 80, "out_gain": 80, "output_select": "DecodeMain"}})
 _tel("discovery-server", "/NDIDisServer", '{"NDIDisServ":"NDIDisServEn","NDIDisServIP":"192.168.1.10"}',
      {"finder": {"discovery_server": True, "discovery_server_ip": "192.168.1.10"}})
+
+# The NDI finder's sources (NDI FINDER, /List): an object keyed by source
+# name, each name one key, the list replaced whole; {"None":"None"} is none.
+telemetry(BC, "ndi-sources", inbound_http={
+    "path": "/List", "body": '{"BIRDDOG-4C526 (Stream1)":"192.168.100.100:5961","studio.cam2 (CAM)":"192.168.100.101:5962"}'},
+    state_before={"ndi": {"sources": {"OLD (CAM)": {"address": "192.168.100.9:5961"}}}},
+    expect_state={"ndi": {"sources": {"BIRDDOG-4C526 (Stream1)": {"address": "192.168.100.100:5961"},
+                                      "studio.cam2 (CAM)": {"address": "192.168.100.101:5962"}}}})
+telemetry(BC, "ndi-sources-none", inbound_http={"path": "/List", "body": '{"None":"None"}'},
+          state_before={"ndi": {"sources": {"OLD (CAM)": {"address": "192.168.100.9:5961"}}}},
+          expect_state={"ndi": {}})
+telemetry(BC, "ndi-finder-reset-rereads", inbound_http={"path": "/reset", "body": '{"Status":"success"}'},
+          expect_then_send=[{"method": "GET", "target": "/List"}], expect_state={})
