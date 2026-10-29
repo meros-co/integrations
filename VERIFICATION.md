@@ -282,7 +282,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the Remote Command Service listens on TCP 45678 and takes each command as a line ended by CR LF; the user guide does not say. ([specs/arkaos-mediamaster.yaml:49](specs/arkaos-mediamaster.yaml#L49))
 - [ ] Compare the command texts with those MediaMaster's TELNET tab shows (Cue:<n>, Controller:Play, Fullscreen:On, Properties:Mixing, View:Remote Player...), on MediaMaster 6 and later. ([specs/arkaos-mediamaster.yaml:68](specs/arkaos-mediamaster.yaml#L68))
 - [ ] Check whether the service ever answers (an acknowledgement or an error), and whether the cue player's state can be read in any way. ([specs/arkaos-mediamaster.yaml:12](specs/arkaos-mediamaster.yaml#L12))
-- [ ] Check what Controller:Final15 and Controller:Final30 do. ([specs/arkaos-mediamaster.yaml:161](specs/arkaos-mediamaster.yaml#L161))
+- [ ] Check what Controller:Final15 and Controller:Final30 do. ([specs/arkaos-mediamaster.yaml:164](specs/arkaos-mediamaster.yaml#L164))
 
 ## artnet — Art-Net 4 network
 
@@ -1010,9 +1010,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## brightsign-udp — BrightSign players (UDP)
 
-- [ ] Confirm the default UDP Receiver Port of a new BrightSign Author presentation (5000 is assumed). ([specs/brightsign-udp.yaml:46](specs/brightsign-udp.yaml#L46))
-- [ ] Confirm the sample control script's command texts (PLAY, PLAYCL, LOOP, LOOPS, STOP, STOPCL, PAUSE, RESUME, SEARCH, VOLUME, REBOOT) on its current version. ([specs/brightsign-udp.yaml:86](specs/brightsign-udp.yaml#L86))
-- [ ] Confirm name:value and name:value!!name:value set user variables through an Input-specifies-variable UDP event. ([specs/brightsign-udp.yaml:79](specs/brightsign-udp.yaml#L79))
+- [ ] Confirm the default UDP Receiver Port of a new BrightSign Author presentation (5000 is assumed). ([specs/brightsign-udp.yaml:62](specs/brightsign-udp.yaml#L62))
+- [ ] Confirm the sample control script's command texts (PLAY, PLAYCL, LOOP, LOOPS, STOP, STOPCL, PAUSE, RESUME, SEARCH, VOLUME, REBOOT) on its current version. ([specs/brightsign-udp.yaml:108](specs/brightsign-udp.yaml#L108))
+- [ ] Confirm name:value and name:value!!name:value set user variables through an Input-specifies-variable UDP event. ([specs/brightsign-udp.yaml:101](specs/brightsign-udp.yaml#L101))
+- [ ] Confirm that BrightSign's current sample control script still broadcasts its responses to UDP 5001 with the v3.01E codes (PLAY, STOP, ENDP, READY...) and STATUS texts read here. ([specs/brightsign-udp.yaml:49](specs/brightsign-udp.yaml#L49))
+- [ ] Check that a response broadcast to 255.255.255.255:5001 comes from the player's own address, so it is taken by the device opened at that address. ([specs/brightsign-udp.yaml:194](specs/brightsign-udp.yaml#L194))
 
 ## brompton-tessera — Brompton Tessera
 
@@ -1123,12 +1125,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## chamsys-magicq-udp — ChamSys MagicQ (UDP remote)
 
 - [ ] Check where the "rx echo" mode sends its echo and whether a header is added. ([specs/chamsys-magicq-udp.yaml:781](specs/chamsys-magicq-udp.yaml#L781))
-- [ ] Confirm commands sent to the console's address (not broadcast) are received. ([specs/chamsys-magicq-udp.yaml:791](specs/chamsys-magicq-udp.yaml#L791))
-- [ ] Check the highest playback number the console accepts over the remote protocol (1-202, or 34 on consoles and 10 on PC). ([specs/chamsys-magicq-udp.yaml:806](specs/chamsys-magicq-udp.yaml#L806))
-- [ ] Check the bounds chosen where the manual is silent: attribute values 0-65535, times 0-3600 s, cue stack ids 1-10000, cue ids 1-65536. ([specs/chamsys-magicq-udp.yaml:814](specs/chamsys-magicq-udp.yaml#L814))
-- [ ] On QuickQ, check the jump cue form (whole numbers only) and the X zone range 0-10. ([specs/chamsys-magicq-udp.yaml:836](specs/chamsys-magicq-udp.yaml#L836))
-- [ ] Check whether QuickQ DIN accepts remote control. ([specs/chamsys-magicq-udp.yaml:852](specs/chamsys-magicq-udp.yaml#L852))
-- [ ] On MQ40 and MQ40N, confirm the remote protocol works. ([specs/chamsys-magicq-udp.yaml:830](specs/chamsys-magicq-udp.yaml#L830))
+- [ ] Confirm commands sent to the console's address (not broadcast) are received. ([specs/chamsys-magicq-udp.yaml:798](specs/chamsys-magicq-udp.yaml#L798))
+- [ ] Check the highest playback number the console accepts over the remote protocol (1-202, or 34 on consoles and 10 on PC). ([specs/chamsys-magicq-udp.yaml:813](specs/chamsys-magicq-udp.yaml#L813))
+- [ ] Check the bounds chosen where the manual is silent: attribute values 0-65535, times 0-3600 s, cue stack ids 1-10000, cue ids 1-65536. ([specs/chamsys-magicq-udp.yaml:821](specs/chamsys-magicq-udp.yaml#L821))
+- [ ] On QuickQ, check the jump cue form (whole numbers only) and the X zone range 0-10. ([specs/chamsys-magicq-udp.yaml:843](specs/chamsys-magicq-udp.yaml#L843))
+- [ ] Check whether QuickQ DIN accepts remote control. ([specs/chamsys-magicq-udp.yaml:859](specs/chamsys-magicq-udp.yaml#L859))
+- [ ] On MQ40 and MQ40N, confirm the remote protocol works. ([specs/chamsys-magicq-udp.yaml:837](specs/chamsys-magicq-udp.yaml#L837))
 
 ## characterworks — CharacterWorks
 
@@ -1979,13 +1981,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## grandma2 — MA Lighting grandMA2
 
-- [ ] Record exactly what the console sends over telnet after a failed Login, since a failed login cannot be detected now and every later command is silently discarded. ([specs/grandma2.yaml:1164](specs/grandma2.yaml#L1164))
-- [ ] Check what the console greets with before login (it claims the guest user) and whether that text differs from a logged-in session. ([specs/grandma2.yaml:1161](specs/grandma2.yaml#L1161))
-- [ ] Check whether Login "user" "" is accepted for a user without a password. ([specs/grandma2.yaml:1170](specs/grandma2.yaml#L1170))
-- [ ] Confirm the username is case sensitive over telnet ("administrator" against "Administrator"). ([specs/grandma2.yaml:1167](specs/grandma2.yaml#L1167))
-- [ ] Check whether At accepts a fractional percentage. ([specs/grandma2.yaml:1235](specs/grandma2.yaml#L1235))
-- [ ] Check the upper bounds of pool numbers and fixture and channel IDs (9999 and 99999 assumed). ([specs/grandma2.yaml:1226](specs/grandma2.yaml#L1226))
-- [ ] Check the units and ranges of Rate, Speed and MasterFade values. ([specs/grandma2.yaml:1237](specs/grandma2.yaml#L1237))
+- [ ] Record exactly what the console sends over telnet after a failed Login, since a failed login cannot be detected now and every later command is silently discarded. ([specs/grandma2.yaml:1195](specs/grandma2.yaml#L1195))
+- [ ] Check what the console greets with before login (it claims the guest user) and whether that text differs from a logged-in session. ([specs/grandma2.yaml:1192](specs/grandma2.yaml#L1192))
+- [ ] Check whether Login "user" "" is accepted for a user without a password. ([specs/grandma2.yaml:1201](specs/grandma2.yaml#L1201))
+- [ ] Confirm the username is case sensitive over telnet ("administrator" against "Administrator"). ([specs/grandma2.yaml:1198](specs/grandma2.yaml#L1198))
+- [ ] Check whether At accepts a fractional percentage. ([specs/grandma2.yaml:1266](specs/grandma2.yaml#L1266))
+- [ ] Check the upper bounds of pool numbers and fixture and channel IDs (9999 and 99999 assumed). ([specs/grandma2.yaml:1257](specs/grandma2.yaml#L1257))
+- [ ] Check the units and ranges of Rate, Speed and MasterFade values. ([specs/grandma2.yaml:1268](specs/grandma2.yaml#L1268))
+- [ ] Record the address grandMA2 sends MSC via Ethernet to (broadcast on the console's network, or a configured host), since the manual does not say. ([specs/grandma2.yaml:1632](specs/grandma2.yaml#L1632))
+- [ ] Confirm that MSC Out with Mode Ethernet sends the Exec.Page and Exec Page data the MSC In examples show (exec.page after the cue, or exec and page separated by 00). ([specs/grandma2.yaml:1625](specs/grandma2.yaml#L1625))
+- [ ] Confirm which events send MSC Out (Go, Timed_Go, Stop, Resume, Go_Off, Set, Fire) and that the length field counts the 12-byte header. ([specs/grandma2.yaml:1623](specs/grandma2.yaml#L1623))
+- [ ] Check the fader position MSC Set sends at full (7F 7F, read as 99.99 %). ([specs/grandma2.yaml:1643](specs/grandma2.yaml#L1643))
 
 ## grandma3 — MA Lighting grandMA3
 
@@ -2089,14 +2095,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## highend-hog4 — High End Systems Hog 4 / Hog OS
 
-- [ ] Confirm that playback commands take the object number as the argument (/hog/playback/go/0 with 15), as the manual says, and not in the address as the Companion module sends it. ([specs/highend-hog4.yaml:507](specs/highend-hog4.yaml#L507))
-- [ ] Check how goto_cue's float list.cue is read (15.2 sent as 15.19999981; cue 2 versus 20; point cues). ([specs/highend-hog4.yaml:516](specs/highend-hog4.yaml#L516))
-- [ ] Record the argument types of the status outputs (LED value, LED colour, command line, encoder and H-key labels, chat lines). ([specs/highend-hog4.yaml:497](specs/highend-hog4.yaml#L497))
-- [ ] Find the address the console uses for fader level status after consolefaderrefresh. ([specs/highend-hog4.yaml:491](specs/highend-hog4.yaml#L491))
-- [ ] Check the real ranges of H keys, U keys, encoder wheels and the trackball values per model. ([specs/highend-hog4.yaml:524](specs/highend-hog4.yaml#L524))
-- [ ] Check which keys of the Hog OS 5 table work on Hog 4 OS 3.x and 4.x. ([specs/highend-hog4.yaml:534](specs/highend-hog4.yaml#L534))
-- [ ] Confirm that refreshall makes the console send every status, and whether repeating it every 60 s is noticeable on the console. ([specs/highend-hog4.yaml:489](specs/highend-hog4.yaml#L489))
-- [ ] Check whether the HPU acts on front panel keys, encoders and faders sent over OSC. ([specs/highend-hog4.yaml:556](specs/highend-hog4.yaml#L556))
+- [ ] Confirm that playback commands take the object number as the argument (/hog/playback/go/0 with 15), as the manual says, and not in the address as the Companion module sends it. ([specs/highend-hog4.yaml:522](specs/highend-hog4.yaml#L522))
+- [ ] Check how goto_cue's float list.cue is read (15.2 sent as 15.19999981; cue 2 versus 20; point cues). ([specs/highend-hog4.yaml:531](specs/highend-hog4.yaml#L531))
+- [ ] Record the argument types of the status outputs (LED value, LED colour, command line, encoder and H-key labels, chat lines). ([specs/highend-hog4.yaml:512](specs/highend-hog4.yaml#L512))
+- [ ] Find the address the console uses for fader level status after consolefaderrefresh. ([specs/highend-hog4.yaml:506](specs/highend-hog4.yaml#L506))
+- [ ] Check the real ranges of H keys, U keys, encoder wheels and the trackball values per model. ([specs/highend-hog4.yaml:539](specs/highend-hog4.yaml#L539))
+- [ ] Check which keys of the Hog OS 5 table work on Hog 4 OS 3.x and 4.x. ([specs/highend-hog4.yaml:549](specs/highend-hog4.yaml#L549))
+- [ ] Confirm that refreshall makes the console send every status, and whether repeating it every 60 s is noticeable on the console. ([specs/highend-hog4.yaml:504](specs/highend-hog4.yaml#L504))
+- [ ] Check whether the HPU acts on front panel keys, encoders and faders sent over OSC. ([specs/highend-hog4.yaml:571](specs/highend-hog4.yaml#L571))
+- [ ] Confirm that Hog 4 OS sends MSC on MSC Out for Go, Halt, Resume, Skip and Release, as 21.1's table of commands it recognises and sends suggests. ([specs/highend-hog4.yaml:499](specs/highend-hog4.yaml#L499))
 
 ## holographics — Holographics
 
@@ -2148,9 +2155,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## irisdown-remote-show-control — Irisdown Remote Show Control
 
-- [ ] Confirm the add-in takes each command as a single UDP datagram with no line ending, and plain ASCII double quotes around names. ([specs/irisdown-remote-show-control.yaml:138](specs/irisdown-remote-show-control.yaml#L138))
-- [ ] Record how FIND answers (over UDP and over TCP 61001) and how the end of the list is marked. ([specs/irisdown-remote-show-control.yaml:135](specs/irisdown-remote-show-control.yaml#L135))
-- [ ] Check whether GO takes a slide number with the space (GO 23), as the manual's syntax shows, as well as without (GO2 in the Spyder example). ([specs/irisdown-remote-show-control.yaml:102](specs/irisdown-remote-show-control.yaml#L102))
+- [ ] Confirm the add-in takes each command as a single UDP datagram with no line ending, and plain ASCII double quotes around names. ([specs/irisdown-remote-show-control.yaml:156](specs/irisdown-remote-show-control.yaml#L156))
+- [ ] Record how FIND answers (over UDP and over TCP 61001) and how the end of the list is marked. ([specs/irisdown-remote-show-control.yaml:154](specs/irisdown-remote-show-control.yaml#L154))
+- [ ] Check whether GO takes a slide number with the space (GO 23), as the manual's syntax shows, as well as without (GO2 in the Spyder example). ([specs/irisdown-remote-show-control.yaml:104](specs/irisdown-remote-show-control.yaml#L104))
+- [ ] Record how FIND's answer arrives over UDP (one datagram back to the sender's port holding every line, as assumed, or one per line) and its line ending. ([specs/irisdown-remote-show-control.yaml:147](specs/irisdown-remote-show-control.yaml#L147))
 
 ## joy-playdeck — PLAYDECK
 
@@ -2666,8 +2674,8 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## lightkey — Lightkey (OSC)
 
 - [ ] Confirm Lightkey sends nothing back over OSC (no feedback or replies), so no state can be read. ([specs/lightkey.yaml:288](specs/lightkey.yaml#L288))
-- [ ] Check that commands sent over UDP to 21600 act, and how Lightkey frames OSC over TCP on the same port. ([specs/lightkey.yaml:295](specs/lightkey.yaml#L295))
-- [ ] Check the value ranges Lightkey accepts for modifiers, fixture properties, fade times and tempo. ([specs/lightkey.yaml:302](specs/lightkey.yaml#L302))
+- [ ] Check that commands sent over UDP to 21600 act, and how Lightkey frames OSC over TCP on the same port. ([specs/lightkey.yaml:298](specs/lightkey.yaml#L298))
+- [ ] Check the value ranges Lightkey accepts for modifiers, fixture properties, fade times and tempo. ([specs/lightkey.yaml:305](specs/lightkey.yaml#L305))
 
 ## lightware-lw2 — Lightware LW2 (bracket protocol) matrices and switchers
 
@@ -3310,10 +3318,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## ontime-osc — Ontime (OSC API)
 
-- [ ] Check whether the boolean arguments (blackout, skip, visible, blink) are taken as the strings true and false, or need OSC T/F or an int. ([specs/ontime-osc.yaml:351](specs/ontime-osc.yaml#L351))
-- [ ] Confirm /ontime/message/timer/text, /visible and /blink exist beside the documented blackout and secondarySource. ([specs/ontime-osc.yaml:352](specs/ontime-osc.yaml#L352))
-- [ ] Confirm /ontime/auxtimer/2/... and /3/... act on auxiliary timers 2 and 3. ([specs/ontime-osc.yaml:355](specs/ontime-osc.yaml#L355))
-- [ ] Check whether integer arguments sent as OSC int32 are taken for millisecond values and indexes, or must be floats or strings. ([specs/ontime-osc.yaml:78](specs/ontime-osc.yaml#L78))
+- [ ] Check whether the boolean arguments (blackout, skip, visible, blink) are taken as the strings true and false, or need OSC T/F or an int. ([specs/ontime-osc.yaml:364](specs/ontime-osc.yaml#L364))
+- [ ] Confirm /ontime/message/timer/text, /visible and /blink exist beside the documented blackout and secondarySource. ([specs/ontime-osc.yaml:365](specs/ontime-osc.yaml#L365))
+- [ ] Confirm /ontime/auxtimer/2/... and /3/... act on auxiliary timers 2 and 3. ([specs/ontime-osc.yaml:368](specs/ontime-osc.yaml#L368))
+- [ ] Check whether integer arguments sent as OSC int32 are taken for millisecond values and indexes, or must be floats or strings. ([specs/ontime-osc.yaml:88](specs/ontime-osc.yaml#L88))
 
 ## onvif-ptz — ONVIF PTZ cameras (PTZ, imaging, media and device services)
 
@@ -4038,8 +4046,8 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Check that OSC over UDP is accepted with SCS as a Network Server on the Listen on Port No. given, and whether SCS offers a port of its own when none is set. ([specs/showcuesystems-scs.yaml:187](specs/showcuesystems-scs.yaml#L187))
 - [ ] Confirm that SCS sends nothing back to the sender for network cue control messages. ([specs/showcuesystems-scs.yaml:195](specs/showcuesystems-scs.yaml#L195))
-- [ ] Check the master and device fader range SCS caps at (the help page gives -75 dB to 0 dB as an example). ([specs/showcuesystems-scs.yaml:210](specs/showcuesystems-scs.yaml#L210))
-- [ ] Check that /ctrl/fadeall (from the Companion module, not in SCS's table) fades all cues. ([specs/showcuesystems-scs.yaml:212](specs/showcuesystems-scs.yaml#L212))
+- [ ] Check the master and device fader range SCS caps at (the help page gives -75 dB to 0 dB as an example). ([specs/showcuesystems-scs.yaml:214](specs/showcuesystems-scs.yaml#L214))
+- [ ] Check that /ctrl/fadeall (from the Companion module, not in SCS's table) fades all cues. ([specs/showcuesystems-scs.yaml:216](specs/showcuesystems-scs.yaml#L216))
 
 ## shure-ani — Shure ANI4IN, ANI4OUT, ANIUSB-MATRIX, ANI22
 

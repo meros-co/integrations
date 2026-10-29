@@ -123,6 +123,8 @@ mod jnior;
 mod kissbox;
 #[cfg(feature = "labgruppen-lake")]
 mod lake_dlm;
+#[cfg(feature = "grandma2")]
+mod ma_msc;
 #[cfg(feature = "meros-camera")]
 mod meros_camera;
 #[cfg(feature = "meros-camera")]
@@ -344,6 +346,8 @@ pub(crate) fn construct(
             Some("nmos-event-transports") => {
                 Ok(Box::new(nmos_events::NmosEvents::new(engine, &context)))
             }
+            #[cfg(feature = "grandma2")]
+            Some("ma-msc-ethernet") => Ok(Box::new(ma_msc::MaMsc::new(engine, &context))),
             #[cfg(feature = "nmos-registry")]
             Some("nmos-query-websocket") => {
                 Ok(Box::new(nmos_query::NmosQuery::new(engine, &context)))

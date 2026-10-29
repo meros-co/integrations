@@ -357,6 +357,16 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
 
     if native and doc.get("extension"):
         errors.append("'extension' adds to a spec-driven device; a native device has its module")
+    # ma-msc-ethernet listens on the msc_port setting: an int, with a udp
+    # feedback port the core listens on.
+    if doc.get("extension") == "ma-msc-ethernet":
+        msc = (doc.get("settings") or {}).get("msc_port") or {}
+        if msc.get("type") != "int":
+            errors.append("the extension 'ma-msc-ethernet' needs an int setting msc_port")
+        if not any(e.get("setting") == "msc_port" and e.get("protocol") == "udp"
+                   and e.get("role") == "feedback" and e.get("listener") == "core"
+                   for e in doc.get("ports") or [] if isinstance(e, dict)):
+            errors.append("the extension 'ma-msc-ethernet' needs a udp feedback port, listener core, setting msc_port")
     if native:
         # Wire behaviour lives in the Rust module; the spec is catalogue only.
         if not doc.get("reason"):
