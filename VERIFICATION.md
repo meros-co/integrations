@@ -1089,15 +1089,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## casparcg — CasparCG Server
 
-- [ ] Confirm the reply framing on 2.3 and later: 200 followed by lines and a blank line, 201 and 400 by exactly one line, 202 and the other errors alone, including for a 200 that lists nothing. ([specs/casparcg.yaml:1441](specs/casparcg.yaml#L1441))
-- [ ] Check that LOADBG, LOAD and PLAY accept the transition sent in full when none is wanted (CUT 0 linear RIGHT) and SEEK 0, and that LOOP and AUTO may sit where they are sent. ([specs/casparcg.yaml:1457](specs/casparcg.yaml#L1457))
-- [ ] Confirm that 2.3 and later send OSC to each AMCP client's address on the configured default-port (6250), with no predefined client needed. ([specs/casparcg.yaml:1465](specs/casparcg.yaml#L1465))
-- [ ] Record the OSC addresses a 2.3 or later server sends for a layer playing a file, an image and an HTML template (with or without a foreground/ segment, and whether background, paused, loop, host and profiler messages still exist), and fix the rules to match. ([specs/casparcg.yaml:1477](specs/casparcg.yaml#L1477))
-- [ ] Check where DEFER goes in a MIXER command with a tween (after the tween, as sent here) and what a read answers for a deferred change before MIXER COMMIT. ([specs/casparcg.yaml:1499](specs/casparcg.yaml#L1499))
-- [ ] Check the code and layout of MIXER CHROMA's read answer (201 and nine values, or the example's 202) and of the other MIXER reads. ([specs/casparcg.yaml:1504](specs/casparcg.yaml#L1504))
-- [ ] Check what CALL LOOP, CALL SEEK, START and LENGTH answer (201 CALL OK and a value, or 202). ([specs/casparcg.yaml:1548](specs/casparcg.yaml#L1548))
-- [ ] Check PING's answer on 2.3 and later (PONG alone, or with a code). ([specs/casparcg.yaml:1555](specs/casparcg.yaml#L1555))
-- [ ] Record TLS, FLS and DATA LIST answers on 2.3 and later, so their lines can be read into fields. ([specs/casparcg.yaml:1514](specs/casparcg.yaml#L1514))
+- [ ] Confirm the reply framing on 2.3 and later: 200 followed by lines and a blank line, 201 and 400 by exactly one line, 202 and the other errors alone, including for a 200 that lists nothing. ([specs/casparcg.yaml:1450](specs/casparcg.yaml#L1450))
+- [ ] Check that LOADBG, LOAD and PLAY accept the transition sent in full when none is wanted (CUT 0 linear RIGHT) and SEEK 0, and that LOOP and AUTO may sit where they are sent. ([specs/casparcg.yaml:1466](specs/casparcg.yaml#L1466))
+- [ ] Confirm that 2.3 and later send OSC to each AMCP client's address on the configured default-port (6250), with no predefined client needed. ([specs/casparcg.yaml:1474](specs/casparcg.yaml#L1474))
+- [ ] Record the OSC addresses a 2.3 or later server sends for a layer playing a file, an image and an HTML template (with or without a foreground/ segment, and whether background, paused, loop, host and profiler messages still exist), and fix the rules to match. ([specs/casparcg.yaml:1486](specs/casparcg.yaml#L1486))
+- [ ] Check where DEFER goes in a MIXER command with a tween (after the tween, as sent here) and what a read answers for a deferred change before MIXER COMMIT. ([specs/casparcg.yaml:1508](specs/casparcg.yaml#L1508))
+- [ ] Check the code and layout of MIXER CHROMA's read answer (201 and nine values, or the example's 202) and of the other MIXER reads. ([specs/casparcg.yaml:1513](specs/casparcg.yaml#L1513))
+- [ ] Check what CALL LOOP, CALL SEEK, START and LENGTH answer (201 CALL OK and a value, or 202). ([specs/casparcg.yaml:1572](specs/casparcg.yaml#L1572))
+- [ ] Check PING's answer on 2.3 and later (PONG alone, or with a code). ([specs/casparcg.yaml:1579](specs/casparcg.yaml#L1579))
+- [ ] Record TLS, FLS and DATA LIST answers on 2.3 and later, so their lines can be read into fields. ([specs/casparcg.yaml:1523](specs/casparcg.yaml#L1523))
+- [ ] Confirm CG ADD, PLAY, STOP, REMOVE and CLEAR answer 202 CG OK, LOADBG 202 LOADBG OK and a bare PLAY 202 PLAY OK, so the template and background state is kept. ([specs/casparcg.yaml:1530](specs/casparcg.yaml#L1530))
+- [ ] Record the XML CG INFO and INFO <channel>-<layer> answer on 2.3 and later, so templates loaded by other clients can be read into state. ([specs/casparcg.yaml:1530](specs/casparcg.yaml#L1530))
 
 ## castr — Castr
 
