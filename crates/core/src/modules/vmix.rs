@@ -29,7 +29,7 @@ use crate::catalog::Params;
 use crate::engine::template::percent_encode;
 use crate::module::{
     CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
-    TcpInput,
+    PollStamps, TcpInput,
 };
 use crate::session::merge_patch;
 
@@ -168,6 +168,8 @@ pub(crate) struct Vmix {
     monitor: bool,
     /// How often the XML state is read.
     state_poll: Millis,
+    /// When the XML state was last read (`polled.xml`).
+    stamps: PollStamps,
     retry_after: Millis,
     /// The state as last reported, from XML reads and events alike: an XML
     /// read reports only what differs from it.
@@ -882,6 +884,7 @@ impl Vmix {
             sent_at: 0,
             monitor: true,
             state_poll: STATE_POLL_DEFAULT,
+            stamps: PollStamps::default(),
             retry_after: RETRY_MIN,
             view: json!({}),
             xml_last: json!({}),
@@ -1020,7 +1023,10 @@ impl Vmix {
                 }
             }
             Request::Xml => match message.status {
-                Status::Data(data) => self.xml(cx, &String::from_utf8_lossy(&data)),
+                Status::Data(data) => {
+                    self.xml(cx, &String::from_utf8_lossy(&data));
+                    self.stamps.answered(cx, "xml");
+                }
                 _ => cx.log(
                     Level::Warning,
                     format!("vMix refused XML: {}", message.rest),
@@ -1352,11 +1358,13 @@ mod tests {
         merged
     }
 
+    /// The state patches, without the XML read's `polled` stamp
+    /// (`each_xml_read_is_stamped`).
     fn patches(actions: &[Action]) -> Vec<Value> {
         actions
             .iter()
             .filter_map(|a| match a {
-                Action::State(p) => Some(p.clone()),
+                Action::State(p) if p.get("polled").is_none() => Some(p.clone()),
                 _ => None,
             })
             .collect()
@@ -1707,6 +1715,29 @@ mod tests {
         m.timer(&mut cx, POLL);
         assert_eq!(sent(&cx.take()), ["XML\r\n"]);
         patches(&feed(m, now + 10, &xml_reply(xml)))
+    }
+
+    #[test]
+    fn each_xml_read_is_stamped() {
+        let (mut m, _) = connected_to(STATUS_XML);
+        let mut cx = Cx::new(1_000);
+        m.timer(&mut cx, POLL);
+        cx.take();
+        let mut cx = Cx::at(1_010, 1_700_000_000_500);
+        m.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Data(xml_reply(STATUS_XML).into_bytes()),
+        );
+        let stamps: Vec<Value> = cx
+            .take()
+            .into_iter()
+            .filter_map(|a| match a {
+                Action::State(p) if p.get("polled").is_some() => Some(p),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(stamps, [json!({"polled": {"xml": 1_700_000_000u64}})]);
     }
 
     #[test]

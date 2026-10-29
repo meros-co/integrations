@@ -56,7 +56,7 @@ use sha2::{Digest, Sha256};
 use crate::catalog::Params;
 use crate::module::{
     Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext,
-    Outcome, TcpInput,
+    Outcome, PollStamps, TcpInput,
 };
 
 pub(crate) const DEFAULT_PORT: u16 = 4352;
@@ -220,6 +220,8 @@ pub(crate) struct PjLink {
     sent_at: Millis,
     /// False: commands only, CLSS as the liveness check and nothing else.
     monitor: bool,
+    /// When the poll was last answered (`polled.status`).
+    stamps: PollStamps,
     /// Why the projector refused the password. Terminal.
     refused: Option<String>,
     retry_after: Millis,
@@ -291,6 +293,7 @@ impl PjLink {
             in_flight: None,
             sent_at: 0,
             monitor: true,
+            stamps: PollStamps::default(),
             refused: None,
             retry_after: RETRY_MIN,
             cycle: 0,
@@ -616,6 +619,9 @@ impl PjLink {
                 }
             }
         };
+        if result.is_ok() && job.command.is_none() && self.monitor {
+            self.stamps.answered(cx, "status");
+        }
         if result.is_ok() && self.monitor {
             if let Some(follow) = job.follow {
                 self.polls.push_front(Job::query(follow, None));
@@ -1795,6 +1801,24 @@ mod tests {
         }
         assert!(matches!(notification("%2POWR=1"), Some(Notice::Poll)));
         assert!(notification("%2SRCH").is_none());
+    }
+
+    #[test]
+    fn each_answered_poll_query_stamps_the_status_poll() {
+        let mut m = module(2, "", AuthMode::Auto);
+        let a = greeted(&mut m, "PJLINK 0\r");
+        assert_eq!(sent(&a), ["%1CLSS ?\r"]);
+        let mut cx = Cx::at(10, 1_700_000_000_400);
+        m.tcp(&mut cx, SOCKET, TcpInput::Data(b"%1CLSS=2\r".to_vec()));
+        let stamps: Vec<Value> = cx
+            .take()
+            .into_iter()
+            .filter_map(|a| match a {
+                Action::State(p) if p.get("polled").is_some() => Some(p),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(stamps, [json!({"polled": {"status": 1_700_000_000u64}})]);
     }
 
     #[test]
