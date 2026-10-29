@@ -312,6 +312,10 @@ telemetry:
       - '{"type":"rcp_subscribe","id":"ENABLE_CAMERA_LUT_SDI_2","on_off":true}'
       - '{"type":"rcp_subscribe","id":"MEDIA_PERCENTAGE_REMAINING","on_off":true}'
       - '{"type":"rcp_subscribe","id":"MEDIA_TIME_REMAINING","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"APERTURE_CONTROL","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"AF_ENABLE","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"AF_MODE","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"AF_STATE","on_off":true}'
       - '{"type":"rcp_get","id":"RECORD_STATE"}'
       - '{"type":"rcp_get","id":"RECORD_FORMAT"}'
       - '{"type":"rcp_get","id":"SENSOR_FRAME_RATE"}'
@@ -319,11 +323,49 @@ telemetry:
       - '{"type":"rcp_get","id":"COLOR_TEMPERATURE"}'
       - '{"type":"rcp_get","id":"EXPOSURE_ADJUST"}'
       - '{"type":"rcp_get","id":"TIMECODE"}'
+  # The power input (battery) and board temperatures change every few
+  # seconds, so they are read every 30 s rather than subscribed: each read is
+  # followed by an unsubscribe, since rcp_get also subscribes (the integration
+  # this spec follows does the same).
   poll:
-    every_ms: 60000
-    send:
-      - '{"type":"rcp_get","id":"CAMERA_INFO"}'
-      - '{"type":"rcp_get_parameters"}'
+    - every_ms: 60000
+      send:
+        - '{"type":"rcp_get","id":"CAMERA_INFO"}'
+        - '{"type":"rcp_get_parameters"}'
+    - every_ms: 30000
+      send:
+        - '{"type":"rcp_get","id":"ACTIVE_POWER_IN_CURRENT"}'
+        - '{"type":"rcp_subscribe","id":"ACTIVE_POWER_IN_CURRENT","on_off":false}'
+        - '{"type":"rcp_get","id":"ACTIVE_POWER_IN_INFO"}'
+        - '{"type":"rcp_subscribe","id":"ACTIVE_POWER_IN_INFO","on_off":false}'
+        - '{"type":"rcp_get","id":"ACTIVE_POWER_IN_LOW_POWER"}'
+        - '{"type":"rcp_subscribe","id":"ACTIVE_POWER_IN_LOW_POWER","on_off":false}'
+        - '{"type":"rcp_get","id":"ACTIVE_POWER_IN_PERCENT"}'
+        - '{"type":"rcp_subscribe","id":"ACTIVE_POWER_IN_PERCENT","on_off":false}'
+        - '{"type":"rcp_get","id":"ACTIVE_POWER_IN_PRESENT"}'
+        - '{"type":"rcp_subscribe","id":"ACTIVE_POWER_IN_PRESENT","on_off":false}'
+        - '{"type":"rcp_get","id":"ACTIVE_POWER_IN_RUNTIME"}'
+        - '{"type":"rcp_subscribe","id":"ACTIVE_POWER_IN_RUNTIME","on_off":false}'
+        - '{"type":"rcp_get","id":"ACTIVE_POWER_IN_STATE"}'
+        - '{"type":"rcp_subscribe","id":"ACTIVE_POWER_IN_STATE","on_off":false}'
+        - '{"type":"rcp_get","id":"ACTIVE_POWER_IN_TYPE"}'
+        - '{"type":"rcp_subscribe","id":"ACTIVE_POWER_IN_TYPE","on_off":false}'
+        - '{"type":"rcp_get","id":"ACTIVE_POWER_IN_VALID"}'
+        - '{"type":"rcp_subscribe","id":"ACTIVE_POWER_IN_VALID","on_off":false}'
+        - '{"type":"rcp_get","id":"ACTIVE_POWER_IN_VOLTAGE"}'
+        - '{"type":"rcp_subscribe","id":"ACTIVE_POWER_IN_VOLTAGE","on_off":false}'
+        - '{"type":"rcp_get","id":"TEMPERATURE_IOB"}'
+        - '{"type":"rcp_subscribe","id":"TEMPERATURE_IOB","on_off":false}'
+        - '{"type":"rcp_get","id":"TEMPERATURE_LEVEL"}'
+        - '{"type":"rcp_subscribe","id":"TEMPERATURE_LEVEL","on_off":false}'
+        - '{"type":"rcp_get","id":"TEMPERATURE_PCM"}'
+        - '{"type":"rcp_subscribe","id":"TEMPERATURE_PCM","on_off":false}'
+        - '{"type":"rcp_get","id":"TEMPERATURE_PL"}'
+        - '{"type":"rcp_subscribe","id":"TEMPERATURE_PL","on_off":false}'
+        - '{"type":"rcp_get","id":"TEMPERATURE_PS"}'
+        - '{"type":"rcp_subscribe","id":"TEMPERATURE_PS","on_off":false}'
+        - '{"type":"rcp_get","id":"TEMPERATURE_SB"}'
+        - '{"type":"rcp_subscribe","id":"TEMPERATURE_SB","on_off":false}'
   updates:
     - json_match: { "$.type": "^rcp_cur_int$", "$.id": "^([A-Z0-9_]+)$" }
       json: { val: "$.cur.val", str: "$.display.str" }
@@ -337,6 +379,23 @@ telemetry:
       json: { val: "$.cur.val" }
       state:
         recording: { value: "{val}", map: { "0": idle, "1": recording, "2": finalizing, "3": pre_recording, "4": encoding } }
+    # The power input (ACTIVE_POWER_IN_*), board temperatures
+    # (TEMPERATURE_*) and autofocus (AF_*), also kept by name.
+    - json_match: { "$.type": "^rcp_cur_int$", "$.id": "^ACTIVE_POWER_IN_([A-Z_]+)$" }
+      json: { val: "$.cur.val", str: "$.display.str" }
+      state: { "power.{1:lower}.value": "{val}", "power.{1:lower}.display": "{str}" }
+    - json_match: { "$.type": "^rcp_cur_str$", "$.id": "^ACTIVE_POWER_IN_([A-Z_]+)$" }
+      json: { str: "$.display.str" }
+      state: { "power.{1:lower}.display": "{str}" }
+    - json_match: { "$.type": "^rcp_cur_int$", "$.id": "^TEMPERATURE_([A-Z_]+)$" }
+      json: { val: "$.cur.val", str: "$.display.str" }
+      state: { "temperatures.{1:lower}.value": "{val}", "temperatures.{1:lower}.display": "{str}" }
+    - json_match: { "$.type": "^rcp_cur_str$", "$.id": "^TEMPERATURE_([A-Z_]+)$" }
+      json: { str: "$.display.str" }
+      state: { "temperatures.{1:lower}.display": "{str}" }
+    - json_match: { "$.type": "^rcp_cur_int$", "$.id": "^AF_(ENABLE|MODE|STATE)$" }
+      json: { val: "$.cur.val", str: "$.display.str" }
+      state: { "autofocus.{1:lower}.value": "{val}", "autofocus.{1:lower}.display": "{str}" }
     - json_match: { "$.type": "^rcp_cur_cam_info$" }
       json: { name: "$.name", serial: "$.serial_number", type: "$.camera_type.str", type_number: "$.camera_type.num", version: "$.version.str" }
       state:
@@ -361,6 +420,12 @@ state:
   camera.type: { type: string, description: "Camera type name" }
   camera.type_number: { type: int, description: "Camera type number: 50 KOMODO, 51 V-RAPTOR, 52 V-RAPTOR XL, 53 KOMODO-X" }
   camera.firmware: { type: string, description: "Firmware version" }
+  power.*.value: { type: int, description: "The power input's reading from ACTIVE_POWER_IN_<NAME>, keyed by the name in lower case: voltage, current, percent (charge), runtime, state, present, valid, type, low_power, info; in the camera's own units, which RED's public material does not give (display has the camera's text)" }
+  power.*.display: { type: string, description: "The power reading as the camera displays it, with its unit" }
+  temperatures.*.value: { type: int, description: "A board temperature from TEMPERATURE_<NAME>, keyed by the name in lower case (iob, level, pcm, pl, ps, sb), in the camera's own units (display has the camera's text)" }
+  temperatures.*.display: { type: string, description: "The temperature as the camera displays it" }
+  autofocus.*.value: { type: int, description: "Autofocus enable, mode and state (AF_ENABLE, AF_MODE, AF_STATE), keyed enable, mode and state, as the camera numbers them" }
+  autofocus.*.display: { type: string, description: "The autofocus value as the camera displays it" }
   supported_parameters: { type: string, description: "The RCP2 parameter ids the camera supports, as a JSON array" }
   cdl: { type: string, description: "The camera's last CDL message (slope, offset, power and saturation in hundred-thousandths), as JSON text" }
 
@@ -372,6 +437,11 @@ quirks:
       parameter ids, value scales and enumerations here come from a public integration's use of
       the protocol and need checking against the camera (see VERIFICATION.md). Any other
       parameter is reached with set_parameter, set_parameter_text and get_parameter by its id.
+      The power input (battery voltage, current, charge, runtime), board temperatures and
+      autofocus are read by the ids that integration uses (ACTIVE_POWER_IN_*, TEMPERATURE_*,
+      AF_*); their scales are not public, so each is kept with the camera's display text. Lens
+      data beyond the aperture and autofocus (focus distance, focal length, lens name) has no id
+      in any public source, so it is not read; get_parameter reads it by its id where known.
   - models: [all]
     severity: info
     text: >
