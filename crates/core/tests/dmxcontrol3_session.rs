@@ -387,6 +387,8 @@ async fn an_umbra_announcing_itself_is_discovered() {
         action: DiscoverAction::Listen,
         protocols: vec!["umbra".into()],
         hints: vec![],
+        dns_servers: vec![],
+        dns_domains: vec![],
     })
     .unwrap();
     // UmbraUdpBroadcast: umbraServer (2) { clientInfo (3) { clientname (4)

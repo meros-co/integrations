@@ -469,3 +469,28 @@ telemetry(XA, "param-string", inbound_hex=hexs(osc("/-usb/path", ("s", "SONGS"))
 
 # The X32's helper (behringer-x32.py): the generic params rules.
 _with_params(XA)
+
+# ── Meters ────────────────────────────────────────────────────────────────
+# With the meters setting on, /meters ,s /meters/1 and /meters/2 follow
+# /xremote on connecting (p.2-3). A blob holds one integer, then signed
+# 16-bit values in 1/256 dB.
+def _xa_meter_blob(values):
+    return struct.pack("<i", len(values)) + b"".join(struct.pack("<h", v) for v in values)
+
+
+_XA_M1 = [-2560] * 16 + [0] * 10 + [256] * 6 + [-32768] * 4 + [-128, 512] + [-768, 32767]
+telemetry(XA, "meters-all-channels", settings={"meters": True},
+          expect_connect_wire_hex=[hexs(osc("/xremote")), hexs(osc("/meters", ("s", "/meters/1"))),
+                                   hexs(osc("/meters", ("s", "/meters/2"))), hexs(osc("/ch/01/mix/on"))],
+          inbound_hex=hexs(osc("/meters/1", ("b", _xa_meter_blob(_XA_M1)))),
+          expect_state={"channels": {str(n): {"meter_db": -10.0} for n in range(1, 17)},
+                        "returns": {str(n): {"meter_db": 0.0} for n in range(1, 11)},
+                        "buses": {str(n): {"meter_db": 1.0} for n in range(1, 7)},
+                        "fx_sends": {str(n): {"meter_db": -128.0} for n in range(1, 5)},
+                        "main": {"meter_left_db": -0.5, "meter_right_db": 2.0},
+                        "monitor": {"meter_left_db": -3.0, "meter_right_db": 127.99609375}})
+_XA_M2 = [-1280] * 16 + [0, 256] + [-256] * 18
+telemetry(XA, "meters-all-inputs", inbound_hex=hexs(osc("/meters/2", ("b", _xa_meter_blob(_XA_M2)))),
+          expect_state={"inputs": {"mic": {str(n): {"meter_db": -5.0} for n in range(1, 17)},
+                                   "aux": {"1": {"meter_db": 0.0}, "2": {"meter_db": 1.0}},
+                                   "usb": {str(n): {"meter_db": -1.0} for n in range(1, 19)}}})

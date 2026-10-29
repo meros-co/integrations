@@ -73,19 +73,45 @@ fn hex(bytes: &[u8]) -> String {
 /// A spec's named conversions: SPEC.md §4, "Conversions".
 pub(crate) type Conversions = BTreeMap<String, Conversion>;
 
-/// A piecewise-linear conversion between a wire value and the value an
-/// operator uses (an X32 fader position and its dB), given as points joined
-/// by straight lines. Both columns are strictly monotonic, so it inverts.
+/// A conversion between a wire value and the value an operator uses: a
+/// piecewise-linear one (an X32 fader position and its dB), given as points
+/// joined by straight lines, both columns strictly monotonic so it inverts;
+/// or a level law (`law: db20`), a linear amplitude and its dB, with the
+/// floor the device's meters bottom out at.
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Conversion {
-    /// (wire, value), wire ascending.
-    by_wire: Vec<(f64, f64)>,
-    /// (value, wire), value ascending.
-    by_value: Vec<(f64, f64)>,
+pub(crate) enum Conversion {
+    Points {
+        /// (wire, value), wire ascending.
+        by_wire: Vec<(f64, f64)>,
+        /// (value, wire), value ascending.
+        by_value: Vec<(f64, f64)>,
+    },
+    /// `law: db20`: value = 20·log10(wire), wire a linear amplitude (1.0 is
+    /// full scale). A wire value at or below the floor's amplitude, silence
+    /// (0) included, reads as `floor`; a value below `floor` does not
+    /// convert to the wire.
+    Db20 { floor: f64 },
 }
 
 impl Conversion {
     fn parse(name: &str, v: &Value) -> Result<Conversion, String> {
+        if let Some(law) = v.get("law") {
+            if law.as_str() != Some("db20") {
+                return Err(format!("conversion '{name}': law is db20"));
+            }
+            if v.get("points").is_some() {
+                return Err(format!("conversion '{name}': a law has no points"));
+            }
+            let floor = v
+                .get("floor")
+                .and_then(Value::as_f64)
+                .filter(|f| f.is_finite())
+                .ok_or(format!("conversion '{name}': law db20 needs a floor in dB"))?;
+            return Ok(Conversion::Db20 { floor });
+        }
+        if v.get("floor").is_some() {
+            return Err(format!("conversion '{name}': floor goes with a law"));
+        }
         let points = v
             .get("points")
             .and_then(Value::as_array)
@@ -116,17 +142,33 @@ impl Conversion {
                 ));
             }
         }
-        Ok(Conversion { by_wire, by_value })
+        Ok(Conversion::Points { by_wire, by_value })
     }
 
-    /// The wire value for an operator value; `None` outside the points.
+    /// The wire value for an operator value; `None` outside the points (or
+    /// below a law's floor).
     pub(crate) fn value_to_wire(&self, value: f64) -> Option<f64> {
-        interpolate(&self.by_value, value)
+        match self {
+            Conversion::Points { by_value, .. } => interpolate(by_value, value),
+            Conversion::Db20 { floor } => {
+                (value.is_finite() && value >= *floor).then(|| 10f64.powf(value / 20.0))
+            }
+        }
     }
 
-    /// The operator value for a wire value; `None` outside the points.
+    /// The operator value for a wire value; `None` outside the points. A
+    /// law's value never goes below its floor.
     pub(crate) fn wire_to_value(&self, wire: f64) -> Option<f64> {
-        interpolate(&self.by_wire, wire)
+        match self {
+            Conversion::Points { by_wire, .. } => interpolate(by_wire, wire),
+            Conversion::Db20 { floor } => {
+                if !wire.is_finite() || wire < 0.0 {
+                    return None;
+                }
+                let db = 20.0 * wire.log10();
+                Some(if db > *floor { db } else { *floor })
+            }
+        }
     }
 }
 
@@ -342,7 +384,13 @@ pub(crate) fn sole_converted(template: &str, values: &Values) -> Option<Result<f
     if caps.get(0)?.as_str() != template || caps[2].is_empty() {
         return None;
     }
-    let directives: Vec<&str> = caps[2].split(':').filter(|d| !d.is_empty()).collect();
+    let mut directives: Vec<&str> = caps[2].split(':').filter(|d| !d.is_empty()).collect();
+    // `hex` first: the number a device sends in hexadecimal, then converted
+    // (a Yamaha meter's two hex digits to dB).
+    let hex = directives.first() == Some(&"hex") && directives.len() > 1;
+    if hex {
+        directives.remove(0);
+    }
     if !directives.iter().all(|d| conversion_directive(d).is_some()) {
         return None;
     }
@@ -350,13 +398,33 @@ pub(crate) fn sole_converted(template: &str, values: &Values) -> Option<Result<f
         Ok(v) => v,
         Err(e) => return Some(Err(e)),
     };
-    if !matches!(kind, ParamType::Int | ParamType::Float) {
-        return Some(Err(format!(
-            "a conversion needs a number, not '{}'",
-            &caps[1]
-        )));
-    }
-    let mut x = value.as_f64()?;
+    let mut x = if hex {
+        let text = match &value {
+            Value::Number(n) if n.is_u64() => n.to_string(),
+            Value::String(s) => s.trim().to_string(),
+            _ => {
+                return Some(Err(format!(
+                    "':hex' on '{}' needs hexadecimal digits",
+                    &caps[1]
+                )))
+            }
+        };
+        match i64::from_str_radix(&text, 16)
+            .ok()
+            .filter(|_| !text.is_empty() && text.bytes().all(|b| b.is_ascii_hexdigit()))
+        {
+            Some(n) => n as f64,
+            None => return Some(Err(format!("'{text}' is not hexadecimal"))),
+        }
+    } else {
+        if !matches!(kind, ParamType::Int | ParamType::Float) {
+            return Some(Err(format!(
+                "a conversion needs a number, not '{}'",
+                &caps[1]
+            )));
+        }
+        value.as_f64()?
+    };
     for d in directives {
         x = match apply_conversion(x, d, values) {
             Ok(x) => x,
@@ -815,6 +883,7 @@ mod tests {
         let empty_specs = BTreeMap::new();
         let conversions = conversions(Some(&json!({
             "fader": {"points": [[0.0, -90.0], [0.0625, -60.0], [0.25, -30.0], [0.5, -10.0], [1.0, 10.0]]},
+            "meter": {"law": "db20", "floor": -90.0},
         })))
         .unwrap();
         let v = Values {
@@ -862,6 +931,58 @@ mod tests {
         let c = conversions(Some(&json!({"att": {"points": [[0, 0], [100, -50]]}}))).unwrap();
         assert_eq!(c["att"].value_to_wire(-25.0), Some(50.0));
         assert!(conversions(Some(&json!({"bad": {"points": [[0, 0], [1, 1], [2, 0]]}}))).is_err());
+        // A number sent in hexadecimal, then converted: Yamaha's meter step
+        // 0x7E is 0 dBFS, one dB a step.
+        let c = conversions(Some(&json!({"m": {"points": [[0, -126], [126, 0]]}}))).unwrap();
+        let (p, s) = values(
+            json!({"x": "7E", "y": 69, "z": "zz"}),
+            "{ x: { type: string }, y: { type: int }, z: { type: string } }",
+        );
+        let empty = Params::new();
+        let empty_specs = BTreeMap::new();
+        let maps = maps(None).unwrap();
+        let v = Values {
+            params: &p,
+            param_specs: &s,
+            settings: &empty,
+            setting_specs: &empty_specs,
+            conversions: &c,
+            maps: &maps,
+            session: None,
+        };
+        assert_eq!(sole_converted("{x:hex:from.m}", &v), Some(Ok(0.0)));
+        assert_eq!(sole_converted("{y:hex:from.m}", &v), Some(Ok(-21.0)));
+        assert!(matches!(sole_converted("{z:hex:from.m}", &v), Some(Err(_))));
+        assert_eq!(sole_converted("{x:hex}", &v), None);
+    }
+
+    #[test]
+    fn a_level_law_converts_amplitude_to_db_down_to_its_floor() {
+        let c = conversions(Some(&json!({"meter": {"law": "db20", "floor": -90.0}}))).unwrap();
+        let m = &c["meter"];
+        // Full scale is 0 dB, half amplitude about -6.02 dB, ten times +20 dB.
+        assert_eq!(m.wire_to_value(1.0), Some(0.0));
+        assert!((m.wire_to_value(0.5).unwrap() + 6.0206).abs() < 1e-4);
+        assert_eq!(m.wire_to_value(10.0), Some(20.0));
+        // Silence and anything quieter than the floor read as the floor.
+        assert_eq!(m.wire_to_value(0.0), Some(-90.0));
+        assert_eq!(m.wire_to_value(1e-9), Some(-90.0));
+        assert_eq!(m.wire_to_value(-0.1), None);
+        assert!((m.value_to_wire(-20.0).unwrap() - 0.1).abs() < 1e-12);
+        assert_eq!(m.value_to_wire(-91.0), None);
+        let s = "db: { type: float }";
+        assert_eq!(
+            go("{db:from.meter:.1f}", json!({"db": 0.1}), s).unwrap(),
+            "-20.0"
+        );
+        for bad in [
+            json!({"law": "db10", "floor": -90}),
+            json!({"law": "db20"}),
+            json!({"law": "db20", "floor": -90, "points": [[0, 0], [1, 1]]}),
+            json!({"points": [[0, 0], [1, 1]], "floor": -90}),
+        ] {
+            assert!(conversions(Some(&json!({"bad": bad}))).is_err(), "{bad}");
+        }
     }
 
     #[test]

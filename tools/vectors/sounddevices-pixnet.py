@@ -28,3 +28,9 @@ _px("format_all_drives", {"label": "PIX"}, "/sounddevices/invoke/RemoteApi/forma
 _px("create_sound_report", {}, "/sounddevices/invoke/RemoteApi/createSoundReportCurrentReel()")
 _px("set_drive_mode", {"drive": 3, "mode": "ethernet_transfer"},
     "/sounddevices/setsetting/RecordToDrive3=Ethernet%20File%20Transfer", model="pix-270i")
+
+# The transport status (GET /sounddevices/transport), polled every second and
+# kept as the text the recorder answers.
+telemetry("sounddevices-pixnet", "transport-reply",
+          inbound_http={"path": "/sounddevices/transport", "body": '\n["stop", "A001C002.mov"]\n'},
+          expect_state={"transport": {"reply": '["stop", "A001C002.mov"]'}})

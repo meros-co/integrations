@@ -613,6 +613,16 @@ impl Tesira {
                     })),
                 });
             }
+            // The running design's instance tags: the names its blocks and
+            // controls are addressed by (SESSION get aliases, p.36-37).
+            setup.push(Request {
+                line: "SESSION get aliases".into(),
+                purpose: Purpose::Read(Some(Target {
+                    tag: "\u{0}design".into(),
+                    attribute: "aliases".into(),
+                    index: Vec::new(),
+                })),
+            });
             for (target, rate) in self.standing.clone() {
                 self.subscriptions
                     .entry(target.clone())
@@ -994,7 +1004,15 @@ impl Tesira {
                 (line, None, None)
             }
             "raw" => (s("command"), None, None),
-            "get_aliases" => ("SESSION get aliases".into(), None, None),
+            "get_aliases" => (
+                "SESSION get aliases".into(),
+                Some(Target {
+                    tag: "\u{0}design".into(),
+                    attribute: "aliases".into(),
+                    index: Vec::new(),
+                }),
+                None,
+            ),
             "recall_preset" => (device("recallPreset", i("preset").to_string()), None, None),
             "recall_preset_show_failures" => (
                 device("recallPresetShowFailures", i("preset").to_string()),
@@ -1667,6 +1685,7 @@ mod tests {
                 "DEVICE get serialNumber",
                 "DEVICE get version",
                 "DEVICE get hostname",
+                "SESSION get aliases",
                 "Level1 subscribe level 1 meros1 250",
                 "\"Room Mics\" subscribe mutes meros2",
             ]
@@ -1736,8 +1755,9 @@ mod tests {
             b"Welcome to the Tesira Text Protocol Server...\r\n",
         );
         let lines = drain(&mut m, 32);
+        assert_eq!(lines[4], "SESSION get aliases");
         assert_eq!(
-            &lines[4..],
+            &lines[5..],
             [
                 "Level1 subscribe level 1 meros1 250",
                 "LogicMeter1 subscribe state 2 meros3",
@@ -1789,6 +1809,28 @@ mod tests {
         let a = feed(&mut m, 10_020, b"+OK \"value\":\"01842224\"\r\n");
         assert!(a.contains(&Action::RoundTrip(6)));
         assert_eq!(state(&a), json!({}));
+    }
+
+    #[test]
+    fn the_designs_instance_tags_are_kept_in_state() {
+        let (mut m, a) = ready(json!({}), true);
+        assert_eq!(sent(&a), ["SESSION set verbose true\n"]);
+        // Verbose, serial number, version, host name, then the aliases.
+        for now in 2..6 {
+            feed(&mut m, now, b"+OK\r\n");
+        }
+        assert_eq!(m.current.as_ref().unwrap().0.line, "SESSION get aliases");
+        let a = feed(&mut m, 6, b"+OK \"list\":[\"Level1\" \"Room Mics\"]\r\n");
+        assert_eq!(
+            state(&a),
+            json!({"design": {"aliases": ["Level1", "Room Mics"]}})
+        );
+        // The command reads them again, into state too.
+        let mut cx = Cx::new(7);
+        m.command(&mut cx, 1, "get_aliases", &Params::new());
+        cx.take();
+        let a = feed(&mut m, 8, b"+OK \"list\":[\"Level1\"]\r\n");
+        assert_eq!(state(&a), json!({"design": {"aliases": ["Level1"]}}));
     }
 
     #[test]

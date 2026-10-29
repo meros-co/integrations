@@ -9,6 +9,7 @@
 //! as the answer to a later command. Liveness probes queue like commands for the
 //! same reason.
 
+mod acknowledge;
 mod cookies;
 mod expect;
 pub(crate) use expect::json_path;
@@ -1067,6 +1068,9 @@ pub(crate) struct SpecEngine {
     outbox: VecDeque<Paced>,
     /// The pacing timer let the command in flight's next message go.
     pace_pass: bool,
+    /// `transport.acknowledge`: what the device sends by itself and wants
+    /// answered (SPEC.md §2, Acknowledgements).
+    acknowledge: acknowledge::Acknowledge,
 }
 
 fn str_field<'a>(v: &'a Value, key: &str) -> Option<&'a str> {
@@ -1897,6 +1901,15 @@ impl SpecEngine {
             )?,
         };
         let keepalive = keepalive_of(&t, &transport)?;
+        let acknowledge = acknowledge::Acknowledge::parse(t.get("acknowledge"))?;
+        if !acknowledge.is_empty()
+            && !matches!(
+                transport,
+                Transport::LineTcp { .. } | Transport::LineUdp { .. } | Transport::Ws { .. }
+            )
+        {
+            return Err("transport.acknowledge needs a line or websocket transport".into());
+        }
         // A list of probes, each for some models: the first for this one.
         let probe = match t.get("probe") {
             Some(Value::Array(items)) => items.iter().find(|i| for_model(i, &ctx.model)).cloned(),
@@ -2326,6 +2339,7 @@ impl SpecEngine {
             pacer,
             outbox: VecDeque::new(),
             pace_pass: false,
+            acknowledge,
         })
     }
 
@@ -2631,9 +2645,10 @@ impl SpecEngine {
             let outgoing = self.build(&item, &values)?;
             let text = match (&self.transport, line_message(&item)) {
                 (_, _) if matches!(outgoing, Outgoing::Http(..)) => None,
-                (Transport::LineTcp { .. } | Transport::LineUdp { .. }, Some(template)) => {
-                    Some(render(template, &values, no_escape)?)
-                }
+                (
+                    Transport::LineTcp { .. } | Transport::LineUdp { .. } | Transport::Ws { .. },
+                    Some(template),
+                ) => Some(render(template, &values, no_escape)?),
                 _ => None,
             };
             let pace = pace_text(&outgoing, text.as_deref());
@@ -2814,6 +2829,12 @@ impl SpecEngine {
                 }
                 return;
             };
+            if let Some(text) = &text {
+                self.acknowledge.sent(text, cx.now() + self.timeout);
+            }
+            let Some(flight) = self.current.as_mut() else {
+                return;
+            };
             flight.request_text = text;
             // A request to an endpoint goes to another server: not paced.
             let groups = (!matches!(&outgoing, Outgoing::Http(_, route) if *route != Route::Main))
@@ -2953,6 +2974,9 @@ impl SpecEngine {
     /// Send a message that awaits no reply (`on_connect`, a subscription),
     /// in its turn under the pacing.
     fn emit(&mut self, cx: &mut Cx, outgoing: Outgoing, text: Option<&str>) {
+        if let Some(text) = text {
+            self.acknowledge.sent(text, cx.now() + self.timeout);
+        }
         if self.pacer.is_off()
             || matches!(&outgoing, Outgoing::Http(_, route) if *route != Route::Main)
         {
@@ -2989,10 +3013,11 @@ impl SpecEngine {
         }
     }
 
-    /// A line message's text without framing, on a line transport.
+    /// A text message's text without framing, on a line or websocket
+    /// transport: what pacing groups and a reply's `request_match` read.
     fn line_text(&self, item: &Value, values: &Values) -> Option<String> {
         match self.transport {
-            Transport::LineTcp { .. } | Transport::LineUdp { .. } => {
+            Transport::LineTcp { .. } | Transport::LineUdp { .. } | Transport::Ws { .. } => {
                 line_message(item).and_then(|t| render(t, values, no_escape).ok())
             }
             _ => None,
@@ -3743,6 +3768,7 @@ impl SpecEngine {
     fn opened(&mut self, cx: &mut Cx) {
         self.backoff = RECONNECT_MIN;
         self.last_heard = cx.now();
+        self.acknowledge.reset();
         self.prompt_wait = None;
         self.refusals.clear();
         self.quiet_done = false;
@@ -3815,12 +3841,24 @@ impl SpecEngine {
         self.send_items(cx, items, poll);
     }
 
+    /// `when_set` on a telemetry message: sent only while that setting is
+    /// set (not empty, and not `false`), decided from the settings current
+    /// when it would go, so `update_settings` turns it on and off.
+    fn wanted(&self, item: &Value) -> bool {
+        match item.get("when_set").and_then(Value::as_str) {
+            None => true,
+            Some(setting) => self.settings.get(setting).is_some_and(|v| {
+                !v.is_null() && v.as_str() != Some("") && v.as_bool() != Some(false)
+            }),
+        }
+    }
+
     /// Telemetry messages, each rendered from its own values: none for a
     /// subscription or a poll, a rule's captures for `then_send`.
     fn send_items(&mut self, cx: &mut Cx, items: Vec<telemetry::Triggered>, poll: bool) {
         let items: Vec<telemetry::Triggered> = items
             .into_iter()
-            .filter(|t| for_model(&t.item, &self.ctx.model))
+            .filter(|t| for_model(&t.item, &self.ctx.model) && self.wanted(&t.item))
             .collect();
         // HTTP requests are always queued: each reply is matched to its
         // request. Poll items are queries, so on any transport that answers
@@ -3837,8 +3875,18 @@ impl SpecEngine {
             // connection step still waits for its answer (a login), they
             // queue behind it: DHD's Control API takes nothing before its
             // auth message is answered.
-            Transport::Ws { .. } => {
-                self.queue.iter().any(|j| j.setup)
+            //
+            // A device whose replies `reply_match` tells from its pushes
+            // (QLC+'s `QLC+API|...` answers) has them queued as on a line
+            // transport, each awaiting its reply, so a rule can tie the
+            // reply to the message it answers (`request_match`).
+            Transport::Ws {
+                ref reply_match,
+                replies,
+                ..
+            } => {
+                (replies && reply_match.is_some())
+                    || self.queue.iter().any(|j| j.setup)
                     || self.current.as_ref().is_some_and(|f| f.job.setup)
             }
         };
@@ -3992,6 +4040,34 @@ impl SpecEngine {
         self.offer(cx, &telemetry::Inbound::Text(text));
     }
 
+    /// `transport.acknowledge`: a message the device sent by itself that it
+    /// wants answered is answered at once, whether or not the device is
+    /// monitored, since the answer keeps the connection (or stops the device
+    /// repeating itself), not state. It is not paced: the device waits for
+    /// it, and nothing else waits behind it.
+    fn answer_unasked(&mut self, cx: &mut Cx, message: &str, error: bool) {
+        if self.acknowledge.is_empty() || self.refused.is_some() {
+            return;
+        }
+        let Some((rule, captures)) = self.acknowledge.heard(message, error, cx.now()) else {
+            return;
+        };
+        let (send, framed) = (rule.send.clone(), rule.framed);
+        let (params, specs) = telemetry::capture_params(&captures);
+        let values = self.values(&params, &specs);
+        let outgoing = match render(&send, &values, no_escape) {
+            Err(e) => Err(e),
+            Ok(text) if matches!(self.transport, Transport::Ws { .. }) => Ok(Outgoing::Ws(text)),
+            // As it is, without the framing: Denon's ACK is the byte alone.
+            Ok(text) if !framed => Ok(Outgoing::Bytes(text.into_bytes())),
+            Ok(_) => self.build(&Value::String(send), &values),
+        };
+        match outgoing {
+            Ok(outgoing) => self.emit_now(cx, outgoing),
+            Err(e) => cx.log(Level::Warning, format!("acknowledgement not sent: {e}")),
+        }
+    }
+
     fn inbound_text(&mut self, cx: &mut Cx, message: String) {
         if self.refusals.iter().any(|(re, _)| re.is_match(&message)) {
             self.refuse(cx, format!("login refused: {}", message.trim()));
@@ -4001,6 +4077,8 @@ impl SpecEngine {
         // text that happens to match is not about the login.
         self.refusals
             .retain(|(_, accepted)| !accepted.as_ref().is_some_and(|a| a.is_match(&message)));
+        let error = matches!(&self.transport, Transport::LineTcp { error_match: Some(re), .. } if re.is_match(&message));
+        self.answer_unasked(cx, &message, error);
         let waiting = match self.current.as_ref().and_then(|f| f.awaiting.as_ref()) {
             Some(Await::Text(None)) => true,
             // `expect.reply_contains`: a message that does not hold the text
@@ -4132,7 +4210,7 @@ impl SpecEngine {
         }
         self.refusals
             .retain(|(_, accepted)| !accepted.as_ref().is_some_and(|a| a.is_match(&text)));
-        self.apply_message(cx, &text);
+        self.answer_unasked(cx, &text, false);
         let ours =
             match self.current.as_ref().and_then(|f| f.awaiting.as_ref()) {
                 Some(Await::Ws(Some(fields))) => serde_json::from_str::<Value>(&text)
@@ -4158,6 +4236,15 @@ impl SpecEngine {
                 },
                 _ => false,
             };
+        // The reply to the message in flight is offered with that message's
+        // text, for a rule that needs to know what it answers.
+        let request = ours
+            .then(|| self.current.as_ref().and_then(|f| f.request_text.clone()))
+            .flatten();
+        match request {
+            Some(request) => self.offer_answer(cx, &text, &request),
+            None => self.apply_message(cx, &text),
+        }
         if ours {
             self.reply(cx, Reply::Text(text));
         } else {
@@ -5377,6 +5464,8 @@ fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 mod auth_tests;
 #[cfg(test)]
 mod pacing_tests;
+#[cfg(test)]
+mod stream_tests;
 #[cfg(test)]
 mod vectors;
 

@@ -52,9 +52,32 @@ source:
   - title: grandMA2 Release Notes 2.8, 3.1, 3.2, 3.3, 3.8
     url: https://help.malighting.com/grandMA2/en/help/release_notes/key_releasenotes.html
     note: Telnet fixes that become quirks below.
+  - title: grandMA2 User Manual, MIDI Show Control (MSC)
+    url: https://help.malighting.com/grandMA2/en/help/key_remote_control_msc.html
+    note: >
+      Version 3.9. Setup > Console > Midi Show Control: MSC In and MSC Out
+      rows with Device (0-111), Group (1-15), Port (Ethernet, default 6004,
+      6000 to 6100), Mode (Disabled, Ethernet, MIDI), Exec (Default Only,
+      Exec.Page with page and executor separated by 2E, Exec Page separated
+      by 00) and Command (General Light 01, Moving Light 02, All 7F); Send to
+      group, device or all. The seven commands Go 01, Stop 02, Resume 03,
+      Timed_Go 04, Set 06, Fire 07 and Go_Off 0B with their data and
+      examples: cue numbers as ASCII digits ("37.200 00 5.1" for cue 37.2 on
+      executor 5, page 1), Stop and Resume sent with cue 0.000, times in
+      hours, minutes, seconds, frames (24 per second when transmitting) and
+      fractions, Set as fader (00 for fader 1), page and a 14-bit position
+      (percent x 1.28, fine byte first), transmitted only for executors with
+      sequences and the selected executor's special masters. MSC via
+      Ethernet: UDP, each message preceded by "GMA" 00 "MSC" 00 and a 4-byte
+      little-endian length of the whole message including those 12 bytes.
   - title: grandMA2 User Manual, grandMA3 Mode2 introduction
     url: https://help.malighting.com/grandMA2/en/help/grandma3_mode2/key_mode2_introduction.html
     note: grandMA3 hardware running grandMA2 software 3.4 and later.
+
+# The console's MSC output (MSC Out mode Ethernet) is the only structured
+# report of what it does; the ma-msc-ethernet extension listens for it on
+# msc_port and offers each message to the rules below as a line of text.
+extension: ma-msc-ethernet
 
 transport:
   type: line-tcp
@@ -81,12 +104,20 @@ settings:
     pattern: '^[^"]+$'
     label: Password
     description: "That user's password, case sensitive; a user without a password cannot be configured."
+  msc_port:
+    type: int
+    min: 6000
+    max: 6100
+    default: 6004
+    label: MSC port
+    description: "The Port of the console's MSC Out row (Setup > Console > Midi Show Control, Mode Ethernet), on which this host receives what the console plays; empty to read nothing."
 
 on_connect:
   - 'Login "{settings.username}" "{settings.password}"'
 
 ports:
   - { port: 30000, protocol: tcp, role: control }
+  - { port: 6004, protocol: udp, role: feedback, listener: core, setting: msc_port, note: "MSC via Ethernet from the console's MSC Out (Mode Ethernet)" }
 
 models:
   - id: grandma2
@@ -1506,12 +1537,12 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      There is no structured acknowledgement and no pushed state. The console
+      There is no structured acknowledgement over telnet. The console
       echoes command-line feedback as free text, so a rejected command, a
       non-existent executor and a successful Go are indistinguishable. MA
       documents no machine-readable feedback over telnet; port 30001 gives a
       read-only System Monitor stream, also free text. All commands are
-      unverified, and no state is tracked.
+      unverified. State comes only from the console's MSC output (below).
 
   - models: [all]
     severity: warning
@@ -1585,3 +1616,69 @@ quirks:
       MA's Web Remote is a browser interface (Setup > Console > Global
       Settings > Remotes, at most three remote users, Administrator cannot log
       in). MA documents no protocol for it, so it is not used here.
+
+  - models: [all]
+    severity: warning
+    text: >
+      State is read from the console's MIDI Show Control output, which it
+      sends over UDP when Setup > Console > Midi Show Control > MSC Out has
+      Mode Ethernet and a Port (msc_port, default 6004). Set MSC Out's Exec
+      to Exec.Page or Exec Page so each message names its executor and page;
+      with Default Only only the selected executor's cue is known
+      (selected.*). The console sends a message when a cue runs (Go,
+      Timed_Go), an executor is paused, resumed or switched off, a fader of
+      an executor with a sequence moves (Set) and a macro fires, so state
+      shows what happened since this host started listening, not what was
+      running before. The manual does not say to which address the console
+      sends: this host must be reachable at it (broadcast, or this host's
+      address), and each message is taken by the console's address.
+      Receiving and sending MSC on the same MIDI channel loops (manual).
+
+  - models: [all]
+    severity: info
+    text: >
+      Cue numbers are kept as the console sends them (37.200 for cue 37.2).
+      Stop and Resume carry cue 0.000, so they change an executor's status
+      and leave its cue. A fader position is the manual's percent x 1.28 as
+      a 14-bit value, read back as value / 163.84: full arrives as 99.99.
+
+state:
+  pages.*.executors.*.cue: { type: string, description: "The cue the executor last ran, from MSC Go or Timed_Go, as the console writes it (37.200)" }
+  pages.*.executors.*.status: { type: string, description: "running after Go, Timed_Go or Resume; paused after Stop; off after Go_Off" }
+  pages.*.executors.*.fade: { type: float, unit: s, description: "The fade time of the executor's last Timed_Go, in seconds" }
+  pages.*.executors.*.fader: { type: float, unit: "%", description: "The executor's fader position from MSC Set, 0 to 99.99 percent" }
+  selected.cue: { type: string, description: "With MSC Out's Exec set to Default Only: the cue the selected executor last ran" }
+  selected.status: { type: string, description: "With Default Only: running, paused or off, as for an executor" }
+  macros.last_fired: { type: int, description: "The macro the console last fired, from MSC Fire (1 to 255)" }
+  msc.last: { type: string, description: "The last MSC message the console sent, decoded, such as MSC GO device=1 format=01 cue=37.200 list=5.1" }
+
+conversions:
+  ma_msc_fader:   # MSC Set: percent x 1.28, coarse and fine as 14 bits
+    points: [[0, 0.0], [16384, 100.0]]
+
+telemetry:
+  updates:
+    - match: '^(MSC .+)$'
+      state: { msc.last: "{1}" }
+    # Exec.Page: list "exec.page"; Exec Page: list exec, path page.
+    - match: '^MSC (?:GO|TIMED_GO) device=\d+ format=\w+(?: fade=[0-9.]+)? cue=([0-9.]+) list=(\d+)\.(\d+)$'
+      state: { "pages.{3}.executors.{2}.cue": "{1}", "pages.{3}.executors.{2}.status": "running" }
+    - match: '^MSC (?:GO|TIMED_GO) device=\d+ format=\w+(?: fade=[0-9.]+)? cue=([0-9.]+) list=(\d+) path=(\d+)$'
+      state: { "pages.{3}.executors.{2}.cue": "{1}", "pages.{3}.executors.{2}.status": "running" }
+    - match: '^MSC TIMED_GO device=\d+ format=\w+ fade=([0-9.]+) cue=[0-9.]+ list=(\d+)\.(\d+)$'
+      state: { "pages.{3}.executors.{2}.fade": "{1}" }
+    - match: '^MSC TIMED_GO device=\d+ format=\w+ fade=([0-9.]+) cue=[0-9.]+ list=(\d+) path=(\d+)$'
+      state: { "pages.{3}.executors.{2}.fade": "{1}" }
+    - match: '^MSC (STOP|RESUME|GO_OFF) device=\d+ format=\w+(?: cue=[0-9.]+)? list=(\d+)\.(\d+)$'
+      state: { "pages.{3}.executors.{2}.status": { value: "{1}", map: { STOP: paused, RESUME: running, GO_OFF: "off" } } }
+    - match: '^MSC (STOP|RESUME|GO_OFF) device=\d+ format=\w+(?: cue=[0-9.]+)? list=(\d+) path=(\d+)$'
+      state: { "pages.{3}.executors.{2}.status": { value: "{1}", map: { STOP: paused, RESUME: running, GO_OFF: "off" } } }
+    # Default Only: the selected executor.
+    - match: '^MSC (?:GO|TIMED_GO) device=\d+ format=\w+(?: fade=[0-9.]+)? cue=([0-9.]+)$'
+      state: { selected.cue: "{1}", selected.status: "running" }
+    - match: '^MSC (STOP|RESUME|GO_OFF) device=\d+ format=\w+(?: cue=[0-9.]+)?$'
+      state: { selected.status: { value: "{1}", map: { STOP: paused, RESUME: running, GO_OFF: "off" } } }
+    - match: '^MSC SET device=\d+ format=\w+ fader=(\d+) page=(\d+) value=(\d+)(?: fade=[0-9.]+)?$'
+      state: { "pages.{2}.executors.{1}.fader": "{3:from.ma_msc_fader}" }
+    - match: '^MSC FIRE device=\d+ format=\w+ macro=(\d+)$'
+      state: { macros.last_fired: "{1}" }

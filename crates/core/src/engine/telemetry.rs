@@ -29,6 +29,153 @@ struct Assign {
     delete: bool,
 }
 
+/// `blob_each`: numbers packed back to back in an OSC blob argument.
+#[derive(Debug)]
+struct BlobEach {
+    /// The argument holding the blob.
+    arg: usize,
+    /// Bytes skipped at the blob's start (a count the device puts first).
+    offset: usize,
+    /// At most this many numbers; as many as the blob holds when absent.
+    count: Option<usize>,
+    /// Each number's width in bytes, and how it is read.
+    format: BlobFormat,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum BlobFormat {
+    I8,
+    U8,
+    I16(bool),
+    U16(bool),
+    I32(bool),
+    U32(bool),
+    F32(bool),
+}
+
+impl BlobFormat {
+    /// `i16le`, `f32be`, ...: the type, then the byte order (`le` or `be`)
+    /// for anything wider than a byte.
+    fn parse(s: &str) -> Option<BlobFormat> {
+        Some(match s {
+            "i8" => BlobFormat::I8,
+            "u8" => BlobFormat::U8,
+            "i16le" => BlobFormat::I16(true),
+            "i16be" => BlobFormat::I16(false),
+            "u16le" => BlobFormat::U16(true),
+            "u16be" => BlobFormat::U16(false),
+            "i32le" => BlobFormat::I32(true),
+            "i32be" => BlobFormat::I32(false),
+            "u32le" => BlobFormat::U32(true),
+            "u32be" => BlobFormat::U32(false),
+            "f32le" => BlobFormat::F32(true),
+            "f32be" => BlobFormat::F32(false),
+            _ => return None,
+        })
+    }
+
+    fn width(self) -> usize {
+        match self {
+            BlobFormat::I8 | BlobFormat::U8 => 1,
+            BlobFormat::I16(_) | BlobFormat::U16(_) => 2,
+            BlobFormat::I32(_) | BlobFormat::U32(_) | BlobFormat::F32(_) => 4,
+        }
+    }
+
+    /// The number in `b`, exactly `width()` bytes: an integer as a JSON
+    /// integer, a float as a JSON number (none for NaN or infinity).
+    fn read(self, b: &[u8]) -> Option<Value> {
+        fn two(b: &[u8], le: bool) -> [u8; 2] {
+            let a = [b[0], b[1]];
+            if le {
+                a
+            } else {
+                [a[1], a[0]]
+            }
+        }
+        fn four(b: &[u8], le: bool) -> [u8; 4] {
+            let a = [b[0], b[1], b[2], b[3]];
+            if le {
+                a
+            } else {
+                [a[3], a[2], a[1], a[0]]
+            }
+        }
+        Some(match self {
+            BlobFormat::I8 => Value::from(b[0] as i8),
+            BlobFormat::U8 => Value::from(b[0]),
+            BlobFormat::I16(le) => Value::from(i16::from_le_bytes(two(b, le))),
+            BlobFormat::U16(le) => Value::from(u16::from_le_bytes(two(b, le))),
+            BlobFormat::I32(le) => Value::from(i32::from_le_bytes(four(b, le))),
+            BlobFormat::U32(le) => Value::from(u32::from_le_bytes(four(b, le))),
+            BlobFormat::F32(le) => {
+                let f = f32::from_le_bytes(four(b, le));
+                Value::from(serde_json::Number::from_f64(f64::from(f))?)
+            }
+        })
+    }
+}
+
+impl BlobEach {
+    fn parse(v: &Value) -> Result<BlobEach, String> {
+        let m = v
+            .as_object()
+            .ok_or("telemetry: blob_each is a mapping of arg, offset, count and format")?;
+        for k in m.keys() {
+            if !["arg", "offset", "count", "format"].contains(&k.as_str()) {
+                return Err(format!("telemetry: blob_each.{k} is not a blob_each key"));
+            }
+        }
+        let num = |k: &str| -> Result<Option<usize>, String> {
+            match m.get(k) {
+                None => Ok(None),
+                Some(n) => n
+                    .as_u64()
+                    .map(|n| Some(n as usize))
+                    .ok_or(format!("telemetry: blob_each.{k} is a whole number")),
+            }
+        };
+        let format = m
+            .get("format")
+            .and_then(Value::as_str)
+            .and_then(BlobFormat::parse)
+            .ok_or("telemetry: blob_each.format is one of i8, u8, i16le, i16be, u16le, u16be, i32le, i32be, u32le, u32be, f32le, f32be")?;
+        let count = num("count")?;
+        if count == Some(0) {
+            return Err("telemetry: blob_each.count is at least 1".into());
+        }
+        Ok(BlobEach {
+            arg: num("arg")?.unwrap_or(0),
+            offset: num("offset")?.unwrap_or(0),
+            count,
+            format,
+        })
+    }
+
+    /// The numbers in the blob at `arg` (its bytes as a JSON array), from
+    /// `offset`, as many as fit whole, up to `count`. None when that
+    /// argument is not a blob.
+    fn numbers(&self, args: &[Value]) -> Option<Vec<Value>> {
+        let bytes = match args.get(self.arg)? {
+            Value::Array(a) => a
+                .iter()
+                .map(|b| b.as_u64().and_then(|b| u8::try_from(b).ok()))
+                .collect::<Option<Vec<u8>>>()?,
+            _ => return None,
+        };
+        let rest = bytes.get(self.offset..).unwrap_or(&[]);
+        let width = self.format.width();
+        let n = rest.len() / width;
+        let n = self.count.map_or(n, |c| c.min(n));
+        Some(
+            rest.chunks_exact(width)
+                .take(n)
+                .filter_map(|c| self.format.read(c))
+                .collect(),
+        )
+    }
+}
+
 #[derive(Debug)]
 enum Matcher {
     /// The whole message matches; captures are `{1}`, `{2}`, ... With
@@ -74,6 +221,10 @@ enum Matcher {
         /// or `arg_match`'s): a list inside a string argument (WING's node
         /// query), each item's captures numbered on and `{index}` its place.
         text_each: Option<(Regex, usize)>,
+        /// `blob_each`: the rule matches once for each number packed in a
+        /// blob argument (a console's meter block), `{value}` the number and
+        /// `{index}` its place.
+        blob_each: Option<BlobEach>,
         select: Vec<(String, Regex)>,
         each: Option<String>,
         each_select: Vec<(String, Regex)>,
@@ -866,6 +1017,20 @@ impl Telemetry {
                                 )? as usize,
                         )),
                     },
+                    blob_each: match rule.get("blob_each") {
+                        None => None,
+                        Some(b) => {
+                            if ["match_each", "json", "json_each", "json_match"]
+                                .iter()
+                                .any(|k| rule.get(k).is_some())
+                            {
+                                return Err(
+                                    "telemetry: blob_each goes without match_each or json".into()
+                                );
+                            }
+                            Some(BlobEach::parse(b)?)
+                        }
+                    },
                     select: selectors(rule.get("json_match"), "json_match")?,
                     each: rule
                         .get("json_each")
@@ -1111,6 +1276,12 @@ impl Telemetry {
         let (message, request) = match message {
             Inbound::Answer { text, request } => (&Inbound::Text(text), Some(*request)),
             other => (other, None),
+        };
+        // `blob_each` reads a blob's bytes as they came, even ones that
+        // happen to be UTF-8 (a block of silent meters is all zeros).
+        let raw_args: &[Value] = match message {
+            Inbound::Osc { args, .. } => args,
+            _ => &[],
         };
         // An OSC blob holding UTF-8 text (OSCPoint's names, notes and JSON)
         // is read as that text; one that is not UTF-8 stays its bytes.
@@ -1377,6 +1548,7 @@ impl Telemetry {
                         arg_types,
                         arg_match,
                         text_each,
+                        blob_each,
                         select: selectors,
                         each,
                         each_select,
@@ -1416,6 +1588,21 @@ impl Telemetry {
                     let numbered = base.len();
                     for (i, a) in args.iter().enumerate() {
                         base.push((format!("arg{i}"), a.clone()));
+                    }
+                    // Each number of a blob; an argument that is not a blob
+                    // gives nothing.
+                    if let Some(blob) = blob_each {
+                        let Some(numbers) = blob.numbers(raw_args) else {
+                            continue;
+                        };
+                        self.clear(rule, &base, cleared);
+                        for (index, n) in numbers.into_iter().enumerate() {
+                            let mut values = base.clone();
+                            values.push(("value".to_string(), n));
+                            values.push(("index".to_string(), Value::from(index)));
+                            any |= self.matched(rule, &values, &mut patch, triggers);
+                        }
+                        continue;
                     }
                     self.clear(rule, &base, cleared);
                     // Each item of a list inside a capture's text; a capture
@@ -2314,6 +2501,85 @@ mod tests {
         );
         // A blob that is not UTF-8 stays bytes, which a JSON rule cannot read.
         assert!(osc("/doc", "sb", &[json!("{}"), json!([0xff, 0xfe])]).is_none());
+    }
+
+    #[test]
+    fn numbers_packed_in_a_blob_are_read_one_by_one() {
+        let conversions = super::super::template::conversions(Some(&json!({
+            "q8": {"points": [[-32768, -128.0], [32767, 127.99609375]]},
+            "amp": {"law": "db20", "floor": -90.0},
+        })))
+        .unwrap();
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                // A count first, then i16 levels in 1/256 dB.
+                {"address": "^/meters/1$", "blob_each": {"offset": 4, "count": 2, "format": "i16le"},
+                 "state": {"ch.{index:+1}.db": "{value:from.q8}"}},
+                {"address": "^/meters/1$", "blob_each": {"offset": 8, "format": "i16le"},
+                 "state": {"bus.{index:+1}.db": "{value:from.q8}"}},
+                // Linear floats, as dB.
+                {"address": "^/meters/2$", "blob_each": {"arg": 1, "offset": 4, "format": "f32le"},
+                 "state": {"main.{index:+1}.db": "{value:from.amp}"}},
+                {"address": "^/raw$", "blob_each": {"format": "u16be"}, "replace": "raw",
+                 "state": {"raw.{index}": "{value}"}},
+            ]})),
+            &state(json!({
+                "ch.*.db": {"type": "float", "description": "x"},
+                "bus.*.db": {"type": "float", "description": "x"},
+                "main.*.db": {"type": "float", "description": "x"},
+                "raw.*": {"type": "int", "description": "x"},
+            })),
+            conversions,
+        )
+        .unwrap();
+        let osc = |address, types, args: &[Value]| {
+            t.apply(&Inbound::Osc {
+                address,
+                types,
+                args,
+            })
+        };
+        let mut blob = vec![3u8, 0, 0, 0];
+        for v in [-2560i16, 0, 256] {
+            blob.extend_from_slice(&v.to_le_bytes());
+        }
+        // Count 2 takes the first two numbers; the bus rule starts 4 bytes on
+        // and takes what is left, the odd byte past the end dropped.
+        blob.push(9);
+        assert_eq!(
+            osc("/meters/1", "b", &[json!(blob)]).unwrap(),
+            json!({"ch": {"1": {"db": -10.0}, "2": {"db": 0.0}}, "bus": {"1": {"db": 1.0}}})
+        );
+        // All zeros is valid UTF-8, yet still read as numbers: silence.
+        let mut floats = vec![2u8, 0, 0, 0];
+        floats.extend_from_slice(&1.0f32.to_le_bytes());
+        floats.extend_from_slice(&0.0f32.to_le_bytes());
+        assert_eq!(
+            osc("/meters/2", "ib", &[json!(7), json!(floats)]).unwrap(),
+            json!({"main": {"1": {"db": 0.0}, "2": {"db": -90.0}}})
+        );
+        assert_eq!(
+            osc("/raw", "b", &[json!([0, 0, 0, 0])]).unwrap(),
+            json!({"raw": {"0": 0, "1": 0}})
+        );
+        assert_eq!(
+            osc("/raw", "b", &[json!([1, 2])]).unwrap(),
+            json!({"raw": {"0": 258}})
+        );
+        // An argument that is not a blob gives nothing.
+        assert!(osc("/raw", "s", &[json!("x")]).is_none());
+        for bad in [
+            json!({"format": "f64le"}),
+            json!({"format": "i16le", "count": 0}),
+            json!({"format": "i16le", "size": 2}),
+        ] {
+            let e = Telemetry::parse(
+                Some(&json!({"updates": [{"address": "^/x$", "blob_each": bad, "state": {}}]})),
+                &BTreeMap::new(),
+                Conversions::new(),
+            );
+            assert!(e.is_err(), "{bad}");
+        }
     }
 
     #[test]

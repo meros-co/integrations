@@ -87,6 +87,22 @@ transport:
   reply_match: '^(OK|OKm|ERROR) '
   probe: devstatus runmode
 
+conversions:
+  # Meter steps 00-7E are -126 to 0 dBFS, one dB a step; 7F is OVER (DME7
+  # Remote Control Protocol Specifications V1.1.0, 5.1 p.50).
+  yamaha_meter:
+    points: [[0, -126.0], [126, 0.0]]
+
+settings:
+  # Meters are a continuous stream, so they are asked for only when the
+  # operator turns them on.
+  meters: { type: bool, default: false, label: Meters,
+    description: "On asks the console for its meters (mtrstart) and keeps them in state in dBFS; off leaves them alone." }
+  meter_interval_ms: { type: int, min: 40, max: 10000, default: 100, label: Meter interval,
+    description: "Least time between meter notifications in milliseconds, 40 to 10000." }
+  meter_point: { type: enum, values: [PreFader, PostOn], default: PostOn, label: Meter point,
+    description: "Where the meters are picked off: PreFader before the fader, PostOn after the fader and ON key, as the console's meter list names them." }
+
 ports:
   - { port: 49280, protocol: tcp, role: control }
 
@@ -4764,10 +4780,13 @@ quirks:
       prmnum and prminfo <index> (the DME7 document's 3-14 and 3-15, also implemented by the RM
       series) appear to be answered by the consoles: the Companion module's parameter list is a
       console's prminfo answers. They are not typed here and no runtime catalogue is built from
-      them; get_parameter cannot send them because they take no address. Meter data (mtrstart and
-      NOTIFY mtr) is not typed: the list names meters for every channel type
-      (MIXER:Current/Meter/InCh and others, with pick-off points), whose values are hexadecimal and
-      arrive as a variable-length list the format cannot map to per-channel state.
+      them; get_parameter cannot send them because they take no address. Meters are kept in state with the meters setting on: Yamaha documents no console meter
+      addresses, so they are the console's own meter list (its mtrinfo answers, as recorded in the
+      Companion module's dump), asked for with mtrstart without the Meter segment as the Companion
+      module sends it; the notification's layout (a type word, then one two-digit hexadecimal value per
+      channel) and the dB table are the DME7 document's (3.2.3 p.10, 5.1 p.50), not a console document's. Scene titles are read with ssinfo_ex, as the Companion
+      module reads them for the current scene; the reply's layout is the DME7 document's ssinfo_ex (3-19
+      p.31).
   - models:
       - all
     severity: critical
@@ -4779,6 +4798,67 @@ quirks:
       the console's read-only initial scene, so the range here starts at 1 and ends at 99, as for recall.
 
 state:
+  inputs.*.meter:
+    type: int
+    description: 'Input channel meter as sent (MIXER:Current/Meter/InCh, at the meter point setting; NOTIFY mtr), with the meters setting on: 0-126 for -126 to 0 dBFS, 127 OVER'
+  inputs.*.meter_db:
+    type: float
+    unit: dB
+    description: 'Input channel meter in dBFS, -126 to 0, with the meters setting on; not written while the meter reads OVER (127), which meter says'
+  stereo_inputs.*.meter:
+    type: int
+    description: 'Stereo input channel meter as sent (MIXER:Current/Meter/StInCh, at the meter point setting; NOTIFY mtr), with the meters setting on: 0-126 for -126 to 0 dBFS, 127 OVER'
+  stereo_inputs.*.meter_db:
+    type: float
+    unit: dB
+    description: 'Stereo input channel meter in dBFS, -126 to 0, with the meters setting on; not written while the meter reads OVER (127), which meter says'
+  fx_returns.*.meter:
+    type: int
+    description: 'Effects return meter as sent (MIXER:Current/Meter/FxRtnCh, at the meter point setting; NOTIFY mtr), with the meters setting on: 0-126 for -126 to 0 dBFS, 127 OVER'
+  fx_returns.*.meter_db:
+    type: float
+    unit: dB
+    description: 'Effects return meter in dBFS, -126 to 0, with the meters setting on; not written while the meter reads OVER (127), which meter says'
+  mixes.*.meter:
+    type: int
+    description: 'Mix bus meter as sent (MIXER:Current/Meter/Mix, at the meter point setting; NOTIFY mtr), with the meters setting on: 0-126 for -126 to 0 dBFS, 127 OVER'
+  mixes.*.meter_db:
+    type: float
+    unit: dB
+    description: 'Mix bus meter in dBFS, -126 to 0, with the meters setting on; not written while the meter reads OVER (127), which meter says'
+  matrices.*.meter:
+    type: int
+    description: 'Matrix meter as sent (MIXER:Current/Meter/Mtrx, at the meter point setting; NOTIFY mtr), with the meters setting on: 0-126 for -126 to 0 dBFS, 127 OVER'
+  matrices.*.meter_db:
+    type: float
+    unit: dB
+    description: 'Matrix meter in dBFS, -126 to 0, with the meters setting on; not written while the meter reads OVER (127), which meter says'
+  stereo.*.meter:
+    type: int
+    description: 'Stereo bus channel meter as sent (MIXER:Current/Meter/St, at the meter point setting; NOTIFY mtr), with the meters setting on: 0-126 for -126 to 0 dBFS, 127 OVER'
+  stereo.*.meter_db:
+    type: float
+    unit: dB
+    description: 'Stereo bus channel meter in dBFS, -126 to 0, with the meters setting on; not written while the meter reads OVER (127), which meter says'
+  mono.meter:
+    type: int
+    description: 'Mono bus meter as sent (MIXER:Current/Meter/Mono, at the meter point setting; NOTIFY mtr), with the meters setting on: 0-126 for -126 to 0 dBFS, 127 OVER'
+  mono.meter_db:
+    type: float
+    unit: dB
+    description: 'Mono bus meter in dBFS, -126 to 0, with the meters setting on; not written while the meter reads OVER (127), which meter says'
+  scenes.*.list.*.number_text:
+    type: string
+    description: 'Scene number as the console shows it (ssinfo_ex); keyed by scene list (a or b) then scene number, 0-99, every scene read on connecting'
+  scenes.*.list.*.title:
+    type: string
+    description: 'Scene title, as sent with its escapes (ssinfo_ex); keyed by scene list (a or b) then scene number, 0-99, every scene read on connecting'
+  scenes.*.list.*.comment:
+    type: string
+    description: 'Scene comment, as sent with its escapes (ssinfo_ex); keyed by scene list (a or b) then scene number, 0-99, every scene read on connecting'
+  scenes.*.list.*.attribute:
+    type: string
+    description: 'Scene attribute: user for a stored scene, empty, preinst or reserve (ssinfo_ex); keyed by scene list (a or b) then scene number, 0-99, every scene read on connecting'
   inputs.*.fader_level:
     type: int
     description: 'Input channel fader level (MIXER:Current/InCh/Fader/Level): hundredths of a dB, -32768 (-inf) to 1000 (+10 dB)'
@@ -5054,6 +5134,20 @@ state:
     description: 'Run mode: normal, emergency, booting or update (devstatus runmode)'
 
 telemetry:
+  # With the meters setting on, the meters of the console's meter list
+  # (its mtrinfo answers) are asked for; notifications stop after 10
+  # seconds unless asked again (DME7 document 2-16 p.22), so they are
+  # asked again every 9.
+  subscribe:
+    send:
+      - { when_set: meters, message: "mtrstart MIXER:Current/InCh/{settings.meter_point} {settings.meter_interval_ms}" }
+      - { when_set: meters, message: "mtrstart MIXER:Current/StInCh/{settings.meter_point} {settings.meter_interval_ms}" }
+      - { when_set: meters, message: "mtrstart MIXER:Current/FxRtnCh/{settings.meter_point} {settings.meter_interval_ms}" }
+      - { when_set: meters, message: "mtrstart MIXER:Current/Mix/{settings.meter_point} {settings.meter_interval_ms}" }
+      - { when_set: meters, message: "mtrstart MIXER:Current/Mtrx/{settings.meter_point} {settings.meter_interval_ms}" }
+      - { when_set: meters, message: "mtrstart MIXER:Current/St/{settings.meter_point} {settings.meter_interval_ms}" }
+      - { when_set: meters, message: "mtrstart MIXER:Current/Mono/{settings.meter_point} {settings.meter_interval_ms}" }
+    every_ms: 9000
   poll:
     send:
       - devinfo productname
@@ -5453,7 +5547,261 @@ telemetry:
       - get MIXER:Current/MuteMaster/Label/Name 3 0
       - get MIXER:Current/MuteMaster/Label/Name 4 0
       - get MIXER:Current/MuteMaster/Label/Name 5 0
+      - ssinfo_ex scene_a 0
+      - ssinfo_ex scene_a 1
+      - ssinfo_ex scene_a 2
+      - ssinfo_ex scene_a 3
+      - ssinfo_ex scene_a 4
+      - ssinfo_ex scene_a 5
+      - ssinfo_ex scene_a 6
+      - ssinfo_ex scene_a 7
+      - ssinfo_ex scene_a 8
+      - ssinfo_ex scene_a 9
+      - ssinfo_ex scene_a 10
+      - ssinfo_ex scene_a 11
+      - ssinfo_ex scene_a 12
+      - ssinfo_ex scene_a 13
+      - ssinfo_ex scene_a 14
+      - ssinfo_ex scene_a 15
+      - ssinfo_ex scene_a 16
+      - ssinfo_ex scene_a 17
+      - ssinfo_ex scene_a 18
+      - ssinfo_ex scene_a 19
+      - ssinfo_ex scene_a 20
+      - ssinfo_ex scene_a 21
+      - ssinfo_ex scene_a 22
+      - ssinfo_ex scene_a 23
+      - ssinfo_ex scene_a 24
+      - ssinfo_ex scene_a 25
+      - ssinfo_ex scene_a 26
+      - ssinfo_ex scene_a 27
+      - ssinfo_ex scene_a 28
+      - ssinfo_ex scene_a 29
+      - ssinfo_ex scene_a 30
+      - ssinfo_ex scene_a 31
+      - ssinfo_ex scene_a 32
+      - ssinfo_ex scene_a 33
+      - ssinfo_ex scene_a 34
+      - ssinfo_ex scene_a 35
+      - ssinfo_ex scene_a 36
+      - ssinfo_ex scene_a 37
+      - ssinfo_ex scene_a 38
+      - ssinfo_ex scene_a 39
+      - ssinfo_ex scene_a 40
+      - ssinfo_ex scene_a 41
+      - ssinfo_ex scene_a 42
+      - ssinfo_ex scene_a 43
+      - ssinfo_ex scene_a 44
+      - ssinfo_ex scene_a 45
+      - ssinfo_ex scene_a 46
+      - ssinfo_ex scene_a 47
+      - ssinfo_ex scene_a 48
+      - ssinfo_ex scene_a 49
+      - ssinfo_ex scene_a 50
+      - ssinfo_ex scene_a 51
+      - ssinfo_ex scene_a 52
+      - ssinfo_ex scene_a 53
+      - ssinfo_ex scene_a 54
+      - ssinfo_ex scene_a 55
+      - ssinfo_ex scene_a 56
+      - ssinfo_ex scene_a 57
+      - ssinfo_ex scene_a 58
+      - ssinfo_ex scene_a 59
+      - ssinfo_ex scene_a 60
+      - ssinfo_ex scene_a 61
+      - ssinfo_ex scene_a 62
+      - ssinfo_ex scene_a 63
+      - ssinfo_ex scene_a 64
+      - ssinfo_ex scene_a 65
+      - ssinfo_ex scene_a 66
+      - ssinfo_ex scene_a 67
+      - ssinfo_ex scene_a 68
+      - ssinfo_ex scene_a 69
+      - ssinfo_ex scene_a 70
+      - ssinfo_ex scene_a 71
+      - ssinfo_ex scene_a 72
+      - ssinfo_ex scene_a 73
+      - ssinfo_ex scene_a 74
+      - ssinfo_ex scene_a 75
+      - ssinfo_ex scene_a 76
+      - ssinfo_ex scene_a 77
+      - ssinfo_ex scene_a 78
+      - ssinfo_ex scene_a 79
+      - ssinfo_ex scene_a 80
+      - ssinfo_ex scene_a 81
+      - ssinfo_ex scene_a 82
+      - ssinfo_ex scene_a 83
+      - ssinfo_ex scene_a 84
+      - ssinfo_ex scene_a 85
+      - ssinfo_ex scene_a 86
+      - ssinfo_ex scene_a 87
+      - ssinfo_ex scene_a 88
+      - ssinfo_ex scene_a 89
+      - ssinfo_ex scene_a 90
+      - ssinfo_ex scene_a 91
+      - ssinfo_ex scene_a 92
+      - ssinfo_ex scene_a 93
+      - ssinfo_ex scene_a 94
+      - ssinfo_ex scene_a 95
+      - ssinfo_ex scene_a 96
+      - ssinfo_ex scene_a 97
+      - ssinfo_ex scene_a 98
+      - ssinfo_ex scene_a 99
+      - ssinfo_ex scene_b 0
+      - ssinfo_ex scene_b 1
+      - ssinfo_ex scene_b 2
+      - ssinfo_ex scene_b 3
+      - ssinfo_ex scene_b 4
+      - ssinfo_ex scene_b 5
+      - ssinfo_ex scene_b 6
+      - ssinfo_ex scene_b 7
+      - ssinfo_ex scene_b 8
+      - ssinfo_ex scene_b 9
+      - ssinfo_ex scene_b 10
+      - ssinfo_ex scene_b 11
+      - ssinfo_ex scene_b 12
+      - ssinfo_ex scene_b 13
+      - ssinfo_ex scene_b 14
+      - ssinfo_ex scene_b 15
+      - ssinfo_ex scene_b 16
+      - ssinfo_ex scene_b 17
+      - ssinfo_ex scene_b 18
+      - ssinfo_ex scene_b 19
+      - ssinfo_ex scene_b 20
+      - ssinfo_ex scene_b 21
+      - ssinfo_ex scene_b 22
+      - ssinfo_ex scene_b 23
+      - ssinfo_ex scene_b 24
+      - ssinfo_ex scene_b 25
+      - ssinfo_ex scene_b 26
+      - ssinfo_ex scene_b 27
+      - ssinfo_ex scene_b 28
+      - ssinfo_ex scene_b 29
+      - ssinfo_ex scene_b 30
+      - ssinfo_ex scene_b 31
+      - ssinfo_ex scene_b 32
+      - ssinfo_ex scene_b 33
+      - ssinfo_ex scene_b 34
+      - ssinfo_ex scene_b 35
+      - ssinfo_ex scene_b 36
+      - ssinfo_ex scene_b 37
+      - ssinfo_ex scene_b 38
+      - ssinfo_ex scene_b 39
+      - ssinfo_ex scene_b 40
+      - ssinfo_ex scene_b 41
+      - ssinfo_ex scene_b 42
+      - ssinfo_ex scene_b 43
+      - ssinfo_ex scene_b 44
+      - ssinfo_ex scene_b 45
+      - ssinfo_ex scene_b 46
+      - ssinfo_ex scene_b 47
+      - ssinfo_ex scene_b 48
+      - ssinfo_ex scene_b 49
+      - ssinfo_ex scene_b 50
+      - ssinfo_ex scene_b 51
+      - ssinfo_ex scene_b 52
+      - ssinfo_ex scene_b 53
+      - ssinfo_ex scene_b 54
+      - ssinfo_ex scene_b 55
+      - ssinfo_ex scene_b 56
+      - ssinfo_ex scene_b 57
+      - ssinfo_ex scene_b 58
+      - ssinfo_ex scene_b 59
+      - ssinfo_ex scene_b 60
+      - ssinfo_ex scene_b 61
+      - ssinfo_ex scene_b 62
+      - ssinfo_ex scene_b 63
+      - ssinfo_ex scene_b 64
+      - ssinfo_ex scene_b 65
+      - ssinfo_ex scene_b 66
+      - ssinfo_ex scene_b 67
+      - ssinfo_ex scene_b 68
+      - ssinfo_ex scene_b 69
+      - ssinfo_ex scene_b 70
+      - ssinfo_ex scene_b 71
+      - ssinfo_ex scene_b 72
+      - ssinfo_ex scene_b 73
+      - ssinfo_ex scene_b 74
+      - ssinfo_ex scene_b 75
+      - ssinfo_ex scene_b 76
+      - ssinfo_ex scene_b 77
+      - ssinfo_ex scene_b 78
+      - ssinfo_ex scene_b 79
+      - ssinfo_ex scene_b 80
+      - ssinfo_ex scene_b 81
+      - ssinfo_ex scene_b 82
+      - ssinfo_ex scene_b 83
+      - ssinfo_ex scene_b 84
+      - ssinfo_ex scene_b 85
+      - ssinfo_ex scene_b 86
+      - ssinfo_ex scene_b 87
+      - ssinfo_ex scene_b 88
+      - ssinfo_ex scene_b 89
+      - ssinfo_ex scene_b 90
+      - ssinfo_ex scene_b 91
+      - ssinfo_ex scene_b 92
+      - ssinfo_ex scene_b 93
+      - ssinfo_ex scene_b 94
+      - ssinfo_ex scene_b 95
+      - ssinfo_ex scene_b 96
+      - ssinfo_ex scene_b 97
+      - ssinfo_ex scene_b 98
+      - ssinfo_ex scene_b 99
   updates:
+    # Meters (NOTIFY mtr): two hexadecimal digits a meter, in the order
+    # of the console's channels (DME7 document 3.2.3 p.10, 5.1 p.50).
+    - match: '^NOTIFY mtr MIXER:Current/(?:Meter/)?InCh(?:/[A-Za-z]+)? [a-z][a-z0-9+]*((?: [0-9A-Fa-f]{2})+)\s*$'
+      match_each: '([0-9A-Fa-f]{2})'
+      match_each_in: 1
+      state:
+        inputs.{index:+1}.meter: '{2:hex}'
+        inputs.{index:+1}.meter_db: '{2:hex:from.yamaha_meter}'
+    - match: '^NOTIFY mtr MIXER:Current/(?:Meter/)?StInCh(?:/[A-Za-z]+)? [a-z][a-z0-9+]*((?: [0-9A-Fa-f]{2})+)\s*$'
+      match_each: '([0-9A-Fa-f]{2})'
+      match_each_in: 1
+      state:
+        stereo_inputs.{index:+1}.meter: '{2:hex}'
+        stereo_inputs.{index:+1}.meter_db: '{2:hex:from.yamaha_meter}'
+    - match: '^NOTIFY mtr MIXER:Current/(?:Meter/)?FxRtnCh(?:/[A-Za-z]+)? [a-z][a-z0-9+]*((?: [0-9A-Fa-f]{2})+)\s*$'
+      match_each: '([0-9A-Fa-f]{2})'
+      match_each_in: 1
+      state:
+        fx_returns.{index:+1}.meter: '{2:hex}'
+        fx_returns.{index:+1}.meter_db: '{2:hex:from.yamaha_meter}'
+    - match: '^NOTIFY mtr MIXER:Current/(?:Meter/)?Mix(?:/[A-Za-z]+)? [a-z][a-z0-9+]*((?: [0-9A-Fa-f]{2})+)\s*$'
+      match_each: '([0-9A-Fa-f]{2})'
+      match_each_in: 1
+      state:
+        mixes.{index:+1}.meter: '{2:hex}'
+        mixes.{index:+1}.meter_db: '{2:hex:from.yamaha_meter}'
+    - match: '^NOTIFY mtr MIXER:Current/(?:Meter/)?Mtrx(?:/[A-Za-z]+)? [a-z][a-z0-9+]*((?: [0-9A-Fa-f]{2})+)\s*$'
+      match_each: '([0-9A-Fa-f]{2})'
+      match_each_in: 1
+      state:
+        matrices.{index:+1}.meter: '{2:hex}'
+        matrices.{index:+1}.meter_db: '{2:hex:from.yamaha_meter}'
+    - match: '^NOTIFY mtr MIXER:Current/(?:Meter/)?St(?:/[A-Za-z]+)? [a-z][a-z0-9+]*((?: [0-9A-Fa-f]{2})+)\s*$'
+      match_each: '([0-9A-Fa-f]{2})'
+      match_each_in: 1
+      state:
+        stereo.{index:+1}.meter: '{2:hex}'
+        stereo.{index:+1}.meter_db: '{2:hex:from.yamaha_meter}'
+    - match: '^NOTIFY mtr MIXER:Current/(?:Meter/)?Mono(?:/[A-Za-z]+)? [a-z][a-z0-9+]*((?: [0-9A-Fa-f]{2})+)\s*$'
+      match_each: '([0-9A-Fa-f]{2})'
+      match_each_in: 1
+      state:
+        mono.meter: '{2:hex}'
+        mono.meter_db: '{2:hex:from.yamaha_meter}'
+    # Scene titles (ssinfo_ex, DME7 document 3-19 p.31), read on connecting
+    # and again for a scene stored or made current.
+    - match: '^OK ssinfo(?:_ex)? scene_([ab]) (\d+) "((?:[^"\\]|\\.)*)" "((?:[^"\\]|\\.)*)" "((?:[^"\\]|\\.)*)" (\w+)\s*$'
+      state:
+        scenes.{1}.list.{2}.number_text: '{3}'
+        scenes.{1}.list.{2}.title: '{4}'
+        scenes.{1}.list.{2}.comment: '{5}'
+        scenes.{1}.list.{2}.attribute: '{6}'
+    - match: '^(?:OK|NOTIFY) (?:sscurrent_ex|ssrecall_ex|ssupdate_ex) scene_([ab]) "?(\d+)"?(?: .*)?$'
+      then_send: ['ssinfo_ex scene_{1} {2}']
     - match: ^OK devinfo productname "?([^"]*?)"?\s*$
       state:
         device.product_name: '{1}'

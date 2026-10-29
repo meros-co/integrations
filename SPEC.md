@@ -1188,7 +1188,14 @@ Every message, reply or not, is also offered to the telemetry rules (§8).
 device pushes and what it sends back goes to the rules. While a step with
 `await_reply` (a login) still waits for its answer, they queue behind it
 instead, each taking the next message as its reply, since such a device
-accepts nothing before the login is answered (DHD's Control API). Pings are answered by
+accepts nothing before the login is answered (DHD's Control API). A device
+whose replies `reply_match` tells from what it pushes has its telemetry
+messages queued instead, as on `line-tcp`: each poll, subscription and
+`then_send` message is sent in turn and takes the next message matching
+`reply_match` as its reply, so a rule can tie a reply to the message it
+answers with `request_match` (§8, "Replies and what they answer"). QLC+
+answers `QLC+API|getFunctionStatus|<id>` with `QLC+API|getFunctionStatus|Running`,
+naming no function, while it pushes `GM_VALUE|...` at any time. Pings are answered by
 the core. `wss` uses TLS 1.2 or later and checks the device's certificate
 against the same public roots as `https`; a device with a self-signed
 certificate declares `accept_invalid_certs: true`, as for `http`: the
@@ -1363,6 +1370,61 @@ keeps the connection rather than state; it is paced like any message. The
 timer starts when the connection is ready and stops when it is lost or the
 credential refused. A device that answers its keep-alive should rather have
 a `probe`, which checks the answer.
+
+### Acknowledgements
+
+Some devices want the host to answer what they send by themselves. A Denon
+Professional or TASCAM Blu-ray player notifies each change of its status and
+waits 30 ms for the host's ACK, sending the status once more without it; a
+RED camera keeps an RCP2 connection only while the client echoes its
+`rcp_session` messages back. `acknowledge` on a `line-tcp`, `line-serial`,
+`line-udp` or `ws` transport lists what such messages look like and the
+answer to each:
+
+```yaml
+transport:
+  type: line-tcp
+  port: 9030
+  framing: terminated
+  terminator: cr
+  acknowledge:
+    match: "^@0"                  # a status, from "@0" to CR
+    send: "\u0006"                # the ACK byte
+    framed: false                 # alone: no CR after it
+    answers: '^@0\?'              # a status request is answered with a status
+```
+
+Each entry selects messages with `match`, a regex over the message's text
+(its captures `{1}`, `{2}`, ...), or on a websocket or a JSON line
+protocol with `json_match` and `json`, as a telemetry rule does (§8, JSON
+messages). `send` is a template over those captures and the settings, framed
+as any message is unless `framed: false` sends it exactly as rendered. A
+`json` name stands for its value as JSON text, a string with its quotes, so
+an echo sends back exactly what the device sent, whatever its type. A
+list of entries answers each message with the first entry it matches. A RED
+camera's session:
+
+```yaml
+  acknowledge:
+    - json_match: { "$.type": "^rcp_session$", "$.status": "^open$" }
+      json: { data: "$.data" }
+      send: '{"type":"rcp_session","data":{data}}'
+```
+
+Every message an entry matches is answered at once, whether or not it is
+also taken as a command's reply and whether or not the device is monitored:
+the answer keeps the connection, or stops the device repeating itself, and
+is no request for state. It awaits no reply and is not paced, since the
+device waits for it. A device that sends the same message as the answer to
+a request (the Denon player answers `@0?ST` with ACK and then `@0STPL`,
+which it also notifies when the status changes) names those requests with
+`answers`, a regex over the text of each message sent: after each one sent,
+the next message an entry matches is its answer and is not acknowledged,
+unless it has not come within the transport's `timeout_ms`, or an error
+answer (`error_match`) came instead. The messages still go to the
+telemetry rules as any message does. `tools/validate.py` checks the
+regexes and the templates' placeholders; the engine's own tests play the
+exchange.
 
 ### Settings and connection setup
 
@@ -1642,7 +1704,7 @@ The directive set is closed.
 | `url` | String percent-encoded, RFC 3986 unreserved characters kept: `{name:url}` → `Cam%201`. For free text in a `raw_query` |
 | `url_decode` | String percent-decoded, each `%XX` the byte it stands for: `{2:url_decode}` → `Camera 1` for `Camera%201`. For a telemetry value a device sends encoded (Spyder's names); a `%` not followed by two hex digits is kept, and a name that is all digits, which arrives as a number, is left as it is |
 | `x`, `02x`, `03x`, … | Integer as lowercase hexadecimal digits, zero-padded to the width given: `{volume:02x}` → `64` for 100, `{id:x}` → `3e8` for 1000. For a protocol that writes numbers in hex as text (LG's `kf 01 64`) |
-| `hex` | Hexadecimal digits a device sends, read as a number: `{1:hex}` → `100` for `64`, `{1:hex}` → `1000` for `3E8`. First among a placeholder's directives, which then apply to the number; text that is not hex digits only (or a negative number) assigns nothing. For a telemetry capture, which arrives as an integer when it holds digits only and is read the same way |
+| `hex` | Hexadecimal digits a device sends, read as a number: `{1:hex}` → `100` for `64`, `{1:hex}` → `1000` for `3E8`. First among a placeholder's directives, which then apply to the number, a conversion too (`{2:hex:from.meter}`, a Yamaha meter's two hex digits in dB); text that is not hex digits only (or a negative number) assigns nothing. For a telemetry capture, which arrives as an integer when it holds digits only and is read the same way |
 | `-1`, `+1`, … | Integer offset applied before formatting; combines as `{preset:-1:02d}` |
 | `signed` | Number with an explicit leading sign: `7` → `+7`, `-7` → `-7`; with a float's `.Nf`, `{gain:signed:.1f}` → `+1.5`. For a protocol that reads a leading sign as a relative change (REAPER's `+1.5` for 1.5 dB up). A float that rounds to zero is `+0.0` |
 | `bit.0` … `bit.63` | Integer → `true` / `false`, whether that bit is set, numbered from 0 for the value 1 (two's complement for a negative value): `{flags:bit.3}` → `true` for `328`. For a flags word a device sends whole, read into one boolean per bit (§8); offsets apply first, and it is the last directive |
@@ -1688,7 +1750,26 @@ a float, so as text a converted value needs one `.Nf`; as the whole value of
 an OSC `float` argument, or the whole value of a state assignment, it is a
 number and needs none. `expect.convert: <name>` converts a command's returned
 value from the wire (§5). A documented formula made of linear segments is
-written as its segment ends; a curved law has no exact form here.
+written as its segment ends.
+
+A level a device sends as a linear amplitude (the X32's meters, 1.0 at
+digital full scale) is converted by a law instead of points:
+
+```yaml
+conversions:
+  x32_meter:
+    law: db20                 # value = 20·log10(wire)
+    floor: -90.0              # the lowest value, in dB
+```
+
+`db20` is exact both ways: a wire value is 20·log10 of it in dB, and a
+value converts back to 10^(value/20). `floor` is required and is where
+the device's meters bottom out: silence (0), and any wire value quieter
+than the floor, reads as the floor, so a meter at rest always has a
+value; a value below the floor does not convert to the wire, and a
+negative wire value does not convert. `tools/validate.py` checks that a
+conversion has either `points` or `law` with `floor`. Other curved laws
+have no form here.
 
 ### Value tables
 
@@ -2065,6 +2146,28 @@ telemetry:
 
 A group is a poll like any other: its items are queries, queued one at a
 time, and an item still waiting from its last round is not queued again.
+
+A `subscribe` or `poll` item can be limited to installations that turn on
+a setting with `when_set`, as an `on_connect` step can (§2): it is sent
+only while that setting is set (not empty, and not `false`), decided from
+the settings current each time it would go, so `update_settings` turns it
+on and off. A console's meters, a continuous stream, are asked for only
+when the operator wants them:
+
+```yaml
+settings:
+  meters: { type: bool, default: false, … }
+telemetry:
+  subscribe:
+    send:
+      - "/xremote"
+      - { when_set: meters, address: /meters, args: [{ value: "/meters/1", type: string }] }
+      - { when_set: meters, message: "mtrstart MIXER:Current/InCh/PostOn 100" }   # a line item
+    every_ms: 9000
+```
+
+`tools/validate.py` checks that the setting exists and that `when_set`
+stands only on `on_connect` steps and `subscribe` and `poll` items.
 Over HTTP this is the way to read something less often; a `subscribe` with
 `every_ms` is sent again at its interval too, and older specs use it so, but
 its items are not kept from piling up behind a slow device.
@@ -2443,6 +2546,21 @@ alike, and never a message the device pushes. Rules without
 `request_match` see replies as before. A telemetry vector for such a rule
 gives `request`, the text of the message the `inbound` reply answers.
 
+The same holds on a `ws` transport, for a text message and the reply taken
+for it, in order or by `reply_json` (§2, `ws`); with `reply_match` there,
+telemetry messages are queued so that each has its reply. QLC+'s statuses
+are read for each function its list names:
+
+```yaml
+    - match: "^QLC\\+API\\|getFunctionsList\\|"
+      match_each: '(\d+)\|([^|]*)(?:\||$)'
+      state: { "functions.{1}.name": "{2}" }
+      then_send: ["QLC+API|getFunctionStatus|{1}"]
+    - match: "^QLC\\+API\\|getFunctionStatus\\|(.*?)\\s*$"
+      request_match: '^QLC\+API\|getFunctionStatus\|(\d+)$'
+      state: { "functions.{2}.status": "{1}" }
+```
+
 With `then_send` (below, "Re-reads on a push"), a reply can have more read: the NLB's VDN table
 names each amplifier, and each name has that amplifier's status, power and
 mutes read in turn.
@@ -2559,6 +2677,31 @@ reads an argument: as `{argN}`, by `arg_match` and as the JSON at
 string and then as a UTF-8 blob (`,sb`), so a rule limited to `arg_types: sb`
 after the plain one keeps the full text. A blob that is not UTF-8 stays its
 bytes, which no text rule reads.
+
+#### Numbers in a blob
+
+A device that packs many values in one blob argument (a mixer's meters:
+the X32 sends a count and then little-endian floats, the X AIR signed
+16-bit levels in 1/256 dB) has them read one by one with `blob_each` on an
+`address` rule:
+
+```yaml
+    - address: "^/meters/1$"
+      blob_each: { arg: 0, offset: 4, count: 32, format: f32le }
+      state: { "channels.{index:+1}.meter_db": "{value:from.x32_meter}" }
+```
+
+The rule matches once for each number, `{value}` the number and `{index}`
+its place from 0. `arg` is the argument holding the blob (default 0),
+`offset` the bytes skipped at its start (default 0), `count` the most
+numbers taken (default: as many as the blob holds whole) and `format` each
+number's type and byte order: `i8`, `u8`, `i16le`, `i16be`, `u16le`,
+`u16be`, `i32le`, `i32be`, `u32le`, `u32be`, `f32le` or `f32be`. The blob's
+bytes are read as they came, even when they happen to be UTF-8 (a block of
+silent meters is all zeros). Several rules on one address take the parts
+of one blob (a bank of 32 levels, then 32 gate and 32 dynamics meters). An
+argument that is not a blob gives nothing; `replace` and `then_send` apply
+as for any rule. `blob_each` goes without `match_each` and the JSON keys.
 
 #### JSON messages
 
@@ -3128,7 +3271,10 @@ events, as the ATEM's do.
 | `aja-config-events` | AJA's event connection (Ki Pro, KUMO): sends the spec's `open_event_connection` request, then its `wait_for_events` request with the returned connection id, again as each reply arrives, beside the command queue. Each element of the reply, `{param_id, param_type, int_value, str_value}`, is offered to the spec's telemetry rules as two text messages, `event <param_id> value=<value>` and `event <param_id> value_name=<name>`: as a `/config?action=get` reply gives them, a string parameter's value is `str_value` and its name empty, and any other's value is `int_value` and its name `str_value`, or the value when that is empty. Opens a new connection when the id has expired or a request fails, after 1 s doubling to 30 s |
 | `resolume-push` | Resolume Arena and Avenue's websocket API (`ws://host:port/api/v1`): reads the composition Resolume sends on connecting and after each structural change into state keyed by unique id (composition, layers, columns, clips, decks, layer groups, and the effects in their chains), subscribes to every parameter that state shows with `{"action":"subscribe","parameter":"/parameter/by-id/<id>"}`, and applies each `parameter_subscribed` and `parameter_update`. A new composition is diffed against the last: removed items leave state and are unsubscribed, new ones are subscribed. Reads the composition again over REST after a deck switch, after a structural command of the session's own, and as a slow safety refresh (`composition_refresh_s`) for a deck's `closed`, which is not a parameter. Reopens the websocket after 1 s doubling to 30 s |
 | `hyperdeck-ftp` | Blackmagic HyperDeck's FTP server (TCP 21, `ftp_port`; anonymous unless `ftp_username` is set) for the files on its media: `list_files` (MLSD, or LIST in the Unix or DOS form), `delete_file`, `rename_file`, `create_folder`, each answered when done on a connection of its own, and `download_file` and `upload_file`, one at a time in the background on another, with `cancel_transfer`. Passive data connections (PASV, EPSV over IPv6) always go to the control connection's peer, whatever address the reply names. An upload's or a rename's target is checked with SIZE first and replaced only with `overwrite`; a download is checked against SIZE. Each connection logs in, works and quits; a reply is waited for 15 s, a transfer may be silent 30 s |
+| `ma-msc-ethernet` | MA Lighting's MIDI Show Control via Ethernet (grandMA2): listens on UDP `msc_port` (6000 to 6100; shared, each datagram taken by the console it came from) for the console's MSC Out, each message `GMA\0MSC\0`, a 4-byte little-endian length of the whole message, then the MSC SysEx, and offers each message to the spec's telemetry rules as one line of text: `MSC <command> device=<n> format=<hex>`, then `cue=`, `list=` and `path=` (the cue data's fields), `fade=<seconds>` (frames at 24 per second) before them for TIMED_GO, `fader=<n> page=<n> value=<0-16383>` for SET (fader from 1), `macro=<n>` for FIRE, or `data=<hex>`; a command MA does not list is `CMD_<hex>`. A new `msc_port` rebuilds the module |
 | `nmos-query-websocket` | An AMWA NMOS registry's Query API subscriptions (IS-04): creates a non-persistent subscription for each resource type (`POST /x-nmos/query/<query_version>/subscriptions`), opens the websocket its answer names in `ws_href` (with the bearer token, where set), and offers each grain to the spec's telemetry rules as JSON: `{"nmos": <type>, "op": "sync", "items": [...]}` for the first on a websocket (every resource, which the spec replaces), `{"nmos": <type>, "op": "set", "items": [...]}` for resources added or changed, and `{"nmos": <type>, "op": "delete", "ids": [...]}` for those gone. Subscribes again when a websocket closes, after 1 s doubling to 30 s |
+| `nmos-event-transports` | An AMWA NMOS Node's IS-07 event transports: lists the Node's Senders every 30 s, reads the active IS-05 parameters of each whose transport is `urn:x-nmos:transport:websocket` or `urn:x-nmos:transport:mqtt` (and enabled), and listens where each publishes. Senders sharing a `connection_uri` share one websocket, sent a `subscription` command naming every `ext_is_07_source_id` and a `health` command every 5 s, and reopened when silent 12 s (with the bearer token where `connection_authorization` is true); Senders sharing a broker share one MQTT 3.1.1 connection (TLS for `secure-mqtt`, `mqtt_username` and `mqtt_password` where `broker_authorization` is true), subscribed at QoS 0 to each `broker_topic` and `connection_status_broker_topic`. Offers each `state`, `reboot` and `shutdown` message to the rules as it is, and each connection status as `{"message_type": "connection_status", "active", "sender_id"}`. Reopens what closes after 1 s doubling to 30 s |
+| `wing-meters` | Behringer WING's meters, which its OSC tree does not carry: with the `meters` setting on, connects to the native interface (TCP 2222), selects channel 3 and asks for every channel, aux, bus, main, matrix and DCA meter under one report id, to `meter_port` of this host (UDP, a shared port routed by the console's address), renewing the request every 4 s as meter data stops after 5. Each block, the report id then big-endian words in 1/256 dB, is kept as `<strips>.<n>.meters.<meter>`. Reconnects after 1 s doubling to 30 s |
 | `ultimatte-preset-archive` | Blackmagic Ultimatte 12's binary settings channel (TCP 9996, `archive_port`), which the vendor's Smart Remote 4 and Software Control use for Archive All and Restore: `export_presets` reads every preset of the FILE LIST the unit last sent on its text port, and its `GPISettings` and `SavedSettings`, one request per connection, into a zip in Archive All's layout on the host; `import_presets` writes such a zip's presets in name order, then `GPISettings`, then `SavedSettings`, stopping at the first refusal; `export_preset`, `import_preset`, `export_settings` and `import_settings` move one of them to or from a host file. A connection that does not open, or a read the unit drops unanswered, is tried once more after 250 ms |
 
 ## HTTP service

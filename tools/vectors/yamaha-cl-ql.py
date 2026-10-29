@@ -222,7 +222,7 @@ _YCLQL_REREAD = [f"get MIXER:Current/{a} {x} 0\n" for a, n in (
     ("Cue/Output", 1), ("Cue/CueMode", 1), ("Cue/FaderCueRelease", 1), ("Cue/OutputLevel", 1), ("Cue/ActiveCue", 1),
 ) for x in range(n)]
 _yclql_explicit("telemetry", "scene-current", inbound="NOTIFY sscurrent_ex MIXER:Lib/Scene 12\n", expect_state={"scene": {"current": 12}},
-                expect_then_send=_YCLQL_REREAD)
+                expect_then_send=["ssinfo_ex MIXER:Lib/Scene 12\n"] + _YCLQL_REREAD)
 _yclql_explicit("telemetry", "scene-current-reply", inbound="OK sscurrent_ex MIXER:Lib/Scene 4 unmodified\n",
                 expect_state={"scene": {"current": 4, "modified": False}})
 # Scene step events: the console's scninfo list (MIXER:Lib/Scene/RecallInc, RecallDec); event form as Yamaha's DM7 document.
@@ -267,3 +267,12 @@ _yclql_explicit("telemetry", "error-status", inbound='NOTIFY devstatus error "wr
 
 _yclql_vectors()
 _yclql_EXPLICIT.clear()
+
+# ── Meters and scene titles ───────────────────────────────────────────────
+# With the meters setting on, mtrstart for each meter of the console's list
+# goes first on connecting, before the reads (DME7 document 2-16 p.22). A
+# notification is a type word, then two hex digits per channel (3.2.3 p.10);
+# 00-7E are -126 to 0 dBFS, 7F OVER (5.1 p.50).
+telemetry('yamaha-cl-ql', 'meters-subscribe', settings={'meters': True, 'meter_interval_ms': 200}, expect_connect_wire=['mtrstart MIXER:Current/Mix/PostOn 200\n'], inbound='NOTIFY mtr MIXER:Current/Mix/PostOn level 7e 7F 00 6a\n', expect_state={'mixes': {'1': {'meter': 126, 'meter_db': 0.0}, '2': {'meter': 127}, '3': {'meter': 0, 'meter_db': -126.0}, '4': {'meter': 106, 'meter_db': -20.0}}})
+telemetry('yamaha-cl-ql', 'scene-title', inbound='OK ssinfo_ex MIXER:Lib/Scene 5 "005" "Act 1 \\"Open\\"" "" user\n', expect_state={'scene': {'list': {'5': {'number_text': '005', 'title': 'Act 1 \\"Open\\"', 'comment': '', 'attribute': 'user'}}}})
+telemetry('yamaha-cl-ql', 'scene-stored-reads-title', inbound='OK ssupdate_ex MIXER:Lib/Scene 7\n', expect_state={}, expect_then_send=['ssinfo_ex MIXER:Lib/Scene 7\n'])

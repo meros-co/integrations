@@ -294,11 +294,11 @@ const TTL: u32 = 255;
 
 // --- DNS messages (RFC 1035 §4, RFC 6762 §18) -------------------------------
 
-const TYPE_A: u16 = 1;
-const TYPE_PTR: u16 = 12;
-const TYPE_TXT: u16 = 16;
+pub(crate) const TYPE_A: u16 = 1;
+pub(crate) const TYPE_PTR: u16 = 12;
+pub(crate) const TYPE_TXT: u16 = 16;
 const TYPE_AAAA: u16 = 28;
-const TYPE_SRV: u16 = 33;
+pub(crate) const TYPE_SRV: u16 = 33;
 const CLASS_IN: u16 = 1;
 /// The top bit of a record's class is the cache-flush bit (RFC 6762 §10.2).
 const CLASS_MASK: u16 = 0x7fff;
@@ -307,11 +307,11 @@ const MAX_NAME: usize = 255;
 /// A domain name as its labels. Labels are bytes: an instance label may hold
 /// any UTF-8, dots included (RFC 6763 §4.3).
 #[derive(Debug, Clone, PartialEq)]
-struct Name(Vec<Vec<u8>>);
+pub(crate) struct Name(Vec<Vec<u8>>);
 
 impl Name {
     /// A name with no dot inside a label, such as a service type.
-    fn dotted(text: &str) -> Name {
+    pub(crate) fn dotted(text: &str) -> Name {
         Name(
             text.split('.')
                 .filter(|l| !l.is_empty())
@@ -321,7 +321,7 @@ impl Name {
     }
 
     /// Dotted text, a '.' or '\' inside a label escaped with '\'.
-    fn text(&self) -> String {
+    pub(crate) fn text(&self) -> String {
         let mut out = String::new();
         for (i, label) in self.0.iter().enumerate() {
             if i > 0 {
@@ -338,7 +338,7 @@ impl Name {
     }
 
     /// For comparing: names are equal without regard to ASCII case (§16).
-    fn key(&self) -> String {
+    pub(crate) fn key(&self) -> String {
         self.text().to_ascii_lowercase()
     }
 
@@ -347,7 +347,7 @@ impl Name {
     }
 
     /// The first label: an instance's own name.
-    fn first(&self) -> String {
+    pub(crate) fn first(&self) -> String {
         self.0
             .first()
             .map(|l| String::from_utf8_lossy(l).into_owned())
@@ -371,7 +371,7 @@ impl Name {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-enum Data {
+pub(crate) enum Data {
     Ptr(Name),
     Srv { port: u16, target: Name },
     Txt(Vec<Vec<u8>>),
@@ -380,21 +380,21 @@ enum Data {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct Record {
-    name: Name,
+pub(crate) struct Record {
+    pub(crate) name: Name,
     ttl: u32,
-    data: Data,
+    pub(crate) data: Data,
     /// The cache-flush bit (RFC 6762 §10.2): this record replaces what was
     /// heard before for its name and type.
     flush: bool,
 }
 
 #[derive(Debug, PartialEq)]
-struct Message {
+pub(crate) struct Message {
     response: bool,
     /// Answers, authority and additional records alike: mDNS answers often
     /// arrive as additional records (RFC 6763 §12).
-    records: Vec<Record>,
+    pub(crate) records: Vec<Record>,
 }
 
 fn u16_at(packet: &[u8], at: usize) -> Option<u16> {
@@ -444,7 +444,7 @@ fn read_name(packet: &[u8], start: usize) -> Option<(Name, usize)> {
 /// A DNS message's records of the types discovery reads, or `None` for a
 /// message that is malformed or carries an opcode or rcode other than 0
 /// (RFC 6762 §18.3, §18.11).
-fn parse(packet: &[u8]) -> Option<Message> {
+pub(crate) fn parse(packet: &[u8]) -> Option<Message> {
     let flags = u16_at(packet, 2)?;
     let count = |at| u16_at(packet, at).map(usize::from);
     let (questions, answers, authority, additional) = (count(4)?, count(6)?, count(8)?, count(10)?);
@@ -521,7 +521,7 @@ fn parse(packet: &[u8]) -> Option<Message> {
 /// A query (ID 0, RFC 6762 §18.1; QU clear, so answers are multicast, or
 /// unicast to a query from another port) with as many of `questions` as fit
 /// in `limit` bytes. Returns the message and how many questions it holds.
-fn query(questions: &[(Name, u16)], limit: usize) -> (Vec<u8>, usize) {
+pub(crate) fn query(questions: &[(Name, u16)], limit: usize) -> (Vec<u8>, usize) {
     let mut out = vec![0u8; 12];
     let mut held = 0u16;
     for (name, qtype) in questions {
@@ -544,7 +544,7 @@ fn query(questions: &[(Name, u16)], limit: usize) -> (Vec<u8>, usize) {
 /// A TXT record's strings as keys and values (RFC 6763 §6): keys without
 /// regard to case, the first of a repeated key kept, a string without '='
 /// a key with no value, an empty key dropped.
-fn txt_pairs(strings: &[Vec<u8>]) -> Vec<(String, Option<String>)> {
+pub(crate) fn txt_pairs(strings: &[Vec<u8>]) -> Vec<(String, Option<String>)> {
     let mut pairs: Vec<(String, Option<String>)> = Vec::new();
     for s in strings {
         let (key, value) = match s.iter().position(|&b| b == b'=') {

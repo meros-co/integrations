@@ -54,7 +54,8 @@ transport:
   timeout_ms: 3000
   reply: expected
   # Only QLC+API answers are replies; pushes (GM_VALUE and widget updates)
-  # go to the rules alone.
+  # go to the rules alone. Polls and re-reads are queued, each awaiting its
+  # answer, so a rule can tell which function or widget an answer is about.
   reply_match: "^QLC\\+API\\|"
   keepalive: { send: POLL, every_ms: 30000 }
   endpoints:
@@ -430,13 +431,19 @@ state:
   functions_count: { type: int, description: "Number of functions in the project" }
   functions.*.name: { type: string, description: "Function name, keyed by function ID" }
   widgets_count: { type: int, description: "Number of Virtual Console widgets" }
+  functions.*.type: { type: string, description: "Function type as QLC+ names it, such as Scene or Chaser, keyed by function ID" }
+  functions.*.status: { type: string, description: "Running or Stopped, as getFunctionStatus answers, keyed by function ID" }
+  functions.*.running: { type: bool, description: "Whether the function is running, keyed by function ID" }
   widgets.*.caption: { type: string, description: "Widget caption, keyed by widget ID" }
+  widgets.*.type: { type: string, description: "Widget type as QLC+ names it, such as Button or Slider, keyed by widget ID" }
+  widgets.*.function: { type: string, description: "The function attached to the widget (its id, type and name) as getWidgetFunction answers, keyed by widget ID" }
+  widgets.*.status: { type: string, description: "The widget's value or state as getWidgetStatus answers: a button 255 (active), 127 (monitoring) or 0, a slider its value, a cue list PLAY|<index> or STOP, an animation its fader level" }
   grand_master.value: { type: int, description: "Grand Master level, 0 to 255, as QLC+ pushes it" }
   grand_master.display: { type: string, description: "Grand Master as QLC+ displays it, pushed with the value" }
 
 telemetry:
   poll:
-    - every_ms: 30000
+    - every_ms: 10000
       send: ["QLC+API|isProjectLoaded", "QLC+API|getFunctionsNumber", "QLC+API|getFunctionsList",
              "QLC+API|getWidgetsNumber", "QLC+API|getWidgetsList"]
   updates:
@@ -451,10 +458,31 @@ telemetry:
       match_each: '(\d+)\|([^|]*)(?:\||$)'
       replace: functions
       state: { "functions.{1}.name": "{2}" }
+      # Each function listed has its type and status read in turn.
+      then_send: ["QLC+API|getFunctionType|{1}", "QLC+API|getFunctionStatus|{1}"]
     - match: "^QLC\\+API\\|getWidgetsList\\|"
       match_each: '(\d+)\|([^|]*)(?:\||$)'
       replace: widgets
       state: { "widgets.{1}.caption": "{2}" }
+      then_send: ["QLC+API|getWidgetType|{1}", "QLC+API|getWidgetFunction|{1}", "QLC+API|getWidgetStatus|{1}"]
+    # These answers name no function or widget: the request each answers does.
+    - match: "^QLC\\+API\\|getFunctionType\\|(.*?)\\s*$"
+      request_match: '^QLC\+API\|getFunctionType\|(\d+)$'
+      state: { "functions.{2}.type": "{1}" }
+    - match: "^QLC\\+API\\|getFunctionStatus\\|(.*?)\\s*$"
+      request_match: '^QLC\+API\|getFunctionStatus\|(\d+)$'
+      state:
+        "functions.{2}.status": "{1}"
+        "functions.{2}.running": { value: "{1}", map: { Running: true, Stopped: false } }
+    - match: "^QLC\\+API\\|getWidgetType\\|(.*?)\\s*$"
+      request_match: '^QLC\+API\|getWidgetType\|(\d+)$'
+      state: { "widgets.{2}.type": "{1}" }
+    - match: "^QLC\\+API\\|getWidgetFunction\\|(.*?)\\s*$"
+      request_match: '^QLC\+API\|getWidgetFunction\|(\d+)$'
+      state: { "widgets.{2}.function": "{1}" }
+    - match: "^QLC\\+API\\|getWidgetStatus\\|(.*?)\\s*$"
+      request_match: '^QLC\+API\|getWidgetStatus\|(\d+)$'
+      state: { "widgets.{2}.status": "{1}" }
     - match: "^GM_VALUE\\|(\\d+)\\|(.*?)\\s*$"
       state: { grand_master.value: "{1}", grand_master.display: "{2}" }
 
@@ -466,10 +494,12 @@ quirks:
       HTTP Basic on the WebSocket's opening request; with no username set an empty Basic
       credential is sent, which QLC+ without -wa is assumed to ignore. The documented push is GM_VALUE; QLC+ also
       pushes widget and function changes, but their messages are not documented, so they are not
-      read. Function status, widget status and channel values are read on demand only: their
-      replies do not name the function, widget or channel asked about, and the WebSocket gives
-      the rules no way to tie a reply to its request. Function and widget names are polled every
-      30 s with getFunctionsList and getWidgetsList.
+      read. The function and widget lists are polled every 10 s with getFunctionsList and
+      getWidgetsList, and each function's type and status and each widget's type, function and
+      status are read after each list; their answers do not name what they are about, so each
+      is tied to the request it answers. A change made here shows in state at the next poll,
+      or at once with the matching get_ command. Channel values are read on demand only
+      (get_channels_values): the form of their answer is not documented.
   - models: [all]
     severity: warning
     text: >

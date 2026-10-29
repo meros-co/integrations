@@ -6,10 +6,11 @@ category: playback
 
 # Remote Show Control is a free PowerPoint add-in that takes plain-text
 # commands over the network to open, run and step through presentations.
-# It answers nothing (except FIND), so commands are unacknowledged. The
-# spec sends each command as one UDP datagram to port 61000, the way the
-# vendor's own example does; the add-in takes the same commands on TCP
-# 61001.
+# It answers nothing except FIND, which answers the presentations in a
+# folder: that list is the only state it can report, kept per folder asked.
+# The spec sends each command as one UDP datagram to port 61000, the way the
+# vendor's own example does, and takes datagrams back to its own port as
+# FIND's answer; the add-in takes the same commands on TCP 61001.
 
 source:
   - title: Remote Show Control v1.2.4 (user manual, PDF)
@@ -39,7 +40,8 @@ transport:
   port: 61000
   terminator: none
   encoding: utf-8
-  reply: none
+  reply: to-source
+  timeout_ms: 5000
 
 ports:
   - { port: 61000, protocol: udp, role: control }
@@ -48,7 +50,7 @@ models:
   - id: remote-show-control
     name: Remote Show Control 1.2.4 (PowerPoint 2010 or later, Windows)
     supports: [open, close, close_all, run, run_active, run_current, stop, stop_all,
-               next, previous, go_to_slide, go_to_section, set_background]
+               next, previous, go_to_slide, go_to_section, set_background, find]
     verification: none
 
 commands:
@@ -117,27 +119,41 @@ commands:
     summary: Set the desktop wallpaper to the slide showing, as a safety while presentations change (SETBG; experimental)
     send: "SETBG"
     returns: none
+  find:
+    summary: List the presentations in a folder of the PowerPoint computer, read into state (FIND "<path>")
+    params:
+      path: { type: string, max_length: 1024, required: true, pattern: "^[^\"]+$",
+              label: Folder, description: "Fully qualified folder on the PowerPoint computer, such as c:\\presentations; no double quotes." }
+    send: "FIND \"{path}\""
+    returns: text
 
 quirks:
   - models: [all]
     severity: warning
     text: >
-      Remote Show Control sends nothing back: every command is
-      unacknowledged and there is no state to read. It processes one
+      Remote Show Control answers no command but FIND: every other command
+      is unacknowledged. It processes one
       command at a time and a command may fail while PowerPoint is busy (for
       example loading a presentation), so leave time after OPEN and RUN. If
       the PowerPoint window does not have focus, animations do not animate;
       transitions still work.
 
   - models: [all]
+    severity: warning
+    text: >
+      FIND "<path>" answers the fully qualified names of the folder's
+      *.ppt* files, one per line, or "none". The manual prints the answer
+      but does not say how it is sent over UDP: it is taken here as one
+      datagram back to the sender's port holding every line, and kept in
+      folders.<path>.files. Remote Show Control reports nothing else: which
+      presentation is open or running and the current slide cannot be read
+      (manual v1.2.4, "No response is sent back").
+  - models: [all]
     severity: info
     text: >
-      FIND "<path>" answers a list of presentations in a folder, but the
-      manual does not say how the list is sent back over UDP or how its end
-      is marked on TCP, so it is not offered. The manual prints the quotes
-      around file and section names as typographic quotes; the spec sends
-      plain double quotes. The add-in also takes the commands on TCP 61001,
-      with no line ending documented.
+      The manual prints the quotes around file and section names as
+      typographic quotes; the spec sends plain double quotes. The add-in
+      also takes the commands on TCP 61001, with no line ending documented.
 
   - models: [all]
     severity: critical
@@ -154,3 +170,14 @@ quirks:
       PowerPoint computer running the add-in. The add-in needs Visual Studio
       Tools for Office, downloaded when it is installed; without them it is
       installed but disabled.
+
+state:
+  folders.*.files.*: { type: string, description: "Per folder FIND was asked for (the key is the path as given), the presentations it answered, fully qualified and numbered from 0 in the order sent; none when it answered none" }
+
+telemetry:
+  updates:
+    - match: "^"
+      request_match: '^FIND "(.+)"$'
+      match_each: '([^\r\n]*\\[^\r\n]*)'
+      replace: "folders.{1:key}.files"
+      state: { "folders.{1:key}.files.{index}": "{2}" }

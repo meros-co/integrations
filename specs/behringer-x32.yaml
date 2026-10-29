@@ -35,6 +35,20 @@ maps:
 conversions:
   x32_fader:
     points: [[0.0, -90.0], [0.0625, -60.0], [0.25, -30.0], [0.5, -10.0], [1.0, 10.0]]
+  # Meter values are linear levels, 1.0 digital full scale and up to 8.0
+  # (+18 dBFS) (p.16), so their dB is 20·log10; the meters bottom out at
+  # -90 dB, the fader law's floor.
+  x32_meter:
+    law: db20
+    floor: -90.0
+
+settings:
+  # Meters are a continuous stream (every 50 ms by default, p.16), so they
+  # are asked for only when the operator turns them on.
+  meters: { type: bool, default: false, label: Meters,
+    description: "On subscribes to the console's meters (channels, gate and dynamics, buses, matrices, main, mono, aux and effects returns, aux outputs) and keeps them in state in dB; off leaves them alone." }
+  meter_time_factor: { type: int, min: 1, max: 99, default: 2, label: Meter interval,
+    description: "Time between meter updates in steps of 50 ms, 1 to 99 (2 is every 100 ms), as the console's time factor (p.16)." }
 
 transport:
   type: osc-udp
@@ -6201,8 +6215,18 @@ commands:
 telemetry:
   # /xremote asks the console to send every parameter change to this client
   # for 10 seconds (p.9); it is renewed every 9.
+  # With the meters setting on, the meter banks of the METERS pages are
+  # asked for too (p.16-17): they also stop after 10 seconds, so they are
+  # renewed with /xremote.
   subscribe:
-    send: ["/xremote"]
+    send:
+      - "/xremote"
+      - { when_set: meters, address: /meters, args: [{ value: "/meters/1", type: string }, { value: "0", type: int },
+          { value: "0", type: int }, { value: "{settings.meter_time_factor}", type: int }] }
+      - { when_set: meters, address: /meters, args: [{ value: "/meters/2", type: string }, { value: "0", type: int },
+          { value: "0", type: int }, { value: "{settings.meter_time_factor}", type: int }] }
+      - { when_set: meters, address: /meters, args: [{ value: "/meters/3", type: string }, { value: "0", type: int },
+          { value: "0", type: int }, { value: "{settings.meter_time_factor}", type: int }] }
     every_ms: 9000
   # The current values, asked once on connecting, one at a time: /xremote
   # only reports changes. The list is explicit because the format has no loops:
@@ -15764,6 +15788,53 @@ telemetry:
       - "/-urec/sessionpos"
       - "/-urec/sessionlen"
   updates:
+    # Meter blobs (p.16-17): a little-endian count, then little-endian
+    # floats in the order the bank lists them.
+    - address: "^/meters/1$"
+      blob_each: { offset: 4, count: 32, format: f32le }
+      state: { "channels.{index:+1}.meter_db": "{value:from.x32_meter}" }
+    - address: "^/meters/1$"
+      blob_each: { offset: 132, count: 32, format: f32le }
+      state: { "channels.{index:+1}.gate_meter_db": "{value:from.x32_meter}" }
+    - address: "^/meters/1$"
+      blob_each: { offset: 260, count: 32, format: f32le }
+      state: { "channels.{index:+1}.dyn_meter_db": "{value:from.x32_meter}" }
+    - address: "^/meters/2$"
+      blob_each: { offset: 4, count: 16, format: f32le }
+      state: { "buses.{index:+1}.meter_db": "{value:from.x32_meter}" }
+    - address: "^/meters/2$"
+      blob_each: { offset: 68, count: 6, format: f32le }
+      state: { "matrices.{index:+1}.meter_db": "{value:from.x32_meter}" }
+    - address: "^/meters/2$"
+      blob_each: { offset: 92, count: 1, format: f32le }
+      state: { "main.meter_left_db": "{value:from.x32_meter}" }
+    - address: "^/meters/2$"
+      blob_each: { offset: 96, count: 1, format: f32le }
+      state: { "main.meter_right_db": "{value:from.x32_meter}" }
+    - address: "^/meters/2$"
+      blob_each: { offset: 100, count: 1, format: f32le }
+      state: { "mono.meter_db": "{value:from.x32_meter}" }
+    - address: "^/meters/2$"
+      blob_each: { offset: 104, count: 16, format: f32le }
+      state: { "buses.{index:+1}.dyn_meter_db": "{value:from.x32_meter}" }
+    - address: "^/meters/2$"
+      blob_each: { offset: 168, count: 6, format: f32le }
+      state: { "matrices.{index:+1}.dyn_meter_db": "{value:from.x32_meter}" }
+    - address: "^/meters/2$"
+      blob_each: { offset: 192, count: 1, format: f32le }
+      state: { "main.dyn_meter_db": "{value:from.x32_meter}" }
+    - address: "^/meters/2$"
+      blob_each: { offset: 196, count: 1, format: f32le }
+      state: { "mono.dyn_meter_db": "{value:from.x32_meter}" }
+    - address: "^/meters/3$"
+      blob_each: { offset: 4, count: 6, format: f32le }
+      state: { "outputs.aux.{index:+1}.meter_db": "{value:from.x32_meter}" }
+    - address: "^/meters/3$"
+      blob_each: { offset: 28, count: 8, format: f32le }
+      state: { "aux.{index:+1}.meter_db": "{value:from.x32_meter}" }
+    - address: "^/meters/3$"
+      blob_each: { offset: 60, count: 8, format: f32le }
+      state: { "fx_returns.{index:+1}.meter_db": "{value:from.x32_meter}" }
     - address: "^/ch/(\\d\\d)/mix/on$"
       state: { "channels.{1}.mute": { value: "{arg0}", map: { "0": true, "1": false } } }
     - address: "^/ch/(\\d\\d)/mix/fader$"
@@ -16795,6 +16866,21 @@ telemetry:
       state: { "params.{1}.string": "{arg0}" }
 
 state:
+  channels.*.meter_db:           { type: float, unit: dB, description: "Input channel level meter (dBFS), with the meters setting on (/meters/1), in dB from the linear value, -90 at silence" }
+  channels.*.gate_meter_db:      { type: float, unit: dB, description: "Input channel gate gain-reduction meter, with the meters setting on (/meters/1), in dB from the linear value, -90 at silence" }
+  channels.*.dyn_meter_db:       { type: float, unit: dB, description: "Input channel dynamics gain-reduction meter, with the meters setting on (/meters/1), in dB from the linear value, -90 at silence" }
+  buses.*.meter_db:              { type: float, unit: dB, description: "Mix bus master level meter (dBFS), with the meters setting on (/meters/2), in dB from the linear value, -90 at silence" }
+  buses.*.dyn_meter_db:          { type: float, unit: dB, description: "Mix bus dynamics gain-reduction meter, with the meters setting on (/meters/2), in dB from the linear value, -90 at silence" }
+  matrices.*.meter_db:           { type: float, unit: dB, description: "Matrix level meter (dBFS), with the meters setting on (/meters/2), in dB from the linear value, -90 at silence" }
+  matrices.*.dyn_meter_db:       { type: float, unit: dB, description: "Matrix dynamics gain-reduction meter, with the meters setting on (/meters/2), in dB from the linear value, -90 at silence" }
+  main.meter_left_db:            { type: float, unit: dB, description: "Main stereo bus left level meter (dBFS), with the meters setting on (/meters/2), in dB from the linear value, -90 at silence" }
+  main.meter_right_db:           { type: float, unit: dB, description: "Main stereo bus right level meter (dBFS), with the meters setting on (/meters/2), in dB from the linear value, -90 at silence" }
+  main.dyn_meter_db:             { type: float, unit: dB, description: "Main stereo bus dynamics gain-reduction meter, with the meters setting on (/meters/2), in dB from the linear value, -90 at silence" }
+  mono.meter_db:                 { type: float, unit: dB, description: "Mono/centre bus level meter (dBFS), with the meters setting on (/meters/2), in dB from the linear value, -90 at silence" }
+  mono.dyn_meter_db:             { type: float, unit: dB, description: "Mono/centre bus dynamics gain-reduction meter, with the meters setting on (/meters/2), in dB from the linear value, -90 at silence" }
+  outputs.*.*.meter_db:          { type: float, unit: dB, description: "Aux send level meter (dBFS), keyed aux then 1-6, with the meters setting on (/meters/3), in dB from the linear value, -90 at silence" }
+  aux.*.meter_db:                { type: float, unit: dB, description: "Aux return level meter (dBFS), with the meters setting on (/meters/3), in dB from the linear value, -90 at silence" }
+  fx_returns.*.meter_db:         { type: float, unit: dB, description: "Effects return level meter (dBFS), 1-8 for 1L-4R, with the meters setting on (/meters/3), in dB from the linear value, -90 at silence" }
   channels.*.mute:              { type: bool, description: "Input channel muted (mix/on inverted)" }
   channels.*.fader:             { type: float, description: "Input channel fader position 0-1 (0.75 = 0 dB), not dB" }
   channels.*.name:              { type: string, description: "Input channel scribble-strip name" }

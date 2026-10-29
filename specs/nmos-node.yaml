@@ -41,8 +41,23 @@ source:
     url: https://specs.amwa.tv/is-07/v1.0.1/
     note: >
       Apache 2.0 specification: APIs/EventsAPI.raml (/sources, /sources/{id}/type,
-      /sources/{id}/state) and the state and type examples. Repository
-      https://github.com/AMWA-TV/is-07.
+      /sources/{id}/state) and the state and type examples; docs (CC BY-SA 4.0),
+      read for the event transports: "Transport - Websocket" (connection_uri,
+      connection_authorization and ext_is_07_source_id; the subscription
+      command and the states it resends; a health command every 5 seconds,
+      the server closing after 12 seconds without one), "Transport - MQTT"
+      (destination_host and destination_port, broker_protocol mqtt or
+      secure-mqtt, broker_authorization, broker_topic and
+      connection_status_broker_topic, retained states) and "Message types"
+      (state, reboot, shutdown, connection_status and health). Repository
+      https://github.com/AMWA-TV/is-07 at tag v1.0.1.
+  - title: OASIS MQTT Version 3.1.1 (OASIS Standard, 29 October 2014)
+    author: OASIS
+    url: http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html
+    note: >
+      The MQTT packets the core sends and reads at an IS-07 Sender's broker
+      (CONNECT, CONNACK, SUBSCRIBE, SUBACK, UNSUBSCRIBE, PUBLISH and its
+      acknowledgements, PINGREQ, DISCONNECT), sections 2 and 3.
 
 transport:
   type: http
@@ -61,6 +76,9 @@ transport:
     connection: { port: { setting: connection_port } }
     channelmapping: { port: { setting: channelmapping_port } }
     events: { port: { setting: events_port } }
+# Following each IS-07 Sender to its websocket or MQTT broker, where the
+# address comes from the Sender's own transport parameters, is native.
+extension: nmos-event-transports
 settings:
   scheme:
     type: enum
@@ -104,12 +122,26 @@ settings:
     max: 65535
     label: Events API port
     description: "The port of the Node's IS-07 Events API, from its Devices' urn:x-nmos:control:events control; empty uses the Node API's port."
+  mqtt_username:
+    type: string
+    max_length: 256
+    label: MQTT user name
+    description: "The user name for the MQTT broker of an IS-07 Sender whose broker_authorization is true; empty sends none."
+  mqtt_password:
+    type: string
+    secret: true
+    max_length: 256
+    label: MQTT password
+    description: "That user's password at the broker."
 
 ports:
   - { port: null, protocol: http, role: control, note: "the Node API port has no standard number: it is given when the Node is opened, from its _nmos-node._tcp SRV record or its configuration" }
   - { port: null, protocol: http, role: control, setting: connection_port, note: "IS-05 Connection API; the Node API's port when not set" }
   - { port: null, protocol: http, role: control, setting: channelmapping_port, note: "IS-08 Channel Mapping API; the Node API's port when not set" }
   - { port: null, protocol: http, role: control, setting: events_port, note: "IS-07 Events API; the Node API's port when not set" }
+  - { port: null, protocol: ws, role: push, note: "IS-07: each event Sender's websocket server, at the connection_uri its transport parameters give" }
+  - { port: 1883, protocol: tcp, role: push, note: "IS-07: an event Sender's MQTT broker (destination_host and destination_port), mqtt" }
+  - { port: 8883, protocol: tls, role: push, note: "IS-07: an event Sender's MQTT broker over TLS, secure-mqtt" }
   - { port: 5353, protocol: udp, role: discovery, note: "mDNS / DNS-SD: _nmos-node._tcp" }
 models:
   - id: node
@@ -1075,6 +1107,21 @@ telemetry:
     - path: "^/x-nmos/events/v1[.]0/sources/([0-9a-f-]+)/type$"
       json: { body: "$" }
       state: { "events.{1}.type": "{body}" }
+    # IS-07 messages on an event Sender's websocket or MQTT broker
+    # (nmos-event-transports): each state names its source.
+    - json_match: { "$.message_type": "^state$", "$.identity.source_id": "^([0-9A-Za-z_-]+)$" }
+      json: { event_type: "$.event_type", value: "$.payload.value", scale: "$.payload.scale", payload: "$.payload", time: "$.timing.creation_timestamp" }
+      state:
+        "events.{1}.event_type": "{event_type}"
+        "events.{1}.value": "{value}"
+        "events.{1}.scale": "{scale}"
+        "events.{1}.payload": "{payload}"
+        "events.{1}.creation_timestamp": "{time}"
+        "events.{1}.announced": "none"
+    - json_match: { "$.message_type": "^(reboot|shutdown)$", "$.identity.source_id": "^([0-9A-Za-z_-]+)$" }
+      state: { "events.{2}.announced": "{1}" }
+    - json_match: { "$.message_type": "^connection_status$", "$.sender_id": "^([0-9A-Za-z_-]+)$", "$.active": "^(true|false)$" }
+      state: { "event_senders.{1}.broker_connected": { value: "{2}", map: { "true": true, "false": false } } }
 state:
   nodes.*.label: { type: string, description: "Node: its label, free text" }
   nodes.*.description: { type: string, description: "Node: its description, free text" }
@@ -1202,6 +1249,8 @@ state:
   events.*.payload: { type: string, description: "IS-07 event source: the whole payload, as JSON text" }
   events.*.creation_timestamp: { type: string, description: "IS-07 event source: when the state was created, TAI <seconds>:<nanoseconds>" }
   events.*.type: { type: string, description: "IS-07 event source: its type definition (enumerations, ranges), as JSON text, read with get_event_type" }
+  events.*.announced: { type: string, description: "IS-07 event source: reboot or shutdown when its Sender announced one on its websocket or broker, none once a state has come since" }
+  event_senders.*.broker_connected: { type: bool, description: "IS-07 MQTT Sender, keyed by its id: whether it is connected to its broker, from its connection status message (false is its will message, or its goodbye)" }
 
 quirks:
   - models: [all]
@@ -1230,8 +1279,12 @@ quirks:
     text: >
       Nothing is pushed by the Node API: the resources are read every 30 seconds,
       the IS-05 active parameters every 5 seconds, the IS-08 map every 5 seconds
-      and the IS-07 event states every 2 seconds. An IS-07 Node's websocket or
-      MQTT event transport is not used. IS-05 parameters of a Sender or Receiver
+      and the IS-07 event states every 2 seconds. Events are pushed as well:
+      each Sender of transport urn:x-nmos:transport:websocket or
+      urn:x-nmos:transport:mqtt is followed to its websocket server or MQTT
+      broker (listed every 30 seconds, with its active IS-05 parameters), whose
+      state messages are kept in events.* as they come. A broker the Sender
+      chooses itself (destination_host auto) cannot be followed. IS-05 parameters of a Sender or Receiver
       that has gone stay in state until the Node is opened again, since the
       Connection API's lists name ids only.
 

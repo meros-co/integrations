@@ -127,6 +127,8 @@ mod jnior;
 mod kissbox;
 #[cfg(feature = "labgruppen-lake")]
 mod lake_dlm;
+#[cfg(feature = "grandma2")]
+mod ma_msc;
 #[cfg(feature = "meros-camera")]
 mod meros_camera;
 #[cfg(feature = "meros-camera")]
@@ -145,6 +147,10 @@ mod nec_display;
 mod nec_projector;
 #[cfg(feature = "nec-projector")]
 mod nec_projector_models;
+#[cfg(feature = "nmos-node")]
+mod nmos_events;
+#[cfg(feature = "nmos-node")]
+mod nmos_mqtt;
 #[cfg(feature = "nmos-registry")]
 mod nmos_query;
 #[cfg(feature = "novastar-central-control")]
@@ -294,6 +300,8 @@ mod vmix;
 mod vmix_functions;
 #[cfg(any(feature = "sony-9pin", feature = "grassvalley-amp"))]
 mod vtr;
+#[cfg(feature = "behringer-wing")]
+mod wing_meters;
 #[cfg(any(feature = "generic-ping", feature = "samsung-mdc"))]
 mod wol;
 
@@ -340,6 +348,14 @@ pub(crate) fn construct(
             Some("resolume-push") => Ok(Box::new(resolume_push::ResolumePush::new(
                 engine, spec, &context,
             ))),
+            #[cfg(feature = "nmos-node")]
+            Some("nmos-event-transports") => {
+                Ok(Box::new(nmos_events::NmosEvents::new(engine, &context)))
+            }
+            #[cfg(feature = "grandma2")]
+            Some("ma-msc-ethernet") => Ok(Box::new(ma_msc::MaMsc::new(engine, &context))),
+            #[cfg(feature = "behringer-wing")]
+            Some("wing-meters") => Ok(Box::new(wing_meters::WingMeters::new(engine, &context))),
             #[cfg(feature = "nmos-registry")]
             Some("nmos-query-websocket") => {
                 Ok(Box::new(nmos_query::NmosQuery::new(engine, &context)))

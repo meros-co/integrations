@@ -42,6 +42,12 @@ export interface DiscoverRequest {
    * /24s; SSDP, PJLink and mDNS scans also ask each by unicast.
    */
   hints?: string[];
+  /**
+   * For a `dns-sd` scan (NMOS registries in unicast DNS): the DNS servers to
+   * ask and the domains to browse, in place of the host's own.
+   */
+  dns_servers?: string[];
+  dns_domains?: string[];
 }
 
 export type Outcome =

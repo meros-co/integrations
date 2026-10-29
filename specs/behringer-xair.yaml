@@ -83,6 +83,16 @@ source:
 conversions:
   x32_fader:
     points: [[0.0, -90.0], [0.0625, -60.0], [0.25, -30.0], [0.5, -10.0], [1.0, 10.0]]
+  # Meter values are signed 16-bit integers in 1/256 dB (protocol document
+  # p.1-2): the value divided by 256.
+  xair_meter:
+    points: [[-32768, -128.0], [32767, 127.99609375]]
+
+settings:
+  # Meters are a continuous stream, so they are asked for only when the
+  # operator turns them on.
+  meters: { type: bool, default: false, label: Meters,
+    description: "On subscribes to the mixer's meters (every channel, return, bus, effects send, main and monitor, and every input) and keeps them in state in dB; off leaves them alone." }
 
 transport:
   type: osc-udp
@@ -4052,8 +4062,13 @@ commands:
 telemetry:
   # /xremote asks the mixer to send every parameter change to this client for
   # 10 seconds, to at most eight clients (protocol document p.1); renewed every 9.
+  # With the meters setting on, meter banks /meters/1 and /meters/2 are asked
+  # for too (p.2-3), renewed with /xremote.
   subscribe:
-    send: ["/xremote"]
+    send:
+      - "/xremote"
+      - { when_set: meters, address: /meters, args: [{ value: "/meters/1", type: string }] }
+      - { when_set: meters, address: /meters, args: [{ value: "/meters/2", type: string }] }
     every_ms: 9000
   # The current values, asked once on connecting, one at a time: /xremote only
   # reports changes. The list is explicit because the format has no loops:
@@ -4211,6 +4226,41 @@ telemetry:
       - "/config/solo/level"
       - "/config/solo/source"
   updates:
+    # Meter blobs (p.3): one integer, then 16-bit values in the order the
+    # bank lists them.
+    - address: "^/meters/1$"
+      blob_each: { offset: 4, count: 16, format: i16le }
+      state: { "channels.{index:+1}.meter_db": "{value:from.xair_meter}" }
+    - address: "^/meters/1$"
+      blob_each: { offset: 36, count: 10, format: i16le }
+      state: { "returns.{index:+1}.meter_db": "{value:from.xair_meter}" }
+    - address: "^/meters/1$"
+      blob_each: { offset: 56, count: 6, format: i16le }
+      state: { "buses.{index:+1}.meter_db": "{value:from.xair_meter}" }
+    - address: "^/meters/1$"
+      blob_each: { offset: 68, count: 4, format: i16le }
+      state: { "fx_sends.{index:+1}.meter_db": "{value:from.xair_meter}" }
+    - address: "^/meters/1$"
+      blob_each: { offset: 76, count: 1, format: i16le }
+      state: { "main.meter_left_db": "{value:from.xair_meter}" }
+    - address: "^/meters/1$"
+      blob_each: { offset: 78, count: 1, format: i16le }
+      state: { "main.meter_right_db": "{value:from.xair_meter}" }
+    - address: "^/meters/1$"
+      blob_each: { offset: 80, count: 1, format: i16le }
+      state: { "monitor.meter_left_db": "{value:from.xair_meter}" }
+    - address: "^/meters/1$"
+      blob_each: { offset: 82, count: 1, format: i16le }
+      state: { "monitor.meter_right_db": "{value:from.xair_meter}" }
+    - address: "^/meters/2$"
+      blob_each: { offset: 4, count: 16, format: i16le }
+      state: { "inputs.mic.{index:+1}.meter_db": "{value:from.xair_meter}" }
+    - address: "^/meters/2$"
+      blob_each: { offset: 36, count: 2, format: i16le }
+      state: { "inputs.aux.{index:+1}.meter_db": "{value:from.xair_meter}" }
+    - address: "^/meters/2$"
+      blob_each: { offset: 40, count: 18, format: i16le }
+      state: { "inputs.usb.{index:+1}.meter_db": "{value:from.xair_meter}" }
     - address: "^/ch/(\\d\\d)/mix/on$"
       state: { "channels.{1}.mute": { value: "{arg0}", map: { "0": true, "1": false } } }
     - address: "^/ch/(\\d\\d)/mix/fader$"
@@ -4663,6 +4713,15 @@ telemetry:
       state: { "params.{1}.string": "{arg0}" }
 
 state:
+  channels.*.meter_db:               { type: float, unit: dB, description: "Input channel meter (pre), with the meters setting on (/meters/1), in dB (the 1/256 dB value sent)" }
+  returns.*.meter_db:                { type: float, unit: dB, description: "Stereo return meters 1-10 in the order the document lists them ('5x2 fx/aux', left then right of each pair), with the meters setting on (/meters/1), in dB (the 1/256 dB value sent)" }
+  buses.*.meter_db:                  { type: float, unit: dB, description: "Mix bus meter (pre), with the meters setting on (/meters/1), in dB (the 1/256 dB value sent)" }
+  fx_sends.*.meter_db:               { type: float, unit: dB, description: "Effects send meter (pre), with the meters setting on (/meters/1), in dB (the 1/256 dB value sent)" }
+  main.meter_left_db:                { type: float, unit: dB, description: "Main stereo left meter (post), with the meters setting on (/meters/1), in dB (the 1/256 dB value sent)" }
+  main.meter_right_db:               { type: float, unit: dB, description: "Main stereo right meter (post), with the meters setting on (/meters/1), in dB (the 1/256 dB value sent)" }
+  monitor.meter_left_db:             { type: float, unit: dB, description: "Monitor left meter, with the meters setting on (/meters/1), in dB (the 1/256 dB value sent)" }
+  monitor.meter_right_db:            { type: float, unit: dB, description: "Monitor right meter, with the meters setting on (/meters/1), in dB (the 1/256 dB value sent)" }
+  inputs.*.*.meter_db:               { type: float, unit: dB, description: "Input meter keyed by kind (mic 1-16, aux 1-2, usb 1-18) and number, with the meters setting on (/meters/2), in dB (the 1/256 dB value sent)" }
   channels.*.mute:                   { type: bool, description: "Input channel muted (mix/on inverted)" }
   channels.*.fader:                  { type: float, description: "Input channel fader position 0-1 (0.75 = 0 dB), not dB" }
   channels.*.name:                   { type: string, description: "Input channel scribble-strip name" }

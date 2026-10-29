@@ -9,7 +9,8 @@
 //! Sony cameras (SSDP) by `crate::ssdp`, and PJLink Class 2 projectors
 //! (SRCH/ACKN and LKUP on UDP 4352) by `crate::pjlink_discovery`, and
 //! Blackmagic Design devices, Meros Cameras, RTP-MIDI sessions and NMOS
-//! Nodes (mDNS / DNS-SD) by `crate::mdns`, and DMXControl 3's Umbra servers
+//! Nodes (mDNS / DNS-SD) by `crate::mdns`, NMOS registries advertised in
+//! unicast DNS (DNS-SD) by `crate::dns_sd`, and DMXControl 3's Umbra servers
 //! (their announcements on UDP 17474) by `crate::umbra_discovery`, whose
 //! rules are there. Each is compiled only with the integrations whose
 //! devices it finds. Protocols are independent: each listens, scans and
@@ -47,6 +48,7 @@ pub const PROTOCOLS: &[(&str, &[&str])] = &[
             "nmos-registry",
         ],
     ),
+    ("dns-sd", &["nmos-registry"]),
 ];
 
 /// What a host asks of discovery.
@@ -57,9 +59,10 @@ pub struct DiscoverRequest {
     /// Which discovery protocols: `mcp` (Sennheiser G3/G4), `ssdp` (Sony
     /// cameras), `pjlink` (PJLink Class 2 projectors), `mdns` (Blackmagic
     /// ATEM, Videohub, HyperDeck, SmartView and MultiView, Meros Cameras,
-    /// RTP-MIDI sessions and NMOS Nodes) and `umbra` (DMXControl 3). Empty
-    /// means every protocol that finds a device in this core's catalogue;
-    /// naming one that finds none of them is an error.
+    /// RTP-MIDI sessions, NMOS Nodes and registries), `dns-sd` (NMOS
+    /// registries advertised in unicast DNS) and `umbra` (DMXControl 3).
+    /// Empty means every protocol that finds a device in this core's
+    /// catalogue; naming one that finds none of them is an error.
     #[serde(default)]
     pub protocols: Vec<String>,
     /// Addresses where devices were last seen. An MCP scan also sweeps their
@@ -69,6 +72,14 @@ pub struct DiscoverRequest {
     /// by unicast to UDP 5353.
     #[serde(default)]
     pub hints: Vec<Ipv4Addr>,
+    /// For a unicast DNS-SD scan (`dns-sd`): the DNS servers to ask, in
+    /// place of the host's own.
+    #[serde(default)]
+    pub dns_servers: Vec<IpAddr>,
+    /// For a unicast DNS-SD scan: the DNS domains to browse, in place of the
+    /// host's own (its DHCP or configured domain and search list).
+    #[serde(default)]
+    pub dns_domains: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
@@ -117,6 +128,8 @@ pub(crate) struct Discovery {
         feature = "nmos-registry"
     ))]
     mdns: crate::mdns::Mdns,
+    #[cfg(feature = "nmos-registry")]
+    dns_sd: crate::dns_sd::DnsSd,
     /// The protocols that find a device in the core's catalogue.
     available: Vec<&'static str>,
 }
@@ -154,6 +167,8 @@ impl Discovery {
                 feature = "nmos-registry"
             ))]
             mdns: crate::mdns::Mdns::new(catalog),
+            #[cfg(feature = "nmos-registry")]
+            dns_sd: Default::default(),
             available: protocols_for(catalog),
         }
     }
@@ -193,14 +208,15 @@ impl Discovery {
         let wants = |p: &str| wanted.contains(&p);
         // A protocol whose integration is not built in is never available, so
         // its branches below are compiled only with that integration.
-        let (mcp, ssdp, pjlink, mdns, umbra) = (
+        let (mcp, ssdp, pjlink, mdns, dns_sd, umbra) = (
             wants("mcp"),
             wants("ssdp"),
             wants("pjlink"),
             wants("mdns"),
+            wants("dns-sd"),
             wants("umbra"),
         );
-        let _ = (mcp, ssdp, pjlink, mdns, umbra);
+        let _ = (mcp, ssdp, pjlink, mdns, dns_sd, umbra);
         match request.action {
             DiscoverAction::Stop => {
                 #[cfg(feature = "sennheiser-ew-g3-g4")]
@@ -233,6 +249,10 @@ impl Discovery {
                 ))]
                 if mdns {
                     self.mdns.stop();
+                }
+                #[cfg(feature = "nmos-registry")]
+                if dns_sd {
+                    self.dns_sd.stop();
                 }
                 Ok(())
             }
@@ -267,6 +287,10 @@ impl Discovery {
                 ))]
                 if mdns {
                     self.mdns.listen(services)?;
+                }
+                #[cfg(feature = "nmos-registry")]
+                if dns_sd {
+                    self.dns_sd.listen(services)?;
                 }
                 Ok(())
             }
@@ -306,6 +330,11 @@ impl Discovery {
                     self.mdns.listen(services)?;
                     self.mdns.scan(services, &request.hints);
                 }
+                #[cfg(feature = "nmos-registry")]
+                if dns_sd {
+                    self.dns_sd
+                        .scan(services, &request.dns_servers, &request.dns_domains);
+                }
                 Ok(())
             }
         }
@@ -331,6 +360,8 @@ mod tests {
             action: DiscoverAction::Scan,
             protocols: protocols.iter().map(|p| p.to_string()).collect(),
             hints: vec![],
+            dns_servers: vec![],
+            dns_domains: vec![],
         }
     }
 
@@ -359,7 +390,13 @@ mod tests {
         let every = Discovery::new(&Catalog::source_tree());
         assert_eq!(
             every.protocols(),
-            ["mcp", "ssdp", "pjlink", "umbra", "mdns"]
+            ["mcp", "ssdp", "pjlink", "umbra", "mdns", "dns-sd"]
+        );
+
+        let registries = Discovery::new(&catalog(&["nmos-registry"]));
+        assert_eq!(
+            registries.wanted(&request(&[])).unwrap(),
+            ["mdns", "dns-sd"]
         );
 
         let switchers = Discovery::new(&catalog(&["blackmagic-atem", "vmix"]));

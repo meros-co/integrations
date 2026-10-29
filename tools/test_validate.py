@@ -112,6 +112,21 @@ class NullStates(unittest.TestCase):
         self.assertEqual(validate.telemetry_checks(self.doc(gone)), [])
 
 
+class MaMscEthernet(unittest.TestCase):
+    DOC = {"id": "x", "transport": {"type": "line-tcp"}, "extension": "ma-msc-ethernet",
+           "models": [{"id": "m", "supports": []}]}
+
+    def errors(self, settings, ports):
+        doc = dict(self.DOC, settings=settings, ports=ports)
+        return [e for e in validate.cross_field_checks(doc, "x.yaml") if "ma-msc-ethernet" in e]
+
+    def test_the_port_setting_and_its_listener_are_required(self):
+        port = {"port": 6004, "protocol": "udp", "role": "feedback", "listener": "core", "setting": "msc_port"}
+        self.assertEqual(self.errors({"msc_port": {"type": "int"}}, [port]), [])
+        self.assertEqual(len(self.errors({}, [port])), 1)
+        self.assertEqual(len(self.errors({"msc_port": {"type": "int"}}, [])), 1)
+
+
 class ExtensionCommands(unittest.TestCase):
     DOC = {"id": "x", "transport": {"type": "line-tcp"}, "extension": "ultimatte-preset-archive",
            "models": [{"id": "m", "supports": []}]}

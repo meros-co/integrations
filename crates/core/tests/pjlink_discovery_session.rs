@@ -120,6 +120,8 @@ async fn class_2_projectors_are_found_by_search_and_link_up() {
         action: DiscoverAction::Scan,
         protocols: vec!["pjlink".into()],
         hints: vec![SEARCHED],
+        dns_servers: vec![],
+        dns_domains: vec![],
     })
     .unwrap();
 
@@ -167,6 +169,8 @@ async fn class_2_projectors_are_found_by_search_and_link_up() {
         action: DiscoverAction::Scan,
         protocols: vec!["pjlink".into()],
         hints: vec![SEARCHED],
+        dns_servers: vec![],
+        dns_domains: vec![],
     })
     .unwrap();
     assert!(
@@ -179,6 +183,8 @@ async fn class_2_projectors_are_found_by_search_and_link_up() {
         action: DiscoverAction::Stop,
         protocols: vec!["pjlink".into()],
         hints: vec![],
+        dns_servers: vec![],
+        dns_domains: vec![],
     })
     .unwrap();
     core.close(open_id).await;
