@@ -474,16 +474,7 @@ enum Ask {
 }
 
 impl Ask {
-    fn answered_by(&self, cookie: &[u8; 4]) -> bool {
-        match self {
-            Ask::Libraries { .. } => cookie == b"ELIn",
-            Ask::Elements { .. } => matches!(cookie, b"MEIn" | b"EEIn" | b"GLEI"),
-            Ask::LibraryThumb { .. } => cookie == b"ELTh",
-            Ask::ElementThumb { .. } => cookie == b"EThn",
-            Ask::Sources => cookie == b"VSrc",
-        }
-    }
-
+    /// The request's own cookie, which a Nack names.
     fn cookie(&self) -> &'static [u8; 4] {
         match self {
             Ask::Libraries { .. } => b"GELI",
