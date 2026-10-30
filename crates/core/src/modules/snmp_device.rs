@@ -37,6 +37,7 @@ use super::snmp_ber::{hex, Oid, Value};
 use crate::catalog::Params;
 use crate::module::{
     CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    PollStamps,
 };
 
 const SOCKET: Key = "snmp";
@@ -238,6 +239,8 @@ pub(crate) struct SnmpDevice {
     max_repetitions: u32,
     interval: Millis,
     monitor: bool,
+    /// When each poll was last answered (`polled.status`, SPEC.md §8).
+    stamps: PollStamps,
     trap: Option<(Option<std::net::IpAddr>, u16)>,
     trap_community: Vec<u8>,
     trap_user: Option<User>,
@@ -286,6 +289,7 @@ impl SnmpDevice {
             max_repetitions: s.max_repetitions,
             interval: s.interval,
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             trap: s.trap,
             trap_community: s.trap_community,
             trap_user: s.user,
@@ -463,6 +467,7 @@ impl SnmpDevice {
                     self.up(cx, reply.round_trip);
                     let rows = self.apply(cx, &varbinds);
                     self.walked(cx, root, rows);
+                    self.stamps.answered(cx, "status");
                 }
                 (Purpose::Reread, Ok(varbinds)) => {
                     cx.alive();

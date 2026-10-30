@@ -73,6 +73,17 @@ _pc("get_organization", {}, "GET", "/services/v2",
     http_reply={"status": 200, "body": '{"data":{"type":"Organization","id":"1","attributes":{"name":"Grace Church"}}}'},
     expect_result={"ok": {"kind": "value", "value": {"type": "Organization", "id": "1",
                                                      "attributes": {"name": "Grace Church"}}}})
+# The person the credential acts as: /me of the Services API (the
+# documentation overview's Current User), a Person resource.
+_ME = {"data": {"type": "Person", "id": "321",
+                "attributes": {"first_name": "Ada", "last_name": "Lovelace", "full_name": "Ada Lovelace",
+                               "photo_thumbnail_url": "https://example.com/ada.jpg",
+                               "plan_permissions": "Editor", "song_permissions": "Viewer",
+                               "media_permissions": "Viewer", "can_view_all_people": True,
+                               "can_edit_all_people": False}}}
+_pc("get_me", {}, "GET", "/services/v2/me",
+    http_reply={"status": 200, "body": json.dumps(_ME)},
+    expect_result={"ok": {"kind": "value", "value": _ME["data"]}})
 _pc("list_service_types", {}, "GET", "/services/v2/service_types?per_page=100")
 _pc("list_live_controllers", {"service_type_id": "1234"}, "GET",
     "/services/v2/service_types/1234/live_controllers?per_page=100")
@@ -181,6 +192,24 @@ telemetry(PC, "plans", settings=_PCS, inbound_http={
         "short_dates": "Oct 4", "sort_date": "2026-10-04T23:00:00Z", "last_time_at": "2026-10-05T00:00:00Z",
         "total_length": 3600, "items_count": 9,
         "planning_center_url": "https://services.planningcenteronline.com/plans/5679"}}})
+# The organization and the signed-in person (the account poll).
+telemetry(PC, "organization", settings=_PCS, inbound_http={"path": "/services/v2", "body": json.dumps({
+    "data": {"type": "Organization", "id": "42",
+             "attributes": {"name": "Grace Church", "owner_name": "Pat Smith", "time_zone": "America/Chicago",
+                            "twenty_four_hour_time": False, "date_format": 1, "ccli": "123456"}}})},
+    expect_state={"organization": {"id": "42", "name": "Grace Church", "owner_name": "Pat Smith",
+                                   "time_zone": "America/Chicago", "twenty_four_hour_time": False,
+                                   "date_format": 1, "ccli": "123456"}})
+telemetry(PC, "me", settings=_PCS, inbound_http={"path": "/services/v2/me", "body": json.dumps(_ME)},
+    expect_state={"me": {"id": "321", "first_name": "Ada", "last_name": "Lovelace", "full_name": "Ada Lovelace",
+                         "photo_thumbnail_url": "https://example.com/ada.jpg", "plan_permissions": "Editor",
+                         "song_permissions": "Viewer", "media_permissions": "Viewer",
+                         "can_view_all_people": True, "can_edit_all_people": False}})
+# Opened before a plan is chosen: the account's telemetry alone.
+telemetry(PC, "service-types-unchosen", settings={"auth": "oauth2", "access_token": "pco_tok_x"}, inbound_http={
+    "path": "/services/v2/service_types?per_page=100",
+    "body": '{"links":{},"data":[{"type":"ServiceType","id":"1234","attributes":{"name":"Sunday Morning"}}]}'},
+    expect_state={"service_types": {"1234": {"name": "Sunday Morning"}}})
 # The whole list of service types replaces the last: 999 leaves.
 telemetry(PC, "service-types", settings=_PCS, inbound_http={
     "path": "/services/v2/service_types?per_page=100",

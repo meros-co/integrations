@@ -38,6 +38,7 @@ use super::snmp_ber::{hex, Oid, Value, SET_TYPES};
 use crate::catalog::Params;
 use crate::module::{
     CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    PollStamps,
 };
 
 const SOCKET: Key = "snmp";
@@ -92,6 +93,8 @@ pub(crate) struct GenericSnmp {
     polled: Vec<Polled>,
     interval: Millis,
     monitor: bool,
+    /// When each poll was last answered (`polled.status`, SPEC.md §8).
+    stamps: PollStamps,
     trap: Option<(Option<IpAddr>, u16)>,
     trap_community: Vec<u8>,
     trap_user: Option<User>,
@@ -190,6 +193,7 @@ impl GenericSnmp {
             polled: parse_polled(setting(&ctx.settings, "poll_oids"))?,
             interval: s.interval,
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             trap: s.trap,
             trap_community: s.trap_community,
             trap_user: s.user,
@@ -355,6 +359,7 @@ impl GenericSnmp {
                 (Purpose::Poll(_), Ok(varbinds)) => {
                     self.up(cx, reply.round_trip);
                     self.apply_polled(cx, &varbinds);
+                    self.stamps.answered(cx, "status");
                 }
                 (Purpose::Poll(chunk), Err(SnmpError::Status { status, index, .. })) => {
                     cx.alive();

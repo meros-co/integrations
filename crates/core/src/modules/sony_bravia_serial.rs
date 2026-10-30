@@ -27,7 +27,7 @@ use serde_json::{json, Value};
 use crate::catalog::Params;
 use crate::module::{
     CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, SerialPort, TcpInput,
+    Outcome, PollStamps, SerialPort, TcpInput,
 };
 
 const SOCKET: Key = "bravia";
@@ -133,6 +133,8 @@ enum Phase {
 pub(crate) struct SonyBraviaSerial {
     link: Link,
     monitor: bool,
+    /// When each poll was last answered (`polled.<group>`, SPEC.md §8).
+    stamps: PollStamps,
     phase: Phase,
     connected: bool,
     on: bool,
@@ -265,6 +267,7 @@ impl SonyBraviaSerial {
         Ok(SonyBraviaSerial {
             link,
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             phase: Phase::Closed,
             connected: false,
             on: false,
@@ -561,6 +564,9 @@ impl SonyBraviaSerial {
                 cx.connection(Connection::Connected);
             }
             self.in_flight = None;
+            if job.command.is_none() && self.monitor && answer.is_ok() {
+                self.stamps.answered(cx, "status");
+            }
             let result = match answer {
                 Err(message) => Err(CommandError::DeviceError {
                     code: Some("0x04".into()),

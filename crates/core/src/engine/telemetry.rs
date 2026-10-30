@@ -801,6 +801,8 @@ pub(crate) enum Inbound<'a> {
 pub(crate) struct Poll {
     pub(crate) send: Vec<Value>,
     pub(crate) every: Option<u64>,
+    /// Its key under `polled` in state: its `name`, or its place from 1.
+    pub(crate) name: String,
 }
 
 /// The most poll groups a spec may have: each has a timer of its own.
@@ -934,11 +936,13 @@ impl Telemetry {
                     .map(|g| Poll {
                         send: items(g.get("send")),
                         every: every(Some(g)),
+                        name: String::new(),
                     })
                     .collect(),
                 Some(one) => vec![Poll {
                     send: items(one.get("send")),
                     every: every(Some(one)),
+                    name: String::new(),
                 }],
                 None => Vec::new(),
             },
@@ -946,6 +950,13 @@ impl Telemetry {
             types,
             conversions,
         };
+        for (poll, name) in t
+            .polls
+            .iter_mut()
+            .zip(crate::catalog::poll_group_names(Some(spec)))
+        {
+            poll.name = name;
+        }
         if t.polls.len() > MAX_POLLS {
             return Err(format!("telemetry: at most {MAX_POLLS} poll groups"));
         }
@@ -1921,6 +1932,7 @@ fn spec_of(kind: ParamType) -> ParamSpec {
         multiline: false,
         negative_infinity: false,
         default_by_model: None,
+        select: None,
     }
 }
 

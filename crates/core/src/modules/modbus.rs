@@ -35,7 +35,7 @@ use serde_json::{json, Map, Value};
 use crate::catalog::Params;
 use crate::module::{
     CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
-    TcpInput,
+    PollStamps, TcpInput,
 };
 
 pub(crate) const PORT: u16 = 502;
@@ -512,6 +512,8 @@ pub(crate) struct Modbus {
     to: SocketAddr,
     unit: u8,
     monitor: bool,
+    /// When each poll was last answered (`polled.<group>`, SPEC.md §8).
+    stamps: PollStamps,
     entries: Vec<Entry>,
     poll_every: Millis,
     timeout: Millis,
@@ -551,6 +553,7 @@ impl Modbus {
             to: SocketAddr::new(ctx.host, ctx.port.unwrap_or(PORT)),
             unit: int(s, "unit_id", 1).min(255) as u8,
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             entries,
             poll_every: int(s, "poll_interval_ms", 1000).max(10),
             timeout: int(s, "timeout_ms", 2000).max(1),
@@ -755,6 +758,7 @@ impl Modbus {
             (Purpose::Poll { entry }, Ok(Parsed::Read(data))) => {
                 let address = u16::from_be_bytes([request.pdu[1], request.pdu[2]]);
                 self.apply_entry(cx, *entry, address, &data);
+                self.stamps.answered(cx, "status");
             }
             (Purpose::Poll { entry }, Err(e)) => {
                 if let Some(entry) = self.entries.get(*entry) {

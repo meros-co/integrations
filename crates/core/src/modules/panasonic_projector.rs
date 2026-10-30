@@ -43,7 +43,7 @@ use super::panasonic_projector_commands::COMMANDS;
 use crate::catalog::{DeviceSpec, Params};
 use crate::module::{
     CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, SerialPort, TcpInput,
+    Outcome, PollStamps, SerialPort, TcpInput,
 };
 
 pub(crate) const DEFAULT_PORT: u16 = 1024;
@@ -208,6 +208,8 @@ pub(crate) struct PanasonicProjector {
     commands: VecDeque<Job>,
     polls: VecDeque<Job>,
     in_flight: Option<(Job, Millis)>,
+    /// When each poll was last answered (`polled.status`, SPEC.md §8).
+    stamps: PollStamps,
     paced: bool,
     cycle: u32,
 }
@@ -267,6 +269,7 @@ impl PanasonicProjector {
             commands: VecDeque::new(),
             polls: VecDeque::new(),
             in_flight: None,
+            stamps: PollStamps::default(),
             paced: false,
             cycle: 0,
         }
@@ -457,6 +460,9 @@ impl PanasonicProjector {
                 }
             }
         };
+        if result.is_ok() && job.command.is_none() && self.monitor {
+            self.stamps.answered(cx, "status");
+        }
         if result.is_ok() && self.monitor {
             for follow in job.follow.iter().rev() {
                 self.polls.push_front(follow.clone());

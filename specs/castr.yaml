@@ -7,8 +7,9 @@ category: other
 # A cloud service, not a device on the venue network: the integration is
 # opened with host api.castr.com on port 443 and acts for the Castr account
 # the API access token belongs to. It follows one live stream, the stream_id
-# setting, keeping its status, its multistream platforms and its ingest stats
-# in state; the commands take any stream.
+# setting (which may be chosen after opening), keeping its status, its
+# multistream platforms and its ingest stats in state; the commands take any
+# stream.
 
 source:
   - title: Castr API documentation, Guides (Overview, Accessing the API, HTTP Verbs, Response Codes, Versioning)
@@ -99,8 +100,11 @@ transport:
   # 403 is a plan or permission limit, not a refused key.
   refusal_status: [401]
   timeout_ms: 10000
-  # The followed stream: one request that also checks the key.
-  probe: { method: GET, path: "/v2/live_streams/{settings.stream_id}" }
+  # The followed stream: one request that also checks the key. Before a
+  # stream is chosen, the account's first stream does.
+  probe:
+    - { method: GET, path: "/v2/live_streams/{settings.stream_id}" }
+    - { method: GET, path: /v2/live_streams, query: { page: "1", limit: "1" } }
 
 settings:
   username: { type: string, max_length: 256, required: true,
@@ -109,9 +113,10 @@ settings:
   password: { type: string, secret: true, max_length: 256, required: true,
               label: Secret key,
               description: "The access token's secret key, shown by Castr only once when the token is made, sent as the HTTP Basic password." }
-  stream_id: { type: string, pattern: "^[0-9a-f]{24}$", required: true,
+  stream_id: { type: string, pattern: "^[0-9a-f]{24}$",
+               select: { command: list_streams, id: $._id, label: $.name },
                label: Stream ID,
-               description: "The id of the live stream to follow, 24 hexadecimal characters, from list_streams or the stream's dashboard URL." }
+               description: "The id of the live stream to follow, 24 hexadecimal characters, from list_streams or the stream's dashboard URL; may be left empty on opening and chosen later with update_settings." }
 
 ports:
   - { port: 443, protocol: https, role: control, note: "the cloud API at api.castr.com, opened by that host name" }
@@ -912,7 +917,11 @@ quirks:
     text: >
       Castr pushes nothing to the API (webhooks need a server of the
       consumer's). The followed stream and its stats are polled every 15
-      seconds (2 requests); answers to commands that change a stream or its
+      seconds (2 requests); with stream_id left empty they wait until a
+      stream is chosen with update_settings, which polls it at once, while
+      the sub-second streams and the account's live streams (each one's
+      name, enabled and broadcasting_status, 100 a page) are polled as
+      before. Answers to commands that change a stream or its
       platforms update state at once. Stats exist only while the stream is
       online: Castr answers 404 otherwise, so streams.*.stats_* and the
       tracks keep their last values after the stream goes offline, and
@@ -1019,8 +1028,9 @@ state:
   streams.*.tracks.*.channels:    { type: int, description: "Audio channels" }
 
 telemetry:
-  # Castr pushes nothing to the API: the followed stream and its stats are
-  # polled every 15 seconds.
+  # Castr pushes nothing to the API: the followed stream and its stats, the
+  # sub-second streams and the account's live streams are polled every 15
+  # seconds.
   poll:
     every_ms: 15000
     send:
@@ -1028,7 +1038,20 @@ telemetry:
       - { method: GET, path: "/v2/live_streams/{settings.stream_id}/stats" }
       - { method: GET, path: /v2/sub_second_streams, query: { page: "1", limit: "100" },
           pages: { items: "$", page: page, size: limit } }
+      # The account's live streams, what stream_id is chosen from.
+      - { method: GET, path: /v2/live_streams, query: { page: "1", limit: "100" },
+          pages: { items: "$", page: page, size: limit } }
   updates:
+    # A list of live streams (list_streams, the poll, the account probe):
+    # each stream's name and status. The followed stream's other values are
+    # its own reads', so the list adds to streams and never replaces them.
+    - path: '^/v2/live_streams\?'
+      json_each: "$"
+      json: { id: "$._id", name: "$.name", enabled: "$.enabled", status: "$.broadcasting_status" }
+      state:
+        streams.{id}.name: "{name}"
+        streams.{id}.enabled: "{enabled}"
+        streams.{id}.broadcasting_status: "{status}"
     # Polls, get_stream, every stream update and every platform change
     # answer the stream.
     - path: '^/v2/live_streams/([0-9a-f]{24})(/platforms(/[0-9a-f]{24})?)?$'

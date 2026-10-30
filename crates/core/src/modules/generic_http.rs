@@ -44,7 +44,7 @@ use serde_json::{json, Value};
 use crate::catalog::Params;
 use crate::module::{
     CommandError, CommandId, Connection, Credentials, Cx, HttpRequest, HttpResponse, Key, Millis,
-    Module, OpenContext, Outcome, RequestId,
+    Module, OpenContext, Outcome, PollStamps, RequestId,
 };
 
 const POLL: Key = "poll";
@@ -185,6 +185,8 @@ pub(crate) struct GenericHttp {
     poll_every: Millis,
     /// Poll on a schedule; false for commands only.
     monitor: bool,
+    /// When each poll was last answered (`polled.status`, SPEC.md §8).
+    stamps: PollStamps,
     polling: bool,
     /// A poll refused the credentials. Terminal for polling.
     refused: bool,
@@ -248,6 +250,7 @@ impl GenericHttp {
                 .and_then(Value::as_u64)
                 .unwrap_or(DEFAULT_POLL_EVERY),
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             polling: false,
             refused: false,
             next_id: 1,
@@ -480,6 +483,9 @@ impl Module for GenericHttp {
                     return;
                 }
                 self.polling = false;
+                if matches!(&result, Ok(r) if (200..300).contains(&r.status)) {
+                    self.stamps.answered(cx, "status");
+                }
                 let refused = matches!(&result, Ok(r) if r.status == 401 || r.status == 403);
                 if refused && self.auth != Auth::None {
                     self.refused = true;

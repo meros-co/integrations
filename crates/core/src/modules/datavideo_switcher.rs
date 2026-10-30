@@ -51,7 +51,7 @@ use super::datavideo_switcher_table::{
 use crate::catalog::Params;
 use crate::module::{
     Bind, CommandError, CommandId, Connection, Cx, FileInput, Key, Level, Link, Millis, Module,
-    OpenContext, Outcome, SerialPort, TcpInput,
+    OpenContext, Outcome, PollStamps, SerialPort, TcpInput,
 };
 
 const CMD: Key = "command";
@@ -847,6 +847,8 @@ struct Processor {
     controller: Option<u16>,
     port: Option<u16>,
     monitor: bool,
+    /// When each poll was last answered (`polled.<group>`, SPEC.md §8).
+    stamps: PollStamps,
     poll_ms: Millis,
     table: Vec<Control>,
     by_path: HashMap<String, usize>,
@@ -915,6 +917,7 @@ impl Processor {
             controller,
             port: ctx.port,
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             poll_ms,
             table,
             by_path,
@@ -1228,6 +1231,9 @@ impl Processor {
         } else {
             self.tcp_reply(cx, &mut job, &req, packet)
         };
+        if result.is_ok() && job.id.is_none() && self.monitor {
+            self.stamps.answered(cx, "status");
+        }
         match result {
             Err(e) => {
                 if job.returns == Returns::File {
@@ -2223,6 +2229,7 @@ struct Se2200 {
     buf: Vec<u8>,
     queue: VecDeque<S2Job>,
     in_flight: Option<(S2Job, S2Req, Millis)>,
+    stamps: PollStamps,
     status: Option<[u8; 7]>,
 }
 
@@ -2242,6 +2249,7 @@ impl Se2200 {
             queue: VecDeque::new(),
             in_flight: None,
             status: None,
+            stamps: PollStamps::default(),
         }
     }
 
@@ -2371,6 +2379,9 @@ impl Se2200 {
             cx.connection(Connection::Connected);
         }
         let status = message.get(1).copied().unwrap_or(0);
+        if job.id.is_none() && self.monitor && status & 0x80 != 0 {
+            self.stamps.answered(cx, "status");
+        }
         let result = if status & 0x80 == 0 {
             Err(device_error(
                 Some(format!("{status:02x}")),
@@ -2584,7 +2595,7 @@ impl Se2200 {
 
 enum Protocol {
     Processor(Box<Processor>),
-    Se2200(Se2200),
+    Se2200(Box<Se2200>),
     DvipOnly,
 }
 
@@ -2645,11 +2656,11 @@ impl DatavideoSwitcher {
             };
             Protocol::Processor(Box::new(Processor::new(family, link, &ctx, poll_ms)))
         } else if ctx.model == "se-2200" {
-            Protocol::Se2200(Se2200::new(
+            Protocol::Se2200(Box::new(Se2200::new(
                 Link::from_settings(&ctx, DVIP_PORT)?,
                 ctx.monitor,
                 poll_ms,
-            ))
+            )))
         } else if standalone {
             Protocol::DvipOnly
         } else {
@@ -2823,12 +2834,16 @@ mod tests {
             .collect()
     }
 
+    /// The state the actions report, without the poll's `polled` stamp.
     fn state(actions: &[Action]) -> Value {
         let mut merged = json!({});
         for a in actions {
             if let Action::State(p) = a {
                 merge_patch(&mut merged, p);
             }
+        }
+        if let Some(m) = merged.as_object_mut() {
+            m.remove("polled");
         }
         merged
     }

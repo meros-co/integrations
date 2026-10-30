@@ -276,3 +276,15 @@ _cs("get_stream_logs", _S, "GET", "/v2/activity/logs/stream/" + _CSI)
 _cs("get_stream_events", _S, "GET", "/v2/activity/events/stream/" + _CSI)
 _cs("get_video_logs", {"video_id": _CT}, "GET", "/v2/activity/logs/stream/" + _CT)
 _cs("get_video_events", {"video_id": _CT}, "GET", "/v2/activity/events/stream/" + _CT)
+
+# The account's live streams (the poll, list_streams, the probe before a
+# stream is chosen): each one's name and status, what stream_id is chosen
+# from.
+telemetry(CS, "live-streams", settings={"username": "tok_5b2e1c65", "password": "s3cr3t"}, inbound_http={
+    "path": "/v2/live_streams?page=1&limit=100",
+    "body": json.dumps([{"_id": _CSI, "name": "Sunday Service", "enabled": True, "broadcasting_status": "online"},
+                        {"_id": "6226ce5f31ddbeb3754aa250", "name": "Rehearsal", "enabled": False,
+                         "broadcasting_status": "offline"}])},
+    expect_state={"streams": {_CSI: {"name": "Sunday Service", "enabled": True, "broadcasting_status": "online"},
+                              "6226ce5f31ddbeb3754aa250": {"name": "Rehearsal", "enabled": False,
+                                                           "broadcasting_status": "offline"}}})

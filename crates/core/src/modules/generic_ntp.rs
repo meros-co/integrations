@@ -18,7 +18,8 @@ use serde_json::{json, Value};
 
 use crate::catalog::Params;
 use crate::module::{
-    Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext,
+    Outcome, PollStamps,
 };
 
 const SOCKET: Key = "ntp";
@@ -138,6 +139,8 @@ fn decode(p: &[u8], sent: u64, t1: u64, t4: u64) -> Option<Value> {
 pub(crate) struct GenericNtp {
     to: SocketAddr,
     monitor: bool,
+    /// When each poll was last answered (`polled.<group>`, SPEC.md §8).
+    stamps: PollStamps,
     poll_ms: Millis,
     reachable: bool,
     misses: u32,
@@ -161,6 +164,7 @@ impl GenericNtp {
         Ok(GenericNtp {
             to: SocketAddr::new(ctx.host, ctx.port.unwrap_or(DEFAULT_PORT)),
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             poll_ms,
             reachable: false,
             misses: 0,
@@ -229,6 +233,9 @@ impl Module for GenericNtp {
             cx.connection(Connection::Connected);
         }
         cx.state(state.clone());
+        if self.monitor {
+            self.stamps.answered(cx, "status");
+        }
         for id in self.waiting.drain(..) {
             cx.complete(
                 id,

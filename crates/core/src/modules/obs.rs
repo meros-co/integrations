@@ -35,7 +35,7 @@ use sha2::{Digest, Sha256};
 use crate::catalog::Params;
 use crate::module::{
     CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
-    WsInput, WsRequest,
+    PollStamps, WsInput, WsRequest,
 };
 
 const PORT: u16 = 4455;
@@ -309,6 +309,8 @@ pub(crate) struct Obs {
     pending: HashMap<String, Pending>,
     /// False: commands only, no events and no state reads.
     monitor: bool,
+    /// When each poll was last answered (`polled.status`, SPEC.md §8).
+    stamps: PollStamps,
     retry_after: Millis,
     strikes: u32,
     /// Set when OBS refuses the password. Terminal, as for every credential in
@@ -437,6 +439,7 @@ impl Obs {
             next_request: 1,
             pending: HashMap::new(),
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             retry_after: RETRY_MIN,
             strikes: 0,
             refused: None,
@@ -953,6 +956,11 @@ impl Obs {
     }
 
     fn answer(&mut self, cx: &mut Cx, read: Read, data: &Value) {
+        // The poll's statistics, its last read but the outputs: the poll
+        // was answered.
+        if read == Read::Stats && self.monitor {
+            self.stamps.answered(cx, "status");
+        }
         match read {
             Read::Version | Read::Liveness => self.emit(
                 cx,

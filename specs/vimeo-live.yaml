@@ -6,9 +6,9 @@ category: other
 
 # A cloud service, not a device on the venue network: the integration is
 # opened with host api.vimeo.com on port 443 and acts for the Vimeo user the
-# access token belongs to. It follows one event, the live_event_id setting,
-# keeping its settings, its ingest session and its simulcast destinations in
-# state; the commands take any event. Vimeo's access tokens have no refresh
+# access token belongs to. It follows one event, the live_event_id setting
+# (which may be chosen after opening), keeping its settings, its ingest
+# session and its simulcast destinations in state; the commands take any event. Vimeo's access tokens have no refresh
 # grant: the consumer passes one (a personal access token, or one from its
 # own app's sign-in) as the token setting.
 
@@ -97,9 +97,11 @@ settings:
   token: { type: string, secret: true, max_length: 4096, required: true,
            label: Access token,
            description: "A Vimeo access token with the private, create, edit, delete and public scopes, from the consumer's own Vimeo app (a personal access token or one from its sign-in); Vimeo has no way to refresh it." }
-  live_event_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+  live_event_id: { type: string, pattern: "^[0-9]+$", max_length: 20,
+                   select: { command: list_live_events, items: $.data, id: $.uri,
+                             id_match: '^/live_events/([0-9]+)$', label: $.title },
                    label: Event ID,
-                   description: "The numeric id of the event to follow, as in its URL vimeo.com/event/<id> or from list_live_events." }
+                   description: "The numeric id of the event to follow, as in its URL vimeo.com/event/<id> or from list_live_events; may be left empty on opening and chosen later with update_settings." }
 
 ports:
   - { port: 443, protocol: https, role: control, note: "the cloud API at api.vimeo.com, opened by that host name" }
@@ -120,7 +122,8 @@ models:
     notes: >
       Vimeo's live API is enabled only for Vimeo Enterprise accounts, per
       API app, on request to Vimeo. Follows the event named by
-      live_event_id; the commands take any event of the token's user.
+      live_event_id, which may be chosen after opening (list_live_events
+      lists the events); the commands take any event of the token's user.
 
 commands:
   # ── Events ────────────────────────────────────────────────────────────────
@@ -552,7 +555,10 @@ quirks:
       Vimeo pushes nothing. The followed event, its ingest session and its
       destinations are polled every 30 seconds (3 requests), and every
       change command's answer updates state at once for the event it
-      touched. State is keyed by event id; set_destination_enabled answers
+      touched. With live_event_id left empty nothing is polled until an
+      event is chosen with update_settings, which polls it at once; the
+      commands that take an event id work meanwhile. State is keyed by
+      event id; set_destination_enabled answers
       on /destination/{id} and shows in state at the next poll. The
       session's status (event.*.ingest_status) is the stream's health as
       far as Vimeo reports it: 2 ready, 4 streaming, 3 timed out before

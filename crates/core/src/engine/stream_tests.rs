@@ -43,11 +43,13 @@ pub(super) fn ws_sent(actions: &[Action], socket: Key) -> Vec<String> {
         .collect()
 }
 
+/// The state patches, without the poll groups' `polled` stamps (SPEC.md §8),
+/// which `select_tests` covers.
 pub(super) fn states(actions: &[Action]) -> Vec<Value> {
     actions
         .iter()
         .filter_map(|a| match a {
-            Action::State(p) => Some(p.clone()),
+            Action::State(p) if p.get("polled").is_none() => Some(p.clone()),
             _ => None,
         })
         .collect()

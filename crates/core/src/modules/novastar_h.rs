@@ -46,7 +46,7 @@ use super::novastar_h_commands::{Endpoint, ENDPOINTS};
 use crate::catalog::Params;
 use crate::module::{
     CommandError, CommandId, Connection, Cx, HttpRequest, HttpResponse, Key, Level, Millis, Module,
-    OpenContext, Outcome, RequestId,
+    OpenContext, Outcome, PollStamps, RequestId,
 };
 
 pub(crate) const DEFAULT_PORT: u16 = 8000;
@@ -455,6 +455,8 @@ pub(crate) struct NovastarH {
     epoch: u64,
     poll_every: Millis,
     monitor: bool,
+    /// When each poll was last answered (`polled.status`, SPEC.md §8).
+    stamps: PollStamps,
     next_id: RequestId,
     pending: HashMap<RequestId, Pending>,
     connected: Option<bool>,
@@ -559,6 +561,7 @@ impl NovastarH {
             epoch,
             poll_every: s.get("poll_ms").and_then(Value::as_u64).unwrap_or(5_000),
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             next_id: 1,
             pending: HashMap::new(),
             connected: None,
@@ -944,6 +947,7 @@ impl Module for NovastarH {
             Purpose::Read(read) => {
                 if let Ok((0, _, body)) = parsed {
                     self.apply(cx, read, &body);
+                    self.stamps.answered(cx, "status");
                 }
             }
         }
@@ -1264,11 +1268,12 @@ mod tests {
         cx.take()
     }
 
+    /// The state patches, without the poll's `polled` stamp.
     fn states(actions: &[Action]) -> Vec<Value> {
         actions
             .iter()
             .filter_map(|a| match a {
-                Action::State(v) => Some(v.clone()),
+                Action::State(v) if v.get("polled").is_none() => Some(v.clone()),
                 _ => None,
             })
             .collect()

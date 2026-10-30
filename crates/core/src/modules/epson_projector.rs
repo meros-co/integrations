@@ -47,7 +47,7 @@ use super::epson_projector_commands::COMMANDS;
 use crate::catalog::{DeviceSpec, Params};
 use crate::module::{
     CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, TcpInput,
+    Outcome, PollStamps, TcpInput,
 };
 
 pub(crate) const DEFAULT_PORT: u16 = 3629;
@@ -175,6 +175,8 @@ pub(crate) struct EpsonProjector {
     commands: VecDeque<Job>,
     polls: VecDeque<Job>,
     in_flight: Option<(Job, Millis)>,
+    /// When each poll was last answered (`polled.status`, SPEC.md §8).
+    stamps: PollStamps,
     cycle: u32,
     need_identity: bool,
 }
@@ -213,6 +215,7 @@ impl EpsonProjector {
             commands: VecDeque::new(),
             polls: VecDeque::new(),
             in_flight: None,
+            stamps: PollStamps::default(),
             cycle: 0,
             need_identity: true,
         }
@@ -408,6 +411,9 @@ impl EpsonProjector {
         } else {
             Ok(Outcome::Ack)
         };
+        if result.is_ok() && job.command.is_none() && self.monitor {
+            self.stamps.answered(cx, "status");
+        }
         if result.is_ok() && self.monitor {
             for follow in job.follow.iter().rev() {
                 self.polls.push_front(follow.clone());

@@ -1526,6 +1526,79 @@ A step the device answers (a login acknowledged with `ACK`) declares
 consumed so it cannot be taken as the answer to the next command, and no
 command goes ahead of it.
 
+#### Settings chosen after signing in
+
+A cloud service follows one of an account's things, named by an id: a
+YouTube broadcast, a Twitch channel, a Planning Center service type and
+plan. The consumer lists them to let the operator choose, and listing them
+needs the service open. Such a setting says so with `select`: it may be left
+empty when the device is opened, and names the command that lists the
+choices, where each one's id and name are in that command's result, and any
+of the command's parameters that take another setting chosen first:
+
+```yaml
+settings:
+  service_type_id:
+    type: string
+    pattern: "^[0-9]+$"
+    label: Service type
+    description: "…"
+    select: { command: list_service_types, id: $.id, label: $.attributes.name }
+  plan_id:
+    type: string
+    pattern: "^[0-9]+$"
+    label: Plan
+    description: "…"
+    select: { command: list_plans, id: $.id, label: $.attributes.title,
+              params: { service_type_id: service_type_id } }
+```
+
+The command's result is an array of choices (or one object, a single
+choice: a Page token names its one Page), or holds one at the JSON path
+`items`, and `id` and `label` are JSON paths in each (§5). A service that
+names a thing by a path rather than an id (Vimeo's `uri`,
+`/live_events/123`) gives `id_match`, a regex whose first group is the id
+within it. The catalogue serves `select` with the setting, so a
+consumer can build its picker: open the device without the setting, run
+the command (filling `params` from the settings named), offer each
+choice's `label`, and pass the `id` chosen with `update_settings`.
+
+While a selection setting is empty the device is open in a reduced way, and
+nothing that names it is sent:
+
+- A command whose messages name it fails at once with `invalid_params`,
+  saying which setting to choose and the command that lists it. The
+  catalogue lists, for each command, the selection settings it `needs`, so a
+  consumer can tell the commands that work before the choice.
+- Telemetry `poll`, `subscribe` and `then_send` items and `on_connect`
+  steps that name it are left out, as with `when_set` (§8): account-level
+  polls go on, so the state holds what the account offers.
+- A `probe` naming it is passed over for the next probe for the model in
+  the list, so a spec probing the chosen thing lists an account-level probe
+  after it.
+- An event stream whose path names it is not opened (§8).
+
+When `update_settings` sets or changes one while the device is open and
+monitored, the subscriptions and every poll group are sent at once, and the
+push websocket and event stream are opened again, so what the new choice
+names is read straight away (a Twitch EventSub websocket makes its
+subscriptions for the channel on its welcome). State keyed by the chosen id
+stays, as for any keyed state; state that belongs to the thing chosen
+without being keyed by it (a rundown's status and cues) is named in
+`clears`, a list of declared state paths, each of which leaves state, with
+everything under it, when the choice changes:
+
+```yaml
+  rundown_id:
+    select: { command: list_rundowns, id: $.id, label: $.name, clears: [status, cues] }
+```
+
+A selection setting is neither `required` nor given a `default`;
+`tools/validate.py` and the core check that, that the command exists,
+returns its list (`returns: value`), does not name the setting itself, that
+`params` name the command's parameters and other settings, and that
+`clears` names declared state.
+
 ## 3. Models and capabilities
 
 A spec covers a device family. Differences between models are expressed as data.
@@ -2271,6 +2344,62 @@ telemetry:
 
 A group is a poll like any other: its items are queries, queued one at a
 time, and an item still waiting from its last round is not queued again.
+
+#### When each poll group was last answered
+
+Polled state is only as fresh as the last answer, and a value that did not
+change is not reported again (§1), so the state itself cannot say whether a
+poll still gets through. The core keeps, for each poll group, when it was
+last answered: `polled.<group>`, in whole Unix seconds, where `<group>` is
+the group's `name` (snake_case), or its place in the list from 1 (`1` for a
+`poll` that is one group):
+
+```yaml
+telemetry:
+  poll:
+    - { name: timers, every_ms: 1000, send: [{ method: GET, path: /v1/timers/current }] }
+    - { every_ms: 30000, send: [{ method: GET, path: /v1/props }] }   # polled.2
+```
+
+```json
+{"polled": {"timers": 1791234567, "2": 1791234540}}
+```
+
+It moves on when an item of the group is answered: over HTTP with a 2xx (a
+page of a paged list counts once, when the list is whole), on other
+transports with any reply taken as the item's answer. A timeout, an error
+status, or a lost connection leaves it where it was, so its age is how old
+the group's data is: a consumer compares it with the group's interval (the
+catalogue gives it in the key's description) to tell fresh from stale. The
+stamp is one key per group (at most four), not per item: a group of many
+items (every channel's fader) reports one stamp, not one per item. Being in
+whole seconds, and reported only when it moves on, it changes at most once a
+second whatever the interval: a group polled every 500 ms reports its stamp
+once a second, one polled every minute once a minute, and a group polled
+once on connecting once. Consumers that ignore it pay one small patch per
+group per interval at most.
+
+It is kept for every spec-driven device whose transport waits for each
+poll item's answer: `http`, `osc-tcp`, a line transport or `osc-udp`
+whose device answers (`reply` other than `none`), and a `ws` transport with
+`reply_match`. Elsewhere poll items go out without awaiting an answer and
+nothing times them. The catalogue adds `polled.<group>` to the spec's
+`state` (type `int`, unit `s`); a spec never declares it, and its group
+names are unique (`tools/validate.py` checks both). Pushed state
+(subscriptions, a push websocket, an event stream) has no stamp: the
+connection's `alive` events say it is heard from. A device opened for
+commands only polls nothing and has none. Every native module that polls
+keeps the same keys with `module::PollStamps`, declared in its spec's
+`state`: `polled.status` for a status poll (projectors, displays, OBS,
+NovaStar, SNMP, Modbus, NTP and generic HTTP devices, switchers, routers,
+power and I/O devices), one key per group where a module polls at
+several rates (Lake's `parameters`, `configuration` and `meters`; AIM's
+`status` and `slow`), and a name for what it reads otherwise
+(`polled.ping`, `polled.properties` of a Sony camera, `polled.levels` of
+AES70 level sensors, `polled.nodes` for Art-Net's ArtPollReply,
+`polled.metering` of Spectera, `polled.xml` of vMix). A module whose state
+is pushed and whose periodic read only repeats it (Shure's refresh,
+Resolume's composition refresh, NMOS event transports) has none.
 
 A `subscribe`, `poll` or `then_send` item can be limited to installations
 that turn on a setting with `when_set`, as an `on_connect` step can (§2): it is sent

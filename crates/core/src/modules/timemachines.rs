@@ -27,7 +27,8 @@ use serde_json::{json, Map, Value};
 
 use crate::catalog::Params;
 use crate::module::{
-    Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext,
+    Outcome, PollStamps,
 };
 
 const SOCKET: Key = "locator";
@@ -475,6 +476,8 @@ fn ascii_z_multiline(params: &Params) -> Result<Vec<u8>, CommandError> {
 pub(crate) struct TimeMachines {
     to: SocketAddr,
     monitor: bool,
+    /// When each poll was last answered (`polled.<group>`, SPEC.md §8).
+    stamps: PollStamps,
     poll_ms: Millis,
     reachable: bool,
     misses: u32,
@@ -496,6 +499,7 @@ impl TimeMachines {
         Ok(TimeMachines {
             to: SocketAddr::new(ctx.host, ctx.port.unwrap_or(DEFAULT_PORT)),
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             poll_ms,
             reachable: false,
             misses: 0,
@@ -558,6 +562,9 @@ impl TimeMachines {
             Answer::Status => match decode_status(data) {
                 Some(state) => {
                     cx.state(state.clone());
+                    if job.id.is_none() && self.monitor {
+                        self.stamps.answered(cx, "status");
+                    }
                     Outcome::Value { value: state }
                 }
                 None => Outcome::Value { value: Value::Null },

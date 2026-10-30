@@ -30,7 +30,7 @@ use serde_json::{json, Map, Value};
 use crate::catalog::Params;
 use crate::module::{
     CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
-    TcpInput,
+    PollStamps, TcpInput,
 };
 
 pub(crate) const PORT: u16 = 8888;
@@ -212,6 +212,8 @@ pub(crate) struct Pigpio {
     to: SocketAddr,
     gpios: Vec<u32>,
     monitor: bool,
+    /// When each poll was last answered (`polled.<group>`, SPEC.md §8).
+    stamps: PollStamps,
     poll_every: Millis,
     timeout: Millis,
     open: bool,
@@ -240,6 +242,7 @@ impl Pigpio {
             to: SocketAddr::new(ctx.host, ctx.port.unwrap_or(PORT)),
             gpios: parse_gpios(s.get("gpios").and_then(Value::as_str).unwrap_or("2-27"))?,
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             poll_every: s
                 .get("poll_interval_ms")
                 .and_then(Value::as_u64)
@@ -354,6 +357,9 @@ impl Pigpio {
                 self.reflect(cx, cmd, p1, p2, res);
             }
             _ => {}
+        }
+        if matches!(r.purpose, Purpose::Read) && signed >= 0 && self.monitor {
+            self.stamps.answered(cx, "status");
         }
         match r.purpose {
             Purpose::Command(id, answer) => {

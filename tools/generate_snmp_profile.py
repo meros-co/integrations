@@ -698,7 +698,8 @@ RAW_COMMANDS = r'''  get:
     returns: ack
 '''
 
-COMMON_STATE = r'''  version: { type: string, description: "The SNMP version used: v1, v2c or v3" }
+COMMON_STATE = r'''  polled.status: { type: int, unit: s, description: "When the status poll (a walk of the device's tables at its interval) was last answered, in Unix seconds: the polled state is as old as this" }
+  version: { type: string, description: "The SNMP version used: v1, v2c or v3" }
   system.description: { type: string, description: "sysDescr.0: the agent's description of the device" }
   system.object_id: { type: string, description: "sysObjectID.0: the vendor's OID for the device type" }
   system.uptime: { type: int, unit: "1/100 s", description: "sysUpTime.0, in hundredths of a second (TimeTicks)" }

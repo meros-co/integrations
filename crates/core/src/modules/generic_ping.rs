@@ -27,7 +27,7 @@ use super::wol;
 use crate::catalog::Params;
 use crate::module::{
     CommandError, CommandId, Connection, Cx, EchoResult, Key, Level, Millis, Module, OpenContext,
-    Outcome, TcpInput,
+    Outcome, PollStamps, TcpInput,
 };
 
 const ICMP: Key = "icmp";
@@ -90,6 +90,8 @@ pub(crate) struct GenericPing {
     sent: u64,
     received: u64,
     failures: u32,
+    /// When each poll was last answered (`polled.ping`, SPEC.md §8).
+    stamps: PollStamps,
     reachable: Option<bool>,
     /// `ping` commands answered by the probe in flight.
     waiting: Vec<CommandId>,
@@ -159,6 +161,7 @@ impl GenericPing {
             sent: 0,
             received: 0,
             failures: 0,
+            stamps: PollStamps::default(),
             reachable: None,
             waiting: Vec::new(),
         })
@@ -230,6 +233,7 @@ impl GenericPing {
         let answer = match &found {
             Found::Reply { rtt_ms, ttl } => {
                 self.received += 1;
+                self.stamps.answered(cx, "ping");
                 self.failures = 0;
                 self.history.push_back(Some(*rtt_ms));
                 cx.alive();

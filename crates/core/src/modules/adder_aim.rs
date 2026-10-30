@@ -31,7 +31,7 @@ use serde_json::{json, Map, Value};
 use crate::catalog::Params;
 use crate::module::{
     CommandError, CommandId, Connection, Cx, HttpRequest, HttpResponse, Key, Level, Millis, Module,
-    OpenContext, Outcome, RequestId,
+    OpenContext, Outcome, PollStamps, RequestId,
 };
 
 const POLL_TIMER: Key = "poll";
@@ -215,6 +215,8 @@ pub(crate) struct AdderAim {
     password: String,
     version: u64,
     monitor: bool,
+    /// When each poll was last answered (`polled.<group>`, SPEC.md §8).
+    stamps: PollStamps,
     poll_every: Millis,
     timeout: Millis,
     token: Option<String>,
@@ -259,6 +261,7 @@ impl AdderAim {
             password: st("password"),
             version: num("api_version", 14),
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             poll_every: num("poll_interval_ms", 5000).max(500),
             timeout: num("timeout_ms", 10_000).max(1),
             token: None,
@@ -602,6 +605,14 @@ impl AdderAim {
             Purpose::List(list, page) => {
                 if answer.success {
                     self.apply_list(cx, *list, *page, &answer);
+                    if self.monitor {
+                        let group = if *list == List::Servers {
+                            "slow"
+                        } else {
+                            "status"
+                        };
+                        self.stamps.answered(cx, group);
+                    }
                 }
             }
             Purpose::Disk => {

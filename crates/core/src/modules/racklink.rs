@@ -30,7 +30,7 @@ use serde_json::{json, Map, Value};
 use crate::catalog::Params;
 use crate::module::{
     CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, TcpInput,
+    Outcome, PollStamps, TcpInput,
 };
 
 const SOCKET: Key = "racklink";
@@ -311,6 +311,8 @@ struct Job {
 pub(crate) struct RackLink {
     link: Link,
     monitor: bool,
+    /// When each poll was last answered (`polled.<group>`, SPEC.md §8).
+    stamps: PollStamps,
     premium: bool,
     username: String,
     password: String,
@@ -725,6 +727,7 @@ impl RackLink {
         Ok(RackLink {
             link,
             monitor: ctx.monitor,
+            stamps: PollStamps::default(),
             premium,
             username,
             password,
@@ -963,6 +966,9 @@ impl RackLink {
         }
         cx.cancel_timer(REPLY_TIMER);
         cx.round_trip(cx.now().saturating_sub(sent_at));
+        if job.id.is_none() && self.monitor {
+            self.stamps.answered(cx, "status");
+        }
         if let Some(id) = job.id {
             let outcome = if command == READ_LOG {
                 Outcome::Value {

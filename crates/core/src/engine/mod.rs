@@ -963,6 +963,9 @@ struct Job {
     /// A `then_send` item's captures: the types of `params`, which hold
     /// them.
     specs: Option<Arc<BTreeMap<String, ParamSpec>>>,
+    /// A poll item: the index of its group, whose `polled` stamp an answer
+    /// moves on (SPEC.md §8).
+    group: Option<usize>,
 }
 
 impl Job {
@@ -976,12 +979,19 @@ impl Job {
             login: false,
             relogged: false,
             specs: None,
+            group: None,
         }
     }
 }
 
 pub(crate) struct SpecEngine {
     spec: Arc<DeviceSpec>,
+    /// The settings chosen after signing in (`select`, SPEC.md §2): a
+    /// message naming one left empty is not sent.
+    selects: Vec<String>,
+    /// Each poll group's `polled` stamp last reported, in Unix seconds;
+    /// empty when the transport does not wait for poll answers.
+    poll_stamps: Vec<Option<u64>>,
     /// What the device was opened with, its settings kept current, for
     /// settings changed while open.
     ctx: OpenContext,
@@ -1934,9 +1944,19 @@ impl SpecEngine {
             return Err("transport.acknowledge needs a line or websocket transport".into());
         }
         // A list of probes, each for some models: the first for this one.
+        let selects: Vec<String> = spec
+            .settings
+            .iter()
+            .filter(|(_, s)| s.select.is_some())
+            .map(|(n, _)| n.clone())
+            .collect();
+        let chosen = |i: &Value| unset_selection(&selects, &ctx.settings, i).is_none();
         let probe = match t.get("probe") {
-            Some(Value::Array(items)) => items.iter().find(|i| for_model(i, &ctx.model)).cloned(),
-            Some(one) if for_model(one, &ctx.model) => Some(one.clone()),
+            Some(Value::Array(items)) => items
+                .iter()
+                .find(|i| for_model(i, &ctx.model) && chosen(i))
+                .cloned(),
+            Some(one) if for_model(one, &ctx.model) && chosen(one) => Some(one.clone()),
             _ => None,
         };
         let maps = template::maps(spec.maps.as_ref())?;
@@ -2310,8 +2330,19 @@ impl SpecEngine {
             }
             _ => None,
         };
+        let poll_stamps = if spec
+            .transport
+            .as_ref()
+            .is_some_and(crate::catalog::polls_answered)
+        {
+            vec![None; telemetry.polls.len()]
+        } else {
+            Vec::new()
+        };
         Ok(SpecEngine {
             spec,
+            selects,
+            poll_stamps,
             ctx: ctx.clone(),
             oauth,
             side_refreshed: false,
@@ -3544,7 +3575,15 @@ impl SpecEngine {
 
         if flight.id.is_none() {
             // Probe (or a queued query) answered.
+            let group = flight.job.group;
+            let answered = match &reply {
+                Reply::Http { status, .. } => (200..300).contains(status),
+                _ => true,
+            };
             self.current = None;
+            if let (Some(group), true) = (group, answered) {
+                self.stamp_poll(cx, group);
+            }
             if main {
                 self.heard(cx);
             }
@@ -3899,6 +3938,9 @@ impl SpecEngine {
                     continue;
                 }
             }
+            if unset_selection(&self.selects, &self.settings, &item).is_some() {
+                continue;
+            }
             if let Some(prompt) = prompt {
                 if !(prompted && index == from) {
                     self.prompt_wait = Some((index, prompt.to_string(), Vec::new()));
@@ -4013,6 +4055,12 @@ impl SpecEngine {
     /// goes through the command queue so its reply is not mistaken for a
     /// command's; otherwise it is sent straight away, like `on_connect`.
     fn send_telemetry(&mut self, cx: &mut Cx, items: Vec<Value>, poll: bool) {
+        self.send_group(cx, items, poll, None);
+    }
+
+    /// A poll group's items, each tied to the group so its answer moves the
+    /// group's `polled` stamp on.
+    fn send_group(&mut self, cx: &mut Cx, items: Vec<Value>, poll: bool, group: Option<usize>) {
         let items = items
             .into_iter()
             .map(|item| telemetry::Triggered {
@@ -4021,13 +4069,19 @@ impl SpecEngine {
                 specs: BTreeMap::new(),
             })
             .collect();
-        self.send_items(cx, items, poll);
+        self.send_items_in(cx, items, poll, group);
     }
 
     /// `when_set` on a telemetry message: sent only while that setting is
     /// set (not empty, and not `false`), decided from the settings current
     /// when it would go, so `update_settings` turns it on and off.
+    ///
+    /// A message naming a selection setting (`select`) left empty is not
+    /// sent either: it waits for the setting to be chosen.
     fn wanted(&self, item: &Value) -> bool {
+        if unset_selection(&self.selects, &self.settings, item).is_some() {
+            return false;
+        }
         match item.get("when_set").and_then(Value::as_str) {
             None => true,
             Some(setting) => self.settings.get(setting).is_some_and(|v| {
@@ -4039,6 +4093,16 @@ impl SpecEngine {
     /// Telemetry messages, each rendered from its own values: none for a
     /// subscription or a poll, a rule's captures for `then_send`.
     fn send_items(&mut self, cx: &mut Cx, items: Vec<telemetry::Triggered>, poll: bool) {
+        self.send_items_in(cx, items, poll, None);
+    }
+
+    fn send_items_in(
+        &mut self,
+        cx: &mut Cx,
+        items: Vec<telemetry::Triggered>,
+        poll: bool,
+        group: Option<usize>,
+    ) {
         let items: Vec<telemetry::Triggered> = items
             .into_iter()
             .filter(|t| for_model(&t.item, &self.ctx.model) && self.wanted(&t.item))
@@ -4109,6 +4173,7 @@ impl SpecEngine {
                 self.queue.push_back(Job {
                     params,
                     specs: (!specs.is_empty()).then(|| Arc::new(specs)),
+                    group,
                     ..Job::internal(Some(item), false)
                 });
                 continue;
@@ -4193,6 +4258,93 @@ impl SpecEngine {
         }
     }
 
+    /// A poll group answered: its `polled` stamp, in whole Unix seconds,
+    /// reported only when it moves on, so a group polled more often than
+    /// once a second reports at most once a second (SPEC.md §8).
+    fn stamp_poll(&mut self, cx: &mut Cx, group: usize) {
+        let now = cx.unix_millis() / 1000;
+        let Some(stamp) = self.poll_stamps.get_mut(group) else {
+            return;
+        };
+        if *stamp == Some(now) {
+            return;
+        }
+        *stamp = Some(now);
+        let Some(name) = self.telemetry.polls.get(group).map(|p| p.name.clone()) else {
+            return;
+        };
+        let patch = serde_json::json!({ "polled": { name: now } });
+        if let Some(mirror) = &mut self.mirror {
+            crate::session::merge_patch(mirror, &patch);
+        }
+        cx.state(patch);
+    }
+
+    /// What belonged to the thing chosen before (`select.clears`) leaves
+    /// state: each path, and everything under it.
+    fn clear_state(&mut self, cx: &mut Cx, paths: &[String]) {
+        let mut patch = Value::Object(Map::new());
+        for path in paths {
+            let mut at = &mut patch;
+            let mut segments = path.split('.').peekable();
+            while let Some(segment) = segments.next() {
+                let Value::Object(map) = at else { break };
+                if segments.peek().is_none() {
+                    map.insert(segment.to_string(), Value::Null);
+                    break;
+                }
+                at = map
+                    .entry(segment.to_string())
+                    .or_insert_with(|| Value::Object(Map::new()));
+            }
+        }
+        if patch.as_object().is_some_and(|m| m.is_empty()) {
+            return;
+        }
+        if let Some(mirror) = &mut self.mirror {
+            crate::session::merge_patch(mirror, &patch);
+        }
+        cx.state(patch);
+    }
+
+    /// A selection setting was chosen or changed while open: the
+    /// subscriptions and every poll group are sent again at once, and the
+    /// push websocket and event stream opened again, so what it names is
+    /// read now (Twitch's EventSub subscriptions are made on its welcome).
+    fn reselected(&mut self, cx: &mut Cx) {
+        if !self.monitor || self.refused.is_some() {
+            return;
+        }
+        self.reopen_side_channels(cx);
+        if !self.can_send() || self.telemetry.is_empty() {
+            return;
+        }
+        let subscribe = self.telemetry.subscribe.clone();
+        self.send_telemetry(cx, subscribe, false);
+        let polls = self.telemetry.polls.clone();
+        for (i, poll) in polls.into_iter().enumerate() {
+            self.send_group(cx, poll.send, true, Some(i));
+        }
+    }
+
+    /// The push websocket and event stream opened again with the settings
+    /// now held: a new selection's subscriptions, or a stream whose path
+    /// names it.
+    fn reopen_side_channels(&mut self, cx: &mut Cx) {
+        if self.push.is_some() {
+            cx.cancel_timer(PUSH_PING);
+            cx.cancel_timer(PUSH_RENEW);
+            cx.cancel_timer(PUSH_RECONNECT);
+            cx.ws_close(PUSH);
+            self.push_backoff = RECONNECT_MIN;
+            self.open_push(cx);
+        }
+        cx.sse_close(EVENTS);
+        cx.cancel_timer(EVENTS_RECONNECT);
+        self.events_backoff = RECONNECT_MIN;
+        self.open_events(cx);
+    }
+
     /// After connecting: subscribe, poll once, and schedule both.
     fn start_telemetry(&mut self, cx: &mut Cx) {
         if self.telemetry.is_empty() || !self.monitor {
@@ -4201,8 +4353,8 @@ impl SpecEngine {
         let subscribe = self.telemetry.subscribe.clone();
         self.send_telemetry(cx, subscribe, false);
         let polls = self.telemetry.polls.clone();
-        for (key, poll) in POLLS.iter().zip(polls) {
-            self.send_telemetry(cx, poll.send, true);
+        for (i, (key, poll)) in POLLS.iter().zip(polls).enumerate() {
+            self.send_group(cx, poll.send, true, Some(i));
             if let Some(every) = poll.every {
                 cx.set_timer(key, every);
             }
@@ -5070,6 +5222,29 @@ impl Module for SpecEngine {
             cx.complete(id, Err(CommandError::Auth { message }));
             return;
         }
+        // A command naming a selection setting left empty (SPEC.md §2,
+        // "Settings chosen after signing in") waits for nothing: it fails,
+        // saying how to choose.
+        if let Some(command) = self.spec.commands.get(name) {
+            let unset = command.needs.iter().find(|setting| {
+                self.settings
+                    .get(*setting)
+                    .is_none_or(|v| v.is_null() || v.as_str() == Some(""))
+            });
+            if let Some(setting) = unset {
+                let lister = self.spec.settings[setting]
+                    .select
+                    .as_ref()
+                    .map(|s| s.command.clone())
+                    .unwrap_or_default();
+                let message = format!(
+                    "'{name}' needs the setting '{setting}', which is not chosen yet: list the \
+                     choices with {lister} and set it with update_settings"
+                );
+                cx.complete(id, Err(CommandError::InvalidParams { message }));
+                return;
+            }
+        }
         // Ahead of queued telemetry queries, behind other commands: an
         // operator's command does not wait for a poll of every channel.
         // Replies are still matched one at a time, in sending order.
@@ -5510,7 +5685,7 @@ impl Module for SpecEngine {
                 let Some(poll) = self.telemetry.polls.get(i).cloned() else {
                     return;
                 };
-                self.send_telemetry(cx, poll.send, true);
+                self.send_group(cx, poll.send, true, Some(i));
                 if let Some(every) = poll.every {
                     cx.set_timer(key, every);
                 }
@@ -5564,8 +5739,22 @@ impl Module for SpecEngine {
         if link(self) != link(&fresh) {
             return SettingsUpdate::Restart;
         }
+        // A selection chosen or changed (SPEC.md §2, "Settings chosen after
+        // signing in"): what it names is read at once, not at the next poll.
+        let changed: Vec<&String> = self
+            .selects
+            .iter()
+            .filter(|s| self.settings.get(*s) != fresh.settings.get(*s))
+            .collect();
+        let reselected = !changed.is_empty();
+        let clears: Vec<String> = changed
+            .iter()
+            .filter_map(|s| self.spec.settings[*s].select.as_ref())
+            .flat_map(|sel| sel.clears.iter().cloned())
+            .collect();
         self.ctx = fresh.ctx;
         self.settings = fresh.settings;
+        self.probe = fresh.probe;
         self.transport = fresh.transport;
         self.endpoints = fresh.endpoints;
         self.events = fresh.events;
@@ -5612,6 +5801,10 @@ impl Module for SpecEngine {
         }
         // New settings may carry a new token: it is validated now.
         self.validate_token(cx);
+        if reselected {
+            self.clear_state(cx, &clears);
+            self.reselected(cx);
+        }
         // A request waiting on a refresh goes with the new tokens, refreshed
         // first if they need it.
         if self.current.as_ref().is_some_and(|f| f.retry.is_some()) {
@@ -5628,6 +5821,20 @@ impl Module for SpecEngine {
         self.pump(cx);
         SettingsUpdate::Applied
     }
+}
+
+/// The first selection setting (`select`, SPEC.md §2) a message names that
+/// has no value yet, if any: such a message waits for it to be chosen.
+fn unset_selection<'a>(selects: &'a [String], settings: &Params, item: &Value) -> Option<&'a str> {
+    selects
+        .iter()
+        .find(|name| {
+            settings
+                .get(name.as_str())
+                .is_none_or(|v| v.is_null() || v.as_str() == Some(""))
+                && crate::catalog::names_setting(item, name)
+        })
+        .map(String::as_str)
 }
 
 /// The text a message's pacing groups are matched against (SPEC.md §2,
@@ -5689,6 +5896,8 @@ fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 mod auth_tests;
 #[cfg(test)]
 mod pacing_tests;
+#[cfg(test)]
+mod select_tests;
 #[cfg(test)]
 mod stream_tests;
 #[cfg(test)]

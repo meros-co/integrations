@@ -389,5 +389,44 @@ class EndpointAuth(unittest.TestCase):
                           "transport.endpoints.rest.auth basic needs a 'password' setting"])
 
 
+
+class Selections(unittest.TestCase):
+    def doc(self, select, setting_extra=None):
+        setting = {"type": "string", "select": select, **(setting_extra or {})}
+        return {
+            "settings": {"thing": setting, "other": {"type": "string", "default": "x"}},
+            "models": [{"id": "m", "supports": ["list_things", "start"]}],
+            "commands": {
+                "list_things": {"params": {"group": {"type": "string", "required": True}},
+                                "send": {"method": "GET", "path": "/things"}, "returns": "value"},
+                "start": {"send": {"method": "POST", "path": "/things/{settings.thing}/start"}, "returns": "ack"},
+            },
+            "state": {"thing.status": {"type": "string"}},
+        }
+
+    def test_a_selection_names_a_lister_that_works_before_it(self):
+        good = {"command": "list_things", "id": "$.id", "params": {"group": "other"}, "clears": ["thing"]}
+        self.assertEqual(validate.select_checks(self.doc(good)), [])
+        errors = validate.select_checks(self.doc(good, {"required": True}))
+        self.assertTrue(any("neither required" in e for e in errors))
+        errors = validate.select_checks(self.doc({"command": "start", "id": "$.id"}))
+        self.assertIn("settings.thing.select: 'start' names the setting it lists the choices for", errors)
+        self.assertIn("settings.thing.select: 'start' must return the list (returns: value)", errors)
+        bad = {"command": "list_things", "id": "$.id", "id_match": "^x$", "params": {"nope": "thing"},
+               "clears": ["nothing"]}
+        errors = validate.select_checks(self.doc(bad))
+        self.assertIn("settings.thing.select.id_match: the id is its first group", errors)
+        self.assertIn("settings.thing.select.params: 'list_things' has no parameter 'nope'", errors)
+        self.assertIn("settings.thing.select.params: 'thing' is not another setting", errors)
+        self.assertIn("settings.thing.select.clears: 'nothing' is no declared state", errors)
+
+    def test_polled_is_the_cores_own_state(self):
+        doc = {"state": {"polled.1": {"type": "int"}},
+               "telemetry": {"poll": [{"name": "a", "send": []}, {"name": "a", "send": []}]}}
+        errors = validate.polled_checks(doc)
+        self.assertIn("state: polled.* is the core's own; leave it out", errors)
+        self.assertIn("telemetry.poll: two groups named 'a'", errors)
+
+
 if __name__ == "__main__":
     unittest.main()

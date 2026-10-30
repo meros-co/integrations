@@ -9,7 +9,8 @@ category: other
 # start, pause, next, jump, the output message, sub-timers) and a data plane
 # (rundowns, cues, columns, cells, mentions, text variables), with a
 # Server-Sent Events stream of live changes per rundown. One device here is
-# one rundown, reached with an API token.
+# one rundown, reached with an API token; the rundown may be chosen after
+# opening, from the team's rundowns.
 
 source:
   - title: Rundown Studio API v1 (OpenAPI 3.1, version 1.1.0)
@@ -68,9 +69,11 @@ settings:
   token: { type: string, secret: true, required: true, max_length: 4096,
     label: API token,
     description: "A Rundown Studio API token, scoped to the team or to this rundown, sent as a bearer token." }
-  rundown_id: { type: string, required: true, max_length: 64, pattern: "^[A-Za-z0-9_-]+$",
+  rundown_id: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_-]+$",
+    select: { command: list_rundowns, id: $.id, label: $.title,
+              clears: [status, countdown, output_message, rundown, cues, columns, cells, sub_timers, mentions, text_variables, stream] },
     label: Rundown ID,
-    description: "ID of the rundown this device controls, as in its URL in Rundown Studio." }
+    description: "ID of the rundown this device controls, as in its URL in Rundown Studio or from list_rundowns; may be left empty on opening and chosen later with update_settings." }
 
 ports:
   - { port: 443, protocol: https, role: control, note: "api-v1.rundownstudio.app, opened by host name" }
@@ -603,6 +606,9 @@ telemetry:
         - { method: GET, path: "/rundowns/{settings.rundown_id}/output-message" }
     - every_ms: 60000
       send:
+        # The team's rundowns, what rundown_id is chosen from (a token
+        # scoped to one rundown is refused them, and they stay empty).
+        - { method: GET, path: /rundowns, query: { limit: "100" }, pages: *pages }
         - { method: GET, path: "/rundowns/{settings.rundown_id}/text-variables" }
         - { method: GET, path: "/rundowns/{settings.rundown_id}/mentions" }
         - { method: GET, path: "/rundowns/{settings.rundown_id}/sub-timers" }
@@ -680,6 +686,15 @@ telemetry:
         output_message.underline: "{underline}"
 
     # ── The rundown, its cues and columns ─────────────────────────────────
+    # The team's rundowns, every page joined: the whole list.
+    - path: "^/rundowns\\?limit="
+      json_each: "$.data.items"
+      json: { id: "$.id", title: "$.title", start: "$.start_time", status: "$.status" }
+      replace: rundowns
+      state:
+        rundowns.{id}.title: "{title}"
+        rundowns.{id}.start_time: "{start}"
+        rundowns.{id}.status: "{status}"
     - path: "^/rundowns/[^/?]+\\?include="
       json: &rundown_fields
         title: "$.data.title"
@@ -854,6 +869,9 @@ state:
   output_message.color: { type: string, description: "Output message color" }
   output_message.bold: { type: bool, description: "Whether the output message is bold" }
   output_message.underline: { type: bool, description: "Whether the output message is underlined" }
+  rundowns.*.title: { type: string, description: "A team rundown's title, keyed by rundown id: the choices for rundown_id (list_rundowns and the minute's poll)" }
+  rundowns.*.start_time: { type: int, unit: ms, description: "Its planned start, ms since 1970" }
+  rundowns.*.status: { type: string, description: "Its status: imported, draft, awaiting-data, approved, finalized, rejected or template" }
   rundown.title: { type: string, description: "Rundown title" }
   rundown.timezone: { type: string, description: "Rundown's time zone, an IANA name" }
   rundown.start_time: { type: int, unit: ms, description: "Planned start, ms since 1970" }

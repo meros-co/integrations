@@ -38,7 +38,7 @@ use serde_json::{json, Map, Value};
 use crate::catalog::Params;
 use crate::module::{
     CommandError, CommandId, Connection, Cx, HttpRequest, HttpResponse, Key, Level, Millis, Module,
-    Outcome, RequestId, SseInput,
+    Outcome, PollStamps, RequestId, SseInput,
 };
 
 pub(crate) const STREAM: Key = "subscriptions";
@@ -171,6 +171,8 @@ pub(crate) struct Sscv2<D: SscDevice> {
     liveness_in_flight: bool,
     /// Poll reads not yet answered; a new round waits for them.
     polls_in_flight: usize,
+    /// When each poll was last answered (`polled.metering`, SPEC.md §8).
+    stamps: PollStamps,
     strikes: u32,
     /// Set once the device refuses the credential. Terminal: nothing is sent
     /// again. A refused password is never retried on any schedule, because
@@ -213,6 +215,7 @@ impl<D: SscDevice> Sscv2<D> {
             last_activity: 0,
             liveness_in_flight: false,
             polls_in_flight: 0,
+            stamps: PollStamps::default(),
             strikes: 0,
             refused: None,
         }
@@ -487,6 +490,7 @@ impl<D: SscDevice> Module for Sscv2<D> {
                 if let (Some(s), Some(value)) = (status, body) {
                     if is_success(s) {
                         self.apply(cx, &json!({ path: value }));
+                        self.stamps.answered(cx, "metering");
                     }
                 }
             }
