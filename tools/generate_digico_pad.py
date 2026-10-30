@@ -22,6 +22,11 @@ import struct
 import sys
 from pathlib import Path
 
+
+def num(x):
+    """A number as YAML reads it as one: no exponent, which PyYAML takes for text."""
+    return f"{x:.10f}".rstrip("0").rstrip(".") if isinstance(x, float) else str(x)
+
 ROOT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent
 SID = "digico-pad"
 
@@ -435,10 +440,10 @@ def value_param(row):
         return "name", (f"name: {{ type: string, max_length: 64, required: true, label: {q(label)}, "
                         f"description: {q(row.desc + ' Up to 64 characters.')} }}"), "{name}", "string"
     if isinstance(k, E):
-        vals = ", ".join(k.values.values())
+        vals = ", ".join(q(v) for v in k.values.values())
         return "value", (f"value: {{ type: enum, values: [{vals}], required: true, label: {q(label)}, "
                          f"description: {q(row.desc)} }}"), None, "float"
-    return "value", (f"value: {{ type: float, min: {k.lo:g}, max: {k.hi:g}, required: true, label: {q(label)}, "
+    return "value", (f"value: {{ type: float, min: {num(k.lo)}, max: {num(k.hi)}, required: true, label: {q(label)}, "
                      f"description: {q(row.desc)} }}"), "{value}", "float"
 
 
@@ -750,7 +755,7 @@ LIST_RULES = f"""    - address: '^/Console/Name$'
     - address: '^/Snapshots/name$'
       state: {{ "snapshots.list.{{arg0}}.number": "{{arg1:from.snapshot_number}}", "snapshots.list.{{arg0}}.group": "{{arg2}}", "snapshots.list.{{arg0}}.name": "{{arg3}}" }}
       then_send:
-        - {{ address: /Snapshots/notes/?, args: [ {{ value: "{{arg0}}", type: int }} ], reply_address: "^/Snapshots/notes$" }}
+        - {{ address: "/Snapshots/notes/?", args: [ {{ value: "{{arg0}}", type: int }} ], reply_address: "^/Snapshots/notes$" }}
     - address: '^/Snapshots/notes$'
       state: {{ "snapshots.list.{{arg0}}.notes": "{{arg4}}" }}
     - address: '^/Macros/name$'
@@ -761,7 +766,7 @@ LIST_RULES = f"""    - address: '^/Console/Name$'
       request_match: '^/Macros/Buttons/count/\\?$'
       replace: macros.buttons
       then_send:
-        - {{ address: /Macros/Buttons/?, reply_address: "^/Macros/Buttons/" }}
+        - {{ address: "/Macros/Buttons/?", reply_address: "^/Macros/Buttons/" }}
     - address: '^/Macros/Buttons/state$'
       state: {{ "macros.buttons.{{arg0}}.state": "{{arg1}}", "macros.buttons.{{arg0}}.name": "{{arg2}}" }}
     - address: '^/Macros/Buttons/state/(\\d+)$'
@@ -780,7 +785,7 @@ for root, key, name_reply in ENTITY:
       request_match: '^/{root}/count/\\?$'
       replace: {key}.list
       then_send:
-        - {{ address: /{root}/names/?, reply_address: "{name_reply}" }}
+        - {{ address: "/{root}/names/?", reply_address: "{name_reply}" }}
     - address: '^/{root}/!$'
       then_send:
         - {query(f'/{root}/count')}"""
@@ -788,9 +793,9 @@ for root, key, name_reply in ENTITY:
 # A change notice: read what is under the path again. A session loaded reads
 # everything again.
 LIST_RULES += """
-    - address: '^(/.+)/!$'
+    - address: '^/(.+)/!$'
       then_send:
-        - { address: "{1}/?", reply_address: "^{1}(/|$)" }
+        - { address: "/{1}/?", reply_address: "^/{1}(/|$)" }
     - address: '^/Console/Session/!$'
       then_send:
 """ + "\n".join(f"        - {i}" for i in CONSOLE_READS + LIST_READS) + "\n" + \
@@ -942,7 +947,7 @@ ports:
     out.append("")
     out.append("maps:")
     for name, values in MAPS.items():
-        out.append(f"  {name}: {{ {', '.join(f'{v}: {q(str(k))}' for k, v in values.items())} }}")
+        out.append(f"  {name}: {{ {', '.join(f'{q(v)}: {q(str(k))}' for k, v in values.items())} }}")
     out.append("")
     out.append("state:")
     for path, (t, unit, desc) in O.state.items():

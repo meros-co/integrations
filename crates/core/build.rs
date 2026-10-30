@@ -146,7 +146,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ),
     ("vendor-dev-core", &["mixingstation"]),
     ("vendor-dhd", &["dhd-aes67", "dhd-control-api", "dhd-ecp"]),
-    ("vendor-digico", &["digico-sd"]),
+    ("vendor-digico", &["digico-pad", "digico-sd"]),
     (
         "vendor-digitalprojection",
         &[

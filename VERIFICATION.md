@@ -1533,13 +1533,25 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that Load Save Setups (0x111C) loads and saves snapshots on firmware 06 and later, which DHD documents only under firmware 05 but lists for every firmware line. ([specs/dhd-ecp.yaml:538](specs/dhd-ecp.yaml#L538))
 - [ ] Check that the channel label request (0x1114, length 3) is answered with length 8 for the display asked, and how a central operating panel module (0x8001-0x800C) answers it. ([specs/dhd-ecp.yaml:363](specs/dhd-ecp.yaml#L363))
 
+## digico-pad — DiGiCo SD and Quantum consoles (DiGiCo Pad remote)
+
+- [ ] Confirm the setup on current SD and Quantum software: a DiGiCo Pad device with this host's address, the console taking OSC on its Receive port (8000) and sending to the Send port (`feedback_port`, 9000), and the command file each console needs (iPadv2sd8-9-11-12, ipad_q3). ([specs/digico-pad.yaml:2737](specs/digico-pad.yaml#L2737))
+- [ ] Confirm a query is the address with `/?` appended (an int index for names) and that the console answers on the address itself, and also sends the same message when the value changes on the surface. ([specs/digico-pad.yaml:2758](specs/digico-pad.yaml#L2758))
+- [ ] Confirm the name walk: `/<root>/names/?` and the strip names answered from 1, and that a strip the session lacks is simply not answered. ([specs/digico-pad.yaml:2758](specs/digico-pad.yaml#L2758))
+- [ ] Confirm `<path>/!` means something under the path changed, and that reading `<path>/?` again returns all of it. ([specs/digico-pad.yaml:3214](specs/digico-pad.yaml#L3214))
+- [ ] Record the units the console takes and sends: times in seconds (the module's table gives ms with scale 1000), fine delay in samples, pans -1 to +1, the fader's -150 dB floor. ([specs/digico-pad.yaml:2770](specs/digico-pad.yaml#L2770))
+- [ ] Record what the raw numbers mean for de-esser and gate key centre and width, EQ curve, dynamic EQ over/under, solo bus, group send tap, input type, gate mode and macro button state. ([specs/digico-pad.yaml:2770](specs/digico-pad.yaml#L2770))
+- [ ] Check the parameters the source marks "MAYBE?": input_type, Dynamics gate-duck-comp, the outputs' alternate_solo, and Group_Send/<n>/group. ([specs/digico-pad.yaml:2780](specs/digico-pad.yaml#L2780))
+- [ ] Confirm snapshot, macro and preset indexes, the snapshot number in hundredths, and that inserting, deleting or moving one sends `/Snapshots/!` (or `/Macros/!`, `/Presets/!`). ([specs/digico-pad.yaml:2789](specs/digico-pad.yaml#L2789))
+- [ ] Record the meter request's argument and the meter messages' form (the source says some arrive without an OSC type-tag string). ([specs/digico-pad.yaml:2799](specs/digico-pad.yaml#L2799))
+
 ## digico-sd — DiGiCo SD and Quantum consoles
 
 - [ ] Confirm that current SD and Quantum software still accepts the 2014 Other OSC list's /sd/ addresses, on an SD-series console and on a Quantum (225, 338, 5, 7 or 852). ([specs/digico-sd.yaml:18](specs/digico-sd.yaml#L18))
 - [ ] Check whether the console sends anything back to an Other OSC device (changes made on the surface, or echoes of received messages), and on which port. ([specs/digico-sd.yaml:4037](specs/digico-sd.yaml#L4037))
-- [ ] Record the fader position for 0 dB and a few other levels, and what the 0.0-1.0 range covers for trim, analogue gain, EQ frequency and gain, and delay. ([specs/digico-sd.yaml:4045](specs/digico-sd.yaml#L4045))
-- [ ] Check what a message for a strip the session does not have does (ignored, or something else), and the real strip limits per console. ([specs/digico-sd.yaml:4054](specs/digico-sd.yaml#L4054))
-- [ ] Confirm press_macro sends macro 1 as 0 (the list's 0-255 range and the Companion module), not 1. ([specs/digico-sd.yaml:4062](specs/digico-sd.yaml#L4062))
+- [ ] Record the fader position for 0 dB and a few other levels, and what the 0.0-1.0 range covers for trim, analogue gain, EQ frequency and gain, and delay. ([specs/digico-sd.yaml:4046](specs/digico-sd.yaml#L4046))
+- [ ] Check what a message for a strip the session does not have does (ignored, or something else), and the real strip limits per console. ([specs/digico-sd.yaml:4055](specs/digico-sd.yaml#L4055))
+- [ ] Confirm press_macro sends macro 1 as 0 (the list's 0-255 range and the Companion module), not 1. ([specs/digico-sd.yaml:4063](specs/digico-sd.yaml#L4063))
 - [ ] Check that fire_snapshot takes the snapshot number shown on the console (and what happens for a number with no snapshot, or a decimal-numbered snapshot). ([specs/digico-sd.yaml:3764](specs/digico-sd.yaml#L3764))
 - [ ] Check the meaning of the Int ranges taken as given: input phase 0-3, EQ curve 1-4, compressor knee 0-2, dynamic EQ over/under 0-1. ([specs/digico-sd.yaml:837](specs/digico-sd.yaml#L837))
 - [ ] Check the longest channel name the console accepts, and what it does with a longer one. ([specs/digico-sd.yaml:921](specs/digico-sd.yaml#L921))
