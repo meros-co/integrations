@@ -2988,7 +2988,9 @@ mod tests {
             types: "s",
             args: &args,
         };
-        assert!(t.apply_into(&pushed, &mut triggers, &mut json!({})).is_some());
+        assert!(t
+            .apply_into(&pushed, &mut triggers, &mut json!({}))
+            .is_some());
         assert!(triggers.is_empty());
         let other = Inbound::OscAnswer {
             address: "/Input_Channels/4/name",
@@ -2996,7 +2998,9 @@ mod tests {
             args: &args,
             request: "/Console/Name/?",
         };
-        assert!(t.apply_into(&other, &mut triggers, &mut json!({})).is_some());
+        assert!(t
+            .apply_into(&other, &mut triggers, &mut json!({}))
+            .is_some());
         assert!(triggers.is_empty());
     }
 

@@ -2669,7 +2669,7 @@ impl SpecEngine {
                 // captures give, each value matched literally.
                 Some(Value::Object(o)) if osc => match o.get("reply_address") {
                     Some(Value::String(re)) => Some(OscReply::Pattern(
-                        Regex::new(&render(re, &values, |s| regex::escape(s))?)
+                        Regex::new(&render(re, &values, regex::escape)?)
                             .map_err(|e| format!("reply_address: {e}"))?,
                     )),
                     _ => None,

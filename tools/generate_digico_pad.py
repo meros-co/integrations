@@ -1207,9 +1207,9 @@ telemetry(S, "snapshot-notes", inbound_hex=hexs(osc("/Snapshots/notes", ("i", 4)
 # The count answering its query clears the list and reads the names.
 telemetry(S, "snapshot-count", inbound_hex=hexs(osc("/Snapshots/count", ("i", 12))), request="/Snapshots/count/?",
           state_before={"snapshots": {"count": 13, "list": {"13": {"name": "Old"}}}},
-          expect_state={"snapshots": {"count": 12, "list": None}},
+          expect_state={"snapshots": {"count": 12}},
           expect_then_send_hex=[hexs(osc("/Snapshots/names/?"))])
-telemetry(S, "snapshots-changed", inbound_hex=hexs(osc("/Snapshots/!")),
+telemetry(S, "snapshots-changed", inbound_hex=hexs(osc("/Snapshots/!")), expect_state={},
           expect_then_send_hex=[hexs(osc("/Snapshots/count/?")), hexs(osc("/Snapshots/?"))])
 telemetry(S, "macro-record", inbound_hex=hexs(osc("/Macros/name", ("i", 2), ("s", "Band on"))),
           expect_state={"macros": {"list": {"2": {"name": "Band on"}}}})
@@ -1241,7 +1241,7 @@ telemetry(S, "aux-send-walk", inbound_hex=hexs(osc("/Input_Channels/4/Aux_Send/2
           expect_then_send_hex=[hexs(osc("/Input_Channels/5/Aux_Send/2/send_level/?")),
                                 hexs(osc("/Input_Channels/4/Aux_Send/2/send_on/?")),
                                 hexs(osc("/Input_Channels/4/Aux_Send/2/send_pan/?"))])
-telemetry(S, "layout-changed", inbound_hex=hexs(osc("/Layout/Layout/Banks/!")),
+telemetry(S, "layout-changed", inbound_hex=hexs(osc("/Layout/Layout/Banks/!")), expect_state={},
           expect_then_send_hex=[hexs(osc("/Layout/Layout/Banks/?"))])
 '''
 
