@@ -21,8 +21,11 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::net::SocketAddr;
 
+use crate::{
+    json,
+    value::{Map, Value},
+};
 use roxmltree::Node;
-use serde_json::{json, Map, Value};
 
 use super::vmix_functions::FUNCTIONS;
 use crate::catalog::Params;

@@ -5,7 +5,7 @@
 //! results itself could differ from the others in a field name or an omitted
 //! null; this module is why none can.
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 
 use crate::{CommandResult, Core, CoreOptions, DeviceId, OpenError, OpenRequest, Params};
 
@@ -13,15 +13,14 @@ use crate::{CommandResult, Core, CoreOptions, DeviceId, OpenError, OpenRequest, 
 pub fn core_options(value: &Value) -> Result<CoreOptions, String> {
     match value {
         Value::Null => Ok(CoreOptions::default()),
-        other => {
-            serde_json::from_value(other.clone()).map_err(|e| format!("invalid core options: {e}"))
-        }
+        other => crate::value::from_value(other.clone())
+            .map_err(|e| format!("invalid core options: {e}")),
     }
 }
 
 /// `{"device": <id>}` or `{"error": {...}}`.
 pub fn open(core: &Core, request: &Value) -> Value {
-    let request: OpenRequest = match serde_json::from_value(request.clone()) {
+    let request: OpenRequest = match crate::value::from_value(request.clone()) {
         Ok(r) => r,
         Err(e) => return json!({"error": {"error": "invalid_request", "message": e.to_string()}}),
     };
@@ -33,7 +32,7 @@ pub fn open(core: &Core, request: &Value) -> Value {
 
 /// `{"ok": true}` or `{"error": {...}}`. Found devices arrive as events.
 pub fn discover(core: &Core, request: &Value) -> Value {
-    let request: crate::DiscoverRequest = match serde_json::from_value(request.clone()) {
+    let request: crate::DiscoverRequest = match crate::value::from_value(request.clone()) {
         Ok(r) => r,
         Err(e) => return json!({"error": {"error": "invalid_request", "message": e.to_string()}}),
     };
@@ -44,7 +43,7 @@ pub fn discover(core: &Core, request: &Value) -> Value {
 }
 
 fn open_error(e: &OpenError) -> Value {
-    let mut v = serde_json::to_value(e).expect("OpenError serialises");
+    let mut v = crate::value::to_value(e).expect("OpenError serialises");
     v["message"] = json!(e.to_string());
     v
 }
@@ -66,7 +65,7 @@ pub fn result(result: &CommandResult) -> Value {
     match result {
         Ok(outcome) => json!({ "ok": outcome }),
         Err(e) => {
-            let mut v = serde_json::to_value(e).expect("CommandError serialises");
+            let mut v = crate::value::to_value(e).expect("CommandError serialises");
             v["message"] = json!(e.to_string());
             json!({ "error": v })
         }
@@ -92,7 +91,7 @@ pub async fn update_settings(core: &Core, device: DeviceId, settings: &Value) ->
     match core.update_settings(device, settings.clone()).await {
         Ok(()) => json!({ "ok": true }),
         Err(e) => {
-            let mut v = serde_json::to_value(&e).expect("SettingsError serialises");
+            let mut v = crate::value::to_value(&e).expect("SettingsError serialises");
             v["message"] = json!(e.to_string());
             json!({ "error": v })
         }
@@ -100,7 +99,7 @@ pub async fn update_settings(core: &Core, device: DeviceId, settings: &Value) ->
 }
 
 pub fn catalog(core: &Core) -> Value {
-    serde_json::to_value(core.catalog()).expect("catalog serialises")
+    crate::value::to_value(core.catalog()).expect("catalog serialises")
 }
 
 /// The host's serial ports (`Core::serial_ports`): `{"ok": [{"name": ...}]}`
@@ -124,18 +123,18 @@ pub fn midi_ports(core: &Core) -> Value {
 /// The snapshot, or `null` for a device that is not open.
 pub fn snapshot(core: &Core, device: DeviceId) -> Value {
     core.snapshot(device)
-        .map(|s| serde_json::to_value(s).expect("snapshot serialises"))
+        .map(|s| crate::value::to_value(s).expect("snapshot serialises"))
         .unwrap_or(Value::Null)
 }
 
 pub fn events(events: &[crate::Event]) -> Value {
-    serde_json::to_value(events).expect("events serialise")
+    crate::value::to_value(events).expect("events serialise")
 }
 
 /// A stream that cannot be watched, as `{"error": {...}}` with a readable
 /// `message`, shaped like a command error.
 pub fn stream_error(e: &crate::StreamError) -> Value {
-    let mut v = serde_json::to_value(e).expect("StreamError serialises");
+    let mut v = crate::value::to_value(e).expect("StreamError serialises");
     v["message"] = json!(e.to_string());
     json!({ "error": v })
 }

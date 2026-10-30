@@ -16,8 +16,8 @@ mod common;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
+use meros_integrations::{json, value::Value};
 use meros_integrations::{Core, CoreOptions, DiscoverAction, DiscoverRequest, Event, OpenRequest};
-use serde_json::{json, Value};
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::UdpSocket;
 

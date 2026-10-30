@@ -35,8 +35,11 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::net::SocketAddr;
 
+use crate::{
+    json,
+    value::{Map, Value},
+};
 use regex::Regex;
-use serde_json::{json, Map, Value};
 
 use crate::catalog::Params;
 use crate::module::{

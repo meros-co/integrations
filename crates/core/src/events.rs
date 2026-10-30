@@ -7,8 +7,8 @@ use std::collections::{BTreeSet, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 
+use crate::value::Value;
 use serde::Serialize;
-use serde_json::Value;
 use tokio::sync::Notify;
 
 use crate::module::{Connection, Level};
@@ -203,7 +203,7 @@ impl EventQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    use crate::json;
 
     fn discovered(device: &str) -> Event {
         Event::Discovered {
@@ -288,7 +288,7 @@ mod tests {
         let events = q.drain(10);
         assert!(events.contains(&credentials));
         assert_eq!(
-            serde_json::to_value(&credentials).unwrap(),
+            crate::value::to_value(&credentials).unwrap(),
             json!({"event": "credentials", "device": 1,
                    "settings": {"access_token": "a", "expires_at": 1}})
         );
@@ -348,13 +348,13 @@ mod tests {
         assert_eq!(&events[1..4], [message(0), message(1), message(2)]);
         assert_eq!(events[4], Event::Closed { device: 1 });
         assert_eq!(
-            serde_json::to_value(&events[1]).unwrap(),
+            crate::value::to_value(&events[1]).unwrap(),
             json!({"event": "message", "device": 1, "address": "/1/push1", "types": "f",
                    "args": [0], "source": "127.0.0.1:9000"})
         );
         // As before for state patches alone.
         assert_eq!(
-            serde_json::to_value(Event::Dropped {
+            crate::value::to_value(Event::Dropped {
                 count: 3,
                 messages: 0
             })

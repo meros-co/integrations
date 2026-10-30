@@ -16,8 +16,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use meros_integrations::{json, value::Value};
 use meros_integrations::{CommandError, Core, DeviceId, Event, OpenRequest, Outcome};
-use serde_json::{json, Value};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
@@ -279,7 +279,7 @@ async fn simulate() -> (u16, u16, Shared) {
     (ports.0, ports.1, deck)
 }
 
-fn params(v: Value) -> serde_json::Map<String, Value> {
+fn params(v: Value) -> meros_integrations::value::Map<String, Value> {
     v.as_object().unwrap().clone()
 }
 
@@ -318,7 +318,7 @@ async fn start(core: &Core, id: DeviceId, name: &str, p: Value) -> u64 {
 struct Ended {
     started: Value,
     finished: Value,
-    state: serde_json::Map<String, Value>,
+    state: meros_integrations::value::Map<String, Value>,
 }
 
 /// Every event seen, so one waited for is never lost to another wait.
@@ -338,7 +338,7 @@ impl Seen<'_> {
         tokio::time::timeout(Duration::from_secs(20), async {
             loop {
                 let mut started = Value::Null;
-                let mut state = serde_json::Map::new();
+                let mut state = meros_integrations::value::Map::new();
                 for e in &self.events {
                     match e {
                         Event::State { patch, .. } => {

@@ -29,7 +29,10 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 
 use super::sscv2::{object, Call, Returns, SscDevice, Sscv2, REQUEST_TIMEOUT};
 use crate::catalog::Params;

@@ -36,8 +36,8 @@
 use std::collections::VecDeque;
 use std::net::SocketAddr;
 
+use crate::{json, value::Value};
 use md5::{Digest, Md5};
-use serde_json::{json, Value};
 
 use super::panasonic_projector_commands::COMMANDS;
 use crate::catalog::{DeviceSpec, Params};

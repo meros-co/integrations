@@ -8,7 +8,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use serde_json::Value;
+use crate::value::Value;
 use tokio::net::UdpSocket;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
@@ -1503,7 +1503,7 @@ pub(crate) fn merge_patch(target: &mut Value, patch: &Value) {
 #[cfg(test)]
 mod tests {
     use super::merge_patch;
-    use serde_json::json;
+    use crate::json;
 
     #[tokio::test]
     async fn an_ephemeral_ipv4_socket_may_broadcast() {
@@ -1585,7 +1585,7 @@ mod tests {
         });
         let snapshot = Arc::new(Mutex::new(DeviceSnapshot {
             connection: crate::module::Connection::Connecting,
-            state: serde_json::Value::Null,
+            state: crate::value::Value::Null,
             latency_ms: None,
         }));
         let (release, gate) = std::sync::mpsc::channel();
@@ -1695,7 +1695,7 @@ mod tests {
         });
         let snapshot = Arc::new(Mutex::new(DeviceSnapshot {
             connection: Connection::Connecting,
-            state: serde_json::Value::Null,
+            state: crate::value::Value::Null,
             latency_ms: None,
         }));
         let session = Session::new(

@@ -18,8 +18,8 @@ use std::time::Duration;
 
 use base64::Engine;
 use futures_util::{SinkExt, StreamExt};
+use meros_integrations::{json, value::Value};
 use meros_integrations::{CommandError, Connection, Core, Event, OpenRequest, Outcome};
-use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::handshake::server::{Request, Response};

@@ -40,8 +40,11 @@
 use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::net::{IpAddr, SocketAddr};
 
+use crate::{
+    json,
+    value::{Map, Value},
+};
 use base64::Engine as _;
-use serde_json::{json, Map, Value};
 
 use super::datavideo_switcher_table::{
     controls, id, inputs, keyers, present, Control, Family, Kind, Present, MEMORY_COMMAND,

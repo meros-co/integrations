@@ -9,8 +9,8 @@ mod common;
 
 use std::time::Duration;
 
+use meros_integrations::{json, value::Value};
 use meros_integrations::{Connection, Core, DeviceId, OpenRequest, Outcome};
-use serde_json::{json, Value};
 
 fn params(v: Value) -> meros_integrations::Params {
     v.as_object().unwrap().clone()

@@ -41,7 +41,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 
 use super::nmos_mqtt as mqtt;
 use crate::catalog::Params;

@@ -42,7 +42,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use serde_json::json;
+use crate::json;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 

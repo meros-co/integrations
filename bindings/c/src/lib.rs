@@ -10,8 +10,8 @@ use std::ffi::{c_char, CStr, CString};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::time::Duration;
 
+use meros_integrations::{json, value::Value};
 use meros_integrations::{json as api, Core};
-use serde_json::{json, Value};
 
 /// Opaque to C.
 pub struct MiCore {

@@ -12,8 +12,8 @@ mod common;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use meros_integrations::{json, value::Value};
 use meros_integrations::{Core, OpenRequest, Outcome};
-use serde_json::{json, Value};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
@@ -190,7 +190,7 @@ async fn polls_tables_and_writes_through_the_public_api() {
     let outcome = core
         .execute(device, "read_fifo_queue", params(json!({"address": 0})))
         .await;
-    let error = serde_json::to_value(outcome.unwrap_err()).unwrap();
+    let error = meros_integrations::value::to_value(outcome.unwrap_err()).unwrap();
     assert_eq!(error["error"], "device_error");
     assert_eq!(error["code"], "1");
     core.close(device).await;

@@ -5,7 +5,10 @@
 //! GetObjectInfo, SDIO_GetContentInfoList and the ContentInfoList data format,
 //! Acquiring Content from Video Only Models) and ISO 15740 for ObjectInfo.
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 
 use super::sony_camera_dataset::Reader;
 

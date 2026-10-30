@@ -21,7 +21,10 @@
 
 use std::collections::VecDeque;
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 use sha2::{Digest, Sha512};
 
 use crate::catalog::Params;

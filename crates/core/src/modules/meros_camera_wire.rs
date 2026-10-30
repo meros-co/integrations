@@ -3,7 +3,7 @@
 //! event stream and the preview, read on a raw TCP connection because they
 //! never end), NDJSON lines, preview frames, and fleet links.
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 
 /// A response head larger than this is not a camera's.
 const MAX_HEAD: usize = 16 * 1024;
@@ -307,7 +307,7 @@ fn fleet_preset(preset: &Value) -> Result<Value, String> {
             out.remove("outputs");
         }
         Some(Value::Object(outputs)) => {
-            let kept: serde_json::Map<String, Value> = outputs
+            let kept: crate::value::Map<String, Value> = outputs
                 .iter()
                 .filter(|(kind, _)| matches!(kind.as_str(), "format" | "look"))
                 .map(|(k, v)| (k.clone(), v.clone()))

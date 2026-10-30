@@ -8,7 +8,7 @@
 //! starts with its parent's, so a proprietary subclass of OcaGain
 //! (1.1.1.5.65535...) is handled as an OcaGain.
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 
 use super::codec::{Decoded, Id, Reader, Writer};
 

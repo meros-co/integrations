@@ -45,7 +45,7 @@
 use std::collections::VecDeque;
 use std::net::SocketAddr;
 
-use serde_json::{Map, Value};
+use crate::value::{Map, Value};
 
 #[cfg(feature = "allenheath-ahm")]
 use super::allenheath_ahm::Ahm;
@@ -807,9 +807,9 @@ pub(crate) mod testing {
     //! Helpers shared by the dialects' tests.
 
     use super::*;
+    use crate::json;
     use crate::module::Action;
     use crate::session::merge_patch;
-    use serde_json::json;
     use std::net::{IpAddr, Ipv4Addr};
 
     pub(crate) fn module(dialect: Box<dyn Dialect>) -> AllenHeath {
@@ -901,8 +901,8 @@ pub(crate) mod testing {
 mod tests {
     use super::testing::*;
     use super::*;
+    use crate::json;
     use crate::module::Action;
-    use serde_json::json;
 
     /// A dialect with one read and one write, to test the session alone.
     struct Fake;

@@ -9,8 +9,8 @@
 
 use std::collections::{BTreeMap, VecDeque};
 
+use crate::value::Value;
 use regex::Regex;
-use serde_json::Value;
 
 use super::expect;
 use super::Millis;
@@ -220,7 +220,7 @@ impl Rule {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    use crate::json;
 
     fn denon() -> Acknowledge {
         Acknowledge::parse(Some(&json!({

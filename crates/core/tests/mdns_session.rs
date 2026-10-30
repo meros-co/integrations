@@ -16,8 +16,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+use meros_integrations::value::Value;
 use meros_integrations::{CoreOptions, DiscoverAction, DiscoverRequest, Event};
-use serde_json::Value;
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::UdpSocket;
 

@@ -13,7 +13,7 @@
 //! `src/__tests__/connection/*.data`, with Blackmagic's SDK manual for what
 //! each setting means.
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 
 use super::{
     fits, flag, int, invalid, one, opt_bool, opt_int, opt_str, put16, put32, text, u16_at, u32_at,
@@ -704,7 +704,7 @@ impl Atem {
 mod tests {
     use super::super::tests::{cmd, decoded, hex, payload, ready, refused, state};
     use super::super::{command, CommandError};
-    use serde_json::json;
+    use crate::json;
 
     #[test]
     fn media_pool_layouts() {
@@ -795,7 +795,7 @@ mod tests {
     #[test]
     fn multiviewer_video_mode_and_startup_layouts() {
         let (mut m, _) = ready();
-        let mv = |extra: serde_json::Value| {
+        let mv = |extra: crate::value::Value| {
             let mut p = json!({"multiviewer": 1, "window": 3});
             p.as_object_mut()
                 .unwrap()
@@ -1134,7 +1134,7 @@ mod tests {
         );
         assert_eq!(
             s["recording"]["disks"]["930619436"],
-            serde_json::Value::Null
+            crate::value::Value::Null
         );
     }
 

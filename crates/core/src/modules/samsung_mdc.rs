@@ -40,7 +40,10 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 
 use super::samsung_mdc_table::DEFS;
 use crate::catalog::Params;

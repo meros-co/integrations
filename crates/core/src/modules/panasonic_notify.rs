@@ -101,7 +101,7 @@ impl PanasonicNotify {
         let port = ctx
             .settings
             .get("notify_port")
-            .and_then(serde_json::Value::as_u64)
+            .and_then(crate::value::Value::as_u64)
             .map(|p| p as u16)
             .unwrap_or(DEFAULT_NOTIFY_PORT);
         PanasonicNotify {

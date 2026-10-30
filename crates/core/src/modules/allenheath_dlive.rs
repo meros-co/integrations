@@ -24,7 +24,7 @@
 //!   51329, and the first message is the login (p.1); see
 //!   [`super::allenheath`]. The Avantis documents give no TLS port.
 
-use serde_json::Value;
+use crate::value::Value;
 
 use super::allenheath::{invalid, midi_channel, setting_flag, unknown, Args, Dialect, Plan};
 use super::allenheath_midi::{self as midi, level_updates, Event, Law, Update};
@@ -898,7 +898,7 @@ impl Dlive {
 mod tests {
     use super::super::allenheath::testing::*;
     use super::*;
-    use serde_json::json;
+    use crate::json;
 
     fn dlive(model: &str, channel: i64) -> Box<Dlive> {
         Box::new(Dlive::new(model, &params(json!({"midi_channel": channel}))).unwrap())

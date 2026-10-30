@@ -29,7 +29,7 @@ use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 use socket2::{Domain, Protocol, SockRef, Socket, Type};
 use tokio::net::UdpSocket;
 use tokio::task::JoinHandle;

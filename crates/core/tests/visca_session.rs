@@ -15,8 +15,8 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use meros_integrations::{json, value::Value};
 use meros_integrations::{CommandError, Core, Event, OpenRequest, Outcome};
-use serde_json::{json, Value};
 use tokio::net::UdpSocket;
 
 fn frame(kind: u16, seq: u32, payload: &[u8]) -> Vec<u8> {

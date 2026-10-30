@@ -9,8 +9,8 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
+use crate::value::Value;
 use serde::Serialize;
-use serde_json::Value;
 
 use crate::catalog::Params;
 
@@ -252,7 +252,7 @@ impl SerialPort {
     /// bits, no parity, 1 stop bit and no flow control; `baud_rate` may be an
     /// integer or an enum of digits. The port has no default.
     pub fn from_settings(settings: &crate::catalog::Params) -> Result<SerialPort, String> {
-        use serde_json::Value;
+        use crate::value::Value;
         let path = settings
             .get("serial_port")
             .and_then(Value::as_str)
@@ -331,7 +331,11 @@ impl Link {
     /// `serial`. A TCP link needs a host: a device opened without one (as a
     /// device on a serial port may be) is refused here.
     pub fn from_settings(ctx: &OpenContext, default_port: u16) -> Result<Link, String> {
-        match ctx.settings.get("link").and_then(serde_json::Value::as_str) {
+        match ctx
+            .settings
+            .get("link")
+            .and_then(crate::value::Value::as_str)
+        {
             None | Some("tcp") => {
                 if ctx.host.is_unspecified() {
                     return Err("a TCP link needs the device's host".into());
@@ -1210,7 +1214,7 @@ impl PollStamps {
             Some((_, at)) => *at = now,
             None => self.last.push((group, now)),
         }
-        cx.state(serde_json::json!({ "polled": { group: now } }));
+        cx.state(crate::json!({ "polled": { group: now } }));
     }
 }
 

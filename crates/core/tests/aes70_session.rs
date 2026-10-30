@@ -24,10 +24,10 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
+use meros_integrations::{json, value::Value};
 use meros_integrations::{
     CommandError, Connection, Core, DeviceId, Event, OpenError, OpenRequest, Outcome,
 };
-use serde_json::{json, Value};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, UdpSocket};
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};

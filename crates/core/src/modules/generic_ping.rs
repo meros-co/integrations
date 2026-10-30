@@ -21,7 +21,7 @@
 use std::collections::VecDeque;
 use std::net::{IpAddr, SocketAddr};
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 
 use super::wol;
 use crate::catalog::Params;

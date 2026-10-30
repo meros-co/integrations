@@ -43,7 +43,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use serde_json::json;
+use crate::json;
 use socket2::{Domain, Protocol, SockRef, Socket, Type};
 use tokio::net::UdpSocket;
 use tokio::sync::Semaphore;

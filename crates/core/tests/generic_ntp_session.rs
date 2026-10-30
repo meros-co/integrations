@@ -11,8 +11,8 @@ mod common;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use meros_integrations::{json, value::Value};
 use meros_integrations::{OpenRequest, Outcome};
-use serde_json::{json, Value};
 use tokio::net::UdpSocket;
 
 fn now_ntp() -> u64 {

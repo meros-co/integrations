@@ -41,7 +41,7 @@
 
 use std::collections::VecDeque;
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 
 use super::epson_projector_commands::COMMANDS;
 use crate::catalog::{DeviceSpec, Params};

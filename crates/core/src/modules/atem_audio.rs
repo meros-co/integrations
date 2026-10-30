@@ -10,7 +10,10 @@
 
 use std::collections::BTreeSet;
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 
 use super::{
     classic_db, classic_gain, fields, fits, hundredths, i16_at, i64_at, int, invalid, one,
@@ -936,7 +939,7 @@ fn routing_id(
 mod tests {
     use super::super::tests::{cmd, decoded, dump, hex, payload, ready_with, refused};
     use super::super::{command, Atem, CommandError};
-    use serde_json::{json, Value};
+    use crate::{json, value::Value};
 
     const SOURCE: [u8; 8] = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x00];
     const OUTPUT_ID: u32 = 0x0001_0000;

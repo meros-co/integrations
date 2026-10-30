@@ -11,8 +11,8 @@ mod common;
 use std::net::SocketAddr;
 use std::time::Duration;
 
+use meros_integrations::{json, value::Value};
 use meros_integrations::{Connection, Core, DeviceId, OpenRequest};
-use serde_json::{json, Value};
 use tokio::net::UdpSocket;
 
 const SAMPLE: &str = "v=0\r\no=- 123456 123458 IN IP4 10.0.1.2\r\ns=My sample flow\r\n\

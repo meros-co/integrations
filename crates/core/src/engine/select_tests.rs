@@ -4,7 +4,7 @@
 
 use std::net::Ipv4Addr;
 
-use serde_json::json;
+use crate::json;
 
 use super::*;
 use crate::module::Action;
@@ -129,7 +129,7 @@ fn the_catalogue_lists_what_each_command_needs_and_the_poll_stamps() {
     assert_eq!(spec.state["polled.2"].unit.as_deref(), Some("s"));
     assert!(spec.state["polled.2"].description.contains("every 5000 ms"));
     // Served with the setting.
-    let served = serde_json::to_value(&spec).unwrap();
+    let served = crate::value::to_value(&spec).unwrap();
     assert_eq!(served["settings"]["thing"]["select"]["id"], "$.id");
     assert_eq!(served["commands"]["start_thing"]["needs"], json!(["thing"]));
 }

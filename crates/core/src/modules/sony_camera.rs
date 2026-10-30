@@ -53,8 +53,11 @@
 use std::collections::{HashMap, VecDeque};
 use std::net::{IpAddr, SocketAddr};
 
+use crate::{
+    json,
+    value::{Map, Value},
+};
 use base64::Engine as _;
-use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
 use super::sony_camera_content as content;

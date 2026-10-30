@@ -15,8 +15,8 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use meros_integrations::{json, value::Value};
 use meros_integrations::{CommandError, Connection, Core, Event, OpenRequest, Outcome};
-use serde_json::{json, Value};
 use tokio::net::UdpSocket;
 
 const FRAME: (u32, u32) = (0x3d00_0011, 0xd6ed_9201);

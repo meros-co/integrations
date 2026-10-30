@@ -35,8 +35,11 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
+use crate::{
+    json,
+    value::{Map, Value},
+};
 use base64::Engine as _;
-use serde_json::{json, Map, Value};
 
 use crate::catalog::Params;
 use crate::module::{

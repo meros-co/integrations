@@ -1,6 +1,6 @@
 //! OSC 1.0 messages: encoding for sends, decoding for replies.
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Arg {

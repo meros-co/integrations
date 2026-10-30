@@ -26,7 +26,7 @@
 
 use std::net::SocketAddr;
 
-use serde_json::Value;
+use crate::value::Value;
 
 use crate::catalog::Params;
 use crate::engine::SpecEngine;
@@ -253,7 +253,7 @@ impl Module for MaMsc {
 mod tests {
     use std::sync::Arc;
 
-    use serde_json::json;
+    use crate::json;
 
     use super::*;
     use crate::catalog::Catalog;

@@ -10,8 +10,8 @@ mod common;
 use std::net::SocketAddr;
 use std::time::Duration;
 
+use meros_integrations::{json, value::Value};
 use meros_integrations::{Connection, Core, DeviceId, OpenRequest, Outcome};
-use serde_json::{json, Value};
 use tokio::net::UdpSocket;
 
 fn params(v: Value) -> meros_integrations::Params {

@@ -7,7 +7,7 @@
 //! followed by those units. An array is a `u32` element count followed by the
 //! elements.
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 
 /// PTP datatype codes.
 pub(crate) mod dt {

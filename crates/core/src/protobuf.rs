@@ -28,9 +28,9 @@
 //! member appears only when present. Unknown fields are skipped, as proto3
 //! requires. Nothing caps a message's size.
 
+use crate::value::{Map, Value};
 use base64::engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig};
 use base64::Engine;
-use serde_json::{Map, Value};
 
 /// Standard base64 (RFC 4648), written padded and read with or without.
 const BASE64: GeneralPurpose = GeneralPurpose::new(
@@ -721,7 +721,7 @@ fn map_key_value(kind: Kind, key: &str) -> Option<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    use crate::json;
 
     static FIELDS_INNER: &[Field] = &[
         Field {

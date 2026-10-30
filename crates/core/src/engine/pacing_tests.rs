@@ -3,7 +3,7 @@
 
 use std::net::Ipv4Addr;
 
-use serde_json::json;
+use crate::json;
 
 use super::*;
 use crate::module::Action;

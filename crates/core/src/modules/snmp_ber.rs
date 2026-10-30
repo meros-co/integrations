@@ -10,7 +10,7 @@
 
 use std::fmt;
 
-use serde_json::{json, Value as Json};
+use crate::{json, value::Value as Json};
 
 pub(crate) const INTEGER: u8 = 0x02;
 pub(crate) const OCTET_STRING: u8 = 0x04;

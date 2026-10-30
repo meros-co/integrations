@@ -15,8 +15,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use meros_integrations::{json, value::Value};
 use meros_integrations::{Connection, Core, OpenRequest, Outcome};
-use serde_json::{json, Value};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 

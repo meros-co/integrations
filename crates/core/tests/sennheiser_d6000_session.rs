@@ -12,8 +12,8 @@ mod common;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
+use meros_integrations::{json, value::Value};
 use meros_integrations::{Connection, Core, Event, OpenRequest, Outcome};
-use serde_json::{json, Value};
 use tokio::net::UdpSocket;
 
 const DEVICE_IP: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 2);

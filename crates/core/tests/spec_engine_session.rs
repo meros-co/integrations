@@ -10,8 +10,8 @@ mod common;
 
 use std::time::Duration;
 
+use meros_integrations::{json, value::Value};
 use meros_integrations::{CommandError, Connection, Core, Event, OpenRequest, Outcome};
-use serde_json::{json, Value};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, UdpSocket};
 

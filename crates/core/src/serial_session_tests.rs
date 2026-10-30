@@ -6,7 +6,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use serde_json::json;
+use crate::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, DuplexStream};
 
 use crate::catalog::{Catalog, DeviceSpec, Params};
@@ -262,7 +262,7 @@ async fn another_serial_port_in_the_settings_is_opened_at_once() {
 
 #[test]
 fn line_settings_come_from_the_settings_with_defaults() {
-    let settings = |v: serde_json::Value| v.as_object().unwrap().clone();
+    let settings = |v: crate::value::Value| v.as_object().unwrap().clone();
     let port = SerialPort::from_settings(&settings(json!({"serial_port": "COM3"}))).unwrap();
     assert_eq!(
         port,
@@ -363,7 +363,7 @@ fn dual_open(
     core: &Core,
     model: &str,
     host: &str,
-    settings: serde_json::Value,
+    settings: crate::value::Value,
 ) -> Result<u64, crate::OpenError> {
     core.open(OpenRequest {
         device: "dual-test".into(),
@@ -420,7 +420,7 @@ fn a_serial_block_adds_the_link_and_the_line_settings() {
         .as_deref()
         .unwrap()
         .contains("9600 unless changed there, 115200 on rs232-only"));
-    let catalogued = serde_json::to_value(&s["baud_rate"]).unwrap();
+    let catalogued = crate::value::to_value(&s["baud_rate"]).unwrap();
     assert_eq!(
         catalogued["default_by_model"]["rs232-only"],
         json!("115200")

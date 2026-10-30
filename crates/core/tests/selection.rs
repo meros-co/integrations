@@ -10,10 +10,10 @@
 
 mod common;
 
+use meros_integrations::json;
 use meros_integrations::{
     json as api, Core, CoreOptions, DiscoverAction, DiscoverRequest, OpenError, OpenRequest,
 };
-use serde_json::json;
 
 const WIRELESS: [&str; 4] = [
     "sennheiser-ew-dx",

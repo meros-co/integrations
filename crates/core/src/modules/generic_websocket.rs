@@ -42,9 +42,12 @@
 use std::collections::{HashMap, VecDeque};
 use std::net::SocketAddr;
 
+use crate::{
+    json,
+    value::{Map, Value},
+};
 use base64::Engine;
 use regex::Regex;
-use serde_json::{json, Map, Value};
 
 use crate::catalog::Params;
 use crate::engine::json_path;

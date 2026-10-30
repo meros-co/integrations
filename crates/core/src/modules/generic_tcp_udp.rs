@@ -36,8 +36,8 @@
 use std::collections::VecDeque;
 use std::net::SocketAddr;
 
+use crate::{json, value::Value};
 use regex::Regex;
-use serde_json::{json, Value};
 
 use crate::catalog::Params;
 use crate::module::{

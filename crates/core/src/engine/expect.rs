@@ -2,8 +2,11 @@
 
 use std::collections::BTreeMap;
 
+use crate::{
+    json,
+    value::{Map, Value},
+};
 use regex::Regex;
-use serde_json::{json, Map, Value};
 
 use crate::module::{CommandError, CommandResult, Outcome};
 

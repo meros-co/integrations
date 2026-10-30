@@ -17,8 +17,8 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use meros_integrations::{json, value::Value};
 use meros_integrations::{CommandError, Connection, Core, Event, OpenRequest, Outcome};
-use serde_json::{json, Value};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
@@ -176,8 +176,8 @@ async fn simulated_spectera() -> (u16, Arc<Mutex<Device>>) {
                         }
                         ("PUT", "/api/ssc/state/subscriptions/s1/add") => {
                             let paths: Vec<String> =
-                                serde_json::from_value(body).unwrap_or_default();
-                            let mut initial = serde_json::Map::new();
+                                meros_integrations::value::from_value(body).unwrap_or_default();
+                            let mut initial = meros_integrations::value::Map::new();
                             {
                                 let mut d = device.lock().unwrap();
                                 for p in &paths {

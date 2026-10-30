@@ -9,11 +9,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use meros_integrations::{json, value::Value};
 use meros_integrations::{json as api, Core, StreamHandle};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
-use serde_json::{json, Value};
 
 fn parse(text: &str) -> Result<Value, String> {
     serde_json::from_str(text).map_err(|e| {

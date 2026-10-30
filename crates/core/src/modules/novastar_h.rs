@@ -38,9 +38,12 @@
 
 use std::collections::{BTreeSet, HashMap};
 
+use crate::{
+    json,
+    value::{Map, Value},
+};
 use base64::Engine;
 use md5::{Digest, Md5};
-use serde_json::{json, Map, Value};
 
 use super::novastar_h_commands::{Endpoint, ENDPOINTS};
 use crate::catalog::Params;

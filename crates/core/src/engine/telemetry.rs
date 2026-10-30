@@ -10,8 +10,8 @@
 
 use std::collections::BTreeMap;
 
+use crate::value::{Map, Value};
 use regex::Regex;
-use serde_json::{Map, Value};
 
 use super::template::{render, sole_converted, sole_value, Conversions, Values};
 use crate::catalog::{ParamSpec, ParamType, Params, StateField};
@@ -2066,10 +2066,10 @@ fn set_path(patch: &mut Value, parts: &[String], value: Value) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    use crate::json;
 
     fn state(v: Value) -> BTreeMap<String, StateField> {
-        serde_json::from_value(v).unwrap()
+        crate::value::from_value(v).unwrap()
     }
 
     #[test]

@@ -31,8 +31,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use meros_integrations::{json, value::Value};
 use meros_integrations::{CommandError, Connection, Core, Event, OpenRequest, Outcome};
-use serde_json::{json, Value};
 use tokio::net::UdpSocket;
 
 const SESSION: u16 = 0x8123;

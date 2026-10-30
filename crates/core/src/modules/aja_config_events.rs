@@ -25,7 +25,7 @@
 
 use std::net::IpAddr;
 
-use serde_json::Value;
+use crate::value::Value;
 
 use crate::catalog::{DeviceSpec, Params};
 use crate::engine::template::percent_encode;
@@ -488,7 +488,7 @@ impl Module for AjaConfigEvents {
 mod tests {
     use std::sync::Arc;
 
-    use serde_json::json;
+    use crate::json;
 
     use super::*;
     use crate::catalog::Catalog;

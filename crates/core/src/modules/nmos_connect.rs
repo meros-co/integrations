@@ -26,7 +26,7 @@
 //! authorization server. Requests go one command at a time per command, each
 //! waiting up to five seconds.
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 
 use crate::catalog::Params;
 use crate::module::{
@@ -439,7 +439,7 @@ mod tests {
     const DEV: &str = "58f6b536-ca4c-43fd-880a-9df2501fc125";
 
     fn params(v: Value) -> Params {
-        serde_json::from_value(v).unwrap()
+        crate::value::from_value(v).unwrap()
     }
 
     fn requests(actions: &[Act]) -> Vec<(RequestId, HttpRequest)> {

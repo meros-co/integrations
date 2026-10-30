@@ -13,7 +13,7 @@
 //! - With TLS/SSL encryption the processor listens on 51327, and the first
 //!   message is the login, as on dLive (p.1); see [`super::allenheath`].
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 
 use super::allenheath::{invalid, unknown, Args, Dialect, Plan};
 use super::allenheath_midi::{self as midi, level_updates, Event, Law, Update};

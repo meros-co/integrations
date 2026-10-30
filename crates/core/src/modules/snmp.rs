@@ -1665,14 +1665,14 @@ pub(crate) fn parse_oids(text: &str) -> Result<Vec<Oid>, String> {
 
 /// A variable binding as JSON: {oid, type, value}, and `hex` for an
 /// OCTET STRING or Opaque.
-pub(crate) fn varbind_json(vb: &VarBind) -> serde_json::Value {
-    let mut o = serde_json::json!({
+pub(crate) fn varbind_json(vb: &VarBind) -> crate::value::Value {
+    let mut o = crate::json!({
         "oid": vb.oid.to_string(),
         "type": vb.value.type_name(),
         "value": vb.value.to_json(),
     });
     if let Some(bytes) = vb.value.bytes() {
-        o["hex"] = serde_json::json!(ber::hex(bytes));
+        o["hex"] = crate::json!(ber::hex(bytes));
     }
     o
 }
@@ -1715,7 +1715,7 @@ pub(crate) struct Settings {
 
 fn text_setting<'a>(s: &'a crate::catalog::Params, name: &str) -> &'a str {
     s.get(name)
-        .and_then(serde_json::Value::as_str)
+        .and_then(crate::value::Value::as_str)
         .unwrap_or("")
         .trim()
 }
@@ -1738,14 +1738,14 @@ impl Settings {
         interval: Millis,
     ) -> Result<Settings, String> {
         let s = &ctx.settings;
-        let num = |k: &str, d: u64| s.get(k).and_then(serde_json::Value::as_u64).unwrap_or(d);
+        let num = |k: &str, d: u64| s.get(k).and_then(crate::value::Value::as_u64).unwrap_or(d);
         let version = match text_setting(s, "version") {
             "v1" => Version::V1,
             "" | "v2c" => Version::V2c,
             "v3" => Version::V3,
             other => return Err(format!("version '{other}' is not v1, v2c or v3")),
         };
-        let raw = |k: &str| s.get(k).and_then(serde_json::Value::as_str);
+        let raw = |k: &str| s.get(k).and_then(crate::value::Value::as_str);
         let user = if version == Version::V3 {
             let level = match text_setting(s, "security_level") {
                 "no_auth_no_priv" => Level::NoAuthNoPriv,
@@ -1797,7 +1797,7 @@ impl Settings {
                 id
             }
         };
-        let trap = match s.get("trap_port").and_then(serde_json::Value::as_u64) {
+        let trap = match s.get("trap_port").and_then(crate::value::Value::as_u64) {
             None => None,
             Some(p) => {
                 let address = match text_setting(s, "trap_bind_address") {

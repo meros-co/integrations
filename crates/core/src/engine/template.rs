@@ -6,8 +6,8 @@
 
 use std::sync::OnceLock;
 
+use crate::value::Value;
 use regex::Regex;
-use serde_json::Value;
 
 use crate::catalog::{ParamSpec, ParamType, Params};
 use crate::module::BodyPiece;
@@ -775,7 +775,7 @@ pub(crate) fn percent_decode(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    use crate::json;
 
     #[test]
     fn escaped_braces_are_literal() {

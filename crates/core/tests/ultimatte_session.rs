@@ -14,8 +14,8 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use meros_integrations::{json, value::Value};
 use meros_integrations::{CommandError, Core, DeviceId, OpenRequest, Outcome};
-use serde_json::{json, Value};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -161,7 +161,7 @@ async fn simulate() -> (u16, u16, Arc<Mutex<Unit>>) {
     (ports.0, ports.1, unit)
 }
 
-fn params(v: Value) -> serde_json::Map<String, Value> {
+fn params(v: Value) -> meros_integrations::value::Map<String, Value> {
     v.as_object().unwrap().clone()
 }
 

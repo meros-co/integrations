@@ -15,7 +15,7 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 use meros_integrations::json as api;
-use serde_json::{Map, Value};
+use meros_integrations::value::{Map, Value};
 
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")

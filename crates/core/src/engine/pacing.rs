@@ -3,8 +3,8 @@
 //! held back, and everything behind it waits with it, so nothing is
 //! reordered; the wait is a timer, so nothing else is held up.
 
+use crate::value::{Map, Value};
 use regex::Regex;
-use serde_json::{Map, Value};
 
 use crate::module::Millis;
 
@@ -236,7 +236,7 @@ impl Pacer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    use crate::json;
 
     #[test]
     fn a_gap_counts_from_the_send_or_the_reply() {

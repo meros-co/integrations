@@ -6,7 +6,7 @@
 //! the names are this module's own. A property without an entry here is still
 //! reported under `properties.<code>` and can be written with `set_property`.
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 
 use super::sony_camera_dataset::{dt, PtpValue};
 

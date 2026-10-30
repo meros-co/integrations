@@ -8,7 +8,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 
 use super::SpecEngine;
 use crate::catalog::{validate, Catalog};
@@ -339,7 +339,7 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
             })
             .collect();
         if let Some(expected) = v.get("expect_connect_ws") {
-            let expected: Vec<String> = serde_json::from_value(expected.clone())
+            let expected: Vec<String> = crate::value::from_value(expected.clone())
                 .map_err(|e| format!("expect_connect_ws: {e}"))?;
             if sent != expected {
                 return Err(format!(
@@ -388,7 +388,7 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
             }
         }
         if let Some(expected) = v.get("expect_connect_zmq") {
-            let expected: Vec<Vec<String>> = serde_json::from_value(expected.clone())
+            let expected: Vec<Vec<String>> = crate::value::from_value(expected.clone())
                 .map_err(|e| format!("expect_connect_zmq: {e}"))?;
             if published != expected {
                 return Err(format!(
@@ -470,7 +470,7 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         engine.ws(&mut cx, socket, WsInput::Text(text.to_string()));
     } else if let Some(frames) = v.get("inbound_zmq") {
         // One message on `telemetry.zeromq`'s subscriber, its frames as text.
-        let frames: Vec<String> = serde_json::from_value(frames.clone())
+        let frames: Vec<String> = crate::value::from_value(frames.clone())
             .map_err(|e| format!("inbound_zmq is a list of frames: {e}"))?;
         let frames: Vec<Vec<u8>> = frames.into_iter().map(String::into_bytes).collect();
         let doc = super::zeromq::message_value(&frames);

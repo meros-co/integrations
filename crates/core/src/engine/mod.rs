@@ -27,8 +27,8 @@ use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
+use crate::value::{Map, Value};
 use regex::Regex;
-use serde_json::{Map, Value};
 
 use crate::catalog::{DeviceSpec, ParamSpec, Params};
 use crate::module::{
@@ -2696,7 +2696,7 @@ impl SpecEngine {
         for item in &items {
             // OSC probes are bare addresses in the spec.
             let item = match item {
-                Value::String(address) if osc => serde_json::json!({ "address": address }),
+                Value::String(address) if osc => crate::json!({ "address": address }),
                 _ => item.clone(),
             };
             let outgoing = self.build(&item, &values)?;
@@ -3616,7 +3616,7 @@ impl SpecEngine {
             (Ok(_), "file", Some((path, content_type))) => {
                 let size = std::fs::metadata(&path).map(|m| m.len()).ok();
                 Ok(Outcome::Value {
-                    value: serde_json::json!({
+                    value: crate::json!({
                         "file": path.to_string_lossy(),
                         "size": size,
                         "content_type": content_type,
@@ -4180,7 +4180,7 @@ impl SpecEngine {
             }
             let item = match &item {
                 Value::String(address) if self.transport.is_osc() => {
-                    serde_json::json!({ "address": address })
+                    crate::json!({ "address": address })
                 }
                 _ => item,
             };
@@ -4273,7 +4273,7 @@ impl SpecEngine {
         let Some(name) = self.telemetry.polls.get(group).map(|p| p.name.clone()) else {
             return;
         };
-        let patch = serde_json::json!({ "polled": { name: now } });
+        let patch = crate::json!({ "polled": { name: now } });
         if let Some(mirror) = &mut self.mirror {
             crate::session::merge_patch(mirror, &patch);
         }
@@ -4761,7 +4761,7 @@ impl SpecEngine {
                 let doc = if self.events_json {
                     data
                 } else {
-                    serde_json::json!({"event": event.event, "data": data})
+                    crate::json!({"event": event.event, "data": data})
                 };
                 self.offer(cx, &telemetry::Inbound::Json(&doc));
                 // `as_reply`: also the reply to a GET of the path it names.
@@ -4893,7 +4893,7 @@ impl SpecEngine {
             empty.insert("push.token".into(), Value::String(token.clone()));
             empty_specs.insert(
                 "push.token".to_string(),
-                serde_json::from_value::<ParamSpec>(serde_json::json!({"type": "string"}))
+                crate::value::from_value::<ParamSpec>(crate::json!({"type": "string"}))
                     .expect("a string parameter"),
             );
         }
@@ -5012,7 +5012,7 @@ impl SpecEngine {
                         if let Ok(Value::Array(args)) = serde_json::from_str::<Value>(array) {
                             let event = args.first().cloned().unwrap_or(Value::Null);
                             let data = args.get(1).cloned().unwrap_or(Value::Null);
-                            let doc = serde_json::json!({
+                            let doc = crate::json!({
                                 "event": event,
                                 "data": data,
                                 "args": args.get(1..).map(<[Value]>::to_vec).unwrap_or_default(),
@@ -5909,8 +5909,8 @@ mod vectors;
 mod tests {
     use super::*;
     use crate::catalog::Catalog;
+    use crate::json;
     use crate::module::Action;
-    use serde_json::json;
     use std::net::Ipv4Addr;
 
     /// ProPresenter's HTTP spec, switched to basic auth.
@@ -6434,8 +6434,10 @@ mod tests {
             .clone();
         spec.settings.insert(
             "osc_port".into(),
-            serde_json::from_value(json!({"type": "int", "min": 1, "max": 65535, "default": 6250}))
-                .unwrap(),
+            crate::value::from_value(
+                json!({"type": "int", "min": 1, "max": 65535, "default": 6250}),
+            )
+            .unwrap(),
         );
         let telemetry = spec.telemetry.as_mut().unwrap();
         telemetry["osc"] = json!({"listen_port": {"setting": "osc_port"}});
@@ -6886,12 +6888,12 @@ mod tests {
             "type": "ws", "port": 9000, "path": "/api/v1", "subprotocol": "v1.ctl",
             "auth": auth, "timeout_ms": 1000,
         }));
-        spec.settings = serde_json::from_value(json!({
+        spec.settings = crate::value::from_value(json!({
             "token": {"type": "string", "secret": true, "default": "t0k"},
         }))
         .unwrap();
         spec.on_connect = on_connect;
-        spec.commands = serde_json::from_value(json!({
+        spec.commands = crate::value::from_value(json!({
             "get_level": {
                 "params": {"layer": {"type": "int", "min": 1, "required": true}},
                 "send": r#"{"action":"get","parameter":"/layers/{layer}/level"}"#,
@@ -6903,7 +6905,7 @@ mod tests {
         }))
         .unwrap();
         spec.models[0].supports = vec!["get_level".into(), "ping".into()];
-        spec.state = serde_json::from_value(json!({
+        spec.state = crate::value::from_value(json!({
             "layers.*.level": {"type": "float", "description": "x"},
         }))
         .unwrap();
@@ -7434,7 +7436,7 @@ mod tests {
             .unwrap()
             .clone();
         spec.telemetry = Some(telemetry);
-        spec.state = serde_json::from_value(state).unwrap();
+        spec.state = crate::value::from_value(state).unwrap();
         SpecEngine::new(
             Arc::new(spec),
             OpenContext {
@@ -7712,7 +7714,7 @@ mod tests {
             "state": {"level": "{db}"},
         }]}));
         spec.state =
-            serde_json::from_value(json!({"level": {"type": "float", "description": "x"}}))
+            crate::value::from_value(json!({"level": {"type": "float", "description": "x"}}))
                 .unwrap();
         let mut e = SpecEngine::new(
             Arc::new(spec),
@@ -7752,7 +7754,7 @@ mod tests {
             "state": {"level": "{v}"},
         }]}));
         spec.state =
-            serde_json::from_value(json!({"level": {"type": "float", "description": "x"}}))
+            crate::value::from_value(json!({"level": {"type": "float", "description": "x"}}))
                 .unwrap();
         let mut e = SpecEngine::new(
             Arc::new(spec),
@@ -8006,7 +8008,7 @@ mod tests {
         spec.state = Default::default();
         spec.settings.insert(
             "token".into(),
-            serde_json::from_value(json!({"type": "string", "label": "x", "description": "x"}))
+            crate::value::from_value(json!({"type": "string", "label": "x", "description": "x"}))
                 .unwrap(),
         );
         let mut e = SpecEngine::new(
@@ -8760,7 +8762,7 @@ mod tests {
         }));
         spec.settings = BTreeMap::new();
         spec.on_connect = Vec::new();
-        spec.commands = serde_json::from_value(json!({
+        spec.commands = crate::value::from_value(json!({
             "get_info": {
                 "send": {"method": "POST", "path": "/cgi-bin/api.cgi",
                          "body": r#"{"Request":{"Command":"GetSystemInfo","SessionID":{session.id:json}}}"#},
@@ -8922,7 +8924,7 @@ mod tests {
         *w = json!({"url": "ws://example.com/ws?k={settings.k}"});
         spec.settings.insert(
             "k".into(),
-            serde_json::from_value(json!({"type": "string", "default": ""})).unwrap(),
+            crate::value::from_value(json!({"type": "string", "default": ""})).unwrap(),
         );
         let mut e = open_spec(spec, "arena", json!({"k": "x"}));
         let mut cx = Cx::new(0);
@@ -9715,7 +9717,7 @@ commands:
             "admin_port": { "type": "int", "min": 1, "max": 65535, "default": 80 },
             "admin_scheme": { "type": "enum", "values": ["http", "https"], "default": "http" }
         });
-        spec.settings = serde_json::from_value(settings).unwrap();
+        spec.settings = crate::value::from_value(settings).unwrap();
         let given = json!({"password": "SYS-1"});
         let settings =
             crate::catalog::validate(&spec.settings, given.as_object().unwrap()).unwrap();

@@ -9,10 +9,11 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
+use meros_integrations::value::Value;
 use meros_integrations::{json, Core, StreamHandle};
 use napi::bindgen_prelude::*;
+use napi::{JsUnknown, NapiRaw};
 use napi_derive::napi;
-use serde_json::Value;
 
 #[napi(js_name = "NativeCore")]
 pub struct NativeCore {
@@ -34,6 +35,33 @@ pub struct NativeFrame {
     pub dropped: i64,
 }
 
+/// A JSON value crossing to or from JavaScript. It goes through serde so
+/// object keys keep their JavaScript order both ways.
+pub struct Json(Value);
+
+impl TypeName for Json {
+    fn type_name() -> &'static str {
+        "unknown"
+    }
+
+    fn value_type() -> ValueType {
+        ValueType::Unknown
+    }
+}
+
+impl FromNapiValue for Json {
+    unsafe fn from_napi_value(env: sys::napi_env, value: sys::napi_value) -> Result<Self> {
+        let value = unsafe { JsUnknown::from_napi_value(env, value)? };
+        Env::from_raw(env).from_js_value(value).map(Json)
+    }
+}
+
+impl ToNapiValue for Json {
+    unsafe fn to_napi_value(env: sys::napi_env, value: Self) -> Result<sys::napi_value> {
+        Ok(unsafe { Env::from_raw(env).to_js_value(&value.0)?.raw() })
+    }
+}
+
 fn device_id(device: f64) -> Result<u64> {
     if device.fract() == 0.0 && device >= 0.0 && device <= u64::MAX as f64 {
         Ok(device as u64)
@@ -49,9 +77,9 @@ fn device_id(device: f64) -> Result<u64> {
 impl NativeCore {
     /// `options`: CoreOptions JSON (`bind_address`, `devices`), or null.
     #[napi(constructor)]
-    pub fn new(options: Option<Value>) -> Result<Self> {
-        let options =
-            json::core_options(&options.unwrap_or(Value::Null)).map_err(Error::from_reason)?;
+    pub fn new(options: Option<Json>) -> Result<Self> {
+        let options = json::core_options(&options.map_or(Value::Null, |o| o.0))
+            .map_err(Error::from_reason)?;
         let core = Core::with_options(options).map_err(|e| Error::from_reason(e.to_string()))?;
         Ok(NativeCore {
             core: Arc::new(core),
@@ -61,32 +89,32 @@ impl NativeCore {
     }
 
     #[napi]
-    pub fn catalog(&self) -> Value {
-        json::catalog(&self.core)
+    pub fn catalog(&self) -> Json {
+        Json(json::catalog(&self.core))
     }
 
     /// The host's serial ports: `{ok: [{name}]}` or `{error}`.
     #[napi]
-    pub fn serial_ports(&self) -> Value {
-        json::serial_ports(&self.core)
+    pub fn serial_ports(&self) -> Json {
+        Json(json::serial_ports(&self.core))
     }
 
     /// The host's MIDI ports: `{ok: [{name, input, output}]}` or `{error}`.
     #[napi]
-    pub fn midi_ports(&self) -> Value {
-        json::midi_ports(&self.core)
+    pub fn midi_ports(&self) -> Json {
+        Json(json::midi_ports(&self.core))
     }
 
     /// `{device}` or `{error}`.
     #[napi]
-    pub fn open(&self, request: Value) -> Value {
-        json::open(&self.core, &request)
+    pub fn open(&self, request: Json) -> Json {
+        Json(json::open(&self.core, &request.0))
     }
 
     /// `{ok: true}` or `{error}`. Found devices arrive as events.
     #[napi]
-    pub fn discover(&self, request: Value) -> Value {
-        json::discover(&self.core, &request)
+    pub fn discover(&self, request: Json) -> Json {
+        Json(json::discover(&self.core, &request.0))
     }
 
     /// `{ok}` or `{error}`. Never rejects for a device or validation error.
@@ -95,35 +123,43 @@ impl NativeCore {
         &self,
         device: f64,
         command: String,
-        params: Option<Value>,
-    ) -> Result<Value> {
+        params: Option<Json>,
+    ) -> Result<Json> {
         let device = device_id(device)?;
-        let params = params.unwrap_or(Value::Null);
-        Ok(json::execute(&self.core, device, &command, &params).await)
+        let params = params.map_or(Value::Null, |p| p.0);
+        Ok(Json(
+            json::execute(&self.core, device, &command, &params).await,
+        ))
     }
 
     /// `{ok: true}` or `{error}`: merge settings into an open device's.
     #[napi]
-    pub async fn update_settings(&self, device: f64, settings: Value) -> Result<Value> {
+    pub async fn update_settings(&self, device: f64, settings: Json) -> Result<Json> {
         let device = device_id(device)?;
-        Ok(json::update_settings(&self.core, device, &settings).await)
+        Ok(Json(
+            json::update_settings(&self.core, device, &settings.0).await,
+        ))
     }
 
     #[napi]
-    pub fn snapshot(&self, device: f64) -> Result<Value> {
-        Ok(json::snapshot(&self.core, device_id(device)?))
+    pub fn snapshot(&self, device: f64) -> Result<Json> {
+        Ok(Json(json::snapshot(&self.core, device_id(device)?)))
     }
 
     /// Queued events, without waiting.
     #[napi]
-    pub fn poll_events(&self, max: Option<u32>) -> Value {
-        json::events(&self.core.poll_events(max.unwrap_or(256) as usize))
+    pub fn poll_events(&self, max: Option<u32>) -> Json {
+        Json(json::events(
+            &self.core.poll_events(max.unwrap_or(256) as usize),
+        ))
     }
 
     /// Wait for at least one event.
     #[napi]
-    pub async fn next_events(&self, max: Option<u32>) -> Value {
-        json::events(&self.core.next_events(max.unwrap_or(256) as usize).await)
+    pub async fn next_events(&self, max: Option<u32>) -> Json {
+        Json(json::events(
+            &self.core.next_events(max.unwrap_or(256) as usize).await,
+        ))
     }
 
     /// Make a pending `nextEvents` return, empty if nothing is queued.
@@ -135,14 +171,14 @@ impl NativeCore {
     /// `{stream: <id>}` or `{error}`. The device produces frames while the
     /// stream is open.
     #[napi]
-    pub fn open_stream(&self, device: f64, stream: String) -> Result<Value> {
+    pub fn open_stream(&self, device: f64, stream: String) -> Result<Json> {
         match json::open_stream(&self.core, device_id(device)?, &stream) {
             Ok(handle) => {
                 let id = self.next_stream.fetch_add(1, Ordering::Relaxed);
                 self.streams.lock().unwrap().insert(id, Arc::new(handle));
-                Ok(serde_json::json!({ "stream": id }))
+                Ok(Json(meros_integrations::json!({ "stream": id })))
             }
-            Err(error) => Ok(error),
+            Err(error) => Ok(Json(error)),
         }
     }
 

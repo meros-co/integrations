@@ -8,7 +8,10 @@
 //! samples in Sofie `commands/__tests__/libatem-data.json`, which give each
 //! field both as raw bytes and in the user's units.
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 
 use super::{fields, invalid, one, opt_str, unsupported, Atem, Body, CommandError, Out, Params, W};
 
@@ -397,7 +400,7 @@ fn keyframe(params: &Params) -> Result<u8, CommandError> {
 mod tests {
     use super::super::tests::{cmd, decoded, dump, hex, payload, ready, ready_with, refused};
     use super::super::{command, Atem, CommandError};
-    use serde_json::{json, Value};
+    use crate::{json, value::Value};
 
     #[test]
     fn dve_settings_layout() {

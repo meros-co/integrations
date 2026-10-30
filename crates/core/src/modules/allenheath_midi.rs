@@ -16,7 +16,7 @@
 //! data, optionally CC 26 data LSB) and a scene recall (CC 00 / CC 20 bank,
 //! then Program Change).
 
-use serde_json::{Map, Value};
+use crate::value::{Map, Value};
 
 /// SysEx longer than this is dropped rather than grown without limit.
 const MAX_SYSEX: usize = 64 * 1024;
@@ -720,7 +720,7 @@ mod tests {
         ]);
         assert_eq!(
             p,
-            serde_json::json!({"channels": {"input": {"1": {"mute": true, "level_raw": 5}}}, "scene": {"current": 3}})
+            crate::json!({"channels": {"input": {"1": {"mute": true, "level_raw": 5}}}, "scene": {"current": 3}})
         );
     }
 }

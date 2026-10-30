@@ -27,7 +27,10 @@
 use std::collections::VecDeque;
 use std::net::SocketAddr;
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 
 use super::ftp::{Event, Failure, Keys, Lane, Login, Op};
 use crate::catalog::Params;

@@ -16,8 +16,8 @@
 
 use std::collections::BTreeMap;
 
+use crate::value::Value;
 use regex::Regex;
-use serde_json::Value;
 
 use crate::catalog::{ParamSpec, Params};
 use crate::module::HttpRequest;
@@ -204,7 +204,7 @@ impl Sign {
         let bad = |what: &str| format!("transport.sign: {what}");
         let mut values = Vec::new();
         let map = match v.get("values") {
-            None => serde_json::Map::new(),
+            None => crate::value::Map::new(),
             Some(Value::Object(m)) => m.clone(),
             Some(_) => return Err(bad("values maps names to expressions")),
         };
@@ -339,8 +339,7 @@ impl Sign {
         if !self.applies(settings) {
             return Ok(());
         }
-        let string: ParamSpec =
-            serde_json::from_value(serde_json::json!({"type": "string"})).unwrap();
+        let string: ParamSpec = crate::value::from_value(crate::json!({"type": "string"})).unwrap();
         let (_, path, query) = split(&request.url);
         let mut params = Params::new();
         params.insert("request.method".into(), request.method.into());
@@ -708,7 +707,7 @@ pub(crate) fn wsse(request: &mut HttpRequest, settings: &Params, unix_ms: u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    use crate::json;
 
     fn request(method: &'static str, url: &str, body: Option<&str>) -> HttpRequest {
         HttpRequest {
@@ -829,7 +828,7 @@ mod tests {
             .map(|n| {
                 (
                     n.to_string(),
-                    serde_json::from_value(json!({"type": "string"})).unwrap(),
+                    crate::value::from_value(json!({"type": "string"})).unwrap(),
                 )
             })
             .collect();
@@ -868,7 +867,7 @@ mod tests {
         .unwrap();
         let specs: BTreeMap<String, ParamSpec> = [(
             "token".to_string(),
-            serde_json::from_value(json!({"type": "string"})).unwrap(),
+            crate::value::from_value(json!({"type": "string"})).unwrap(),
         )]
         .into();
         fix_random(Some(0));

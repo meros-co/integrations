@@ -13,7 +13,7 @@
 
 use std::collections::BTreeMap;
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 
 use super::template::{no_escape, render};
 use super::{listen_port, telemetry, SpecEngine, RECONNECT_MAX, RECONNECT_MIN};
@@ -357,7 +357,7 @@ mod tests {
     use std::net::{IpAddr, Ipv4Addr};
     use std::sync::Arc;
 
-    use serde_json::json;
+    use crate::json;
 
     use super::*;
     use crate::catalog::Catalog;
@@ -371,18 +371,18 @@ mod tests {
             .clone();
         spec.settings.insert(
             "bus_port".into(),
-            serde_json::from_value(
+            crate::value::from_value(
                 json!({"type": "int", "min": 1, "max": 65535, "default": 16201}),
             )
             .unwrap(),
         );
         spec.settings.insert(
             "me".into(),
-            serde_json::from_value(json!({"type": "string", "default": "Client1"})).unwrap(),
+            crate::value::from_value(json!({"type": "string", "default": "Client1"})).unwrap(),
         );
         spec.state.insert(
             "bus.*.value".into(),
-            serde_json::from_value(json!({"type": "string", "description": "A value"})).unwrap(),
+            crate::value::from_value(json!({"type": "string", "description": "A value"})).unwrap(),
         );
         let telemetry = spec.telemetry.as_mut().unwrap();
         let mut zmq = json!({

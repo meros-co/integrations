@@ -28,8 +28,11 @@
 
 use std::collections::{BTreeMap, HashMap};
 
+use crate::{
+    json,
+    value::{Map, Value},
+};
 use base64::Engine;
-use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
 use crate::catalog::Params;
@@ -1709,7 +1712,7 @@ fn camel(name: &str, upper: bool) -> String {
 }
 
 fn request_for(name: &str, params: &Params) -> (String, Option<Value>) {
-    let data: serde_json::Map<String, Value> = params
+    let data: crate::value::Map<String, Value> = params
         .iter()
         .map(|(k, v)| (camel(k, false), v.clone()))
         .collect();
@@ -2744,7 +2747,8 @@ mod tests {
         let mut m = obs("");
         loaded(&mut m);
         let mut cx = Cx::new(100);
-        let p: Params = serde_json::from_value(json!({"position": 0.4, "release": false})).unwrap();
+        let p: Params =
+            crate::value::from_value(json!({"position": 0.4, "release": false})).unwrap();
         m.command(&mut cx, 7, "set_t_bar_position", &p);
         let a = cx.take();
         assert_eq!(requests(&a)[0].0, "SetTBarPosition");

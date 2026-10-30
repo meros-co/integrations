@@ -3,7 +3,7 @@
 //!
 //! ```no_run
 //! use meros_integrations::{Core, CoreOptions, OpenRequest};
-//! use serde_json::json;
+//! use meros_integrations::json;
 //!
 //! # async fn demo() -> Result<(), Box<dyn std::error::Error>> {
 //! let core = Core::with_options(CoreOptions::new().devices(["sennheiser-ew-g3-g4"]))?;
@@ -105,6 +105,7 @@ mod tls;
 mod udp;
 #[cfg(feature = "dmxcontrol3")]
 mod umbra_discovery;
+pub mod value;
 mod ws;
 mod yaml;
 mod zmtp;
@@ -490,7 +491,7 @@ impl Core {
             }
             if settings
                 .get("serial_port")
-                .and_then(serde_json::Value::as_str)
+                .and_then(crate::value::Value::as_str)
                 .is_none_or(|p| p.trim().is_empty())
             {
                 return Err(OpenError::InvalidSettings {
@@ -551,7 +552,7 @@ impl Core {
         let id = self.next_device.fetch_add(1, Ordering::Relaxed);
         let snapshot = Arc::new(Mutex::new(DeviceSnapshot {
             connection: Connection::Connecting,
-            state: serde_json::Value::Object(Default::default()),
+            state: crate::value::Value::Object(Default::default()),
             latency_ms: None,
         }));
         let (tx, rx) = mpsc::channel(256);

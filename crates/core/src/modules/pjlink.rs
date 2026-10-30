@@ -49,8 +49,11 @@ use std::collections::{HashSet, VecDeque};
 use std::hash::{BuildHasher, Hasher};
 use std::net::SocketAddr;
 
+use crate::{
+    json,
+    value::{Map, Value},
+};
 use md5::Md5;
-use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
 use crate::catalog::Params;

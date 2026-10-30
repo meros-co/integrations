@@ -34,7 +34,10 @@
 
 use std::net::SocketAddr;
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 
 use super::midi_link::{timecode, MidiLink};
 use crate::catalog::Params;
@@ -1449,7 +1452,7 @@ mod tests {
     }
 
     mod json_patch {
-        use serde_json::Value;
+        use crate::value::Value;
         pub(super) fn merge(target: &mut Value, patch: &Value) {
             if let Value::Object(p) = patch {
                 if !target.is_object() {

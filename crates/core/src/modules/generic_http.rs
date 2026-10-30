@@ -39,7 +39,7 @@
 
 use std::collections::HashMap;
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 
 use crate::catalog::Params;
 use crate::module::{

@@ -1211,8 +1211,8 @@ impl<'de> de::VariantAccess<'de> for UnitVariantAccess<'_> {
 #[cfg(test)]
 mod tests {
     use super::from_str;
+    use crate::{json, value::Value};
     use serde::Deserialize;
-    use serde_json::{json, Value};
 
     fn value(yaml: &str) -> Value {
         from_str::<Value>(yaml).unwrap_or_else(|e| panic!("{yaml:?}: {e}"))

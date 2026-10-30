@@ -24,7 +24,10 @@
 
 use std::net::{IpAddr, SocketAddr};
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 
 use super::sennheiser_ewdx_legacy::{self as legacy, Legacy};
 use super::sscv2::{object, Call, SscDevice, Sscv2};

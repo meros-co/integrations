@@ -13,8 +13,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+use meros_integrations::json;
 use meros_integrations::{json as api, Connection, Core, OpenRequest, StreamError};
-use serde_json::json;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpListener;
 

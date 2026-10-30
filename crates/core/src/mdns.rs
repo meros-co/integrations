@@ -107,7 +107,10 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 use socket2::{Domain, Protocol, SockRef, Socket, Type};
 use tokio::net::UdpSocket;
 use tokio::task::JoinHandle;

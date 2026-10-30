@@ -14,8 +14,8 @@
 //! application on a schedule (Twitch: on start and hourly), independent of
 //! the device's own traffic.
 
+use crate::value::{Map, Value};
 use base64::Engine as _;
-use serde_json::{Map, Value};
 
 use super::template::percent_encode;
 use crate::catalog::Params;
@@ -496,7 +496,7 @@ fn describe(doc: Option<&Map<String, Value>>, error: &str, status: u16) -> Strin
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    use crate::json;
 
     fn params(v: Value) -> Params {
         v.as_object().unwrap().clone()

@@ -43,7 +43,10 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 
 use super::barco_projection_table::DEFS;
 use crate::catalog::Params;

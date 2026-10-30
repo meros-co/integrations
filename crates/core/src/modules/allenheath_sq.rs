@@ -26,7 +26,7 @@
 
 use std::collections::HashMap;
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 
 use super::allenheath::{invalid, midi_channel, setting_flag, unknown, Args, Dialect, Plan};
 use super::allenheath_midi::{self as midi, level_updates, Event, Law, Update};

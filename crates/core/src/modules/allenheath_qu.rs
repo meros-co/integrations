@@ -20,7 +20,7 @@
 //!   seven bits to a byte, in blocks whose order depends on the model
 //!   (p.11-12). Read only when the `meters` setting is on.
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 
 use super::allenheath::{invalid, midi_channel, unknown, Args, Dialect, Plan};
 use super::allenheath_midi::{self as midi, level_updates, Event, Law, Update};

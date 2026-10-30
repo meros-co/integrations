@@ -51,8 +51,11 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::net::{IpAddr, SocketAddr};
 
+use crate::{
+    json,
+    value::{Map, Value},
+};
 use base64::Engine;
-use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
 use super::dmxcontrol3_schema::{COLLECTIONS, METHODS, SCHEMA};

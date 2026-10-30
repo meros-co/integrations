@@ -6,7 +6,10 @@
 //! 0.4.0 (`ids.d.ts`, `commandSender/baseGenerator.js` and the state builders
 //! in `stateBuilder/`), framing from Sofie `CameraControlCommand.ts`.
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 
 use super::{
     camera_body, i16_at, i32_at, invalid, one, opt_bool, opt_num, u16_at, Atem, CommandError, Out,
@@ -248,7 +251,7 @@ impl Atem {
 mod tests {
     use super::super::tests::{cmd, decoded, payload, ready, refused};
     use super::super::{command, CommandError};
-    use serde_json::json;
+    use crate::json;
 
     /// A CCmd header: camera 1, category, parameter, not relative, type,
     /// rsv, then the 8-, 16-, 32- and 64-bit counts at 6 to 12.
@@ -264,7 +267,7 @@ mod tests {
     #[test]
     fn camera_command_layouts() {
         let (mut m, _) = ready();
-        let cam = |extra: serde_json::Value| {
+        let cam = |extra: crate::value::Value| {
             let mut p = json!({"camera": 1});
             p.as_object_mut()
                 .unwrap()

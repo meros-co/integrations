@@ -39,7 +39,10 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::net::IpAddr;
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 
 use crate::catalog::{DeviceSpec, Params};
 use crate::engine::SpecEngine;
@@ -1881,7 +1884,7 @@ mod tests {
             &mut cx,
             7,
             "close_deck",
-            &serde_json::from_value(json!({"deck": 2})).unwrap(),
+            &crate::value::from_value(json!({"deck": 2})).unwrap(),
         );
         let request = engine_request(&cx.take());
         let mut cx = Cx::new(11);
@@ -1910,7 +1913,7 @@ mod tests {
             &mut cx,
             8,
             "open_deck",
-            &serde_json::from_value(json!({"deck": 9})).unwrap(),
+            &crate::value::from_value(json!({"deck": 9})).unwrap(),
         );
         let request = engine_request(&cx.take());
         let mut cx = Cx::new(13);

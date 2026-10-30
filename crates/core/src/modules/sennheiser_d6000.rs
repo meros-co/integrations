@@ -19,7 +19,10 @@
 use std::collections::BTreeMap;
 use std::net::{Ipv4Addr, SocketAddr};
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 
 use crate::catalog::Params;
 use crate::module::{

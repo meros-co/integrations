@@ -30,7 +30,10 @@
 use std::collections::VecDeque;
 use std::net::SocketAddr;
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 
 use crate::catalog::Params;
 use crate::module::{

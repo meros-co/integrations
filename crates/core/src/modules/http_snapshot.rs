@@ -17,7 +17,7 @@
 //! someone watches. The time from each fetch to its response is reported as
 //! the camera's latency.
 
-use serde_json::{json, Value};
+use crate::{json, value::Value};
 
 use crate::catalog::Params;
 use crate::module::{
@@ -134,7 +134,7 @@ impl HttpSnapshot {
     }
 
     fn report(&mut self, cx: &mut Cx, status: Option<u16>, error: Option<String>) {
-        let mut patch = serde_json::Map::new();
+        let mut patch = crate::value::Map::new();
         if status.is_some() && status != self.last_status {
             patch.insert("status".into(), json!(status));
         }
@@ -258,7 +258,7 @@ impl Module for HttpSnapshot {
 mod tests {
     use super::*;
     use crate::module::Action;
-    use serde_json::Map;
+    use crate::value::Map;
 
     fn module(settings: Value) -> HttpSnapshot {
         let mut s: Map<String, Value> = settings.as_object().unwrap().clone();

@@ -18,8 +18,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 use md5::{Digest, Md5};
+use meros_integrations::{json, value::Value};
 use meros_integrations::{CommandError, Core, OpenRequest, Outcome};
-use serde_json::{json, Value};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 

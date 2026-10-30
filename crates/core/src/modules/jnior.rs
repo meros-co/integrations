@@ -35,9 +35,12 @@
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 
+use crate::{
+    json,
+    value::{Map, Value},
+};
 use base64::Engine as _;
 use md5::{Digest, Md5};
-use serde_json::{json, Map, Value};
 
 use crate::catalog::Params;
 use crate::module::{

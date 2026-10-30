@@ -613,7 +613,7 @@ pub(crate) fn construct(
 mod tests {
     use std::net::{IpAddr, Ipv4Addr};
 
-    use serde_json::Value;
+    use crate::value::Value;
 
     use super::construct;
     use crate::catalog::{Catalog, Implementation, ParamType, Params};

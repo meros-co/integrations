@@ -4,9 +4,9 @@
 
 use std::collections::BTreeMap;
 
+use crate::value::{Map, Value};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
 
 include!(concat!(env!("OUT_DIR"), "/embedded_specs.rs"));
 
@@ -1276,7 +1276,7 @@ fn check_value(name: &str, spec: &ParamSpec, value: &Value) -> Result<(), String
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    use crate::json;
 
     fn spec(yaml: &str) -> BTreeMap<String, ParamSpec> {
         crate::yaml::from_str(yaml).unwrap()

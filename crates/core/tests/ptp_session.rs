@@ -11,7 +11,7 @@ mod common;
 use std::time::Duration;
 
 use meros_integrations::OpenRequest;
-use serde_json::{json, Value};
+use meros_integrations::{json, value::Value};
 use tokio::net::UdpSocket;
 
 fn params(v: Value) -> meros_integrations::Params {

@@ -21,7 +21,10 @@
 //! their status byte, by [`Message::encode`]. Channels are 0 to 15 here and
 //! 1 to 16 wherever a person reads them.
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 
 /// One MIDI message.
 #[derive(Debug, Clone, PartialEq, Eq)]

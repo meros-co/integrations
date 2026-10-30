@@ -6,7 +6,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use serde_json::{json, Value as Json};
+use crate::{json, value::Value as Json};
 use tokio::net::UdpSocket;
 
 use super::snmp::agent::Agent;

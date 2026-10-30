@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use serde_json::Value;
+use crate::value::Value;
 
 use super::expect::json_path;
 use super::template::percent_encode;
@@ -549,7 +549,7 @@ fn xml_merged(last: &str, name: &str, all: &[String]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    use crate::json;
 
     fn answer(body: Value, headers: &[(&str, &str)]) -> HttpResponse {
         HttpResponse {

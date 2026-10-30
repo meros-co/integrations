@@ -24,7 +24,10 @@
 use std::collections::{HashMap, VecDeque};
 use std::net::{IpAddr, SocketAddr};
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 
 use super::generic_osc::{decode, encode, frame, parse_args, Deframer, Framing};
 use super::generic_tcp_udp::{to_hex, RETRY_MAX, RETRY_MIN};

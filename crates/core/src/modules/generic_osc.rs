@@ -33,7 +33,10 @@
 use std::collections::{HashMap, VecDeque};
 use std::net::SocketAddr;
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 
 use super::generic_tcp_udp::{parse_hex, to_hex, RETRY_MAX, RETRY_MIN};
 use crate::catalog::Params;

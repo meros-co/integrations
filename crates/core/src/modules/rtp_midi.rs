@@ -72,7 +72,7 @@
 
 use std::net::{IpAddr, SocketAddr};
 
-use serde_json::json;
+use crate::json;
 
 use super::rtp_journal::{Item, Journal};
 use crate::midi::Message;

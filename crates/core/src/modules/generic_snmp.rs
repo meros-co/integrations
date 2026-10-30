@@ -28,7 +28,10 @@
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 
-use serde_json::{json, Map, Value as Json};
+use crate::{
+    json,
+    value::{Map, Value as Json},
+};
 
 use super::snmp::{
     self, command_error, parse_oids, varbind_json, Client, Notification, Reply, Request, Security,

@@ -43,7 +43,10 @@
 
 use std::collections::{HashSet, VecDeque};
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 
 use crate::catalog::{DeviceSpec, Params};
 use crate::module::{

@@ -55,7 +55,10 @@
 use std::collections::{BTreeSet, HashMap};
 use std::net::{IpAddr, SocketAddr};
 
-use serde_json::{json, Map, Value};
+use crate::{
+    json,
+    value::{Map, Value},
+};
 
 use super::meros_camera_wire::{self as wire, Frames, Lines, Piece, ResponseReader};
 use crate::catalog::Params;

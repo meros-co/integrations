@@ -56,8 +56,11 @@
 
 use std::collections::{BTreeMap, VecDeque};
 
+use crate::{
+    json,
+    value::{Map, Value},
+};
 use md5::{Digest, Md5};
-use serde_json::{json, Map, Value};
 
 use super::label::{self, Resolutions};
 use super::media;

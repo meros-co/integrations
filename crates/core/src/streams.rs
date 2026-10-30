@@ -511,7 +511,7 @@ mod tests {
         let calls = Arc::new(Mutex::new(Vec::new()));
         let snapshot = Arc::new(Mutex::new(DeviceSnapshot {
             connection: crate::module::Connection::Connecting,
-            state: serde_json::Value::Null,
+            state: crate::value::Value::Null,
             latency_ms: None,
         }));
         let session = Session::new(

@@ -111,6 +111,13 @@ surface and is opened with no host, reports each message it receives as a
 `message` event, even when it repeats the last, so a button pressed twice
 arrives twice; a slow consumer loses state patches before it loses those.
 
+**JSON keeps its key order.** Devices read query strings, bodies and signed
+fields in the order a spec gives them, so the core's JSON objects keep their
+keys in order, and so does the JSON every package hands out. In Rust, values
+are `meros_integrations::value::Value` (built with `meros_integrations::json!`):
+the same API as `serde_json::Value`, converted to and from it with `From`.
+Linking the core does not change how `serde_json` behaves in your own code.
+
 **Streams** (a camera's live view, under a device's `streams` in the
 catalogue) run only while watched, and a slow reader gets the newest frame,
 never a backlog (SPEC.md, Streams). The HTTP service serves a `jpeg` stream
@@ -252,3 +259,7 @@ The ATEM multiviewer label renderer carries the label box sizes, corner pixels
 and coverage-to-palette table from atem-connection (Sofie), which is MIT
 licensed; its notice is included as
 [crates/core/third-party/LICENSE-atem-connection.txt](crates/core/third-party/LICENSE-atem-connection.txt).
+
+The core's JSON value (`crates/core/src/value`) is serde_json's value code,
+which is MIT licensed; its notice is included as
+[crates/core/third-party/LICENSE-serde_json.txt](crates/core/third-party/LICENSE-serde_json.txt).
