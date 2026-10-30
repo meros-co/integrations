@@ -254,6 +254,7 @@ models:
                set_ui_sourcesignalposition, set_ui_stealthmode, set_ui_temperature, set_ui_theme,
                set_ui_touchscreen_status, get_property, set_property, call_method, subscribe_property,
                unsubscribe_property, subscribe_signal, unsubscribe_signal, introspect, authenticate, power_on,
+               initial_setup, initial_setup_without_eula, add_user, change_pin_code, set_protocols_jsonrpc_port_raw_enable, set_protocols_http_enable, set_user_authenticationrequired, set_user_pincodeauthenticationenabled,
                power_off, go_to_ready, go_to_eco, signal_activity, list_reset_domains, reset_domains,
                get_identifications, get_system_date, get_local_date, get_utc_date, list_boards,
                list_missing_boards, save_license_registration_to_usb, upload_license_from_usb, open_shutter,
@@ -390,6 +391,7 @@ models:
                set_ui_theme, set_ui_touchscreen_status, get_property, set_property, call_method,
                subscribe_property, unsubscribe_property, subscribe_signal, unsubscribe_signal, introspect,
                authenticate, power_on, power_off, go_to_ready, go_to_eco, signal_activity, list_reset_domains,
+               initial_setup, initial_setup_without_eula, add_user, change_pin_code, set_protocols_jsonrpc_port_raw_enable, set_protocols_http_enable, set_user_authenticationrequired, set_user_pincodeauthenticationenabled,
                reset_domains, reset_all, get_identifications, get_identification, get_system_date, get_local_date,
                get_utc_date, list_boards, list_missing_boards, save_license_registration_to_usb,
                upload_license_from_usb, open_shutter, close_shutter, toggle_shutter, get_shutter_state,
@@ -521,6 +523,7 @@ models:
                set_ui_stealthmode, set_ui_temperature, set_ui_theme, set_ui_touchscreen_status, get_property,
                set_property, call_method, subscribe_property, unsubscribe_property, subscribe_signal,
                unsubscribe_signal, introspect, authenticate, power_on, power_off, go_to_ready, go_to_eco,
+               initial_setup, initial_setup_without_eula, add_user, change_pin_code, set_protocols_jsonrpc_port_raw_enable, set_protocols_http_enable, set_user_authenticationrequired, set_user_pincodeauthenticationenabled,
                signal_activity, list_reset_domains, reset_domains, reset_all, get_identifications,
                get_identification, get_system_date, get_local_date, get_utc_date, list_boards,
                list_missing_boards, save_license_registration_to_usb, upload_license_from_usb,
@@ -671,6 +674,7 @@ models:
                set_ui_sourcesignalposition, set_ui_stealthmode, set_ui_temperature, set_ui_theme,
                set_ui_touchscreen_status, get_property, set_property, call_method, subscribe_property,
                unsubscribe_property, subscribe_signal, unsubscribe_signal, introspect, authenticate, power_on,
+               initial_setup, initial_setup_without_eula, add_user, change_pin_code, set_protocols_jsonrpc_port_raw_enable, set_protocols_http_enable, set_user_authenticationrequired, set_user_pincodeauthenticationenabled,
                power_off, go_to_ready, go_to_eco, signal_activity, list_reset_domains, reset_domains, reset_all,
                get_identifications, get_identification, get_system_date, get_local_date, get_utc_date,
                list_boards, list_missing_boards, open_shutter, close_shutter, toggle_shutter, get_shutter_state,
@@ -3504,6 +3508,65 @@ commands:
     send: '{"jsonrpc":"2.0","method":"authenticate","params":{"code":{code}},"id":1}'
     expect: { json_path: "$.result" }
     returns: value
+  initial_setup:
+    summary: "Complete a factory-fresh projector's initial setup: accept the EULA and set the admin password (initialsetup.activate, Pulse 2.10 and later)"
+    params:
+      password: { type: "string", max_length: 128, pattern: "^.{8,}$", required: true, secret: true, label: "Admin password", description: "The new password of the admin account: at least 8 characters, and not the default device password setup123." }
+    send: '{"jsonrpc":"2.0","method":"initialsetup.activate","params":{"steps":[["Eula",["true"]],["AdminAccount",[{password:json},{password:json}]]]},"id":1}'
+    expect: { json_path: "$.result" }
+    returns: value
+  initial_setup_without_eula:
+    summary: "Complete the initial setup of a projector that asks for no EULA (F-Series): set the admin password only (initialsetup.activate, Pulse 2.10 and later)"
+    params:
+      password: { type: "string", max_length: 128, pattern: "^.{8,}$", required: true, secret: true, label: "Admin password", description: "The new password of the admin account: at least 8 characters, and not the default device password setup123." }
+    send: '{"jsonrpc":"2.0","method":"initialsetup.activate","params":{"steps":[["AdminAccount",[{password:json},{password:json}]]]},"id":1}'
+    expect: { json_path: "$.result" }
+    returns: value
+  add_user:
+    summary: "Create a user account in a group (user.adduser; administrator)"
+    params:
+      username: { type: "string", max_length: 64, pattern: "^[A-Za-z0-9_.-]+$", required: true, label: "User name", description: "The new account's user name." }
+      password: { type: "string", max_length: 128, required: true, secret: true, label: "Password", description: "The new account's password." }
+      group: { type: "enum", values: ["End User", "Power User", "Administrator"], required: true, label: "Group", description: "The user group, which sets the account's access level." }
+    send: '{"jsonrpc":"2.0","method":"user.adduser","params":{"username":{username:json},"password":{password:json},"group":{group:json}},"id":1}'
+    expect: { json_path: "$.result" }
+    returns: ack
+  change_pin_code:
+    summary: "Set a user's PIN code (user.<user>.changepincode; that user, or administrator)"
+    params:
+      username: { type: "string", max_length: 64, pattern: "^[A-Za-z0-9_.-]+$", required: true, label: "User name", description: "The account whose PIN code is set, such as admin." }
+      code: { type: "int", min: 0, max: 99999999, required: true, secret: true, label: "PIN code", description: "The new PIN code." }
+    send: '{"jsonrpc":"2.0","method":"user.{username}.changepincode","params":{"newpincode":{code}},"id":1}'
+    expect: { json_path: "$.result" }
+    returns: ack
+  set_protocols_jsonrpc_port_raw_enable:
+    summary: "Set protocols.jsonrpc.port-raw.enable (property.set): turn the unencrypted API on TCP 9090 on or off (power user or higher)"
+    params:
+      value: { type: "bool", required: true, label: "Value", description: "true serves the JSON-RPC API on the raw port 9090 as well as TLS on 9091; Pulse 2.10 and later default to false." }
+    send: '{"jsonrpc":"2.0","method":"property.set","params":{"property":"protocols.jsonrpc.port-raw.enable","value":{value}},"id":1}'
+    expect: { json_path: "$.result" }
+    returns: ack
+  set_protocols_http_enable:
+    summary: "Set protocols.http.enable (property.set): turn unencrypted HTTP on port 80 on or off (power user or higher)"
+    params:
+      value: { type: "bool", required: true, label: "Value", description: "true serves HTTP on port 80 instead of redirecting it to HTTPS on 443; Pulse 2.10 and later default to false." }
+    send: '{"jsonrpc":"2.0","method":"property.set","params":{"property":"protocols.http.enable","value":{value}},"id":1}'
+    expect: { json_path: "$.result" }
+    returns: ack
+  set_user_authenticationrequired:
+    summary: "Set user.authenticationrequired (property.set): require authentication of all users (administrator)"
+    params:
+      value: { type: "bool", required: true, label: "Value", description: "false lets an unauthenticated client use end user functions, HTTP file transfers included; Barco discourages it." }
+    send: '{"jsonrpc":"2.0","method":"property.set","params":{"property":"user.authenticationrequired","value":{value}},"id":1}'
+    expect: { json_path: "$.result" }
+    returns: ack
+  set_user_pincodeauthenticationenabled:
+    summary: "Set user.pincodeauthenticationenabled (property.set): allow authenticating with a PIN code (administrator)"
+    params:
+      value: { type: "bool", required: true, label: "Value", description: "true lets authenticate (the pin_code setting) raise a connection's access level; Pulse 2.10 and later default to false." }
+    send: '{"jsonrpc":"2.0","method":"property.set","params":{"property":"user.pincodeauthenticationenabled","value":{value}},"id":1}'
+    expect: { json_path: "$.result" }
+    returns: ack
   power_on:
     summary: "Power the projector on: from standby or ready, through conditioning to on (system.poweron)"
     send: '{"jsonrpc":"2.0","method":"system.poweron","id":1}'
@@ -4940,8 +5003,11 @@ quirks:
     text: >
       A factory-fresh projector on Pulse 2.10 or later cannot be powered on until its initial setup is
       done (language, EULA where required, an administrator password other than setup123): on the LCD,
-      in Prospector, or with initialsetup.activate over the API (TDE13806 2.1). call_method can send
-      that method; this spec does not do it on its own.
+      in Prospector, or with initialsetup.activate over the API (TDE13806 2.1). initial_setup sends
+      it (initial_setup_without_eula on F-Series projectors, which ask for no EULA); the core never sends it
+      on its own. Before Pulse 2.10 the projector created user, poweruser and admin accounts with
+      well-known PIN codes; from 2.10 only admin exists, and add_user and change_pin_code create the
+      others.
 
   - models: [all]
     severity: info
@@ -5122,7 +5188,7 @@ telemetry:
       - { models: [i600, udm, udx, f70], message: '{"jsonrpc":"2.0","method":"property.subscribe","params":{"property":["screen.hdrboost","screen.luminance","screen.screenaspect","screen.screensize"]},"id":1}' }
       - { models: [i600], message: '{"jsonrpc":"2.0","method":"property.subscribe","params":{"property":["system.articlenumber","system.colorwheel","system.colorwheelname","system.date.ntp.connected","system.date.ntp.enabled","system.date.ntp.server","system.date.timezone","system.eco.available","system.eco.enable","system.familyname","system.firmwareversion","system.health","system.initialstate","system.modelname","system.name","system.on.timeout.duration","system.on.timeout.enable","system.on.timeout.remaining","system.operationalmodes.availablemodes","system.operationalmodes.mode","system.ready.timeout.duration","system.ready.timeout.enable","system.ready.timeout.remaining","system.resetprogress","system.resetresult","system.resetstatus","system.serialnumber","system.standby.available","system.standby.enable","system.standby.timeout.duration","system.standby.timeout.enable","system.standby.timeout.remaining","system.state","system.targetstate"]},"id":1}' }
       - { models: [i600], message: '{"jsonrpc":"2.0","method":"property.subscribe","params":{"property":["ui.access.enduser","ui.backlight.state","ui.backlight.timeout","ui.hasstealthmode","ui.language","ui.layer.advancedblend.drawing","ui.layer.advancedblend.enable","ui.layer.advancedblend.palette","ui.layer.basicblacklevel.color","ui.layer.basicblacklevel.enable","ui.layer.basicblacklevel.selection","ui.layer.basicblacklevel.selectioncolor","ui.layer.basicblend.color","ui.layer.basicblend.enable","ui.layer.basicblend.selection","ui.layer.basicblend.selectioncolor","ui.layer.blank.border","ui.layer.blank.bordercolor","ui.layer.blank.enable","ui.layer.blank.icon","ui.layer.blank.show","ui.layer.blank.showtext","ui.layer.blank.text","ui.layer.fourcorner.cornercolor","ui.layer.fourcorner.enable","ui.layer.fourcorner.linecolor","ui.layer.fourcorner.lines","ui.layer.fourcorner.selection","ui.layer.fourcorner.selectioncolor","ui.layer.grid.color","ui.layer.grid.enable","ui.layer.grid.lines","ui.layer.grid.mark","ui.layer.grid.points","ui.layer.grid.showlines","ui.layer.grid.showpoints","ui.length","ui.lensmenu","ui.luminance","ui.menu","ui.menuposition","ui.message","ui.messageposition","ui.minimize","ui.osd","ui.patternmenu","ui.poweroffhint","ui.showmessage","ui.sourcemenu","ui.sourcesignal","ui.sourcesignalposition","ui.splashscreen.show","ui.splashscreen.timeoutseconds","ui.stealthmode","ui.temperature","ui.theme","ui.touchscreen.mode","ui.touchscreen.status"]},"id":1}' }
-      - { models: [i600, udm, udx, f70], message: '{"jsonrpc":"2.0","method":"property.subscribe","params":{"property":["user.authenticationrequired","user.pincodeauthenticationenabled"]},"id":1}' }
+      - { models: [i600, udm, udx, f70], message: '{"jsonrpc":"2.0","method":"property.subscribe","params":{"property":["protocols.http.enable","protocols.jsonrpc.port-raw.enable","user.authenticationrequired","user.pincodeauthenticationenabled"]},"id":1}' }
       - { models: [i600, f70], message: '{"jsonrpc":"2.0","method":"signal.subscribe","params":{"signal":["modelupdated","notification.emitted","notification.dismissed","notification.info.emitted","notification.caution.emitted","notification.warning.emitted","notification.error.emitted","notification.info.dismissed","notification.caution.dismissed","notification.warning.dismissed","notification.error.dismissed","image.testpattern.added","image.testpattern.removed","image.testpattern.changed","image.testpattern.file.listchanged","image.processing.warp.file.listchanged","image.processing.blend.file.listchanged","image.processing.blacklevel.file.listchanged","image.processing.warpgrid.changed","profile.profileactivated","system.identificationchanged","system.performed","system.license.licensechanged","keydispatcher.keyevent","dmx.shutdownrequest","network.added","network.removed","loggedout"]},"id":1}' }
       - { models: [udm], message: '{"jsonrpc":"2.0","method":"property.subscribe","params":{"property":["gsm.data.status","gsm.iccid","gsm.imei","gsm.pinstate","gsm.signalstrength"]},"id":1}' }
       - { models: [udm], message: '{"jsonrpc":"2.0","method":"property.subscribe","params":{"property":["illumination.clo.allowed","illumination.clo.availability","illumination.clo.enable","illumination.clo.scale","illumination.clo.setpoint","illumination.clo.state","illumination.laser.opticalalignment","illumination.laser.timcuring.cureavailable","illumination.laser.timcuring.state","illumination.laser.whitepoint.tracking.cancellable","illumination.laser.whitepoint.tracking.progress","illumination.laser.whitepoint.tracking.result","illumination.laser.whitepoint.tracking.state","illumination.sources.laser.actualpower","illumination.sources.laser.controlledbyclo","illumination.sources.laser.ispowerlimited","illumination.sources.laser.maxpower","illumination.sources.laser.minpower","illumination.sources.laser.power","illumination.sources.laser.powerlimitreason","illumination.sources.laser.status","illumination.state"]},"id":1}' }
@@ -5630,6 +5696,8 @@ telemetry:
         - { models: [i600, udm, udx, f70], message: '{"jsonrpc":"2.0","method":"property.get","params":{"property":"ui.theme"},"id":1}' }
         - { models: [i600, udm, udx, f70], message: '{"jsonrpc":"2.0","method":"property.get","params":{"property":"ui.touchscreen.mode"},"id":1}' }
         - { models: [i600, udm, udx, f70], message: '{"jsonrpc":"2.0","method":"property.get","params":{"property":"ui.touchscreen.status"},"id":1}' }
+        - { models: [i600, udm, udx, f70], message: '{"jsonrpc":"2.0","method":"property.get","params":{"property":"protocols.http.enable"},"id":1}' }
+        - { models: [i600, udm, udx, f70], message: '{"jsonrpc":"2.0","method":"property.get","params":{"property":"protocols.jsonrpc.port-raw.enable"},"id":1}' }
         - { models: [i600, udm, udx, f70], message: '{"jsonrpc":"2.0","method":"property.get","params":{"property":"user.authenticationrequired"},"id":1}' }
         - { models: [i600, udm, udx, f70], message: '{"jsonrpc":"2.0","method":"property.get","params":{"property":"user.pincodeauthenticationenabled"},"id":1}' }
         - '{"jsonrpc":"2.0","method":"image.connector.list","id":1}'
@@ -6405,7 +6473,7 @@ telemetry:
         - { models: [i600, udm, udx, f70], message: '{"jsonrpc":"2.0","method":"property.subscribe","params":{"property":["screen.hdrboost","screen.luminance","screen.screenaspect","screen.screensize"]},"id":1}' }
         - { models: [i600], message: '{"jsonrpc":"2.0","method":"property.subscribe","params":{"property":["system.articlenumber","system.colorwheel","system.colorwheelname","system.date.ntp.connected","system.date.ntp.enabled","system.date.ntp.server","system.date.timezone","system.eco.available","system.eco.enable","system.familyname","system.firmwareversion","system.health","system.initialstate","system.modelname","system.name","system.on.timeout.duration","system.on.timeout.enable","system.on.timeout.remaining","system.operationalmodes.availablemodes","system.operationalmodes.mode","system.ready.timeout.duration","system.ready.timeout.enable","system.ready.timeout.remaining","system.resetprogress","system.resetresult","system.resetstatus","system.serialnumber","system.standby.available","system.standby.enable","system.standby.timeout.duration","system.standby.timeout.enable","system.standby.timeout.remaining","system.state","system.targetstate"]},"id":1}' }
         - { models: [i600], message: '{"jsonrpc":"2.0","method":"property.subscribe","params":{"property":["ui.access.enduser","ui.backlight.state","ui.backlight.timeout","ui.hasstealthmode","ui.language","ui.layer.advancedblend.drawing","ui.layer.advancedblend.enable","ui.layer.advancedblend.palette","ui.layer.basicblacklevel.color","ui.layer.basicblacklevel.enable","ui.layer.basicblacklevel.selection","ui.layer.basicblacklevel.selectioncolor","ui.layer.basicblend.color","ui.layer.basicblend.enable","ui.layer.basicblend.selection","ui.layer.basicblend.selectioncolor","ui.layer.blank.border","ui.layer.blank.bordercolor","ui.layer.blank.enable","ui.layer.blank.icon","ui.layer.blank.show","ui.layer.blank.showtext","ui.layer.blank.text","ui.layer.fourcorner.cornercolor","ui.layer.fourcorner.enable","ui.layer.fourcorner.linecolor","ui.layer.fourcorner.lines","ui.layer.fourcorner.selection","ui.layer.fourcorner.selectioncolor","ui.layer.grid.color","ui.layer.grid.enable","ui.layer.grid.lines","ui.layer.grid.mark","ui.layer.grid.points","ui.layer.grid.showlines","ui.layer.grid.showpoints","ui.length","ui.lensmenu","ui.luminance","ui.menu","ui.menuposition","ui.message","ui.messageposition","ui.minimize","ui.osd","ui.patternmenu","ui.poweroffhint","ui.showmessage","ui.sourcemenu","ui.sourcesignal","ui.sourcesignalposition","ui.splashscreen.show","ui.splashscreen.timeoutseconds","ui.stealthmode","ui.temperature","ui.theme","ui.touchscreen.mode","ui.touchscreen.status"]},"id":1}' }
-        - { models: [i600, udm, udx, f70], message: '{"jsonrpc":"2.0","method":"property.subscribe","params":{"property":["user.authenticationrequired","user.pincodeauthenticationenabled"]},"id":1}' }
+        - { models: [i600, udm, udx, f70], message: '{"jsonrpc":"2.0","method":"property.subscribe","params":{"property":["protocols.http.enable","protocols.jsonrpc.port-raw.enable","user.authenticationrequired","user.pincodeauthenticationenabled"]},"id":1}' }
         - { models: [i600, f70], message: '{"jsonrpc":"2.0","method":"signal.subscribe","params":{"signal":["modelupdated","notification.emitted","notification.dismissed","notification.info.emitted","notification.caution.emitted","notification.warning.emitted","notification.error.emitted","notification.info.dismissed","notification.caution.dismissed","notification.warning.dismissed","notification.error.dismissed","image.testpattern.added","image.testpattern.removed","image.testpattern.changed","image.testpattern.file.listchanged","image.processing.warp.file.listchanged","image.processing.blend.file.listchanged","image.processing.blacklevel.file.listchanged","image.processing.warpgrid.changed","profile.profileactivated","system.identificationchanged","system.performed","system.license.licensechanged","keydispatcher.keyevent","dmx.shutdownrequest","network.added","network.removed","loggedout"]},"id":1}' }
         - { models: [i600, udm, f70], message: '{"jsonrpc":"2.0","method":"property.get","params":{"property":"illumination.clo.allowed"},"id":1}' }
         - '{"jsonrpc":"2.0","method":"property.get","params":{"property":"illumination.clo.availability"},"id":1}'
@@ -7239,6 +7307,8 @@ state:
   profile.domains: { type: string, description: "The list of available domains for profiles. Kept as the JSON text the projector sends. (Pulse profile.domains)" }
   profile.presetassignments: { type: string, description: "All preset assignments. Kept as the JSON text the projector sends. (Pulse profile.presetassignments)" }
   profile.profiles: { type: string, description: "The list of created profiles. Kept as the JSON text the projector sends. (Pulse profile.profiles)" }
+  protocols.http.enable: { type: bool, description: "Unencrypted HTTP on port 80 is served; off by default from Pulse 2.10 (TDE13806). (Pulse protocols.http.enable)" }
+  protocols.jsonrpc.port-raw.enable: { type: bool, description: "The unencrypted API on TCP 9090 is served; off by default from Pulse 2.10 (TDE13806). (Pulse protocols.jsonrpc.port-raw.enable)" }
   protocols.pjlink.authenticationrequired: { type: bool, description: "Enable/disable PJLink authentication procedure. (Pulse protocols.pjlink.authenticationrequired)" }
   protocols.pjlink.enable: { type: bool, description: "Enable/disable PJLink. (Pulse protocols.pjlink.enable)" }
   remotecontrol.address: { type: int, description: "The address of the remote control that the projector will respond to. (Pulse remotecontrol.address)" }
