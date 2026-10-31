@@ -929,16 +929,36 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what the unit advertises over mDNS (`dns-sd -B _blackmagic._tcp` and `dns-sd -L <instance> _blackmagic._tcp`, or `avahi-browse -rt _blackmagic._tcp`): every service type, the SRV port and the TXT keys and values. Only the service type and TXT `class` come from a public source (Bitfocus Companion's module manifests); the SRV port and the other TXT keys are not documented anywhere. ([crates/core/src/mdns.rs:115](crates/core/src/mdns.rs#L115))
 - [ ] Confirm TXT `name` is the product name (as Companion's MultiView 4 filter relies on), not a label the user sets: discovery narrows `models` to the catalogue model with that name. ([crates/core/src/mdns.rs:471](crates/core/src/mdns.rs#L471))
 
+## blustream-acm — Blustream Multicast ACM controllers
+
+- [ ] Confirm a carriage return alone ends a command on the ACM210, ACM500 and ACM1000 (the manual names only CR), and record what each answers to a command and whether a prompt (ACM1000>) follows. ([specs/blustream-acm.yaml:94](specs/blustream-acm.yaml#L94))
+- [ ] Record the STATUS report of the ACM210, ACM500 and ACM1000 (the manual's sample is an ACM200's, FW 1.14), and check the input, output, LAN and Telnet rows are read. ([specs/blustream-acm.yaml:1768](specs/blustream-acm.yaml#L1768))
+- [ ] Record the OUT xxx STATUS and IN xxx STATUS detail reports on current firmware and check the detail rules read them. ([specs/blustream-acm.yaml:1808](specs/blustream-acm.yaml#L1808))
+- [ ] Check whether Telnet asks for a login on firmware 3.9.0 and later (the manual gives a username and password for the web GUI only). ([specs/blustream-acm.yaml:119](specs/blustream-acm.yaml#L119))
+- [ ] Confirm OSD ON and FLS ON take any number of seconds on every model (the ACM500 help text writes [90]). ([specs/blustream-acm.yaml:373](specs/blustream-acm.yaml#L373))
+- [ ] Confirm names with spaces are taken whole by NAME and CREATE (OUT ooo NAME Lobby TV). ([specs/blustream-acm.yaml:493](specs/blustream-acm.yaml#L493))
+- [ ] Confirm the CEC guest command names the ACM210 and ACM1000 take after OUT ooo CEC and IN iii CEC (only the ACM500 help text lists them), and what IR guest commands look like. ([specs/blustream-acm.yaml:473](specs/blustream-acm.yaml#L473))
+- [ ] Confirm the LANnM mode commands are written without the colon the ACM1000 help text puts after them (OUT ooo LAN2M0:). ([specs/blustream-acm.yaml:456](specs/blustream-acm.yaml#L456))
+- [ ] Confirm IN TGMODE on the ACM1000 takes no input number, as its help text writes it, and SWMODE 01-06 there against 00-04 on the ACM210. ([specs/blustream-acm.yaml:960](specs/blustream-acm.yaml#L960))
+- [ ] Confirm EDID iii DL on the ACM500 takes the user EDID slot as iii. ([specs/blustream-acm.yaml:1240](specs/blustream-acm.yaml#L1240))
+- [ ] Confirm the ACM1000's preset, group and macro indexes are written with two digits (PRE 03 AP, GRP 01 FR 006, MACRO 12) and their ranges. ([specs/blustream-acm.yaml:1249](specs/blustream-acm.yaml#L1249))
+- [ ] Record the ACM1000 EVENT MACRO command syntax (TIME, DAY and SS fields), which its help text leaves unexplained, so the scheduler commands can be added. ([specs/blustream-acm.yaml:1871](specs/blustream-acm.yaml#L1871))
+- [ ] Confirm VW idx CREATE ccXrr with an uppercase X and the name after it. ([specs/blustream-acm.yaml:1331](specs/blustream-acm.yaml#L1331))
+
 ## blustream-matrix — Blustream matrix switchers
 
 - [ ] Record what each model answers to a command (Blustream documents none; a [SUCCESS] line and a prompt are reported). ([specs/blustream-matrix.yaml:17](specs/blustream-matrix.yaml#L17))
-- [ ] Record the STATUS report of each model other than the PLA88CS, and check the table rules read it. ([specs/blustream-matrix.yaml:1449](specs/blustream-matrix.yaml#L1449))
-- [ ] Confirm RESET followed at once by Yes resets the matrix (the help text asks for Yes to confirm). ([specs/blustream-matrix.yaml:554](specs/blustream-matrix.yaml#L554))
-- [ ] Confirm the HDBaseT models accept OUTxx FR yy with a space before FR, as their help text writes it, and the CMX models OUT xx FR yy. ([specs/blustream-matrix.yaml:327](specs/blustream-matrix.yaml#L327))
-- [ ] Confirm the HMX and HMXL models take MUTE On/Off and AUDOUT xx On/Off in that case. ([specs/blustream-matrix.yaml:691](specs/blustream-matrix.yaml#L691))
-- [ ] Check the CECUSERCMD form with a space before the closing bracket, as the help text example writes it. ([specs/blustream-matrix.yaml:1173](specs/blustream-matrix.yaml#L1173))
-- [ ] Record what the CTRLSTA report looks like on models other than the PLA88CS. ([specs/blustream-matrix.yaml:1292](specs/blustream-matrix.yaml#L1292))
-- [ ] Confirm the [SUCCESS] routing line text on current firmware. ([specs/blustream-matrix.yaml:1505](specs/blustream-matrix.yaml#L1505))
+- [ ] Record the STATUS report of each model other than the PLA88CS, and check the table rules read it. ([specs/blustream-matrix.yaml:1616](specs/blustream-matrix.yaml#L1616))
+- [ ] Confirm RESET followed at once by Yes resets the matrix (the help text asks for Yes to confirm). ([specs/blustream-matrix.yaml:697](specs/blustream-matrix.yaml#L697))
+- [ ] Confirm the HDBaseT models accept OUTxx FR yy with a space before FR, as their help text writes it, and the CMX models OUT xx FR yy. ([specs/blustream-matrix.yaml:374](specs/blustream-matrix.yaml#L374))
+- [ ] Confirm the HMX and HMXL models take MUTE On/Off and AUDOUT xx On/Off in that case. ([specs/blustream-matrix.yaml:834](specs/blustream-matrix.yaml#L834))
+- [ ] Check the CECUSERCMD form with a space before the closing bracket, as the help text example writes it. ([specs/blustream-matrix.yaml:1327](specs/blustream-matrix.yaml#L1327))
+- [ ] Record what the CTRLSTA report looks like on models other than the PLA88CS. ([specs/blustream-matrix.yaml:1446](specs/blustream-matrix.yaml#L1446))
+- [ ] Confirm the [SUCCESS] routing line text on current firmware. ([specs/blustream-matrix.yaml:1672](specs/blustream-matrix.yaml#L1672))
+- [ ] Record the MX44KVM's STATUS, INSTA, OUTSTA, GPIOSTATUS and CASCADESTATUS reports, so its USB routing and GPIO state can be read. ([specs/blustream-matrix.yaml:1715](specs/blustream-matrix.yaml#L1715))
+- [ ] Confirm the MX44KVM takes USBOUT xx FR yy with spaces, as its help text writes it (its manual writes USBOUTxxFRyy), and CR LF after each command. ([specs/blustream-matrix.yaml:461](specs/blustream-matrix.yaml#L461))
+- [ ] Confirm the MX44KVM takes AUTOSWITCHING and GPIOSTATUS (its help text) rather than AUTO-SWITCHING, GPOUTSTATUS and GPINSTATUS (its 2021 manual). ([specs/blustream-matrix.yaml:1722](specs/blustream-matrix.yaml#L1722))
+- [ ] Check the 12 V GPIO output's current (the help text says 500 mA, the manual 50 mA). ([specs/blustream-matrix.yaml:514](specs/blustream-matrix.yaml#L514))
 
 ## boinx-mimolive — Boinx mimoLive
 

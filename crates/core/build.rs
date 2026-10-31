@@ -100,7 +100,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-bluenviron", &["mediamtx"]),
-    ("vendor-blustream", &["blustream-matrix"]),
+    ("vendor-blustream", &["blustream-acm", "blustream-matrix"]),
     ("vendor-boinx", &["boinx-mimolive"]),
     ("vendor-boxcast", &["boxcast"]),
     ("vendor-brightsign", &["brightsign-dws", "brightsign-udp"]),

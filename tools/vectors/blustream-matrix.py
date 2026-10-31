@@ -190,3 +190,21 @@ bl_t("input-serial-off-command", "RS232OFFIN01 Command Off 1: Disable",
      {"inputs": {"1": {"serial_off_commands": {"1": "Disable"}}}})
 bl_t("input-serial-delay", "RS232DLYIN01 Time Delay: 3 Second(s)", {"inputs": {"1": {"serial_delay": 3}}})
 bl_t("success-route", "[SUCCESS]Set output 01 connect from input 03.", {"outputs": {"1": {"input": 3}}})
+
+# MX44KVM: its help text ("MX44KVM - API", downloadId 641), same grammar.
+BL_KVM = {"model": "mx44kvm"}
+bl("route_usb", {"host": 1, "device": 4}, "USBOUT 01 FR 04", expect_result=BL_U, **BL_KVM)
+bl("set_usb_device_enabled", {"device": 0, "enabled": False}, "DEVICE 00 OFF", **BL_KVM)
+bl("set_usb_device_power", {"device": 2, "powered": True}, "DEVICE 02 PON", **BL_KVM)
+bl("set_host_av_input", {"host": 3, "av_input": 12}, "HOST 03 FR 12", **BL_KVM)
+bl("set_device_av_output", {"device": 1, "av_output": 0}, "DEVICE 01 OUT 00", **BL_KVM)
+bl("set_gpio_enabled", {"enabled": True}, "GPIOENABLE 1", **BL_KVM)
+bl("set_gpio_output", {"port": 2, "mode": "12v", "time_ds": 50}, "OUTPIN 02 MODE 02 TIME 0050", **BL_KVM)
+bl("set_gpio_input", {"port": 0, "mode": "auto_switching", "high_level": False}, "INPIN 00 MODE 02 SN 0", **BL_KVM)
+bl("set_serial_passthrough", {"mode": "local"}, "RS232PASS 02", **BL_KVM)
+bl("set_serial_passthrough_feedback", {"enabled": True}, "RS232PASSFEED ON", **BL_KVM)
+bl("send_serial_port", {"port": 2, "format": "a", "baud": "9600", "command": "PWR ON"}, "RS232ONOUT 2:a:3:PWR ON",
+   **BL_KVM)
+bl("set_auto_switch", {"enabled": False}, "AUTOSWITCHING OFF", file="set_auto_switch-kvm", **BL_KVM)
+bl("get_gpio_status", {}, "GPIOSTATUS", **BL_KVM)
+bl("get_cascade_status", {}, "CASCADESTATUS", **BL_KVM)

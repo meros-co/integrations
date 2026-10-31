@@ -18,10 +18,15 @@ category: router
 # layout Blustream documents for the PLA88CS (its API download includes it);
 # the rules here read that layout's tables line by line.
 #
-# Not here: the MX44KVM (a USB KVM matrix with GPIO, a separate command set),
-# the ACM210/500/1000 controllers of the IP50/IP200/IP300 AV-over-IP range
-# (another product), the help commands, and the "Yes" confirmation's
-# alternatives (any other command discards a pending reset).
+# The MX44KVM, a 4x4 USB KVM matrix, takes the same grammar on the same
+# Telnet port: its power, key, IR, preset, reset, baud and network commands
+# are the video matrices', and its USB routing, GPIO, cascade and RS-232
+# pass-through commands are its own (USBOUT, DEVICE, HOST, OUTPIN, INPIN,
+# RS232PASS).
+#
+# Not here: the ACM controllers of the AV-over-IP range (blustream-acm), the
+# help commands, and the "Yes" confirmation's alternatives (any other command
+# discards a pending reset).
 source:
   - title: "PLA88CS - API (help text, firmware V2.3.0, with the STATUS and CTRLSTA reports)"
     author: Blustream
@@ -66,6 +71,29 @@ source:
       page (DownloadFile ids 622, 623, 624, 625, 858, 626, 628, 632, 733, 633,
       634, 635, 640, 642, 619 and 647). Each model's supports list below is
       its own help text; the C44CS download ends after OUT xx SCALING.
+  - title: "MX44KVM - API (help text)"
+    author: Blustream
+    url: https://www.blustream.co.uk/Attachment/DownloadFile?downloadId=641
+    note: >
+      Manufacturer document, the MX44KVM's help text: STATUS, INSTA, OUTSTA,
+      GPIOSTATUS, CASCADESTATUS, PON/OFF, IR, KEY, RESET (confirmed with
+      Yes), USBOUT xx FR yy (00 every device), DEVICE xx ON/OFF and
+      PON/POFF, PRESET pp SAVE/CLR/APPLY (1-9), GPIOENABLE, HOST xx FR yy and
+      DEVICE xx OUT yy (AV ports 1-16, 00 none), OUTPIN xx MODE yy TIME zzzz
+      (0005-1800, 0.5-180 s), INPIN xx MODE yy SN z, RS232PASSFEED,
+      AUTOSWITCHING, RS232PASS 01-03, RS232BAUD 1-7, RS232ONOUT a:b:c:d, NET
+      DHCP, MDNS, IP, GW, SM, RB, TN port, TN ON/OFF, TN8000.
+  - title: "MX44KVM User Manual, RevA0 (210830)"
+    author: Blustream
+    url: https://files.hdtvsupply.com/blustream-mx44kvm-um.pdf
+    note: >
+      Manufacturer document (a reseller's copy; Blustream's current manual
+      is the MX44KVM product page's downloadId=1394). Web GUI network page (Telnet port adjustable)
+      p.10; RS-232 port 1 for control, port 2 for cascading, 57600 8N1 by
+      default, carriage return after each command p.15; an earlier command
+      table p.16 (GPOUTSTATUS, GPINSTATUS, PRESETSTATUS and AUTO-SWITCHING
+      where the help text has GPIOSTATUS and AUTOSWITCHING; output trigger
+      modes 5 V and 12 V at 50 mA).
   - title: Bitfocus Companion module companion-module-blustream-hdmimatrix (MIT), index.js
     author: Joseph Adams and contributors
     url: https://github.com/bitfocus/companion-module-blustream-hdmimatrix
@@ -94,6 +122,9 @@ maps:
   cec_word: { "true": "ENABLE", "false": "DISABLE" }
   edid_source: { hdmi: EH, hdbt: ET }
   baud_code: { "2400": "1", "4800": "2", "9600": "3", "19200": "4", "38400": "5", "57600": "6", "115200": "7" }
+  gpio_out_mode: { closed: "00", 5v: "01", 12v: "02", contact: "03" }
+  gpio_in_mode: { none: "00", standby: "01", auto_switching: "02" }
+  serial_pass: { both: "01", local: "02", passthrough: "03" }
   rsb_code: { "115200": "0", "57600": "1", "38400": "2", "19200": "3", "9600": "4", "4800": "5", "2400": "6" }
 
 ports:
@@ -312,6 +343,22 @@ models:
        get_status, get_preset_status, get_audio_status, get_ir_routing]
     verification: none
     notes: Inputs and outputs 1-8. Presets 1-8.
+  - id: mx44kvm
+    name: Blustream MX44KVM (4x4 USB 3.0 KVM matrix)
+    supports:
+      [route_usb, set_usb_device_enabled, set_usb_device_power, set_auto_switch, save_preset, recall_preset,
+       clear_preset, set_power, set_front_panel_keys, set_ir, factory_reset, set_serial_baud,
+       set_serial_passthrough, set_serial_passthrough_feedback, send_serial_port, set_gpio_enabled,
+       set_gpio_output, set_gpio_input, set_host_av_input, set_device_av_output, set_dhcp, set_ip_address,
+       set_gateway, set_subnet_mask, network_reboot, set_telnet_port, set_telnet, set_port_8000, set_mdns,
+       get_status, get_input_status, get_output_status, get_gpio_status, get_cascade_status]
+    verification: none
+    notes: >
+      USB hosts 1-4 (the matrix's outputs) and USB devices 1-4 (its inputs),
+      four GPIO ports, two RS-232 ports (port 2 loops commands through to a
+      cascaded MX44KVM or a Blustream video matrix). Hosts and devices can be
+      tied to a video matrix's inputs and outputs (1-16) so that they switch
+      with it. Presets 1-9.
 
 commands:
   # ── Routing ──────────────────────────────────────────────────────────────
@@ -407,6 +454,102 @@ commands:
       enabled: { type: bool, required: true, label: Auto-switch, description: "On switches to an input when its signal appears." }
     send:
       - { models: [mx22ab-8k], message: "AUTO SWITCH {enabled:map.upper_onoff}" }
+      - { models: [mx44kvm], message: "AUTOSWITCHING {enabled:map.upper_onoff}" }
+    returns: none
+
+  # ── USB KVM (MX44KVM) ────────────────────────────────────────────────────
+  route_usb:
+    summary: Connect a USB device to a USB host, or every device to one host (USBOUT xx FR yy)
+    params:
+      host: { type: int, min: 1, max: 4, required: true, label: USB host, description: "The USB host port (the computer side), 1-4." }
+      device: { type: int, min: 0, max: 4, required: true, label: USB device, description: "The USB device port 1-4, or 0 for every device." }
+    send:
+      - { models: [mx44kvm], message: "USBOUT {host:02d} FR {device:02d}" }
+    returns: none
+
+  set_usb_device_enabled:
+    summary: Turn a USB device port's data connection on or off (DEVICE xx ON/OFF)
+    params:
+      device: &usb_device_all { type: int, min: 0, max: 4, required: true, label: USB device, description: "The USB device port 1-4, or 0 for every device." }
+      enabled: { type: bool, required: true, label: Data, description: "On connects the device's data lines; off disconnects them." }
+    send:
+      - { models: [mx44kvm], message: "DEVICE {device:02d} {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_usb_device_power:
+    summary: Turn a USB device port's 5 V power on or off (DEVICE xx PON/POFF)
+    params:
+      device: *usb_device_all
+      powered: { type: bool, required: true, label: Power, description: "On supplies the port's 5 V; off cuts it." }
+    send:
+      - { models: [mx44kvm], message: "DEVICE {device:02d} {powered:map.power_word}" }
+    returns: none
+
+  set_host_av_input:
+    summary: Tie a USB host to a video matrix input, so it follows that input's routing (HOST xx FR yy)
+    params:
+      host: { type: int, min: 1, max: 4, required: true, label: USB host, description: "The USB host port, 1-4." }
+      av_input: { type: int, min: 0, max: 16, required: true, label: AV input, description: "The video matrix input 1-16 the host belongs to, or 0 for none." }
+    send:
+      - { models: [mx44kvm], message: "HOST {host:02d} FR {av_input:02d}" }
+    returns: none
+
+  set_device_av_output:
+    summary: Tie a USB device to a video matrix output, so it follows that output's routing (DEVICE xx OUT yy)
+    params:
+      device: { type: int, min: 1, max: 4, required: true, label: USB device, description: "The USB device port, 1-4." }
+      av_output: { type: int, min: 0, max: 16, required: true, label: AV output, description: "The video matrix output 1-16 the device belongs to, or 0 for none." }
+    send:
+      - { models: [mx44kvm], message: "DEVICE {device:02d} OUT {av_output:02d}" }
+    returns: none
+
+  set_gpio_enabled:
+    summary: Turn the GPIO ports on or off (GPIOENABLE x)
+    params:
+      enabled: { type: bool, required: true, label: GPIO, description: "On lets the GPIO ports act; off disables them." }
+    send:
+      - { models: [mx44kvm], message: "GPIOENABLE {enabled:bool01}" }
+    returns: none
+
+  set_gpio_output:
+    summary: Make a GPIO port an output and set what it gives and for how long (OUTPIN xx MODE yy TIME zzzz)
+    params:
+      port: &gpio_all { type: int, min: 0, max: 4, required: true, label: GPIO port, description: "The GPIO port 1-4, or 0 for every port." }
+      mode: { type: enum, values: [closed, 5v, 12v, contact], required: true, label: Output,
+              description: "closed turns output mode off; 5v or 12v gives a voltage trigger; contact closes a contact." }
+      time_ds: { type: int, min: 5, max: 1800, required: true, label: Time,
+                 description: "How long the output is held, in tenths of a second: 5 (0.5 s) to 1800 (180 s)." }
+    send:
+      - { models: [mx44kvm], message: "OUTPIN {port:02d} MODE {mode:map.gpio_out_mode} TIME {time_ds:04d}" }
+    returns: none
+
+  set_gpio_input:
+    summary: Make a GPIO port an input and choose what it triggers and on which level (INPIN xx MODE yy SN z)
+    params:
+      port: *gpio_all
+      mode: { type: enum, values: [none, standby, auto_switching], required: true, label: Trigger,
+              description: "none turns detection off; standby puts the matrix in standby; auto_switching turns auto-switching on." }
+      high_level: { type: bool, required: true, label: High level,
+                    description: "On triggers on a high level (6-12 V); off on a low level (0-6 V)." }
+    send:
+      - { models: [mx44kvm], message: "INPIN {port:02d} MODE {mode:map.gpio_in_mode} SN {high_level:bool01}" }
+    returns: none
+
+  set_serial_passthrough:
+    summary: Choose whether RS-232 port 1's commands act locally, pass through to port 2, or both (RS232PASS xx)
+    params:
+      mode: { type: enum, values: [both, local, passthrough], required: true, label: Pass-through,
+              description: "both controls this matrix and repeats on RS-232 port 2; local controls this matrix only; passthrough only repeats on port 2." }
+    send:
+      - { models: [mx44kvm], message: "RS232PASS {mode:map.serial_pass}" }
+    returns: none
+
+  set_serial_passthrough_feedback:
+    summary: Turn feedback from RS-232 port 2 on or off (RS232PASSFEED ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: Port 2 feedback, description: "On passes what arrives on RS-232 port 2 back to the controller." }
+    send:
+      - { models: [mx44kvm], message: "RS232PASSFEED {enabled:map.upper_onoff}" }
     returns: none
 
   set_input_switch_mode:
@@ -425,14 +568,14 @@ commands:
     params: &preset
       preset: { type: int, min: 1, max: 9, required: true, label: Preset, description: "Preset from 1: 1-9 on HDBaseT matrices, 1-8 on CMX and Pro models." }
     send:
-      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, pro16, prohub8], message: "PRESET {preset:02d} SAVE" }
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, pro16, prohub8, mx44kvm], message: "PRESET {preset:02d} SAVE" }
     returns: none
 
   recall_preset:
     summary: Apply a preset's routing (PRESET pp APPLY)
     params: *preset
     send:
-      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, pro16, prohub8], message: "PRESET {preset:02d} APPLY" }
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, pro16, prohub8, mx44kvm], message: "PRESET {preset:02d} APPLY" }
     returns: none
 
   clear_preset:
@@ -440,7 +583,7 @@ commands:
     params:
       preset: { type: int, min: 0, max: 9, required: true, label: Preset, description: "Preset from 1, or 0 for every preset." }
     send:
-      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "PRESET {preset:02d} CLR" }
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2, mx44kvm], message: "PRESET {preset:02d} CLR" }
     returns: none
 
   set_preset:
@@ -459,7 +602,7 @@ commands:
     params:
       powered: { type: bool, required: true, label: Power, description: "On powers the matrix on; off puts it in its power-save state." }
     send:
-      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8], message: "{powered:map.power_word}" }
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8, mx44kvm], message: "{powered:map.power_word}" }
     returns: none
 
   set_front_panel_keys:
@@ -467,7 +610,7 @@ commands:
     params:
       enabled: { type: bool, required: true, label: Buttons enabled, description: "On lets the front-panel buttons work; off locks them." }
     send:
-      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8], message: "KEY {enabled:map.upper_onoff}" }
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8, mx44kvm], message: "KEY {enabled:map.upper_onoff}" }
     returns: none
 
   set_ir:
@@ -475,7 +618,7 @@ commands:
     params:
       enabled: { type: bool, required: true, label: IR enabled, description: "On accepts the IR remote; off ignores it." }
     send:
-      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8], message: "IR {enabled:map.upper_onoff}" }
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8, mx44kvm], message: "IR {enabled:map.upper_onoff}" }
     returns: none
 
   set_ir_voltage:
@@ -545,8 +688,8 @@ commands:
   factory_reset:
     summary: Reset the matrix to its default settings, confirming with Yes (RESET, Yes)
     send:
-      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8], message: "RESET" }
-      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8], message: "Yes" }
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8, mx44kvm], message: "RESET" }
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8, mx44kvm], message: "Yes" }
     returns: none
 
   factory_reset_all:
@@ -562,7 +705,7 @@ commands:
       baud: { type: enum, values: ["2400", "4800", "9600", "19200", "38400", "57600", "115200"], required: true, label: Baud rate,
               description: "Bits per second; the CMX42CS, CMX44CS, CMX88CS, MX22AB-8K and Pro models offer 9600 to 115200 only." }
     send:
-      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc], message: "RS232BAUD {baud:map.baud_code}" }
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, mx44kvm], message: "RS232BAUD {baud:map.baud_code}" }
       - { models: [cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, pro16, prohub8], message: "RSB {baud:map.rsb_code}" }
     returns: none
 
@@ -1012,6 +1155,17 @@ commands:
       - { models: [cmx88cs-v2], message: "RS232ONOUT {format}:{baud:map.rsb_code}:{command}" }
     returns: none
 
+  send_serial_port:
+    summary: Send a command out of one of the matrix's RS-232 ports (RS232ONOUT a:b:c:d)
+    params:
+      port: { type: int, min: 1, max: 2, required: true, label: RS-232 port, description: "RS-232 port 1 or 2." }
+      format: *serial_format
+      baud: *serial_baud
+      command: *serial_command
+    send:
+      - { models: [mx44kvm], message: "RS232ONOUT {port}:{format}:{baud:map.baud_code}:{command}" }
+    returns: none
+
   set_serial_delay:
     summary: Set the delay between an output's stored display-on command and its user commands (RS232DLYOUTxx:tt)
     params:
@@ -1170,7 +1324,7 @@ commands:
     params:
       enabled: { type: bool, required: true, label: DHCP, description: "On takes an address from DHCP; off uses the static address." }
     send:
-      - { models: &net [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx44vw, pro16, prohub8], message: "NET DHCP {enabled:map.upper_onoff}" }
+      - { models: &net [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx44vw, pro16, prohub8, mx44kvm], message: "NET DHCP {enabled:map.upper_onoff}" }
     returns: none
 
   set_ip_address:
@@ -1215,7 +1369,7 @@ commands:
     params:
       enabled: { type: bool, required: true, label: Telnet, description: "On runs Telnet; off stops it, ending control over the network." }
     send:
-      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42cs, cmx88cs-v2], message: "NET TN {enabled:map.upper_onoff}" }
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42cs, cmx88cs-v2, mx44kvm], message: "NET TN {enabled:map.upper_onoff}" }
     returns: none
 
   set_port_8000:
@@ -1223,7 +1377,7 @@ commands:
     params:
       enabled: { type: bool, required: true, label: Port 8000, description: "On also accepts the API on TCP 8000." }
     send:
-      - { models: [pla88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "NET TN8000 {enabled:map.upper_onoff}" }
+      - { models: [pla88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2, mx44kvm], message: "NET TN8000 {enabled:map.upper_onoff}" }
     returns: none
 
   set_tcp_port:
@@ -1239,7 +1393,7 @@ commands:
     params:
       enabled: { type: bool, required: true, label: mDNS, description: "On announces the matrix on the local network by name." }
     send:
-      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "NET MDNS {enabled:map.upper_onoff}" }
+      - { models: [pla88cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2, mx44kvm], message: "NET MDNS {enabled:map.upper_onoff}" }
     returns: none
 
   set_mdns_name:
@@ -1262,19 +1416,19 @@ commands:
   get_status:
     summary: Print the full status report; its lines update state (STATUS)
     send:
-      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8], message: "STATUS" }
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8, mx44kvm], message: "STATUS" }
     returns: none
 
   get_input_status:
     summary: Print the input status report (INSTA)
     send:
-      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "INSTA" }
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2, mx44kvm], message: "INSTA" }
     returns: none
 
   get_output_status:
     summary: Print the output status report (OUTSTA)
     send:
-      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "OUTSTA" }
+      - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2, mx44kvm], message: "OUTSTA" }
     returns: none
 
   get_control_status:
@@ -1328,6 +1482,18 @@ commands:
     params: { input: *input_all }
     send:
       - { models: [cmx88cs-v2], message: "IN {input:02d} DIAG" }
+    returns: none
+
+  get_gpio_status:
+    summary: Print the GPIO ports' status (GPIOSTATUS)
+    send:
+      - { models: [mx44kvm], message: "GPIOSTATUS" }
+    returns: none
+
+  get_cascade_status:
+    summary: Print how the USB hosts and devices are tied to a video matrix's inputs and outputs (CASCADESTATUS)
+    send:
+      - { models: [mx44kvm], message: "CASCADESTATUS" }
     returns: none
 
 state:
@@ -1392,7 +1558,8 @@ state:
 telemetry:
   poll:
     - every_ms: 5000
-      send: ["STATUS"]
+      send:
+        - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx42ab, cmx42cs, cmx44cs, cmx88cs, cmx88cs-v2, mx22ab-8k, mx44vw, pro16, prohub8], message: "STATUS" }
     - every_ms: 60000
       send:
         - { models: [pla88cs, c44cs, c66cs, c88cs, hmx44-18g, hmx88-18g, hmxl42arc, hmxl66arc, hmxl88arc, cmx88cs-v2], message: "CTRLSTA" }
@@ -1542,3 +1709,17 @@ quirks:
       (Blustream requires both). The CMX88CS-V2 manual says spaces are
       optional unless specified; other models' handling of a missing or
       extra space is not documented.
+  - models: [mx44kvm]
+    severity: warning
+    text: >
+      The MX44KVM's STATUS, INSTA, OUTSTA, GPIOSTATUS and CASCADESTATUS
+      reports are undocumented, so the MX44KVM is not polled and no state is
+      read from it: USB routing, device power and GPIO settings cannot be
+      read back here.
+  - models: [mx44kvm]
+    severity: info
+    text: >
+      Commands follow the MX44KVM help text (GPIOSTATUS, AUTOSWITCHING). Its
+      2021 user manual writes some differently (GPOUTSTATUS, GPINSTATUS,
+      PRESETSTATUS, AUTO-SWITCHING ON/OFF), which older firmware may expect.
+      route_usb with device 0 connects every USB device to the host at once.

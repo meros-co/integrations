@@ -1,0 +1,1875 @@
+spec: 1
+id: blustream-acm
+name: Blustream Multicast ACM controllers (Telnet and RS-232 API)
+vendor: Blustream
+category: router
+
+# Blustream's Advanced Control Modules run a Multicast AV-over-IP system: the
+# ACM210 the IP50, IP200, IP250, IP300 and IP350 ranges, the ACM500 the
+# IP500UHD and IP510UHD (SDVoE), the ACM1000 the IP200-IP350 ranges with
+# presets, groups and macros of its own. Each takes one plain-text command
+# set over Telnet on its control LAN port (TCP 23 by default) and its RS-232
+# port, as its help text (the "<model> - API" download, the ACM's answer to
+# HELP) lists it. Transmitters are the system's inputs (iii, 001-254 by ID)
+# and receivers its outputs (ooo, 001-767 by ID), written with three digits;
+# 000 means every input or output where the help text allows it. The ACM
+# accepts numbers with or without leading zeros and ignores spaces (manual
+# p.44); commands are sent as the help texts write them.
+#
+# Blustream documents no answer to a command, so commands are sent without
+# waiting (reply: none). The STATUS report, which the manual prints (p.45),
+# lists every input and output with its routing, and is polled; so are the
+# OUT and IN detail reports when asked for.
+#
+# Not here: the ACM200 (discontinued; Blustream no longer publishes its API
+# document), the help commands, the ACM1000's EVENT MACRO scheduler commands
+# (their help text leaves the time and day fields' format unexplained), and
+# the web GUI.
+source:
+  - title: "ACM210 - API (ACM210 Advanced Control Module Help, firmware 3.9.0c)"
+    author: Blustream
+    url: https://www.blustream.co.uk/Attachment/DownloadFile?downloadId=836
+    note: >
+      Manufacturer document, the ACM210's help text: system information
+      (STATUS), system control (IR, PREVIEW IMAGE, RSB 0-4, REBOOT, RESET,
+      RESET NB, RESET ALL with Yes), output control (OUT ooo ON/OFF, ID,
+      FR/VFR/AFR/RFR/SFR/UFR/CFR yyy or AUTO, FAST, HDR, CEC, OSD, FLS, DEL,
+      RES rr 0-19, ROTATE 0-3, STRETCH, HTTPS, AUDSD/AUDHA/AUDHH/AUDHD/AUDDA/
+      AUDDH, LAN2M0-4, ARC OFF/HDMI/OPT, CEC and IR guest commands, NAME, MODE
+      MX/VW, DBG, BTN, IR, MUTE, PAUSE, AUTOON ENABLED/DISABLED, LED 0-9, SG
+      with BR 0-9 and BIT, GUEST, HDCP BYP/V14/V22, SSM L/N, STATUS, RB,
+      RESET), input control (ID, DEL, RB, RESET, AUD AUTO/HDMI/ANA, HTTPS,
+      AUDAH/AUDAD/AUDHA/AUDHH/AUDHD/AUDDA/AUDDH, LAN2M0-4, SWMODE 00-04,
+      TGMODE 0/1, NAME, CEC, IR, FLS, LED, SG, GUEST, HDCP, SSM, EFR, ARC,
+      STATUS), EDID CP and DF 00-33, CLOSEACMGUEST, the video wall commands
+      (VW idx CREATE, NAME, DEL, OUT, C cidx CREATE/NAME/APPLY/DEL, G gidx,
+      S, OW/VW, OH/VH, STATUS), project control (SCAN, SCAN STATUS/RESET/OSD,
+      ASSIGN RESET/DF/INDEX/AUTO, with REPLACE), GPIO gg DIR/SET/GET/STATUS,
+      and network (NET LAN2 DHCP, LAN1/LAN2 IP/GW/SM, RB, TN, SSH, WEB,
+      HTTPS, DNS).
+  - title: "ACM500 - API (IP Control Box ACM500 Advanced Control Module Help)"
+    author: Blustream
+    url: https://www.blustream.co.uk/Attachment/DownloadFile?downloadId=620
+    note: >
+      Manufacturer document, the ACM500's help text: STATUS, VERSION, IR,
+      PREVIEW IMAGE, RSB, RESET/NB/ALL; output ON/OFF, ID, the FR family,
+      multiview (MVP, MVL, MVLA, MVPA, W widx FR), CEC on/off and the named
+      CEC commands (POWERON ... MUTE), OSD, FLS, DEL, RES 0-21, NAME, MODE
+      MX/VW/MV, TXMODE, BTN, IR, IRVAL 5V/12V, MUTE, AUTOON ON/OFF, LED, SG
+      with BR 0-6, GUEST, STATUS, ASPECT FIT/MAINTAIN, DISPLAYMODE DIS 0/1,
+      RB, RESET; input ID, DEL, RB, RESET, AUD, NAME, CEC, FLS, RXMODE,
+      STREAMDBG, IR, IRVAL, LED, SG, GUEST, STATUS, named CEC commands, the
+      secondary stream (SS STATUS, MSURL, SSURL, SNAPURL, MAINENCATTR,
+      SUBENCATTR, SS MAIN/SUB/PIC); EDID DL, CP and DF 00-23; CLOSEACMGUEST;
+      the video wall commands; multiview presets (MVP) and PIP layouts (PIP);
+      SCAN, ASSIGN RESET/AUTO; GPIO; NET LAN2 DHCP, LAN1/LAN2 IP/GW/SM, RB, TN.
+  - title: "ACM1000 - API (ACM1000 Advanced Control Module Help, firmware 2.5.9)"
+    author: Blustream
+    url: https://www.blustream.co.uk/Attachment/DownloadFile?downloadId=1122
+    note: >
+      Manufacturer document, the ACM1000's help text: the ACM210's system,
+      output, input, EDID, video wall, project and network commands (no SSH,
+      WEB or HTTPS on the ACM itself, RES codes 0, 3, 4 and 7-23 for
+      IP300-350 and 0-13 for IP200-250, SWMODE 1-6, IN TGMODE without an
+      input, EDID DF 00-18 on IP200-250 and 00-33 on IP300-350); PRE xx AP,
+      MACRO xx; GPIO VCC SET VOLTS, GPIO gg SET VOLTS/CURR/0-1 (01-02
+      outputs, 03-04 inputs), GET, STATUS; IN/OUT ASTPARAM and HOTPLUG, OUT
+      FALLBACK, PRE idx ADD/RM RX TX, PRE idx ON/OFF, GRP idx ON/OFF/AD/RM/FR,
+      ACM REBOOT, and the EVENT MACRO commands.
+  - title: "Blustream Multicast ACM200 / ACM210 Advanced Control Module User Manual, Revision 1.6"
+    author: Blustream
+    url: https://www.blustream.co.uk/Attachment/DownloadFile?downloadId=1393
+    note: >
+      Manufacturer document. Control port 23, default control LAN address
+      192.168.0.225, RS-232 57600 8N1 with RSB codes p.4; Telnet port and
+      baud rate settings p.38; the RS-232 and Telnet section (carriage return
+      after each command, spaces ignored, 1 = 01 = 001, up to 762
+      transmitters and receivers) p.44; the STATUS, OUT xxx STATUS, IN xxx
+      STATUS and VW STATUS reports p.45-46.
+
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: cr
+  encoding: ascii
+  timeout_ms: 3000
+  # Blustream documents no answer to a command, only the reports the status
+  # commands print: commands are sent without waiting.
+  reply: none
+
+maps:
+  upper_onoff: { "true": "ON", "false": "OFF" }
+  enabled_word: { "true": "ENABLED", "false": "DISABLED" }
+  rsb_code: { "115200": "0", "57600": "1", "38400": "2", "19200": "3", "9600": "4" }
+  guest_baud_wide: { "300": "0", "600": "1", "1200": "2", "2400": "3", "4800": "4", "9600": "5", "19200": "6", "38400": "7", "57600": "8", "115200": "9" }
+  guest_baud_narrow: { "2400": "0", "4800": "1", "9600": "2", "19200": "3", "38400": "4", "57600": "5", "115200": "6" }
+  rotation: { "0": "0", "90": "1", "180": "2", "270": "3" }
+  display_mode: { fast_switch: "0", genlock: "1" }
+  active_word: { "true": "ACTIVE", "false": "INACTIVE" }
+  signal_route: { video: VFR, audio: AFR, ir: RFR, serial: SFR, usb: UFR, cec: CFR }
+  replace_word: { "true": " REPLACE", "false": "" }
+  wallplate_mode_210: { auto: "00", auto_usbc: "01", auto_hdmi: "02", usbc: "03", hdmi: "04" }
+  wallplate_mode_1000: { auto: "01", auto_usbc: "02", auto_hdmi: "03", usbc: "04", hdmi: "05" }
+  wallplate_input: { hdmi: "0", usbc: "1" }
+  stream_codec: { h264: "0", h265: "1" }
+  main_bitrate: { "1024": "0", "2048": "1", "4096": "2", "6144": "3", "8192": "4", "10240": "5", "12288": "6", "16384": "7", "20480": "8" }
+  sub_bitrate: { "128": "0", "256": "1", "512": "2", "1024": "3", "2048": "4" }
+
+ports:
+  - { port: 23, protocol: tcp, role: control, note: "Telnet on the control LAN port (LAN2), changeable with NET TN; the ACM210 also serves the API over SSH" }
+
+models:
+  - id: acm210
+    name: Blustream ACM210 (Multicast advanced control module for IP50, IP200, IP250, IP300 and IP350)
+    supports:
+      [get_status, set_ir, set_preview_image, set_serial_baud, reboot, factory_reset, reset_network, factory_reset_all,
+       route, route_signal, set_signal_follow, set_output_enabled, set_output_id, set_fast_switching, set_hdr,
+       set_output_cec, set_output_id_osd, show_output_id_osd_for, set_output_led_flash, flash_output_led_for,
+       delete_output, set_output_resolution, set_output_rotation, set_output_stretch, set_output_https,
+       set_output_audio, set_output_lan2_mode, set_output_arc, send_output_cec, send_output_ir, set_output_name,
+       set_output_mode, set_output_debug, set_output_buttons, set_output_ir, set_output_mute, set_output_pause,
+       set_output_auto_on, set_output_led_timeout, set_output_serial_guest, start_output_serial_guest,
+       close_serial_guest, set_output_hdcp, set_output_system_size, get_output_status, get_all_output_status,
+       reboot_output, reset_output, set_input_id, delete_input, reboot_input, reset_input, set_input_audio_source,
+       set_input_https, set_input_audio, set_input_lan2_mode, set_wallplate_switch_mode, set_wallplate_input,
+       set_input_name, set_input_cec, send_input_cec, send_input_ir, set_input_led_flash, flash_input_led_for,
+       set_input_led_timeout, set_input_serial_guest, start_input_serial_guest, set_input_hdcp,
+       set_input_system_size, set_input_arc_output, set_input_arc, get_input_status, copy_edid, set_input_edid,
+       create_video_wall, rename_video_wall, delete_video_wall, place_video_wall_output, create_video_wall_config,
+       rename_video_wall_config, apply_video_wall_config, delete_video_wall_config, set_video_wall_group_screen,
+       route_video_wall_group, set_video_wall_single_screen, route_video_wall_single_screen,
+       set_video_wall_screen_width, set_video_wall_screen_height, get_video_wall_status, get_all_video_wall_status,
+       scan, get_scan_status, reset_scan, set_scan_osd, reset_assignments, assign_default_input,
+       assign_scanned_input, assign_default_output, assign_scanned_output, assign_auto, set_gpio_direction,
+       set_gpio_output, read_gpio, get_gpio_status, set_control_dhcp, set_ip_address, set_gateway,
+       set_subnet_mask, network_reboot, set_telnet, set_telnet_port, set_ssh, set_ssh_port, set_web, set_https,
+       set_dns_name]
+    verification: none
+    notes: >
+      Controls IP50, IP200, IP250, IP300 and IP350 transmitters and receivers:
+      up to 254 input IDs and 767 output IDs, video walls 1-9 of up to 9x9,
+      four GPIO ports. EDID presets 00-33, output resolutions 0-19.
+  - id: acm500
+    name: Blustream ACM500 (Multicast advanced control module for IP500UHD and IP510UHD)
+    supports:
+      [get_status, get_version, set_ir, set_preview_image, set_serial_baud, factory_reset, reset_network,
+       factory_reset_all, route, route_signal, set_signal_follow, set_output_enabled, set_output_id,
+       set_output_multiview_preset, set_output_multiview_layout, set_output_multiview_layouts,
+       set_output_multiview_presets, route_multiview_window, set_output_cec, set_output_id_osd,
+       show_output_id_osd_for, set_output_led_flash, flash_output_led_for, delete_output, set_output_resolution,
+       set_output_name, set_output_mode, set_output_tx_mode, set_output_buttons, set_output_ir,
+       set_output_ir_voltage, set_output_mute, set_output_auto_on, set_output_led_timeout, set_output_serial_guest_sdvoe,
+       start_output_serial_guest, close_serial_guest, get_output_status, get_all_output_status, send_output_cec,
+       set_output_aspect, set_output_display_mode, reboot_output, reset_output, set_input_id, delete_input,
+       reboot_input, reset_input, set_input_audio_source, set_input_name, set_input_cec, set_input_led_flash,
+       flash_input_led_for, set_input_rx_mode, set_input_stream_debug, set_input_ir, set_input_ir_voltage,
+       set_input_led_timeout, set_input_serial_guest_sdvoe, start_input_serial_guest, get_input_status, send_input_cec,
+       get_stream_status, get_main_stream_url, get_sub_stream_url, get_snapshot_url, set_main_stream,
+       set_sub_stream, set_stream_enabled, load_user_edid, copy_edid, set_input_edid, create_video_wall,
+       rename_video_wall, delete_video_wall, place_video_wall_output, create_video_wall_config,
+       rename_video_wall_config, apply_video_wall_config, delete_video_wall_config, set_video_wall_group_screen,
+       route_video_wall_group, set_video_wall_single_screen, route_video_wall_single_screen,
+       set_video_wall_screen_width, set_video_wall_screen_height, get_video_wall_status, get_all_video_wall_status,
+       create_multiview_preset, rename_multiview_preset, set_multiview_preset_layout,
+       route_multiview_preset_window, delete_multiview_preset, create_pip_layout, delete_pip_layout,
+       set_pip_option, set_pip_window_active, set_pip_mode, set_pip_position, rename_pip_layout, scan,
+       get_scan_status, reset_scan, reset_assignments, assign_auto, set_gpio_direction, set_gpio_output,
+       read_gpio, get_gpio_status, set_control_dhcp, set_ip_address, set_gateway, set_subnet_mask,
+       network_reboot, set_telnet_port]
+    verification: none
+    notes: >
+      Controls IP500UHD and IP510UHD SDVoE transmitters and receivers, with
+      multiview (presets 1-100, layouts 1-100, PIP layouts 26-100), a
+      secondary H.264/H.265 stream per transmitter, video walls 1-9. EDID
+      presets 00-23, output resolutions 0-21.
+  - id: acm1000
+    name: Blustream ACM1000 (Multicast advanced control module with presets, groups and macros)
+    supports:
+      [get_status, set_ir, set_preview_image, set_serial_baud, reboot, factory_reset, reset_network,
+       factory_reset_all, route, route_signal, set_signal_follow, set_output_enabled, set_output_id,
+       set_fast_switching, set_hdr, set_output_cec, set_output_id_osd, show_output_id_osd_for,
+       set_output_led_flash, flash_output_led_for, delete_output, set_output_resolution, set_output_rotation,
+       set_output_stretch, set_output_https, set_output_audio, set_output_lan2_mode, set_output_arc,
+       set_output_name, set_output_mode, set_output_debug, set_output_buttons, set_output_ir, set_output_mute,
+       set_output_pause, set_output_auto_on, set_output_led_timeout, set_output_serial_guest,
+       start_output_serial_guest, close_serial_guest, set_output_hdcp, set_output_system_size, get_output_status,
+       get_all_output_status, reboot_output, reset_output, get_output_details, set_output_hotplug,
+       set_output_fallback, set_input_id, delete_input, reboot_input, reset_input, set_input_audio_source,
+       set_input_https, set_input_audio, set_input_lan2_mode, set_input_name, set_input_cec, set_input_led_flash,
+       flash_input_led_for, set_input_led_timeout, set_input_serial_guest, start_input_serial_guest,
+       set_input_hdcp, set_input_system_size, set_input_arc_output, set_input_arc, set_wallplate_input,
+       set_wallplate_switch_mode, set_wallplate_button_only, get_input_status, get_input_details,
+       set_input_hotplug, copy_edid, set_input_edid, recall_preset, trigger_macro, add_preset_route,
+       remove_preset_route, set_preset_enabled, set_group_enabled, add_group_output, remove_group_output,
+       route_group, create_video_wall, rename_video_wall, delete_video_wall, place_video_wall_output,
+       create_video_wall_config, rename_video_wall_config, apply_video_wall_config, delete_video_wall_config,
+       set_video_wall_group_screen, route_video_wall_group, set_video_wall_single_screen,
+       route_video_wall_single_screen, set_video_wall_screen_width, set_video_wall_screen_height,
+       get_video_wall_status, get_all_video_wall_status, scan, get_scan_status, reset_scan, set_scan_osd,
+       reset_assignments, assign_default_input, assign_scanned_input, assign_default_output,
+       assign_scanned_output, assign_auto, set_gpio_vcc_voltage, set_gpio_voltage, set_gpio_current,
+       set_gpio_output, read_gpio, get_gpio_status, set_control_dhcp, set_ip_address, set_gateway,
+       set_subnet_mask, network_reboot, set_telnet_port, set_dns_name]
+    verification: none
+    notes: >
+      Controls IP200-IP350 transmitters and receivers, with presets, groups
+      and macros set up in its web GUI and recalled here. GPIO 1-2 are
+      outputs and 3-4 inputs. EDID presets 00-18 on IP200-250 and 00-33 on
+      IP300-350.
+
+commands:
+  # ── System ───────────────────────────────────────────────────────────────
+  get_status:
+    summary: Print the system report, every input's and output's state and the network settings; its lines update state (STATUS)
+    send:
+      - { models: &all [acm210, acm500, acm1000], message: "STATUS" }
+    returns: none
+
+  get_version:
+    summary: Print the ACM500's, AVP2000's, MCU's and secondary stream's versions (VERSION)
+    send:
+      - { models: [acm500], message: "VERSION" }
+    returns: none
+
+  set_ir:
+    summary: Turn the ACM's IR control input on or off (IR ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: IR control, description: "On accepts IR commands from a control system; off ignores them." }
+    send:
+      - { models: *all, message: "IR {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_preview_image:
+    summary: Turn the web GUI's preview images on or off (PREVIEW IMAGE ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: Preview images, description: "On has the ACM fetch screen grabs of the sources for its web GUI." }
+    send:
+      - { models: *all, message: "PREVIEW IMAGE {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_serial_baud:
+    summary: Set the ACM's RS-232 port baud rate (RSB x)
+    params:
+      baud: { type: enum, values: ["9600", "19200", "38400", "57600", "115200"], required: true, label: Baud rate,
+              description: "Bits per second of the ACM's DB9 control port; 57600 by default." }
+    send:
+      - { models: *all, message: "RSB {baud:map.rsb_code}" }
+    returns: none
+
+  reboot:
+    summary: Restart the ACM (REBOOT, or ACM REBOOT)
+    send:
+      - { models: [acm210], message: "REBOOT" }
+      - { models: [acm1000], message: "ACM REBOOT" }
+    returns: none
+
+  factory_reset:
+    summary: Reset the ACM's system settings to default, keeping its network settings (RESET)
+    send:
+      - { models: *all, message: "RESET" }
+    returns: none
+
+  reset_network:
+    summary: Reset the ACM's network settings to default (RESET NB)
+    send:
+      - { models: *all, message: "RESET NB" }
+    returns: none
+
+  factory_reset_all:
+    summary: Reset the ACM's system and network settings to default, confirming with Yes (RESET ALL, Yes)
+    send:
+      - { models: *all, message: "RESET ALL" }
+      - { models: *all, message: "Yes" }
+    returns: none
+
+  # ── Output routing ───────────────────────────────────────────────────────
+  route:
+    summary: Route an input to an output, or to every output, with all its signals (OUT ooo FR yyy)
+    params:
+      output: &output_all { type: int, min: 0, max: 767, required: true, label: Output,
+                            description: "The receiver's output ID from 1, or 0 for every output." }
+      input: &input_one { type: int, min: 1, max: 254, required: true, label: Input,
+                          description: "The transmitter's input ID, from 1." }
+    send:
+      - { models: *all, message: "OUT {output:03d} FR {input:03d}" }
+    returns: none
+
+  route_signal:
+    summary: Fix one signal of an output to an input, apart from its video (OUT ooo VFR/AFR/RFR/SFR/UFR/CFR yyy)
+    params:
+      output: *output_all
+      signal: &signal { type: enum, values: [video, audio, ir, serial, usb, cec], required: true, label: Signal,
+                        description: "Which signal to route: video, audio, IR, RS-232, USB or CEC." }
+      input: *input_one
+    send:
+      - { models: *all, message: "OUT {output:03d} {signal:map.signal_route} {input:03d}" }
+    returns: none
+
+  set_signal_follow:
+    summary: Let one of an output's signals follow its main routing again (OUT ooo VFR/AFR/... AUTO)
+    params:
+      output: *output_all
+      signal: *signal
+    send:
+      - { models: *all, message: "OUT {output:03d} {signal:map.signal_route} AUTO" }
+    returns: none
+
+  # ── Outputs (receivers) ──────────────────────────────────────────────────
+  set_output_enabled:
+    summary: Turn an output on or off (OUT ooo ON/OFF)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: Enabled, description: "On sends the receiver's picture; off blanks it." }
+    send:
+      - { models: *all, message: "OUT {output:03d} {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_output_id:
+    summary: Give an online receiver another output ID, swapping with the receiver that has it (OUT ooo ID id)
+    params:
+      output: &output_one { type: int, min: 1, max: 767, required: true, label: Output, description: "The receiver's output ID, from 1." }
+      id: { type: int, min: 1, max: 767, required: true, label: New ID, description: "The output ID to give it; a receiver already holding it takes the old ID." }
+    send:
+      - { models: *all, message: "OUT {output:03d} ID {id:03d}" }
+    returns: none
+
+  set_fast_switching:
+    summary: Turn an output's fast switching on or off (OUT ooo FAST ON/OFF)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: Fast switching, description: "On switches sources without re-syncing the display." }
+    send:
+      - { models: &gen2 [acm210, acm1000], message: "OUT {output:03d} FAST {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_hdr:
+    summary: Turn an output's HDR on or off (OUT ooo HDR ON/OFF)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: HDR, description: "On passes HDR to the display." }
+    send:
+      - { models: *gen2, message: "OUT {output:03d} HDR {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_output_cec:
+    summary: Turn CEC control of an output's display on or off (OUT ooo CEC ON/OFF)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: CEC, description: "On lets the receiver control its display over CEC." }
+    send:
+      - { models: *all, message: "OUT {output:03d} CEC {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_output_id_osd:
+    summary: Show an output's ID on its display until hidden, or hide it (OUT ooo OSD ON/OFF)
+    params:
+      output: *output_all
+      shown: { type: bool, required: true, label: Show ID, description: "On shows the receiver's ID on screen; off hides it." }
+    send:
+      - { models: *all, message: "OUT {output:03d} OSD {shown:map.upper_onoff}" }
+    returns: none
+
+  show_output_id_osd_for:
+    summary: Show an output's ID on its display for a time (OUT ooo OSD ON time)
+    params:
+      output: *output_all
+      seconds: &led_seconds { type: int, min: 1, max: 3600, required: true, label: Time, description: "How long, in seconds; the ACM500's help text gives 90." }
+    send:
+      - { models: *all, message: "OUT {output:03d} OSD ON {seconds}" }
+    returns: none
+
+  set_output_led_flash:
+    summary: Flash a receiver's power LED until stopped, or stop it (OUT ooo FLS ON/OFF)
+    params:
+      output: *output_all
+      flashing: { type: bool, required: true, label: Flash, description: "On flashes the receiver's LED to find it; off stops." }
+    send:
+      - { models: *all, message: "OUT {output:03d} FLS {flashing:map.upper_onoff}" }
+    returns: none
+
+  flash_output_led_for:
+    summary: Flash a receiver's power LED for a time (OUT ooo FLS ON time)
+    params:
+      output: *output_all
+      seconds: *led_seconds
+    send:
+      - { models: *all, message: "OUT {output:03d} FLS ON {seconds}" }
+    returns: none
+
+  delete_output:
+    summary: Remove a receiver from the project (OUT ooo DEL)
+    params: { output: *output_one }
+    send:
+      - { models: *all, message: "OUT {output:03d} DEL" }
+    returns: none
+
+  set_output_resolution:
+    summary: Set an output's scaler resolution (OUT ooo RES rr)
+    params:
+      output: *output_all
+      code: { type: int, min: 0, max: 23, required: true, label: Resolution,
+              description: "The model's resolution code, 0 bypass (no scaling); the quirks list each model's codes." }
+    send:
+      - { models: *all, message: "OUT {output:03d} RES {code}" }
+    returns: none
+
+  set_output_rotation:
+    summary: Rotate an output's picture (OUT ooo ROTATE tt)
+    params:
+      output: *output_all
+      rotation: { type: enum, values: ["0", "90", "180", "270"], required: true, label: Rotation,
+                  description: "Clockwise rotation in degrees, 0 for none." }
+    send:
+      - { models: *gen2, message: "OUT {output:03d} ROTATE {rotation:map.rotation}" }
+    returns: none
+
+  set_output_stretch:
+    summary: Stretch an output's picture to the screen or not (OUT ooo STRETCH ON/OFF)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: Stretch, description: "On stretches the picture to fill the screen." }
+    send:
+      - { models: *gen2, message: "OUT {output:03d} STRETCH {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_output_https:
+    summary: Turn a receiver's HTTPS web access on or off (OUT ooo HTTPS ON/OFF)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: HTTPS, description: "On serves the receiver's web page over HTTPS." }
+    send:
+      - { models: *gen2, message: "OUT {output:03d} HTTPS {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_output_audio:
+    summary: Choose a receiver's audio path (OUT ooo AUDSD/AUDHA/AUDHH/AUDHD/AUDDA/AUDDH)
+    params:
+      output: *output_all
+      path: { type: enum, values: [AUDSD, AUDHA, AUDHH, AUDHD, AUDDA, AUDDH], required: true, label: Audio path,
+              description: "AUDSD S/PDIF to Dante, AUDHA HDMI to analog, AUDHH HDMI to HDMI, AUDHD HDMI to Dante, AUDDA Dante to analog, AUDDH Dante to HDMI." }
+    send:
+      - { models: *gen2, message: "OUT {output:03d} {path}" }
+    returns: none
+
+  set_output_lan2_mode:
+    summary: Set a receiver's LAN2 port mode (OUT ooo LAN2M0-4)
+    params:
+      output: *output_all
+      mode: &lan2_mode { type: int, min: 0, max: 4, required: true, label: LAN2 mode, description: "The LAN2 mode 0-4, as the endpoint's manual numbers them." }
+    send:
+      - { models: *gen2, message: "OUT {output:03d} LAN2M{mode}" }
+    returns: none
+
+  set_output_arc:
+    summary: Set a receiver's audio return channel source, or turn ARC off (OUT ooo ARC OFF/HDMI/OPT)
+    params:
+      output: *output_all
+      arc: { type: enum, values: ["OFF", HDMI, OPT], required: true, label: ARC, description: "OFF no ARC, HDMI from the display's HDMI, OPT from the optical input." }
+    send:
+      - { models: *gen2, message: "OUT {output:03d} ARC {arc}" }
+    returns: none
+
+  send_output_cec:
+    summary: Send a CEC command to an output's display (OUT ooo CEC command)
+    params:
+      output: *output_all
+      command: &cec_command { type: string, pattern: '^[A-Z0-9]{2,24}$', required: true, label: CEC command,
+                              description: "A CEC command name such as POWERON, POWEROFF, VIDEOUP, VIDEOENTER, PLAY, PAUSE, VOLUMEUP or MUTE (the ACM500 help text lists them)." }
+    send:
+      - { models: *all, message: "OUT {output:03d} CEC {command}" }
+    returns: none
+
+  send_output_ir:
+    summary: Send an IR guest command from an output's receiver (OUT ooo IR command)
+    params:
+      output: *output_all
+      command: &ir_command { type: string, pattern: '^[A-Za-z0-9 ]{1,200}$', required: true, label: IR command,
+                             description: "The IR guest command, as the ACM's web GUI stores it." }
+    send:
+      - { models: [acm210], message: "OUT {output:03d} IR {command}" }
+    returns: none
+
+  set_output_name:
+    summary: Name a receiver (OUT ooo NAME name)
+    params:
+      output: *output_one
+      name: &device_name { type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9 _.-]{0,15}$', required: true, label: Name,
+                           description: "Up to 16 characters, starting with a letter or digit." }
+    send:
+      - { models: *all, message: "OUT {output:03d} NAME {name}" }
+    returns: none
+
+  set_output_mode:
+    summary: Set an output to matrix, video wall or (ACM500) multiview mode (OUT ooo MODE MX/VW/MV)
+    params:
+      output: *output_all
+      mode: { type: enum, values: [MX, VW, MV], required: true, label: Mode, description: "MX matrix, VW video wall, MV multiview (ACM500 only)." }
+    send:
+      - { models: *all, message: "OUT {output:03d} MODE {mode}" }
+    returns: none
+
+  set_output_tx_mode:
+    summary: Turn an ACM500 receiver into a transmitter (OUT ooo TXMODE)
+    params: { output: *output_one }
+    send:
+      - { models: [acm500], message: "OUT {output:03d} TXMODE" }
+    returns: none
+
+  set_output_debug:
+    summary: Turn a receiver's debug mode on or off (OUT ooo DBG ON/OFF)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: Debug, description: "On turns the receiver's debug mode on." }
+    send:
+      - { models: *gen2, message: "OUT {output:03d} DBG {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_output_buttons:
+    summary: Enable or disable a receiver's front-panel buttons (OUT ooo BTN ON/OFF)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: Buttons, description: "On lets the receiver's buttons work; off locks them." }
+    send:
+      - { models: *all, message: "OUT {output:03d} BTN {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_output_ir:
+    summary: Enable or disable a receiver's IR receiver (OUT ooo IR ON/OFF)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: IR, description: "On accepts IR at the receiver; off ignores it." }
+    send:
+      - { models: *all, message: "OUT {output:03d} IR {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_output_ir_voltage:
+    summary: Set an ACM500 receiver's rear-panel IR voltage (OUT ooo IRVAL 5V/12V)
+    params:
+      output: *output_all
+      volts: &ir_volts { type: enum, values: [5V, 12V], required: true, label: IR voltage, description: "The rear-panel IR line's voltage." }
+    send:
+      - { models: [acm500], message: "OUT {output:03d} IRVAL {volts}" }
+    returns: none
+
+  set_output_mute:
+    summary: Mute or unmute an output's audio (OUT ooo MUTE ON/OFF)
+    params:
+      output: *output_all
+      muted: { type: bool, required: true, label: Muted, description: "On mutes the receiver's audio." }
+    send:
+      - { models: *all, message: "OUT {output:03d} MUTE {muted:map.upper_onoff}" }
+    returns: none
+
+  set_output_pause:
+    summary: Freeze or unfreeze an output's picture (OUT ooo PAUSE ON/OFF)
+    params:
+      output: *output_all
+      paused: { type: bool, required: true, label: Paused, description: "On holds the current frame on the display." }
+    send:
+      - { models: *gen2, message: "OUT {output:03d} PAUSE {paused:map.upper_onoff}" }
+    returns: none
+
+  set_output_auto_on:
+    summary: Let a receiver turn its display on by itself or not (OUT ooo AUTOON)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: Auto on, description: "On turns the display on when a source arrives." }
+    send:
+      - { models: *gen2, message: "OUT {output:03d} AUTOON {enabled:map.enabled_word}" }
+      - { models: [acm500], message: "OUT {output:03d} AUTOON {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_output_led_timeout:
+    summary: Set when a receiver's front-panel LEDs turn off (OUT ooo LED ee)
+    params:
+      output: *output_all
+      timeout: &led_timeout { type: int, min: 0, max: 9, required: true, label: LED timeout,
+                              description: "0 keeps the LEDs on; 1-9 turns them off after 10-90 seconds." }
+    send:
+      - { models: *all, message: "OUT {output:03d} LED {timeout}" }
+    returns: none
+
+  set_output_serial_guest:
+    summary: Set a receiver's serial guest mode and port settings (OUT ooo SG ON/OFF BR br BIT bit)
+    params:
+      output: *output_all
+      enabled: &guest_enabled { type: bool, required: true, label: Guest mode, description: "On lets a controller reach the endpoint's RS-232 port through the ACM." }
+      baud: &guest_baud { type: enum, values: ["300", "600", "1200", "2400", "4800", "9600", "19200", "38400", "57600", "115200"], required: true,
+                          label: Baud rate, description: "The endpoint's RS-232 rate in bits per second." }
+      format: &guest_format { type: string, pattern: '^[5-8][noe][12]$', required: true, label: Format,
+                              description: "Data bits 5-8, parity n, o or e, stop bits 1 or 2, such as 8n1." }
+    send:
+      - { models: *gen2, message: "OUT {output:03d} SG {enabled:map.upper_onoff} BR {baud:map.guest_baud_wide} BIT {format}" }
+    returns: none
+
+  set_output_serial_guest_sdvoe:
+    summary: Set an ACM500 receiver's serial guest mode and port settings, 2400-115200 (OUT ooo SG ON/OFF BR br BIT bit)
+    params:
+      output: *output_all
+      enabled: *guest_enabled
+      baud: &guest_baud_sdvoe { type: enum, values: ["2400", "4800", "9600", "19200", "38400", "57600", "115200"], required: true,
+                                label: Baud rate, description: "The endpoint's RS-232 rate in bits per second." }
+      format: *guest_format
+    send:
+      - { models: [acm500], message: "OUT {output:03d} SG {enabled:map.upper_onoff} BR {baud:map.guest_baud_narrow} BIT {format}" }
+    returns: none
+
+  start_output_serial_guest:
+    summary: Open serial guest mode to a receiver's RS-232 port on this connection (OUT ooo GUEST)
+    params: { output: *output_one }
+    send:
+      - { models: *all, message: "OUT {output:03d} GUEST" }
+    returns: none
+
+  close_serial_guest:
+    summary: Close serial guest mode (CLOSEACMGUEST)
+    send:
+      - { models: *all, message: "CLOSEACMGUEST" }
+    returns: none
+
+  set_output_hdcp:
+    summary: Set a receiver's HDCP override (OUT ooo HDCP BYP/V14/V22)
+    params:
+      output: *output_all
+      hdcp: &hdcp { type: enum, values: [BYP, V14, V22], required: true, label: HDCP, description: "BYP bypass, V14 HDCP 1.4, V22 HDCP 2.2." }
+    send:
+      - { models: *gen2, message: "OUT {output:03d} HDCP {hdcp}" }
+    returns: none
+
+  set_output_system_size:
+    summary: Set a receiver's system size (OUT ooo SSM L/N)
+    params:
+      output: *output_all
+      size: &system_size { type: enum, values: [L, N], required: true, label: System size, description: "L large, N normal, as the endpoint's manual describes." }
+    send:
+      - { models: *gen2, message: "OUT {output:03d} SSM {size}" }
+    returns: none
+
+  get_output_status:
+    summary: Print one receiver's detail report; its lines update state (OUT ooo STATUS)
+    params: { output: *output_one }
+    send:
+      - { models: *all, message: "OUT {output:03d} STATUS" }
+    returns: none
+
+  get_all_output_status:
+    summary: Print every receiver's detail report (OUT STATUS)
+    send:
+      - { models: *all, message: "OUT STATUS" }
+    returns: none
+
+  reboot_output:
+    summary: Restart a receiver, applying its new settings (OUT ooo RB)
+    params: { output: *output_all }
+    send:
+      - { models: *all, message: "OUT {output:03d} RB" }
+    returns: none
+
+  reset_output:
+    summary: Reset a receiver, or every receiver, to factory settings (OUT ooo RESET)
+    params: { output: *output_all }
+    send:
+      - { models: *all, message: "OUT {output:03d} RESET" }
+    returns: none
+
+  get_output_details:
+    summary: Print an ACM1000 receiver's details (OUT ooo ASTPARAM)
+    params: { output: *output_one }
+    send:
+      - { models: [acm1000], message: "OUT {output:03d} ASTPARAM" }
+    returns: none
+
+  set_output_hotplug:
+    summary: Turn an ACM1000 receiver's hot plug on or off (OUT ooo HOTPLUG ON/OFF)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: Hot plug, description: "On asserts hot plug to the display." }
+    send:
+      - { models: [acm1000], message: "OUT {output:03d} HOTPLUG {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_output_fallback:
+    summary: Set the input an ACM1000 receiver falls back to (OUT ooo FALLBACK iii)
+    params:
+      output: *output_all
+      input: *input_one
+    send:
+      - { models: [acm1000], message: "OUT {output:03d} FALLBACK {input:03d}" }
+    returns: none
+
+  # ── Multiview (ACM500) ───────────────────────────────────────────────────
+  set_output_multiview_preset:
+    summary: Show a multiview preset on an output (OUT ooo MVP mvpid)
+    params:
+      output: *output_all
+      preset: &mv_preset { type: int, min: 1, max: 100, required: true, label: Multiview preset, description: "The multiview preset, 1-100." }
+    send:
+      - { models: [acm500], message: "OUT {output:03d} MVP {preset:02d}" }
+    returns: none
+
+  set_output_multiview_layout:
+    summary: Show a multiview layout on an output (OUT ooo MVL lo)
+    params:
+      output: *output_all
+      layout: &mv_layout { type: int, min: 1, max: 100, required: true, label: Layout, description: "The multiview layout, 1-100." }
+    send:
+      - { models: [acm500], message: "OUT {output:03d} MVL {layout:02d}" }
+    returns: none
+
+  set_output_multiview_layouts:
+    summary: Choose which multiview layouts an output offers (OUT ooo MVLA list)
+    params:
+      output: *output_all
+      layouts: &mv_list { type: string, pattern: '^(ALL|NONE|[0-9]{1,3}(,[0-9]{1,3}){0,99})$', required: true, label: Layouts,
+                          description: "Numbers 1-100 separated by commas, or ALL or NONE." }
+    send:
+      - { models: [acm500], message: "OUT {output:03d} MVLA {layouts}" }
+    returns: none
+
+  set_output_multiview_presets:
+    summary: Choose which multiview presets an output offers (OUT ooo MVPA list)
+    params:
+      output: *output_all
+      presets: *mv_list
+    send:
+      - { models: [acm500], message: "OUT {output:03d} MVPA {presets}" }
+    returns: none
+
+  route_multiview_window:
+    summary: Route an input to one window of an output's multiview (OUT ooo W widx FR iii)
+    params:
+      output: *output_all
+      window: &mv_window { type: int, min: 1, max: 16, required: true, label: Window, description: "The window in the layout, from 1 (in a PIP layout, 1 is the background)." }
+      input: &input_or_clear { type: int, min: 0, max: 254, required: true, label: Input, description: "The transmitter's input ID, or 0 to clear the window." }
+    send:
+      - { models: [acm500], message: "OUT {output:03d} W {window:02d} FR {input:03d}" }
+    returns: none
+
+  set_output_aspect:
+    summary: Fit an ACM500 output's picture to the screen or keep its aspect ratio (OUT ooo ASPECT FIT/MAINTAIN)
+    params:
+      output: *output_all
+      aspect: { type: enum, values: [FIT, MAINTAIN], required: true, label: Aspect, description: "FIT fills the screen; MAINTAIN keeps the source's aspect ratio." }
+    send:
+      - { models: [acm500], message: "OUT {output:03d} ASPECT {aspect}" }
+    returns: none
+
+  set_output_display_mode:
+    summary: Set an ACM500 output's display mode, fast switch or genlock (OUT ooo DISPLAYMODE DIS mode)
+    params:
+      output: *output_all
+      mode: { type: enum, values: [fast_switch, genlock], required: true, label: Display mode, description: "fast_switch switches quickly; genlock locks the output to the source." }
+    send:
+      - { models: [acm500], message: "OUT {output:03d} DISPLAYMODE DIS {mode:map.display_mode}" }
+    returns: none
+
+  create_multiview_preset:
+    summary: Create a multiview preset (MVP mvpid CREATE name)
+    params:
+      preset: *mv_preset
+      name: &letter_name { type: string, pattern: '^[A-Za-z][A-Za-z0-9 _.-]{0,15}$', required: true, label: Name, description: "Up to 16 characters, starting with a letter." }
+    send:
+      - { models: [acm500], message: "MVP {preset:02d} CREATE {name}" }
+    returns: none
+
+  rename_multiview_preset:
+    summary: Rename a multiview preset (MVP mvpid Name name)
+    params:
+      preset: *mv_preset
+      name: *letter_name
+    send:
+      - { models: [acm500], message: "MVP {preset:02d} Name {name}" }
+    returns: none
+
+  set_multiview_preset_layout:
+    summary: Set a multiview preset's layout (MVP mvpid L lo)
+    params:
+      preset: *mv_preset
+      layout: *mv_layout
+    send:
+      - { models: [acm500], message: "MVP {preset:02d} L {layout:02d}" }
+    returns: none
+
+  route_multiview_preset_window:
+    summary: Route an input to one window of a multiview preset (MVP mvpid W widx FR iii)
+    params:
+      preset: *mv_preset
+      window: *mv_window
+      input: *input_or_clear
+    send:
+      - { models: [acm500], message: "MVP {preset:02d} W {window:02d} FR {input:03d}" }
+    returns: none
+
+  delete_multiview_preset:
+    summary: Delete a multiview preset (MVP mvpid DEL)
+    params: { preset: *mv_preset }
+    send:
+      - { models: [acm500], message: "MVP {preset:02d} DEL" }
+    returns: none
+
+  create_pip_layout:
+    summary: Create a picture-in-picture layout (PIP pidx CREATE name)
+    params:
+      layout: &pip_layout { type: int, min: 26, max: 100, required: true, label: PIP layout, description: "The PIP layout, 26-100, numbered after the built-in layouts." }
+      name: *letter_name
+    send:
+      - { models: [acm500], message: "PIP {layout} CREATE {name}" }
+    returns: none
+
+  delete_pip_layout:
+    summary: Delete a picture-in-picture layout (PIP pidx DEL)
+    params: { layout: *pip_layout }
+    send:
+      - { models: [acm500], message: "PIP {layout} DEL" }
+    returns: none
+
+  set_pip_option:
+    summary: Choose a picture-in-picture layout's option (PIP pidx OP op)
+    params:
+      layout: *pip_layout
+      option: { type: int, min: 1, max: 99, required: true, label: Option, description: "The layout option, from 1, as the web GUI numbers them." }
+    send:
+      - { models: [acm500], message: "PIP {layout} OP {option:02d}" }
+    returns: none
+
+  set_pip_window_active:
+    summary: Turn one window of a picture-in-picture layout on or off (PIP pidx W widx ACTIVE/INACTIVE)
+    params:
+      layout: *pip_layout
+      window: *mv_window
+      active: { type: bool, required: true, label: Active, description: "On shows the window; off hides it." }
+    send:
+      - { models: [acm500], message: "PIP {layout} W {window:02d} {active:map.active_word}" }
+    returns: none
+
+  set_pip_mode:
+    summary: Set a picture-in-picture layout side by side or overlaid (PIP pidx MODE SIDEBYSIDE/OVERLAY)
+    params:
+      layout: *pip_layout
+      mode: { type: enum, values: [SIDEBYSIDE, OVERLAY], required: true, label: Mode, description: "SIDEBYSIDE splits the screen; OVERLAY puts the window over the background." }
+    send:
+      - { models: [acm500], message: "PIP {layout} MODE {mode}" }
+    returns: none
+
+  set_pip_position:
+    summary: Set where a picture-in-picture window sits (PIP pidx POSITION LT/LB/RT/RB)
+    params:
+      layout: *pip_layout
+      position: { type: enum, values: [LT, LB, RT, RB], required: true, label: Position, description: "LT left top, LB left bottom, RT right top, RB right bottom." }
+    send:
+      - { models: [acm500], message: "PIP {layout} POSITION {position}" }
+    returns: none
+
+  rename_pip_layout:
+    summary: Rename a picture-in-picture layout (PIP pidx Name name)
+    params:
+      layout: *pip_layout
+      name: *letter_name
+    send:
+      - { models: [acm500], message: "PIP {layout} Name {name}" }
+    returns: none
+
+  # ── Inputs (transmitters) ────────────────────────────────────────────────
+  set_input_id:
+    summary: Give an online transmitter another input ID, swapping with the transmitter that has it (IN iii ID id)
+    params:
+      input: *input_one
+      id: { type: int, min: 1, max: 254, required: true, label: New ID, description: "The input ID to give it; a transmitter already holding it takes the old ID." }
+    send:
+      - { models: *all, message: "IN {input:03d} ID {id:03d}" }
+    returns: none
+
+  delete_input:
+    summary: Remove a transmitter from the project (IN iii DEL)
+    params: { input: *input_one }
+    send:
+      - { models: *all, message: "IN {input:03d} DEL" }
+    returns: none
+
+  reboot_input:
+    summary: Restart a transmitter, applying its new settings (IN iii RB)
+    params: { input: *input_one }
+    send:
+      - { models: *all, message: "IN {input:03d} RB" }
+    returns: none
+
+  reset_input:
+    summary: Reset a transmitter to factory settings (IN iii RESET)
+    params: { input: *input_one }
+    send:
+      - { models: *all, message: "IN {input:03d} RESET" }
+    returns: none
+
+  set_input_audio_source:
+    summary: Choose the audio a transmitter sends (IN iii AUD AUTO/HDMI/ANA)
+    params:
+      input: *input_one
+      source: { type: enum, values: [AUTO, HDMI, ANA], required: true, label: Audio source, description: "AUTO picks by itself, HDMI the HDMI audio, ANA the analog input." }
+    send:
+      - { models: *all, message: "IN {input:03d} AUD {source}" }
+    returns: none
+
+  set_input_https:
+    summary: Turn a transmitter's HTTPS web access on or off (IN iii HTTPS ON/OFF)
+    params:
+      input: *input_one
+      enabled: { type: bool, required: true, label: HTTPS, description: "On serves the transmitter's web page over HTTPS." }
+    send:
+      - { models: *gen2, message: "IN {input:03d} HTTPS {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_input_audio:
+    summary: Choose a transmitter's audio path (IN iii AUDAH/AUDAD/AUDHA/AUDHH/AUDHD/AUDDA/AUDDH)
+    params:
+      input: *input_one
+      path: { type: enum, values: [AUDAH, AUDAD, AUDHA, AUDHH, AUDHD, AUDDA, AUDDH], required: true, label: Audio path,
+              description: "AUDAH analog to HDMI, AUDAD analog to Dante, AUDHA HDMI to analog, AUDHH HDMI to HDMI, AUDHD HDMI to Dante, AUDDA Dante to analog, AUDDH Dante to HDMI." }
+    send:
+      - { models: *gen2, message: "IN {input:03d} {path}" }
+    returns: none
+
+  set_input_lan2_mode:
+    summary: Set a transmitter's LAN2 port mode (IN iii LAN2M0-4)
+    params:
+      input: *input_one
+      mode: *lan2_mode
+    send:
+      - { models: *gen2, message: "IN {input:03d} LAN2M{mode}" }
+    returns: none
+
+  set_wallplate_switch_mode:
+    summary: Set how a wall-plate transmitter chooses between its USB-C and HDMI inputs (IN iii SWMODE)
+    params:
+      input: &input_all { type: int, min: 0, max: 254, required: true, label: Input,
+                          description: "The transmitter's input ID from 1, or 0 for every input." }
+      mode: { type: enum, values: [auto, auto_usbc, auto_hdmi, usbc, hdmi], required: true, label: Switch mode,
+              description: "auto switches to the active input, auto_usbc and auto_hdmi prefer one, usbc and hdmi use only that input." }
+    send:
+      - { models: [acm210], message: "IN {input:03d} SWMODE {mode:map.wallplate_mode_210}" }
+      - { models: [acm1000], message: "IN {input:03d} SWMODE {mode:map.wallplate_mode_1000}" }
+    returns: none
+
+  set_wallplate_button_only:
+    summary: Let an ACM1000 wall-plate transmitter switch inputs only by its button (IN iii SWMODE 06)
+    params: { input: *input_all }
+    send:
+      - { models: [acm1000], message: "IN {input:03d} SWMODE 06" }
+    returns: none
+
+  set_wallplate_input:
+    summary: Switch a wall-plate transmitter to its HDMI or USB-C input (IN iii TGMODE, or IN TGMODE)
+    params:
+      input: *input_all
+      source: { type: enum, values: [hdmi, usbc], required: true, label: Source, description: "hdmi or usbc, the wall plate's input to use." }
+    send:
+      - { models: [acm210], message: "IN {input:03d} TGMODE {source:map.wallplate_input}" }
+      - { models: [acm1000], message: "IN TGMODE {source:map.wallplate_input}" }
+    returns: none
+
+  set_input_name:
+    summary: Name a transmitter (IN iii NAME name)
+    params:
+      input: *input_one
+      name: *device_name
+    send:
+      - { models: *all, message: "IN {input:03d} NAME {name}" }
+    returns: none
+
+  set_input_cec:
+    summary: Turn CEC control of a transmitter's source on or off (IN iii CEC ON/OFF)
+    params:
+      input: *input_one
+      enabled: { type: bool, required: true, label: CEC, description: "On lets the transmitter control its source over CEC." }
+    send:
+      - { models: *all, message: "IN {input:03d} CEC {enabled:map.upper_onoff}" }
+    returns: none
+
+  send_input_cec:
+    summary: Send a CEC command to a transmitter's source (IN iii CEC command)
+    params:
+      input: *input_one
+      command: *cec_command
+    send:
+      - { models: [acm210, acm500], message: "IN {input:03d} CEC {command}" }
+    returns: none
+
+  send_input_ir:
+    summary: Send an IR guest command from a transmitter (IN iii IR command)
+    params:
+      input: *input_one
+      command: *ir_command
+    send:
+      - { models: [acm210], message: "IN {input:03d} IR {command}" }
+    returns: none
+
+  set_input_ir:
+    summary: Enable or disable an ACM500 transmitter's rear-panel IR (IN iii IR ON/OFF)
+    params:
+      input: *input_one
+      enabled: { type: bool, required: true, label: IR, description: "On accepts IR at the transmitter; off ignores it." }
+    send:
+      - { models: [acm500], message: "IN {input:03d} IR {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_input_ir_voltage:
+    summary: Set an ACM500 transmitter's rear-panel IR voltage (IN iii IRVAL 5V/12V)
+    params:
+      input: *input_one
+      volts: *ir_volts
+    send:
+      - { models: [acm500], message: "IN {input:03d} IRVAL {volts}" }
+    returns: none
+
+  set_input_led_flash:
+    summary: Flash a transmitter's power LED until stopped, or stop it (IN iii FLS ON/OFF)
+    params:
+      input: *input_one
+      flashing: { type: bool, required: true, label: Flash, description: "On flashes the transmitter's LED to find it; off stops." }
+    send:
+      - { models: *all, message: "IN {input:03d} FLS {flashing:map.upper_onoff}" }
+    returns: none
+
+  flash_input_led_for:
+    summary: Flash a transmitter's power LED for a time (IN iii FLS ON time)
+    params:
+      input: *input_one
+      seconds: *led_seconds
+    send:
+      - { models: *all, message: "IN {input:03d} FLS ON {seconds}" }
+    returns: none
+
+  set_input_rx_mode:
+    summary: Turn an ACM500 transmitter into a receiver (IN iii RXMODE)
+    params: { input: *input_one }
+    send:
+      - { models: [acm500], message: "IN {input:03d} RXMODE" }
+    returns: none
+
+  set_input_stream_debug:
+    summary: Turn an ACM500 transmitter's stream debug on or off (IN iii STREAMDBG ON/OFF)
+    params:
+      input: *input_one
+      enabled: { type: bool, required: true, label: Stream debug, description: "On turns the transmitter's stream debugging on." }
+    send:
+      - { models: [acm500], message: "IN {input:03d} STREAMDBG {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_input_led_timeout:
+    summary: Set when a transmitter's front-panel LEDs turn off (IN iii LED ee)
+    params:
+      input: *input_one
+      timeout: *led_timeout
+    send:
+      - { models: *all, message: "IN {input:03d} LED {timeout}" }
+    returns: none
+
+  set_input_serial_guest:
+    summary: Set a transmitter's serial guest mode and port settings (IN iii SG ON/OFF BR br BIT bit)
+    params:
+      input: *input_one
+      enabled: *guest_enabled
+      baud: *guest_baud
+      format: *guest_format
+    send:
+      - { models: *gen2, message: "IN {input:03d} SG {enabled:map.upper_onoff} BR {baud:map.guest_baud_wide} BIT {format}" }
+    returns: none
+
+  set_input_serial_guest_sdvoe:
+    summary: Set an ACM500 transmitter's serial guest mode and port settings, 2400-115200 (IN iii SG ON/OFF BR br BIT bit)
+    params:
+      input: *input_one
+      enabled: *guest_enabled
+      baud: *guest_baud_sdvoe
+      format: *guest_format
+    send:
+      - { models: [acm500], message: "IN {input:03d} SG {enabled:map.upper_onoff} BR {baud:map.guest_baud_narrow} BIT {format}" }
+    returns: none
+
+  start_input_serial_guest:
+    summary: Open serial guest mode to a transmitter's RS-232 port on this connection (IN iii GUEST)
+    params: { input: *input_one }
+    send:
+      - { models: *all, message: "IN {input:03d} GUEST" }
+    returns: none
+
+  set_input_hdcp:
+    summary: Set a transmitter's HDCP override (IN iii HDCP BYP/V14/V22)
+    params:
+      input: *input_one
+      hdcp: *hdcp
+    send:
+      - { models: *gen2, message: "IN {input:03d} HDCP {hdcp}" }
+    returns: none
+
+  set_input_system_size:
+    summary: Set a transmitter's system size (IN iii SSM L/N)
+    params:
+      input: *input_one
+      size: *system_size
+    send:
+      - { models: *gen2, message: "IN {input:03d} SSM {size}" }
+    returns: none
+
+  set_input_arc_output:
+    summary: Take a transmitter's audio return channel from an output (IN iii EFR ooo)
+    params:
+      input: *input_one
+      output: *output_one
+    send:
+      - { models: *gen2, message: "IN {input:03d} EFR {output:03d}" }
+    returns: none
+
+  set_input_arc:
+    summary: Turn a transmitter's audio return channel on or off (IN iii ARC ON/OFF)
+    params:
+      input: *input_one
+      enabled: { type: bool, required: true, label: ARC, description: "On returns the chosen output's audio to the transmitter's source." }
+    send:
+      - { models: *gen2, message: "IN {input:03d} ARC {enabled:map.upper_onoff}" }
+    returns: none
+
+  get_input_status:
+    summary: Print one transmitter's detail report, or every transmitter's with 0; its lines update state (IN iii STATUS)
+    params: { input: *input_all }
+    send:
+      - { models: *all, message: "IN {input:03d} STATUS" }
+    returns: none
+
+  get_input_details:
+    summary: Print an ACM1000 transmitter's details (IN iii ASTPARAM)
+    params: { input: *input_one }
+    send:
+      - { models: [acm1000], message: "IN {input:03d} ASTPARAM" }
+    returns: none
+
+  set_input_hotplug:
+    summary: Turn an ACM1000 transmitter's hot plug on or off (IN iii HOTPLUG ON/OFF)
+    params:
+      input: *input_one
+      enabled: { type: bool, required: true, label: Hot plug, description: "On asserts hot plug to the source." }
+    send:
+      - { models: [acm1000], message: "IN {input:03d} HOTPLUG {enabled:map.upper_onoff}" }
+    returns: none
+
+  # ── Secondary stream (ACM500) ────────────────────────────────────────────
+  get_stream_status:
+    summary: Print an ACM500 transmitter's secondary stream report, or every one's with 0 (IN iii SS STATUS)
+    params: { input: *input_all }
+    send:
+      - { models: [acm500], message: "IN {input:03d} SS STATUS" }
+    returns: none
+
+  get_main_stream_url:
+    summary: Print an ACM500 transmitter's main stream URL (IN iii SS MSURL)
+    params: { input: *input_one }
+    send:
+      - { models: [acm500], message: "IN {input:03d} SS MSURL" }
+    returns: none
+
+  get_sub_stream_url:
+    summary: Print an ACM500 transmitter's sub stream URL (IN iii SS SSURL)
+    params: { input: *input_one }
+    send:
+      - { models: [acm500], message: "IN {input:03d} SS SSURL" }
+    returns: none
+
+  get_snapshot_url:
+    summary: Print an ACM500 transmitter's snapshot URL (IN iii SS SNAPURL)
+    params: { input: *input_one }
+    send:
+      - { models: [acm500], message: "IN {input:03d} SS SNAPURL" }
+    returns: none
+
+  set_main_stream:
+    summary: Set an ACM500 transmitter's main stream encoding (IN iii ss MAINENCATTR E R H V B)
+    params:
+      input: *input_one
+      codec: &codec { type: enum, values: [h264, h265], required: true, label: Codec, description: "H.264 or H.265." }
+      resolution: { type: enum, values: [auto, manual], required: true, label: Resolution, description: "auto follows the input; manual uses the width and height given." }
+      width: { type: int, min: 960, max: 1920, required: true, label: Width, description: "Stream width in pixels, an even number from 960 to 1920." }
+      height: { type: int, min: 540, max: 1080, required: true, label: Height, description: "Stream height in pixels, an even number from 540 to 1080." }
+      bitrate: { type: enum, values: ["1024", "2048", "4096", "6144", "8192", "10240", "12288", "16384", "20480"], required: true, label: Bit rate,
+                 description: "The stream's bit rate in kbit/s." }
+    send:
+      - { models: [acm500], message: "IN {input:03d} ss MAINENCATTR E {codec:map.stream_codec} R {resolution} H {width} V {height} B {bitrate:map.main_bitrate}" }
+    returns: none
+
+  set_sub_stream:
+    summary: Set an ACM500 transmitter's sub stream encoding (IN iii ss SUBENCATTR E H V B)
+    params:
+      input: *input_one
+      codec: *codec
+      width: { type: int, min: 320, max: 960, required: true, label: Width, description: "Stream width in pixels, an even number from 320 to 960." }
+      height: { type: int, min: 180, max: 540, required: true, label: Height, description: "Stream height in pixels, an even number from 180 to 540." }
+      bitrate: { type: enum, values: ["128", "256", "512", "1024", "2048"], required: true, label: Bit rate, description: "The stream's bit rate in kbit/s." }
+    send:
+      - { models: [acm500], message: "IN {input:03d} ss SUBENCATTR E {codec:map.stream_codec} H {width} V {height} B {bitrate:map.sub_bitrate}" }
+    returns: none
+
+  set_stream_enabled:
+    summary: Turn an ACM500 transmitter's main, sub or picture stream on or off (IN iii SS MAIN/SUB/PIC ON/OFF)
+    params:
+      input: *input_one
+      stream: { type: enum, values: [MAIN, SUB, PIC], required: true, label: Stream, description: "MAIN the main stream, SUB the sub stream, PIC the still picture stream." }
+      enabled: { type: bool, required: true, label: Enabled, description: "On runs the stream; off stops it." }
+    send:
+      - { models: [acm500], message: "IN {input:03d} SS {stream} {enabled:map.upper_onoff}" }
+    returns: none
+
+  # ── EDID ─────────────────────────────────────────────────────────────────
+  copy_edid:
+    summary: Copy a display's EDID from an output to an input (EDID iii CP ooo)
+    params:
+      input: *input_one
+      output: *output_one
+    send:
+      - { models: *all, message: "EDID {input:03d} CP {output:03d}" }
+    returns: none
+
+  set_input_edid:
+    summary: Give an input one of the built-in EDIDs (EDID iii DF zz)
+    params:
+      input: *input_one
+      edid: { type: int, min: 0, max: 33, required: true, label: EDID,
+              description: "The EDID preset: 00-33 on the ACM210 and on ACM1000 IP300-350 systems (15 4K30 4:4:4 7.1 by default), 00-18 on ACM1000 IP200-250 systems, 00-23 on the ACM500 (22 and 23 the user EDIDs)." }
+    send:
+      - { models: *all, message: "EDID {input:03d} DF {edid:02d}" }
+    returns: none
+
+  load_user_edid:
+    summary: Set an ACM500 user EDID from the file uploaded in its web GUI (EDID iii DL)
+    params:
+      slot: { type: int, min: 1, max: 2, required: true, label: User EDID, description: "The user EDID slot, 1 or 2." }
+    send:
+      - { models: [acm500], message: "EDID {slot:03d} DL" }
+    returns: none
+
+  # ── Presets, groups and macros (ACM1000) ─────────────────────────────────
+  recall_preset:
+    summary: Recall a preset set up in the ACM1000's web GUI (PRE xx AP)
+    params:
+      preset: &acm_preset { type: int, min: 1, max: 99, required: true, label: Preset, description: "The preset's index in the ACM1000's web GUI, from 1." }
+    send:
+      - { models: [acm1000], message: "PRE {preset:02d} AP" }
+    returns: none
+
+  trigger_macro:
+    summary: Run a macro set up in the ACM1000's web GUI (MACRO xx)
+    params:
+      macro: { type: int, min: 1, max: 99, required: true, label: Macro, description: "The macro's index in the ACM1000's web GUI, from 1." }
+    send:
+      - { models: [acm1000], message: "MACRO {macro:02d}" }
+    returns: none
+
+  add_preset_route:
+    summary: Add a transmitter-to-receiver route to an ACM1000 preset (PRE idx ADD RX ooo TX iii)
+    params:
+      preset: *acm_preset
+      output: *output_one
+      input: *input_one
+    send:
+      - { models: [acm1000], message: "PRE {preset:02d} ADD RX {output:03d} TX {input:03d}" }
+    returns: none
+
+  remove_preset_route:
+    summary: Remove a transmitter-to-receiver route from an ACM1000 preset (PRE idx RM RX ooo TX iii)
+    params:
+      preset: *acm_preset
+      output: *output_one
+      input: *input_one
+    send:
+      - { models: [acm1000], message: "PRE {preset:02d} RM RX {output:03d} TX {input:03d}" }
+    returns: none
+
+  set_preset_enabled:
+    summary: Enable or disable an ACM1000 preset (PRE idx ON/OFF)
+    params:
+      preset: *acm_preset
+      enabled: { type: bool, required: true, label: Enabled, description: "On makes the preset available; off disables it." }
+    send:
+      - { models: [acm1000], message: "PRE {preset:02d} {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_group_enabled:
+    summary: Enable or disable an ACM1000 receiver group (GRP idx ON/OFF)
+    params:
+      group: &acm_group { type: int, min: 1, max: 99, required: true, label: Group, description: "The group's index in the ACM1000's web GUI, from 1." }
+      enabled: { type: bool, required: true, label: Enabled, description: "On makes the group available; off disables it." }
+    send:
+      - { models: [acm1000], message: "GRP {group:02d} {enabled:map.upper_onoff}" }
+    returns: none
+
+  add_group_output:
+    summary: Add a receiver to an ACM1000 group (GRP idx AD ooo)
+    params:
+      group: *acm_group
+      output: *output_one
+    send:
+      - { models: [acm1000], message: "GRP {group:02d} AD {output:03d}" }
+    returns: none
+
+  remove_group_output:
+    summary: Remove a receiver from an ACM1000 group (GRP idx RM ooo)
+    params:
+      group: *acm_group
+      output: *output_one
+    send:
+      - { models: [acm1000], message: "GRP {group:02d} RM {output:03d}" }
+    returns: none
+
+  route_group:
+    summary: Route an input to every receiver of an ACM1000 group (GRP idx FR iii)
+    params:
+      group: *acm_group
+      input: *input_one
+    send:
+      - { models: [acm1000], message: "GRP {group:02d} FR {input:03d}" }
+    returns: none
+
+  # ── Video walls ──────────────────────────────────────────────────────────
+  create_video_wall:
+    summary: Create a video wall of columns by rows (VW idx CREATE ccXrr name)
+    params:
+      wall: &wall { type: int, min: 1, max: 9, required: true, label: Video wall, description: "The video wall, 1-9." }
+      columns: { type: int, min: 1, max: 9, required: true, label: Columns, description: "Screens across, 1-9." }
+      rows: { type: int, min: 1, max: 9, required: true, label: Rows, description: "Screens down, 1-9." }
+      name: *device_name
+    send:
+      - { models: *all, message: "VW {wall:02d} CREATE {columns:02d}X{rows:02d} {name}" }
+    returns: none
+
+  rename_video_wall:
+    summary: Rename a video wall (VW idx NAME name)
+    params:
+      wall: *wall
+      name: *device_name
+    send:
+      - { models: *all, message: "VW {wall:02d} NAME {name}" }
+    returns: none
+
+  delete_video_wall:
+    summary: Delete a video wall (VW idx DEL)
+    params: { wall: *wall }
+    send:
+      - { models: *all, message: "VW {wall:02d} DEL" }
+    returns: none
+
+  place_video_wall_output:
+    summary: Put a receiver at a screen position of a video wall, or clear the position (VW idx OUT ooo HhhVvv)
+    params:
+      wall: *wall
+      output: { type: int, min: 0, max: 767, required: true, label: Output, description: "The receiver's output ID, or 0 to clear the position." }
+      column: &column { type: int, min: 1, max: 9, required: true, label: Column, description: "The screen's column, from 1 at the left." }
+      row: &row { type: int, min: 1, max: 9, required: true, label: Row, description: "The screen's row, from 1 at the top." }
+    send:
+      - { models: *all, message: "VW {wall:02d} OUT {output:03d} H{column:02d}V{row:02d}" }
+    returns: none
+
+  create_video_wall_config:
+    summary: Create a configuration of a video wall (VW idx C cidx CREATE name)
+    params:
+      wall: *wall
+      config: &wall_config { type: int, min: 1, max: 9, required: true, label: Configuration, description: "The wall's configuration, 1-9." }
+      name: *device_name
+    send:
+      - { models: *all, message: "VW {wall:02d} C {config:02d} CREATE {name}" }
+    returns: none
+
+  rename_video_wall_config:
+    summary: Rename a video wall configuration (VW idx C cidx NAME name)
+    params:
+      wall: *wall
+      config: *wall_config
+      name: *device_name
+    send:
+      - { models: *all, message: "VW {wall:02d} C {config:02d} NAME {name}" }
+    returns: none
+
+  apply_video_wall_config:
+    summary: Apply a video wall configuration (VW idx C cidx APPLY)
+    params:
+      wall: *wall
+      config: *wall_config
+    send:
+      - { models: *all, message: "VW {wall:02d} C {config:02d} APPLY" }
+    returns: none
+
+  delete_video_wall_config:
+    summary: Delete a video wall configuration (VW idx C cidx DEL)
+    params:
+      wall: *wall
+      config: *wall_config
+    send:
+      - { models: *all, message: "VW {wall:02d} C {config:02d} DEL" }
+    returns: none
+
+  set_video_wall_group_screen:
+    summary: Put a screen of a video wall configuration in a group, which shows one picture across its screens (VW idx C cidx G gidx HhhVvv)
+    params:
+      wall: *wall
+      config: *wall_config
+      group: &wall_group { type: enum, values: [A, B, C, D, E, F, G, H, I, J], required: true, label: Group, description: "The screen group, A-J." }
+      column: *column
+      row: *row
+    send:
+      - { models: *all, message: "VW {wall:02d} C {config:02d} G {group} H{column:02d}V{row:02d}" }
+    returns: none
+
+  route_video_wall_group:
+    summary: Route an input to a group of a video wall configuration (VW idx C cidx G gidx FR iii)
+    params:
+      wall: *wall
+      config: *wall_config
+      group: *wall_group
+      input: *input_one
+    send:
+      - { models: *all, message: "VW {wall:02d} C {config:02d} G {group} FR {input:03d}" }
+    returns: none
+
+  set_video_wall_single_screen:
+    summary: Make a screen of a video wall configuration show its own picture (VW idx C cidx S HhhVvv)
+    params:
+      wall: *wall
+      config: *wall_config
+      column: *column
+      row: *row
+    send:
+      - { models: *all, message: "VW {wall:02d} C {config:02d} S H{column:02d}V{row:02d}" }
+    returns: none
+
+  route_video_wall_single_screen:
+    summary: Route an input to a single screen of a video wall configuration (VW idx C cidx S HhhVvv FR iii)
+    params:
+      wall: *wall
+      config: *wall_config
+      column: *column
+      row: *row
+      input: *input_one
+    send:
+      - { models: *all, message: "VW {wall:02d} C {config:02d} S H{column:02d}V{row:02d} FR {input:03d}" }
+    returns: none
+
+  set_video_wall_screen_width:
+    summary: Set a video wall screen's outer and visible width for bezel correction (VW idx HhhVvv OWaa VWww)
+    params:
+      wall: *wall
+      column: *column
+      row: *row
+      outer: &bezel_outer { type: int, min: 100, max: 1000, required: true, label: Outer size, description: "The screen's outside size, bezel included, 100-1000 in the ACM's units." }
+      visible: &bezel_visible { type: int, min: 100, max: 1000, required: true, label: Visible size, description: "The screen's picture size, 100-1000 in the same units." }
+    send:
+      - { models: *all, message: "VW {wall:02d} H{column:02d}V{row:02d} OW{outer} VW{visible}" }
+    returns: none
+
+  set_video_wall_screen_height:
+    summary: Set a video wall screen's outer and visible height for bezel correction (VW idx HhhVvv OHaa VHww)
+    params:
+      wall: *wall
+      column: *column
+      row: *row
+      outer: *bezel_outer
+      visible: *bezel_visible
+    send:
+      - { models: *all, message: "VW {wall:02d} H{column:02d}V{row:02d} OH{outer} VH{visible}" }
+    returns: none
+
+  get_video_wall_status:
+    summary: Print one video wall's report (VW idx STATUS)
+    params: { wall: *wall }
+    send:
+      - { models: *all, message: "VW {wall:02d} STATUS" }
+    returns: none
+
+  get_all_video_wall_status:
+    summary: Print every video wall's report (VW STATUS)
+    send:
+      - { models: *all, message: "VW STATUS" }
+    returns: none
+
+  # ── Project ──────────────────────────────────────────────────────────────
+  scan:
+    summary: Scan the video network for transmitters and receivers (SCAN)
+    send:
+      - { models: *all, message: "SCAN" }
+    returns: none
+
+  get_scan_status:
+    summary: Print the scan results (SCAN STATUS)
+    send:
+      - { models: *all, message: "SCAN STATUS" }
+    returns: none
+
+  reset_scan:
+    summary: Clear the scan results (SCAN RESET)
+    send:
+      - { models: *all, message: "SCAN RESET" }
+    returns: none
+
+  set_scan_osd:
+    summary: Show or hide each receiver's scan index on its display (SCAN OSD ON/OFF)
+    params:
+      shown: { type: bool, required: true, label: Show index, description: "On shows each receiver's scan index on screen." }
+    send:
+      - { models: *gen2, message: "SCAN OSD {shown:map.upper_onoff}" }
+    returns: none
+
+  reset_assignments:
+    summary: Clear every input, output, video wall and scan of the project (ASSIGN RESET)
+    send:
+      - { models: *all, message: "ASSIGN RESET" }
+    returns: none
+
+  assign_default_input:
+    summary: Add the transmitter at the default address as an input, or have it replace one (ASSIGN DF IN iii [REPLACE])
+    params:
+      input: *input_one
+      replace: &replace { type: bool, default: false, label: Replace, description: "On replaces the endpoint that has this ID; off adds the new one." }
+    send:
+      - { models: *gen2, message: "ASSIGN DF IN {input:03d}{replace:map.replace_word}" }
+    returns: none
+
+  assign_scanned_input:
+    summary: Add a scanned transmitter as an input, or have it replace one (ASSIGN INDEX ddd IN iii [REPLACE])
+    params:
+      index: &scan_index { type: int, min: 1, max: 767, required: true, label: Scan index, description: "The device's index in the scan results, from 1." }
+      input: *input_one
+      replace: *replace
+    send:
+      - { models: *gen2, message: "ASSIGN INDEX {index:02d} IN {input:03d}{replace:map.replace_word}" }
+    returns: none
+
+  assign_default_output:
+    summary: Add the receiver at the default address as an output, or have it replace one (ASSIGN DF OUT ooo [REPLACE])
+    params:
+      output: *output_one
+      replace: *replace
+    send:
+      - { models: *gen2, message: "ASSIGN DF OUT {output:03d}{replace:map.replace_word}" }
+    returns: none
+
+  assign_scanned_output:
+    summary: Add a scanned receiver as an output, or have it replace one (ASSIGN INDEX ddd OUT ooo [REPLACE])
+    params:
+      index: *scan_index
+      output: *output_one
+      replace: *replace
+    send:
+      - { models: *gen2, message: "ASSIGN INDEX {index:02d} OUT {output:03d}{replace:map.replace_word}" }
+    returns: none
+
+  assign_auto:
+    summary: Add every newly scanned device to the project (ASSIGN AUTO)
+    send:
+      - { models: *all, message: "ASSIGN AUTO" }
+    returns: none
+
+  # ── GPIO ─────────────────────────────────────────────────────────────────
+  set_gpio_direction:
+    summary: Make a GPIO port an input or an output (GPIO gg DIR IN/OUT)
+    params:
+      port: &gpio_port { type: int, min: 1, max: 4, required: true, label: GPIO port, description: "The GPIO port, 1-4 (on the ACM1000, 1-2 are outputs and 3-4 inputs)." }
+      direction: { type: enum, values: [IN, OUT], required: true, label: Direction, description: "IN reads a level; OUT drives one." }
+    send:
+      - { models: [acm210, acm500], message: "GPIO {port:02d} DIR {direction}" }
+    returns: none
+
+  set_gpio_output:
+    summary: Drive a GPIO output high or low (GPIO gg SET 0/1)
+    params:
+      port: *gpio_port
+      high: { type: bool, required: true, label: High, description: "On drives the output high; off low (0 V)." }
+    send:
+      - { models: *all, message: "GPIO {port:02d} SET {high:bool01}" }
+    returns: none
+
+  read_gpio:
+    summary: Print a GPIO port's input level (GPIO gg GET)
+    params: { port: *gpio_port }
+    send:
+      - { models: *all, message: "GPIO {port:02d} GET" }
+    returns: none
+
+  get_gpio_status:
+    summary: Print every GPIO port's report (GPIO STATUS)
+    send:
+      - { models: *all, message: "GPIO STATUS" }
+    returns: none
+
+  set_gpio_vcc_voltage:
+    summary: Set the ACM1000's GPIO VCC pin voltage (GPIO VCC SET VOLTS 5/12)
+    params:
+      volts: &gpio_volts { type: enum, values: ["5", "12"], required: true, label: Voltage, description: "5 or 12 volts." }
+    send:
+      - { models: [acm1000], message: "GPIO VCC SET VOLTS {volts}" }
+    returns: none
+
+  set_gpio_voltage:
+    summary: Set an ACM1000 GPIO port's voltage (GPIO gg SET VOLTS 5/12)
+    params:
+      port: *gpio_port
+      volts: *gpio_volts
+    send:
+      - { models: [acm1000], message: "GPIO {port:02d} SET VOLTS {volts}" }
+    returns: none
+
+  set_gpio_current:
+    summary: Set an ACM1000 GPIO port's current low or high (GPIO gg SET CURR 0/1)
+    params:
+      port: *gpio_port
+      high: { type: bool, required: true, label: High current, description: "On selects the port's high current; off its low current." }
+    send:
+      - { models: [acm1000], message: "GPIO {port:02d} SET CURR {high:bool01}" }
+    returns: none
+
+  # ── Network ──────────────────────────────────────────────────────────────
+  set_control_dhcp:
+    summary: Turn DHCP on the control LAN (LAN2) on or off (NET LAN2 DHCP ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: DHCP, description: "On takes the control port's address from DHCP; off uses its static address." }
+    send:
+      - { models: *all, message: "NET LAN2 DHCP {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_ip_address:
+    summary: Set a LAN port's static IP address, applied by a network reboot (NET LAN1/LAN2 IP a.b.c.d)
+    params:
+      lan: &lan { type: enum, values: [LAN1, LAN2], required: true, label: Port,
+                  description: "LAN1 the video LAN (PoE) the endpoints are on, LAN2 the control LAN." }
+      address: &ipv4 { type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$', required: true,
+                       label: Address, description: "An IPv4 address in dot-decimal notation." }
+    send:
+      - { models: *all, message: "NET {lan} IP {address}" }
+    returns: none
+
+  set_gateway:
+    summary: Set a LAN port's gateway, applied by a network reboot (NET LAN1/LAN2 GW a.b.c.d)
+    params:
+      lan: *lan
+      address: *ipv4
+    send:
+      - { models: *all, message: "NET {lan} GW {address}" }
+    returns: none
+
+  set_subnet_mask:
+    summary: Set a LAN port's subnet mask, applied by a network reboot (NET LAN1/LAN2 SM a.b.c.d)
+    params:
+      lan: *lan
+      address: *ipv4
+    send:
+      - { models: *all, message: "NET {lan} SM {address}" }
+    returns: none
+
+  network_reboot:
+    summary: Restart the network to apply new settings (NET RB)
+    send:
+      - { models: *all, message: "NET RB" }
+    returns: none
+
+  set_telnet:
+    summary: Turn the Telnet server on or off (NET TN ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: Telnet, description: "On runs Telnet; off stops it, ending control over the network." }
+    send:
+      - { models: [acm210], message: "NET TN {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_telnet_port:
+    summary: Set the Telnet port (NET TN port)
+    params:
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "The Telnet port; 23 by default." }
+    send:
+      - { models: *all, message: "NET TN {port}" }
+    returns: none
+
+  set_ssh:
+    summary: Turn the SSH server on or off (NET SSH ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: SSH, description: "On serves the API over SSH too." }
+    send:
+      - { models: [acm210], message: "NET SSH {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_ssh_port:
+    summary: Set the SSH port (NET SSH port)
+    params:
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "The SSH port." }
+    send:
+      - { models: [acm210], message: "NET SSH {port}" }
+    returns: none
+
+  set_web:
+    summary: Turn the web GUI on or off (NET WEB ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: Web GUI, description: "On serves the ACM's web GUI." }
+    send:
+      - { models: [acm210], message: "NET WEB {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_https:
+    summary: Turn the web GUI's HTTPS access on or off (NET HTTPS ON/OFF)
+    params:
+      enabled: { type: bool, required: true, label: HTTPS, description: "On serves the web GUI over HTTPS." }
+    send:
+      - { models: [acm210], message: "NET HTTPS {enabled:map.upper_onoff}" }
+    returns: none
+
+  set_dns_name:
+    summary: Set the DNS domain name (NET DNS name)
+    params:
+      name: { type: string, pattern: '^[A-Za-z0-9.-]{1,63}$', required: true, label: Name, description: "The domain name." }
+    send:
+      - { models: *gen2, message: "NET DNS {name}" }
+    returns: none
+
+state:
+  model:                     { type: string, description: "Model named in the report title, such as ACM210 (IP Control Box ... Status Info)" }
+  firmware:                  { type: string, description: "ACM firmware version (FW Version)" }
+  power:                     { type: bool, description: "Whether the system is on (Power column)" }
+  ir:                        { type: bool, description: "Whether the ACM's IR control input is on (IR column)" }
+  serial_baud:               { type: int, description: "RS-232 baud rate (Baud column)" }
+  inputs.*.edid:             { type: int, description: "Built-in EDID preset the input presents (EDID column, DFzzz)" }
+  inputs.*.ip_address:       { type: string, description: "Transmitter's address on the video LAN, as the report writes it" }
+  inputs.*.online:           { type: bool, description: "Whether the transmitter answers on the network (NET column)" }
+  inputs.*.signal:           { type: bool, description: "Whether the transmitter has a source signal (Sig column)" }
+  inputs.*.firmware:         { type: string, description: "Transmitter firmware (Ver, IN STATUS)" }
+  inputs.*.audio:            { type: string, description: "Transmitter audio source, such as HDMI (Aud, IN STATUS)" }
+  inputs.*.multicast:        { type: bool, description: "Whether the transmitter streams multicast (MCast, IN STATUS)" }
+  inputs.*.name:             { type: string, description: "Transmitter name (Name, IN STATUS)" }
+  outputs.*.input:           { type: int, description: "Input routed to the output (FromIn column)" }
+  outputs.*.ip_address:      { type: string, description: "Receiver's address on the video LAN, as the report writes it" }
+  outputs.*.online:          { type: bool, description: "Whether the receiver answers on the network (NET column)" }
+  outputs.*.connected:       { type: bool, description: "Whether a display is connected (HDMI or HPD column)" }
+  outputs.*.resolution:      { type: int, description: "Output resolution code, 0 bypass (Res column)" }
+  outputs.*.mode:            { type: string, description: "Output mode: MX, or VW and the wall number such as VW02 (Mode column)" }
+  outputs.*.firmware:        { type: string, description: "Receiver firmware (Ver, OUT STATUS)" }
+  outputs.*.rotation:        { type: int, description: "Rotation code, 0 none, 1-3 90-270 degrees (Rotate, OUT STATUS)" }
+  outputs.*.name:            { type: string, description: "Receiver name (Name, OUT STATUS)" }
+  network.video.dhcp:        { type: bool, description: "Whether the video LAN (LAN1) uses DHCP" }
+  network.video.ip_address:  { type: string, description: "Video LAN address, as the report writes it" }
+  network.video.gateway:     { type: string, description: "Video LAN gateway" }
+  network.video.subnet_mask: { type: string, description: "Video LAN subnet mask" }
+  network.video.mac_address: { type: string, description: "Video LAN MAC address" }
+  network.control.dhcp:        { type: bool, description: "Whether the control LAN (LAN2) uses DHCP" }
+  network.control.ip_address:  { type: string, description: "Control LAN address, as the report writes it" }
+  network.control.gateway:     { type: string, description: "Control LAN gateway" }
+  network.control.subnet_mask: { type: string, description: "Control LAN subnet mask" }
+  network.control.mac_address: { type: string, description: "Control LAN MAC address" }
+  network.telnet_port:       { type: int, description: "Telnet port" }
+
+telemetry:
+  poll:
+    - every_ms: 10000
+      send: ["STATUS"]
+  updates:
+    # The STATUS report (manual p.45): a title, FW Version, then the system
+    # row, an input table (In EDID IP NET/Sig), an output table (Out FromIn
+    # IP NET/HDMI Res Mode), the LAN table and the Telnet and MAC row.
+    - match: '^\s*IP Control Box (\S+) Status Info\s*$'
+      state: { model: "{1}" }
+    - match: '^\s*FW Version:\s*(\S+)\s*$'
+      state: { firmware: "{1}" }
+    - match: '^(On|Off)\s+(On|Off)\s+(\d{4,6})\s*$'
+      state:
+        power: { value: "{1}", map: { "On": true, "Off": false } }
+        ir: { value: "{2}", map: { "On": true, "Off": false } }
+        serial_baud: "{3}"
+    - match: '^(\d{3})\s+DF(\d{3})\s+(\d{1,3}(?:\.\d{1,3}){3})\s+(On|Off)\s*/\s*(On|Off)\s*$'
+      state:
+        "inputs.{1}.edid": "{2}"
+        "inputs.{1}.ip_address": "{3}"
+        "inputs.{1}.online": { value: "{4}", map: { "On": true, "Off": false } }
+        "inputs.{1}.signal": { value: "{5}", map: { "On": true, "Off": false } }
+    - match: '^(\d{3})\s+(\d{3})\s+(\d{1,3}(?:\.\d{1,3}){3})\s+(On|Off)\s*/\s*(On|Off)\s+(\d+)\s+(\S+)\s*$'
+      state:
+        "outputs.{1}.input": "{2}"
+        "outputs.{1}.ip_address": "{3}"
+        "outputs.{1}.online": { value: "{4}", map: { "On": true, "Off": false } }
+        "outputs.{1}.connected": { value: "{5}", map: { "On": true, "Off": false } }
+        "outputs.{1}.resolution": "{6}"
+        "outputs.{1}.mode": "{7}"
+    - match: '^01_POE\s+(On|Off)\s+(\d{1,3}(?:\.\d{1,3}){3})\s+(\d{1,3}(?:\.\d{1,3}){3})\s+(\d{1,3}(?:\.\d{1,3}){3})\s*$'
+      state:
+        network.video.dhcp: { value: "{1}", map: { "On": true, "Off": false } }
+        network.video.ip_address: "{2}"
+        network.video.gateway: "{3}"
+        network.video.subnet_mask: "{4}"
+    - match: '^02_CTRL\s+(On|Off)\s+(\d{1,3}(?:\.\d{1,3}){3})\s+(\d{1,3}(?:\.\d{1,3}){3})\s+(\d{1,3}(?:\.\d{1,3}){3})\s*$'
+      state:
+        network.control.dhcp: { value: "{1}", map: { "On": true, "Off": false } }
+        network.control.ip_address: "{2}"
+        network.control.gateway: "{3}"
+        network.control.subnet_mask: "{4}"
+    - match: '^(\d{1,5})\s+([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})\s+([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})\s*$'
+      state:
+        network.telnet_port: "{1}"
+        network.video.mac_address: "{2}"
+        network.control.mac_address: "{3}"
+    # OUT xxx STATUS (manual p.45): Out Net HPD Ver Mode Res Rotate Name.
+    - match: '^(\d{3})\s+(On|Off)\s+(On|Off)\s+(\S+)\s+(\S+)\s+(\d+)\s+(\d)\s+(\S.*?)\s*$'
+      state:
+        "outputs.{1}.online": { value: "{2}", map: { "On": true, "Off": false } }
+        "outputs.{1}.connected": { value: "{3}", map: { "On": true, "Off": false } }
+        "outputs.{1}.firmware": "{4}"
+        "outputs.{1}.mode": "{5}"
+        "outputs.{1}.resolution": "{6}"
+        "outputs.{1}.rotation": "{7}"
+        "outputs.{1}.name": "{8}"
+    # IN xxx STATUS (manual p.46): In Net Sig Ver EDID Aud MCast Name.
+    - match: '^(\d{3})\s+(On|Off)\s+(On|Off)\s+(\S+)\s+DF(\d{3})\s+(\S+)\s+(On|Off)\s+(\S.*?)\s*$'
+      state:
+        "inputs.{1}.online": { value: "{2}", map: { "On": true, "Off": false } }
+        "inputs.{1}.signal": { value: "{3}", map: { "On": true, "Off": false } }
+        "inputs.{1}.firmware": "{4}"
+        "inputs.{1}.edid": "{5}"
+        "inputs.{1}.audio": "{6}"
+        "inputs.{1}.multicast": { value: "{7}", map: { "On": true, "Off": false } }
+        "inputs.{1}.name": "{8}"
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      factory_reset, reset_network, factory_reset_all (RESET ALL, confirmed
+      with Yes at once), reset_assignments (ASSIGN RESET), reset_output,
+      reset_input, delete_output, delete_input, delete_video_wall and the
+      network commands change the system at once and cannot be undone from
+      here: a reset project has to be scanned and assigned again, and a
+      network change can end control. route and other commands on output 0
+      change every receiver at once.
+  - models: [all]
+    severity: warning
+    text: >
+      Blustream documents no answer to any command, so commands report
+      unverified and a refused one goes unnoticed. State is read from the
+      STATUS report every 10 s, and from the OUT and IN detail reports when
+      they are asked for; a change shows at the next report. The layouts read
+      are the manual's samples, printed by an ACM200; ACM210, ACM500 and
+      ACM1000 reports may differ.
+  - models: [all]
+    severity: info
+    text: >
+      set_output_resolution codes differ by model. ACM210: 0 bypass,
+      1 1080p50, 2 1080p60, 3 720p60, 4 720p50, 5 1280x1024, 6 1024x768,
+      7 1360x768, 8 1440x900, 9 1680x1050, 10 2160p30, 11 2160p24,
+      12 2160p50, 13 2160p60, 14-17 DCI 4K at 25, 30, 50 and 60 Hz,
+      18 1280x800, 19 1920x1200 (60 Hz unless stated). ACM500: 0 bypass,
+      1-2 720p50/60, 3-7 1080p24/25/30/50/60, 8-12 2160p24/25/30/50/60,
+      13-17 4096x2160 at 24/25/30/50/60, 18 1280x768, 19 1360x768,
+      20 1680x1050, 21 1920x1200. ACM1000: 0, 3, 4 and 7-23 on IP300-350,
+      0-13 on IP200-250 (its help text gives no table).
+  - models: [all]
+    severity: info
+    text: >
+      Serial guest mode (start_output_serial_guest, start_input_serial_guest)
+      passes this connection's text to the endpoint's RS-232 port until
+      close_serial_guest; commands sent meanwhile go to that device, not the
+      ACM.
+  - models: [acm1000]
+    severity: info
+    text: >
+      The ACM1000's EVENT MACRO scheduler commands are not here: the help
+      text writes their fields as TIME:HH:SS, DAY:DD and SS:1 without
+      explaining them. Presets, groups and macros themselves are built in
+      the ACM1000's web GUI; the ACM1000 help text gives no range for their
+      indexes.
