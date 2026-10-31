@@ -1,6 +1,6 @@
 //! Video disk servers over VDCP (the Video Disk Control Protocol, Louth's,
 //! now Imagine Communications'): the `vdcp` integration, over TCP to the
-//! server's VDCP port or a serial-to-Ethernet converter's.
+//! server's own VDCP port.
 //!
 //! - A message is STX (02), a byte count (the bytes from CMD-1 to the last
 //!   data byte), CMD-1 (a command type and a unit address), CMD-2, the data

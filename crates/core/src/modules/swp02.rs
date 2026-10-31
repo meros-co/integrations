@@ -25,9 +25,8 @@
 //!   every `poll_ms`, as Pro-Bel controllers interrogate in the background
 //!   (§3.3.1), and by the CONNECTED messages the router broadcasts; after a
 //!   GO that set crosspoints they are interrogated again at once.
-//! - SW-P-02 over TCP has no standard port: the router's (or a
-//!   serial-to-Ethernet converter's) is given when the device is opened. A
-//!   connection that drops is opened again after 1 s, doubling to 30 s. The
+//! - SW-P-02 over TCP has no standard port: the router's own is given when
+//!   the device is opened. A connection that drops is opened again after 1 s, doubling to 30 s. The
 //!   connection being open says nothing of the router: the device is
 //!   connected once a message arrives, and disconnected when three requests
 //!   in a row go unanswered.

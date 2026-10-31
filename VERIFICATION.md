@@ -3513,10 +3513,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## probel-swp02 — Probel / Grass Valley SW-P-02 routers
 
-- [ ] Confirm SW-P-02 over TCP carries the same messages as the serial line, with nothing added, and find the port routers and gateways use. ([specs/probel-swp02.yaml:143](specs/probel-swp02.yaml#L143))
+- [ ] Confirm SW-P-02 over TCP carries the same messages as the serial line, with nothing added, and find the port routers and controllers use. ([specs/probel-swp02.yaml:143](specs/probel-swp02.yaml#L143))
 - [ ] Check that a router answers within the 1 s timeout, and what a router that does not implement a command (the salvo) sends. ([specs/probel-swp02.yaml:115](specs/probel-swp02.yaml#L115))
 - [ ] Record what multiplier bit 3 means on each router tested (bad source, crosspoint updates disabled, or unused). ([specs/probel-swp02.yaml:135](specs/probel-swp02.yaml#L135))
-- [ ] On an NK-3RD, confirm odd parity is needed and that CONNECTED is broadcast after a take. ([specs/probel-swp02.yaml:62](specs/probel-swp02.yaml#L62))
 
 ## probel-swp08 — Probel / Grass Valley SW-P-08 routers
 

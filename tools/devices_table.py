@@ -92,7 +92,7 @@ NATIVE = {
     "pigpio": "pigpio socket interface over TCP 8888",
     "posistagenet": "PosiStageNet over UDP multicast 236.10.10.10:56565; receives and sends",
     "ptp": "PTP v2 over UDP 319 and 320, multicast 224.0.1.129 and 224.0.0.107; listens only",
-    "probel-swp02": "SW-P-02 binary messages over TCP (the router's or a serial-to-Ethernet converter's port)",
+    "probel-swp02": "SW-P-02 binary messages over the router's own TCP port",
     "probel-swp08": "SW-P-08 binary frames over TCP (2008 by default)",
     "qsys": "QRC JSON-RPC over TCP 1710",
     "sacn": "sACN (E1.31) over UDP 5568, multicast 239.255.x.x and unicast; sends and receives",
@@ -109,7 +109,7 @@ NATIVE = {
     "tsl-umd-display": "TSL UMD over UDP, or TCP for V5.0; sends",
     "tsl-umd-listener": "TSL UMD over UDP, or TCP for V3.1 and V5.0; receives",
     "ups-mib": "SNMP v1, v2c or v3 over UDP 161 (UPS-MIB, RFC 1628); traps and informs",
-    "vdcp": "VDCP binary messages over TCP (the server's or a serial-to-Ethernet converter's port)",
+    "vdcp": "VDCP binary messages over the server's own TCP port",
     "visca": "VISCA over IP (UDP 52381), or raw VISCA over TCP or UDP",
     "vmix": "TCP API 8099",
 }
