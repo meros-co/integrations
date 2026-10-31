@@ -131,6 +131,8 @@ mod kissbox;
 mod lake_dlm;
 #[cfg(feature = "grandma2")]
 mod ma_msc;
+#[cfg(feature = "meld-studio")]
+mod meld;
 #[cfg(feature = "meros-camera")]
 mod meros_camera;
 #[cfg(feature = "meros-camera")]
@@ -479,6 +481,8 @@ pub(crate) fn construct(
                     .into(),
             ),
         },
+        #[cfg(feature = "meld-studio")]
+        "meld-studio" => Ok(Box::new(meld::Meld::new(context))),
         #[cfg(feature = "meros-camera")]
         "meros-camera" => Ok(Box::new(meros_camera::MerosCamera::new(context))),
         #[cfg(feature = "labgruppen-lake")]

@@ -73,6 +73,7 @@ NATIVE = {
     "http-listener": "HTTP/1.1 requests from any sender (webhooks); receives",
     "http-snapshot": "HTTP JPEG snapshots",
     "grassvalley-amp": "AMP as hexadecimal text over TCP 3811",
+    "meld-studio": "Qt WebChannel JSON over WebSocket 13376",
     "meros-camera": "HTTP 8790 (JSON, NDJSON event stream, binary preview)",
     "middle-atlantic-racklink": "RackLink binary protocol over TCP 60000",
     "midi-show-control": "MSC SysEx over RTP-MIDI (UDP 5004/5005)",

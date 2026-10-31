@@ -3013,6 +3013,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the status of a successful preset apply (200 is assumed) and of hide_still (204 is assumed, as for show). ([specs/megapixel-helios.yaml:605](specs/megapixel-helios.yaml#L605))
 - [ ] Check that the processor's receivers appear under dev.receivers keyed by MAC address in the state result and in updates, with the fields the 6.1.4 table lists. ([specs/megapixel-helios.yaml:704](specs/megapixel-helios.yaml#L704))
 
+## meld-studio — Meld Studio (WebChannel API)
+
+- [ ] Check whether Meld listens on every interface or only 127.0.0.1 (its documentation says 127.0.0.1), and whether that can be configured. ([specs/meld-studio.yaml:57](specs/meld-studio.yaml#L57))
+- [ ] Record Meld's init response: the method and signal names and indexes (signature forms such as sendStreamEvent(QString) beside plain names) and the property entries, including version. ([specs/meld-studio.yaml:57](specs/meld-studio.yaml#L57))
+- [ ] Confirm setMuted(trackId, muted), which Meld's documentation does not list, on current versions. ([specs/meld-studio.yaml:100](specs/meld-studio.yaml#L100))
+- [ ] Confirm setProperty(id, "visible", false) hides a layer and setProperty(id, "enabled", false) turns an effect off on API version 2. ([specs/meld-studio.yaml:130](specs/meld-studio.yaml#L130))
+- [ ] Confirm sendCommandWithArgs takes meld.recordClip with [seconds], and callFunctionWithArgs seekTo with [seconds]. ([specs/meld-studio.yaml:180](specs/meld-studio.yaml#L180))
+- [ ] Confirm sendStreamEvent with one argument for the events without data, and with {"amount": seconds} for SUBATHONTIMER_ADDTIME. ([specs/meld-studio.yaml:209](specs/meld-studio.yaml#L209))
+- [ ] Confirm registerTrackObserver makes Meld send gainUpdated for that track at once, or only when its gain changes, and what gain values a fader at unity sends. ([specs/meld-studio.yaml:286](specs/meld-studio.yaml#L286))
+- [ ] Record whether Meld sends property updates for isStreaming and isRecording, and for session, after each change without the client subscribing to their notify signals. ([specs/meld-studio.yaml:337](specs/meld-studio.yaml#L337))
+
 ## meros-camera — Meros Camera
 
 - [ ] Confirm that an output with a problem (outputs.problems) is not listed in outputs.on. ([specs/meros-camera.yaml:660](specs/meros-camera.yaml#L660))

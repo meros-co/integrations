@@ -1,0 +1,346 @@
+spec: 1
+id: meld-studio
+name: Meld Studio (WebChannel API)
+vendor: Meld Studio
+category: switcher
+implementation: native
+reason: >
+  Qt's WebChannel protocol over a WebSocket: the client first asks for the
+  published object's description, which numbers its methods, signals and
+  properties, then invokes methods by those numbers with ids it chooses and
+  receives property updates only after telling the server it is idle, again
+  after each update. Turning a layer or effect off needs the scene that holds
+  it, read from the session the server last sent.
+
+source:
+  - title: Meld Studio's WebChannel API Documentation (WebChannelAPI.md, MeldStudio/streamdeck, MIT)
+    author: Meld Studio
+    url: https://github.com/MeldStudio/streamdeck/blob/main/WebChannelAPI.md
+    note: >
+      Manufacturer document, linked from meldstudio.co/docs/api: Meld Studio
+      listens on 127.0.0.1:13376 ("may be configurable in the future") with a
+      QWebChannel server publishing the object meld; its properties version
+      (absent in API version 1), isStreaming, isRecording and session (items
+      keyed by 32-hex-digit id: scenes with index, name, current and staged;
+      tracks with parent, name, monitoring and muted; layers with parent,
+      index, name, visible, x, y, width, height, rotation, source, url and
+      mediaSource; effects with parent, name and enabled); the signals
+      gainUpdated(trackId, gain, muted), sessionChanged, isStreamingChanged
+      and isRecordingChanged; the methods showScene, toggleMute,
+      toggleMonitor, toggleLayer, toggleEffect, toggleRecord, toggleStream,
+      registerTrackObserver, unregisterTrackObserver, setGain (0.0-1.0),
+      callFunction and callFunctionWithArgs (play, pause, seekTo), sendCommand
+      (meld.screenshot, meld.screenshot.vertical, the start, stop and toggle
+      streaming and recording actions, meld.toggleVirtualCameraAction,
+      meld.recordClip, meld.replay.show, meld.replay.dismiss),
+      sendCommandWithArgs (meld.recordClip with 0-90 s), sendStreamEvent
+      (the stopwatch, countdown, confetti, subathon timer, wheel spin and
+      counter events), sendEvent (deprecated), setStagedScene,
+      showStagedScene and, from API version 2, setProperty.
+  - title: Macro Deck, Meld Studio integration (host/src/MacroDeckHost.Integrations/Meld, Apache-2.0)
+    author: Macro Deck contributors
+    url: https://github.com/Macro-Deck-App/Macro-Deck
+    note: >
+      Community code, read for the WebChannel wire format only (Apache-2.0;
+      no code copied): message types 1 signal, 2 property update, 3 init,
+      4 idle, 6 invoke, 7 connect to signal, 10 response; the init request
+      {type 3, id} answered by a response whose data names each object's
+      methods and signals as [name, index] pairs (signature forms ending in
+      ")" beside the plain names) and its properties as [index, name,
+      notify, value]; invoke {type 6, object, method index, args, id}
+      answered by {type 10, id, data}; connect to signal {type 7, object,
+      signal index}; signals {type 1, object, signal, args}; property updates
+      {type 2, data: [{object, properties: {index: value}}]}, each followed
+      by an idle message; and setMuted(trackId, muted), which some Meld
+      versions offer beside toggleMute.
+
+ports:
+  - { port: 13376, protocol: ws, role: control, note: "Meld Studio's WebChannel server; Meld's documentation gives 127.0.0.1, so the core runs on the Meld computer unless Meld is reachable from the network" }
+
+models:
+  - id: meld-studio
+    name: Meld Studio
+    supports:
+      [show_scene, stage_scene, show_staged_scene, toggle_mute, set_muted, toggle_monitoring, set_monitoring,
+       set_gain, toggle_layer, set_layer_visible, toggle_effect, set_effect_enabled, toggle_recording,
+       start_recording, stop_recording, toggle_streaming, start_streaming, stop_streaming, toggle_virtual_camera,
+       take_screenshot, take_vertical_screenshot, record_clip, record_clip_seconds, show_replay,
+       dismiss_replays, play_media, pause_media, seek_media, send_stream_event, add_subathon_time,
+       set_property, set_layer_position, set_layer_size, set_layer_rotation, rename, send_command,
+       send_command_with_args, call_function, call_function_with_args, get_session]
+    verification: none
+    notes: >
+      Meld Studio on Windows and macOS. Scenes, layers, tracks and effects are
+      named by the ids in the session (32 hexadecimal digits); the state lists
+      them. setProperty, and the commands that use it, need API version 2.
+
+commands:
+  # ── Scenes ───────────────────────────────────────────────────────────────
+  show_scene:
+    summary: Switch to a scene (showScene)
+    params:
+      scene: &scene { type: string, pattern: '^[0-9A-Fa-f]{32}$', required: true, label: Scene,
+                      description: "The scene's id, from the state's scenes." }
+    returns: ack
+  stage_scene:
+    summary: Stage a scene, ready to show without putting it on air (setStagedScene)
+    params: { scene: *scene }
+    returns: ack
+  show_staged_scene:
+    summary: Switch to the staged scene (showStagedScene)
+    returns: ack
+
+  # ── Audio ────────────────────────────────────────────────────────────────
+  toggle_mute:
+    summary: Toggle an audio track's mute (toggleMute)
+    params:
+      track: &track { type: string, pattern: '^[0-9A-Fa-f]{32}$', required: true, label: Track,
+                      description: "The audio track's id, from the state's tracks." }
+    returns: ack
+  set_muted:
+    summary: Mute or unmute an audio track (setMuted where Meld offers it, otherwise toggleMute when the track differs)
+    params:
+      track: *track
+      muted: { type: bool, required: true, label: Muted, description: "On mutes the track; off unmutes it." }
+    returns: ack
+  toggle_monitoring:
+    summary: Toggle whether an audio track is monitored, cued to the headphones (toggleMonitor)
+    params: { track: *track }
+    returns: ack
+  set_monitoring:
+    summary: Monitor an audio track or stop monitoring it (toggleMonitor when the track differs)
+    params:
+      track: *track
+      monitoring: { type: bool, required: true, label: Monitoring, description: "On cues the track to the monitor output." }
+    returns: ack
+  set_gain:
+    summary: Set an audio track's gain (setGain)
+    params:
+      track: *track
+      gain: { type: float, min: 0.0, max: 1.0, required: true, label: Gain, description: "The track's gain, 0.0 (silent) to 1.0 (full), as Meld's fader sets it." }
+    returns: ack
+
+  # ── Layers and effects ───────────────────────────────────────────────────
+  toggle_layer:
+    summary: Show or hide a layer in its scene (toggleLayer)
+    params:
+      layer: &layer { type: string, pattern: '^[0-9A-Fa-f]{32}$', required: true, label: Layer,
+                      description: "The layer's id, from the state's layers." }
+    returns: ack
+  set_layer_visible:
+    summary: Show or hide a layer (setProperty visible, or toggleLayer when the layer differs before API version 2)
+    params:
+      layer: *layer
+      visible: { type: bool, required: true, label: Visible, description: "On shows the layer; off hides it." }
+    returns: ack
+  toggle_effect:
+    summary: Turn an effect on a layer on or off (toggleEffect)
+    params:
+      effect: &effect { type: string, pattern: '^[0-9A-Fa-f]{32}$', required: true, label: Effect,
+                        description: "The effect's id, from the state's effects." }
+    returns: ack
+  set_effect_enabled:
+    summary: Turn an effect on or off (setProperty enabled, or toggleEffect when the effect differs before API version 2)
+    params:
+      effect: *effect
+      enabled: { type: bool, required: true, label: Enabled, description: "On applies the effect; off removes it." }
+    returns: ack
+
+  # ── Recording and streaming ──────────────────────────────────────────────
+  toggle_recording:
+    summary: Start or stop recording (toggleRecord)
+    returns: ack
+  start_recording:
+    summary: Start recording (sendCommand meld.startRecordingAction)
+    returns: ack
+  stop_recording:
+    summary: Stop recording (sendCommand meld.stopRecordingAction)
+    returns: ack
+  toggle_streaming:
+    summary: Start or stop streaming (toggleStream)
+    returns: ack
+  start_streaming:
+    summary: Start streaming (sendCommand meld.startStreamingAction)
+    returns: ack
+  stop_streaming:
+    summary: Stop streaming (sendCommand meld.stopStreamingAction)
+    returns: ack
+  toggle_virtual_camera:
+    summary: Turn the virtual camera on or off (sendCommand meld.toggleVirtualCameraAction)
+    returns: ack
+  take_screenshot:
+    summary: Take a screenshot (sendCommand meld.screenshot)
+    returns: ack
+  take_vertical_screenshot:
+    summary: Take a vertical screenshot (sendCommand meld.screenshot.vertical)
+    returns: ack
+  record_clip:
+    summary: Record a clip of the longest length available (sendCommand meld.recordClip)
+    returns: ack
+  record_clip_seconds:
+    summary: Record a clip of the last seconds given (sendCommandWithArgs meld.recordClip)
+    params:
+      seconds: { type: float, min: 0.0, max: 90.0, required: true, label: Length, description: "The clip's length in seconds, up to 90; 0 records the longest available." }
+    returns: ack
+  show_replay:
+    summary: Show the replay layer for the last clip (sendCommand meld.replay.show)
+    returns: ack
+  dismiss_replays:
+    summary: Dismiss every replay layer showing (sendCommand meld.replay.dismiss)
+    returns: ack
+
+  # ── Media ────────────────────────────────────────────────────────────────
+  play_media:
+    summary: Play a media layer (callFunction play)
+    params: { layer: *layer }
+    returns: ack
+  pause_media:
+    summary: Pause a media layer (callFunction pause)
+    params: { layer: *layer }
+    returns: ack
+  seek_media:
+    summary: Seek a media layer to a time (callFunctionWithArgs seekTo)
+    params:
+      layer: *layer
+      seconds: { type: float, min: 0.0, max: 86400.0, required: true, label: Time, description: "Where to seek to, in seconds from the start." }
+    returns: ack
+
+  # ── Widgets ──────────────────────────────────────────────────────────────
+  send_stream_event:
+    summary: Trigger a widget's action, such as resetting a stopwatch or spinning a wheel (sendStreamEvent)
+    params:
+      event: { type: enum, values: [STOPWATCH_RESET, STOPWATCH_PAUSE, STOPWATCH_RESUME, COUNTDOWN_RESET, COUNTDOWN_PAUSE,
+                                    COUNTDOWN_RESUME, CONFETTIFALL_TRIGGER, CONFETTIPOP_TRIGGER, SUBATHONTIMER_RESET,
+                                    SUBATHONTIMER_PAUSE, SUBATHONTIMER_RESUME, WHEELSPIN_SPIN, COUNTER_INCREMENT,
+                                    COUNTER_DECREMENT],
+               required: true, label: Event, description: "The widget event, as Meld names it." }
+    returns: ack
+  add_subathon_time:
+    summary: Add time to the subathon timer widget (sendStreamEvent SUBATHONTIMER_ADDTIME)
+    params:
+      seconds: { type: int, min: 1, max: 86400, required: true, label: Time, description: "Seconds to add to the subathon timer." }
+    returns: ack
+
+  # ── Properties (API version 2) ───────────────────────────────────────────
+  set_property:
+    summary: Set any property of a scene, layer, track or effect (setProperty; parent, type and index cannot be changed)
+    params:
+      object: &object { type: string, pattern: '^[0-9A-Fa-f]{32}$', required: true, label: Item,
+                        description: "The id of the scene, layer, track or effect." }
+      property: { type: string, pattern: '^[A-Za-z][A-Za-z0-9_]{0,63}$', required: true, label: Property,
+                  description: "The property's name as the session writes it, such as name, visible, x or enabled." }
+      value: { type: json, required: true, label: Value, description: "The new value, of the type the session gives the property." }
+    returns: ack
+  set_layer_position:
+    summary: Move a layer within its scene (setProperty x and y)
+    params:
+      layer: *layer
+      x: { type: int, min: -100000, max: 100000, required: true, label: X, description: "The layer's horizontal position in the scene, in pixels." }
+      y: { type: int, min: -100000, max: 100000, required: true, label: Y, description: "The layer's vertical position in the scene, in pixels." }
+    returns: ack
+  set_layer_size:
+    summary: Resize a layer (setProperty width and height)
+    params:
+      layer: *layer
+      width: { type: int, min: 1, max: 100000, required: true, label: Width, description: "The layer's width in the scene, in pixels." }
+      height: { type: int, min: 1, max: 100000, required: true, label: Height, description: "The layer's height in the scene, in pixels." }
+    returns: ack
+  set_layer_rotation:
+    summary: Rotate a layer (setProperty rotation)
+    params:
+      layer: *layer
+      rotation: { type: float, min: -360.0, max: 360.0, required: true, label: Rotation, description: "The layer's rotation in degrees." }
+    returns: ack
+  rename:
+    summary: Rename a scene, layer, track or effect (setProperty name)
+    params:
+      object: *object
+      name: { type: string, max_length: 256, required: true, label: Name, description: "The new name." }
+    returns: ack
+
+  # ── Raw calls ────────────────────────────────────────────────────────────
+  send_command:
+    summary: Send any command Meld names, such as meld.screenshot (sendCommand)
+    params:
+      command: { type: string, pattern: '^[A-Za-z0-9_.]{1,128}$', required: true, label: Command, description: "The command's name, as Meld's documentation lists them." }
+    returns: ack
+  send_command_with_args:
+    summary: Send any command Meld names, with arguments (sendCommandWithArgs)
+    params:
+      command: { type: string, pattern: '^[A-Za-z0-9_.]{1,128}$', required: true, label: Command, description: "The command's name, as Meld's documentation lists them." }
+      args: { type: json, required: true, label: Arguments, description: "The command's positional arguments, as a JSON array." }
+    returns: ack
+  call_function:
+    summary: Call a function of a layer, such as a media player's play (callFunction)
+    params:
+      layer: *layer
+      function: { type: string, pattern: '^[A-Za-z][A-Za-z0-9_]{0,63}$', required: true, label: Function, description: "The function's name, such as play or pause." }
+    returns: ack
+  call_function_with_args:
+    summary: Call a function of a layer with arguments, such as a media player's seekTo (callFunctionWithArgs)
+    params:
+      layer: *layer
+      function: { type: string, pattern: '^[A-Za-z][A-Za-z0-9_]{0,63}$', required: true, label: Function, description: "The function's name, such as seekTo." }
+      args: { type: json, required: true, label: Arguments, description: "The function's arguments, as a JSON array." }
+    returns: ack
+  get_session:
+    summary: Return the session Meld last sent, every scene, layer, track and effect keyed by id
+    returns: value
+
+state:
+  api_version:            { type: int, description: "Meld's WebChannel API version (version property; 1 when absent)" }
+  streaming:              { type: bool, description: "Whether Meld is streaming (isStreaming)" }
+  recording:              { type: bool, description: "Whether Meld is recording (isRecording)" }
+  current_scene:          { type: string, description: "Id of the scene on air, empty when none is" }
+  staged_scene:           { type: string, description: "Id of the staged scene, empty when none is" }
+  scenes.*.name:          { type: string, description: "Scene name" }
+  scenes.*.index:         { type: int, description: "Scene's place in the scene list, from 0" }
+  scenes.*.current:       { type: bool, description: "Whether the scene is on air" }
+  scenes.*.staged:        { type: bool, description: "Whether the scene is staged" }
+  layers.*.scene:         { type: string, description: "Id of the scene holding the layer (parent)" }
+  layers.*.name:          { type: string, description: "Layer name" }
+  layers.*.index:         { type: int, description: "Layer's place in the scene's layer list, from 0" }
+  layers.*.visible:       { type: bool, description: "Whether the layer is shown" }
+  layers.*.x:             { type: float, unit: px, description: "Horizontal position in the scene" }
+  layers.*.y:             { type: float, unit: px, description: "Vertical position in the scene" }
+  layers.*.width:         { type: float, unit: px, description: "Width in the scene" }
+  layers.*.height:        { type: float, unit: px, description: "Height in the scene" }
+  layers.*.rotation:      { type: float, unit: degrees, description: "Rotation" }
+  layers.*.source:        { type: string, description: "Path of an image source" }
+  layers.*.url:           { type: string, description: "URL of a browser source" }
+  layers.*.media_source:  { type: string, description: "Path of a media source" }
+  layers.*.playing:       { type: bool, description: "Whether a media layer is playing (isPlaying)" }
+  tracks.*.name:          { type: string, description: "Track name; a layer's track takes the layer's name" }
+  tracks.*.layer:         { type: string, description: "Id of the layer the track belongs to, empty for a global track" }
+  tracks.*.muted:         { type: bool, description: "Whether the track is muted" }
+  tracks.*.monitoring:    { type: bool, description: "Whether the track is monitored (cued)" }
+  tracks.*.gain:          { type: float, description: "Track gain, 0.0-1.0, from gainUpdated" }
+  effects.*.layer:        { type: string, description: "Id of the layer the effect is on" }
+  effects.*.name:         { type: string, description: "Effect name" }
+  effects.*.enabled:      { type: bool, description: "Whether the effect is applied" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      show_scene, show_staged_scene, the layer and effect commands and the
+      mute commands change what is on air at once; stop_streaming,
+      stop_recording and the toggle commands end a stream or recording when
+      one runs.
+  - models: [all]
+    severity: warning
+    text: >
+      Meld's documentation says it listens on 127.0.0.1:13376, so the core
+      reaches it only from the same computer unless Meld or a forwarder
+      exposes the port. Meld asks for no password: anything that reaches the
+      port controls Meld.
+  - models: [all]
+    severity: info
+    text: >
+      The toggle commands toggle; set_muted, set_monitoring and, before API
+      version 2, set_layer_visible and set_effect_enabled toggle only when
+      the session shows the item in the other state, and do nothing (and
+      succeed) when it is already as asked. set_property, set_layer_position,
+      set_layer_size, set_layer_rotation and rename need API version 2.
+      Track gain is known once Meld reports it (the module registers for
+      every track's gain updates while monitoring).

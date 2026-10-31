@@ -268,6 +268,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-megapixel", &["megapixel-helios"]),
+    ("vendor-meld", &["meld-studio"]),
     ("vendor-meros", &["meros-camera"]),
     ("vendor-meta", &["facebook-account", "facebook-live"]),
     (
