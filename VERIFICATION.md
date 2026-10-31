@@ -302,7 +302,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## atlona-matrix — Atlona matrix switchers and switchers
 
 - [ ] Record the Telnet login prompts (Username:, Password:) and what a wrong login answers. ([specs/atlona-matrix.yaml:295](specs/atlona-matrix.yaml#L295))
-- [ ] Confirm the RS-232 factory default of PRO3 matrices and the AT-HDR-H2H-88MA (115200 8N1 assumed from the CSpara example). ([specs/atlona-matrix.yaml:275](specs/atlona-matrix.yaml#L275))
 - [ ] Confirm CSpara and RS232para write parity as 0 none, 1 odd, 2 even. ([specs/atlona-matrix.yaml:308](specs/atlona-matrix.yaml#L308))
 - [ ] Check whether PRO3 matrices and the H2H need a gap between commands (none is documented; Omega asks for 500 ms). ([specs/atlona-matrix.yaml:264](specs/atlona-matrix.yaml#L264))
 - [ ] Confirm the PS62 sets the repeat count with RepeatCmd n, as its document writes RepCmdTime. ([specs/atlona-matrix.yaml:1453](specs/atlona-matrix.yaml#L1453))
@@ -319,7 +318,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] AT-HDR-H2H-44M: confirm HDCPSet takes a space before the input (HDCPSet 1 on), as its document writes it, unlike the 44MA and 88MA. ([specs/atlona-matrix.yaml:407](specs/atlona-matrix.yaml#L407))
 - [ ] AT-HDR-H2H-44M and -44MA: record what EDIDOut's one number is (an output or an EDID memory), so save_output_edid can be offered. ([specs/atlona-matrix.yaml:427](specs/atlona-matrix.yaml#L427))
 - [ ] AT-HDR-H2H-44MA: confirm the longest name InNameSet, OutNameSet and PreNameSet take, whether a name may hold spaces, and that the 44MA needs 500 ms between commands as its document says. ([specs/atlona-matrix.yaml:1015](specs/atlona-matrix.yaml#L1015))
-- [ ] AT-OME-ST31: the RS-232 control port runs at 9600 8N1, as on the ST31A (its document gives no line settings) ([specs/atlona-matrix.yaml:277](specs/atlona-matrix.yaml#L277))
 - [ ] AT-OME-SR21: HDMIAUD, RelayAct, USBHostRoute and VOUT sta answer in the form of the document's examples (HDMIAUD on, RelayAct1 close, USBHostRoute local, VOUT -30) ([specs/atlona-matrix.yaml:2756](specs/atlona-matrix.yaml#L2756))
 - [ ] AT-OME-SR21: Status answers x1AVx1 or x2AVx1 (the document's example reads x3Vx1 on a two-input unit) ([specs/atlona-matrix.yaml:2981](specs/atlona-matrix.yaml#L2981))
 - [ ] AT-UHD-CLSO-840: an audio route (x6Ax2) is answered x6Ax2, not x6AVx2 as the document's example shows ([specs/atlona-matrix.yaml:646](specs/atlona-matrix.yaml#L646))
@@ -329,7 +327,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] AT-UHD-CLSO-601: microphone ducking is turned on and off with MICon and MICoff and read with MICsta ([specs/atlona-matrix.yaml:1942](specs/atlona-matrix.yaml#L1942))
 - [ ] AT-UHD-CLSO-601: the output resolution command is VFmtRes (the syntax line says VidOutRes) and the aspect values are full, overscan, underscan, letterbox, panscan and follow (the example answers fill) ([specs/atlona-matrix.yaml:1716](specs/atlona-matrix.yaml#L1716))
 - [ ] AT-UHD-CLSO-601: InputStatus without an input answers one digit per input, and VersionMCU and VersionVSRX answer V followed by the version ([specs/atlona-matrix.yaml:1666](specs/atlona-matrix.yaml#L1666))
-- [ ] AT-UHD-CLSO-601 and AT-UHD-CLSO-840: the RS-232 control port's factory line is 115200 8N1 (the documents give the CSpara example only) ([specs/atlona-matrix.yaml:272](specs/atlona-matrix.yaml#L272))
 - [ ] AT-OME-MS42-HDBT: route numbers the inputs as the rear panel does (1 HDBaseT IN, 2 USB-C, 3 and 4 HDMI), not as the API document's MS42 wording (1 USB-C, 2 DisplayPort) ([specs/atlona-matrix.yaml:517](specs/atlona-matrix.yaml#L517))
 
 ## atlona-ms52w — Atlona AT-OME-MS52W and AT-UHD-SW-510W switchers (Telnet JSON API)
@@ -477,7 +474,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## barco-projection-protocol — Barco projectors (Barco Projection Protocol)
 
-- [ ] The serial baud rate default (9600 assumed; the catalogs leave it to the owner's manual) on HDX, PGWU and older models. ([specs/barco-projection-protocol.yaml:59](specs/barco-projection-protocol.yaml#L59))
 - [ ] Default serial address 1, and that the address byte is escaped like the rest of the message (addresses 0x80, 0xFE, 0xFF). ([specs/barco-projection-protocol.yaml:55](specs/barco-projection-protocol.yaml#L55))
 - [ ] A projector keeps an idle TCP connection on 43680 open, with the 10 s status read as its only traffic. ([specs/barco-projection-protocol.yaml:71](specs/barco-projection-protocol.yaml#L71))
 - [ ] Read responses repeat the request's bytes, data included, before the values; read projector status (0x67) does not repeat its optional mask. ([specs/barco-projection-protocol.yaml:1168](specs/barco-projection-protocol.yaml#L1168))
@@ -532,7 +528,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Which properties and methods answer -32000 in standby (shutter, optics, illumination), and that the re-reads after the state change fill them in. ([specs/barco-pulse.yaml:4973](specs/barco-pulse.yaml#L4973))
 - [ ] The connector and source object names the catalogs list (hdmi, displayport1, l1hdmi, l2displayporta ...) match real units of each family. ([specs/barco-pulse.yaml:4993](specs/barco-pulse.yaml#L4993))
 - [ ] power_on does nothing from ECO over the network, and the API stops answering in ECO. ([specs/barco-pulse.yaml:5010](specs/barco-pulse.yaml#L5010))
-- [ ] The RS232 port speaks the same undelimited JSON-RPC stream as TCP 9090 (link serial). ([specs/barco-pulse.yaml:5017](specs/barco-pulse.yaml#L5017))
 - [ ] GET /api/image/processing/warp/file/transfer answers the current warp grid XML, and which HTTP authentication Pulse 2.10 asks for on the file endpoints. ([specs/barco-pulse.yaml:5027](specs/barco-pulse.yaml#L5027))
 - [ ] show_test_pattern: image.testpattern.selected takes the pattern id from image.testpattern.list and image.testpattern.show true then shows it. ([specs/barco-pulse.yaml:3647](specs/barco-pulse.yaml#L3647))
 - [ ] activate_profile and activate_preset apply the stored settings live, and their result is true on success. ([specs/barco-pulse.yaml:4493](specs/barco-pulse.yaml#L4493))
@@ -540,27 +535,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the UDM, F70, F80, F90, HDX 4K and XDL serve the file endpoints the I600 and UDX catalogs list (logs, EDID, black level, blend, warp and test pattern files, license registration, LCD and OSD captures, splash screen upload), and which of them also serve the UDX's source image and camera downloads. ([specs/barco-pulse.yaml:4759](specs/barco-pulse.yaml#L4759))
 - [ ] Confirm what the file endpoints answer to a multipart upload (status and body), and that the part's file name may be any name with the right extension. ([specs/barco-pulse.yaml:4850](specs/barco-pulse.yaml#L4850))
 - [ ] image.testpattern.listinternal and image.testpattern.nosignal.list answer their lists in "result" as JSON, as the other list methods do, and on which models each is available. ([specs/barco-pulse.yaml:4218](specs/barco-pulse.yaml#L4218))
-
-## barco-rlm-w14 — Barco RLM-W14
-
-- [ ] The echo is lower case and ends at CR, and answers come as "OP <COMMAND> = <value>" lines (line ending unknown). ([specs/barco-rlm-w14.yaml:29](specs/barco-rlm-w14.yaml#L29))
-- [ ] Commands the table capitalizes (Bright, Tint, Lens.center, Osdlite, CS_cust_*, DarkTm.sel) are accepted in lower case. ([specs/barco-rlm-w14.yaml:1087](specs/barco-rlm-w14.yaml#L1087))
-- [ ] A step (+/-) answers with the new value. ([specs/barco-rlm-w14.yaml:1810](specs/barco-rlm-w14.yaml#L1810))
-- [ ] Execute functions answer "OP <COMMAND>". ([specs/barco-rlm-w14.yaml:154](specs/barco-rlm-w14.yaml#L154))
-- [ ] What motor commands answer (OP ZOOMIO, OP FOCUS, OP VERT.OFFSET ...). ([specs/barco-rlm-w14.yaml:138](specs/barco-rlm-w14.yaml#L138))
-- [ ] What lens memory commands answer. ([specs/barco-rlm-w14.yaml:852](specs/barco-rlm-w14.yaml#L852))
-- [ ] P7 custom coordinates must be sent as three digits. ([specs/barco-rlm-w14.yaml:1382](specs/barco-rlm-w14.yaml#L1382))
-- [ ] Blend top/bottom 0-500 and left/right 0-800 (ranges reconstructed from the table layout). ([specs/barco-rlm-w14.yaml:1059](specs/barco-rlm-w14.yaml#L1059))
-- [ ] Black level width top/bottom in steps of 8 and left/right in steps of 4 (reconstructed from the table layout). ([specs/barco-rlm-w14.yaml:1003](specs/barco-rlm-w14.yaml#L1003))
-- [ ] The scen.blue range (0-32) is assumed, and scen.all reads NA when red, green and blue differ. ([specs/barco-rlm-w14.yaml:954](specs/barco-rlm-w14.yaml#L954))
-- [ ] pip.sel uses 1-based source numbers, unlike input.sel. ([specs/barco-rlm-w14.yaml:1452](specs/barco-rlm-w14.yaml#L1452))
-- [ ] The text format of lamp hours, pixel clock, refresh rates and run time. ([specs/barco-rlm-w14.yaml:458](specs/barco-rlm-w14.yaml#L458))
-- [ ] Error codes 39 and 41-50 (the catalog elides them). ([specs/barco-rlm-w14.yaml:378](specs/barco-rlm-w14.yaml#L378))
-- [ ] What scen.adl and w2.recover do. ([specs/barco-rlm-w14.yaml:1515](specs/barco-rlm-w14.yaml#L1515))
-- [ ] Unit of warp rotation -20 to +20. ([specs/barco-rlm-w14.yaml:1642](specs/barco-rlm-w14.yaml#L1642))
-- [ ] The effect of control_port network (marked obsolete) and eco_network_power on RS-232 control. ([specs/barco-rlm-w14.yaml:1130](specs/barco-rlm-w14.yaml#L1130))
-- [ ] Whether the projector has a network (TCP) form of these commands. ([specs/barco-rlm-w14.yaml:2563](specs/barco-rlm-w14.yaml#L2563))
-- [ ] What op errcode answers while nothing is wrong (NA, 0, or the last error), since 0 is documented as over temperature inlet. ([specs/barco-rlm-w14.yaml:2566](specs/barco-rlm-w14.yaml#L2566))
 
 ## behringer-wing — Behringer WING
 
@@ -947,15 +921,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what the unit advertises over mDNS (`dns-sd -B _blackmagic._tcp` and `dns-sd -L <instance> _blackmagic._tcp`, or `avahi-browse -rt _blackmagic._tcp`): every service type, the SRV port and the TXT keys and values. Only the service type and TXT `class` come from a public source (Bitfocus Companion's module manifests); the SRV port and the other TXT keys are not documented anywhere. ([crates/core/src/mdns.rs:115](crates/core/src/mdns.rs#L115))
 - [ ] Confirm TXT `name` is the product name (as Companion's MultiView 4 filter relies on), not a label the user sets: discovery narrows `models` to the catalogue model with that name. ([crates/core/src/mdns.rs:471](crates/core/src/mdns.rs#L471))
 
-## blackmagic-videohub-leitch — Blackmagic Videohub (RS-422, Leitch protocol)
-
-- [ ] Confirm the ">" prompt is the only answer to every command, comes after the S: or V: lines a query returns, and that an unrecognized or out-of-range command gets no other answer (Blackmagic documents none). ([specs/blackmagic-videohub-leitch.yaml:58](specs/blackmagic-videohub-leitch.yaml#L58))
-- [ ] Confirm the bare CR on connecting is answered by ">" and that nothing else (a banner) is sent. ([specs/blackmagic-videohub-leitch.yaml:66](specs/blackmagic-videohub-leitch.yaml#L66))
-- [ ] Record the S: and V: notifications as sent: the hex digits' case, any zero padding, and whether a route change made by this connection is notified with status reporting off. ([specs/blackmagic-videohub-leitch.yaml:284](specs/blackmagic-videohub-leitch.yaml#L284))
-- [ ] Confirm the RS-422 port needs no flow control, which Blackmagic leaves unstated. ([specs/blackmagic-videohub-leitch.yaml:107](specs/blackmagic-videohub-leitch.yaml#L107))
-- [ ] Confirm which models have an RS-422 router control port that answers in Leitch server mode (Smart Videohub 12x12/20x20/40x40, CleanSwitch 12x12, Universal Videohub 72/288 from the manuals; older Smart Videohub, Broadcast and Studio Videohub not checked) and the connector each uses. ([specs/blackmagic-videohub-leitch.yaml:112](specs/blackmagic-videohub-leitch.yaml#L112))
-- [ ] Confirm a read-back right after a route (`@ X?`) reports the new source, and that @ B:R behaves as @ B:C. ([specs/blackmagic-videohub-leitch.yaml:160](specs/blackmagic-videohub-leitch.yaml#L160))
-
 ## blustream-matrix — Blustream matrix switchers
 
 - [ ] Record what each model answers to a command (Blustream documents none; a [SUCCESS] line and a prompt are reported). ([specs/blustream-matrix.yaml:17](specs/blustream-matrix.yaml#L17))
@@ -963,7 +928,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm RESET followed at once by Yes resets the matrix (the help text asks for Yes to confirm). ([specs/blustream-matrix.yaml:554](specs/blustream-matrix.yaml#L554))
 - [ ] Confirm the HDBaseT models accept OUTxx FR yy with a space before FR, as their help text writes it, and the CMX models OUT xx FR yy. ([specs/blustream-matrix.yaml:327](specs/blustream-matrix.yaml#L327))
 - [ ] Confirm the HMX and HMXL models take MUTE On/Off and AUDOUT xx On/Off in that case. ([specs/blustream-matrix.yaml:691](specs/blustream-matrix.yaml#L691))
-- [ ] Confirm the RS-232 factory default of the CMX, MX and Pro models (57600 assumed from the HDBaseT models and the CMX88CS-V2). ([specs/blustream-matrix.yaml:92](specs/blustream-matrix.yaml#L92))
 - [ ] Check the CECUSERCMD form with a space before the closing bracket, as the help text example writes it. ([specs/blustream-matrix.yaml:1173](specs/blustream-matrix.yaml#L1173))
 - [ ] Record what the CTRLSTA report looks like on models other than the PLA88CS. ([specs/blustream-matrix.yaml:1292](specs/blustream-matrix.yaml#L1292))
 - [ ] Confirm the [SUCCESS] routing line text on current firmware. ([specs/blustream-matrix.yaml:1505](specs/blustream-matrix.yaml#L1505))
@@ -1280,12 +1244,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Which SNMP traps each family accepts (LAMP and LIFE are not on Mirage SST; LIFE is not on the 4K40-RGB). ([specs/christie-trulife.yaml:1581](specs/christie-trulife.yaml#L1581))
 - [ ] The UID login echo, and whether it repeats the password. ([specs/christie-trulife.yaml:1784](specs/christie-trulife.yaml#L1784))
 - [ ] Whether LAS+EBLU/EGRN/ERED (and LAS+EPOW on Mirage SST) are safe on the 4K40-RGB and Mirage SST, where they are still documented (not offered). ([specs/christie-trulife.yaml:2732](specs/christie-trulife.yaml#L2732))
-- [ ] The RS232 IN data bits, parity, stop bits and connector (not in these references). ([specs/christie-trulife.yaml:2739](specs/christie-trulife.yaml#L2739))
 - [ ] Measure how long power on and off, lens calibration, the CAV+MODE reload, the BST self tests and the rebooting commands take to acknowledge, against the three minutes those commands wait. ([specs/christie-trulife.yaml:2659](specs/christie-trulife.yaml#L2659))
 
 ## chyron-prime — Chyron PRIME (Intelligent Interface)
 
-- [ ] Record the default serial line settings of an Intelligent Interface COM connection (9600 8N1, no flow control assumed). ([specs/chyron-prime.yaml:772](specs/chyron-prime.yaml#L772))
 - [ ] Confirm each reply ends with CR LF, and record the replies to the B commands (AN, AV, QS, QL, TH, SL, SA, SX, MX, CO, CS, SI, QE); the spec takes a reply to start with * or an eight-digit error code. ([specs/chyron-prime.yaml:62](specs/chyron-prime.yaml#L62))
 - [ ] Record what PRIME answers to the default heartbeat (two backslashes). ([specs/chyron-prime.yaml:39](specs/chyron-prime.yaml#L39))
 - [ ] Check that a buffer of * and a layer expression of * are accepted wherever the spec sends them (play_all with channel *, clear with layer *). ([specs/chyron-prime.yaml:192](specs/chyron-prime.yaml#L192))
@@ -1421,7 +1383,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm POST /v0/showfile takes the .watch file as the raw request body with Content-Type application/octet-stream, answers 200, and that showName names the loaded show; and record whether WATCHOUT 7 before 7.8 has it. ([specs/dataton-watchout7.yaml:318](specs/dataton-watchout7.yaml#L318))
 - [ ] Record /v0/show's shape (show.timelines keyed by id with name and cues keyed by id with name and start, showName, show.hosts) against the node's OpenAPI document, and whether a show revision event carries the revision bare or as value.revision. ([specs/dataton-watchout7.yaml:481](specs/dataton-watchout7.yaml#L481))
 
-## datavideo-switcher — Datavideo switchers (DVIP and RS-232)
+## datavideo-switcher — Datavideo switchers (DVIP)
 
 - [ ] Confirm port 5009's answer (a real-time port, 0xaa55ffff when none is free) and that the pair it names is held while connected; check which pair the RMC-260 panel takes on the SE-1200MU. ([specs/datavideo-switcher.yaml:860](specs/datavideo-switcher.yaml#L860))
 - [ ] Confirm the real-time port's first packet: whether it lists every control or only the non-zero ones (state is rebuilt against zeros), that later packets carry only changes, and that answering each with a null packet keeps it flowing. ([specs/datavideo-switcher.yaml:868](specs/datavideo-switcher.yaml#L868))
@@ -1430,7 +1392,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the SE-3200/SE-4000 bus tally numbering 30-43 and free space 44 (the documents repeat 23-30), and the Ethernet input numbering (freeze mode 6) over the RS-232 supplement's (5). ([specs/datavideo-switcher.yaml:885](specs/datavideo-switcher.yaml#L885))
 - [ ] Record the types and values of the audio section, GPI, output mode and system preference controls, which the documents leave undescribed, and how memory.flags reads. ([specs/datavideo-switcher.yaml:891](specs/datavideo-switcher.yaml#L891))
 - [ ] Confirm names are UTF-16LE, GET_INPUT_NAME's input numbering (from 0 assumed), and the file transfer: GET_FILE_DATA chunk size and end, STORE_FILE_DATA's chunk numbering and size word, FILE_EVENT; and the mini picture's layout. ([specs/datavideo-switcher.yaml:901](specs/datavideo-switcher.yaml#L901))
-- [ ] Confirm the RS-232 70/F0 control IDs and values are little-endian, the SE-1200MU's speed (19200 in 2019, 57600 in 2017) and the SE-4000's status byte bits. ([specs/datavideo-switcher.yaml:909](specs/datavideo-switcher.yaml#L909))
 - [ ] Confirm the HS-1300 takes the SE-1200MU's Ethernet protocol and the HS-4000 the SE-4000's, and their control tables. ([specs/datavideo-switcher.yaml:921](specs/datavideo-switcher.yaml#L921))
 - [ ] Confirm the SE-2200's DVIP board takes the serial blocks over TCP 5002 inside DVIP's length header and answers the same way; the T-bar's range; status byte 4 bit 4 as PinP 2 preview; and the 'ignored' status outside PC CTRL mode. ([specs/datavideo-switcher.yaml:926](specs/datavideo-switcher.yaml#L926))
 - [ ] Confirm DVIP UDP packets' length counts the whole packet (or leaves out the type byte), replies come back to the sender's port, vendor and product IDs are big-endian, and which switchers answer the UDP management commands and presets. ([specs/datavideo-switcher.yaml:935](specs/datavideo-switcher.yaml#L935))
@@ -1469,7 +1430,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm IP control on TCP 9030 for the DN-500BD MKII (its guide documents RS-232C only; the port is the DN-500BD guide's and the Companion module's). ([specs/denon-dn500bd.yaml:48](specs/denon-dn500bd.yaml#L48))
 - [ ] Confirm ACK and NACK are the bare bytes 06H and 15H with no CR, on TCP as on RS-232C. ([specs/denon-dn500bd.yaml:56](specs/denon-dn500bd.yaml#L56))
 - [ ] Confirm the host's ACK is the byte 06H alone (no CR after it), that each status the player notifies by itself is answered within 30 ms by it and not sent again, and which statuses it sends by itself. ([specs/denon-dn500bd.yaml:62](specs/denon-dn500bd.yaml#L62))
-- [ ] Confirm the RS-232C speed's factory setting (115200 assumed). ([specs/denon-dn500bd.yaml:71](specs/denon-dn500bd.yaml#L71))
 - [ ] Confirm the total group and group answers carry the "?" (@0?PCTG0003) as the guide prints them. ([specs/denon-dn500bd.yaml:779](specs/denon-dn500bd.yaml#L779))
 - [ ] Confirm ?DVANGL is answered @0DVANGL and the angle's number. ([specs/denon-dn500bd.yaml:340](specs/denon-dn500bd.yaml#L340))
 - [ ] Confirm the speaker setting's level form (a sign and two digits; the guide writes vvv and vvvv) and the delay's unit and range. ([specs/denon-dn500bd.yaml:560](specs/denon-dn500bd.yaml#L560))
@@ -1479,31 +1439,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether the DN-500BD MKII answers the menu settings' requests (?PCAP and the others) as the DN-500BD does; its guide lists none, so the spec does not ask it. ([specs/denon-dn500bd.yaml:857](specs/denon-dn500bd.yaml#L857))
 - [ ] Confirm DHCP is set with @0IpAUTO and eight zeros, and the IP settings' twelve-digit form. ([specs/denon-dn500bd.yaml:666](specs/denon-dn500bd.yaml#L666))
 - [ ] Confirm a status request's own answer wants no ACK (the guide's status request flow shows none), that ?PW is answered ACK alone, and that BUSY (@0BDERBUSY) wants none. ([specs/denon-dn500bd.yaml:62](specs/denon-dn500bd.yaml#L62))
-
-## denon-dn500cb — Denon Professional DN-500CB
-
-- [ ] Confirm ACK and NACK are the bare bytes 06H and 15H with no CR, and statuses end in CR. ([specs/denon-dn500cb.yaml:33](specs/denon-dn500cb.yaml#L33))
-- [ ] Confirm the host's ACK is the byte 06H alone (no CR after it), that each status the player notifies by itself is answered by it and not sent again, and that a status request's own answer, ?PW's ACK alone and BUSY want none. ([specs/denon-dn500cb.yaml:39](specs/denon-dn500cb.yaml#L39))
-- [ ] Confirm the RS-232C speed's factory setting (115200 assumed). ([specs/denon-dn500cb.yaml:50](specs/denon-dn500cb.yaml#L50))
-- [ ] Confirm track selection is @0Tr and four digits with no space, and the artist and album answers' form (the guide shows a space after at and al). ([specs/denon-dn500cb.yaml:129](specs/denon-dn500cb.yaml#L129))
-- [ ] Confirm the track time answer is MMMSS (five digits) on this model. ([specs/denon-dn500cb.yaml:268](specs/denon-dn500cb.yaml#L268))
-
-## denon-dn500r — Denon Professional DN-500R
-
-- [ ] Confirm ACK and NACK are the bare bytes 06H and 15H with no CR, and statuses end in CR. ([specs/denon-dn500r.yaml:44](specs/denon-dn500r.yaml#L44))
-- [ ] Confirm the host's ACK is the byte 06H alone (no CR after it), that each status the recorder notifies by itself is answered by it and not sent again, and that a status request's own answer and BUSY want none. ([specs/denon-dn500r.yaml:50](specs/denon-dn500r.yaml#L50))
-- [ ] Confirm the RS-232C speed's factory setting (9600 assumed). ([specs/denon-dn500r.yaml:61](specs/denon-dn500r.yaml#L61))
-- [ ] Check random's and program list playback's codes: set 00 for on, but answered 01 for on as the guide prints it. ([specs/denon-dn500r.yaml:1321](specs/denon-dn500r.yaml#L1321))
-- [ ] Confirm rename_file (@0RN, a four-digit file number and a name) is not taken for random (@0RN00 or @0RN01). ([specs/denon-dn500r.yaml:791](specs/denon-dn500r.yaml#L791))
-- [ ] Confirm ?FE answers each media's free space and its unit; the media size request (?SF in the guide) is the folder name's. ([specs/denon-dn500r.yaml:885](specs/denon-dn500r.yaml#L885))
-- [ ] Confirm the track change the recorder sends by itself: "@Tr NNNN" as printed, or @0Tr. ([specs/denon-dn500r.yaml:1924](specs/denon-dn500r.yaml#L1924))
-- [ ] Confirm the three-digit hot start assignment @0HS, and the four-digit one's code (printed @hs without the ID). ([specs/denon-dn500r.yaml:705](specs/denon-dn500r.yaml#L705))
-- [ ] Confirm the codes printed with a space (@0PO XX, @0IN XX and others) take no space. ([specs/denon-dn500r.yaml:1090](specs/denon-dn500r.yaml#L1090))
-- [ ] Confirm the fade in answer's code: FL as printed, or FI. ([specs/denon-dn500r.yaml:1363](specs/denon-dn500r.yaml#L1363))
-- [ ] Confirm the recording sample rate is asked with ?FS (the guide prints @0FSNN as the request). ([specs/denon-dn500r.yaml:1228](specs/denon-dn500r.yaml#L1228))
-- [ ] Confirm the recording volume answer's form: two characters per channel, signed or not. ([specs/denon-dn500r.yaml:918](specs/denon-dn500r.yaml#L918))
-- [ ] Confirm the hot start information's time is HHHmmssttt (ten digits) after the colon. ([specs/denon-dn500r.yaml:1966](specs/denon-dn500r.yaml#L1966))
-- [ ] Confirm the timer answers carry no timer number (the spec takes it from the request) and their field order. ([specs/denon-dn500r.yaml:1895](specs/denon-dn500r.yaml#L1895))
 
 ## dhd-aes67 — DHD audio AES67 / RAVENNA interfaces (Control API)
 
@@ -1692,14 +1627,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Confirm the TP-2000XLT takes commands ended by a carriage return alone and sends its messages with the > prefix and a CR (the PDF writes /x0D and \x0D). ([specs/dsan-limitimer.yaml:195](specs/dsan-limitimer.yaml#L195))
 - [ ] Record the time strings in hours mode and over 99 minutes, and in overtime. ([specs/dsan-limitimer.yaml:199](specs/dsan-limitimer.yaml#L199))
-- [ ] Check whether the TP-2000XLT sends the LED states on connecting or only on change, and whether flow control is needed. ([specs/dsan-limitimer.yaml:188](specs/dsan-limitimer.yaml#L188))
+- [ ] Check whether the TP-2000XLT sends the LED states on connecting or only on change, and whether a gateway needs flow control set. ([specs/dsan-limitimer.yaml:188](specs/dsan-limitimer.yaml#L188))
 - [ ] Confirm INCMIN and INCHOUR (struck through in the PDF) are no longer taken. ([specs/dsan-limitimer.yaml:203](specs/dsan-limitimer.yaml#L203))
 - [ ] Record what a Global Cache iTach (or other gateway) adds between messages (the Companion module skips a byte after each CR). ([specs/dsan-limitimer.yaml:41](specs/dsan-limitimer.yaml#L41))
 
 ## dsan-perfectcue — DSAN PerfectCue
 
 - [ ] Confirm the TP-2000X-PC takes commands ended by a carriage return alone and sends its LED messages with the > prefix and a CR. ([specs/dsan-perfectcue.yaml:103](specs/dsan-perfectcue.yaml#L103))
-- [ ] Check whether the LED states are sent on connecting or only on change, and whether flow control is needed. ([specs/dsan-perfectcue.yaml:96](specs/dsan-perfectcue.yaml#L96))
+- [ ] Check whether the LED states are sent on connecting or only on change, and whether a gateway needs flow control set. ([specs/dsan-perfectcue.yaml:96](specs/dsan-perfectcue.yaml#L96))
 
 ## eeg-smart-encoder — EEG / AI-Media caption encoders
 
@@ -1856,9 +1791,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On an MMX, record the part number reply (the guide prints Nnn-nnn-nn: with or without a leading N) and the bare tie views (In05). ([spec](specs/extron-matrix.yaml#L936))
 - [ ] On an MMX, record the I reply's exact spacing (V1*03 A1*03 V2*05 A2*06 Vmt1*0 Amt1*0 Vmt2*1 Amt2*0 assumed) and whether input numbers are padded. ([spec](specs/extron-matrix.yaml#L2808))
 - [ ] On an MMX, check whether front panel mutes or level changes send any message (only front panel ties are documented), and whether set_input_attenuation takes 0 (g with 00). ([spec](specs/extron-matrix.yaml#L306))
-- [ ] On each family, drive the matrix on its rear Remote port (link serial) and confirm replies, change reports and the verbose-mode step behave as over Telnet, with the banner only at power-up. ([spec](specs/extron-matrix.yaml#L157))
-- [ ] On DXP HD 4K PLUS, confirm the Remote RS-232 and USB ports ask for no password when one is set (documented for DXP DVI/HDMI, XTP II and SMX only). ([spec](specs/extron-matrix.yaml#L181))
-- [ ] On DXP HD 4K PLUS, confirm the Remote port uses no flow control (not documented). ([spec](specs/extron-matrix.yaml#L2059))
 - [ ] On an MVX 44-88, confirm Esc nVC (the examples) reads a preset's ties, not Esc n1VC (the symbol line). ([specs/extron-matrix.yaml:2049](specs/extron-matrix.yaml#L2049))
 - [ ] On an MVX 44-88, confirm n*40# reads the output level (the example) and record its answer. ([specs/extron-matrix.yaml:2101](specs/extron-matrix.yaml#L2101))
 - [ ] On an MVX 128-1616, record the Esc VM answer (a digit per output assumed, with or without separators). ([specs/extron-matrix.yaml:3477](specs/extron-matrix.yaml#L3477))
@@ -1896,13 +1828,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On an IN1604, check the EDID and output rate codes against the guide's table (no 27 or 28) and what Esc A n*0EDID (automatic) answers. ([spec](specs/extron-switcher.yaml#L1669))
 - [ ] On an IN1604, record the internal temperature reply (the guide prints xxx.x degrees Celsius) and its tagged form (20Stat). ([spec](specs/extron-switcher.yaml#L2386))
 - [ ] On an IN1604, record the ranges the unit accepts for total pixels, active pixels and active lines (the guide gives only +/-512 or 256 of the signal's default). ([spec](specs/extron-switcher.yaml#L1786))
-- [ ] On IN1806/IN1808 and IN1606/IN1608, confirm the Remote RS-232 port asks for no password when one is set (not documented either way). ([spec](specs/extron-switcher.yaml#L150))
 - [ ] Confirm 8 data bits on the IN1606/IN1608 and IN1604 Remote port (not stated) and which stop bits the IN1806/IN1808 Esc...CP command accepts (1 assumed). ([spec](specs/extron-switcher.yaml#L126))
-- [ ] Drive a unit on its rear Remote port (link serial) and confirm the same replies and change reports as over Telnet; check whether the front USB port appears as a serial port. ([spec](specs/extron-switcher.yaml#L2499))
 
 ## ezcoo-matrix — Ezcoo HDMI matrices
 
-- [ ] Record the RS-232 line settings (57600 8N1 assumed). ([specs/ezcoo-matrix.yaml:54](specs/ezcoo-matrix.yaml#L54))
 - [ ] Record what each command answers and the lines EZSTA prints (the OUT1 VS IN1 form is assumed from a community module). ([specs/ezcoo-matrix.yaml:50](specs/ezcoo-matrix.yaml#L50))
 - [ ] Confirm the matrix sends a status line unasked after a front-panel or remote change. ([specs/ezcoo-matrix.yaml:13](specs/ezcoo-matrix.yaml#L13))
 - [ ] Record the full EZH command list and the MX42HS and other models it applies to. ([specs/ezcoo-matrix.yaml:69](specs/ezcoo-matrix.yaml#L69))
@@ -2008,9 +1937,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that an initiator that has joined the core's hosted session sends its data invitation from its control port plus one, or that the core's answering the port it came from suits it, and that it accepts the core's count 1 answers and sends count 2. ([specs/generic-midi.yaml:465](specs/generic-midi.yaml#L465))
 - [ ] Capture Apple's RS packet and confirm the sequence number sits in the upper 16 bits of its 32-bit field, and that a host starting its own clock synchronisation accepts the core's count 1 answer. ([specs/generic-midi.yaml:465](specs/generic-midi.yaml#L465))
 - [ ] Confirm 5004 is the port Audio MIDI Setup offers for a new session, and that the session's advertised _apple-midi._udp SRV port is its control port. ([specs/generic-midi.yaml:101](specs/generic-midi.yaml#L101))
-- [ ] With a USB MIDI device on Windows, macOS and Linux, confirm the port listing's names open the device, that unplugging it reports disconnected within a second or two and plugging it back reconnects, and that a port held by another program on Windows fails to open as described. ([specs/generic-midi.yaml:444](specs/generic-midi.yaml#L444))
-- [ ] On Linux, confirm the core's own ALSA sequencer calls (libasound.so.2 loaded at first use) list a USB MIDI device and a software port under the same names midir gave, send and receive notes and long SysEx both ways, and that on a machine without libasound.so.2, and on one without the sequencer (snd-seq not loaded), the core starts, lists no port and reports why a port device stays disconnected. ([specs/generic-midi.yaml:450](specs/generic-midi.yaml#L450))
-- [ ] Run the MTC generator into a DAW or lighting console chasing MTC, over a MIDI port and over RTP-MIDI, at 24, 25, 30df and 30: confirm it locks at the time located, reads drop-frame across a minute (00:00:59:28 to 00:01:00:02), and stays within a frame of the core's clock for an hour. ([specs/generic-midi.yaml:457](specs/generic-midi.yaml#L457))
+- [ ] Run the MTC generator into a DAW or lighting console chasing MTC over RTP-MIDI, at 24, 25, 30df and 30: confirm it locks at the time located, reads drop-frame across a minute (00:00:59:28 to 00:01:00:02), and stays within a frame of the core's clock for an hour. ([specs/generic-midi.yaml:457](specs/generic-midi.yaml#L457))
 - [ ] Against an MMC device (a DAW or recorder), confirm READ answers for selected_time_code and motion_control_tally decode as kept, including short time code updates. ([specs/generic-midi.yaml:475](specs/generic-midi.yaml#L475))
 
 ## generic-modbus — Generic Modbus TCP server
@@ -2670,8 +2597,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which network changes end the connection at once, and that NET-IP answers before the address changes. ([specs/kramer-p3000.yaml:4056](specs/kramer-p3000.yaml#L4056))
 - [ ] On the VP-551X, check MIC-GAIN's three-parameter form (0,mic,level) against the two-parameter command offered. ([specs/kramer-p3000.yaml:2599](specs/kramer-p3000.yaml#L2599))
 - [ ] Check that the queries added to the poll on connecting are answered ERR 002, not ignored, on products without them. ([specs/kramer-p3000.yaml:4084](specs/kramer-p3000.yaml#L4084))
-- [ ] On each product, confirm the RS-232 control port runs 115200 8N1 with no flow control and takes the same commands and handshake as TCP 5000, and that #BAUD? 0 lists the rates link serial offers. ([specs/kramer-p3000.yaml:110](specs/kramer-p3000.yaml#L110))
-- [ ] Check whether the RS-232 port needs LOGIN when security is on (product-specific, guide p.49). ([specs/kramer-p3000.yaml:3931](specs/kramer-p3000.yaml#L3931))
 
 ## kuma-timer — KUMA Timer
 
@@ -2713,7 +2638,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Confirm that a verbose wildcard query is answered as OK target(*)={...} (and OK target(*,bus)={...} for crosspoints), the values in address order. ([specs/lectrosonics-aspen.yaml:4370](specs/lectrosonics-aspen.yaml#L4370))
 - [ ] Confirm that a verbose update is answered with the value read back, as OK target(address)=value, and a verbose query of a target without an address as OK target=value. ([specs/lectrosonics-aspen.yaml:10](specs/lectrosonics-aspen.yaml#L10))
-- [ ] Record the RS-232 port's default speed and line settings (8N1 without flow control assumed) and the cable wiring. ([specs/lectrosonics-aspen.yaml:61](specs/lectrosonics-aspen.yaml#L61))
 - [ ] Confirm that the device answers its first request on a new TCP connection without any greeting, and how many TCP clients it takes on each port. ([specs/lectrosonics-aspen.yaml:56](specs/lectrosonics-aspen.yaml#L56))
 - [ ] Record what the device sends for a command a model lacks and for a value out of range (ERROR assumed for both). ([specs/lectrosonics-aspen.yaml:55](specs/lectrosonics-aspen.yaml#L55))
 - [ ] Check the virtual programmable input functions on SPNConference and SPNTrio (their pages give the range 0-16 but list 0-19). ([specs/lectrosonics-aspen.yaml:3270](specs/lectrosonics-aspen.yaml#L3270))
@@ -2739,7 +2663,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the IR codes LG prints only as icons: 7E, and the media keys B0, B1, BA, 8F, 8E, AA on signage. ([specs/lg-display.yaml:2020](specs/lg-display.yaml#L2020))
 - [ ] Confirm the daylight saving read `sd 01 01 ff ff ff ff` answers the start entry with its 01 echoed first. ([specs/lg-display.yaml:876](specs/lg-display.yaml#L876))
 - [ ] Confirm the equalizer byte (band in bits 7-5, step in bits 4-0) on a commercial TV. ([specs/lg-display.yaml:814](specs/lg-display.yaml#L814))
-- [ ] Drive an LG display on its RS-232C port (link serial) and confirm the acknowledgements are those of TCP 9761; confirm a commercial TV (UV340C, UL3E) runs at 9600 bps, 8N1, no flow control as the signage guides state. ([specs/lg-display.yaml:107](specs/lg-display.yaml#L107))
 
 ## lightkey — Lightkey (OSC)
 
@@ -2762,8 +2685,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the UMX GPIO pin range (the manual prints 0 ...8 and pin 1 to 8; the hardware has 7) and the RS232_LOCAL_FORMAT reply. ([specs/lightware-lw2.yaml:656](specs/lightware-lw2.yaml#L656))
 - [ ] Confirm set_hdmi_output's answer is the output's STO line. ([specs/lightware-lw2.yaml:528](specs/lightware-lw2.yaml#L528))
 - [ ] Capture the {VM} answer on an MX matrix and confirm it lists one 1 or 0 per output in order after MUT, so the mutes poll keys them by position; and confirm {VC V} and {VC A} answer on the UMX as get_connection_layer's replies do. ([specs/lightware-lw2.yaml:842](specs/lightware-lw2.yaml#L842))
-- [ ] Drive an MX8x8 Pro, an MX-CPU2 frame and a UMX-HDMI-140 on RS-232 (link serial) and confirm the same answers as over TCP 10001, and that no flow control is used. ([specs/lightware-lw2.yaml:81](specs/lightware-lw2.yaml#L81))
-- [ ] On a UMX-HDMI-140-Plus with the Cleartext login on, confirm LW2 on RS-232 is refused (no LW2 login command). ([specs/lightware-lw2.yaml:674](specs/lightware-lw2.yaml#L674))
 
 ## lightware-lw3 — Lightware LW3 matrices, switchers and extenders
 
@@ -2783,8 +2704,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that the reads on connecting (about 390 single GETs across the three trees, most answered with errors on the other trees) complete without the device dropping the connection. ([specs/lightware-lw3.yaml:2774](specs/lightware-lw3.yaml#L2774))
 - [ ] On MX2, record the answers to PRESET:create and PRESET:rename, and whether GET /MEDIA/PRESET lists the presets as child nodes. ([specs/lightware-lw3.yaml:3406](specs/lightware-lw3.yaml#L3406))
 - [ ] On MX2, confirm that port names cannot be set over LW3 (no property in the manual's LW3 chapter). ([specs/lightware-lw3.yaml:4523](specs/lightware-lw3.yaml#L4523))
-- [ ] Drive an MX2 and a UMX-HDMI-140 (Control mode, LW3) on RS-232 (link serial) and confirm the same answers and CHG notifications as over TCP 6107, with no flow control. ([specs/lightware-lw3.yaml:161](specs/lightware-lw3.yaml#L161))
-- [ ] Check when a Cleartext login on the RS-232 port ends (not documented) and that the login step works there. ([specs/lightware-lw3.yaml:4333](specs/lightware-lw3.yaml#L4333))
 
 ## logos-proclaim — Logos Proclaim
 
@@ -3103,7 +3022,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the current energy management state response (0x60): occupancy first and a letter per outlet (INFOCOMM 4:2012) or 16 letters (I-00472). ([specs/middle-atlantic-racklink.yaml:168](specs/middle-atlantic-racklink.yaml#L168))
 - [ ] Check the temperature's unit in sensor readings and thresholds (the log gives Fahrenheit). ([specs/middle-atlantic-racklink.yaml:283](specs/middle-atlantic-racklink.yaml#L283))
 - [ ] Check how often the unit pings and that answering each ping keeps the connection, on Select, Premium and Premium+. ([specs/middle-atlantic-racklink.yaml:9](specs/middle-atlantic-racklink.yaml#L9))
-- [ ] Check RS-232 on a Premium: the same messages at 9600 8N1, and whether it needs the login. ([specs/middle-atlantic-racklink.yaml:53](specs/middle-atlantic-racklink.yaml#L53))
 
 ## midi-show-control — MIDI Show Control (MSC) device
 
@@ -3183,7 +3101,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## nec-projector — NEC and Sharp NEC projectors
 
 - [ ] Find the serial speed a projector ships with: the manual lists the speeds each model offers but no default, and 38400 bit/s is assumed. ([specs/nec-projector.yaml:59](specs/nec-projector.yaml#L59))
-- [ ] Check whether any model needs RTS/CTS flow control on its PC CONTROL port, which the pinout wires but the communication conditions do not mention. ([specs/nec-projector.yaml:64](specs/nec-projector.yaml#L64))
 - [ ] Confirm commands sent with ID1 and ID2 as 00h are answered when a control ID is set on the projector, and whether TCP 7142 keeps an idle connection open or closes it. ([specs/nec-projector.yaml:840](specs/nec-projector.yaml#L840))
 - [ ] Measure how long POWER ON and POWER OFF take to answer (15 s is allowed). ([specs/nec-projector.yaml:840](specs/nec-projector.yaml#L840))
 - [ ] Confirm each model's input terminal codes, which differ by family (HDMI is 1Ah on the older models and A1h on the newer). ([specs/nec-projector.yaml:845](specs/nec-projector.yaml#L845))
@@ -3200,7 +3117,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Confirm current-value responses repeat the command's words before the value (">volume 5", ">lens zoom 1000", ">usage light hours 120", ">avmute video on", ">tilematrix position 2"); the manual shows only the power, volume, input and status forms. ([specs/nec-projector-ascii.yaml:421](specs/nec-projector-ascii.yaml#L421))
 - [ ] Confirm TCP 7142 takes ASCII and binary commands on the same connection, and whether the projector keeps an idle connection open. ([specs/nec-projector-ascii.yaml:52](specs/nec-projector-ascii.yaml#L52))
-- [ ] Find the serial defaults of models other than the NP-P627UL family (38400 bit/s, 8N1, no flow control there), and of monitors. ([specs/nec-projector-ascii.yaml:47](specs/nec-projector-ascii.yaml#L47))
 - [ ] Confirm a display without a polled function answers error:command-try'help' or error:parameter promptly, so the poll is not held up. ([specs/nec-projector-ascii.yaml:427](specs/nec-projector-ascii.yaml#L427))
 - [ ] Check how negative lens travel times and half-second values are written ("lens focus time -1.5"). ([specs/nec-projector-ascii.yaml:246](specs/nec-projector-ascii.yaml#L246))
 - [ ] Confirm the NORMAL standby mode refuses ASCII commands on the network on other models. ([specs/nec-projector-ascii.yaml:435](specs/nec-projector-ascii.yaml#L435))
@@ -3496,17 +3412,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the Admin CGIs answer a Digest challenge with the current firmware, and Basic with older firmware. ([specs/panasonic-ptz.yaml:136](specs/panasonic-ptz.yaml#L136))
 - [ ] Confirm whether the 40 ms gap between pan-tilt head commands (chapter 4, restriction 1) counts from the previous command or from its reply; the core counts it from the reply, and the HE document's 130 ms between any two commands likewise. ([specs/panasonic-ptz.yaml:109](specs/panasonic-ptz.yaml#L109))
 
-## panasonic-ptz-serial — Panasonic PTZ on RS-422
-
-- [ ] On the RS-422 port, confirm that every camera command, queries included, is answered with ACK (06H) and then its reply between STX and ETX, as chapter 4-1 shows for a control command only. ([specs/panasonic-ptz-serial.yaml:10219](specs/panasonic-ptz-serial.yaml#L10219))
-- [ ] Record what a refused camera command gets on the serial line: ACK and then ER1/ER2/ER3:<command> between STX and ETX, or the error alone (chapter 7 shows the IP sequence only); and that a pan-tilt error is eR<n>:<command> with CR. ([specs/panasonic-ptz-serial.yaml:10228](specs/panasonic-ptz-serial.yaml#L10228))
-- [ ] Check that the camera sends update notifications on the RS-422 line with no registration, and whether the version (qSV, every 60 s), error (rER, every 30 s) and lens (lPI, every 300 ms) notifications of chapter 6 come there too. ([specs/panasonic-ptz-serial.yaml:10237](specs/panasonic-ptz-serial.yaml#L10237))
-- [ ] Check the half-duplex pacing: whether a command sent right after a reply (less than 40 ms, or 16 ms on the AW-UE160, after the last pan-tilt command) is taken, and what happens to a command sent while the camera is sending a notification. ([specs/panasonic-ptz-serial.yaml:10210](specs/panasonic-ptz-serial.yaml#L10210))
-- [ ] Confirm the AW-UE20/HE20 take these commands on the RS-422 connector with Serial Com. Protocol Panasonic, and that Panasonic is the factory setting. ([specs/panasonic-ptz-serial.yaml:10246](specs/panasonic-ptz-serial.yaml#L10246))
-- [ ] Confirm the AW-UE160 leaves the factory at 9600 bps (its interface specification lists 9600, 38400 and 115200 without marking a default). ([specs/panasonic-ptz-serial.yaml:87](specs/panasonic-ptz-serial.yaml#L87))
-- [ ] Confirm the AW-UE30, AW-UE40 and AW-UE50 have the RS-422 port the shared AW-UE80/UE50/UE40/UE30 interface specification describes (chapter 4-1 names no model). ([specs/panasonic-ptz-serial.yaml:94](specs/panasonic-ptz-serial.yaml#L94))
-- [ ] Confirm the 40 ms gap between pan-tilt head commands (16 ms on the AW-UE160) on the RS-422 line, counted here from each reply, and that camera commands (STX ... ETX) need no gap of their own. ([specs/panasonic-ptz-serial.yaml:72](specs/panasonic-ptz-serial.yaml#L72))
-
 ## panasonic-projector — Panasonic projectors
 
 - [ ] Confirm the NTCONTROL hash against a projector in protect mode: MD5 of "user:password:random" as 32 lowercase hex digits (the manual's example gives no random number to check against). ([specs/panasonic-projector.yaml:54](specs/panasonic-projector.yaml#L54))
@@ -3514,7 +3419,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a set command's network reply echoes the command after "00" (as "00PON"), and the serial reply is the bare data without "00". ([specs/panasonic-projector.yaml:9094](specs/panasonic-projector.yaml#L9094))
 - [ ] Check which serial speeds the older series offer (the PT-RZ120's menu gives 9600, 19200 and 38400). ([specs/panasonic-projector.yaml:57](specs/panasonic-projector.yaml#L57))
 - [ ] Check that commands addressed to ZZ are answered with RESPONSE (ID ALL) off on a single projector. ([specs/panasonic-projector.yaml:16378](specs/panasonic-projector.yaml#L16378))
-- [ ] Check whether commands over the network also need the 60 s after the light source lights that the RS-232C section asks for (the core waits only on the serial port), and whether a power read during lighting answers 001 (the core starts the 60 s when it first reads on after standby). ([specs/panasonic-projector.yaml:16379](specs/panasonic-projector.yaml#L16379))
 - [ ] Check the older section-per-command lists against a projector where their titles and bytes disagree (GMFI2 printed GMFI1, QJB as QJK, QFI as QEI, and value conflicts such as SHIFT -327 and -127). ([specs/panasonic-projector.yaml:16355](specs/panasonic-projector.yaml#L16355))
 - [ ] Confirm QPW codes other than 000 and 001 that some series may return (warm-up, cooling). ([specs/panasonic-projector.yaml:9094](specs/panasonic-projector.yaml#L9094))
 
@@ -3809,7 +3713,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Over Telnet, confirm that each reply (OK, ERR:n; and request replies) is a line ended by CR LF with no stx, and that the echo of the command arrives as its own line before the reply. ([specs/roland-m5000.yaml:47](specs/roland-m5000.yaml#L47))
 - [ ] Check whether the console sends Telnet option negotiation (IAC) bytes on connecting, and how many Telnet sessions it accepts. ([specs/roland-m5000.yaml:605](specs/roland-m5000.yaml#L605))
-- [ ] On RS-232C, confirm the reply framing (stx before reply commands, a bare 06H ack, no line ending) and that Xon/Xoff is used. ([specs/roland-m5000.yaml:59](specs/roland-m5000.yaml#L59))
 - [ ] Confirm that a request through a user fader (U1-U192) is answered with the U token, not the assigned channel's. ([specs/roland-m5000.yaml:600](specs/roland-m5000.yaml#L600))
 - [ ] Check whether channel names shorter than 12 characters are padded with spaces in CNS replies. ([specs/roland-m5000.yaml:613](specs/roland-m5000.yaml#L613))
 - [ ] Confirm the RNS reply's song name is closed by a quote (the reference's example leaves it out). ([specs/roland-m5000.yaml:951](specs/roland-m5000.yaml#L951))
@@ -3819,13 +3722,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Confirm the login exchange: USR sent on connecting with no prompt, ACK after USR and after PSS, NAK on refusal. ([specs/roland-p20hd.yaml:588](specs/roland-p20hd.yaml#L588))
 - [ ] Confirm the session closes after five minutes without commands and that ACS every ten seconds of silence keeps it open. ([specs/roland-p20hd.yaml:609](specs/roland-p20hd.yaml#L609))
-- [ ] Confirm XON/XOFF flow control on the RS-232 port (only the XON and XOFF commands are documented, p.78) and that no login is asked for there. ([specs/roland-p20hd.yaml:50](specs/roland-p20hd.yaml#L50))
-
-## roland-v1200hd — Roland V-1200HD
-
-- [ ] Confirm ACS (verification of unit status) is answered by a bare ACK, as the liveness check assumes; the guide lists no reply for it. ([specs/roland-v1200hd.yaml:44](specs/roland-v1200hd.yaml#L44))
-- [ ] Check whether ACK is the single byte 06H or "ACK;" as the guide's overview writes it, and that a trailing ";" is harmless. ([specs/roland-v1200hd.yaml:41](specs/roland-v1200hd.yaml#L41))
-- [ ] Confirm the STS frames carry their values comma-separated without spaces, group 5 answering 8 for no memory, and the order of each group as listed. ([specs/roland-v1200hd.yaml:298](specs/roland-v1200hd.yaml#L298))
 
 ## roland-v160hd — Roland V-160HD, V-80HD, VR-120HD, VR-6HD, V-1-4K
 
@@ -3839,33 +3735,26 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the minimum firmware version per model for the Basic commands. ([specs/roland-v160hd.yaml:2932](specs/roland-v160hd.yaml#L2932))
 - [ ] Check whether a second control session receives tally frames after TALLY AUTO SEND. ([specs/roland-v160hd.yaml:2946](specs/roland-v160hd.yaml#L2946))
 - [ ] Check whether RQH sizes other than 000001 are answered. ([specs/roland-v160hd.yaml:2944](specs/roland-v160hd.yaml#L2944))
-- [ ] Drive a V-160HD, VR-120HD or VR-6HD on RS-232 (link serial): confirm commands with stx and nothing after the ";" are accepted, and whether replies end in LF there. ([specs/roland-v160hd.yaml:3281](specs/roland-v160hd.yaml#L3281))
-- [ ] Drive a V-80HD on RS-232 and confirm commands without stx and line ending are accepted. ([specs/roland-v160hd.yaml:3281](specs/roland-v160hd.yaml#L3281))
 - [ ] Check whether DTH is answered by the ack byte 06H or by ACK; on V-160HD, VR-120HD and VR-6HD, on RS-232 and over LAN. ([specs/roland-v160hd.yaml:3288](specs/roland-v160hd.yaml#L3288))
-- [ ] Find the V-80HD's default RS-232 BAUDRATE (115200 assumed, as on the others). ([specs/roland-v160hd.yaml:3291](specs/roland-v160hd.yaml#L3291))
-- [ ] Confirm XON/XOFF flow control on RS-232, which the communication standards leave out. ([specs/roland-v160hd.yaml:3294](specs/roland-v160hd.yaml#L3294))
 
 ## roland-v600uhd — Roland V-600UHD
 
 - [ ] Confirm the password prompt "Enter password:" and greeting "Welcome to Roland V-600UHD.", and record what a wrong password produces. ([specs/roland-v600uhd.yaml:281](specs/roland-v600uhd.yaml#L281))
 - [ ] Find which input audio numbers lie between HDMI IN1 (0) and TEST TONE (7). ([specs/roland-v600uhd.yaml:301](specs/roland-v600uhd.yaml#L301))
-- [ ] Drive the V-600UHD on RS-232 (link serial): confirm commands with stx and no line ending are accepted, ACK arrives as the bare byte 06H, and whether any line ending follows a reply. ([specs/roland-v600uhd.yaml:50](specs/roland-v600uhd.yaml#L50))
 
 ## roland-v60hd — Roland V-60HD
 
 - [ ] Confirm the QAL numbering (which of 11, 12 and 13 is MASTER OUT, AUX and all) and the order of the QAL:13 frame (inputs 0-10, AUX, MASTER OUT assumed). ([specs/roland-v60hd.yaml:441](specs/roland-v60hd.yaml#L441))
 - [ ] Check whether the QPL frame for PANEL INFORMATION is also sent over LAN. ([specs/roland-v60hd.yaml:516](specs/roland-v60hd.yaml#L516))
-- [ ] Drive the V-60HD on RS-232 (link serial) and confirm the same frames as over LAN, with XON/XOFF. ([specs/roland-v60hd.yaml:50](specs/roland-v60hd.yaml#L50))
 
-## roland-vmixer — Roland V-Mixer M-480 / M-400 / M-380 / M-300 / M-200i
+## roland-vmixer — Roland V-Mixer M-200i (Telnet)
 
 - [ ] On the M-200i over Telnet, confirm that each reply (OK, ERR:n; and request replies) is a line ended by CR LF with no stx, and that the echoed command arrives as its own line. ([specs/roland-vmixer.yaml:44](specs/roland-vmixer.yaml#L44))
-- [ ] On RS-232C, confirm that reply commands begin with stx and end at ";" with no line ending, and that ack is the bare byte 06H. ([specs/roland-vmixer.yaml:63](specs/roland-vmixer.yaml#L63))
 - [ ] Confirm the CNS name is six characters padded with spaces, quoted. ([specs/roland-vmixer.yaml:1131](specs/roland-vmixer.yaml#L1131))
 - [ ] Confirm that a request through a user fader is answered with the U token, not the assigned channel's. ([specs/roland-vmixer.yaml:1115](specs/roland-vmixer.yaml#L1115))
-- [ ] Measure whether the consoles keep up with the polls (up to about 230 fader and mute requests every ten seconds at 115200 bps) without answering ERR:2 busy. ([specs/roland-vmixer.yaml:1190](specs/roland-vmixer.yaml#L1190))
+- [ ] Measure whether the M-200i keeps up with the polls (its fader and mute requests every ten seconds) without answering ERR:2 busy. ([specs/roland-vmixer.yaml:1190](specs/roland-vmixer.yaml#L1190))
 - [ ] Check the DTS reply for a delay in milliseconds and in samples (decimal places, unit token). ([specs/roland-vmixer.yaml:788](specs/roland-vmixer.yaml#L788))
-- [ ] Check which input-patch channels and ports each model accepts (the reference lists the M-480 cascade inputs and per-model port ranges). ([specs/roland-vmixer.yaml:862](specs/roland-vmixer.yaml#L862))
+- [ ] Check which input-patch channels and ports the M-200i accepts (the reference lists per-model port ranges). ([specs/roland-vmixer.yaml:862](specs/roland-vmixer.yaml#L862))
 
 ## roland-vr400uhd — Roland VR-400UHD
 
@@ -3873,37 +3762,23 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether get is answered with an ack line as well as the set line. ([specs/roland-vr400uhd.yaml:588](specs/roland-vr400uhd.yaml#L588))
 - [ ] Check the dB scale of levels 0-127. ([specs/roland-vr400uhd.yaml:601](specs/roland-vr400uhd.yaml#L601))
 - [ ] Confirm get answers every parameter of the command list (OUTPUT FADE, DSK, LOGO, transition, MIC and LINE channels, outputs, auto mixing, audio follow video, reverb) with its current value, in the ranges set takes. ([specs/roland-vr400uhd.yaml:433](specs/roland-vr400uhd.yaml#L433))
-- [ ] Confirm the RS-232 port uses no flow control (not documented) and asks for no password. ([specs/roland-vr400uhd.yaml:49](specs/roland-vr400uhd.yaml#L49))
-
-## roland-vr4hd — Roland VR-4HD
-
-- [ ] Confirm VER, used as the liveness check (the VR-4HD lists no ACS), is answered with REMOTE RS-232 on, and nothing when it is off. ([specs/roland-vr4hd.yaml:44](specs/roland-vr4hd.yaml#L44))
-- [ ] Check that a status frame pushed on a change (QPI, QDK, QPG, QUB) comes besides, not in place of, the ACK of the command that caused it. ([specs/roland-vr4hd.yaml:268](specs/roland-vr4hd.yaml#L268))
-
-## roland-xs1hd — Roland XS-1HD
-
-- [ ] Confirm ACS (obtain the status) is answered by a bare ACK and nothing else, as the liveness check assumes; the manual lists no ACS reply. ([specs/roland-xs1hd.yaml:39](specs/roland-xs1hd.yaml#L39))
-- [ ] Check that levels between 100 (0.0 dB) and 127 (+6.0 dB) are linear in dB, as the dB commands assume. ([specs/roland-xs1hd.yaml:107](specs/roland-xs1hd.yaml#L107))
 
 ## roland-xs42h — Roland XS-42H / VP-42H
 
 - [ ] Check whether the unit prompts before taking the password, and record the login exchange and what a wrong password produces. ([specs/roland-xs42h.yaml:480](specs/roland-xs42h.yaml#L480))
 - [ ] Check the dB scale of levels 0-127. ([specs/roland-xs42h.yaml:507](specs/roland-xs42h.yaml#L507))
-- [ ] Confirm the RS-232 port uses no flow control (not documented) and asks for no password. ([specs/roland-xs42h.yaml:39](specs/roland-xs42h.yaml#L39))
 - [ ] Check that levels between 100 (0.0 dB) and 127 (+6.0 dB) are linear in dB, as the dB commands assume. ([specs/roland-xs42h.yaml:128](specs/roland-xs42h.yaml#L128))
 
 ## roland-xs62s — Roland XS-62S
 
 - [ ] Confirm the forms the manual leaves open: VOS with only the bus, IL2 with both a and b, the two TRS values, and VER's empty model field. ([specs/roland-xs62s.yaml:653](specs/roland-xs62s.yaml#L653))
 - [ ] Confirm QAL:14 answers fourteen levels (the manual's example shows thirteen), in the order inputs 0-10, MASTER OUT, PVW/2, AUX/3, and whether the input levels are the PGM/1 (IL1) or PVW/2 (IL2) bus levels. ([specs/roland-xs62s.yaml:580](specs/roland-xs62s.yaml#L580))
-- [ ] Drive the XS-62S on RS-232 (link serial) and confirm the same frames as over LAN, with XON/XOFF. ([specs/roland-xs62s.yaml:40](specs/roland-xs62s.yaml#L40))
 
 ## roland-xs80h — Roland XS-82H/83H/84H
 
 - [ ] Check whether any line ending follows ";" over LAN. ([specs/roland-xs80h.yaml:606](specs/roland-xs80h.yaml#L606))
 - [ ] Check whether ITS, OTS, CTS, KLS and VER are followed by ACK;. ([specs/roland-xs80h.yaml:608](specs/roland-xs80h.yaml#L608))
 - [ ] Check whether a setting enables LAN control and whether a password applies. ([specs/roland-xs80h.yaml:626](specs/roland-xs80h.yaml#L626))
-- [ ] Drive an XS-8xH on RS-232C (link serial, FUNCTION RECEIVER) with no CR after the ";" and confirm the same replies as over LAN, with XON/XOFF. ([specs/roland-xs80h.yaml:48](specs/roland-xs80h.yaml#L48))
 - [ ] Confirm an XS-82H or XS-83H answers ITS and OTS for the inputs and outputs it lacks with an error, as for CTS. ([specs/roland-xs80h.yaml:552](specs/roland-xs80h.yaml#L552))
 - [ ] Check that levels between 100 (0.0 dB) and 127 (+6.0 dB) are linear in dB, as the dB commands assume. ([specs/roland-xs80h.yaml:198](specs/roland-xs80h.yaml#L198))
 
@@ -4130,7 +4005,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what `SCnn????` answers and the meaning of its two weekday digits. ([specs/sharp-display.yaml:2255](specs/sharp-display.yaml#L2255))
 - [ ] Confirm the exact `LOCKED` and `UNSELECTED` texts on the PN-HB and PN-R903A (read from garbled Japanese PDFs). ([specs/sharp-display.yaml:5727](specs/sharp-display.yaml#L5727))
 - [ ] Record whether the PN-LC, PN-HW2 and PN-ME2 take commands their short tables leave out (for example `MPOS`, `CONT`). ([specs/sharp-display.yaml:5698](specs/sharp-display.yaml#L5698))
-- [ ] Drive a Sharp display on its RS-232C terminal (link serial): confirm no login is asked for and the replies are those of the LAN, each ended CR LF. ([specs/sharp-display.yaml:5736](specs/sharp-display.yaml#L5736))
 - [ ] Confirm the minute Sharp asks for after a power or reset command counts from the final OK (after any WAIT), and that RSET (all reset) is the reset command meant; ARST and CRST are not held. ([specs/sharp-display.yaml:80](specs/sharp-display.yaml#L80))
 
 ## showcuesystems-scs — SCS (Show Cue System)
@@ -4366,7 +4240,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which commands EU models with each RED-DA specification refuse. ([specs/sony-bravia-ip.yaml:248](specs/sony-bravia-ip.yaml#L248))
 - [ ] Check that an enquiry the display cannot answer (scene on an unsupported input) is answered sixteen N. ([specs/sony-bravia-ip.yaml:255](specs/sony-bravia-ip.yaml#L255))
 
-## sony-bravia-serial — Sony BRAVIA Professional Displays (RS-232C serial control)
+## sony-bravia-serial — Sony BRAVIA Professional Displays (RS-232C serial control, through a serial-to-Ethernet converter)
 
 - [ ] Capture the data each query returns (power, input, volume, muting, ID, product information 1-3); the core reads power and muting as one byte, the input as kind and number. ([specs/sony-bravia-serial.yaml:312](specs/sony-bravia-serial.yaml#L312))
 - [ ] Check which functions answer canceled (0x03) in standby. ([specs/sony-bravia-serial.yaml:301](specs/sony-bravia-serial.yaml#L301))
@@ -4460,7 +4334,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Confirm how the player ends its messages: "ack" and "nack" with or without CR, and statuses (such as !7SSTPL) ended by CR; TEAC's later document shows them without CR. ([specs/tascam-bd-mp1.yaml:50](specs/tascam-bd-mp1.yaml#L50))
 - [ ] Confirm the host's ACK is "ack" alone (no CR after it), that each status notification answered by it is not sent again, and that a status request's own answer and ?PWR's ack want none. ([specs/tascam-bd-mp1.yaml:56](specs/tascam-bd-mp1.yaml#L56))
-- [ ] Confirm no flow control is needed on RS-232C. ([specs/tascam-bd-mp1.yaml:66](specs/tascam-bd-mp1.yaml#L66))
 - [ ] Confirm a status request is answered "ack" first, then the status, and a set with "ack" alone. ([specs/tascam-bd-mp1.yaml:134](specs/tascam-bd-mp1.yaml#L134))
 - [ ] Confirm the status notifications of the chapter and chapter count use the short forms TN and TT, the answers TNM and TTN. ([specs/tascam-bd-mp1.yaml:649](specs/tascam-bd-mp1.yaml#L649))
 - [ ] Confirm the answer to ?SCN is the direction and speed letters (!7SCNFf). ([specs/tascam-bd-mp1.yaml:675](specs/tascam-bd-mp1.yaml#L675))
@@ -4472,7 +4345,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Confirm how the player ends its messages: "ack" and "nack" with or without CR, and statuses (such as !7SSTPL) ended by CR; Ver. 1.01 shows them without CR. ([specs/tascam-bd-mp4k.yaml:48](specs/tascam-bd-mp4k.yaml#L48))
 - [ ] Confirm the host's ACK is "ack" alone (no CR after it), that each status notification answered by it is not sent again, and that a status request's own answer and ?PWR's ack want none. ([specs/tascam-bd-mp4k.yaml:54](specs/tascam-bd-mp4k.yaml#L54))
-- [ ] Confirm the RS-232C speed's factory setting (115200 assumed), and that no flow control is needed. ([specs/tascam-bd-mp4k.yaml:60](specs/tascam-bd-mp4k.yaml#L60))
 - [ ] Confirm a status request is answered "ack" first, then the status, and a set with "ack" alone. ([specs/tascam-bd-mp4k.yaml:149](specs/tascam-bd-mp4k.yaml#L149))
 - [ ] Confirm the status notifications of the chapter and chapter count use the short forms TN and TT, the answers TNM and TTN. ([specs/tascam-bd-mp4k.yaml:765](specs/tascam-bd-mp4k.yaml#L765))
 - [ ] Confirm the downmix is read with ?DNM (as the document gives it) and answered DMX. ([specs/tascam-bd-mp4k.yaml:629](specs/tascam-bd-mp4k.yaml#L629))
@@ -4482,8 +4354,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## tascam-cd-400u — TASCAM CD-400U / CD-400UDAB
 
-- [ ] Confirm the RS-232C framing: LF before and CR after each message, and the player's own messages framed the same way; the network framing CR LF (the vendor command page shows LF CR). ([specs/tascam-cd-400u.yaml:68](specs/tascam-cd-400u.yaml#L68))
-- [ ] Confirm no flow control is needed on RS-232C (RTS and CTS are joined inside the player). ([specs/tascam-cd-400u.yaml:73](specs/tascam-cd-400u.yaml#L73))
 - [ ] Confirm the IF-E100's Telnet password is 400 by default, digits only, and what the card answers to a wrong one (TEAC documents nothing). ([specs/tascam-cd-400u.yaml:78](specs/tascam-cd-400u.yaml#L78))
 - [ ] Confirm 100 ms between commands is enough, polls included. ([specs/tascam-cd-400u.yaml:66](specs/tascam-cd-400u.yaml#L66))
 - [ ] Check TRACK No. RETURN's layout: the document lists four digits but gives six bytes; confirm whether two EOM digits come first (as on the SS-R250N) or there are only four. ([specs/tascam-cd-400u.yaml:512](specs/tascam-cd-400u.yaml#L512))
@@ -4511,7 +4381,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## tascam-ss-r250n — TASCAM SS-CDR250N / SS-R250N / SS-R300N
 
 - [ ] Confirm messages on TELNET end CR LF (the vendor command page shows LF CR), and that the recorder's own messages end the same way. ([specs/tascam-ss-r250n.yaml:44](specs/tascam-ss-r250n.yaml#L44))
-- [ ] Confirm the recorder's RS-232C answers are LF, the message, then CR, as its commands are. ([specs/tascam-ss-r250n.yaml:64](specs/tascam-ss-r250n.yaml#L64))
 - [ ] Confirm the login (Enter, "Enter Password", the password, "Login Successful") and the SS-R300N's default password. ([specs/tascam-ss-r250n.yaml:73](specs/tascam-ss-r250n.yaml#L73))
 - [ ] Check whether the Telnet server echoes commands. ([specs/tascam-ss-r250n.yaml:50](specs/tascam-ss-r250n.yaml#L50))
 - [ ] Check whether CLOCK DATA RETURN carries ten digits (as its example) or twelve (as its byte count says). ([specs/tascam-ss-r250n.yaml:992](specs/tascam-ss-r250n.yaml#L992))
@@ -4796,8 +4665,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On AVer, confirm presets are numbered from 0 on the wire (preset n is wire n-1). ([specs/visca.yaml:1020](specs/visca.yaml#L1020))
 - [ ] On Canon, confirm replies go to UDP 52381 with the default response port setting. ([specs/visca.yaml:1032](specs/visca.yaml#L1032))
 - [ ] On Datavideo, find the IP framing and port, which the document does not give (52381 with Sony framing assumed). ([specs/visca.yaml:1040](specs/visca.yaml#L1040))
-- [ ] On a serial camera (Sony, Datavideo, Lumens, Marshall), confirm replies come from y0 with y = address + 8 and that only Address Set and IF_Clear broadcasts answer from 88. ([specs/visca.yaml:1126](specs/visca.yaml#L1126))
-- [ ] Confirm a camera answers commands right after Address Set and IF_Clear broadcast on opening, and whether one that already has its address needs them. ([specs/visca.yaml:130](specs/visca.yaml#L130))
 - [ ] On Sony, confirm the 200 ms before a cancel counts from the pan/tilt drive's ACK (the core's reading of "after executing"); on the other vendors' cameras, which document no such gap and get none, check whether a cancel sent within 200 ms of a drive starting still stops it. ([specs/visca.yaml:1194](specs/visca.yaml#L1194))
 
 ## visualproductions-cuecore — Visual Productions CueCore, QuadCore, B-Station2, IoCore2, TimeCore and KioscTouch2 (UDP API)
