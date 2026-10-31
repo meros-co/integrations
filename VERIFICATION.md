@@ -4387,6 +4387,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that the session's own sign-in to /oauth/token, paced with the API's requests, stays within the token endpoint's 30 requests per minute. ([specs/teradek-prism.yaml:79](specs/teradek-prism.yaml#L79))
 - [ ] Confirm the encoder snapshot is read with GET (as Teradek's SDK does) and the decoder's with the settings POST, each answering the JPEG itself. ([specs/teradek-prism.yaml:560](specs/teradek-prism.yaml#L560))
 
+## teradek-vidiu — Teradek VidiU Go streaming encoder (web API)
+
+- [ ] Confirm the login (POST /cgi-bin/api.cgi, command=login, user=admin, passwd) answers with the serenity-session cookie, and that later requests need nothing more (the module also sends cookies fw_ver and passwordChanged=true). ([specs/teradek-vidiu.yaml:51](specs/teradek-vidiu.yaml#L51))
+- [ ] Record what a wrong password and an expired session are answered (##Invalid password#, ##Access denied#) and with which HTTP status, so they can be told apart as a refusal and a re-login. ([specs/teradek-vidiu.yaml:110](specs/teradek-vidiu.yaml#L110))
+- [ ] Record a full status reply on a VidiU Go (system.cgi command=status): the fields of System-Power, Video-Input and Record-Status, and the Broadcast-State values. ([specs/teradek-vidiu.yaml:148](specs/teradek-vidiu.yaml#L148))
+- [ ] Check how often a VidiU Go stops answering status reads and whether a 2 s poll makes it worse. ([specs/teradek-vidiu.yaml:119](specs/teradek-vidiu.yaml#L119))
+- [ ] Record which json.cgi geti keys a VidiU Go answers, and whether it takes a matching write (seti) for settings. ([specs/teradek-vidiu.yaml:119](specs/teradek-vidiu.yaml#L119))
+
 ## timemachines-clock — TimeMachines clocks, timers and time servers (Locator Protocol API)
 
 - [ ] Record a clock's 40-byte status and confirm bytes 20 to 39 (alarm, days, digits value, WiFi signal, name). ([specs/timemachines-clock.yaml:261](specs/timemachines-clock.yaml#L261))

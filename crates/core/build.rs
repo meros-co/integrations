@@ -421,7 +421,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "tascam-ss-r250n",
         ],
     ),
-    ("vendor-teradek", &["teradek-prism"]),
+    ("vendor-teradek", &["teradek-prism", "teradek-vidiu"]),
     ("vendor-timemachines", &["timemachines-clock"]),
     ("vendor-tinkerlist", &["cuez-automator"]),
     (

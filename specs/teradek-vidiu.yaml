@@ -1,0 +1,179 @@
+spec: 1
+id: teradek-vidiu
+name: Teradek VidiU Go streaming encoder (web API)
+vendor: Teradek
+category: other
+
+# The VidiU Go is controlled from its web interface's CGI API on port 80:
+# a login on /cgi-bin/api.cgi answered with a serenity-session cookie,
+# status on /cgi-bin/system.cgi?command=status, settings read with
+# /cgi-bin/json.cgi?command=geti&q=<key>, and broadcast and recording
+# started and stopped on system.cgi. Teradek publishes no document for it;
+# it is taken from the MIT-licensed Bitfocus Companion module, and every
+# behavior is inferred (quirks, VERIFICATION.md).
+source:
+  - title: companion-module-teradek-vidiu (Bitfocus Companion module, MIT license)
+    author: Joseph Adams and contributors
+    url: https://github.com/bitfocus/companion-module-teradek-vidiu/tree/e4d75b7cea31a14f8728cafa8d12d0551418f542
+    note: >
+      Read at commit e4d75b7c (21 February 2026), MIT license (Copyright 2019 Joseph Adams), as
+      the only source of the API. index.js: POST http://<host>/cgi-bin/api.cgi with the form
+      command=login, user=admin, passwd (admin when no password is set), answered
+      ##Invalid password# on a wrong password or with the serenity-session cookie; requests
+      sent with it (and cookies fw_ver and passwordChanged=true); ##Access denied# without a
+      session; GET /cgi-bin/system.cgi?command=status answered {"result": "success", "status":
+      {...}} with System-Power (source:percent:...:charging), Video-Input (input:state),
+      Network-Uplink, Broadcast-State (Live, Starting, Ready, Stopping), Codec-State,
+      Broadcast-Error (none when there is none) and Record-Status (1 recording, 0 not, before
+      the first colon); GET /cgi-bin/json.cgi?command=geti&q=System.Info.Product
+      (productname, serialnumber, productversion), System.Info.CPU.Temp (c, f) and
+      Codec.Status (stream1, a JSON string with encoder.current_bitrate); GET
+      /cgi-bin/system.cgi?command=broadcast&action=start or stop and command=recording, each
+      answered {"result": "success"}. HELP.md: port 80, the device's admin password, and a
+      VidiU Go mode that reads only status and product (the CPU temperature and codec status
+      are not supported by the VidiU Go) and polls more slowly, as a VidiU Go may stop
+      answering status requests.
+  - title: VidiU Go product page (read 31 October 2026)
+    author: Teradek
+    url: https://teradek.com/products/vidiu-go
+    note: >
+      Manufacturer page: the VidiU Go H.264/HEVC streaming encoder, discontinued, Teradek
+      pointing to Prism; still common in streaming.
+
+transport:
+  type: http
+  port: 80
+  scheme: http
+  auth: none
+  timeout_ms: 5000
+  # The login answers with the serenity-session cookie, sent back on every
+  # request.
+  session:
+    login: { method: POST, path: /cgi-bin/api.cgi, content_type: application/x-www-form-urlencoded,
+             body: "command=login&user=admin&passwd={settings.password:url}" }
+    capture: { cookie: serenity-session }
+
+settings:
+  password: { type: string, secret: true, default: admin, max_length: 128, label: Password,
+    description: "The VidiU Go's admin password, as set in its web interface; admin when none was set." }
+
+ports:
+  - { port: 80, protocol: http, role: control, note: "the encoder's web interface" }
+
+models:
+  - id: vidiu-go
+    name: Teradek VidiU Go
+    supports: [get_status, get_product, get_setting, start_broadcast, stop_broadcast, start_recording, stop_recording]
+    verification: none
+
+commands:
+  get_status:
+    summary: "Read the encoder's status: power, video input, uplink, broadcast, codec and recording (system.cgi command=status)"
+    send: { method: GET, path: /cgi-bin/system.cgi, query: { command: status } }
+    expect: { status: 200, json_equals: { "$.result": "success" }, json_path: "$.status" }
+    returns: value
+  get_product:
+    summary: "Read the product name, serial number and firmware version (json.cgi geti System.Info.Product)"
+    send: { method: GET, path: /cgi-bin/json.cgi, query: { command: geti, q: System.Info.Product } }
+    expect: { status: 200, json_path: "$.System.Info.Product" }
+    returns: value
+  get_setting:
+    summary: "Read any setting or status branch by its dotted key (json.cgi geti), such as Codec.Status"
+    params:
+      key: { type: string, required: true, max_length: 128, pattern: '^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$', label: Key,
+        description: "The dotted key of the branch to read, such as System.Info.Product." }
+    send: { method: GET, path: /cgi-bin/json.cgi, query: { command: geti, q: "{key}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  start_broadcast:
+    summary: "Start streaming to the configured destination (system.cgi command=broadcast action=start)"
+    send: { method: GET, path: /cgi-bin/system.cgi, query: { command: broadcast, action: start } }
+    expect: { status: 200, json_equals: { "$.result": "success" } }
+    returns: ack
+  stop_broadcast:
+    summary: "Stop streaming (system.cgi command=broadcast action=stop)"
+    send: { method: GET, path: /cgi-bin/system.cgi, query: { command: broadcast, action: stop } }
+    expect: { status: 200, json_equals: { "$.result": "success" } }
+    returns: ack
+  start_recording:
+    summary: "Start recording to the SD card (system.cgi command=recording action=start)"
+    send: { method: GET, path: /cgi-bin/system.cgi, query: { command: recording, action: start } }
+    expect: { status: 200, json_equals: { "$.result": "success" } }
+    returns: ack
+  stop_recording:
+    summary: "Stop recording (system.cgi command=recording action=stop)"
+    send: { method: GET, path: /cgi-bin/system.cgi, query: { command: recording, action: stop } }
+    expect: { status: 200, json_equals: { "$.result": "success" } }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Teradek does not document this API: it is the web interface's own, read from an
+      MIT-licensed third-party module, and may change with firmware. The login is assumed to
+      need no more than the form and the serenity-session cookie; a wrong password is answered
+      ##Invalid password# rather than with an HTTP error, so it shows as commands failing
+      without a session, not as a refused credential. The module also sends cookies fw_ver and
+      passwordChanged=true, which this spec does not.
+  - models: [all]
+    severity: info
+    text: >
+      While monitoring, the status is read every 2 s and the product once a minute. The VidiU
+      Go is reported to stop answering status reads at times; the core keeps polling, and a
+      read that times out leaves the state as it was. CPU temperature and codec status are not
+      read, as the VidiU Go does not support them; get_setting reads any other branch.
+  - models: [all]
+    severity: critical
+    text: >
+      stop_broadcast ends a live stream at once, and stop_recording closes the recording; the
+      stream's platform may end the event when the stream stops.
+
+state:
+  power.source:     { type: string, description: "The power source, the first field of System-Power" }
+  power.battery_percent: { type: int, unit: "%", description: "Battery charge in percent, the second field of System-Power" }
+  power.charging:   { type: string, description: "The battery's charging state, the fourth field of System-Power" }
+  video.input:      { type: string, description: "The video input in use, the first field of Video-Input" }
+  video.state:      { type: string, description: "The video input's state or format, the second field of Video-Input" }
+  network.uplink:   { type: string, description: "The network uplink in use (Network-Uplink)" }
+  broadcast.state:  { type: string, description: "The broadcast state: Live, Starting, Ready or Stopping (Broadcast-State)" }
+  broadcast.live:   { type: bool, description: "Whether the encoder is streaming live (Broadcast-State Live)" }
+  broadcast.error:  { type: string, description: "The last broadcast error, none when there is none (Broadcast-Error)" }
+  codec.state:      { type: string, description: "The codec's state (Codec-State)" }
+  recording.active: { type: bool, description: "Whether the encoder is recording (Record-Status)" }
+  product.name:     { type: string, description: "The product name" }
+  product.serial:   { type: string, description: "The serial number" }
+  product.firmware: { type: string, description: "The firmware version" }
+
+telemetry:
+  poll:
+    - every_ms: 2000
+      send:
+        - { method: GET, path: /cgi-bin/system.cgi, query: { command: status } }
+    - every_ms: 60000
+      send:
+        - { method: GET, path: /cgi-bin/json.cgi, query: { command: geti, q: System.Info.Product } }
+  updates:
+    - path: '^/cgi-bin/system\.cgi\?command=status$'
+      json_match: { "$.status.System-Power": "^([^:]*):([^:]*)(?::[^:]*:([^:]*))?" }
+      json: {}
+      state: { power.source: "{1}", power.battery_percent: "{2}", power.charging: "{3}" }
+    - path: '^/cgi-bin/system\.cgi\?command=status$'
+      json_match: { "$.status.Video-Input": "^([^:]*)(?::([^:]*))?" }
+      json: {}
+      state: { video.input: "{1}", video.state: "{2}" }
+    - path: '^/cgi-bin/system\.cgi\?command=status$'
+      json: { uplink: "$.status.Network-Uplink", state: "$.status.Broadcast-State", error: "$.status.Broadcast-Error", codec: "$.status.Codec-State" }
+      state:
+        network.uplink: "{uplink}"
+        broadcast.state: "{state}"
+        broadcast.live: { value: "{state}", map: { Live: true, Starting: false, Ready: false, Stopping: false } }
+        broadcast.error: "{error}"
+        codec.state: "{codec}"
+    - path: '^/cgi-bin/system\.cgi\?command=status$'
+      json_match: { "$.status.Record-Status": "^([01])" }
+      json: {}
+      state: { recording.active: { value: "{1}", map: { "0": false, "1": true } } }
+    - path: '^/cgi-bin/json\.cgi\?command=geti&q=System\.Info\.Product$'
+      json: { name: "$.System.Info.Product.productname", serial: "$.System.Info.Product.serialnumber", firmware: "$.System.Info.Product.productversion" }
+      state: { product.name: "{name}", product.serial: "{serial}", product.firmware: "{firmware}" }
