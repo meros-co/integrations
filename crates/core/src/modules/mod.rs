@@ -258,8 +258,6 @@ mod snmp_device_session_tests;
     feature = "ups-mib"
 ))]
 mod snmp_usm;
-#[cfg(feature = "sony-bravia-serial")]
-mod sony_bravia_serial;
 #[cfg(feature = "sony-camera")]
 mod sony_camera;
 #[cfg(feature = "sony-camera")]
@@ -302,7 +300,7 @@ mod visca;
 mod vmix;
 #[cfg(feature = "vmix")]
 mod vmix_functions;
-#[cfg(any(feature = "sony-9pin", feature = "grassvalley-amp"))]
+#[cfg(feature = "grassvalley-amp")]
 mod vtr;
 #[cfg(feature = "behringer-wing")]
 mod wing_meters;
@@ -523,12 +521,8 @@ pub(crate) fn construct(
         "nec-projector" => Ok(Box::new(nec_projector::NecProjector::new(context)?)),
         #[cfg(feature = "samsung-mdc")]
         "samsung-mdc" => Ok(Box::new(samsung_mdc::SamsungMdc::new(context)?)),
-        #[cfg(feature = "sony-bravia-serial")]
-        "sony-bravia-serial" => Ok(Box::new(sony_bravia_serial::SonyBraviaSerial::new(context)?)),
-        #[cfg(feature = "sony-9pin")]
-        "sony-9pin" => Ok(Box::new(vtr::Vtr::new(vtr::Dialect::Sony, context)?)),
         #[cfg(feature = "grassvalley-amp")]
-        "grassvalley-amp" => Ok(Box::new(vtr::Vtr::new(vtr::Dialect::Amp, context)?)),
+        "grassvalley-amp" => Ok(Box::new(vtr::Vtr::new(context)?)),
         #[cfg(feature = "vdcp")]
         "vdcp" => Ok(Box::new(vdcp::Vdcp::new(context)?)),
         #[cfg(feature = "generic-modbus")]

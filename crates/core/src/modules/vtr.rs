@@ -1,24 +1,22 @@
-//! VTR remote control over the Sony 9-pin protocol (RS-422) and Grass Valley's
-//! Advanced Media Protocol (AMP), which extends it: the `sony-9pin` and
-//! `grassvalley-amp` integrations.
+//! Video server control over Grass Valley's Advanced Media Protocol (AMP),
+//! which extends the Sony 9-pin VTR protocol: the `grassvalley-amp`
+//! integration.
 //!
 //! - A message is CMD-1 (the command type in the high nibble, the number of
-//!   data bytes in the low one), CMD-2 (the command), the data and, in the
-//!   binary form, a checksum: the low byte of the sum of the bytes before it.
-//!   The device answers every message: ACK (10 01), NAK (11 12 and an error
+//!   data bytes in the low one), CMD-2 (the command) and the data. The
+//!   device answers every message: ACK (10 01), NAK (11 12 and an error
 //!   byte), or the data asked for (12 11 the device type, 7X the sense
-//!   returns, and for AMP 8X its own returns). One message is in flight at a
-//!   time and the next goes once it is answered.
-//! - AMP's extended messages (a clip name of any length) put 2, A or E in the
-//!   count nibble and the real count in the two bytes after CMD-2; so do its
+//!   returns, 8X AMP's own returns). One message is in flight at a time and
+//!   the next goes once it is answered.
+//! - Extended messages (a clip name of any length) put 2, A or E in the
+//!   count nibble and the real count in the two bytes after CMD-2; so do the
 //!   8X returns that carry names.
-//! - Sony 9-pin (RS-422 on the device) goes through a serial-to-Ethernet
-//!   converter, which carries the binary messages unchanged. AMP goes over
-//!   TCP 3811, where each message is ASCII: `CMDS`, its length in characters as four decimal
-//!   digits, the message's bytes as hexadecimal digits, then LF, with no
-//!   checksum; the server answers in hexadecimal digits too. A TCP
-//!   connection first opens an AMP channel (`CRAT`, the channel's name) or a
-//!   channel-less session, answered 1001, and ends with `STOP0000`.
+//! - AMP goes over TCP 3811, where each message is ASCII: `CMDS`, its length
+//!   in characters as four decimal digits, the message's bytes as
+//!   hexadecimal digits, then LF, with no checksum; the server answers in
+//!   hexadecimal digits too. A TCP connection first opens an AMP channel
+//!   (`CRAT`, the channel's name) or a channel-less session, answered 1001,
+//!   and ends with `STOP0000`.
 //! - Nothing is pushed: monitored, the status bytes (61.20) and the current
 //!   time (61.0C) are asked every 250 ms, and the edit points and other
 //!   settings every 5 s.
@@ -53,26 +51,12 @@ const PROBE_EVERY: Millis = 10_000;
 const RETRY_MIN: Millis = 1_000;
 const RETRY_MAX: Millis = 30_000;
 
-/// The protocol a device speaks.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(
-    not(all(feature = "sony-9pin", feature = "grassvalley-amp")),
-    allow(dead_code)
-)]
-pub(crate) enum Dialect {
-    Sony,
-    Amp,
-}
+/// The status bytes asked for (61.20's DATA-1): every byte from 0.
+const STATUS_REQUEST: u8 = 0x0F;
+/// The time monitoring asks for (61.0C's DATA-1): LTC.
+const TIME_REQUEST: u8 = 0x01;
 
-/// How messages travel: binary with a checksum (Sony 9-pin through a
-/// converter), or AMP's hexadecimal text over TCP.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Wire {
-    Binary,
-    Hex,
-}
-
-/// One message without its checksum.
+/// One message.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Msg {
     pub cmd1: u8,
@@ -113,30 +97,20 @@ impl Msg {
     }
 }
 
-pub(crate) fn checksum(bytes: &[u8]) -> u8 {
-    bytes.iter().fold(0u8, |a, b| a.wrapping_add(*b))
-}
-
-/// A message as it goes out on the wire.
-pub(crate) fn frame(msg: &Msg, hex: bool) -> Vec<u8> {
-    let bytes = msg.bytes();
-    if hex {
-        let digits: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
-        format!("CMDS{:04}{digits}\n", digits.len()).into_bytes()
-    } else {
-        let mut out = bytes.clone();
-        out.push(checksum(&bytes));
-        out
-    }
+/// A message as it goes out on the wire: `CMDS`, the length and the bytes
+/// as hexadecimal digits.
+pub(crate) fn frame(msg: &Msg) -> Vec<u8> {
+    let digits = hex(&msg.bytes());
+    format!("CMDS{:04}{digits}\n", digits.len()).into_bytes()
 }
 
 /// How many data bytes a received message carries, from its first bytes;
-/// `None` until enough have arrived. AMP's 8X returns with 2, A or E in the
-/// count nibble give the real count in their first two data bytes.
-fn data_len(dialect: Dialect, head: &[u8]) -> Option<usize> {
+/// `None` until enough have arrived. 8X returns with 2, A or E in the count
+/// nibble give the real count in their first two data bytes.
+fn data_len(head: &[u8]) -> Option<usize> {
     let cmd1 = *head.first()?;
     let nibble = (cmd1 & 0x0F) as usize;
-    if dialect == Dialect::Amp && cmd1 >> 4 == 0x8 && matches!(nibble, 0x2 | 0xA | 0xE) {
+    if cmd1 >> 4 == 0x8 && matches!(nibble, 0x2 | 0xA | 0xE) {
         let hi = *head.get(2)? as usize;
         let lo = *head.get(3)? as usize;
         return Some(2 + (hi << 8 | lo));
@@ -192,22 +166,6 @@ fn ub_text(data: &[u8]) -> String {
         .map(|b| format!("{:x}{:x}", b & 0x0F, b >> 4))
         .collect::<String>()
         .to_uppercase()
-}
-
-fn ub_bytes(text: &str) -> Result<[u8; 4], CommandError> {
-    if text.len() != 8 || !text.chars().all(|c| c.is_ascii_hexdigit()) {
-        return Err(invalid("'user_bits' is eight hexadecimal digits"));
-    }
-    let n: Vec<u8> = text
-        .chars()
-        .map(|c| c.to_digit(16).unwrap_or(0) as u8)
-        .collect();
-    Ok([
-        n[0] | n[1] << 4,
-        n[2] | n[3] << 4,
-        n[4] | n[5] << 4,
-        n[6] | n[7] << 4,
-    ])
 }
 
 /// A tape speed as the 9-pin speed bytes: 10^(N/32 - 2) times play speed
@@ -309,7 +267,7 @@ fn names(mut payload: &[u8]) -> Vec<String> {
 }
 
 const DIRECTION: &[(&str, u8)] = &[("forward", 0x00), ("reverse", 0x10)];
-const POINT: &[(&str, u8)] = &[("in", 0), ("out", 1), ("audio_in", 2), ("audio_out", 3)];
+const POINT: &[(&str, u8)] = &[("in", 0), ("out", 1)];
 
 /// What a reply is read as.
 #[derive(Debug, Clone, PartialEq)]
@@ -319,11 +277,7 @@ enum Read {
     DeviceType,
     Status,
     Time,
-    Generator,
     Point(u8),
-    PrerollTime,
-    TimerMode,
-    EditPreset,
     Raw,
     DeviceId,
     Loaded,
@@ -374,14 +328,12 @@ impl Job {
 enum Phase {
     Closed,
     Connecting,
-    /// AMP over TCP: the channel request is answered.
+    /// The channel request is answered.
     Channel,
     Ready,
 }
 
 pub(crate) struct Vtr {
-    dialect: Dialect,
-    wire: Wire,
     to: std::net::SocketAddr,
     monitor: bool,
     channel: String,
@@ -393,73 +345,11 @@ pub(crate) struct Vtr {
     in_flight: Option<Job>,
     sent_at: Millis,
     retry_after: Millis,
-    /// The status bytes asked for (61.20's DATA-1).
-    status_request: u8,
 }
 
-/// The status bits both dialects share and the Sony-only ones, by byte and
-/// bit, as the 7X.20 status data gives them.
-const SONY_BITS: &[(usize, u8, &str)] = &[
-    (0, 0, "local"),
-    (0, 4, "servo_ref_missing"),
-    (0, 5, "tape_out"),
-    (1, 0, "play"),
-    (1, 1, "record"),
-    (1, 2, "fast_forward"),
-    (1, 3, "rewind"),
-    (1, 4, "eject"),
-    (1, 5, "stop"),
-    (1, 6, "tension_release"),
-    (1, 7, "standby"),
-    (2, 0, "cue_complete"),
-    (2, 1, "still"),
-    (2, 2, "reverse"),
-    (2, 3, "var"),
-    (2, 4, "jog"),
-    (2, 5, "shuttle"),
-    (2, 6, "tso"),
-    (2, 7, "servo_lock"),
-    (3, 0, "in_point"),
-    (3, 1, "out_point"),
-    (3, 2, "audio_in_point"),
-    (3, 3, "audio_out_point"),
-    (3, 4, "cf_mode"),
-    (3, 6, "freeze"),
-    (3, 7, "auto_mode"),
-    (4, 0, "preroll"),
-    (4, 1, "preview"),
-    (4, 2, "auto_edit"),
-    (4, 3, "review"),
-    (4, 4, "edit"),
-    (4, 6, "full_ee"),
-    (4, 7, "select_ee"),
-    (5, 0, "a1"),
-    (5, 1, "a2"),
-    (5, 2, "a3"),
-    (5, 3, "a4"),
-    (5, 4, "video"),
-    (5, 5, "assemble"),
-    (5, 6, "insert"),
-    (6, 4, "lamp_reverse"),
-    (6, 5, "lamp_forward"),
-    (6, 6, "lamp_still"),
-    (7, 0, "in_out"),
-    (7, 2, "spot_erase"),
-    (7, 4, "sync_active"),
-    (7, 5, "audio_split"),
-    (8, 0, "record_inhibit"),
-    (8, 1, "system_alarm"),
-    (8, 2, "servo_alarm"),
-    (8, 3, "cf_lock"),
-    (8, 4, "eot"),
-    (8, 5, "near_eot"),
-    (8, 6, "lost_lock"),
-    (8, 7, "buzzer"),
-    (9, 7, "function_abort"),
-];
-
-/// AMP's status bits (Grass Valley's T2 AMP manual lists them).
-const AMP_BITS: &[(usize, u8, &str)] = &[
+/// The status bits by byte and bit, as the 7X.20 status data gives them
+/// (Grass Valley's T2 AMP manual lists them).
+const STATUS_BITS: &[(usize, u8, &str)] = &[
     (0, 0, "local"),
     (0, 1, "remote_and_local"),
     (0, 2, "hard_error"),
@@ -574,19 +464,8 @@ fn nak_text(bits: u8) -> String {
 }
 
 impl Vtr {
-    pub(crate) fn new(dialect: Dialect, ctx: OpenContext) -> Result<Vtr, String> {
-        let (to, wire) = match dialect {
-            Dialect::Amp => (crate::module::tcp_address(&ctx, 3811)?, Wire::Hex),
-            Dialect::Sony => {
-                if ctx.port.is_none() {
-                    return Err(
-                        "a serial-to-Ethernet converter has no standard port: give the converter's port"
-                            .into(),
-                    );
-                }
-                (crate::module::tcp_address(&ctx, 0)?, Wire::Binary)
-            }
-        };
+    pub(crate) fn new(ctx: OpenContext) -> Result<Vtr, String> {
+        let to = crate::module::tcp_address(&ctx, 3811)?;
         let channel = ctx
             .settings
             .get("channel")
@@ -594,8 +473,6 @@ impl Vtr {
             .unwrap_or("")
             .to_string();
         Ok(Vtr {
-            dialect,
-            wire,
             to,
             monitor: ctx.monitor,
             channel,
@@ -607,18 +484,7 @@ impl Vtr {
             in_flight: None,
             sent_at: 0,
             retry_after: RETRY_MIN,
-            status_request: match dialect {
-                Dialect::Sony => 0x0A,
-                Dialect::Amp => 0x0F,
-            },
         })
-    }
-
-    fn time_request(&self) -> u8 {
-        match self.dialect {
-            Dialect::Sony => 0x03,
-            Dialect::Amp => 0x01,
-        }
     }
 
     /// The job for a command, or why it cannot be sent.
@@ -626,13 +492,12 @@ impl Vtr {
         let ack = |kind: u8, cmd2: u8, data: &[u8]| Ok(Job::ack(Msg::new(kind, cmd2, data)));
         let read =
             |kind: u8, cmd2: u8, data: &[u8], r: Read| Ok(Job::read(Msg::new(kind, cmd2, data), r));
-        let status = || Msg::new(6, 0x20, &[self.status_request]);
         let point_sense = |pt: u8| Msg::new(6, 0x10 + pt, &[]);
-        let amp = self.dialect == Dialect::Amp;
         match name {
             "local_disable" => ack(0, 0x0C, &[]),
             "local_enable" => ack(0, 0x1D, &[]),
             "get_device_type" => read(0, 0x11, &[], Read::DeviceType),
+            "set_drop_frame" => ack(0, 0x06, &[u8::from(flag(p, "enabled")?)]),
             "stop" => ack(2, 0x00, &[]),
             "play" => ack(2, 0x01, &[]),
             "record" => ack(2, 0x02, &[]),
@@ -663,142 +528,16 @@ impl Vtr {
                 let base = if fields < 0 { 0x21 } else { 0x11 };
                 ack(2, base, &(fields.unsigned_abs() as u32).to_be_bytes())
             }
-            "frame_step" => {
-                let dir = pick(p, "direction", DIRECTION)?;
-                ack(2, 0x14 + dir, &[])
-            }
-            "preroll" => ack(2, 0x30, &[]),
             "cue_up" => ack(2, 0x31, &timecode(text(p, "timecode")?)?),
-            "sync_play" => ack(2, 0x34, &[]),
-            "program_speed_play" => {
-                let percent = num(p, "percent")?;
-                let code = if percent < 0.0 { 0x39 } else { 0x38 };
-                let steps = (percent.abs() * 10.0).round().min(255.0) as u8;
-                ack(2, code, &[steps])
-            }
-            "preview" => ack(2, 0x40, &[]),
-            "review" => ack(2, 0x41, &[]),
-            "auto_edit" => ack(2, 0x42, &[]),
-            "outpoint_preview" => ack(2, 0x43, &[]),
-            "anti_clog_timer" => ack(2, if flag(p, "enabled")? { 0x55 } else { 0x54 }, &[]),
             "full_ee" => ack(2, if flag(p, "enabled")? { 0x61 } else { 0x60 }, &[]),
-            "select_ee_on" => ack(2, 0x63, &[]),
-            "edit" => ack(2, if flag(p, "enabled")? { 0x65 } else { 0x64 }, &[]),
-            "freeze" => ack(2, if flag(p, "enabled")? { 0x6B } else { 0x6A }, &[]),
             "set_mute" => ack(2, 0x62, &[u8::from(flag(p, "enabled")?)]),
-            "set_timer1" => ack(4, 0x00, &timecode(text(p, "timecode")?)?),
-            "reset_timer1" => ack(4, 0x08, &[]),
-            "set_generator" => {
-                let mut tc = timecode(text(p, "timecode")?)?;
-                if flag(p, "drop_frame")? {
-                    tc[0] |= 0x40;
-                }
-                if flag(p, "color_frame")? {
-                    tc[0] |= 0x80;
-                }
-                Ok(Job::ack(Msg::new(4, 0x04, &tc))
-                    .then(Msg::new(6, 0x0A, &[0x11]), Read::Generator))
-            }
-            "set_user_bits" => Ok(
-                Job::ack(Msg::new(4, 0x05, &ub_bytes(text(p, "user_bits")?)?))
-                    .then(Msg::new(6, 0x0A, &[0x11]), Read::Generator),
-            ),
-            "enter_point" => {
-                let pt = pick(p, "point", POINT)?;
-                Ok(Job::ack(Msg::new(4, 0x10 + pt, &[])).then(point_sense(pt), Read::Point(pt)))
-            }
             "set_point" => {
                 let pt = pick(p, "point", POINT)?;
                 let tc = timecode(text(p, "timecode")?)?;
                 Ok(Job::ack(Msg::new(4, 0x14 + pt, &tc)).then(point_sense(pt), Read::Point(pt)))
             }
-            "shift_point" => {
-                let pt = pick(p, "point", POINT)?;
-                let minus = pick(p, "direction", &[("plus", 0), ("minus", 1)])?;
-                Ok(Job::ack(Msg::new(4, 0x18 + pt * 2 + minus, &[]))
-                    .then(point_sense(pt), Read::Point(pt)))
-            }
-            "reset_point" => {
-                let pt = pick(p, "point", POINT)?;
-                Ok(Job::ack(Msg::new(4, 0x20 + pt, &[])).then(point_sense(pt), Read::Point(pt)))
-            }
-            "recall_point" => {
-                let pt = pick(p, "point", POINT)?;
-                Ok(Job::ack(Msg::new(4, 0x24 + pt, &[])).then(point_sense(pt), Read::Point(pt)))
-            }
-            "reset_lost_lock" => ack(4, 0x2D, &[]),
-            "set_edit_preset" => {
-                let b = |k: &str, bit: u8| -> Result<u8, CommandError> {
-                    Ok(u8::from(flag(p, k)?) << bit)
-                };
-                let d1 = b("insert", 6)?
-                    | b("assemble", 5)?
-                    | b("video", 4)?
-                    | b("timecode", 2)?
-                    | b("cue_a2", 1)?
-                    | b("cue_a1", 0)?;
-                let d2 = b("audio4", 3)? | b("audio3", 2)? | b("audio2", 1)? | b("audio1", 0)?;
-                Ok(Job::ack(Msg::new(4, 0x30, &[d1, d2]))
-                    .then(Msg::new(6, 0x30, &[0x02]), Read::EditPreset))
-            }
-            "get_edit_preset" => read(6, 0x30, &[0x02], Read::EditPreset),
-            "set_preroll_time" => {
-                let tc = timecode(text(p, "timecode")?)?;
-                Ok(
-                    Job::ack(Msg::new(4, 0x31, &tc))
-                        .then(Msg::new(6, 0x31, &[]), Read::PrerollTime),
-                )
-            }
-            "set_tape_auto" => ack(
-                4,
-                0x32,
-                &[pick(
-                    p,
-                    "mode",
-                    &[("auto", 0x00), ("tape", 0x01), ("local", 0xFF)],
-                )?],
-            ),
-            "set_servo_reference" => ack(
-                4,
-                0x33,
-                &[pick(
-                    p,
-                    "reference",
-                    &[
-                        ("auto", 0x00),
-                        ("external", 0x01),
-                        ("input", 0x02),
-                        ("local", 0xFF),
-                    ],
-                )?],
-            ),
-            "set_color_frame" => ack(
-                4,
-                0x35,
-                &[pick(
-                    p,
-                    "mode",
-                    &[
-                        ("two_field", 0x01),
-                        ("four_field", 0x02),
-                        ("eight_field", 0x03),
-                        ("local", 0xFF),
-                    ],
-                )?],
-            ),
-            "set_timer_mode" => {
-                let m = pick(
-                    p,
-                    "mode",
-                    &[
-                        ("timecode", 0x00),
-                        ("timer1", 0x01),
-                        ("timer2", 0x02),
-                        ("local", 0xFF),
-                    ],
-                )?;
-                Ok(Job::ack(Msg::new(4, 0x36, &[m])).then(Msg::new(6, 0x36, &[]), Read::TimerMode))
-            }
+            "reset_in" => ack(4, 0x20, &[]),
+            "reset_out" => ack(4, 0x21, &[]),
             "set_timecode_mode" => ack(
                 4,
                 0x36,
@@ -813,51 +552,17 @@ impl Vtr {
                     ],
                 )?],
             ),
-            "input_check" => ack(4, 0x37, &[u8::from(flag(p, "enabled")?)]),
-            "set_edit_field" => ack(
-                4,
-                0x3A,
-                &[pick(
-                    p,
-                    "field",
-                    &[
-                        ("either", 0x00),
-                        ("field1", 0x01),
-                        ("field2", 0x02),
-                        ("local", 0xFF),
-                    ],
-                )?],
-            ),
-            "set_freeze_mode" => ack(
-                4,
-                0x3B,
-                &[pick(
-                    p,
-                    "mode",
-                    &[
-                        ("either_field", 0x00),
-                        ("field1", 0x01),
-                        ("field2", 0x10),
-                        ("frame", 0x11),
-                    ],
-                )?],
-            ),
             "auto_mode" => ack(4, if flag(p, "enabled")? { 0x41 } else { 0x40 }, &[]),
-            "spot_erase" => ack(4, if flag(p, "enabled")? { 0x43 } else { 0x42 }, &[]),
-            "audio_split" => ack(4, if flag(p, "enabled")? { 0x45 } else { 0x44 }, &[]),
             "set_loop" => ack(4, 0x42, &[u8::from(flag(p, "enabled")?)]),
-            "set_drop_frame" => ack(0, 0x06, &[u8::from(flag(p, "enabled")?)]),
-            "get_status" => Ok(Job::read(status(), Read::Status)),
+            "get_status" => read(6, 0x20, &[STATUS_REQUEST], Read::Status),
             "get_time" => {
                 let which = pick(
                     p,
                     "source",
                     &[
-                        ("best", 0x03),
                         ("ltc", 0x01),
                         ("vitc", 0x02),
                         ("timer1", 0x04),
-                        ("timer2", 0x08),
                         ("ltc_user_bits", 0x10),
                         ("vitc_user_bits", 0x20),
                         ("windows_time", 0x08),
@@ -866,13 +571,10 @@ impl Vtr {
                 )?;
                 read(6, 0x0C, &[which], Read::Time)
             }
-            "get_generator" => read(6, 0x0A, &[0x11], Read::Generator),
             "get_point" => {
                 let pt = pick(p, "point", POINT)?;
                 Ok(Job::read(point_sense(pt), Read::Point(pt)))
             }
-            "get_preroll_time" => read(6, 0x31, &[], Read::PrerollTime),
-            "get_timer_mode" => read(6, 0x36, &[], Read::TimerMode),
             "send_raw" => {
                 let bytes = unhex(text(p, "message")?)
                     .filter(|b| b.len() >= 2)
@@ -886,9 +588,8 @@ impl Vtr {
                 };
                 Ok(Job::read(msg, Read::Raw))
             }
-            // AMP's own commands.
-            "get_device_id" if amp => read(0xA, 0x21, &[], Read::DeviceId),
-            "load_clip" if amp => {
+            "get_device_id" => read(0xA, 0x21, &[], Read::DeviceId),
+            "load_clip" => {
                 let mut payload = Vec::new();
                 for clip in clip_list(p)? {
                     payload.extend(name_field(&clip));
@@ -896,7 +597,7 @@ impl Vtr {
                 Ok(Job::ack(Msg::extended(4, 0xA, 0x14, &payload))
                     .then(Msg::new(0xA, 0x16, &[]), Read::Loaded))
             }
-            "cue_clip" if amp => {
+            "cue_clip" => {
                 let mut payload = vec![b'E'];
                 payload.extend(name_len(text(p, "clip")?));
                 payload.extend(timecode(text(p, "timecode")?)?);
@@ -904,69 +605,67 @@ impl Vtr {
                 Ok(Job::ack(Msg::extended(4, 0xE, 0x14, &payload))
                     .then(Msg::new(0xA, 0x16, &[]), Read::Loaded))
             }
-            "set_clip_out" if amp => {
+            "set_clip_out" => {
                 let mut payload = vec![b'E'];
                 payload.extend(name_len(text(p, "clip")?));
                 payload.extend(timecode(text(p, "timecode")?)?);
                 payload.extend(text(p, "clip")?.as_bytes());
                 Ok(Job::ack(Msg::extended(4, 0xE, 0x15, &payload)))
             }
-            "reset_in" if amp => ack(4, 0x20, &[]),
-            "reset_out" if amp => ack(4, 0x21, &[]),
-            "preview_clip" if amp => {
+            "preview_clip" => {
                 let mut payload = Vec::new();
                 for clip in clip_list(p)? {
                     payload.extend(name_field(&clip));
                 }
                 Ok(Job::ack(Msg::extended(0xA, 0xA, 0x04, &payload)))
             }
-            "preview_clip_at" if amp => {
+            "preview_clip_at" => {
                 let mut payload = vec![b'E'];
                 payload.extend(name_len(text(p, "clip")?));
                 payload.extend(timecode(text(p, "timecode")?)?);
                 payload.extend(text(p, "clip")?.as_bytes());
                 Ok(Job::ack(Msg::extended(0xA, 0xE, 0x04, &payload)))
             }
-            "set_preview_out" if amp => ack(0xA, 0x05, &timecode(text(p, "timecode")?)?),
-            "reset_preview_in" if amp => ack(0xA, 0x06, &[]),
-            "reset_preview_out" if amp => ack(0xA, 0x07, &[]),
-            "record_cue" if amp => Ok(Job::ack(Msg::extended(
+            "set_preview_out" => ack(0xA, 0x05, &timecode(text(p, "timecode")?)?),
+            "reset_preview_in" => ack(0xA, 0x06, &[]),
+            "reset_preview_out" => ack(0xA, 0x07, &[]),
+            "record_cue" => Ok(Job::ack(Msg::extended(
                 0xA,
                 0xA,
                 0x02,
                 &name_field(text(p, "clip")?),
             ))),
-            "record_cue_at" if amp => {
+            "record_cue_at" => {
                 let mut payload = timecode(text(p, "timecode")?)?.to_vec();
                 payload.extend(name_field(text(p, "clip")?));
                 Ok(Job::ack(Msg::extended(0xA, 0xE, 0x02, &payload)))
             }
-            "get_loaded_clip" if amp => read(0xA, 0x16, &[], Read::Loaded),
-            "get_clip_start" if amp => Ok(Job::read(
+            "get_loaded_clip" => read(0xA, 0x16, &[], Read::Loaded),
+            "get_clip_start" => Ok(Job::read(
                 Msg::extended(0xA, 0x2, 0x25, text(p, "clip")?.as_bytes()),
                 Read::ClipTime("start"),
             )),
-            "get_clip_duration" if amp => Ok(Job::read(
+            "get_clip_duration" => Ok(Job::read(
                 Msg::extended(0xA, 0x2, 0x17, text(p, "clip")?.as_bytes()),
                 Read::ClipTime("duration"),
             )),
-            "get_working_folder" if amp => read(0xA, 0x0F, &[], Read::WorkingFolder),
-            "set_working_folder" if amp => {
+            "get_working_folder" => read(0xA, 0x0F, &[], Read::WorkingFolder),
+            "set_working_folder" => {
                 Ok(
                     Job::ack(Msg::extended(0xA, 0x2, 0x0E, text(p, "folder")?.as_bytes()))
                         .then(Msg::new(0xA, 0x0F, &[]), Read::WorkingFolder),
                 )
             }
-            "list_folders" if amp => read(0xA, 0x2A, &[], Read::Folders(Vec::new())),
-            "list_clips" if amp => Ok(Job::read(
+            "list_folders" => read(0xA, 0x2A, &[], Read::Folders(Vec::new())),
+            "list_clips" => Ok(Job::read(
                 Msg::extended(0xA, 0x2, 0x14, &[]),
                 Read::Clips(Vec::new()),
             )),
-            "get_clip_status" if amp => Ok(Job::read(
+            "get_clip_status" => Ok(Job::read(
                 Msg::extended(0xA, 0xA, 0x18, text(p, "clip")?.as_bytes()),
                 Read::ClipStatus,
             )),
-            "get_clip_data" if amp => {
+            "get_clip_data" => {
                 let mut payload = vec![b'C'];
                 payload.extend(name_field(text(p, "clip")?));
                 Ok(Job::read(
@@ -974,19 +673,19 @@ impl Vtr {
                     Read::ClipData,
                 ))
             }
-            "erase_clip" if amp => Ok(Job::ack(Msg::extended(
+            "erase_clip" => Ok(Job::ack(Msg::extended(
                 0xA,
                 0x2,
                 0x10,
                 text(p, "clip")?.as_bytes(),
             ))),
-            "create_folder" if amp => Ok(Job::ack(Msg::extended(
+            "create_folder" => Ok(Job::ack(Msg::extended(
                 0xA,
                 0x2,
                 0x31,
                 text(p, "folder")?.as_bytes(),
             ))),
-            "delete_folder" if amp => Ok(Job::ack(Msg::extended(
+            "delete_folder" => Ok(Job::ack(Msg::extended(
                 0xA,
                 0x2,
                 0x29,
@@ -1006,7 +705,7 @@ impl Vtr {
             return;
         };
         self.buf.clear();
-        cx.tcp_send(SOCKET, frame(&job.msg, self.wire == Wire::Hex));
+        cx.tcp_send(SOCKET, frame(&job.msg));
         self.sent_at = cx.now();
         cx.set_timer(REPLY_TIMER, REPLY_TIMEOUT);
         self.in_flight = Some(job);
@@ -1021,32 +720,16 @@ impl Vtr {
     }
 
     fn fast_poll(&mut self) {
-        self.queue_poll(Msg::new(6, 0x20, &[self.status_request]), Read::Status);
-        self.queue_poll(Msg::new(6, 0x0C, &[self.time_request()]), Read::Time);
+        self.queue_poll(Msg::new(6, 0x20, &[STATUS_REQUEST]), Read::Status);
+        self.queue_poll(Msg::new(6, 0x0C, &[TIME_REQUEST]), Read::Time);
     }
 
     fn slow_poll(&mut self) {
-        let points: &[u8] = match self.dialect {
-            Dialect::Sony => &[0, 1, 2, 3],
-            Dialect::Amp => &[0, 1],
-        };
-        for pt in points {
-            self.queue_poll(Msg::new(6, 0x10 + pt, &[]), Read::Point(*pt));
+        for (pt, _) in (0u8..).zip(POINT) {
+            self.queue_poll(Msg::new(6, 0x10 + pt, &[]), Read::Point(pt));
         }
-        match self.dialect {
-            Dialect::Sony => {
-                self.queue_poll(Msg::new(6, 0x0C, &[0x04]), Read::Time);
-                self.queue_poll(Msg::new(6, 0x0C, &[0x10]), Read::Time);
-                self.queue_poll(Msg::new(6, 0x0A, &[0x11]), Read::Generator);
-                self.queue_poll(Msg::new(6, 0x31, &[]), Read::PrerollTime);
-                self.queue_poll(Msg::new(6, 0x36, &[]), Read::TimerMode);
-                self.queue_poll(Msg::new(6, 0x30, &[0x02]), Read::EditPreset);
-            }
-            Dialect::Amp => {
-                self.queue_poll(Msg::new(0xA, 0x16, &[]), Read::Loaded);
-                self.queue_poll(Msg::new(0xA, 0x0F, &[]), Read::WorkingFolder);
-            }
-        }
+        self.queue_poll(Msg::new(0xA, 0x16, &[]), Read::Loaded);
+        self.queue_poll(Msg::new(0xA, 0x0F, &[]), Read::WorkingFolder);
     }
 
     fn open(&mut self, cx: &mut Cx) {
@@ -1084,9 +767,7 @@ impl Vtr {
         self.phase = Phase::Ready;
         self.queue_poll(Msg::new(0, 0x11, &[]), Read::DeviceType);
         if self.monitor {
-            if self.dialect == Dialect::Amp {
-                self.queue_poll(Msg::new(0xA, 0x21, &[]), Read::DeviceId);
-            }
+            self.queue_poll(Msg::new(0xA, 0x21, &[]), Read::DeviceId);
             self.fast_poll();
             self.slow_poll();
             cx.set_timer(FAST_TIMER, FAST_EVERY);
@@ -1099,44 +780,24 @@ impl Vtr {
 
     /// One whole message at the front of the buffer, as bytes (CMD-1,
     /// CMD-2, data); `None` until it has all arrived.
-    fn take_message(&mut self) -> Option<Result<Msg, String>> {
-        match self.wire {
-            Wire::Binary => {
-                let n = data_len(self.dialect, &self.buf)?;
-                let total = 2 + n + 1;
-                if self.buf.len() < total {
-                    return None;
-                }
-                let bytes: Vec<u8> = self.buf.drain(..total).collect();
-                if checksum(&bytes[..total - 1]) != bytes[total - 1] {
-                    return Some(Err(format!("a reply with a bad checksum: {}", hex(&bytes))));
-                }
-                Some(Ok(Msg {
-                    cmd1: bytes[0],
-                    cmd2: bytes[1],
-                    data: bytes[2..total - 1].to_vec(),
-                }))
-            }
-            Wire::Hex => {
-                // Hexadecimal digits; line ends and spaces between replies
-                // are skipped.
-                self.buf.retain(|b| b.is_ascii_hexdigit());
-                let digits = |buf: &[u8], from: usize, count: usize| -> Option<Vec<u8>> {
-                    let s = std::str::from_utf8(buf.get(from..from + count * 2)?).ok()?;
-                    unhex(s)
-                };
-                let head = digits(&self.buf, 0, (self.buf.len() / 2).min(4))?;
-                let n = data_len(self.dialect, &head)?;
-                let total = 2 + n;
-                let bytes = digits(&self.buf, 0, total)?;
-                self.buf.drain(..total * 2);
-                Some(Ok(Msg {
-                    cmd1: bytes[0],
-                    cmd2: bytes[1],
-                    data: bytes[2..].to_vec(),
-                }))
-            }
-        }
+    fn take_message(&mut self) -> Option<Msg> {
+        // Hexadecimal digits; line ends and spaces between replies are
+        // skipped.
+        self.buf.retain(|b| b.is_ascii_hexdigit());
+        let digits = |buf: &[u8], from: usize, count: usize| -> Option<Vec<u8>> {
+            let s = std::str::from_utf8(buf.get(from..from + count * 2)?).ok()?;
+            unhex(s)
+        };
+        let head = digits(&self.buf, 0, (self.buf.len() / 2).min(4))?;
+        let n = data_len(&head)?;
+        let total = 2 + n;
+        let bytes = digits(&self.buf, 0, total)?;
+        self.buf.drain(..total * 2);
+        Some(Msg {
+            cmd1: bytes[0],
+            cmd2: bytes[1],
+            data: bytes[2..].to_vec(),
+        })
     }
 
     fn on_data(&mut self, cx: &mut Cx, data: &[u8]) {
@@ -1192,27 +853,10 @@ impl Vtr {
     }
 
     /// A reply to the job in flight.
-    fn answer(&mut self, cx: &mut Cx, mut job: Job, reply: Result<Msg, String>) {
-        let reply = match reply {
-            Ok(m) => m,
-            Err(message) => {
-                return self.finish(
-                    cx,
-                    job,
-                    Err(CommandError::DeviceError {
-                        code: None,
-                        message,
-                    }),
-                );
-            }
-        };
+    fn answer(&mut self, cx: &mut Cx, mut job: Job, reply: Msg) {
         // NAK: 11 12 and the error bits.
         if reply.cmd1 == 0x11 && reply.cmd2 == 0x12 {
             let bits = reply.data.first().copied().unwrap_or(0);
-            if job.read == Read::Status && self.status_request == 0x0A && job.command.is_none() {
-                // A device keeping fewer status bytes: ask four from now on.
-                self.status_request = 0x04;
-            }
             return self.finish(
                 cx,
                 job,
@@ -1288,61 +932,16 @@ impl Vtr {
                 v
             }
             Read::Status if reply.kind() == 7 && reply.cmd2 == 0x20 => {
-                let start = (self.status_request >> 4) as usize;
-                let v = self.decode_status(start, &reply.data);
+                let v = decode_status(&reply.data);
                 cx.state(json!({"status": v.clone(), "transport": transport_of(&v)}));
                 v
             }
             Read::Time if reply.kind() == 7 => self.time(cx, &reply),
-            Read::Generator if reply.kind() == 7 => {
-                let mut v = Map::new();
-                match reply.cmd2 {
-                    0x08 => {
-                        v.insert("timecode".into(), json!(tc_text(&reply.data)));
-                        if reply.data.len() >= 8 {
-                            v.insert("user_bits".into(), json!(ub_text(&reply.data[4..])));
-                        }
-                    }
-                    0x09 => {
-                        v.insert("user_bits".into(), json!(ub_text(&reply.data)));
-                    }
-                    _ => {}
-                }
-                cx.state(json!({"generator": v.clone()}));
-                Value::Object(v)
-            }
             Read::Point(pt) if reply.kind() == 7 => {
                 let name = POINT[pt as usize].0;
                 let tc = tc_text(&reply.data);
                 cx.state(json!({"points": {name: tc}}));
                 json!(tc)
-            }
-            Read::PrerollTime if reply.kind() == 7 => {
-                let tc = tc_text(&reply.data);
-                cx.state(json!({"preroll_time": tc}));
-                json!(tc)
-            }
-            Read::TimerMode if reply.kind() == 7 => {
-                let mode = match reply.data.first() {
-                    Some(0) => "timecode",
-                    Some(1) => "timer1",
-                    Some(2) => "timer2",
-                    _ => "other",
-                };
-                cx.state(json!({"timer_mode": mode}));
-                json!(mode)
-            }
-            Read::EditPreset if reply.kind() == 7 && reply.cmd2 == 0x30 => {
-                let d1 = reply.data.first().copied().unwrap_or(0);
-                let d2 = reply.data.get(1).copied().unwrap_or(0);
-                let bit = |b: u8, n: u8| b & (1 << n) != 0;
-                let v = json!({
-                    "insert": bit(d1, 6), "assemble": bit(d1, 5), "video": bit(d1, 4),
-                    "timecode": bit(d1, 2), "cue_a2": bit(d1, 1), "cue_a1": bit(d1, 0),
-                    "audio4": bit(d2, 3), "audio3": bit(d2, 2), "audio2": bit(d2, 1), "audio1": bit(d2, 0),
-                });
-                cx.state(json!({"edit_preset": v.clone()}));
-                v
             }
             Read::DeviceId if reply.kind() == 8 => {
                 let id = String::from_utf8_lossy(&reply.data)
@@ -1491,23 +1090,6 @@ impl Vtr {
         json!({"timecode": tc, "source": source, "drop_frame": drop})
     }
 
-    fn decode_status(&self, start: usize, data: &[u8]) -> Value {
-        let bits = match self.dialect {
-            Dialect::Sony => SONY_BITS,
-            Dialect::Amp => AMP_BITS,
-        };
-        let mut v = Map::new();
-        for (byte, bit, name) in bits {
-            if *byte < start {
-                continue;
-            }
-            if let Some(b) = data.get(byte - start) {
-                v.insert((*name).into(), json!(b & (1 << bit) != 0));
-            }
-        }
-        Value::Object(v)
-    }
-
     fn finish(&mut self, cx: &mut Cx, job: Job, result: Result<Outcome, CommandError>) {
         match (job.command, result) {
             (Some(id), r) => cx.complete(id, r),
@@ -1515,6 +1097,17 @@ impl Vtr {
             _ => {}
         }
     }
+}
+
+/// The status bits by name, from the status bytes read from byte 0.
+fn decode_status(data: &[u8]) -> Value {
+    let mut v = Map::new();
+    for (byte, bit, name) in STATUS_BITS {
+        if let Some(b) = data.get(*byte) {
+            v.insert((*name).into(), json!(b & (1 << bit) != 0));
+        }
+    }
+    Value::Object(v)
 }
 
 /// The transport state the status bits show, in one word.
@@ -1625,23 +1218,17 @@ impl Module for Vtr {
                 if self.phase != Phase::Connecting {
                     return;
                 }
-                if self.wire == Wire::Hex {
-                    // Open the AMP channel, or a channel-less session.
-                    let request = if self.channel.is_empty() {
-                        "CRAT00014\n".to_string()
-                    } else {
-                        let body = format!("2{:02}{}", self.channel.len(), self.channel);
-                        format!("CRAT{:04}{body}\n", body.len())
-                    };
-                    self.phase = Phase::Channel;
-                    self.sent_at = cx.now();
-                    cx.tcp_send(SOCKET, request.into_bytes());
-                    cx.set_timer(REPLY_TIMER, REPLY_TIMEOUT);
+                // Open the AMP channel, or a channel-less session.
+                let request = if self.channel.is_empty() {
+                    "CRAT00014\n".to_string()
                 } else {
-                    // A converter's connection shows nothing of the
-                    // device: it is reported connected once it answers.
-                    self.ready(cx);
-                }
+                    let body = format!("2{:02}{}", self.channel.len(), self.channel);
+                    format!("CRAT{:04}{body}\n", body.len())
+                };
+                self.phase = Phase::Channel;
+                self.sent_at = cx.now();
+                cx.tcp_send(SOCKET, request.into_bytes());
+                cx.set_timer(REPLY_TIMER, REPLY_TIMEOUT);
             }
             TcpInput::Data(data) => {
                 if matches!(self.phase, Phase::Ready | Phase::Channel) {
@@ -1715,7 +1302,7 @@ impl Module for Vtr {
 
     fn stop(&mut self, cx: &mut Cx) {
         if self.phase != Phase::Closed {
-            if self.wire == Wire::Hex && self.phase == Phase::Ready {
+            if self.phase == Phase::Ready {
                 cx.tcp_send(SOCKET, b"STOP0000\n".to_vec());
             }
             cx.tcp_close(SOCKET);
@@ -1731,26 +1318,18 @@ mod tests {
     use crate::module::{Action, CommandResult};
     use std::net::{IpAddr, Ipv4Addr};
 
-    fn module(spec: &str, monitor: bool, settings: Value) -> Vtr {
-        let s = Catalog::source_tree().devices[spec].clone();
+    fn module(monitor: bool, settings: Value) -> Vtr {
+        let s = Catalog::source_tree().devices["grassvalley-amp"].clone();
         let settings = validate(&s.settings, settings.as_object().unwrap()).unwrap();
-        let dialect = if spec == "grassvalley-amp" {
-            Dialect::Amp
-        } else {
-            Dialect::Sony
-        };
-        Vtr::new(
-            dialect,
-            OpenContext {
-                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
-                host_name: None,
-                port: Some(5000),
-                model: s.models[0].id.clone(),
-                channels: None,
-                settings,
-                monitor,
-            },
-        )
+        Vtr::new(OpenContext {
+            host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            host_name: None,
+            port: Some(5000),
+            model: s.models[0].id.clone(),
+            channels: None,
+            settings,
+            monitor,
+        })
         .unwrap()
     }
 
@@ -1771,12 +1350,6 @@ mod tests {
         })
     }
 
-    fn bin(bytes: &[u8]) -> Vec<u8> {
-        let mut v = bytes.to_vec();
-        v.push(checksum(bytes));
-        v
-    }
-
     fn feed(m: &mut Vtr, now: Millis, bytes: &[u8]) -> Vec<Action> {
         let mut cx = Cx::new(now);
         m.tcp(&mut cx, SOCKET, TcpInput::Data(bytes.to_vec()));
@@ -1789,36 +1362,34 @@ mod tests {
         cx.take()
     }
 
-    /// A Sony deck opened for commands only, past its device type request.
-    #[cfg(feature = "sony-9pin")]
-    fn sony_idle() -> Vtr {
-        let mut m = module("sony-9pin", false, json!({}));
+    /// A server channel opened for commands only, past its device type
+    /// request.
+    fn idle(monitor: bool) -> (Vtr, Vec<Action>) {
+        let mut m = module(monitor, json!({"channel": "Vtr1"}));
         let mut cx = Cx::new(0);
         m.start(&mut cx);
         m.tcp(&mut cx, SOCKET, TcpInput::Connected);
-        assert_eq!(sent(&cx.take()), [bin(&[0x00, 0x11])]);
-        let a = feed(&mut m, 0, &bin(&[0x12, 0x11, 0x20, 0x25]));
+        assert_eq!(sent(&cx.take()), [b"CRAT0007204Vtr1\n".to_vec()]);
+        let a = feed(&mut m, 0, b"1001");
+        assert_eq!(sent(&a), [b"CMDS00040011\n".to_vec()]);
+        let a = feed(&mut m, 0, b"12112025");
         assert!(a.contains(&Action::Connection(Connection::Connected)));
         assert!(a.contains(&Action::State(
             json!({"device": {"device_type": "2025", "model": "BVW-75", "line_625": false}})
         )));
-        m
+        (m, a)
     }
 
     #[test]
-    fn frames_carry_a_checksum_or_go_as_hex() {
+    fn frames_go_as_hex() {
         // Play, and cue up to 02:16:58:13 (the bytes of Drastic's worked
-        // example; its printed checksum leaves out CMD-2).
-        assert_eq!(frame(&Msg::new(2, 0x01, &[]), false), [0x20, 0x01, 0x21]);
+        // example).
+        assert_eq!(frame(&Msg::new(2, 0x01, &[])), b"CMDS00042001\n");
         let cue = Msg::new(2, 0x31, &timecode("02:16:58:13").unwrap());
-        assert_eq!(
-            frame(&cue, false),
-            [0x24, 0x31, 0x13, 0x58, 0x16, 0x02, 0xD8]
-        );
-        assert_eq!(frame(&Msg::new(2, 0x01, &[]), true), b"CMDS00042001\n");
+        assert_eq!(frame(&cue), b"CMDS0012243113581602\n");
         // SimplyLive's example: an ID status request for clip01, extended.
         let status = Msg::extended(0xA, 0xA, 0x18, b"clip01");
-        assert_eq!(frame(&status, true), b"CMDS0020aa180006636c69703031\n");
+        assert_eq!(frame(&status), b"CMDS0020aa180006636c69703031\n");
     }
 
     #[test]
@@ -1832,24 +1403,21 @@ mod tests {
     }
 
     #[test]
-    fn user_bits_round_trip() {
-        let b = ub_bytes("06364454").unwrap();
-        assert_eq!(b, [0x60, 0x63, 0x44, 0x45]);
-        assert_eq!(ub_text(&b), "06364454");
+    fn user_bits_read_low_nibble_first() {
+        assert_eq!(ub_text(&[0x60, 0x63, 0x44, 0x45]), "06364454");
     }
 
     #[test]
-    #[cfg(feature = "sony-9pin")]
     fn commands_send_their_bytes_and_read_back() {
-        let mut m = sony_idle();
+        let (mut m, _) = idle(false);
         let a = run(
             &mut m,
             1,
             "shuttle",
             json!({"direction": "reverse", "rate": 1.0}),
         );
-        assert_eq!(sent(&a), [bin(&[0x21, 0x23, 0x40])]);
-        let a = feed(&mut m, 0, &bin(&[0x10, 0x01]));
+        assert_eq!(sent(&a), [b"CMDS0006212340\n".to_vec()]);
+        let a = feed(&mut m, 0, b"1001");
         assert_eq!(completed(&a, 1), Some(Ok(Outcome::Ack)));
         // A point set is read back.
         let a = run(
@@ -1858,15 +1426,15 @@ mod tests {
             "set_point",
             json!({"point": "in", "timecode": "04:25:16:21"}),
         );
-        assert_eq!(sent(&a), [bin(&[0x44, 0x14, 0x21, 0x16, 0x25, 0x04])]);
-        let a = feed(&mut m, 0, &bin(&[0x10, 0x01]));
+        assert_eq!(sent(&a), [b"CMDS0012441421162504\n".to_vec()]);
+        let a = feed(&mut m, 0, b"1001");
         assert_eq!(completed(&a, 2), Some(Ok(Outcome::Ack)));
-        assert_eq!(sent(&a), [bin(&[0x60, 0x10])]);
-        let a = feed(&mut m, 0, &bin(&[0x74, 0x10, 0x21, 0x16, 0x25, 0x04]));
+        assert_eq!(sent(&a), [b"CMDS00046010\n".to_vec()]);
+        let a = feed(&mut m, 0, b"741021162504");
         assert!(a.contains(&Action::State(json!({"points": {"in": "04:25:16:21"}}))));
         // A NAK fails the command with its error bits.
         run(&mut m, 3, "eject", json!({}));
-        let a = feed(&mut m, 0, &bin(&[0x11, 0x12, 0x01]));
+        let a = feed(&mut m, 0, b"111201");
         assert!(matches!(
             completed(&a, 3),
             Some(Err(CommandError::DeviceError { code: Some(c), .. })) if c == "01"
@@ -1874,12 +1442,11 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "sony-9pin")]
     fn status_bytes_become_state() {
-        let mut m = sony_idle();
-        run(&mut m, 1, "get_status", json!({}));
-        let reply = [0x7A, 0x20, 0, 0x01, 0x80, 0, 0, 0, 0, 0, 0, 0];
-        let a = feed(&mut m, 0, &bin(&reply));
+        let (mut m, _) = idle(false);
+        let a = run(&mut m, 1, "get_status", json!({}));
+        assert_eq!(sent(&a), [b"CMDS000661200f\n".to_vec()]);
+        let a = feed(&mut m, 0, b"7f20000180000000000000000000000000");
         let state = a
             .iter()
             .find_map(|a| match a {
@@ -1893,34 +1460,27 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "sony-9pin")]
     fn opened_for_commands_only_it_asks_only_the_device_type() {
-        let mut m = sony_idle();
+        let (mut m, _) = idle(false);
         let mut cx = Cx::new(20_000);
         m.timer(&mut cx, FAST_TIMER);
-        assert_eq!(sent(&cx.take()), [bin(&[0x00, 0x11])]);
-        // Monitored, the status and time follow the device type.
-        let mut m = module("sony-9pin", true, json!({}));
-        let mut cx = Cx::new(0);
-        m.start(&mut cx);
-        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
-        cx.take();
-        let a = feed(&mut m, 0, &bin(&[0x12, 0x11, 0x20, 0x25]));
-        assert_eq!(sent(&a), [bin(&[0x61, 0x20, 0x0A])]);
+        assert_eq!(sent(&cx.take()), [b"CMDS00040011\n".to_vec()]);
+        // Monitored, the device ID follows the device type.
+        let (_, a) = idle(true);
+        assert_eq!(sent(&a), [b"CMDS0004a021\n".to_vec()]);
     }
 
     #[test]
-    #[cfg(feature = "sony-9pin")]
     fn the_time_to_each_answer_is_reported() {
-        let mut m = sony_idle();
+        let (mut m, _) = idle(false);
         let mut cx = Cx::new(1_000);
         m.command(
             &mut cx,
             1,
             "get_time",
-            json!({"source": "best"}).as_object().unwrap(),
+            json!({"source": "ltc"}).as_object().unwrap(),
         );
-        let a = feed(&mut m, 1_012, &bin(&[0x74, 0x04, 0x10, 0x20, 0x30, 0x01]));
+        let a = feed(&mut m, 1_012, b"740410203001");
         assert!(a.contains(&Action::RoundTrip(12)));
         assert_eq!(
             completed(&a, 1),
@@ -1931,9 +1491,8 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "grassvalley-amp")]
     fn amp_opens_its_channel_and_lists_clips_in_hex() {
-        let mut m = module("grassvalley-amp", false, json!({"channel": "Vtr2"}));
+        let mut m = module(false, json!({"channel": "Vtr2"}));
         let mut cx = Cx::new(0);
         m.start(&mut cx);
         m.tcp(&mut cx, SOCKET, TcpInput::Connected);

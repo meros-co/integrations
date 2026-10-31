@@ -1,12 +1,11 @@
-//! A Sony 9-pin deck behind a serial-to-Ethernet converter, and an AMP server's
-//! TCP socket, simulated on loopback and driven through the public API.
+//! An AMP server's TCP socket, simulated on loopback and driven through the
+//! public API.
 //!
-//! The deck checks each message's checksum, answers ACK, NAK, its device type,
-//! its status bytes and its time, and keeps play and stop and an in point. The
-//! AMP server answers the channel request with 1001 and the same messages in
-//! hexadecimal, and keeps a clip list and the loaded clip.
+//! The server answers the channel request with 1001, then each message in
+//! hexadecimal: ACK, NAK, its device type, its status bytes and its time. It
+//! keeps play and stop, an in point, a clip list and the loaded clip.
 
-#![cfg(any(feature = "sony-9pin", feature = "grassvalley-amp"))]
+#![cfg(feature = "grassvalley-amp")]
 
 mod common;
 
@@ -18,11 +17,6 @@ use meros_integrations::{Core, OpenRequest, Outcome};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
-#[cfg(feature = "sony-9pin")]
-fn sum(bytes: &[u8]) -> u8 {
-    bytes.iter().fold(0u8, |a, b| a.wrapping_add(*b))
-}
-
 #[derive(Default)]
 struct Deck {
     playing: bool,
@@ -32,7 +26,7 @@ struct Deck {
 }
 
 impl Deck {
-    /// The answer to one message (without its checksum).
+    /// The answer to one message.
     fn answer(&mut self, m: &[u8]) -> Vec<u8> {
         self.received.push(m.to_vec());
         let ack = vec![0x10, 0x01];
@@ -115,41 +109,6 @@ where
     port
 }
 
-#[cfg(feature = "sony-9pin")]
-/// A deck behind a converter: binary messages with a checksum.
-async fn binary_deck() -> (u16, Arc<Mutex<Deck>>) {
-    let deck = Arc::new(Mutex::new(Deck::default()));
-    let d = deck.clone();
-    let port = serve(move |mut stream| {
-        let d = d.clone();
-        tokio::spawn(async move {
-            let mut buf = Vec::new();
-            let mut chunk = [0u8; 256];
-            loop {
-                let n = stream.read(&mut chunk).await.unwrap_or(0);
-                if n == 0 {
-                    return;
-                }
-                buf.extend_from_slice(&chunk[..n]);
-                while buf.len() >= 2 {
-                    let len = 2 + (buf[0] & 0x0F) as usize + 1;
-                    if buf.len() < len {
-                        break;
-                    }
-                    let frame: Vec<u8> = buf.drain(..len).collect();
-                    assert_eq!(sum(&frame[..len - 1]), frame[len - 1], "checksum");
-                    let mut answer = d.lock().unwrap().answer(&frame[..len - 1]);
-                    answer.push(sum(&answer));
-                    stream.write_all(&answer).await.unwrap();
-                }
-            }
-        })
-    })
-    .await;
-    (port, deck)
-}
-
-#[cfg(feature = "grassvalley-amp")]
 /// An AMP server's socket: CRAT, then CMDS messages in hexadecimal.
 async fn amp_server() -> (u16, Arc<Mutex<Deck>>) {
     let deck = Arc::new(Mutex::new(Deck::default()));
@@ -197,18 +156,17 @@ fn params(v: Value) -> meros_integrations::Params {
     v.as_object().unwrap().clone()
 }
 
-#[cfg(feature = "sony-9pin")]
 #[tokio::test(flavor = "multi_thread")]
-async fn a_9pin_deck_is_read_and_driven() {
-    let (port, deck) = binary_deck().await;
+async fn an_amp_channel_is_read_and_driven() {
+    let (port, deck) = amp_server().await;
     let core: Core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
-            device: "sony-9pin".into(),
-            model: "generic".into(),
+            device: "grassvalley-amp".into(),
+            model: "k2".into(),
             host: "127.0.0.1".into(),
             port: Some(port),
-            settings: params(json!({})),
+            settings: params(json!({"channel": "Vtr1"})),
             monitor: true,
         })
         .unwrap();
@@ -262,18 +220,17 @@ async fn a_9pin_deck_is_read_and_driven() {
     core.close(id).await;
 }
 
-#[cfg(feature = "sony-9pin")]
 #[tokio::test(flavor = "multi_thread")]
-async fn opened_for_commands_only_the_deck_is_not_polled() {
-    let (port, deck) = binary_deck().await;
+async fn opened_for_commands_only_the_channel_is_not_polled() {
+    let (port, deck) = amp_server().await;
     let core: Core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
-            device: "sony-9pin".into(),
-            model: "generic".into(),
+            device: "grassvalley-amp".into(),
+            model: "k2".into(),
             host: "127.0.0.1".into(),
             port: Some(port),
-            settings: params(json!({})),
+            settings: params(json!({"channel": "Vtr1"})),
             monitor: false,
         })
         .unwrap();
@@ -292,7 +249,6 @@ async fn opened_for_commands_only_the_deck_is_not_polled() {
     core.close(id).await;
 }
 
-#[cfg(feature = "grassvalley-amp")]
 #[tokio::test(flavor = "multi_thread")]
 async fn an_amp_server_loads_and_lists_clips() {
     let (port, _server) = amp_server().await;

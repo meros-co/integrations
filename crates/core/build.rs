@@ -149,7 +149,6 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ),
     ("vendor-disguise", &["disguise"]),
     ("vendor-dmxcontrol", &["dmxcontrol3"]),
-    ("vendor-dsan", &["dsan-limitimer", "dsan-perfectcue"]),
     ("vendor-dtvideolabs", &["dtvideolabs-playbackpro-plus"]),
     ("vendor-eeg", &["eeg-smart-encoder"]),
     ("vendor-epiphan", &["epiphan-pearl"]),
@@ -399,14 +398,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-songbeamer", &["songbeamer"]),
     (
         "vendor-sony",
-        &[
-            "sony-9pin",
-            "sony-bravia",
-            "sony-bravia-ip",
-            "sony-bravia-serial",
-            "sony-camera",
-            "visca",
-        ],
+        &["sony-bravia", "sony-bravia-ip", "sony-camera", "visca"],
     ),
     ("vendor-sounddevices", &["sounddevices-pixnet"]),
     ("vendor-spx", &["spx-graphics"]),

@@ -1623,19 +1623,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that GO, GT, SI and TI take a number without leading zeros (GO7) and the largest number they accept. ([specs/dtvideolabs-playbackpro-plus.yaml:437](specs/dtvideolabs-playbackpro-plus.yaml#L437))
 - [ ] Record the ID inquiry's answer, to read each clip's number and file name apart. ([specs/dtvideolabs-playbackpro-plus.yaml:453](specs/dtvideolabs-playbackpro-plus.yaml#L453))
 
-## dsan-limitimer — DSAN Limitimer
-
-- [ ] Confirm the TP-2000XLT takes commands ended by a carriage return alone and sends its messages with the > prefix and a CR (the PDF writes /x0D and \x0D). ([specs/dsan-limitimer.yaml:195](specs/dsan-limitimer.yaml#L195))
-- [ ] Record the time strings in hours mode and over 99 minutes, and in overtime. ([specs/dsan-limitimer.yaml:199](specs/dsan-limitimer.yaml#L199))
-- [ ] Check whether the TP-2000XLT sends the LED states on connecting or only on change, and whether a gateway needs flow control set. ([specs/dsan-limitimer.yaml:188](specs/dsan-limitimer.yaml#L188))
-- [ ] Confirm INCMIN and INCHOUR (struck through in the PDF) are no longer taken. ([specs/dsan-limitimer.yaml:203](specs/dsan-limitimer.yaml#L203))
-- [ ] Record what a Global Cache iTach (or other gateway) adds between messages (the Companion module skips a byte after each CR). ([specs/dsan-limitimer.yaml:41](specs/dsan-limitimer.yaml#L41))
-
-## dsan-perfectcue — DSAN PerfectCue
-
-- [ ] Confirm the TP-2000X-PC takes commands ended by a carriage return alone and sends its LED messages with the > prefix and a CR. ([specs/dsan-perfectcue.yaml:103](specs/dsan-perfectcue.yaml#L103))
-- [ ] Check whether the LED states are sent on connecting or only on change, and whether a gateway needs flow control set. ([specs/dsan-perfectcue.yaml:96](specs/dsan-perfectcue.yaml#L96))
-
 ## eeg-smart-encoder — EEG / AI-Media caption encoders
 
 - [ ] Record what the encoder answers to a command and to the status commands (?, O, +, A, b, S, e), so replies can be checked and status read into state. ([specs/eeg-smart-encoder.yaml:250](specs/eeg-smart-encoder.yaml#L250))
@@ -4211,17 +4198,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm changes made over OSC are still not reported back on current versions (the document's known bug). ([specs/songbeamer.yaml:337](specs/songbeamer.yaml#L337))
 - [ ] Confirm /video/position and /video/length answer as doubles (1.0 = 24 h) and take the string forms hh:mm:ss and +seconds. ([specs/songbeamer.yaml:321](specs/songbeamer.yaml#L321))
 
-## sony-9pin — Sony 9-pin (RS-422 VTR protocol) decks and servers
-
-- [ ] Check the jog, var and shuttle speeds the device runs at for the speed bytes sent (10^(N/32-2) times play speed, a second byte for finer steps), and whether speed 0 pauses it or creeps. ([specs/sony-9pin.yaml:121](specs/sony-9pin.yaml#L121))
-- [ ] Check how many status bytes the device returns for 61.20 0A (ten asked; a NAK makes the core ask four), and which bits it sets. ([specs/sony-9pin.yaml:299](specs/sony-9pin.yaml#L299))
-- [ ] Check what 61.0C 03 (the best of LTC and VITC) returns on the device (74.04, 74.06, 74.14 or 74.16), and the 70.0D answer when a time is missing. ([specs/sony-9pin.yaml:302](specs/sony-9pin.yaml#L302))
-- [ ] Confirm the user bits' byte and nibble order (Drastic's example: 06364454 is sent 60 63 44 45) on a deck's generator and in its 74.05 returns. ([specs/sony-9pin.yaml:201](specs/sony-9pin.yaml#L201))
-- [ ] Check whether the device steps a frame on 20.14 and 20.24 (documented by Drastic as an extension, not in Sony's table). ([specs/sony-9pin.yaml:135](specs/sony-9pin.yaml#L135))
-- [ ] Record the device type code the device returns, and whether its model is named. ([specs/sony-9pin.yaml:95](specs/sony-9pin.yaml#L95))
-- [ ] Check a serial-to-Ethernet converter at 38400 8-O-1 carries the bytes and the 9-pin timing (a reply within about 10 ms, no gap over 10 ms inside a message) closely enough for the device. ([specs/sony-9pin.yaml:351](specs/sony-9pin.yaml#L351))
-- [ ] Confirm the DA-6400's 9-pin subset (shuttle by its first speed byte, cue up then pause, edit on and off) and its device type F0 1A. ([specs/sony-9pin.yaml:82](specs/sony-9pin.yaml#L82))
-
 ## sony-bravia — Sony BRAVIA Professional Displays (REST API and IRCC-IP)
 
 - [ ] Check what a wrong or missing pre-shared key is answered with (HTTP 403 or 401, or a 200 carrying error 403), since that decides whether the core reports unauthorized. ([specs/sony-bravia.yaml:460](specs/sony-bravia.yaml#L460))
@@ -4239,14 +4215,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check what the input notification of sixteen 0 means and when it is sent. ([specs/sony-bravia-ip.yaml:256](specs/sony-bravia-ip.yaml#L256))
 - [ ] Check which commands EU models with each RED-DA specification refuse. ([specs/sony-bravia-ip.yaml:248](specs/sony-bravia-ip.yaml#L248))
 - [ ] Check that an enquiry the display cannot answer (scene on an unsupported input) is answered sixteen N. ([specs/sony-bravia-ip.yaml:255](specs/sony-bravia-ip.yaml#L255))
-
-## sony-bravia-serial — Sony BRAVIA Professional Displays (RS-232C serial control, through a serial-to-Ethernet converter)
-
-- [ ] Capture the data each query returns (power, input, volume, muting, ID, product information 1-3); the core reads power and muting as one byte, the input as kind and number. ([specs/sony-bravia-serial.yaml:312](specs/sony-bravia-serial.yaml#L312))
-- [ ] Check which functions answer canceled (0x03) in standby. ([specs/sony-bravia-serial.yaml:301](specs/sony-bravia-serial.yaml#L301))
-- [ ] Check the V shift up and down bytes: the document prints function 0x42 for them, the core sends 0x43. ([specs/sony-bravia-serial.yaml:326](specs/sony-bravia-serial.yaml#L326))
-- [ ] Check the hue up/down layout (a color byte, then up or down). ([specs/sony-bravia-serial.yaml:179](specs/sony-bravia-serial.yaml#L179))
-- [ ] Check the answer timing at 9600 bit/s (3 s allowed) and whether the display sends anything unasked. ([specs/sony-bravia-serial.yaml:319](specs/sony-bravia-serial.yaml#L319))
 
 ## sony-camera — Sony cameras
 
