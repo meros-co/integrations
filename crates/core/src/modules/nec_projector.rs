@@ -466,7 +466,7 @@ impl NecProjector {
     }
 
     /// The status request that shows the projector is there: 305-3, else
-    /// 078-2, else 009; a model with none of them (XP-M421W) is asked
+    /// 078-2, else 009; a model with none of them is asked
     /// 078-2 all the same, since its "not supported" answer is an answer.
     fn probe(&self) -> Job {
         let job = if self.has("305-3") {

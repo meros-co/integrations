@@ -66,7 +66,7 @@ ws("save_video_preset", {"preset": 5}, "SAVE PRESET_V 5")
 ws("recall_video_preset", {"preset": 5}, "RESTORE PRESET_V 5")
 ws("save_audio_preset", {"preset": 5}, "SAVE PRESET_A 5")
 ws("recall_audio_preset", {"preset": 5}, "RESTORE PRESET_A 5")
-ws("set_cec_power", {"port": "hdmiout1", "powered": True}, "SET CEC_PWR hdmiout1 on")
+ws("set_cec_power", {"port": "hdmiout1", "powered": True}, "SET CEC_PWR hdmiout1 on", **WS_H2X)
 ws("set_cec_power", {"port": "hdbtout10", "powered": True}, "SET CEC_PWR hdbtout10 on",
    file="set_cec_power-h2x", **WS_H2X)
 ws("set_cec_power_exp", {"powered": True}, "SET CEC_PWR out on")

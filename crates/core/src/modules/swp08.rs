@@ -29,10 +29,9 @@
 //! - Numbers are 1-based in commands and state, 0-based on the wire (§9),
 //!   except the System 2 matrix and level, which the wire carries from 1 (§8).
 //!
-//! The link is TCP (SW-P-08 over IP, §11): a controller's own port, or a
-//! serial-to-Ethernet converter's, the framing, acknowledgements and messages
-//! being the same as on the protocol's RS-232 or RS-422 layer (SW-P-88
-//! §6.1).
+//! The link is TCP (SW-P-08 over IP, §11) to a controller's own port, the
+//! framing, acknowledgements and messages being the same as on the
+//! protocol's RS-232 or RS-422 layer (SW-P-88 §6.1).
 //!
 //! Opened for commands only (`monitor` false), nothing is read on connecting
 //! and NAMES UPDATED reads nothing again; the only message sent unasked is a
@@ -86,7 +85,6 @@ const GENERAL_ONLY: &[&str] = &[
     "probel-system3-8400",
     "probel-system3-6000",
     "probel-freeway",
-    "ross-nk-3rd",
 ];
 
 // ── Framing ─────────────────────────────────────────────────────────────────

@@ -1,8 +1,7 @@
 //! Barco's binary Barco Projection Protocol for its older projectors: the
-//! HDX series, the PGWU-61B family, and the LCD/DLP projectors of the RS-232
-//! catalog (BarcoData, BarcoGraphics, BarcoReality, BarcoVision, Galaxy,
-//! Helios, ELM, SLM, DP100, XLM), over TCP 43680 (or a serial-to-Ethernet
-//! converter's port).
+//! HDX series, the PGWU-61B family, and the networked projectors of the
+//! RS-232 catalog (SLM, DP100, XLM), over TCP: 43680 on the HDX and PGWU,
+//! the projector's own port on the others.
 //!
 //! Wire format from Barco's "HDX series/Apollo Command Catalog" R5905447/03
 //! §2, the "PGWU-61B Command Catalog" R5905746/03 §2 and "RS232 Commands for
@@ -217,8 +216,7 @@ pub(crate) fn family(model: &str) -> Option<u8> {
         "pgwu-61b" | "pgwx-61b" | "pgxg-61b" => Some(PGWU),
         "dp100" => Some(DP100),
         "xlm" => Some(XLM),
-        "barcodata" | "barcographics" | "barcoreality" | "barcovision" | "galaxy" | "helios"
-        | "elm" | "slm" => Some(LEGACY),
+        "slm" => Some(LEGACY),
         _ => None,
     }
 }

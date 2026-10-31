@@ -89,13 +89,13 @@ models:
     supports: &h2a
       [route, route_all, get_route, set_audio_route, get_audio_route, set_audio_mute, get_audio_mute,
        set_audio_switch_mode, get_audio_switch_mode, save_preset, recall_preset,
-       set_cec_power, set_auto_cec, get_auto_cec, set_auto_cec_delay, get_auto_cec_delay,
+       set_auto_cec, get_auto_cec, set_auto_cec_delay, get_auto_cec_delay,
        set_ir_system_code, get_ir_system_code, set_standby, get_standby, get_ip_address, get_firmware,
        reboot, factory_reset]
     verification: none
     notes: >
-      Inputs hdmiin1-4, outputs hdmiout1-4; presets 1-3. CEC power works
-      over RS-232 only (p.9).
+      Inputs hdmiin1-4, outputs hdmiout1-4; presets 1-3. CEC power is
+      documented over RS-232 only (p.9), so it is not offered.
   - id: mx-0606-h2a
     name: WyreStorm MX-0606-H2A (6x6 HDMI matrix)
     supports: *h2a
@@ -111,7 +111,7 @@ models:
     supports: &mxv
       [route, route_all, get_route, set_audio_route, get_audio_route, set_audio_mute, get_audio_mute,
        set_audio_switch_mode, get_audio_switch_mode, save_preset, recall_preset,
-       set_cec_power, set_auto_cec, get_auto_cec, set_auto_cec_delay, get_auto_cec_delay,
+       set_auto_cec, get_auto_cec, set_auto_cec_delay, get_auto_cec_delay,
        set_ir_system_code, get_ir_system_code, set_ir_callback, get_ir_callback,
        set_standby, get_standby, get_ip_address, get_firmware, reboot, factory_reset]
     verification: none
@@ -477,11 +477,9 @@ commands:
     summary: Power a display on or off over CEC (SET CEC_PWR port on|off)
     params:
       port: &cec_port { type: string, pattern: '^((hdmiout|hdbtout)([1-9]|1[0-6])|all)$', required: true, label: Display port,
-                        description: "hdmiout1-16 or hdbtout1-16 (HDBaseT outputs on MXV and H2X), or all." }
+                        description: "hdmiout1-16 or hdbtout1-16 (HDBaseT outputs), or all." }
       powered: { type: bool, required: true, label: Power, description: "On powers the display on; off powers it off." }
-    send:
-      - { models: [mx-0404-h2a, mx-0606-h2a, mx-0808-h2a, mxv-0404-h2a-kit, mxv-0408-h2a, mxv-0606-h2a, mxv-0808-h2a], message: "SET CEC_PWR {port} {powered:map.onoff}" }
-      - { models: [mx-1010-h2x, mx-1616-h2x], message: "SET CEC_PWR {port} {powered:map.onoff}" }
+    send: "SET CEC_PWR {port} {powered:map.onoff}"
     expect: { reply_contains: "CEC_PWR" }
     returns: ack
 
@@ -953,13 +951,11 @@ quirks:
       it lacks, a firmware's missing command) can lock the unit up. The
       ranges here are the widest any model allows; keep to the model notes.
   - models: [mx-0404-h2a, mx-0606-h2a, mx-0808-h2a, mxv-0404-h2a-kit, mxv-0408-h2a, mxv-0606-h2a, mxv-0808-h2a]
-    severity: warning
+    severity: info
     text: >
-      CEC_PWR works over RS-232 only on H2A and MXV matrices (p.9): use link
-      serial for it. The H2A/MXV document's syntax line writes it with no
-      space before the port (SET CEC_PWR[Output]), its example with one (SET
-      CEC_PWR hdbtout2 on); it is sent as the example and the H2X document
-      write it.
+      CEC_PWR works over RS-232 only on H2A and MXV matrices (p.9), so
+      set_cec_power is not offered on them; automatic CEC (AUTOCEC_FN,
+      AUTOCEC_D) is.
   - models: [all]
     severity: info
     text: >
