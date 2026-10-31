@@ -129,6 +129,8 @@ mod jnior;
 mod kissbox;
 #[cfg(feature = "labgruppen-lake")]
 mod lake_dlm;
+#[cfg(feature = "panasonic-lumix")]
+mod lumix;
 #[cfg(feature = "grandma2")]
 mod ma_msc;
 #[cfg(feature = "meld-studio")]
@@ -525,6 +527,8 @@ pub(crate) fn construct(
         "pjlink" => Ok(Box::new(pjlink::PjLink::new(context)?)),
         #[cfg(feature = "epson-projector")]
         "epson-projector" => Ok(Box::new(epson_projector::EpsonProjector::new(spec, context)?)),
+        #[cfg(feature = "panasonic-lumix")]
+        "panasonic-lumix" => Ok(Box::new(lumix::Lumix::new(context))),
         #[cfg(feature = "panasonic-projector")]
         "panasonic-projector" => Ok(Box::new(panasonic_projector::PanasonicProjector::new(
             spec, context,

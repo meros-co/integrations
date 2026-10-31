@@ -301,7 +301,12 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-opensong", &["opensong"]),
     (
         "vendor-panasonic",
-        &["panasonic-kairos", "panasonic-projector", "panasonic-ptz"],
+        &[
+            "panasonic-kairos",
+            "panasonic-lumix",
+            "panasonic-projector",
+            "panasonic-ptz",
+        ],
     ),
     ("vendor-phabrix", &["phabrix-qx"]),
     ("vendor-pharos", &["pharos-designer"]),

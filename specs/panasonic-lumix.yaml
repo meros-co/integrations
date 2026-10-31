@@ -1,0 +1,289 @@
+spec: 1
+id: panasonic-lumix
+name: Panasonic LUMIX cameras (Wi-Fi remote control, cam.cgi)
+vendor: Panasonic
+category: camera
+implementation: native
+reason: >
+  The camera serves commands only to a controller it has accepted: an access
+  request it answers "under research" until the user approves it on the
+  camera, and on newer bodies a nonce the controller must fold into the
+  request with its own transform, after which a session id from the answer
+  goes on every request. Its web server takes one request at a time and
+  drops a controller that stops polling, and live view arrives as JPEG
+  frames in UDP datagrams to a port the controller names.
+
+source:
+  - title: Lumix Remote (sapoepsilon/lumix-remote, MIT), docs/protocol-research.md, docs/camera-models.md, lumix/protocol.py, lumix/camera.py
+    author: Lumix Remote contributors
+    url: https://github.com/sapoepsilon/lumix-remote
+    note: >
+      Community code and notes, read for the protocol only (LICENSE is MIT; no
+      code copied), verified on a DC-S5 (firmware 2.03) in 2026-10: control by
+      HTTP GET of /cam.cgi on port 80 with mode, type, value and value2,
+      answered by XML <camrply><result>ok</result>...</camrply> or CSV text
+      (ok,...) for accctrl and the lens; the UPnP device description at
+      :60606/Lumix/Server0/ddd (friendlyName, modelNumber, serialNumber, UDN,
+      X_FirmVersion, X_CamCapability); the access request accctrl req_acc with
+      the controller's id and name, answered ok_under_research while the user
+      is asked on the camera and ok,<name>,remote,... once accepted; on bodies
+      whose X_CamCapability ends in 1, req_acc_g answered ok,<8 hex digits>
+      (a nonce) and req_acc_e with both fields transformed (UTF-8 padded with
+      0xFF to 4-byte blocks, each block XOR the nonce, byte-swapped, printed
+      as 8 hex digits; a zero nonce replaced by LUMIX Sync's constant), the
+      session id in the answer's fifth field sent as X-SESSION_ID; req_acc_can
+      to withdraw a request; getstate kept up every 1-2 s or the camera drops
+      the controller; camcmd (recmode, playmode, capture, capture_cancel,
+      video_recstart, video_recstop, oneshot_af, touchrelease, poweroff, the
+      zoom steps and zoomstop), setsetting and getsetting (iso, focal,
+      shtrspeed, exposure, focusmode, afmode, liveviewsize, device_name and
+      the rest named by getinfo allmenu), camctrl (touch, focus), getinfo
+      capability, allmenu, curmenu and lens, get_content_info; live view by
+      startstream with a UDP port and stopstream, each datagram a header and
+      one JPEG; mode switches close together wedging the S5; the UPnP
+      ContentDirectory Browse (POST :60606/Server0/CDS_control with
+      pana:X_FromCP LumixLink2.0, in playmode) and the files on :50001.
+  - title: lx100-api (fibasile/lx100-api, MIT), docs/commands.md, docs/other.md
+    author: fibasile
+    url: https://github.com/fibasile/lx100-api
+    note: >
+      Community notes, read for corroboration (LICENSE is MIT): the cam.cgi
+      commands of the GH3 and LX100 era (getstate, camcmd recmode, playmode,
+      capture, video_recstart and video_recstop, the zoom steps and zoomstop,
+      camctrl touchcapt, setsetting afmode, startstream and stopstream,
+      getinfo capability, curmenu, allmenu and lens) and live view as MJPEG
+      over UDP.
+
+settings:
+  device_name: { type: string, max_length: 32, pattern: "^[A-Za-z0-9 _-]{1,32}$", default: Meros,
+    label: Controller name,
+    description: "The name the camera shows when asking to accept this controller." }
+  client_id: { type: string, max_length: 64, pattern: "^[A-Za-z0-9-]{0,64}$", default: "",
+    label: Controller ID,
+    description: "The identity the camera remembers an accepted controller by; leave empty to use meros- and the controller name, and keep it unchanged so the camera does not ask again." }
+  handshake: { type: enum, values: [auto, plain, encrypted], default: auto,
+    label: Access request,
+    description: "auto picks the encrypted request when the camera's description says it needs one; plain and encrypted force one." }
+  liveview_port: { type: int, min: 1024, max: 65535, default: 49199,
+    label: Live view port,
+    description: "The UDP port on this computer the camera sends live view frames to while the live stream is watched." }
+
+ports:
+  - { port: 80, protocol: http, role: control, note: "cam.cgi" }
+  - { port: 60606, protocol: http, role: control, note: "UPnP device description (/Lumix/Server0/ddd), read on connecting" }
+  - { port: 50001, protocol: http, role: control, note: "The card's files, for download_file" }
+  - { port: 49199, protocol: udp, role: feedback, listener: core, setting: liveview_port, note: "Live view frames while the live stream is watched" }
+
+streams:
+  live:
+    format: jpeg
+    summary: The camera's live view (640x360 or 320x184 on the S5, by liveviewsize), while watched; the camera must be in record mode
+
+models:
+  - id: lumix
+    name: Panasonic LUMIX with Wi-Fi remote shooting (GH5, GH5S, GH6, GH7, G9, G9 II, S1, S1R, S1H, S5, S5 II, S5 IIX and others)
+    supports:
+      [get_state, get_info, get_lens, get_setting, set_setting, set_setting_pair, camcmd, camctrl, camctrl_pair,
+       capture, cancel_capture, start_recording, stop_recording, record_mode, playback_mode, power_off,
+       one_shot_af, touch_af, touch_release, zoom, focus, set_iso, set_aperture, set_shutter_speed,
+       set_exposure_compensation, set_focus_mode, set_af_mode, set_liveview_size, get_content_info,
+       browse_content, download_file]
+    verification: none
+    notes: >
+      The camera must be in Wi-Fi remote shooting mode, joined to the same
+      network (or with the core on its own access point, 192.168.54.1), and
+      the user must accept the controller on the camera the first time.
+      Bodies whose description's X_CamCapability ends in 1 (S5 II, S5 IIX,
+      G9 II and later) need the encrypted access request.
+
+commands:
+  get_state:
+    summary: Read the camera's state, every field of getstate (mode, battery, card, recording)
+    returns: value
+  get_info:
+    summary: Read one of the camera's descriptions (getinfo), as XML text
+    params:
+      type: { type: enum, values: [capability, allmenu, curmenu], required: true, label: Description,
+              description: "capability what the body offers, allmenu every menu item with the setsetting names that change it, curmenu which items are enabled now." }
+    returns: value
+  get_lens:
+    summary: Read the attached lens (getinfo lens), as the camera's comma-separated text
+    returns: value
+  get_setting:
+    summary: Read one setting (getsetting), its attributes as an object
+    params:
+      type: &setting_type { type: string, pattern: '^[a-z0-9_]{1,40}$', required: true, label: Setting,
+                            description: "The setting's cmd_type, such as iso, focal, shtrspeed, focusmode or touch_type (getinfo allmenu lists them)." }
+    returns: value
+  set_setting:
+    summary: Change any setting (setsetting type value)
+    params:
+      type: *setting_type
+      value: &setting_value { type: string, pattern: '^[A-Za-z0-9_./:+-]{1,64}$', required: true, label: Value,
+                              description: "The value as getinfo allmenu writes it, such as 400, auto, 2304/256 or -1/3." }
+    returns: ack
+  set_setting_pair:
+    summary: Change a setting that takes two values (setsetting type value value2)
+    params:
+      type: *setting_type
+      value: *setting_value
+      value2: { type: string, pattern: '^[A-Za-z0-9_./:+-]{1,64}$', required: true, label: Second value, description: "The second value, as getinfo allmenu writes it." }
+    returns: ack
+  camcmd:
+    summary: Send any camera command (camcmd value)
+    params:
+      value: { type: string, pattern: '^[a-z0-9_-]{1,40}$', required: true, label: Command, description: "The command, such as capture, recmode or lcd_on." }
+    returns: ack
+  camctrl:
+    summary: Send any camera control (camctrl type value)
+    params:
+      type: &ctrl_type { type: string, pattern: '^[a-z0-9_]{1,40}$', required: true, label: Control, description: "The control, such as touch, focus or mf_asst." }
+      value: &ctrl_value { type: string, pattern: '^[A-Za-z0-9_./:-]{1,64}$', required: true, label: Value, description: "The control's value, such as 500/500 for a point." }
+    returns: ack
+  camctrl_pair:
+    summary: Send any camera control with two values (camctrl type value value2)
+    params:
+      type: *ctrl_type
+      value: *ctrl_value
+      value2: { type: string, pattern: '^[A-Za-z0-9_./:-]{1,64}$', required: true, label: Second value, description: "The control's second value, such as on." }
+    returns: ack
+  capture:
+    summary: Take a picture (camcmd capture)
+    returns: ack
+  cancel_capture:
+    summary: End a bulb or long exposure (camcmd capture_cancel)
+    returns: ack
+  start_recording:
+    summary: Start recording video (camcmd video_recstart)
+    returns: ack
+  stop_recording:
+    summary: Stop recording video (camcmd video_recstop)
+    returns: ack
+  record_mode:
+    summary: Switch to record mode, which live view and shooting need (camcmd recmode)
+    returns: ack
+  playback_mode:
+    summary: Switch to playback mode (camcmd playmode)
+    returns: ack
+  power_off:
+    summary: Turn the camera off (camcmd poweroff; in record mode)
+    returns: ack
+  one_shot_af:
+    summary: Focus once (camcmd oneshot_af)
+    returns: ack
+  touch_af:
+    summary: Focus on a point of the picture, as a touch on the screen does (camctrl touch x/y on)
+    params:
+      x: &coord_x { type: int, min: 0, max: 1000, required: true, label: X, description: "Horizontal position, 0 (left) to 1000 (right)." }
+      y: &coord_y { type: int, min: 0, max: 1000, required: true, label: Y, description: "Vertical position, 0 (top) to 1000 (bottom)." }
+    returns: ack
+  touch_release:
+    summary: Release the touch focus point (camcmd touchrelease)
+    returns: ack
+  zoom:
+    summary: Zoom a power zoom lens, or stop (camcmd wide-normal, wide-fast, tele-normal, tele-fast, zoomstop)
+    params:
+      action: { type: enum, values: [wide-normal, wide-fast, tele-normal, tele-fast, stop], required: true, label: Zoom,
+                description: "Zoom out (wide) or in (tele) at normal or fast speed until stop." }
+    returns: ack
+  focus:
+    summary: Move manual focus a step near or far (camctrl focus)
+    params:
+      step: { type: enum, values: [wide-normal, wide-fast, tele-normal, tele-fast], required: true, label: Step,
+              description: "wide toward near, tele toward far, a normal or a fast step." }
+    returns: ack
+  set_iso:
+    summary: Set the ISO (setsetting iso)
+    params:
+      value: { type: string, pattern: '^(auto|i_iso|[0-9]{2,6})$', required: true, label: ISO, description: "auto, or a sensitivity the body offers, such as 400." }
+    returns: ack
+  set_aperture:
+    summary: Set the aperture (setsetting focal)
+    params:
+      value: { type: string, pattern: '^[0-9]{1,5}/256$', required: true, label: Aperture, description: "The camera's aperture code in 256ths, such as 1024/256 for f/4 (getinfo allmenu lists the codes)." }
+    returns: ack
+  set_shutter_speed:
+    summary: Set the shutter speed (setsetting shtrspeed)
+    params:
+      value: { type: string, pattern: '^-?[0-9]{1,5}/256$', required: true, label: Shutter speed, description: "The camera's shutter code in 256ths, such as 3584/256 (getinfo allmenu lists the codes)." }
+    returns: ack
+  set_exposure_compensation:
+    summary: Set the exposure compensation (setsetting exposure)
+    params:
+      value: { type: string, pattern: '^-?[0-9]{1,2}(/3)?$', required: true, label: Compensation, description: "In stops, as the camera writes them: 0, 1, -1/3, 5/3." }
+    returns: ack
+  set_focus_mode:
+    summary: Set the focus mode (setsetting focusmode)
+    params:
+      mode: { type: enum, values: [afs, aff, afc, mf], required: true, label: Focus mode, description: "afs single, aff flexible, afc continuous autofocus, or mf manual focus." }
+    returns: ack
+  set_af_mode:
+    summary: Set the autofocus area mode (setsetting afmode)
+    params:
+      mode: { type: string, pattern: '^[a-z0-9_]{1,40}$', required: true, label: AF mode, description: "The mode as getinfo allmenu writes it, such as facedetection." }
+    returns: ack
+  set_liveview_size:
+    summary: Set the live view frame size, taken at the next live view start (setsetting liveviewsize)
+    params:
+      size: { type: enum, values: [vga, qvga], required: true, label: Size, description: "vga (640x360 on the S5) or qvga (320x184)." }
+    returns: ack
+  get_content_info:
+    summary: Read the card's content count and position, in playback mode (get_content_info)
+    returns: value
+  browse_content:
+    summary: List the card's folders and files in playback mode (UPnP ContentDirectory Browse); returns the DIDL-Lite text and counts
+    params:
+      object_id: { type: string, max_length: 128, default: "0", label: Folder, description: "The container to list, 0 for the top; the DIDL-Lite names each folder's id." }
+      start: { type: int, min: 0, max: 100000, default: 0, label: Start, description: "The first entry to return, from 0." }
+      count: { type: int, min: 1, max: 1000, default: 50, label: Count, description: "How many entries to return at most." }
+    returns: value
+  download_file:
+    summary: Save a file from the card to a host file (HTTP on port 50001), by the name its DIDL-Lite res URL gives
+    params:
+      name: { type: string, pattern: '^[A-Za-z0-9_.-]{1,64}$', required: true, label: File, description: "The file's name on port 50001, such as DO01111793.RW2 (original), DL... (medium) or DT... (thumbnail)." }
+      to: { type: save, required: true, label: Save to, description: "The host file the download is written to; replaced once the whole file has arrived." }
+    returns: file
+
+state:
+  device.friendly_name:  { type: string, description: "The camera's name (friendlyName)" }
+  device.model:          { type: string, description: "Model number, such as DC-S5 (modelNumber)" }
+  device.serial:         { type: string, description: "Serial number" }
+  device.firmware:       { type: string, description: "Firmware version (X_FirmVersion)" }
+  device.udn:            { type: string, description: "UPnP device id (UDN)" }
+  access:                { type: string, description: "Access: requesting, waiting (the user is asked on the camera), accepted or refused" }
+  encrypted:             { type: bool, description: "Whether the camera took the encrypted access request" }
+  status.*:              { type: string, description: "Each field of getstate as the camera reports it, such as cammode, batt, sdcardstatus, sd_memory, rec or rem_capacity" }
+  liveview:              { type: bool, description: "Whether live view is running" }
+  polled.status:         { type: int, unit: s, description: "When the state poll (every 2 s, every second during live view) was last answered, in Unix seconds" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      power_off turns the camera off; it can be turned on again only on the
+      camera (or over Bluetooth, not here). stop_recording ends a take, and
+      cancel_capture a long exposure.
+  - models: [all]
+    severity: warning
+    text: >
+      The camera wedges (answering err_busy until it is turned off and on)
+      when mode switches come close together or while it switches modes on
+      its own, as seen on the S5: record_mode, playback_mode and a camcmd of
+      recmode, playmode or pictmode are refused within 10 seconds of the
+      last one sent. Live view switches to record mode only when the camera
+      is not in it already.
+  - models: [all]
+    severity: warning
+    text: >
+      Panasonic publishes no document for this API; it is read from open
+      projects, one of them verified on an S5. The camera accepts one
+      controller at a time and drops it when the state poll stops; the first
+      connection must be accepted on the camera. White balance, shutter and
+      other value lists vary by body: read getinfo allmenu for each setting's
+      names and values and set them with set_setting.
+  - models: [all]
+    severity: info
+    text: >
+      Not here: the BGH1 and BS1H box cameras, whose network control (LUMIX
+      Tether over Ethernet) takes a hashed password no open source documents,
+      and the camera's UPnP event notifications (state is polled instead).

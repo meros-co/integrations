@@ -86,6 +86,7 @@ NATIVE = {
     "omt": "OMT metadata frames over TCP (the source's port, 6400 first)",
     "omt-discovery": "OMT metadata frames over TCP 6399",
     "osc-listener": "OSC over UDP or TCP from any sender; receives",
+    "panasonic-lumix": "HTTP 80 (cam.cgi), UPnP 60606, live view on a UDP port",
     "panasonic-projector": "NTCONTROL over TCP 1024",
     "philips-sicp": "SICP binary messages over TCP 5000",
     "piclock": "Tally Protocol lines over TCP 6254; the clock connects to the core",

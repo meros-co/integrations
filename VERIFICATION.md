@@ -3461,6 +3461,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the Admin CGIs answer a Digest challenge with the current firmware, and Basic with older firmware. ([specs/panasonic-ptz.yaml:136](specs/panasonic-ptz.yaml#L136))
 - [ ] Confirm whether the 40 ms gap between pan-tilt head commands (chapter 4, restriction 1) counts from the previous command or from its reply; the core counts it from the reply, and the HE document's 130 ms between any two commands likewise. ([specs/panasonic-ptz.yaml:109](specs/panasonic-ptz.yaml#L109))
 
+## panasonic-lumix — Panasonic LUMIX cameras (Wi-Fi remote control, cam.cgi)
+
+- [ ] Confirm on an encrypted body (S5 II, S5 IIX, G9 II, GH7) the req_acc_g nonce, the req_acc_e transform of the id and name, and the session id in the accepting answer's fifth field; the transform is from LUMIX Sync's analysis and untested on a camera. ([specs/panasonic-lumix.yaml:64](specs/panasonic-lumix.yaml#L64))
+- [ ] Record which bodies (GH5, GH5S, GH6, G9, S1, S1R, S1H, S5) take the plain req_acc, and what X_CamCapability each describes. ([specs/panasonic-lumix.yaml:83](specs/panasonic-lumix.yaml#L83))
+- [ ] Record the getstate fields of each body and how long the camera keeps a controller that stops polling. ([specs/panasonic-lumix.yaml:100](specs/panasonic-lumix.yaml#L100))
+- [ ] Confirm the 10 s gap between mode switches keeps the S5 (and other bodies) from wedging, and whether a shorter gap is safe on other bodies. ([specs/panasonic-lumix.yaml:267](specs/panasonic-lumix.yaml#L267))
+- [ ] Confirm camctrl touch with value2 on focuses on a point on the S5 (G9 II style) and which bodies take touchaf or touchcapt instead (getsetting touch_type). ([specs/panasonic-lumix.yaml:174](specs/panasonic-lumix.yaml#L174))
+- [ ] Confirm focus steps by camctrl focus on each body and zoom on power zoom lenses. ([specs/panasonic-lumix.yaml:189](specs/panasonic-lumix.yaml#L189))
+- [ ] Record each body's aperture and shutter codes (getinfo allmenu) to check the 256ths codes. ([specs/panasonic-lumix.yaml:200](specs/panasonic-lumix.yaml#L200))
+- [ ] Confirm the live view datagrams reach a port other than 49152 and 49199, the frame size on each body, and whether a datagram can hold FF D8 before the JPEG. ([specs/panasonic-lumix.yaml:67](specs/panasonic-lumix.yaml#L67))
+- [ ] Confirm the ContentDirectory Browse with pana:X_FromCP LumixLink2.0 in playmode and the file names on port 50001 (DO, DL, DT, MP4) on current bodies. ([specs/panasonic-lumix.yaml:233](specs/panasonic-lumix.yaml#L233))
+- [ ] Check power_off answers err_reject in playback mode, as on the S5. ([specs/panasonic-lumix.yaml:168](specs/panasonic-lumix.yaml#L168))
+
 ## panasonic-projector — Panasonic projectors
 
 - [ ] Confirm the NTCONTROL hash against a projector in protect mode: MD5 of "user:password:random" as 32 lowercase hex digits (the manual's example gives no random number to check against). ([specs/panasonic-projector.yaml:54](specs/panasonic-projector.yaml#L54))
