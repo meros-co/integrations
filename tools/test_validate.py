@@ -112,7 +112,7 @@ class QuietRules(unittest.TestCase):
         quiet = {"quiet_ms": 1000, "state": {"done": "true"}}
         self.assertEqual(validate.telemetry_checks(self.doc("line-tcp", quiet)), [])
         self.assertEqual(validate.telemetry_checks(self.doc("http", quiet)),
-                         ["telemetry.updates[0]: quiet_ms needs a line-tcp, line-serial, osc-tcp or ws transport"])
+                         ["telemetry.updates[0]: quiet_ms needs a line-tcp, osc-tcp or ws transport"])
         self.assertIn("telemetry.updates: at most one quiet_ms rule",
                       validate.telemetry_checks(self.doc("ws", quiet, quiet)))
         mixed = dict(quiet, match="^END$", then_send=["X"])
@@ -184,35 +184,7 @@ class ExtensionCommands(unittest.TestCase):
         self.assertTrue(any("answers 'export_presets'" in e for e in errors), errors)
 
 
-class Serial(unittest.TestCase):
-    SETTINGS = {
-        "serial_port": {"type": "string", "required": True},
-        "baud_rate": {"type": "enum", "values": ["9600", "38400"], "default": "9600"},
-        "data_bits": {"type": "int", "min": 8, "max": 8, "default": 8},
-        "parity": {"type": "enum", "values": ["none"], "default": "none"},
-        "stop_bits": {"type": "int", "min": 1, "max": 1, "default": 1},
-        "flow_control": {"type": "enum", "values": ["none", "xon-xoff"], "default": "none"},
-    }
-    PORT = {"port": None, "protocol": "serial", "role": "control", "setting": "serial_port", "note": "RS-232"}
-
-    def doc(self, settings=None, ports=None):
-        return {"transport": {"type": "line-serial", "framing": "terminated"},
-                "settings": self.SETTINGS if settings is None else settings,
-                "ports": [self.PORT] if ports is None else ports}
-
-    def test_a_serial_device_with_its_settings_is_valid(self):
-        self.assertEqual(validate.serial_checks(self.doc()) + validate.port_checks(self.doc()), [])
-
-    def test_each_serial_setting_is_declared_with_a_default_the_core_can_use(self):
-        settings = dict(self.SETTINGS, parity={"type": "enum", "values": ["mark"], "default": "mark"},
-                        stop_bits={"type": "int", "min": 1, "max": 3})
-        del settings["flow_control"]
-        errors = validate.serial_checks(self.doc(settings))
-        self.assertIn("settings.flow_control: a device on a serial port declares it", errors)
-        self.assertIn("settings.parity: an enum of ['even', 'none', 'odd']", errors)
-        self.assertIn("settings.stop_bits: needs the device's default", errors)
-        self.assertIn("settings.stop_bits: an int within 1 to 2 (give min and max)", errors)
-
+class Framing(unittest.TestCase):
     def test_a_delimited_framing_needs_a_close(self):
         for close in (None, "", "  ", "\r\n"):
             t = {"type": "line-tcp", "port": 1, "framing": "delimited", "open": "<"}
@@ -222,107 +194,10 @@ class Serial(unittest.TestCase):
             self.assertIn("transport.close: framing delimited needs a close that is not only whitespace",
                           validate.port_checks(doc))
 
-    def test_a_line_serial_transport_needs_a_serial_control_entry(self):
-        doc = self.doc(ports=[{"port": 23, "protocol": "tcp", "role": "control"}])
-        self.assertIn("ports: a line-serial transport needs a serial control entry", validate.port_checks(doc))
-        bad = dict(self.PORT, port=1, setting="port")
-        errors = validate.serial_checks(self.doc(ports=[bad]))
-        self.assertIn("ports[0]: a serial port has no number (port: null)", errors)
-        self.assertIn("ports[0]: a serial port's setting is serial_port", errors)
-
-
-class MidiPorts(unittest.TestCase):
-    SETTINGS = {"midi_input": {"type": "string"}, "midi_output": {"type": "string"}}
-
-    def doc(self, ports, implementation="native", settings=None):
-        return {"implementation": implementation, "settings": self.SETTINGS if settings is None else settings,
-                "ports": ports}
-
-    def test_a_midi_port_is_named_by_its_setting_on_a_native_module(self):
-        ports = [{"port": None, "protocol": "midi", "role": "control", "setting": "midi_input", "note": "in"},
-                 {"port": None, "protocol": "midi", "role": "control", "setting": "midi_output", "note": "out"}]
-        self.assertEqual(validate.midi_checks(self.doc(ports)), [])
-
-    def test_what_a_midi_port_may_not_be(self):
-        ports = [{"port": 5004, "protocol": "midi", "role": "feedback", "setting": "midi_port"}]
-        errors = validate.midi_checks(self.doc(ports, implementation="spec"))
-        self.assertIn("ports[0]: a MIDI port has no number (port: null)", errors)
-        self.assertIn("ports[0]: a MIDI port's setting is midi_input or midi_output", errors)
-        self.assertIn("ports[0]: a MIDI port is a control entry the device listens on", errors)
-        self.assertIn("ports[0]: only a native module opens a MIDI port", errors)
-        ports = [{"port": None, "protocol": "midi", "role": "control", "setting": "midi_input", "note": "in"}]
-        errors = validate.midi_checks(self.doc(ports, settings={"midi_input": {"type": "int"}}))
-        self.assertEqual(errors, ["settings.midi_input: must be a string"])
-
-
-class SerialBlock(unittest.TestCase):
-    def doc(self, **block):
-        serial = {"baud_rate": {"default": 9600, "values": [9600, 38400]}, "data_bits": 8,
-                  "parity": "none", "stop_bits": 1, "flow_control": "none", **block}
-        return {
-            "transport": {"type": "line-tcp", "port": 23, "serial": serial},
-            "models": [{"id": "a"}, {"id": "b"}],
-            "settings": {},
-            "ports": [{"port": 23, "protocol": "tcp", "role": "control", "when": "link tcp"},
-                      {"port": None, "protocol": "serial", "role": "control", "setting": "serial_port",
-                       "when": "link serial", "note": "RS-232"}],
-        }
-
-    def test_the_block_stands_for_the_link_and_serial_settings(self):
-        doc = self.doc()
-        self.assertEqual(validate.expand_serial(doc), [])
-        self.assertEqual(validate.serial_checks(doc) + validate.port_checks(doc), [])
-        s = doc["settings"]
-        self.assertEqual(s["link"]["default"], "tcp")
-        self.assertEqual(s["baud_rate"]["values"], ["9600", "38400"])
-        self.assertEqual((s["data_bits"]["min"], s["data_bits"]["max"]), (8, 8))
-
-    def test_what_a_block_may_not_be(self):
-        doc = self.doc(serial_only=["c"], link="serial")
-        errors = validate.expand_serial(doc)
-        self.assertIn("transport.serial.serial_only: no model 'c'", errors)
-        self.assertTrue(any("link stays tcp" in e for e in errors))
-        doc = self.doc()
-        doc["settings"]["baud_rate"] = {"type": "int"}
-        doc["ports"] = doc["ports"][:1]
-        errors = validate.expand_serial(doc)
-        self.assertIn("settings.baud_rate: transport.serial declares it; leave it out", errors)
-        self.assertTrue(any("when: \"link serial\"" in e for e in errors))
-        doc = {"transport": {"type": "line-tcp", "port": 1}, "on_connect": [{"send": "x", "link": "tcp"}]}
-        self.assertEqual(validate.expand_serial(doc), ["on_connect[0]: link needs transport.serial"])
-
-    def test_a_default_can_differ_by_model(self):
-        baud = {"default": 9600, "values": [9600, 38400], "by_model": [{"models": ["b"], "default": 38400}]}
-        self.assertEqual(validate.expand_serial(self.doc(baud_rate=baud)), [])
-        baud = {"default": 9600, "values": [9600, 38400],
-                "by_model": [{"models": ["b", "c"], "default": 19200}, {"models": ["b"], "default": 9600}]}
-        errors = validate.expand_serial(self.doc(baud_rate=baud, models=["a", "c"]))
-        self.assertIn("transport.serial.baud_rate.by_model[0]: the default is not one of the values", errors)
-        self.assertIn("transport.serial.baud_rate.by_model[0]: model 'b' has no serial port", errors)
-        self.assertIn("transport.serial.baud_rate.by_model[0]: no model 'c'", errors)
-        self.assertIn("transport.serial.baud_rate.by_model[1]: model 'b' is named twice", errors)
-
-    def test_overrides_change_framing_and_replies_for_the_models_named(self):
-        doc = self.doc(overrides=[{"framing": "delimited", "close": "", "reply_framing": "terminated",
-                                   "reply_terminators": [";"]},
-                                  {"models": ["a"], "open": "\u0002"}])
-        self.assertEqual(validate.expand_serial(doc), [])
-        self.assertEqual(validate.expand_serial(self.doc(overrides={"terminator": "cr"})), [])
-        errors = validate.expand_serial(self.doc(overrides=[{"models": ["c"], "port": 24}]))
-        self.assertIn("transport.serial.overrides[0].models: no model 'c'", errors)
-        self.assertTrue(any("overrides[0].port" in e for e in errors))
-        errors = validate.expand_serial(self.doc(overrides={"framing": "delimited", "close": ""}))
-        self.assertTrue(any("needs reply_framing" in e for e in errors))
-        errors = validate.expand_serial(self.doc(overrides={"reply_match": "("}))
-        self.assertTrue(any("reply_match" in e for e in errors))
-        self.assertTrue(validate.expand_serial(self.doc(overrides=5)))
-
 
 class Pacing(unittest.TestCase):
-    def doc(self, pacing, overrides=None):
+    def doc(self, pacing):
         t = {"type": "line-tcp", "port": 23, "pacing": pacing}
-        if overrides is not None:
-            t["serial"] = {"overrides": overrides}
         return {"transport": t, "models": [{"id": "a"}, {"id": "b"}]}
 
     def test_a_pacing_block_names_known_models_and_regexes(self):
@@ -332,8 +207,8 @@ class Pacing(unittest.TestCase):
         self.assertEqual(validate.pacing_checks(self.doc(good)), [])
         bad = {"by_model": [{"models": ["c"], "min_interval_ms": 1}, {"models": ["a", "a"], "min_interval_ms": 2}],
                "groups": {"g": {"match": "(", "min_interval_ms": 1}, "h": {"match": "(?=x)", "after_ms": 1}}}
-        errors = validate.pacing_checks(self.doc(None, overrides=[{"pacing": bad}]))
-        at = "transport.serial.overrides[0].pacing"
+        errors = validate.pacing_checks(self.doc(bad))
+        at = "transport.pacing"
         self.assertIn(f"{at}.by_model: no model 'c'", errors)
         self.assertIn(f"{at}.by_model: model 'a' is named twice", errors)
         self.assertTrue(any(e.startswith(f"{at}.groups.g.match") for e in errors))

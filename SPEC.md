@@ -245,209 +245,10 @@ self-signed certificate (the link is encrypted, the device not
 authenticated). Everything above the stream (framing, replies, telemetry)
 is as over plain TCP. A handshake that fails is a connection that fails,
 retried with backoff; its reason in the log starts `tls:`. Changing the
-setting with `update_settings` opens the new link at once. TLS is the
-network link's: with a `serial` block (below), link serial opens the
-serial port as it is, and the network entries in `ports` name both choices
-(`when: "link tcp, scheme tls"`). `tools/validate.py` checks that the setting is an enum
+setting with `update_settings` opens the new connection at once.
+`tools/validate.py` checks that the setting is an enum
 of `tcp` and `tls`, that `tls_port` has a `tls` control entry in `ports`,
 and that `accept_invalid_certs` goes with a TLS scheme.
-
-### `line-serial`
-
-Text over a serial port of the host running the core: RS-232, RS-422, or
-a USB serial adapter (Roland's V-1200HD, which has no network control).
-Everything of `line-tcp` applies (its framings, `reply_framing`,
-`reply_match`, `error_match`, `probe`, `on_connect` with `after_prompt`,
-and the telemetry rules), except `port` and `endpoints`: a serial port has
-no number and reaches no HTTP server.
-
-```yaml
-transport:
-  type: line-serial
-  framing: delimited
-  open: "\u0002"
-  close: ";"
-  reply_framing: terminated
-  reply_terminators: [";", "\u0006"]
-settings:
-  serial_port:  { type: string, required: true, max_length: 256, label: Serial port,
-                  description: "The host's serial port: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
-  baud_rate:    { type: enum, values: ["9600", "38400"], default: "38400", label: Baud rate, description: "…" }
-  data_bits:    { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "…" }
-  parity:       { type: enum, values: [none], default: none, label: Parity, description: "…" }
-  stop_bits:    { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "…" }
-  flow_control: { type: enum, values: [none, xon-xoff], default: none, label: Flow control, description: "…" }
-ports:
-  - { port: null, protocol: serial, role: control, setting: serial_port, note: "RS-232, D-sub 9-pin" }
-```
-
-The port and its line settings are settings with these names, so every
-serial device is configured alike: `serial_port` (required, no default),
-`baud_rate` (an `int`, or an `enum` of digits for a device that offers a
-few rates), `data_bits` (5 to 8), `parity` (`none`, `odd`, `even`),
-`stop_bits` (1 or 2) and `flow_control` (`none`, `xon-xoff`, `rts-cts`).
-Each line setting is declared with the device's documented default, and
-narrowed to the values the device allows; `tools/validate.py` checks them.
-Changing any of them with `update_settings` opens the port again.
-
-The port is opened when the device is, and is the device's connection: a
-port that cannot be opened (absent, or held by another program) or that
-fails while open (a USB adapter unplugged) is reported `disconnected`,
-commands in flight fail with `transport`, and it is opened again after 1 s,
-doubling to 30 s, as a TCP connection is reconnected. A serial line gives no
-sign of the device itself, so `connected` means the port is open; the
-device's own presence is what `probe` and its replies show. A device on a
-serial port needs no host: `host` may be left empty when it is opened (a
-`serial` entry in `ports` allows it). Commands-only opening and latency are
-as for any spec-driven device.
-
-Serial ports are opened on Windows, macOS and Linux (and the other Unix
-systems the `serial2` crate supports). Phones have no serial port an app can
-open, so on Android and iOS the port fails to open with a reason saying so,
-and the device stays `disconnected` (docs/MOBILE.md).
-
-Every delivery lists the host's serial ports, for a consumer offering a
-choice of `serial_port`: `Core::serial_ports` in Rust, `mi_serial_ports` in
-C, `serialPorts()` in Node, `serial_ports()` in Python and
-`GET /v1/serial_ports` in the HTTP service. Each port has its `name`, the
-value `serial_port` takes; the port library gives no description or USB
-ids. The list is empty on Android and iOS.
-
-#### The same protocol on a serial port
-
-Many devices speak their network protocol unchanged on an RS-232 or RS-422
-port as well (Extron SIS, Kramer Protocol 3000, Lightware LW2 and LW3, most
-Roland switchers), and some models of a family have only the serial port. A
-`line-tcp` transport then adds a `serial` block, and one spec serves the
-device either way: the framing, replies, probe, `on_connect`, telemetry,
-polls and commands are shared, and only what is opened differs.
-
-```yaml
-transport:
-  type: line-tcp
-  port: 23
-  framing: terminated
-  terminator: cr
-  serial:
-    serial_only: [in1604-dtp, in1604-hd]   # optional
-    models: [in1806-1808, in1604-dtp, in1604-hd]   # optional
-    baud_rate: { default: 9600, values: [9600, 19200, 38400, 115200] }
-    data_bits: 8
-    parity: none
-    stop_bits: 1
-    flow_control: none
-ports:
-  - { port: 23, protocol: tcp, role: control, when: "link tcp" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial",
-      note: "Remote RS-232 port, 3-pole captive screw" }
-```
-
-The block stands for settings the spec does not declare itself (the core
-and `tools/validate.py` add them, and the catalogue lists them like any
-other):
-
-- `link`, `tcp` or `serial`: the consumer's choice for each device. `tcp`
-  reaches the device at its host and port, `serial` opens `serial_port` and
-  needs no host. Its default is the block's `link`, `tcp` unless given.
-  With `serial_only`, a list of the models reached only on a serial port
-  (RS-232-only units), `link` has no default: left out, those models use
-  `serial` and the others `tcp`.
-- `serial_port`, optional, and required by opening with link serial.
-- `baud_rate`, `data_bits`, `parity`, `stop_bits` and `flow_control`, as
-  for `line-serial`, each from the block: the vendor's one documented value
-  (a fixed setting), or `{ default, values }` when the device's port can be
-  set to others (`baud_rate` is then an enum of digits, `data_bits` and
-  `stop_bits` an int range without gaps). All five are given, as the vendor
-  documents them; a value the vendor leaves undocumented (flow control,
-  often) is `none` and a quirk with a VERIFICATION.md item.
-
-A family whose models leave the factory with different line settings (Sharp's
-PN-HB and PN-R903A at 38400 bps, its other displays at 9600) gives those
-models' defaults in `by_model`, a list of `{ models, default }` beside the
-setting's `default` and `values`:
-
-```yaml
-  serial:
-    baud_rate: { default: 9600, values: [9600, 19200, 38400],
-                 by_model: [{ models: [pn-hb, pn-r903a], default: 38400 }] }
-```
-
-A device opened as one of those models takes its model's default for a
-setting it is not given, on opening and in `update_settings` alike; the
-others take `default`. The catalogue lists the setting's `default_by_model`
-(model id to default) and its description names them. Each model is named
-once and must have the serial port, and each default is one of the
-values; the core and `tools/validate.py` refuse a block that breaks this.
-
-`models`, when given, lists the models that have the serial port; opening
-another model with link serial fails with `invalid_settings`, as does link
-serial without `serial_port`. Link tcp without a host fails as for any
-network device. Changing `link` or a line setting with `update_settings`
-opens the new link at once, as for `line-serial`; on Android and iOS link
-serial fails to open as `line-serial` does.
-
-A device with HTTP `endpoints` (§2, Endpoints) beside its line protocol
-(Barco Pulse's file endpoints on its web server) keeps them on link serial
-too: they are reached at the host the device was opened with, over the
-network, while the line protocol goes over the serial port. Opened on link
-serial without a host, it reaches no HTTP server, and a command or poll
-naming an endpoint fails with `invalid_params` saying so. The same holds
-for TLS (§2, `line-tcp`, TLS): it is the network link's.
-
-The ports list both links, the transport's port with `when: "link tcp"` and
-a `serial` control entry with `when: "link serial"`. A step of `on_connect`
-can name the link it is for, `link: tcp` or `link: serial`, when the vendor
-documents a difference between them, such as a login asked for on the
-network only:
-
-```yaml
-on_connect:
-  - { when_set: password, link: tcp, after_prompt: "Password:", send: "{settings.password}" }
-```
-
-Some vendors frame the same commands differently on the serial port: Roland
-wants STX (02H) before each command on RS-232 and no line ending after its
-`;`, and answers with an ACK byte (06H) where the network gets `ACK` and a
-line feed. The block's `overrides` give the transport keys that differ
-there: `framing`, `open`, `close`, `terminator`, `reply_framing`,
-`reply_terminators`, `reply_fence`, `reply_match`, `error_match`, and
-`pacing` (§2, Pacing), which replaces the transport's as a whole. It is a
-mapping for every model, or a list of mappings each for the `models` it
-names (every model when it names none); every entry for the device's model
-is laid over the transport, in order, when the link is serial, and the TCP
-link keeps the transport as it is. Templates, `expect` and the telemetry
-rules are shared, so a reply that differs (`ACK` or the ACK byte) is matched
-by a regex accepting both.
-
-```yaml
-transport:
-  type: line-tcp
-  port: 8023
-  framing: terminated
-  terminator: crlf
-  reply_match: 'ACK;|ERR:[0-9]+;'
-  serial:
-    models: [v-160hd, v-80hd]
-    baud_rate: { default: 115200, values: [9600, 38400, 115200] }
-    data_bits: 8
-    parity: none
-    stop_bits: 1
-    flow_control: { default: xon-xoff, values: [xon-xoff, none] }
-    overrides:
-      - { framing: delimited, close: "", reply_framing: terminated,
-          reply_terminators: [";", "\u0006"] }
-      - { models: [v-160hd], open: "\u0002" }
-```
-
-`framing: delimited` with an empty `close` sends the payload with only `open`
-before it (or as it is, with no `open`); it needs a `reply_framing`, since
-no marker would end a reply. This holds for any line transport, not only in
-`overrides`.
-
-A vector plays a command or a telemetry message on the serial port by giving
-`link: serial` in its `settings` (and on TCP otherwise, unless `serial_only`
-names its model); the vector runner checks that the link opened is the one
-chosen.
 
 ### `line-udp`
 
@@ -1218,7 +1019,7 @@ ports:
 | Field | Meaning |
 |---|---|
 | `port` | The default. `null` when there is none and one must be given; a `note` then says so |
-| `protocol` | `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls`, `ssh`, `serial`: a serial port of the host, with `port: null` and `setting: serial_port` (§2, `line-serial`), `midi`: a MIDI port of the host, with `port: null` and `setting: midi_input` or `midi_output` (native modules only, see [Native modules](#native-modules)), or `icmp`: ICMP echo, which has no port (`port: null`) |
+| `protocol` | `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls`, `ssh`, or `icmp`: ICMP echo, which has no port (`port: null`) |
 | `role` | `control` (where commands go; the port given when opening a device overrides the transport's, not an HTTP endpoint's), `push` (a websocket or event stream beside it), `feedback` (where the device sends replies or changes), `notification` (pushed status the device starts), `discovery` |
 | `listener` | Who listens: `device` (the default) or `core` |
 | `setting` | The setting that changes this port, if any |
@@ -1290,7 +1091,7 @@ no consumer paces commands itself:
 
 ```yaml
 transport:
-  type: line-serial
+  type: line-tcp
   pacing:
     min_interval_ms: 0            # between any two messages
     from: send                    # send (default) | reply
@@ -1336,11 +1137,7 @@ server and are not paced.
   messages before the next message of any kind. Each group gives one or both,
   and its own `by_model`.
 
-A message waits for the longest of these that applies. On a `line-tcp`
-transport with a `serial` block, the block's `overrides` (§2, "The same
-protocol on a serial port") may give a `pacing` of their own for the serial
-port, for every model or the models an entry names; it replaces the
-transport's `pacing` as a whole there. `tools/validate.py` checks the models
+A message waits for the longest of these that applies. `tools/validate.py` checks the models
 named and the regexes; the engine refuses a malformed block when the device
 is opened. Conformance vectors (§7) show what is sent, not when: the
 engine's own tests play pacing on a fake clock.
@@ -1350,7 +1147,7 @@ engine's own tests play pacing on a fake clock.
 Some devices drop a client that has sent nothing for a while: Panasonic
 KAIROS closes its control connection after ten seconds without a message
 from the client, its own messages not counting, and asks for an empty line
-at least every five. `keepalive` on a `line-tcp`, `line-serial` or `ws`
+at least every five. `keepalive` on a `line-tcp` or `ws`
 transport names that message and the longest this side may stay silent:
 
 ```yaml
@@ -1377,7 +1174,7 @@ Some devices want the host to answer what they send by themselves. A Denon
 Professional or TASCAM Blu-ray player notifies each change of its status and
 waits 30 ms for the host's ACK, sending the status once more without it; a
 RED camera keeps an RCP2 connection only while the client echoes its
-`rcp_session` messages back. `acknowledge` on a `line-tcp`, `line-serial`,
+`rcp_session` messages back. `acknowledge` on a `line-tcp`,
 `line-udp` or `ws` transport lists what such messages look like and the
 answer to each:
 
@@ -3417,41 +3214,12 @@ A native spec's commands have no `send`, `expect` or `transport`; the module
 defines those. `reason` says why the protocol cannot be expressed as data.
 Vectors apply to native modules exactly as to spec-driven ones.
 
-A native module can drive a device on a serial port of the host as well
-(`Cx::serial_open`, reported like a TCP connection). Its spec then lists a
-`serial` entry in `ports`, usually with a `when` naming the setting that
-chooses it, and declares the six serial settings of `line-serial` (§2) with
-the device's defaults; `serial_port` is then optional, required only when
-the serial port is chosen.
-
-A native module can also open a MIDI port of the host (`Cx::midi_open`,
-reported like a TCP connection): a USB or other class-compliant MIDI
-device, or another program's port, named by its input and output as the
-operating system lists them. Its spec lists a `midi` entry in `ports` for
-each, `port: null`, with `setting: midi_input` or `setting: midi_output`
-(string settings), and such a device may be opened without a host. The
-port is the device's connection: one that cannot be opened (absent, or
-held by another program) or goes away (unplugged) is reported
-`disconnected` with a reason starting `midi:`, and the module opens it
-again. MIDI ports are opened on Windows (WinMM), macOS and iOS (CoreMIDI)
-and Linux (the ALSA sequencer) in a build with a MIDI integration; Android
-has none an app's native code can open (docs/MOBILE.md). On Linux the ALSA
-library is loaded (`dlopen` of `libasound.so.2`) when ports are first
-listed or opened, never linked: a Linux build needs no ALSA to build or to
-start, and on a host without the library no port is listed and opening one
-fails with a reason saying the library could not be loaded. Every delivery
-lists the host's MIDI ports: `Core::midi_ports` in Rust, `mi_midi_ports` in
-C, `midiPorts()` in Node, `midi_ports()` in Python and `GET /v1/midi_ports`
-in the HTTP service, each with its `name` and whether it is an `input`, an
-`output` or both. The list is empty in a build without a MIDI integration,
-on Android, and on a host whose MIDI system cannot be reached (on Linux:
-without `libasound.so.2` or without the ALSA sequencer).
-
 The MIDI integrations (`generic-midi`, `midi-show-control`) share one link
-(`link` `rtp`, `rtp_host` or `port`): an RTP-MIDI session (Apple's MIDI
-Network Driver Protocol and RFC 6295) the core joins as the initiator
-(`rtp`) or hosts on `local_port` for the device to join (`rtp_host`), with a
-recovery journal in every packet it sends, or a MIDI port.
+(`link` `rtp` or `rtp_host`): an RTP-MIDI session (Apple's MIDI Network
+Driver Protocol and RFC 6295) the core joins as the initiator (`rtp`) or
+hosts on `local_port` for the device to join (`rtp_host`), with a recovery
+journal in every packet it sends. Hosting, the device may be opened without
+a host: any host may then join.
 mDNS discovery (`mdns`) reports each RTP-MIDI session advertised as
 `_apple-midi._udp` for each MIDI integration in the core, at its control
 port.

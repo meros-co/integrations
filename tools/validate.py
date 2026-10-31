@@ -517,12 +517,12 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                 errors += check_template("text", template, params, settings,
                                          f"commands.{name}.expect.reply_json")
         if "reply_contains" in expect_:
-            if transport_type not in ("line-tcp", "line-serial", "line-udp"):
+            if transport_type not in ("line-tcp", "line-udp"):
                 errors.append(f"commands.{name}: expect.reply_contains needs a line transport")
             errors += check_template("text", expect_["reply_contains"], params, settings,
                                      f"commands.{name}.expect.reply_contains",
                                      conversions=conversions, maps=doc.get("maps") or {})
-        if expect_.get("replies", 1) != 1 and transport_type not in ("line-tcp", "line-serial", "line-udp"):
+        if expect_.get("replies", 1) != 1 and transport_type not in ("line-tcp", "line-udp"):
             errors.append(f"commands.{name}: expect.replies needs a line transport")
         if "convert" in expect_:
             if expect_["convert"] not in conversions:
@@ -788,8 +788,8 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
             if conditional and conditional not in settings:
                 errors.append(f"on_connect[{i}]: when_set names unknown setting '{conditional}'")
             transport_type = (doc.get("transport") or {}).get("type")
-            if "after_prompt" in step and transport_type not in ("line-tcp", "line-serial"):
-                errors.append(f"on_connect[{i}]: after_prompt needs a line-tcp or line-serial transport")
+            if "after_prompt" in step and transport_type not in ("line-tcp",):
+                errors.append(f"on_connect[{i}]: after_prompt needs a line-tcp transport")
             for key in ("refused", "accepted"):
                 if key in step:
                     try:
@@ -979,7 +979,7 @@ def per_model_checks(doc: dict, model_ids: set) -> list[str]:
                 if bad:
                     errors.append(f"{where}[{i}]: models names unknown model(s) {sorted(bad)}")
             if (isinstance(item, dict) and "message" in item and where != "telemetry.updates"
-                    and transport.get("type") not in ("line-tcp", "line-serial", "line-udp", "ws")):
+                    and transport.get("type") not in ("line-tcp", "line-udp", "ws")):
                 errors.append(f"{where}[{i}]: {{models, message}} is for line and websocket transports")
             if isinstance(item, dict) and "session" in item and transport.get("type") != "http":
                 errors.append(f"{where}[{i}]: session applies to http requests")
@@ -1097,7 +1097,7 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
     # a line transport; HTTP replies are matched with `path`.
     # A native extension that offers JSON messages of its own (the NMOS Query
     # API's subscriptions) feeds json_match rules too.
-    has_json = (transport_type in ("ws", "line-tcp", "line-serial", "line-udp")
+    has_json = (transport_type in ("ws", "line-tcp", "line-udp")
                 or "websocket" in telemetry or "sse" in telemetry or "zeromq" in telemetry
                 or doc.get("extension") in ("nmos-query-websocket", "nmos-event-transports"))
     if "sse" in telemetry and transport_type != "http":
@@ -1124,8 +1124,8 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
         errors.append("telemetry.updates: at most one quiet_ms rule")
     for i in quiet:
         rule = telemetry["updates"][i]
-        if transport_type not in ("line-tcp", "line-serial", "osc-tcp", "ws"):
-            errors.append(f"telemetry.updates[{i}]: quiet_ms needs a line-tcp, line-serial, osc-tcp or ws transport")
+        if transport_type not in ("line-tcp", "osc-tcp", "ws"):
+            errors.append(f"telemetry.updates[{i}]: quiet_ms needs a line-tcp, osc-tcp or ws transport")
         others = sorted(k for k in ("match", "address", "header", "path", "json_match",
                                     "then_send", "replace") if k in rule)
         if others:
@@ -1148,7 +1148,7 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                 errors.append(f"{where}.request_match: {e}")
             # On a websocket, the message a reply answers (SPEC.md §2, ws);
             # on OSC, the address of the query a reply answers.
-            line = "match" in rule and transport_type in ("line-tcp", "line-serial", "line-udp", "ws")
+            line = "match" in rule and transport_type in ("line-tcp", "line-udp", "ws")
             osc = "address" in rule and transport_type in ("osc-udp", "osc-tcp")
             if not (line or osc):
                 errors.append(f"{where}: a request_match regex goes with match, on a line or websocket "
@@ -1300,13 +1300,10 @@ def port_checks(doc: dict) -> list[str]:
     if t is not None:
         # A delimited reply ends at `close`, compared without surrounding
         # whitespace: an empty one would never end a message.
-        if (t.get("type") in ("line-tcp", "line-serial") and t.get("framing") == "delimited"
+        if (t.get("type") in ("line-tcp",) and t.get("framing") == "delimited"
                 and not str(t.get("close", "")).strip() and "reply_framing" not in t):
             errors.append("transport.close: framing delimited needs a close that is not only whitespace")
-        if t.get("type") == "line-serial":
-            if not any(e["protocol"] == "serial" for e in control):
-                errors.append("ports: a line-serial transport needs a serial control entry")
-        elif t.get("port") not in [e["port"] for e in control]:
+        if t.get("port") not in [e["port"] for e in control]:
             errors.append(f"ports: the transport's port {t.get('port')} is not a control port")
         listen = t.get("listen_port")
         if isinstance(listen, dict) and not any(e.get("setting") == listen["setting"] for e in ports):
@@ -1353,110 +1350,14 @@ def port_checks(doc: dict) -> list[str]:
     return errors
 
 
-# The settings a device on a serial port declares (SPEC.md §2, line-serial),
-# each a type and the values the core can open a port with.
-SERIAL_SETTINGS = ("serial_port", "baud_rate", "data_bits", "parity", "stop_bits", "flow_control")
-SERIAL_CHOICES = {"parity": {"none", "odd", "even"}, "flow_control": {"none", "xon-xoff", "rts-cts"}}
-SERIAL_RANGES = {"data_bits": (5, 8), "stop_bits": (1, 2)}
-
-
-def serial_checks(doc: dict) -> list[str]:
-    """A serial port is named by the serial_port setting, and its line
-    settings are declared with the device's defaults (SPEC.md §2)."""
-    errors = []
-    ports = doc.get("ports") or []
-    entries = [e for e in ports if e["protocol"] == "serial"]
-    line_serial = (doc.get("transport") or {}).get("type") == "line-serial"
-    for i, e in enumerate(ports):
-        if e["protocol"] != "serial":
-            continue
-        if e["port"] is not None:
-            errors.append(f"ports[{i}]: a serial port has no number (port: null)")
-        if e.get("setting") != "serial_port":
-            errors.append(f"ports[{i}]: a serial port's setting is serial_port")
-        if e["role"] != "control" or e.get("listener", "device") != "device":
-            errors.append(f"ports[{i}]: a serial port is a control entry the device listens on")
-    if not entries:
-        return errors
-    settings = doc.get("settings") or {}
-    for name in SERIAL_SETTINGS:
-        s = settings.get(name)
-        if s is None:
-            errors.append(f"settings.{name}: a device on a serial port declares it")
-            continue
-        kind = s.get("type")
-        if name != "serial_port" and "default" not in s:
-            errors.append(f"settings.{name}: needs the device's default")
-        if name == "serial_port":
-            if kind != "string":
-                errors.append("settings.serial_port: must be a string")
-            if line_serial and not s.get("required"):
-                errors.append("settings.serial_port: must be required on a line-serial transport")
-        elif name == "baud_rate":
-            ok = (kind == "int" and s.get("min", 1) >= 1) or (
-                kind == "enum" and all(str(v).isdigit() and int(v) > 0 for v in s.get("values", [])))
-            if not ok:
-                errors.append("settings.baud_rate: an int of 1 or more, or an enum of digits")
-        elif name in SERIAL_RANGES:
-            low, high = SERIAL_RANGES[name]
-            if kind != "int" or s.get("min", 0) < low or s.get("max", 99) > high:
-                errors.append(f"settings.{name}: an int within {low} to {high} (give min and max)")
-        else:
-            bad = set(s.get("values") or []) - SERIAL_CHOICES[name]
-            if kind != "enum" or bad:
-                errors.append(f"settings.{name}: an enum of {sorted(SERIAL_CHOICES[name])}")
-    return errors
-
-
-LINK_SETTINGS = ("link",) + SERIAL_SETTINGS
-
-
-# The settings that name a MIDI port of the host (SPEC.md §2, Ports).
-MIDI_SETTINGS = ("midi_input", "midi_output")
-
-
-def midi_checks(doc: dict) -> list[str]:
-    """A MIDI port is named by the midi_input or midi_output setting, a
-    string, and is only a native module's (no transport opens one)."""
-    errors = []
-    ports = doc.get("ports") or []
-    settings = doc.get("settings") or {}
-    for i, e in enumerate(ports):
-        if e["protocol"] != "midi":
-            continue
-        if e["port"] is not None:
-            errors.append(f"ports[{i}]: a MIDI port has no number (port: null)")
-        if e.get("setting") not in MIDI_SETTINGS:
-            errors.append(f"ports[{i}]: a MIDI port's setting is midi_input or midi_output")
-        elif (settings.get(e["setting"]) or {}).get("type") != "string":
-            errors.append(f"settings.{e['setting']}: must be a string")
-        if e["role"] != "control" or e.get("listener", "device") != "device":
-            errors.append(f"ports[{i}]: a MIDI port is a control entry the device listens on")
-        if doc.get("implementation") != "native":
-            errors.append(f"ports[{i}]: only a native module opens a MIDI port")
-    return errors
-
-
-# The transport keys a `serial` block's `overrides` may change (SPEC.md §2,
-# "The same protocol on a serial port"), as in the core's SERIAL_OVERRIDES.
-SERIAL_OVERRIDES = ("framing", "open", "close", "terminator", "reply_framing",
-                    "reply_terminators", "reply_fence", "reply_match", "error_match", "pacing")
-
-
 def pacing_checks(doc: dict) -> list[str]:
-    """`transport.pacing` and a serial block's `pacing` overrides (SPEC.md §2,
-    Pacing): the models they name exist, each model is named once in a
+    """`transport.pacing` (SPEC.md §2, Pacing): the models it names exist, each model is named once in a
     `by_model` list, and every group's `match` is a regex."""
     t = doc.get("transport") or {}
     model_ids = {m["id"] for m in doc.get("models") or []}
     blocks = []
     if isinstance(t.get("pacing"), dict):
         blocks.append(("transport.pacing", t["pacing"]))
-    overrides = (t.get("serial") or {}).get("overrides")
-    entries = overrides if isinstance(overrides, list) else [overrides] if isinstance(overrides, dict) else []
-    for i, entry in enumerate(entries):
-        if isinstance(entry, dict) and isinstance(entry.get("pacing"), dict):
-            blocks.append((f"transport.serial.overrides[{i}].pacing", entry["pacing"]))
     errors: list[str] = []
 
     def by_model(at: str, owner: dict) -> None:
@@ -1494,8 +1395,8 @@ def acknowledge_checks(doc: dict) -> list[str]:
     if block is None:
         return []
     errors: list[str] = []
-    if t.get("type") not in ("line-tcp", "line-serial", "line-udp", "ws"):
-        errors.append("transport.acknowledge needs a line-tcp, line-serial, line-udp or ws transport")
+    if t.get("type") not in ("line-tcp", "line-udp", "ws"):
+        errors.append("transport.acknowledge needs a line-tcp, line-udp or ws transport")
     settings = doc.get("settings") or {}
     entries = block if isinstance(block, list) else [block]
     for i, entry in enumerate(entries):
@@ -1526,128 +1427,6 @@ def acknowledge_checks(doc: dict) -> list[str]:
                 errors += check_template("text", m.group(0), {}, settings, f"{at}.send")
             elif not ((name.isdigit() and 1 <= int(name) <= groups) or name in names):
                 errors.append(f"{at}.send: '{{{name}}}' is not one of the entry's captures")
-    return errors
-
-
-def expand_serial(doc: dict) -> list[str]:
-    """A line-tcp transport's `serial` block stands for the `link` setting and
-    the six serial settings (SPEC.md §2, "The same protocol on a serial
-    port"); add them, as the core does, so the other checks see them. Returns
-    what is wrong with the block."""
-    t = doc.get("transport") or {}
-    block = t.get("serial")
-    errors: list[str] = []
-    steps_with_link = [i for i, s in enumerate(doc.get("on_connect") or [])
-                       if isinstance(s, dict) and "link" in s]
-    if block is None:
-        for i in steps_with_link:
-            errors.append(f"on_connect[{i}]: link needs transport.serial")
-        return errors
-    if t.get("type") != "line-tcp":
-        return ["transport.serial is for a line-tcp transport"]
-    model_ids = {m["id"] for m in doc.get("models") or []}
-    for key in ("serial_only", "models"):
-        for m in block.get(key) or []:
-            if m not in model_ids:
-                errors.append(f"transport.serial.{key}: no model '{m}'")
-    # `overrides`: the framing and reply keys that differ on the serial
-    # port, for every model or the models an entry names; with a delimited
-    # framing and an empty close, replies need a framing of their own.
-    overrides = block.get("overrides")
-    entries = overrides if isinstance(overrides, list) else [overrides] if overrides is not None else []
-    if overrides is not None and (not entries or not all(isinstance(e, dict) for e in entries)):
-        errors.append("transport.serial.overrides: a mapping or a list of them")
-        entries = []
-    for i, entry in enumerate(entries):
-        for key in entry:
-            if key != "models" and key not in SERIAL_OVERRIDES:
-                errors.append(f"transport.serial.overrides[{i}].{key}: not a framing, reply or pacing key a serial port can change")
-        for m in entry.get("models") or []:
-            if m not in model_ids:
-                errors.append(f"transport.serial.overrides[{i}].models: no model '{m}'")
-    for m in sorted(model_ids):
-        merged = dict(t)
-        for entry in entries:
-            if "models" not in entry or m in entry["models"]:
-                merged.update({k: v for k, v in entry.items() if k != "models"})
-        if (merged.get("framing") == "delimited" and not str(merged.get("close", "")).strip()
-                and "reply_framing" not in merged):
-            errors.append(f"transport.serial.overrides: on the serial port of {m}, framing delimited "
-                          "with an empty close needs reply_framing")
-        for key in ("reply_match", "error_match", "reply_fence"):
-            if isinstance(merged.get(key), str):
-                try:
-                    re.compile(merged[key])
-                except re.error as e:
-                    errors.append(f"transport.serial.overrides: {key} for {m}: {e}")
-    only = "serial_only" in block
-    link = block.get("link", "tcp")
-    if only and link == "serial":
-        errors.append("transport.serial: serial_only names the models that default to serial, so link stays tcp")
-    settings = doc.setdefault("settings", {}) or {}
-    doc["settings"] = settings
-    for name in LINK_SETTINGS:
-        if name in settings:
-            errors.append(f"settings.{name}: transport.serial declares it; leave it out")
-
-    model_ids = {m["id"] for m in doc.get("models") or []}
-    serial_models = block.get("models")
-
-    def line(name):
-        v = block[name]
-        if isinstance(v, dict):
-            if v["default"] not in v["values"]:
-                errors.append(f"transport.serial.{name}: the default is not one of the values")
-            # A default that differs by model: each model named once, with
-            # the serial port, and a value the port allows.
-            seen = set()
-            for i, entry in enumerate(v.get("by_model") or []):
-                if entry["default"] not in v["values"]:
-                    errors.append(f"transport.serial.{name}.by_model[{i}]: the default is not one of the values")
-                for m in entry["models"]:
-                    if m not in model_ids:
-                        errors.append(f"transport.serial.{name}.by_model[{i}]: no model '{m}'")
-                    elif serial_models is not None and m not in serial_models:
-                        errors.append(f"transport.serial.{name}.by_model[{i}]: model '{m}' has no serial port")
-                    if m in seen:
-                        errors.append(f"transport.serial.{name}.by_model[{i}]: model '{m}' is named twice")
-                    seen.add(m)
-            return v["default"], v["values"]
-        return v, [v]
-
-    settings["link"] = {"type": "enum", "values": ["tcp", "serial"], "label": "Link", "description": "generated"}
-    if not only:
-        settings["link"]["default"] = link
-    settings["serial_port"] = {"type": "string", "max_length": 256, "label": "Serial port", "description": "generated"}
-    default, values = line("baud_rate")
-    if any(not isinstance(v, int) or v <= 0 for v in values):
-        errors.append("transport.serial.baud_rate: bits per second, above 0")
-    if len(values) == 1:
-        settings["baud_rate"] = {"type": "int", "min": default, "max": default, "default": default,
-                                 "label": "Baud rate", "description": "generated"}
-    else:
-        settings["baud_rate"] = {"type": "enum", "values": [str(v) for v in values], "default": str(default),
-                                 "label": "Baud rate", "description": "generated"}
-    for name in ("data_bits", "stop_bits"):
-        default, values = line(name)
-        n = sorted(set(values))
-        if len(n) != len(values) or n[-1] - n[0] + 1 != len(n):
-            errors.append(f"transport.serial.{name}: whole numbers with no gaps")
-        settings[name] = {"type": "int", "min": n[0], "max": n[-1], "default": default,
-                          "label": name, "description": "generated"}
-    for name in ("parity", "flow_control"):
-        default, values = line(name)
-        settings[name] = {"type": "enum", "values": list(values), "default": default,
-                          "label": name, "description": "generated"}
-    # The ports say which link each entry is for.
-    ports = doc.get("ports") or []
-    if not any(e["protocol"] == "serial" and e.get("when") == "link serial" for e in ports):
-        errors.append('ports: transport.serial needs a serial control entry with when: "link serial"')
-    # "link tcp", or "link tcp, scheme tcp" beside a TLS scheme setting.
-    if not any(e["protocol"] == "tcp" and e["port"] == t.get("port")
-               and str(e.get("when", "")).split(",")[0].strip() == "link tcp"
-               for e in ports):
-        errors.append(f'ports: the transport port {t.get("port")} needs when: "link tcp" beside transport.serial')
     return errors
 
 
@@ -1767,8 +1546,7 @@ def main() -> int:
             print(f"    {exc.message}")
             continue
 
-        errors = expand_serial(doc)
-        errors += cross_field_checks(doc, rel) + port_checks(doc) + serial_checks(doc) + midi_checks(doc) + label_checks(doc)
+        errors = cross_field_checks(doc, rel) + port_checks(doc) + label_checks(doc)
         errors += pacing_checks(doc) + acknowledge_checks(doc) + select_checks(doc) + polled_checks(doc)
 
         # Spec ids are the consumer-facing contract; they must be unique.

@@ -177,36 +177,6 @@ socket.
 | `omt-discovery` | TCP 6399 to a discovery server | Lists sources with no multicast. Without a discovery server, browse `_omt._tcp` with the platform's DNS-SD. |
 | `tally-arbiter` | WebSocket 4455 (Socket.IO), outgoing only | With `device_id` set, the app registers as a listener client and that device's tally is pushed; every device's tally is pushed when signed in with an admin or producer account, and otherwise read every `poll_ms` (raise it to save battery). A version request every 5 s is the liveness check; `mi_reconnect_all` on resume reopens the connection and registers the listener client again. |
 
-## Serial ports
-
-Phones have no serial port an app can open: Android reaches a USB serial
-adapter only through its Java USB host API, and iOS not at all. The serial
-transport (`line-serial`, link serial of a spec with a `serial` block, and
-the serial link of the native modules that offer one) is therefore left out of Android and iOS builds,
-which do not depend on the serial crate: a device opened on a serial port
-stays `disconnected`, its reason saying serial ports are not available on
-this platform, and the list of the host's serial ports (`serial_ports` in
-every delivery) is empty. Everything else in those integrations builds and works over
-the network as elsewhere.
-
-## MIDI ports
-
-The MIDI integrations (`generic-midi`, `midi-show-control`) reach a device
-over an RTP-MIDI session on the network, which works on a phone as
-anywhere, or on a MIDI port of the host (`link` `port`). MIDI ports are
-opened with the `midir` crate:
-
-- **iOS** has CoreMIDI, which `midir` uses as on macOS: a USB MIDI device
-  on the camera connection kit or USB-C, a Bluetooth MIDI device paired in
-  the app, or another app's port is listed and opened. The app needs no
-  entitlement for it. This has not been built for iOS here; CI builds it.
-- **Android** reaches MIDI only through its Java `android.media.midi` API,
-  which a native library cannot start on its own, so MIDI ports are left
-  out of Android builds: a device opened on a MIDI port stays
-  `disconnected`, its reason saying MIDI ports are not available on this
-  platform, and the list of the host's MIDI ports (`midi_ports` in every
-  delivery) is empty. RTP-MIDI works.
-
 ## What has been verified
 
 - Android: `cargo build` of the core and the C binding (including linking
