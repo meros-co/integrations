@@ -400,6 +400,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-sony",
         &["sony-bravia", "sony-bravia-ip", "sony-camera", "visca"],
     ),
+    ("vendor-soundcraft", &["soundcraft-ui"]),
     ("vendor-sounddevices", &["sounddevices-pixnet"]),
     ("vendor-spx", &["spx-graphics"]),
     ("vendor-stagetimer", &["stagetimer"]),

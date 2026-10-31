@@ -272,6 +272,8 @@ mod sony_camera_http;
 mod sony_camera_props;
 #[cfg(feature = "sony-camera")]
 mod sony_camera_ptpip;
+#[cfg(feature = "soundcraft-ui")]
+mod soundcraft_ui;
 #[cfg(any(feature = "sennheiser-ew-dx", feature = "sennheiser-spectera"))]
 mod sscv2;
 #[cfg(feature = "probel-swp02")]
@@ -362,6 +364,10 @@ pub(crate) fn construct(
             Some("ma-msc-ethernet") => Ok(Box::new(ma_msc::MaMsc::new(engine, &context))),
             #[cfg(feature = "behringer-wing")]
             Some("wing-meters") => Ok(Box::new(wing_meters::WingMeters::new(engine, &context))),
+            #[cfg(feature = "soundcraft-ui")]
+            Some("soundcraft-ui-feedback") => {
+                Ok(Box::new(soundcraft_ui::SoundcraftUi::new(engine, &context)))
+            }
             Some(other) => Err(format!("no native extension '{other}'")),
         };
     }

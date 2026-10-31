@@ -1,0 +1,1114 @@
+spec: 1
+id: soundcraft-ui
+name: Soundcraft Ui24R, Ui16 and Ui12 (web control WebSocket)
+vendor: Soundcraft
+category: mixer
+
+# The Ui mixers are controlled from a browser: the web app opens a WebSocket
+# at ws://<mixer>/ and exchanges text messages, each prefixed 3::: on the
+# wire. SETD^<path>^<number> and SETS^<path>^<text> set a parameter by its
+# dotted path (i.0.mix is input 1's fader, positions 0 to 1); the mixer sends
+# every parameter that way on connecting and each change made elsewhere
+# after. Players, recorders, shows and channel selection have their own
+# messages, and meters arrive as VU2^<base64>. Soundcraft does not publish the
+# protocol; it is taken from Ferdinand Malcher's MIT-licensed soundcraft-ui
+# library, and every behavior is inferred (quirks, VERIFICATION.md).
+source:
+  - title: soundcraft-ui (mixer-connection library, MIT license)
+    author: Ferdinand Malcher and contributors
+    url: https://github.com/fmalcher/soundcraft-ui/tree/2f54ace6a5e0722171607991ff47dac26da4bb86
+    note: >
+      Read at commit 2f54ace6 (27 October 2026), MIT license (LICENSE, Copyright 2020 Ferdinand
+      Malcher), as the only source of the protocol. packages/mixer-connection/src/lib:
+      mixer-connection.ts (ws://<ip>, every message sent prefixed 3:::, only inbound messages
+      with 3::: used, one message may hold several lines, ALIVE every 1000 ms, SETD^path^value,
+      SETD with 1/0 for on/off, SETS^path^text); state/mixer-store.ts (state built from SETD and
+      SETS, outbound ones included; BMSG^SYNC^<id>^<index>; the list replies PLISTS,
+      PLIST_TRACKS^<playlist>, SHOWLIST, SNAPSHOTLIST^<show>, CUELIST^<show>, items separated by
+      ^); state/resource-lists.ts; device-capabilities.ts (ui12: 8 inputs, 4 subgroups, 4 auxes,
+      no VCA; ui16: 12 inputs, 4 subgroups, 6 auxes; ui24: 24 inputs, 6 subgroups, 10 auxes, 6
+      VCAs, multitrack, master dim; all 2 line inputs, 2 player channels, 4 FX); facade/*.ts:
+      channel paths <type>.<n-1> with i, l, p, f, s, a, v, mix, mute, solo, pan, name, delay
+      (seconds; 250 ms for inputs and lines, 500 ms for auxes), amixgroup (-1, 0, 1), amix,
+      mtkrec, aux sends <ch>.aux.<n-1>.value, mute, pan, post, postproc, FX sends
+      <ch>.fx.<n-1>.value, mute, post, matrix sends <a|s>.<n-1>.mtx.<m-1> and m.mtx.<m-1>,
+      a.<n-1>.matrix, hw.<n-1>.gain and phantom on the Ui24R (i.<n-1> on the Ui12 and Ui16), gain
+      ranges -6 to 57 dB (Ui24R) and -40 to 50 dB, m.mix, m.pan, m.dim, m.delayL and m.delayR,
+      settings.solovol, settings.hpvol.<n-1>, mgmask (bits 0-5 groups 1-6, 22 FX, 23 all),
+      automix.a.on, automix.b.on, automix.time, f.<n-1>.bpm (20-400), f.<n-1>.par1-6,
+      f.<n-1>.fxtype, MEDIA_PLAY, MEDIA_PAUSE, MEDIA_STOP, MEDIA_NEXT, MEDIA_PREV,
+      MEDIA_SWITCH_PLIST, MEDIA_SWITCH_TRACK, MEDIA_GET_PLISTS, MEDIA_GET_PLIST_TRACKS,
+      settings.shuffle, settings.playMode (0 manual, 3 auto), var.currentState (0, 2, 3),
+      RECTOGGLE, var.isRecording, var.recBusy, MTK_PLAY, MTK_PAUSE, MTK_STOP, MTK_REC_TOGGLE,
+      var.mtk.* (states 0 stopped, 1 paused, 2 playing), LOADSHOW, LOADSNAPSHOT, LOADCUE,
+      SAVESNAPSHOT, SAVECUE, SHOWLIST, SNAPSHOTLIST, CUELIST, var.currentShow, currentSnapshot,
+      currentCue, model and firmware; eq/*.ts: <ch>.eq.bypass, eq.b1-b4 freq, q and gain,
+      eq.hpf and eq.lpf freq and slope (0, 1, 2 for 12, 24, 36 dB/oct; low-pass on inputs only;
+      EQ on i, l, p, f, s); utils/value-converters: the fader law (position to amplitude),
+      frequency 20 Hz to 22050 Hz and Q 0.05 to 15 on a logarithmic scale, EQ gain -20 to 20 dB
+      and automix weight -12 to 12 dB linear; utils/channel-sync-mapping.ts: the channel index
+      of each strip per model; vu/vu.utils.ts: VU2 is base64, its first seven bytes the counts of
+      inputs, players, subgroups, FX, auxes, masters and lines, blocks from byte 8 of 6, 6, 7, 7,
+      5, 5 and 6 bytes, each meter a byte times 0.004167508166392142, mapped linearly to -80 to
+      0 dB.
+
+# The web app's own WebSocket, on the mixer's web server.
+transport:
+  type: ws
+  port: 80
+  path: /
+  scheme: ws
+  timeout_ms: 2000
+  reply: expected
+  # Only the list answers are replies; everything else the mixer sends is a
+  # push for the rules. Polls and list reads are queued, each awaiting its
+  # answer.
+  reply_match: "^3:::(SHOWLIST|SNAPSHOTLIST|CUELIST|PLISTS|PLIST_TRACKS)(\\^|$)"
+  keepalive: { send: "3:::ALIVE", every_ms: 1000 }
+
+# Meters (VU2) are decoded, and the mixer's silence about this client's own
+# changes made up for, by the soundcraft-ui-feedback extension.
+extension: soundcraft-ui-feedback
+
+settings:
+  # Meters arrive continuously, so they are kept only when the operator
+  # turns them on.
+  meters: { type: bool, default: false, label: Meters,
+    description: "On keeps every channel's, aux's, subgroup's, FX return's and the master's meters in state in dB as the mixer sends them; off ignores them." }
+
+ports:
+  - { port: 80, protocol: ws, role: control, note: "the mixer's web server: the web app's WebSocket at /" }
+
+maps:
+  strip: { input: i, line: l, player: p, fx: f, sub: s, aux: a, vca: v }
+  aux_source: { input: i, line: l, player: p, fx: f }
+  fx_source: { input: i, line: l, player: p, sub: s }
+  matrix_source: { aux: a, sub: s }
+  delay_strip: { input: i, line: l, aux: a }
+  eq_strip: { input: i, line: l, player: p, fx: f, sub: s }
+  multitrack_strip: { input: i, line: l }
+  automix_group: { none: "-1", a: "0", b: "1" }
+  automix_group_name: { a: a, b: b }
+  filter_slope: { "12": "0", "24": "1", "36": "2" }
+  side: { left: L, right: R }
+  play_mode: { manual: "0", auto: "3" }
+
+# The fader law, sampled from the library's position-to-amplitude formula
+# (value-converters.ts) at these positions, in dB; a fader all the way down
+# reads as -100 dB. Linear ranges: input gain, EQ gain, automix weight, and
+# delay in milliseconds sent as seconds.
+conversions:
+  ui_fader:
+    points: [[0.0, -100.0], [0.005, -87.35], [0.01, -80.4], [0.015, -76.01], [0.02, -72.73], [0.03, -67.85], [0.04, -64.32], [0.055, -60.7], [0.075, -57.11], [0.1, -52.86], [0.125, -48.85], [0.15, -45.07], [0.175, -41.52], [0.2, -38.19], [0.225, -35.07], [0.25, -32.14], [0.275, -29.4], [0.3, -26.83], [0.325, -24.44], [0.35, -22.21], [0.375, -20.12], [0.4, -18.18], [0.425, -16.36], [0.45, -14.67], [0.475, -13.09], [0.5, -11.62], [0.525, -10.23], [0.55, -8.94], [0.575, -7.72], [0.6, -6.56], [0.625, -5.47], [0.65, -4.42], [0.675, -3.42], [0.7, -2.44], [0.725, -1.49], [0.75, -0.55], [0.775, 0.38], [0.8, 1.32], [0.825, 2.27], [0.85, 3.25], [0.875, 4.25], [0.9, 5.29], [0.925, 6.37], [0.95, 7.52], [0.975, 8.72], [1.0, 10.0]]
+  ui24_gain:
+    points: [[0.0, -6.0], [1.0, 57.0]]
+  ui12_gain:
+    points: [[0.0, -40.0], [1.0, 50.0]]
+  eq_gain:
+    points: [[0.0, -20.0], [1.0, 20.0]]
+  automix_weight:
+    points: [[0.0, -12.0], [1.0, 12.0]]
+  delay_ms:
+    points: [[0.0, 0.0], [0.5, 500.0]]
+  meter:
+    points: [[0.0, -80.0], [1.0, 0.0]]
+
+models:
+  - id: ui24r
+    name: Soundcraft Ui24R
+    supports: &all
+      [set_value, set_text, set_fader, set_fader_db, set_mute, set_solo, set_pan, set_name, set_delay,
+      set_aux_send, set_aux_send_db, set_aux_send_mute, set_aux_send_pan, set_aux_send_post,
+      set_aux_send_post_proc, set_fx_send, set_fx_send_db, set_fx_send_mute, set_fx_send_post,
+      set_matrix_send, set_matrix_send_db, set_matrix_send_mute, set_matrix_send_pan,
+      set_matrix_send_post_proc, set_master_matrix_send, set_master_matrix_send_db,
+      set_master_matrix_send_mute, set_master_matrix_send_pan, set_master_matrix_send_post_proc,
+      set_aux_matrix_mode, set_master_fader, set_master_fader_db, set_master_pan, set_master_dim,
+      set_master_delay, set_input_gain, set_input_gain_db, set_phantom, set_eq_bypass,
+      set_eq_band_frequency, set_eq_band_q, set_eq_band_gain, set_hpf_frequency, set_hpf_slope,
+      set_lpf_frequency, set_lpf_slope, set_fx_bpm, set_fx_param, set_mute_groups,
+      set_automix_group, set_automix_weight, set_automix_enabled, set_automix_response_time,
+      set_multitrack_arm, set_solo_level, set_solo_level_db, set_headphone_level,
+      set_headphone_level_db, player_play, player_pause, player_stop, player_next,
+      player_previous, load_playlist, load_track, set_player_shuffle, set_player_mode,
+      record_toggle, multitrack_play, multitrack_pause, multitrack_stop, multitrack_record_toggle,
+      set_multitrack_soundcheck, load_show, load_snapshot, load_cue, save_snapshot, save_cue,
+      get_shows, get_snapshots, get_cues, get_playlists, get_playlist_tracks, select_channel]
+    verification: none
+  - id: ui16
+    name: Soundcraft Ui16
+    supports: &small
+      [set_value, set_text, set_fader, set_fader_db, set_mute, set_solo, set_pan, set_name, set_delay,
+      set_aux_send, set_aux_send_db, set_aux_send_mute, set_aux_send_pan, set_aux_send_post,
+      set_aux_send_post_proc, set_fx_send, set_fx_send_db, set_fx_send_mute, set_fx_send_post,
+      set_matrix_send, set_matrix_send_db, set_matrix_send_mute, set_matrix_send_pan,
+      set_matrix_send_post_proc, set_master_matrix_send, set_master_matrix_send_db,
+      set_master_matrix_send_mute, set_master_matrix_send_pan, set_master_matrix_send_post_proc,
+      set_aux_matrix_mode, set_master_fader, set_master_fader_db, set_master_pan,
+      set_master_delay, set_input_gain, set_input_gain_db, set_phantom, set_eq_bypass,
+      set_eq_band_frequency, set_eq_band_q, set_eq_band_gain, set_hpf_frequency, set_hpf_slope,
+      set_lpf_frequency, set_lpf_slope, set_fx_bpm, set_fx_param, set_mute_groups,
+      set_automix_group, set_automix_weight, set_automix_enabled, set_automix_response_time,
+      set_solo_level, set_solo_level_db, set_headphone_level, set_headphone_level_db,
+      player_play, player_pause, player_stop, player_next, player_previous, load_playlist,
+      load_track, set_player_shuffle, set_player_mode, record_toggle, load_show, load_snapshot,
+      load_cue, save_snapshot, save_cue, get_shows, get_snapshots, get_cues, get_playlists,
+      get_playlist_tracks, select_channel]
+    verification: none
+  - id: ui12
+    name: Soundcraft Ui12
+    supports: *small
+    verification: none
+
+commands:
+  # ── Any parameter by path ─────────────────────────────────────────────
+  set_value:
+    summary: "Set any numeric parameter by its path (SETD^<path>^<value>), such as i.0.mix for input 1's fader"
+    params:
+      path: &path { type: string, required: true, max_length: 64, pattern: '^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$', label: Path,
+        description: "The parameter's dotted path as the mixer names it, channels numbered from 0: i.0.mix, a.3.mute, m.dim, settings.hpvol.0; state values lists every path the mixer has sent." }
+      value: { type: float, required: true, label: Value, description: "The value as the mixer takes it: 0 to 1 for faders, pans and most controls, 1 or 0 for on and off, a count or an index where the parameter is one." }
+    send: "3:::SETD^{path}^{value:.6f}"
+    returns: none
+  set_text:
+    summary: "Set any text parameter by its path (SETS^<path>^<text>), such as a channel name"
+    params:
+      path: *path
+      text: { type: string, required: true, max_length: 64, pattern: '^[^\^]*$', label: Text, description: "The text, without ^ (the message separator)." }
+    send: "3:::SETS^{path}^{text}"
+    returns: none
+
+  # ── Channel strips ────────────────────────────────────────────────────
+  set_fader:
+    summary: "Set a strip's fader position, 0 to 1 (<type>.<n>.mix)"
+    params:
+      strip: &strip { type: enum, values: [input, line, player, fx, sub, aux, vca], required: true, label: Strip,
+        description: "The kind of strip: input channel, line input, media player return, FX return, subgroup, aux (or matrix) output, or VCA." }
+      channel: &channel { type: int, min: 1, max: 24, required: true, label: Channel,
+        description: "The strip's number from 1: up to 24 inputs on the Ui24R (12 on the Ui16, 8 on the Ui12), 2 line and 2 player channels (1 left, 2 right), 4 FX, 6 subgroups (4), 10 auxes (6, 4) and 6 VCAs (Ui24R only)." }
+      level: &level { type: float, min: 0.0, max: 1.0, required: true, label: Level, description: "Fader position from 0 (all the way down) to 1 (+10 dB)." }
+    send: "3:::SETD^{strip:map.strip}.{channel:-1}.mix^{level:.4f}"
+    returns: none
+  set_fader_db:
+    summary: "Set a strip's fader to a level in dB, -100 to +10 (<type>.<n>.mix)"
+    params:
+      strip: *strip
+      channel: *channel
+      level_db: &level_db { type: float, min: -100.0, max: 10.0, required: true, label: Level,
+        description: "Level in dB from -100 (all the way down) to +10, converted to a fader position by the mixer's fader law." }
+    send: "3:::SETD^{strip:map.strip}.{channel:-1}.mix^{level_db:to.ui_fader:.4f}"
+    returns: none
+  set_mute:
+    summary: "Mute or unmute a strip (<type>.<n>.mute)"
+    params:
+      strip: *strip
+      channel: *channel
+      muted: &muted { type: bool, default: true, label: Muted, description: "On mutes, off unmutes." }
+    send: "3:::SETD^{strip:map.strip}.{channel:-1}.mute^{muted:bool01}"
+    returns: none
+  set_solo:
+    summary: "Solo or unsolo a strip (<type>.<n>.solo)"
+    params:
+      strip: *strip
+      channel: *channel
+      soloed: { type: bool, default: true, label: Soloed, description: "On solos, off clears the solo." }
+    send: "3:::SETD^{strip:map.strip}.{channel:-1}.solo^{soloed:bool01}"
+    returns: none
+  set_pan:
+    summary: "Set a strip's pan or balance, 0 left to 1 right (<type>.<n>.pan)"
+    params:
+      strip: *strip
+      channel: *channel
+      pan: &pan { type: float, min: 0.0, max: 1.0, required: true, label: Pan, description: "0 hard left, 0.5 center, 1 hard right." }
+    send: "3:::SETD^{strip:map.strip}.{channel:-1}.pan^{pan:.4f}"
+    returns: none
+  set_name:
+    summary: "Name a strip (SETS <type>.<n>.name)"
+    params:
+      strip: *strip
+      channel: *channel
+      name: { type: string, required: true, max_length: 20, pattern: '^[^\^]*$', label: Name, description: "Up to 20 characters without ^; the mixer's app shows names in capitals. Empty restores the default name." }
+    send: "3:::SETS^{strip:map.strip}.{channel:-1}.name^{name}"
+    returns: none
+  set_delay:
+    summary: "Set an input's, line input's or aux's delay in milliseconds (<type>.<n>.delay, sent in seconds)"
+    params:
+      strip: { type: enum, values: [input, line, aux], required: true, label: Strip, description: "Input channel, line input or aux output." }
+      channel: *channel
+      delay_ms: { type: float, min: 0.0, max: 500.0, required: true, label: Delay, description: "Delay in milliseconds: up to 250 for inputs and line inputs, 500 for auxes." }
+    send: "3:::SETD^{strip:map.delay_strip}.{channel:-1}.delay^{delay_ms:to.delay_ms:.4f}"
+    returns: none
+
+  # ── Aux sends ─────────────────────────────────────────────────────────
+  set_aux_send:
+    summary: "Set a channel's send level to an aux, 0 to 1 (<ch>.aux.<n>.value)"
+    params:
+      source: &aux_source { type: enum, values: [input, line, player, fx], required: true, label: Source, description: "The kind of channel sending: input, line input, player or FX return." }
+      channel: *channel
+      aux: &aux { type: int, min: 1, max: 10, required: true, label: Aux, description: "The aux from 1: 10 on the Ui24R, 6 on the Ui16, 4 on the Ui12." }
+      level: *level
+    send: "3:::SETD^{source:map.aux_source}.{channel:-1}.aux.{aux:-1}.value^{level:.4f}"
+    returns: none
+  set_aux_send_db:
+    summary: "Set a channel's send level to an aux in dB (<ch>.aux.<n>.value)"
+    params: { source: *aux_source, channel: *channel, aux: *aux, level_db: *level_db }
+    send: "3:::SETD^{source:map.aux_source}.{channel:-1}.aux.{aux:-1}.value^{level_db:to.ui_fader:.4f}"
+    returns: none
+  set_aux_send_mute:
+    summary: "Mute or unmute a channel's send to an aux (<ch>.aux.<n>.mute)"
+    params: { source: *aux_source, channel: *channel, aux: *aux, muted: *muted }
+    send: "3:::SETD^{source:map.aux_source}.{channel:-1}.aux.{aux:-1}.mute^{muted:bool01}"
+    returns: none
+  set_aux_send_pan:
+    summary: "Set a channel's pan on a stereo-linked aux (<ch>.aux.<n>.pan)"
+    params: { source: *aux_source, channel: *channel, aux: *aux, pan: *pan }
+    send: "3:::SETD^{source:map.aux_source}.{channel:-1}.aux.{aux:-1}.pan^{pan:.4f}"
+    returns: none
+  set_aux_send_post:
+    summary: "Take a channel's aux send before or after its fader (<ch>.aux.<n>.post)"
+    params:
+      source: *aux_source
+      channel: *channel
+      aux: *aux
+      post: &post { type: bool, required: true, label: Post-fader, description: "On sends after the channel's fader, off before it." }
+    send: "3:::SETD^{source:map.aux_source}.{channel:-1}.aux.{aux:-1}.post^{post:bool01}"
+    returns: none
+  set_aux_send_post_proc:
+    summary: "Take a channel's aux send before or after its processing (<ch>.aux.<n>.postproc)"
+    params:
+      source: *aux_source
+      channel: *channel
+      aux: *aux
+      post_proc: &post_proc { type: bool, required: true, label: Post-processing, description: "On sends after the channel's EQ and dynamics, off before them." }
+    send: "3:::SETD^{source:map.aux_source}.{channel:-1}.aux.{aux:-1}.postproc^{post_proc:bool01}"
+    returns: none
+
+  # ── FX sends ──────────────────────────────────────────────────────────
+  set_fx_send:
+    summary: "Set a channel's send level to an FX, 0 to 1 (<ch>.fx.<n>.value)"
+    params:
+      source: &fx_source { type: enum, values: [input, line, player, sub], required: true, label: Source, description: "The kind of channel sending: input, line input, player or subgroup." }
+      channel: *channel
+      fx: &fx { type: int, min: 1, max: 4, required: true, label: FX, description: "The FX engine from 1 to 4." }
+      level: *level
+    send: "3:::SETD^{source:map.fx_source}.{channel:-1}.fx.{fx:-1}.value^{level:.4f}"
+    returns: none
+  set_fx_send_db:
+    summary: "Set a channel's send level to an FX in dB (<ch>.fx.<n>.value)"
+    params: { source: *fx_source, channel: *channel, fx: *fx, level_db: *level_db }
+    send: "3:::SETD^{source:map.fx_source}.{channel:-1}.fx.{fx:-1}.value^{level_db:to.ui_fader:.4f}"
+    returns: none
+  set_fx_send_mute:
+    summary: "Mute or unmute a channel's send to an FX (<ch>.fx.<n>.mute)"
+    params: { source: *fx_source, channel: *channel, fx: *fx, muted: *muted }
+    send: "3:::SETD^{source:map.fx_source}.{channel:-1}.fx.{fx:-1}.mute^{muted:bool01}"
+    returns: none
+  set_fx_send_post:
+    summary: "Take a channel's FX send before or after its fader (<ch>.fx.<n>.post)"
+    params: { source: *fx_source, channel: *channel, fx: *fx, post: *post }
+    send: "3:::SETD^{source:map.fx_source}.{channel:-1}.fx.{fx:-1}.post^{post:bool01}"
+    returns: none
+
+  # ── Matrix sends (an aux switched to matrix mode) ─────────────────────
+  set_matrix_send:
+    summary: "Set an aux's or subgroup's send level to a matrix, 0 to 1 (<a|s>.<n>.mtx.<m>.value)"
+    params:
+      source: &matrix_source { type: enum, values: [aux, sub], required: true, label: Source, description: "The kind of bus sending: an aux or a subgroup." }
+      channel: *channel
+      matrix: &matrix { type: int, min: 1, max: 10, required: true, label: Matrix, description: "The matrix from 1: an aux output switched to matrix mode, numbered as that aux." }
+      level: *level
+    send: "3:::SETD^{source:map.matrix_source}.{channel:-1}.mtx.{matrix:-1}.value^{level:.4f}"
+    returns: none
+  set_matrix_send_db:
+    summary: "Set an aux's or subgroup's send level to a matrix in dB (<a|s>.<n>.mtx.<m>.value)"
+    params: { source: *matrix_source, channel: *channel, matrix: *matrix, level_db: *level_db }
+    send: "3:::SETD^{source:map.matrix_source}.{channel:-1}.mtx.{matrix:-1}.value^{level_db:to.ui_fader:.4f}"
+    returns: none
+  set_matrix_send_mute:
+    summary: "Mute or unmute an aux's or subgroup's send to a matrix (<a|s>.<n>.mtx.<m>.mute)"
+    params: { source: *matrix_source, channel: *channel, matrix: *matrix, muted: *muted }
+    send: "3:::SETD^{source:map.matrix_source}.{channel:-1}.mtx.{matrix:-1}.mute^{muted:bool01}"
+    returns: none
+  set_matrix_send_pan:
+    summary: "Set an aux's or subgroup's pan on a stereo-linked matrix (<a|s>.<n>.mtx.<m>.pan)"
+    params: { source: *matrix_source, channel: *channel, matrix: *matrix, pan: *pan }
+    send: "3:::SETD^{source:map.matrix_source}.{channel:-1}.mtx.{matrix:-1}.pan^{pan:.4f}"
+    returns: none
+  set_matrix_send_post_proc:
+    summary: "Take an aux's or subgroup's matrix send before or after its processing (<a|s>.<n>.mtx.<m>.postproc)"
+    params: { source: *matrix_source, channel: *channel, matrix: *matrix, post_proc: *post_proc }
+    send: "3:::SETD^{source:map.matrix_source}.{channel:-1}.mtx.{matrix:-1}.postproc^{post_proc:bool01}"
+    returns: none
+  set_master_matrix_send:
+    summary: "Set the master's send level to a matrix, 0 to 1 (m.mtx.<m>.value)"
+    params: { matrix: *matrix, level: *level }
+    send: "3:::SETD^m.mtx.{matrix:-1}.value^{level:.4f}"
+    returns: none
+  set_master_matrix_send_db:
+    summary: "Set the master's send level to a matrix in dB (m.mtx.<m>.value)"
+    params: { matrix: *matrix, level_db: *level_db }
+    send: "3:::SETD^m.mtx.{matrix:-1}.value^{level_db:to.ui_fader:.4f}"
+    returns: none
+  set_master_matrix_send_mute:
+    summary: "Mute or unmute the master's send to a matrix (m.mtx.<m>.mute)"
+    params: { matrix: *matrix, muted: *muted }
+    send: "3:::SETD^m.mtx.{matrix:-1}.mute^{muted:bool01}"
+    returns: none
+  set_master_matrix_send_pan:
+    summary: "Set the master's pan on a stereo-linked matrix (m.mtx.<m>.pan)"
+    params: { matrix: *matrix, pan: *pan }
+    send: "3:::SETD^m.mtx.{matrix:-1}.pan^{pan:.4f}"
+    returns: none
+  set_master_matrix_send_post_proc:
+    summary: "Take the master's matrix send before or after its processing (m.mtx.<m>.postproc)"
+    params: { matrix: *matrix, post_proc: *post_proc }
+    send: "3:::SETD^m.mtx.{matrix:-1}.postproc^{post_proc:bool01}"
+    returns: none
+  set_aux_matrix_mode:
+    summary: "Switch an aux output between an aux and a matrix (a.<n>.matrix)"
+    params:
+      aux: *aux
+      matrix: { type: bool, required: true, label: Matrix, description: "On makes the output a matrix fed by auxes, subgroups and the master; off makes it an aux again." }
+    send: "3:::SETD^a.{aux:-1}.matrix^{matrix:bool01}"
+    returns: none
+
+  # ── Master ────────────────────────────────────────────────────────────
+  set_master_fader:
+    summary: "Set the master fader position, 0 to 1 (m.mix)"
+    params: { level: *level }
+    send: "3:::SETD^m.mix^{level:.4f}"
+    returns: none
+  set_master_fader_db:
+    summary: "Set the master fader to a level in dB (m.mix)"
+    params: { level_db: *level_db }
+    send: "3:::SETD^m.mix^{level_db:to.ui_fader:.4f}"
+    returns: none
+  set_master_pan:
+    summary: "Set the master balance, 0 left to 1 right (m.pan)"
+    params: { pan: *pan }
+    send: "3:::SETD^m.pan^{pan:.4f}"
+    returns: none
+  set_master_dim:
+    summary: "Dim the master output or undim it (m.dim, Ui24R)"
+    params:
+      dimmed: { type: bool, default: true, label: Dimmed, description: "On dims the master, off restores it." }
+    send: "3:::SETD^m.dim^{dimmed:bool01}"
+    returns: none
+  set_master_delay:
+    summary: "Set the master's left or right output delay in milliseconds (m.delayL, m.delayR)"
+    params:
+      side: { type: enum, values: [left, right], required: true, label: Side, description: "The left or right master output." }
+      delay_ms: { type: float, min: 0.0, max: 500.0, required: true, label: Delay, description: "Delay in milliseconds, 0 to 500." }
+    send: "3:::SETD^m.delay{side:map.side}^{delay_ms:to.delay_ms:.4f}"
+    returns: none
+
+  # ── Input gain and phantom power ──────────────────────────────────────
+  set_input_gain:
+    summary: "Set a hardware input's preamp gain, 0 to 1 (hw.<n>.gain on the Ui24R, i.<n>.gain on the Ui16 and Ui12)"
+    params:
+      input: &hw_input { type: int, min: 1, max: 22, required: true, label: Input, description: "The hardware input from 1: 20 mic/line and 2 line on the Ui24R, as many as the mixer's inputs on the Ui16 and Ui12." }
+      gain: { type: float, min: 0.0, max: 1.0, required: true, label: Gain, description: "Gain from 0 (-6 dB on the Ui24R, -40 dB on the Ui16 and Ui12) to 1 (+57 dB, +50 dB)." }
+    send:
+      - { models: [ui24r], message: "3:::SETD^hw.{input:-1}.gain^{gain:.4f}" }
+      - { models: [ui16, ui12], message: "3:::SETD^i.{input:-1}.gain^{gain:.4f}" }
+    returns: none
+  set_input_gain_db:
+    summary: "Set a hardware input's preamp gain in dB (-6 to 57 on the Ui24R, -40 to 50 on the Ui16 and Ui12)"
+    params:
+      input: *hw_input
+      gain_db: { type: float, min: -40.0, max: 57.0, required: true, label: Gain, description: "Gain in dB: -6 to +57 on the Ui24R, -40 to +50 on the Ui16 and Ui12; a value outside the model's range is refused." }
+    send:
+      - { models: [ui24r], message: "3:::SETD^hw.{input:-1}.gain^{gain_db:to.ui24_gain:.4f}" }
+      - { models: [ui16, ui12], message: "3:::SETD^i.{input:-1}.gain^{gain_db:to.ui12_gain:.4f}" }
+    returns: none
+  set_phantom:
+    summary: "Switch a hardware input's 48 V phantom power (hw.<n>.phantom on the Ui24R, i.<n>.phantom on the Ui16 and Ui12)"
+    params:
+      input: *hw_input
+      enabled: { type: bool, default: true, label: Phantom power, description: "On switches 48 V phantom power on, off switches it off." }
+    send:
+      - { models: [ui24r], message: "3:::SETD^hw.{input:-1}.phantom^{enabled:bool01}" }
+      - { models: [ui16, ui12], message: "3:::SETD^i.{input:-1}.phantom^{enabled:bool01}" }
+    returns: none
+
+  # ── EQ ────────────────────────────────────────────────────────────────
+  set_eq_bypass:
+    summary: "Bypass a strip's EQ or bring it back (<ch>.eq.bypass)"
+    params:
+      strip: &eq_strip { type: enum, values: [input, line, player, fx, sub], required: true, label: Strip, description: "The kind of strip with an EQ: input, line input, player, FX return or subgroup." }
+      channel: *channel
+      bypassed: { type: bool, default: true, label: Bypassed, description: "On bypasses the EQ, off brings it back." }
+    send: "3:::SETD^{strip:map.eq_strip}.{channel:-1}.eq.bypass^{bypassed:bool01}"
+    returns: none
+  set_eq_band_frequency:
+    summary: "Set an EQ band's frequency as a position 0 to 1 (<ch>.eq.b<band>.freq), 20 Hz to 22050 Hz on a logarithmic scale"
+    params:
+      strip: *eq_strip
+      channel: *channel
+      band: &band { type: int, min: 1, max: 4, required: true, label: Band, description: "The parametric EQ band, 1 to 4." }
+      position: &freq_position { type: float, min: 0.0, max: 1.0, required: true, label: Frequency position,
+        description: "0 to 1: the frequency is 20 × (22050 / 20)^position Hz, so 0 is 20 Hz, 0.5 about 664 Hz and 1 is 22050 Hz." }
+    send: "3:::SETD^{strip:map.eq_strip}.{channel:-1}.eq.b{band}.freq^{position:.4f}"
+    returns: none
+  set_eq_band_q:
+    summary: "Set an EQ band's Q as a position 0 to 1 (<ch>.eq.b<band>.q), 0.05 to 15 on a logarithmic scale"
+    params:
+      strip: *eq_strip
+      channel: *channel
+      band: *band
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Q position,
+        description: "0 to 1: Q is 0.05 × (15 / 0.05)^position, so 0 is 0.05 and 1 is 15." }
+    send: "3:::SETD^{strip:map.eq_strip}.{channel:-1}.eq.b{band}.q^{position:.4f}"
+    returns: none
+  set_eq_band_gain:
+    summary: "Set an EQ band's gain in dB, -20 to +20 (<ch>.eq.b<band>.gain)"
+    params:
+      strip: *eq_strip
+      channel: *channel
+      band: *band
+      gain_db: { type: float, min: -20.0, max: 20.0, required: true, label: Gain, description: "Band gain in dB from -20 to +20." }
+    send: "3:::SETD^{strip:map.eq_strip}.{channel:-1}.eq.b{band}.gain^{gain_db:to.eq_gain:.4f}"
+    returns: none
+  set_hpf_frequency:
+    summary: "Set a strip's high-pass filter frequency as a position 0 to 1 (<ch>.eq.hpf.freq)"
+    params:
+      strip: *eq_strip
+      channel: *channel
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Frequency position,
+        description: "0 to 1 on the EQ frequency scale, 20 × (22050 / 20)^position Hz; the high-pass filter reaches 20 Hz to 1 kHz." }
+    send: "3:::SETD^{strip:map.eq_strip}.{channel:-1}.eq.hpf.freq^{position:.4f}"
+    returns: none
+  set_hpf_slope:
+    summary: "Set a strip's high-pass filter slope, 12, 24 or 36 dB per octave (<ch>.eq.hpf.slope)"
+    params:
+      strip: *eq_strip
+      channel: *channel
+      slope: &slope { type: enum, values: ["12", "24", "36"], required: true, label: Slope, description: "Slope in dB per octave." }
+    send: "3:::SETD^{strip:map.eq_strip}.{channel:-1}.eq.hpf.slope^{slope:map.filter_slope}"
+    returns: none
+  set_lpf_frequency:
+    summary: "Set an input channel's low-pass filter frequency as a position 0 to 1 (i.<n>.eq.lpf.freq)"
+    params:
+      channel: *channel
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Frequency position,
+        description: "0 to 1 on the EQ frequency scale, 20 × (22050 / 20)^position Hz; the low-pass filter reaches 1 kHz to 22050 Hz." }
+    send: "3:::SETD^i.{channel:-1}.eq.lpf.freq^{position:.4f}"
+    returns: none
+  set_lpf_slope:
+    summary: "Set an input channel's low-pass filter slope (i.<n>.eq.lpf.slope)"
+    params: { channel: *channel, slope: *slope }
+    send: "3:::SETD^i.{channel:-1}.eq.lpf.slope^{slope:map.filter_slope}"
+    returns: none
+
+  # ── FX engines ────────────────────────────────────────────────────────
+  set_fx_bpm:
+    summary: "Set an FX engine's tempo in beats per minute (f.<n>.bpm)"
+    params:
+      fx: *fx
+      bpm: { type: int, min: 20, max: 400, required: true, label: BPM, description: "Tempo from 20 to 400 beats per minute." }
+    send: "3:::SETD^f.{fx:-1}.bpm^{bpm}"
+    returns: none
+  set_fx_param:
+    summary: "Set one of an FX engine's six parameters, 0 to 1 (f.<n>.par<p>)"
+    params:
+      fx: *fx
+      param: { type: int, min: 1, max: 6, required: true, label: Parameter, description: "The parameter from 1 to 6; what each does depends on the FX type." }
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: Value, description: "The parameter's position from 0 to 1." }
+    send: "3:::SETD^f.{fx:-1}.par{param}^{value:.4f}"
+    returns: none
+
+  # ── Mute groups and automix ───────────────────────────────────────────
+  set_mute_groups:
+    summary: "Set which mute groups are engaged, as one mask (mgmask)"
+    params:
+      mask: { type: int, min: 0, max: 16777215, required: true, label: Mask,
+        description: "The sum of the groups engaged: 1 for group 1, 2 for group 2, 4, 8, 16, 32 for groups 3 to 6, 4194304 for the FX mute, 8388608 for mute all; 0 releases every group." }
+    send: "3:::SETD^mgmask^{mask}"
+    returns: none
+  set_automix_group:
+    summary: "Assign an input channel to automix group A or B, or to none (i.<n>.amixgroup)"
+    params:
+      channel: *channel
+      group: { type: enum, values: [none, a, b], required: true, label: Group, description: "Automix group A, B, or none." }
+    send: "3:::SETD^i.{channel:-1}.amixgroup^{group:map.automix_group}"
+    returns: none
+  set_automix_weight:
+    summary: "Set an input channel's automix weight in dB, -12 to +12 (i.<n>.amix)"
+    params:
+      channel: *channel
+      weight_db: { type: float, min: -12.0, max: 12.0, required: true, label: Weight, description: "Automix weight in dB from -12 to +12." }
+    send: "3:::SETD^i.{channel:-1}.amix^{weight_db:to.automix_weight:.4f}"
+    returns: none
+  set_automix_enabled:
+    summary: "Switch automix group A or B on or off (automix.<group>.on)"
+    params:
+      group: { type: enum, values: [a, b], required: true, label: Group, description: "Automix group A or B." }
+      enabled: { type: bool, default: true, label: Enabled, description: "On enables the group's automix, off disables it." }
+    send: "3:::SETD^automix.{group:map.automix_group_name}.on^{enabled:bool01}"
+    returns: none
+  set_automix_response_time:
+    summary: "Set the automix response time as a position 0 to 1 (automix.time), 20 ms to 4 s"
+    params:
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Response time position,
+        description: "0 to 1: the time is 20 + 3980 × position^3.0517 milliseconds, so 0 is 20 ms and 1 is 4 s." }
+    send: "3:::SETD^automix.time^{position:.4f}"
+    returns: none
+
+  # ── Multitrack arming, solo and headphone levels ──────────────────────
+  set_multitrack_arm:
+    summary: "Select an input or line input for multitrack recording (<ch>.mtkrec, Ui24R)"
+    params:
+      strip: { type: enum, values: [input, line], required: true, label: Strip, description: "Input channel or line input." }
+      channel: *channel
+      armed: { type: bool, default: true, label: Armed, description: "On records the channel to its multitrack track, off leaves it out." }
+    send: "3:::SETD^{strip:map.multitrack_strip}.{channel:-1}.mtkrec^{armed:bool01}"
+    returns: none
+  set_solo_level:
+    summary: "Set the solo bus level, 0 to 1 (settings.solovol)"
+    params: { level: *level }
+    send: "3:::SETD^settings.solovol^{level:.4f}"
+    returns: none
+  set_solo_level_db:
+    summary: "Set the solo bus level in dB (settings.solovol)"
+    params: { level_db: *level_db }
+    send: "3:::SETD^settings.solovol^{level_db:to.ui_fader:.4f}"
+    returns: none
+  set_headphone_level:
+    summary: "Set a headphone output's level, 0 to 1 (settings.hpvol.<n>)"
+    params:
+      headphone: &headphone { type: int, min: 1, max: 2, required: true, label: Headphone, description: "The headphone output, 1 or 2 (the Ui12 and Ui16 have one)." }
+      level: *level
+    send: "3:::SETD^settings.hpvol.{headphone:-1}^{level:.4f}"
+    returns: none
+  set_headphone_level_db:
+    summary: "Set a headphone output's level in dB (settings.hpvol.<n>)"
+    params: { headphone: *headphone, level_db: *level_db }
+    send: "3:::SETD^settings.hpvol.{headphone:-1}^{level_db:to.ui_fader:.4f}"
+    returns: none
+
+  # ── Media player ──────────────────────────────────────────────────────
+  player_play:
+    summary: "Play the media player (MEDIA_PLAY)"
+    send: "3:::MEDIA_PLAY"
+    returns: none
+  player_pause:
+    summary: "Pause the media player (MEDIA_PAUSE)"
+    send: "3:::MEDIA_PAUSE"
+    returns: none
+  player_stop:
+    summary: "Stop the media player (MEDIA_STOP)"
+    send: "3:::MEDIA_STOP"
+    returns: none
+  player_next:
+    summary: "Skip to the next track (MEDIA_NEXT)"
+    send: "3:::MEDIA_NEXT"
+    returns: none
+  player_previous:
+    summary: "Go back to the previous track (MEDIA_PREV)"
+    send: "3:::MEDIA_PREV"
+    returns: none
+  load_playlist:
+    summary: "Load a playlist into the media player (MEDIA_SWITCH_PLIST^<playlist>)"
+    params:
+      playlist: &playlist { type: string, required: true, max_length: 128, pattern: '^[^\^]+$', label: Playlist, description: "The playlist's name as the mixer lists it (state playlists.names)." }
+    send: "3:::MEDIA_SWITCH_PLIST^{playlist}"
+    returns: none
+  load_track:
+    summary: "Load a track of a playlist into the media player (MEDIA_SWITCH_TRACK^<playlist>^<track>)"
+    params:
+      playlist: *playlist
+      track: { type: string, required: true, max_length: 255, pattern: '^[^\^]+$', label: Track, description: "The track's file name as the mixer lists it in that playlist." }
+    send: "3:::MEDIA_SWITCH_TRACK^{playlist}^{track}"
+    returns: none
+  set_player_shuffle:
+    summary: "Switch the media player's shuffle on or off (settings.shuffle)"
+    params:
+      enabled: { type: bool, default: true, label: Shuffle, description: "On plays in random order, off in list order." }
+    send: "3:::SETD^settings.shuffle^{enabled:bool01}"
+    returns: none
+  set_player_mode:
+    summary: "Set the media player to manual or automatic play (settings.playMode)"
+    params:
+      mode: { type: enum, values: [manual, auto], required: true, label: Mode, description: "Manual stops after each track; auto plays on through the playlist." }
+    send: "3:::SETD^settings.playMode^{mode:map.play_mode}"
+    returns: none
+
+  # ── Recorders ─────────────────────────────────────────────────────────
+  record_toggle:
+    summary: "Start or stop the 2-track USB recorder (RECTOGGLE)"
+    send: "3:::RECTOGGLE"
+    returns: none
+  multitrack_play:
+    summary: "Play the multitrack session (MTK_PLAY, Ui24R)"
+    send: "3:::MTK_PLAY"
+    returns: none
+  multitrack_pause:
+    summary: "Pause the multitrack player (MTK_PAUSE, Ui24R)"
+    send: "3:::MTK_PAUSE"
+    returns: none
+  multitrack_stop:
+    summary: "Stop the multitrack player (MTK_STOP, Ui24R)"
+    send: "3:::MTK_STOP"
+    returns: none
+  multitrack_record_toggle:
+    summary: "Start or stop multitrack recording (MTK_REC_TOGGLE, Ui24R)"
+    send: "3:::MTK_REC_TOGGLE"
+    returns: none
+  set_multitrack_soundcheck:
+    summary: "Switch multitrack soundcheck (virtual soundcheck playback) on or off (var.mtk.soundcheck, Ui24R)"
+    params:
+      enabled: { type: bool, default: true, label: Soundcheck, description: "On feeds the channels from the multitrack recording, off from their inputs." }
+    send: "3:::SETD^var.mtk.soundcheck^{enabled:bool01}"
+    returns: none
+
+  # ── Shows, snapshots and cues ─────────────────────────────────────────
+  load_show:
+    summary: "Load a show (LOADSHOW^<show>)"
+    params:
+      show: &show { type: string, required: true, max_length: 128, pattern: '^[^\^]+$', label: Show, description: "The show's name as the mixer lists it (state shows.names)." }
+    send: "3:::LOADSHOW^{show}"
+    returns: none
+  load_snapshot:
+    summary: "Recall a snapshot of a show (LOADSNAPSHOT^<show>^<snapshot>)"
+    params:
+      show: *show
+      snapshot: &snapshot { type: string, required: true, max_length: 128, pattern: '^[^\^]+$', label: Snapshot, description: "The snapshot's name in that show." }
+    send: "3:::LOADSNAPSHOT^{show}^{snapshot}"
+    returns: none
+  load_cue:
+    summary: "Recall a cue of a show (LOADCUE^<show>^<cue>)"
+    params:
+      show: *show
+      cue: &cue { type: string, required: true, max_length: 128, pattern: '^[^\^]+$', label: Cue, description: "The cue's name in that show." }
+    send: "3:::LOADCUE^{show}^{cue}"
+    returns: none
+  save_snapshot:
+    summary: "Save the mix as a snapshot of a show, replacing one of that name (SAVESNAPSHOT^<show>^<snapshot>)"
+    params: { show: *show, snapshot: *snapshot }
+    send: "3:::SAVESNAPSHOT^{show}^{snapshot}"
+    returns: none
+  save_cue:
+    summary: "Save the mix as a cue of a show, replacing one of that name (SAVECUE^<show>^<cue>)"
+    params: { show: *show, cue: *cue }
+    send: "3:::SAVECUE^{show}^{cue}"
+    returns: none
+
+  # ── Lists ─────────────────────────────────────────────────────────────
+  get_shows:
+    summary: "List the shows, as names separated by ^ (SHOWLIST); also kept in shows.names"
+    send: "3:::SHOWLIST"
+    expect: { matches: "^3:::SHOWLIST\\^?(.*)$" }
+    returns: value
+  get_snapshots:
+    summary: "List a show's snapshots, as names separated by ^ (SNAPSHOTLIST^<show>); also kept in shows.snapshots"
+    params: { show: *show }
+    send: "3:::SNAPSHOTLIST^{show}"
+    expect: { matches: "^3:::SNAPSHOTLIST\\^[^^]*\\^?(.*)$" }
+    returns: value
+  get_cues:
+    summary: "List a show's cues, as names separated by ^ (CUELIST^<show>); also kept in shows.cues"
+    params: { show: *show }
+    send: "3:::CUELIST^{show}"
+    expect: { matches: "^3:::CUELIST\\^[^^]*\\^?(.*)$" }
+    returns: value
+  get_playlists:
+    summary: "List the media player's playlists, as names separated by ^ (MEDIA_GET_PLISTS); also kept in playlists.names"
+    send: "3:::MEDIA_GET_PLISTS"
+    expect: { matches: "^3:::PLISTS\\^?(.*)$" }
+    returns: value
+  get_playlist_tracks:
+    summary: "List a playlist's tracks, as file names separated by ^ (MEDIA_GET_PLIST_TRACKS^<playlist>); also kept in playlists.tracks"
+    params: { playlist: *playlist }
+    send: "3:::MEDIA_GET_PLIST_TRACKS^{playlist}"
+    expect: { matches: "^3:::PLIST_TRACKS\\^[^^]*\\^?(.*)$" }
+    returns: value
+
+  # ── Channel selection ─────────────────────────────────────────────────
+  select_channel:
+    summary: "Select a strip in every app following a sync id (BMSG^SYNC^<id>^<index>)"
+    params:
+      index: { type: int, min: 0, max: 53, required: true, label: Channel index,
+        description: "The strip's place in the mixer's list from 0: on the Ui24R inputs 0-23, line 24-25, players 26-27, FX 28-31, subgroups 32-37, auxes 38-47, VCAs 48-53; on the Ui16 inputs 0-11, then line, players, FX, subgroups and auxes in the same order; on the Ui12 inputs 0-7 likewise." }
+      sync_id: { type: string, default: SYNC_ID, max_length: 64, pattern: '^[^\^]+$', label: Sync id,
+        description: "The sync id the apps to follow it are set to; SYNC_ID is the apps' default." }
+    send: "3:::BMSG^SYNC^{sync_id}^{index}"
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Soundcraft does not publish this protocol: it is the web app's own WebSocket, read from an
+      MIT-licensed third-party library, and may change with firmware. Open the device at the
+      mixer's address, port 80, as a browser would; up to the mixer's client limit of web apps
+      may be connected at once. Nothing the mixer sends answers a set, so sets report done when
+      sent; a value outside a parameter's range is ignored or clamped by the mixer.
+  - models: [all]
+    severity: info
+    text: >
+      On connecting the mixer sends every parameter as SETD and SETS messages, several lines to a
+      message, and then each change made elsewhere. All are kept by path in values (numbers) and
+      texts (text), and the main ones also by name: each strip's name, fader (and its level in dB
+      by the fader law, -100 for a fader all the way down), mute, solo and pan; the master; the
+      player, recorders and shows; mute groups; automix; the model and firmware. The mixer is
+      assumed not to send a client's own changes back to it, as the library keeps them itself, so
+      while monitored this client's own SETD and SETS messages are applied to state as sent.
+  - models: [all]
+    severity: info
+    text: >
+      Stereo-linked strips and auxes are separate parameters: the library writes a fader, mute or
+      send to both channels of a linked pair itself, and these commands write only the channel
+      named, so set both channels of a pair (stereoIndex in values shows the link: 0 on the left
+      channel, 1 on the right). The show list and playlist list are read on connecting and every
+      60 s, each show's snapshots and cues and each playlist's tracks after each list.
+  - models: [all]
+    severity: info
+    text: >
+      Meters (setting meters) are VU2 messages of base64 bytes the mixer sends while a client is
+      connected; each level is one byte read as the library does, on a 0 to 1 scale mapped
+      linearly to -80 to 0 dB (slightly above 0 at the top of the byte). Inputs, line inputs and
+      players have pre, post and post-fader meters; subgroups and FX returns left and right post
+      and post-fader; auxes post and post-fader; the master left and right.
+  - models: [all]
+    severity: info
+    text: >
+      Channel counts differ by model: the Ui24R has 24 inputs, 20 mic/line and 2 line hardware
+      inputs, 6 subgroups, 10 auxes, 6 VCAs, master dim and the multitrack recorder; the Ui16 has
+      12 inputs, 4 subgroups and 6 auxes; the Ui12 8 inputs, 4 subgroups and 4 auxes; all have 2
+      line inputs, 2 player channels and 4 FX. A command for a strip a model lacks is ignored by
+      the mixer. EQ frequency, EQ Q and automix response time are taken as the mixer's 0 to 1
+      positions, whose scales are given with each command.
+  - models: [all]
+    severity: critical
+    text: >
+      load_show, load_snapshot and load_cue change the whole mix at once and cannot be undone
+      remotely; save_snapshot and save_cue replace a snapshot or cue of the same name without
+      asking. record_toggle and multitrack_record_toggle toggle: check the recorder's state
+      first, or a recording in progress is stopped. set_multitrack_soundcheck replaces the
+      inputs with the recording on every armed channel.
+
+state:
+  values.*: { type: float, description: "Every numeric parameter the mixer has sent, keyed by its path (i.0.mix, m.dim, hw.3.gain), as the mixer sends it" }
+  texts.*:  { type: string, description: "Every text parameter the mixer has sent, keyed by its path (i.0.name, var.currentShow)" }
+  device.model:    { type: string, description: "The mixer model as it names itself: ui24, ui16 or ui12" }
+  device.firmware: { type: string, description: "The mixer's firmware version" }
+  "inputs.*.name":     { type: string, description: "Input channel name as set on the mixer (empty for the default name); i.<n>.name" }
+  "inputs.*.fader":    { type: float, description: "Input channel fader position, 0 to 1 (i.<n>.mix)" }
+  "inputs.*.fader_db": { type: float, unit: dB, description: "Input channel fader level in dB from the fader position, -100 for a fader all the way down" }
+  "inputs.*.mute":     { type: bool, description: "Input channel muted (i.<n>.mute)" }
+  "inputs.*.solo":     { type: bool, description: "Input channel soloed (i.<n>.solo)" }
+  "inputs.*.pan":      { type: float, description: "Input channel pan or balance, 0 left, 0.5 center, 1 right (i.<n>.pan)" }
+  "lines.*.name":     { type: string, description: "Line input (1 left, 2 right) name as set on the mixer (empty for the default name); l.<n>.name" }
+  "lines.*.fader":    { type: float, description: "Line input (1 left, 2 right) fader position, 0 to 1 (l.<n>.mix)" }
+  "lines.*.fader_db": { type: float, unit: dB, description: "Line input (1 left, 2 right) fader level in dB from the fader position, -100 for a fader all the way down" }
+  "lines.*.mute":     { type: bool, description: "Line input (1 left, 2 right) muted (l.<n>.mute)" }
+  "lines.*.solo":     { type: bool, description: "Line input (1 left, 2 right) soloed (l.<n>.solo)" }
+  "lines.*.pan":      { type: float, description: "Line input (1 left, 2 right) pan or balance, 0 left, 0.5 center, 1 right (l.<n>.pan)" }
+  "players.*.name":     { type: string, description: "Media player return (1 left, 2 right) name as set on the mixer (empty for the default name); p.<n>.name" }
+  "players.*.fader":    { type: float, description: "Media player return (1 left, 2 right) fader position, 0 to 1 (p.<n>.mix)" }
+  "players.*.fader_db": { type: float, unit: dB, description: "Media player return (1 left, 2 right) fader level in dB from the fader position, -100 for a fader all the way down" }
+  "players.*.mute":     { type: bool, description: "Media player return (1 left, 2 right) muted (p.<n>.mute)" }
+  "players.*.solo":     { type: bool, description: "Media player return (1 left, 2 right) soloed (p.<n>.solo)" }
+  "players.*.pan":      { type: float, description: "Media player return (1 left, 2 right) pan or balance, 0 left, 0.5 center, 1 right (p.<n>.pan)" }
+  "fx_returns.*.name":     { type: string, description: "FX return name as set on the mixer (empty for the default name); f.<n>.name" }
+  "fx_returns.*.fader":    { type: float, description: "FX return fader position, 0 to 1 (f.<n>.mix)" }
+  "fx_returns.*.fader_db": { type: float, unit: dB, description: "FX return fader level in dB from the fader position, -100 for a fader all the way down" }
+  "fx_returns.*.mute":     { type: bool, description: "FX return muted (f.<n>.mute)" }
+  "fx_returns.*.solo":     { type: bool, description: "FX return soloed (f.<n>.solo)" }
+  "fx_returns.*.pan":      { type: float, description: "FX return pan or balance, 0 left, 0.5 center, 1 right (f.<n>.pan)" }
+  "subgroups.*.name":     { type: string, description: "Subgroup name as set on the mixer (empty for the default name); s.<n>.name" }
+  "subgroups.*.fader":    { type: float, description: "Subgroup fader position, 0 to 1 (s.<n>.mix)" }
+  "subgroups.*.fader_db": { type: float, unit: dB, description: "Subgroup fader level in dB from the fader position, -100 for a fader all the way down" }
+  "subgroups.*.mute":     { type: bool, description: "Subgroup muted (s.<n>.mute)" }
+  "subgroups.*.solo":     { type: bool, description: "Subgroup soloed (s.<n>.solo)" }
+  "subgroups.*.pan":      { type: float, description: "Subgroup pan or balance, 0 left, 0.5 center, 1 right (s.<n>.pan)" }
+  "auxes.*.name":     { type: string, description: "Aux (or matrix) output name as set on the mixer (empty for the default name); a.<n>.name" }
+  "auxes.*.fader":    { type: float, description: "Aux (or matrix) output fader position, 0 to 1 (a.<n>.mix)" }
+  "auxes.*.fader_db": { type: float, unit: dB, description: "Aux (or matrix) output fader level in dB from the fader position, -100 for a fader all the way down" }
+  "auxes.*.mute":     { type: bool, description: "Aux (or matrix) output muted (a.<n>.mute)" }
+  "auxes.*.solo":     { type: bool, description: "Aux (or matrix) output soloed (a.<n>.solo)" }
+  "auxes.*.pan":      { type: float, description: "Aux (or matrix) output pan or balance, 0 left, 0.5 center, 1 right (a.<n>.pan)" }
+  "vcas.*.name":     { type: string, description: "VCA name as set on the mixer (empty for the default name); v.<n>.name" }
+  "vcas.*.fader":    { type: float, description: "VCA fader position, 0 to 1 (v.<n>.mix)" }
+  "vcas.*.fader_db": { type: float, unit: dB, description: "VCA fader level in dB from the fader position, -100 for a fader all the way down" }
+  "vcas.*.mute":     { type: bool, description: "VCA muted (v.<n>.mute)" }
+  "vcas.*.solo":     { type: bool, description: "VCA soloed (v.<n>.solo)" }
+  master.fader:    { type: float, description: "Master fader position, 0 to 1 (m.mix)" }
+  master.fader_db: { type: float, unit: dB, description: "Master fader level in dB from the fader position" }
+  master.pan:      { type: float, description: "Master balance, 0 left, 0.5 center, 1 right (m.pan)" }
+  master.dim:      { type: bool, description: "Master dimmed (m.dim, Ui24R)" }
+  master.delay_left_ms:  { type: float, unit: ms, description: "Master left output delay in milliseconds (m.delayL)" }
+  master.delay_right_ms: { type: float, unit: ms, description: "Master right output delay in milliseconds (m.delayR)" }
+  mute_groups.mask: { type: int, description: "The engaged mute groups as one mask (mgmask): 1 group 1 ... 32 group 6, 4194304 FX, 8388608 all" }
+  mute_groups.*.muted: { type: bool, description: "Whether mute group 1 to 6 is engaged, from mgmask" }
+  mute_groups.fx: { type: bool, description: "Whether the FX mute is engaged, from mgmask" }
+  mute_groups.all: { type: bool, description: "Whether mute all is engaged, from mgmask" }
+  automix.a.enabled: { type: bool, description: "Automix group A on (automix.a.on)" }
+  automix.b.enabled: { type: bool, description: "Automix group B on (automix.b.on)" }
+  automix.response_time: { type: float, description: "Automix response time as the mixer's 0 to 1 position (automix.time)" }
+  player.state:    { type: string, description: "Media player state: stopped, playing or paused (var.currentState)" }
+  player.playlist: { type: string, description: "The playlist loaded in the media player" }
+  player.track:    { type: string, description: "The track loaded in the media player" }
+  player.length_s: { type: float, unit: s, description: "The track's length in seconds" }
+  player.position: { type: float, description: "The play position as a fraction of the track, 0 to 1" }
+  player.shuffle:  { type: bool, description: "Shuffle on (settings.shuffle)" }
+  player.mode:     { type: string, description: "manual or auto play (settings.playMode)" }
+  recorder.recording: { type: bool, description: "The 2-track USB recorder is recording (var.isRecording)" }
+  recorder.busy:      { type: bool, description: "The 2-track recorder is busy starting or stopping (var.recBusy)" }
+  multitrack.state:     { type: string, description: "Multitrack player state: stopped, paused or playing (var.mtk.currentState, Ui24R)" }
+  multitrack.session:   { type: string, description: "The multitrack session loaded (var.mtk.session)" }
+  multitrack.length_s:  { type: float, unit: s, description: "The multitrack session's length in seconds" }
+  multitrack.position:  { type: float, description: "The multitrack play position as a fraction of the session, 0 to 1" }
+  multitrack.recording: { type: bool, description: "Multitrack recording in progress (var.mtk.rec.currentState)" }
+  multitrack.busy:      { type: bool, description: "The multitrack recorder is busy starting or stopping (var.mtk.rec.busy)" }
+  multitrack.record_time_s: { type: float, unit: s, description: "Time recorded so far in seconds (var.mtk.rec.time), meaningful while recording" }
+  multitrack.soundcheck: { type: bool, description: "Multitrack soundcheck on (var.mtk.soundcheck)" }
+  shows.current:          { type: string, description: "The show loaded (var.currentShow)" }
+  shows.current_snapshot: { type: string, description: "The snapshot last recalled (var.currentSnapshot)" }
+  shows.current_cue:      { type: string, description: "The cue last recalled (var.currentCue)" }
+  shows.names.*:          { type: string, description: "Each show's name, by its place in the mixer's list from 0" }
+  shows.snapshots.*.*:    { type: string, description: "Each snapshot's name, by show and by its place in the show from 0" }
+  shows.cues.*.*:         { type: string, description: "Each cue's name, by show and by its place in the show from 0" }
+  playlists.names.*:      { type: string, description: "Each playlist's name, by its place in the mixer's list from 0" }
+  playlists.tracks.*.*:   { type: string, description: "Each track's file name, by playlist and by its place in the playlist from 0" }
+  sync.*.selected_channel: { type: int, description: "The strip index selected under each sync id (BMSG^SYNC), as select_channel numbers them" }
+  "meters.inputs.*.pre":        { type: float, unit: dB, description: "Input channel meter before processing, with the meters setting on, -80 to 0 dB" }
+  "meters.inputs.*.post":       { type: float, unit: dB, description: "Input channel meter after processing, before the fader, with the meters setting on" }
+  "meters.inputs.*.post_fader": { type: float, unit: dB, description: "Input channel meter after the fader, with the meters setting on" }
+  "meters.lines.*.pre":         { type: float, unit: dB, description: "Line input meter before processing, with the meters setting on" }
+  "meters.lines.*.post":        { type: float, unit: dB, description: "Line input meter after processing, with the meters setting on" }
+  "meters.lines.*.post_fader":  { type: float, unit: dB, description: "Line input meter after the fader, with the meters setting on" }
+  "meters.players.*.pre":       { type: float, unit: dB, description: "Player channel meter before processing, with the meters setting on" }
+  "meters.players.*.post":      { type: float, unit: dB, description: "Player channel meter after processing, with the meters setting on" }
+  "meters.players.*.post_fader": { type: float, unit: dB, description: "Player channel meter after the fader, with the meters setting on" }
+  "meters.subgroups.*.post_left":        { type: float, unit: dB, description: "Subgroup left meter after processing, with the meters setting on" }
+  "meters.subgroups.*.post_right":       { type: float, unit: dB, description: "Subgroup right meter after processing, with the meters setting on" }
+  "meters.subgroups.*.post_fader_left":  { type: float, unit: dB, description: "Subgroup left meter after the fader, with the meters setting on" }
+  "meters.subgroups.*.post_fader_right": { type: float, unit: dB, description: "Subgroup right meter after the fader, with the meters setting on" }
+  "meters.fx_returns.*.post_left":        { type: float, unit: dB, description: "FX return left meter after processing, with the meters setting on" }
+  "meters.fx_returns.*.post_right":       { type: float, unit: dB, description: "FX return right meter after processing, with the meters setting on" }
+  "meters.fx_returns.*.post_fader_left":  { type: float, unit: dB, description: "FX return left meter after the fader, with the meters setting on" }
+  "meters.fx_returns.*.post_fader_right": { type: float, unit: dB, description: "FX return right meter after the fader, with the meters setting on" }
+  "meters.auxes.*.post":       { type: float, unit: dB, description: "Aux output meter after processing, with the meters setting on" }
+  "meters.auxes.*.post_fader": { type: float, unit: dB, description: "Aux output meter after the fader, with the meters setting on" }
+  "meters.master.post_left":        { type: float, unit: dB, description: "Master left meter after processing, with the meters setting on" }
+  "meters.master.post_right":       { type: float, unit: dB, description: "Master right meter after processing, with the meters setting on" }
+  "meters.master.post_fader_left":  { type: float, unit: dB, description: "Master left meter after the fader, with the meters setting on" }
+  "meters.master.post_fader_right": { type: float, unit: dB, description: "Master right meter after the fader, with the meters setting on" }
+
+telemetry:
+  # The mixer pushes its parameters by itself; the lists are read.
+  poll:
+    send: ["3:::SHOWLIST", "3:::MEDIA_GET_PLISTS"]
+    every_ms: 60000
+  updates:
+    # Every parameter by path, from each line of each message.
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^([^\^\r\n]+)\^([^\r\n]*)'
+      state: { "values.{1:key}": "{2}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETS\^([^\^\r\n]+)\^([^\r\n]*)'
+      state: { "texts.{1:key}": "{2}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETS\^(model|firmware)\^([^\r\n]*)'
+      state: { "device.{1}": "{2}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETS\^i\.(\d+)\.name\^([^\r\n]*)'
+      state: { "inputs.{1:+1}.name": "{2}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^i\.(\d+)\.mix\^([^\r\n]*)'
+      state: { "inputs.{1:+1}.fader": "{2}", "inputs.{1:+1}.fader_db": "{2:from.ui_fader}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^i\.(\d+)\.(mute|solo)\^([^\r\n]*)'
+      state: { "inputs.{1:+1}.{2}": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^i\.(\d+)\.pan\^([^\r\n]*)'
+      state: { "inputs.{1:+1}.pan": "{2}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETS\^l\.(\d+)\.name\^([^\r\n]*)'
+      state: { "lines.{1:+1}.name": "{2}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^l\.(\d+)\.mix\^([^\r\n]*)'
+      state: { "lines.{1:+1}.fader": "{2}", "lines.{1:+1}.fader_db": "{2:from.ui_fader}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^l\.(\d+)\.(mute|solo)\^([^\r\n]*)'
+      state: { "lines.{1:+1}.{2}": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^l\.(\d+)\.pan\^([^\r\n]*)'
+      state: { "lines.{1:+1}.pan": "{2}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETS\^p\.(\d+)\.name\^([^\r\n]*)'
+      state: { "players.{1:+1}.name": "{2}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^p\.(\d+)\.mix\^([^\r\n]*)'
+      state: { "players.{1:+1}.fader": "{2}", "players.{1:+1}.fader_db": "{2:from.ui_fader}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^p\.(\d+)\.(mute|solo)\^([^\r\n]*)'
+      state: { "players.{1:+1}.{2}": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^p\.(\d+)\.pan\^([^\r\n]*)'
+      state: { "players.{1:+1}.pan": "{2}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETS\^f\.(\d+)\.name\^([^\r\n]*)'
+      state: { "fx_returns.{1:+1}.name": "{2}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^f\.(\d+)\.mix\^([^\r\n]*)'
+      state: { "fx_returns.{1:+1}.fader": "{2}", "fx_returns.{1:+1}.fader_db": "{2:from.ui_fader}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^f\.(\d+)\.(mute|solo)\^([^\r\n]*)'
+      state: { "fx_returns.{1:+1}.{2}": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^f\.(\d+)\.pan\^([^\r\n]*)'
+      state: { "fx_returns.{1:+1}.pan": "{2}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETS\^s\.(\d+)\.name\^([^\r\n]*)'
+      state: { "subgroups.{1:+1}.name": "{2}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^s\.(\d+)\.mix\^([^\r\n]*)'
+      state: { "subgroups.{1:+1}.fader": "{2}", "subgroups.{1:+1}.fader_db": "{2:from.ui_fader}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^s\.(\d+)\.(mute|solo)\^([^\r\n]*)'
+      state: { "subgroups.{1:+1}.{2}": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^s\.(\d+)\.pan\^([^\r\n]*)'
+      state: { "subgroups.{1:+1}.pan": "{2}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETS\^a\.(\d+)\.name\^([^\r\n]*)'
+      state: { "auxes.{1:+1}.name": "{2}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^a\.(\d+)\.mix\^([^\r\n]*)'
+      state: { "auxes.{1:+1}.fader": "{2}", "auxes.{1:+1}.fader_db": "{2:from.ui_fader}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^a\.(\d+)\.(mute|solo)\^([^\r\n]*)'
+      state: { "auxes.{1:+1}.{2}": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^a\.(\d+)\.pan\^([^\r\n]*)'
+      state: { "auxes.{1:+1}.pan": "{2}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETS\^v\.(\d+)\.name\^([^\r\n]*)'
+      state: { "vcas.{1:+1}.name": "{2}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^v\.(\d+)\.mix\^([^\r\n]*)'
+      state: { "vcas.{1:+1}.fader": "{2}", "vcas.{1:+1}.fader_db": "{2:from.ui_fader}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^v\.(\d+)\.(mute|solo)\^([^\r\n]*)'
+      state: { "vcas.{1:+1}.{2}": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^m\.mix\^([^\r\n]*)'
+      state: { master.fader: "{1}", master.fader_db: "{1:from.ui_fader}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^m\.pan\^([^\r\n]*)'
+      state: { master.pan: "{1}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^m\.dim\^([^\r\n]*)'
+      state: { master.dim: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^m\.delayL\^([^\r\n]*)'
+      state: { master.delay_left_ms: "{1:from.delay_ms}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^m\.delayR\^([^\r\n]*)'
+      state: { master.delay_right_ms: "{1:from.delay_ms}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^mgmask\^(\d+)\r?$'
+      state:
+        mute_groups.mask: "{1}"
+        mute_groups.1.muted: "{1:bit.0}"
+        mute_groups.2.muted: "{1:bit.1}"
+        mute_groups.3.muted: "{1:bit.2}"
+        mute_groups.4.muted: "{1:bit.3}"
+        mute_groups.5.muted: "{1:bit.4}"
+        mute_groups.6.muted: "{1:bit.5}"
+        mute_groups.fx: "{1:bit.22}"
+        mute_groups.all: "{1:bit.23}"
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^automix\.(a|b)\.on\^([^\r\n]*)'
+      state: { "automix.{1}.enabled": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^automix\.time\^([^\r\n]*)'
+      state: { automix.response_time: "{1}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^var\.currentState\^([^\r\n]*)'
+      state: { player.state: { value: "{1}", map: { "0": stopped, "2": playing, "3": paused } } }
+    - match: "^3:::"
+      match_each: '(?m)^SETS\^var\.currentPlaylist\^([^\r\n]*)'
+      state: { player.playlist: "{1}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETS\^var\.currentTrack\^([^\r\n]*)'
+      state: { player.track: "{1}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^var\.currentLength\^([^\r\n]*)'
+      state: { player.length_s: "{1}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^var\.currentTrackPos\^([^\r\n]*)'
+      state: { player.position: "{1}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^settings\.shuffle\^([^\r\n]*)'
+      state: { player.shuffle: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^settings\.playMode\^([^\r\n]*)'
+      state: { player.mode: { value: "{1}", map: { "0": manual, "3": auto } } }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^var\.isRecording\^([^\r\n]*)'
+      state: { recorder.recording: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^var\.recBusy\^([^\r\n]*)'
+      state: { recorder.busy: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^var\.mtk\.currentState\^([^\r\n]*)'
+      state: { multitrack.state: { value: "{1}", map: { "0": stopped, "1": paused, "2": playing } } }
+    - match: "^3:::"
+      match_each: '(?m)^SETS\^var\.mtk\.session\^([^\r\n]*)'
+      state: { multitrack.session: "{1}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^var\.mtk\.currentLength\^([^\r\n]*)'
+      state: { multitrack.length_s: "{1}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^var\.mtk\.currentTrackPos\^([^\r\n]*)'
+      state: { multitrack.position: "{1}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^var\.mtk\.rec\.currentState\^([^\r\n]*)'
+      state: { multitrack.recording: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^var\.mtk\.rec\.busy\^([^\r\n]*)'
+      state: { multitrack.busy: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^var\.mtk\.rec\.time\^([^\r\n]*)'
+      state: { multitrack.record_time_s: "{1}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETD\^var\.mtk\.soundcheck\^([^\r\n]*)'
+      state: { multitrack.soundcheck: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^3:::"
+      match_each: '(?m)^SETS\^var\.currentShow\^([^\r\n]*)'
+      state: { shows.current: "{1}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETS\^var\.currentSnapshot\^([^\r\n]*)'
+      state: { shows.current_snapshot: "{1}" }
+    - match: "^3:::"
+      match_each: '(?m)^SETS\^var\.currentCue\^([^\r\n]*)'
+      state: { shows.current_cue: "{1}" }
+    - match: "^3:::"
+      match_each: '(?m)^BMSG\^SYNC\^([^\^\r\n]+)\^(\d+)'
+      state: { "sync.{1:key}.selected_channel": "{2}" }
+    # The lists, each replacing what was there, and what each item holds.
+    - match: "^3:::SHOWLIST(?:\\^|\\r?$)"
+      match_each: '([^\^\r\n]+)'
+      replace: shows.names
+      state: { "shows.names.{index}": "{1}" }
+      then_send: ["3:::SNAPSHOTLIST^{1}", "3:::CUELIST^{1}"]
+    - match: "^3:::SNAPSHOTLIST\\^([^\\^\\r\\n]+)"
+      match_each: '\^([^\^\r\n]+)'
+      replace: "shows.snapshots.{1:key}"
+      state: { "shows.snapshots.{1:key}.{index}": "{2}" }
+    - match: "^3:::CUELIST\\^([^\\^\\r\\n]+)"
+      match_each: '\^([^\^\r\n]+)'
+      replace: "shows.cues.{1:key}"
+      state: { "shows.cues.{1:key}.{index}": "{2}" }
+    - match: "^3:::PLISTS(?:\\^|\\r?$)"
+      match_each: '([^\^\r\n]+)'
+      replace: playlists.names
+      state: { "playlists.names.{index}": "{1}" }
+      then_send: ["3:::MEDIA_GET_PLIST_TRACKS^{1}"]
+    - match: "^3:::PLIST_TRACKS\\^([^\\^\\r\\n]+)"
+      match_each: '\^([^\^\r\n]+)'
+      replace: "playlists.tracks.{1:key}"
+      state: { "playlists.tracks.{1:key}.{index}": "{2}" }

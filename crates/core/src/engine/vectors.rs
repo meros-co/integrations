@@ -808,6 +808,8 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         "<ack/>",
         // QLC+'s web API: an answer to a QLC+API query.
         "QLC+API|ok",
+        // A Soundcraft Ui's list answer: an empty show list.
+        "3:::SHOWLIST",
     ];
     let line = match &engine.transport {
         super::Transport::LineTcp {

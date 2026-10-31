@@ -4207,6 +4207,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the unit of Recording Duration (0xD120) while a movie records (seconds, frames or another count), so recording.duration can state it; the reference gives none. ([specs/sony-camera.yaml:2718](specs/sony-camera.yaml#L2718))
 - [ ] Check what the range of Custom WB Capture Frame Size (0xD26C) holds (the frame's width and height as the maximum, or something else), since the property has no current value and the reference describes only the packing. ([specs/sony-camera.yaml:2686](specs/sony-camera.yaml#L2686))
 
+## soundcraft-ui — Soundcraft Ui24R, Ui16 and Ui12 (web control WebSocket)
+
+- [ ] Confirm the WebSocket opens at ws://<mixer>/ on port 80 for a client that is not the web app, that every message is prefixed 3:::, and that 3:::ALIVE every second keeps it open. ([specs/soundcraft-ui.yaml:56](specs/soundcraft-ui.yaml#L56))
+- [ ] Confirm the mixer sends every parameter as SETD and SETS lines on connecting, several lines to a message, and each change made from another client after. ([specs/soundcraft-ui.yaml:746](specs/soundcraft-ui.yaml#L746))
+- [ ] Check whether the mixer sends a client's own SETD and SETS changes back to it; the spec assumes it does not and applies them to state as sent. ([specs/soundcraft-ui.yaml:746](specs/soundcraft-ui.yaml#L746))
+- [ ] Confirm on/off parameters (mute, solo, dim, phantom, shuffle, recorder states) arrive as 0 and 1, not 0.0 and 1.0, and that mgmask arrives as a whole number. ([specs/soundcraft-ui.yaml:899](specs/soundcraft-ui.yaml#L899))
+- [ ] Check what the mixer does with a set to one channel of a stereo-linked pair: whether it moves the other channel too. ([specs/soundcraft-ui.yaml:756](specs/soundcraft-ui.yaml#L756))
+- [ ] Confirm the list answers SHOWLIST, SNAPSHOTLIST^<show>, CUELIST^<show>, PLISTS and PLIST_TRACKS^<playlist>, items separated by ^ (with a trailing ^), and what each sends for an empty list or an unknown show or playlist. ([specs/soundcraft-ui.yaml:66](specs/soundcraft-ui.yaml#L66))
+- [ ] Confirm the mixer sends VU2 meter messages without being asked, how often, and the byte layout (seven counts, blocks from byte 8) on each model, including the Ui12's and Ui16's line and master blocks. ([specs/soundcraft-ui.yaml:764](specs/soundcraft-ui.yaml#L764))
+- [ ] Check the fader law in dB at several positions against the mixer's own display (the spec samples the library's formula), and the gain ranges (-6 to 57 dB on the Ui24R, -40 to 50 dB on the Ui16 and Ui12). ([specs/soundcraft-ui.yaml:100](specs/soundcraft-ui.yaml#L100))
+- [ ] Check the parameter paths the library does not exercise on every model: delay on line inputs, matrix sends on the Ui16 and Ui12, master dim and the multitrack recorder only on the Ui24R, the number of headphone outputs, and whether the model and firmware arrive as SETS model and firmware. ([specs/soundcraft-ui.yaml:772](specs/soundcraft-ui.yaml#L772))
+- [ ] Check the player's play mode values beyond 0 (manual) and 3 (auto), and the player and multitrack state values (0, 2, 3 and 0, 1, 2). ([specs/soundcraft-ui.yaml:899](specs/soundcraft-ui.yaml#L899))
+
 ## sounddevices-pixnet — Sound Devices / Video Devices PIX and 970 (PIXNET)
 
 - [ ] Check every call against Sound Devices' PIXNET Web API (v1.02), which could not be retrieved: the POST of {} to /sounddevices/settransport/play, stop and rec. ([specs/sounddevices-pixnet.yaml:75](specs/sounddevices-pixnet.yaml#L75))

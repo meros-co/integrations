@@ -427,13 +427,15 @@ pub(crate) fn sole_converted(template: &str, values: &Values) -> Option<Result<f
             None => return Some(Err(format!("'{text}' is not hexadecimal"))),
         }
     } else {
-        if !matches!(kind, ParamType::Int | ParamType::Float) {
-            return Some(Err(format!(
-                "a conversion needs a number, not '{}'",
-                &caps[1]
-            )));
+        match converted_number(value, kind) {
+            Some(x) => x,
+            None => {
+                return Some(Err(format!(
+                    "a conversion needs a number, not '{}'",
+                    &caps[1]
+                )))
+            }
         }
-        value.as_f64()?
     };
     for d in directives {
         x = match apply_conversion(x, d, values) {
@@ -442,6 +444,20 @@ pub(crate) fn sole_converted(template: &str, values: &Values) -> Option<Result<f
         };
     }
     Some(Ok(x))
+}
+
+/// The number a conversion starts from: a numeric parameter, or a capture
+/// holding a decimal number as text (a level a text protocol sends as
+/// `0.75`), which arrives as a string.
+fn converted_number(value: &Value, kind: ParamType) -> Option<f64> {
+    match kind {
+        ParamType::Int | ParamType::Float => value.as_f64(),
+        ParamType::String => value
+            .as_str()
+            .and_then(|s| s.trim().parse::<f64>().ok())
+            .filter(|x| x.is_finite()),
+        _ => None,
+    }
 }
 
 fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String, String> {
@@ -476,12 +492,8 @@ fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String
         .take_while(|d| conversion_directive(d).is_some())
         .count();
     if converted > 0 {
-        if !matches!(kind, ParamType::Int | ParamType::Float) {
-            return Err(format!("a conversion needs a number, not '{name}'"));
-        }
-        let mut x = value
-            .as_f64()
-            .ok_or_else(|| format!("'{name}' is not a number"))?;
+        let mut x = converted_number(value, kind)
+            .ok_or_else(|| format!("a conversion needs a number, not '{name}'"))?;
         for d in &directives[..converted] {
             x = apply_conversion(x, d, values)?;
         }
@@ -967,6 +979,35 @@ mod tests {
         assert_eq!(sole_converted("{y:hex:from.m}", &v), Some(Ok(-21.0)));
         assert!(matches!(sole_converted("{z:hex:from.m}", &v), Some(Err(_))));
         assert_eq!(sole_converted("{x:hex}", &v), None);
+    }
+
+    #[test]
+    fn a_conversion_reads_a_decimal_number_given_as_text() {
+        // A text protocol's capture of a fader position, 0.75, arrives as a
+        // string; text that is not a number still does not convert.
+        let c = conversions(Some(&json!({"f": {"points": [[0.0, -100.0], [1.0, 0.0]]}}))).unwrap();
+        let (p, s) = values(
+            json!({"x": "0.75", "z": "loud"}),
+            "{ x: { type: string }, z: { type: string } }",
+        );
+        let empty = Params::new();
+        let empty_specs = BTreeMap::new();
+        let maps = maps(None).unwrap();
+        let v = Values {
+            params: &p,
+            param_specs: &s,
+            settings: &empty,
+            setting_specs: &empty_specs,
+            conversions: &c,
+            maps: &maps,
+            session: None,
+        };
+        assert_eq!(sole_converted("{x:from.f}", &v), Some(Ok(-25.0)));
+        assert!(matches!(sole_converted("{z:from.f}", &v), Some(Err(_))));
+        assert_eq!(
+            render("{x:from.f:.1f}", &v, |s| s.to_string()).unwrap(),
+            "-25.0"
+        );
     }
 
     #[test]
