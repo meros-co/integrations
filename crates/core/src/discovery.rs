@@ -8,7 +8,7 @@
 //! Sennheiser EW G3/G4 receivers (MCP) are found by `crate::mcp_discovery`,
 //! Sony cameras (SSDP) by `crate::ssdp`, and PJLink Class 2 projectors
 //! (SRCH/ACKN and LKUP on UDP 4352) by `crate::pjlink_discovery`, and
-//! Blackmagic Design devices, Meros Cameras, RTP-MIDI sessions and NMOS
+//! Blackmagic Design devices, Ecamm Live, Meros Cameras, RTP-MIDI sessions and NMOS
 //! Nodes (mDNS / DNS-SD) by `crate::mdns`, NMOS registries advertised in
 //! unicast DNS (DNS-SD) by `crate::dns_sd`, and DMXControl 3's Umbra servers
 //! (their announcements on UDP 17474) by `crate::umbra_discovery`, whose
@@ -41,6 +41,7 @@ pub const PROTOCOLS: &[(&str, &[&str])] = &[
             "blackmagic-multiview",
             "blackmagic-smartview",
             "blackmagic-videohub",
+            "ecamm-live",
             "generic-midi",
             "meros-camera",
             "midi-show-control",
@@ -58,7 +59,7 @@ pub struct DiscoverRequest {
     pub action: DiscoverAction,
     /// Which discovery protocols: `mcp` (Sennheiser G3/G4), `ssdp` (Sony
     /// cameras), `pjlink` (PJLink Class 2 projectors), `mdns` (Blackmagic
-    /// ATEM, Videohub, HyperDeck, SmartView and MultiView, Meros Cameras,
+    /// ATEM, Videohub, HyperDeck, SmartView and MultiView, Ecamm Live, Meros Cameras,
     /// RTP-MIDI sessions, NMOS Nodes and registries), `dns-sd` (NMOS
     /// registries advertised in unicast DNS) and `umbra` (DMXControl 3).
     /// Empty means every protocol that finds a device in this core's
@@ -121,6 +122,7 @@ pub(crate) struct Discovery {
         feature = "blackmagic-multiview",
         feature = "blackmagic-smartview",
         feature = "blackmagic-videohub",
+        feature = "ecamm-live",
         feature = "generic-midi",
         feature = "meros-camera",
         feature = "midi-show-control",
@@ -160,6 +162,7 @@ impl Discovery {
                 feature = "blackmagic-multiview",
                 feature = "blackmagic-smartview",
                 feature = "blackmagic-videohub",
+                feature = "ecamm-live",
                 feature = "generic-midi",
                 feature = "meros-camera",
                 feature = "midi-show-control",
@@ -241,6 +244,7 @@ impl Discovery {
                     feature = "blackmagic-multiview",
                     feature = "blackmagic-smartview",
                     feature = "blackmagic-videohub",
+                    feature = "ecamm-live",
                     feature = "generic-midi",
                     feature = "meros-camera",
                     feature = "midi-show-control",
@@ -279,6 +283,7 @@ impl Discovery {
                     feature = "blackmagic-multiview",
                     feature = "blackmagic-smartview",
                     feature = "blackmagic-videohub",
+                    feature = "ecamm-live",
                     feature = "generic-midi",
                     feature = "meros-camera",
                     feature = "midi-show-control",
@@ -320,6 +325,7 @@ impl Discovery {
                     feature = "blackmagic-multiview",
                     feature = "blackmagic-smartview",
                     feature = "blackmagic-videohub",
+                    feature = "ecamm-live",
                     feature = "generic-midi",
                     feature = "meros-camera",
                     feature = "midi-show-control",

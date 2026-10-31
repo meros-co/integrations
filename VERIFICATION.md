@@ -1661,6 +1661,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that GO, GT, SI and TI take a number without leading zeros (GO7) and the largest number they accept. ([specs/dtvideolabs-playbackpro-plus.yaml:437](specs/dtvideolabs-playbackpro-plus.yaml#L437))
 - [ ] Record the ID inquiry's answer, to read each clip's number and file name apart. ([specs/dtvideolabs-playbackpro-plus.yaml:453](specs/dtvideolabs-playbackpro-plus.yaml#L453))
 
+## ecamm-live — Ecamm Live (Remote API)
+
+- [ ] Record what Ecamm answers a controller it has not allowed yet (Pending) or has denied: the HTTP status and body of a get and of a set command. ([specs/ecamm-live.yaml:792](specs/ecamm-live.yaml#L792))
+- [ ] Confirm the _ecammliveremote._tcp advertisement's SRV port is the Remote API's HTTP port, and whether it carries TXT keys. ([specs/ecamm-live.yaml:78](specs/ecamm-live.yaml#L78))
+- [ ] Check that requests without EcammLive-DeviceName (left out while device_name is empty) are accepted, and whether User-Agent must name a real version. ([specs/ecamm-live.yaml:57](specs/ecamm-live.yaml#L57))
+- [ ] Record the getSceneImage, getVideoImage and getOverlayImage answers: a JSON object with icon, or bare Base64. ([specs/ecamm-live.yaml:162](specs/ecamm-live.yaml#L162))
+- [ ] Record what getChannels returns once destinations are set up (its items' fields), which start_broadcast's channel takes. ([specs/ecamm-live.yaml:544](specs/ecamm-live.yaml#L544))
+- [ ] Confirm setMute and getMute take the bus parameter on current versions (observed, not documented by Ecamm). ([specs/ecamm-live.yaml:217](specs/ecamm-live.yaml#L217))
+- [ ] Confirm setMarker without text adds an untitled marker, and that dialogbox=false adds it without asking. ([specs/ecamm-live.yaml:558](specs/ecamm-live.yaml#L558))
+- [ ] Confirm the getInfo key names for every bus (VOLUME_<BUS>, MUTE_<BUS>) and the guest name keys, which are read only into info. ([specs/ecamm-live.yaml:700](specs/ecamm-live.yaml#L700))
+- [ ] Confirm scene and overlay UUIDs and video paths in getSceneList and getVideoList are as read, and what a group of scenes (Children) looks like. ([specs/ecamm-live.yaml:703](specs/ecamm-live.yaml#L703))
+
 ## eeg-smart-encoder — EEG / AI-Media caption encoders
 
 - [ ] Record what the encoder answers to a command and to the status commands (?, O, +, A, b, S, e), so replies can be checked and status read into state. ([specs/eeg-smart-encoder.yaml:250](specs/eeg-smart-encoder.yaml#L250))

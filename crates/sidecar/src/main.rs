@@ -43,7 +43,7 @@
 //!
 //! `/v1/discover` takes `protocols` among `mcp` (Sennheiser G3/G4), `ssdp`
 //! (Sony cameras), `pjlink` (PJLink projectors), `mdns` (Blackmagic ATEM,
-//! Videohub, HyperDeck, SmartView and MultiView, Meros Cameras, and RTP-MIDI
+//! Videohub, HyperDeck, SmartView and MultiView, Ecamm Live, Meros Cameras, and RTP-MIDI
 //! sessions), `dns-sd` (NMOS registries advertised in unicast DNS) and
 //! `umbra` (DMXControl 3's Umbra servers); none
 //! means every protocol that finds a device in the service's catalogue.

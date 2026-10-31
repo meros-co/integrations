@@ -1,0 +1,810 @@
+spec: 1
+id: ecamm-live
+name: Ecamm Live (Remote API)
+vendor: Ecamm
+category: switcher
+
+# Ecamm Live, the macOS live streaming and recording app, serves its Remote
+# API over HTTP on a port it chooses each time it starts and advertises over
+# Bonjour as _ecammliveremote._tcp; mDNS discovery reports it at that port,
+# which is given when the device is opened. Every request is a GET of
+# /<command>, with parameters URL-encoded in the query: get commands answer
+# JSON (a list under "items", a dictionary, or a one-string array such as
+# ["no"]), set commands answer "Done". Each request carries the client's
+# name and a persistent UUID in headers, and Ecamm asks its user to allow
+# the client in Preferences > Remote Control before obeying it.
+#
+# Many set commands toggle (mute, PIP, an overlay, preview mode, the Zoom
+# controls); the state read back from getInfo and the lists says which way
+# they went.
+source:
+  - title: Ecamm Live Remote API v4.4
+    author: Ecamm Network
+    url: "https://github.com/bitfocus/companion-module-ecamm-live/blob/main/docs/Ecamm%20Live%20Control.pdf"
+    note: >
+      Manufacturer document, as Ecamm gives it to developers (a copy is kept in
+      the Companion module's docs folder, with a Markdown transcription):
+      Bonjour _ecammliveremote._tcp; the User-Agent, EcammLive-UUID,
+      EcammLive-ClientName and optional EcammLive-DeviceName and
+      EcammLive-ClientIcon headers; GET requests, get commands answering
+      JSON and set commands "Done"; getInfo (not more often than every 2 s)
+      and the display, scene, mute, volume (buses mic, mic2, skype, system
+      audio, interview, zoom, soundeffects, movie, guest_1 to guest_4),
+      viewer, camera, source mode, PIP, video, overlay, comment, sound
+      effect, audio filter, preview mode, profile, Ecamm for Zoom, channel,
+      comment, marker, live demo, UI, connection status and new recording
+      commands with their parameters.
+  - title: Bitfocus Companion module companion-module-ecamm-live v4.0.1 (MIT), src/ecamm-api, tests/fixtures, docs/ecamm-live-remote-api-v4.4.md
+    author: Bitfocus contributors
+    url: https://github.com/bitfocus/companion-module-ecamm-live
+    note: >
+      Community code, read for corroboration only (LICENSE is MIT; no code
+      copied). Ecamm binds a new port on every launch; spaces in query
+      values must be %20, not +; scalar answers are one-string arrays;
+      getInfo keys (ButtonLabel, PauseButtonLabel, CurrentScene, Viewers,
+      Mute, PreviewMode, HidingUI, LiveDemo, MUTE_<BUS>, VOLUME_<BUS>, the
+      Zoom flags); list items' title, UUID, CURRENT (scenes) and Visible
+      (overlays); volume 0-100; overlays are listed for the current scene
+      only; getMute and setMute take the bus parameter too (observed on a
+      live install, not documented by Ecamm).
+
+transport:
+  type: http
+  port: null
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  headers:
+    User-Agent: "{settings.client_name}/1.0"
+    EcammLive-UUID: "{settings.client_uuid}"
+    EcammLive-ClientName: "{settings.client_name}"
+    EcammLive-DeviceName: "{settings.device_name}"
+  probe: { method: GET, path: /getConnectionStatus }
+
+settings:
+  client_uuid: { type: string, pattern: '^([0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})?$',
+                 default: "", label: Client UUID,
+                 description: "A GUID naming this controller in Ecamm's Remote Control list, which Ecamm requires; keep it the same between sessions, or Ecamm asks for permission again." }
+  client_name: { type: string, max_length: 64, default: Meros, label: Client name,
+                 description: "The name Ecamm shows its user when asking to allow this controller." }
+  device_name: { type: string, max_length: 64, default: "", label: Device name,
+                 description: "The name of the computer or device this controller runs on, shown beside the client name; leave empty on the Mac running Ecamm Live." }
+
+maps:
+  yes_no: { "true": "true", "false": "false" }
+
+ports:
+  - { port: null, protocol: http, role: control, note: "no fixed port: Ecamm Live chooses one each time it starts and advertises it over Bonjour (_ecammliveremote._tcp), which mDNS discovery reports; give that port when opening the device" }
+  - { port: 5353, protocol: udp, role: discovery, note: "mDNS / DNS-SD: _ecammliveremote._tcp" }
+
+models:
+  - id: ecamm-live
+    name: Ecamm Live (macOS)
+    supports:
+      [get_info, get_button_label, get_pause_button_label, click_button, start_broadcast, click_pause_button,
+       start_new_recording, get_scene_list, get_scene_dict, get_scene_image, get_current_scene, set_scene,
+       next_scene, previous_scene, get_mute, get_bus_mute, toggle_mute, toggle_bus_mute, get_volume, set_volume,
+       get_viewers, get_cameras, get_default_camera, set_camera, get_source_mode, set_source_mode, toggle_pip,
+       get_video_list, get_video_dict, get_video_image, play_video, get_overlay_list, get_overlay_dict,
+       get_overlay_image, toggle_overlay, hide_comment, show_comment, get_sound_list, get_sound_dict, play_sound,
+       set_sound_volume, stop_sound, pause_sound, get_audio_filter_list, get_audio_filter_dict,
+       toggle_audio_filter, toggle_preview_mode, publish_preview, get_profile_list, set_profile, zoom_new_meeting,
+       zoom_leave_meeting, zoom_panel, zoom_video, zoom_audio, zoom_mute_all, zoom_raise_hand, zoom_full_screen,
+       zoom_cloud_record, zoom_local_record, zoom_pause_record, zoom_previous_gallery, zoom_next_gallery,
+       zoom_gallery_speaker, zoom_spotlight_self, get_channels, post_comment, add_marker, add_marker_untitled,
+       get_live_demo, toggle_live_demo, get_hide_show_ui, toggle_hide_show_ui, get_connection_status]
+    verification: none
+    notes: >
+      Ecamm Live 4 on macOS, Remote API v4.4. Ecamm for Zoom commands act
+      only while Ecamm's Zoom integration is in use.
+
+commands:
+  # ── Display and broadcast ────────────────────────────────────────────────
+  get_info:
+    summary: Read the display info (button labels, current scene, viewers, mutes, volumes, Zoom flags); updates state (getInfo)
+    send: { method: GET, path: /getInfo }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_button_label:
+    summary: Read the start button's label, such as Record, Go Live or Stop (getButtonLabel)
+    send: { method: GET, path: /getButtonLabel }
+    expect: { status: 200, json_path: "$[0]" }
+    returns: value
+
+  get_pause_button_label:
+    summary: Read the pause button's label (getPauseButtonLabel)
+    send: { method: GET, path: /getPauseButtonLabel }
+    expect: { status: 200, json_path: "$[0]" }
+    returns: value
+
+  click_button:
+    summary: Click the start (or stop) button, going live to the scheduled event or recording (setClickButton)
+    send: { method: GET, path: /setClickButton }
+    expect: { status: 200 }
+    returns: ack
+
+  start_broadcast:
+    summary: Click the start button for a destination, with a new broadcast's title and description (setClickButton channel, title, desc)
+    params:
+      channel: { type: string, max_length: 128, required: true, label: Destination, description: "The destination's UUID, from get_channels." }
+      title: { type: string, max_length: 200, required: true, label: Title, description: "Title of the new live broadcast." }
+      description: { type: string, max_length: 2000, default: "", label: Description, description: "Description of the new live broadcast." }
+    send: { method: GET, path: /setClickButton, query: { channel: "{channel}", title: "{title}", desc: "{description}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  click_pause_button:
+    summary: Click the pause recording button (setClickPauseButton)
+    send: { method: GET, path: /setClickPauseButton }
+    expect: { status: 200 }
+    returns: ack
+
+  start_new_recording:
+    summary: Start a new recording file while streaming or recording (setStartNewRecording)
+    send: { method: GET, path: /setStartNewRecording }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Scenes ───────────────────────────────────────────────────────────────
+  get_scene_list:
+    summary: List the scenes; updates state (getSceneList)
+    send: { method: GET, path: /getSceneList }
+    expect: { status: 200, json_path: "$.items" }
+    returns: value
+
+  get_scene_dict:
+    summary: Read the scenes as a dictionary (getSceneDict)
+    send: { method: GET, path: /getSceneDict }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_scene_image:
+    summary: Read a scene's last thumbnail, a Base64 JPEG (getSceneImage)
+    params:
+      id: &scene_id { type: string, max_length: 128, required: true, label: Scene, description: "The scene's UUID, from get_scene_list." }
+    send: { method: GET, path: /getSceneImage, query: { id: "{id}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_current_scene:
+    summary: Read the current scene's UUID (getCurrentScene)
+    send: { method: GET, path: /getCurrentScene }
+    expect: { status: 200, json_path: "$[0]" }
+    returns: value
+
+  set_scene:
+    summary: Switch to a scene (setScene)
+    params: { id: *scene_id }
+    send: { method: GET, path: /setScene, query: { id: "{id}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  next_scene:
+    summary: Go to the next scene (setNext)
+    send: { method: GET, path: /setNext }
+    expect: { status: 200 }
+    returns: ack
+
+  previous_scene:
+    summary: Go to the previous scene (setPrev)
+    send: { method: GET, path: /setPrev }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Audio ────────────────────────────────────────────────────────────────
+  get_mute:
+    summary: Read whether the main audio is muted, yes or no (getMute)
+    send: { method: GET, path: /getMute }
+    expect: { status: 200, json_path: "$[0]" }
+    returns: value
+
+  get_bus_mute:
+    summary: Read whether one audio bus is muted, yes or no (getMute bus)
+    params:
+      bus: &bus { type: enum, values: [mic, mic2, skype, system audio, interview, zoom, soundeffects, movie, guest_1, guest_2, guest_3, guest_4],
+                  required: true, label: Audio bus, description: "The audio bus: microphones, Skype, system audio, interview, Zoom, sound effects, movie or a guest." }
+    send: { method: GET, path: /getMute, query: { bus: "{bus}" } }
+    expect: { status: 200, json_path: "$[0]" }
+    returns: value
+
+  toggle_mute:
+    summary: Toggle the main audio mute (setMute)
+    send: { method: GET, path: /setMute }
+    expect: { status: 200 }
+    returns: ack
+
+  toggle_bus_mute:
+    summary: Toggle one audio bus's mute (setMute bus)
+    params: { bus: *bus }
+    send: { method: GET, path: /setMute, query: { bus: "{bus}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_volume:
+    summary: Read an audio bus's volume, 0-100, or N/A where the bus is absent (getVolume)
+    params: { bus: *bus }
+    send: { method: GET, path: /getVolume, query: { bus: "{bus}" } }
+    expect: { status: 200, json_path: "$[0]" }
+    returns: value
+
+  set_volume:
+    summary: Set an audio bus's volume (setVolume)
+    params:
+      bus: *bus
+      volume: &volume { type: int, min: 0, max: 100, required: true, label: Volume, description: "Volume level, 0 (silent) to 100." }
+    send: { method: GET, path: /setVolume, query: { bus: "{bus}", volume: "{volume}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_viewers:
+    summary: Read the number of concurrent viewers (getViewers)
+    send: { method: GET, path: /getViewers }
+    expect: { status: 200, json_path: "$[0]" }
+    returns: value
+
+  # ── Cameras and source ───────────────────────────────────────────────────
+  get_cameras:
+    summary: List the camera inputs; updates state (getInputs)
+    send: { method: GET, path: /getInputs }
+    expect: { status: 200, json_path: "$.items" }
+    returns: value
+
+  get_default_camera:
+    summary: Read the default camera's UUID (getDefaultCamera)
+    send: { method: GET, path: /getDefaultCamera }
+    expect: { status: 200, json_path: "$[0]" }
+    returns: value
+
+  set_camera:
+    summary: Pick a camera (setInput)
+    params:
+      id: { type: string, max_length: 128, required: true, label: Camera, description: "The camera's UUID, from get_cameras." }
+    send: { method: GET, path: /setInput, query: { id: "{id}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_source_mode:
+    summary: Read the source mode, cam, screen or video (getCurrentMode)
+    send: { method: GET, path: /getCurrentMode }
+    expect: { status: 200, json_path: "$[0]" }
+    returns: value
+
+  set_source_mode:
+    summary: Set the source mode (setMode)
+    params:
+      mode: { type: enum, values: [cam, screen, video], required: true, label: Source mode, description: "cam a camera, screen screen sharing, video video playback." }
+    send: { method: GET, path: /setMode, query: { mode: "{mode}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  toggle_pip:
+    summary: Toggle the picture-in-picture (setPIP)
+    send: { method: GET, path: /setPIP }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Video playback ───────────────────────────────────────────────────────
+  get_video_list:
+    summary: List the recently used video files; updates state (getVideoList)
+    send: { method: GET, path: /getVideoList }
+    expect: { status: 200, json_path: "$.items" }
+    returns: value
+
+  get_video_dict:
+    summary: Read the recently used video files as a dictionary (getVideoDict)
+    send: { method: GET, path: /getVideoDict }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_video_image:
+    summary: Read a video's thumbnail, a Base64 JPEG (getVideoImage)
+    params:
+      path: &video_path { type: string, max_length: 1024, required: true, label: Video file, description: "The video's file path on the Mac running Ecamm Live." }
+    send: { method: GET, path: /getVideoImage, query: { id: "{path}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  play_video:
+    summary: Play a video file (setVideo)
+    params: { path: *video_path }
+    send: { method: GET, path: /setVideo, query: { id: "{path}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Overlays and comments ────────────────────────────────────────────────
+  get_overlay_list:
+    summary: List the current scene's overlays; updates state (getOverlayList)
+    send: { method: GET, path: /getOverlayList }
+    expect: { status: 200, json_path: "$.items" }
+    returns: value
+
+  get_overlay_dict:
+    summary: Read the overlays as a dictionary (getOverlayDict)
+    send: { method: GET, path: /getOverlayDict }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_overlay_image:
+    summary: Read an overlay's thumbnail, a Base64 JPEG (getOverlayImage)
+    params:
+      id: &overlay_id { type: string, max_length: 128, required: true, label: Overlay, description: "The overlay's UUID, from get_overlay_list." }
+    send: { method: GET, path: /getOverlayImage, query: { id: "{id}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  toggle_overlay:
+    summary: Toggle an overlay's visibility (setOverlay)
+    params: { id: *overlay_id }
+    send: { method: GET, path: /setOverlay, query: { id: "{id}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  hide_comment:
+    summary: Hide the most recent comment overlay (setHideComment)
+    send: { method: GET, path: /setHideComment }
+    expect: { status: 200 }
+    returns: ack
+
+  show_comment:
+    summary: Show the most recent comment as an overlay (setShowComment)
+    send: { method: GET, path: /setShowComment }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Sound effects ────────────────────────────────────────────────────────
+  get_sound_list:
+    summary: List the sound effects; updates state (getSoundList)
+    send: { method: GET, path: /getSoundList }
+    expect: { status: 200, json_path: "$.items" }
+    returns: value
+
+  get_sound_dict:
+    summary: Read the sound effects as a dictionary (getSoundDict)
+    send: { method: GET, path: /getSoundDict }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  play_sound:
+    summary: Play a sound effect at a volume, choosing what playing it again does (setSound)
+    params:
+      id: { type: string, max_length: 1024, required: true, label: Sound, description: "The sound effect's UUID from get_sound_list, or a sound file's path." }
+      volume: *volume
+      action: { type: enum, values: [stop, loop, restart], default: stop, label: Playback,
+                description: "stop plays once (pressing again stops it), loop repeats, restart starts again from the beginning." }
+    send: { method: GET, path: /setSound, query: { id: "{id}", volume: "{volume}", action: "{action}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  set_sound_volume:
+    summary: Set the volume of the sound playing (setSoundVolume)
+    params: { volume: *volume }
+    send: { method: GET, path: /setSoundVolume, query: { volume: "{volume}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_sound:
+    summary: Stop the sound playing (setSoundStop)
+    send: { method: GET, path: /setSoundStop }
+    expect: { status: 200 }
+    returns: ack
+
+  pause_sound:
+    summary: Pause the sound playing (setSoundPause)
+    send: { method: GET, path: /setSoundPause }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Audio filters ────────────────────────────────────────────────────────
+  get_audio_filter_list:
+    summary: List the audio filters; updates state (getAudioFilterList)
+    send: { method: GET, path: /getAudioFilterList }
+    expect: { status: 200, json_path: "$.items" }
+    returns: value
+
+  get_audio_filter_dict:
+    summary: Read the audio filters as a dictionary (getAudioFilterDict)
+    send: { method: GET, path: /getAudioFilterDict }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  toggle_audio_filter:
+    summary: Toggle an audio filter (setAudioFilter)
+    params:
+      id: { type: string, max_length: 128, required: true, label: Audio filter, description: "The audio filter's UUID, from get_audio_filter_list." }
+    send: { method: GET, path: /setAudioFilter, query: { id: "{id}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Preview mode and profiles ────────────────────────────────────────────
+  toggle_preview_mode:
+    summary: Toggle preview mode, where scene changes wait to be published (setPreviewMode)
+    send: { method: GET, path: /setPreviewMode }
+    expect: { status: 200 }
+    returns: ack
+
+  publish_preview:
+    summary: Publish what preview mode holds to the live output (setPublish)
+    send: { method: GET, path: /setPublish }
+    expect: { status: 200 }
+    returns: ack
+
+  get_profile_list:
+    summary: List the profiles; updates state (getProfileList)
+    send: { method: GET, path: /getProfileList }
+    expect: { status: 200, json_path: "$.items" }
+    returns: value
+
+  set_profile:
+    summary: Switch to another profile (setProfile)
+    params:
+      id: { type: string, max_length: 128, required: true, label: Profile, description: "The profile's UUID, from get_profile_list." }
+    send: { method: GET, path: /setProfile, query: { id: "{id}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Ecamm for Zoom ───────────────────────────────────────────────────────
+  zoom_new_meeting:
+    summary: Start a new Zoom meeting (setZoomNew)
+    params:
+      personal_meeting_id: { type: bool, default: true, label: Personal Meeting ID, description: "On uses your Personal Meeting ID; off a new meeting ID." }
+    send: { method: GET, path: /setZoomNew, query: { pmi: "{personal_meeting_id:map.yes_no}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_leave_meeting:
+    summary: Leave the Zoom meeting, or end it for everyone as host (setZoomLeave)
+    params:
+      end_for_all: { type: bool, default: true, label: End for all, description: "On ends the meeting for everyone (host only); off only leaves it." }
+    send: { method: GET, path: /setZoomLeave, query: { end: "{end_for_all:map.yes_no}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_panel:
+    summary: Show or hide a Zoom meeting panel (setZoomPanel)
+    params:
+      panel: { type: enum, values: [meeting, chat, participants, share], required: true, label: Panel, description: "The panel to show or hide." }
+    send: { method: GET, path: /setZoomPanel, query: { panel: "{panel}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_video:
+    summary: Start or stop your Zoom video (setZoomVideo)
+    send: { method: GET, path: /setZoomVideo }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_audio:
+    summary: Mute or unmute your Zoom microphone (setZoomAudio)
+    send: { method: GET, path: /setZoomAudio }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_mute_all:
+    summary: Mute every participant but the host, as host or co-host (setZoomMuteAll)
+    send: { method: GET, path: /setZoomMuteAll }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_raise_hand:
+    summary: Raise or lower your hand in Zoom (setZoomRaiseHand)
+    send: { method: GET, path: /setZoomRaiseHand }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_full_screen:
+    summary: Toggle the Zoom meeting full screen (setZoomFullScreen)
+    send: { method: GET, path: /setZoomFullScreen }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_cloud_record:
+    summary: Start or stop Zoom cloud recording (setZoomCloudRecord)
+    send: { method: GET, path: /setZoomCloudRecord }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_local_record:
+    summary: Start or stop Zoom local recording (setZoomLocalRecord)
+    send: { method: GET, path: /setZoomLocalRecord }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_pause_record:
+    summary: Pause or resume Zoom local or cloud recording (setZoomPauseRecord)
+    send: { method: GET, path: /setZoomPauseRecord }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_previous_gallery:
+    summary: Go to the previous Zoom gallery page (setZoomPrevGallery)
+    send: { method: GET, path: /setZoomPrevGallery }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_next_gallery:
+    summary: Go to the next Zoom gallery page (setZoomNextGallery)
+    send: { method: GET, path: /setZoomNextGallery }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_gallery_speaker:
+    summary: Switch between Zoom gallery view and speaker view (setZoomGallerySpeaker)
+    send: { method: GET, path: /setZoomGallerySpeaker }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_spotlight_self:
+    summary: Toggle spotlighting yourself in Zoom (setSpotlightSelf)
+    send: { method: GET, path: /setSpotlightSelf }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Other ────────────────────────────────────────────────────────────────
+  get_channels:
+    summary: List the streaming destinations, for start_broadcast; updates state (getChannels)
+    send: { method: GET, path: /getChannels }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  post_comment:
+    summary: Post a comment to Twitch, YouTube or Facebook Pages (setComment)
+    params:
+      text: { type: string, max_length: 2000, required: true, label: Comment, description: "The comment to post to the live broadcast's chat." }
+    send: { method: GET, path: /setComment, query: { text: "{text}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  add_marker:
+    summary: Add a marker with text to the recording (setMarker text, dialogbox)
+    params:
+      text: { type: string, max_length: 500, required: true, label: Marker text, description: "The marker's text." }
+      show_dialog: &marker_dialog { type: bool, default: false, label: Show dialog, description: "On shows Ecamm's marker dialog box." }
+    send: { method: GET, path: /setMarker, query: { text: "{text}", dialogbox: "{show_dialog:map.yes_no}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  add_marker_untitled:
+    summary: Add a marker without text to the recording (setMarker dialogbox)
+    params: { show_dialog: *marker_dialog }
+    send: { method: GET, path: /setMarker, query: { dialogbox: "{show_dialog:map.yes_no}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_live_demo:
+    summary: Read whether Live Demo mode is on, yes or no (getLiveDemo)
+    send: { method: GET, path: /getLiveDemo }
+    expect: { status: 200, json_path: "$[0]" }
+    returns: value
+
+  toggle_live_demo:
+    summary: Toggle Live Demo mode (setLiveDemo)
+    send: { method: GET, path: /setLiveDemo }
+    expect: { status: 200 }
+    returns: ack
+
+  get_hide_show_ui:
+    summary: Read whether the main window's controls are hidden, yes or no (getHideShowUI)
+    send: { method: GET, path: /getHideShowUI }
+    expect: { status: 200, json_path: "$[0]" }
+    returns: value
+
+  toggle_hide_show_ui:
+    summary: Toggle hiding the main window's controls (setHideShowUI)
+    send: { method: GET, path: /setHideShowUI }
+    expect: { status: 200 }
+    returns: ack
+
+  get_connection_status:
+    summary: Read this controller's permission in Ecamm's Remote Control list, Allowed, Denied, Pending or Not Found (getConnectionStatus)
+    send: { method: GET, path: /getConnectionStatus }
+    expect: { status: 200, json_path: "$[0]" }
+    returns: value
+
+state:
+  button_label:              { type: string, description: "The start button's label, such as Record, Go Live or Stop (ButtonLabel)" }
+  pause_button_label:        { type: string, description: "The pause button's label, None when there is none (PauseButtonLabel)" }
+  current_scene:             { type: string, description: "UUID of the current scene (CurrentScene)" }
+  viewers:                   { type: int, description: "Concurrent viewers (Viewers)" }
+  muted:                     { type: bool, description: "Whether the main audio is muted (Mute)" }
+  preview_mode:              { type: bool, description: "Whether preview mode is on (PreviewMode)" }
+  hiding_ui:                 { type: bool, description: "Whether the main window's controls are hidden (HidingUI)" }
+  live_demo:                 { type: bool, description: "Whether Live Demo mode is on (LiveDemo)" }
+  info.*:                    { type: string, description: "Every getInfo value by its key, as Ecamm sends it, such as VOLUME_MIC, MUTE_MIC or a guest name" }
+  zoom.in_meeting:           { type: bool, description: "Whether a Zoom meeting is in progress (ZoomInMeeting)" }
+  zoom.muted:                { type: bool, description: "Whether your Zoom microphone is muted (ZoomMuted)" }
+  zoom.hand_raised:          { type: bool, description: "Whether your hand is raised (ZoomHandRaised)" }
+  zoom.camera_on:            { type: bool, description: "Whether your Zoom video is on (ZoomCamOn)" }
+  zoom.cloud_recording:      { type: bool, description: "Whether Zoom cloud recording runs (ZoomCloudRecording)" }
+  zoom.local_recording:      { type: bool, description: "Whether Zoom local recording runs (ZoomLocalRecording)" }
+  zoom.recording_paused:     { type: bool, description: "Whether Zoom recording is paused (ZoomRecordingPaused)" }
+  zoom.hosting:              { type: bool, description: "Whether you host the Zoom meeting (ZoomHosting)" }
+  scenes.*.title:            { type: string, description: "Scene name, keyed by its UUID" }
+  scenes.*.index:            { type: int, description: "Scene's place in the list, from 0" }
+  scenes.*.current:          { type: bool, description: "Whether the scene is the current one (CURRENT)" }
+  scenes.*.locked:           { type: bool, description: "Whether the scene is locked" }
+  overlays.*.title:          { type: string, description: "Overlay name of the current scene, keyed by its UUID" }
+  overlays.*.visible:        { type: bool, description: "Whether the overlay shows (Visible)" }
+  overlays.*.comment:        { type: bool, description: "Whether the overlay is a comment (IsComment)" }
+  cameras.*.title:           { type: string, description: "Camera name, keyed by its UUID" }
+  default_camera:            { type: string, description: "UUID of the default camera" }
+  source_mode:               { type: string, description: "Source mode: cam, screen or video, as Ecamm sends it" }
+  videos.*.title:            { type: string, description: "Recently used video, keyed by its place in the list" }
+  videos.*.path:             { type: string, description: "The video's file path (UUID), empty for the placeholder Ecamm lists when there is none" }
+  sounds.*.title:            { type: string, description: "Sound effect name, keyed by its UUID" }
+  sounds.*.duration:         { type: float, unit: s, description: "Sound effect length" }
+  audio_filters.*.title:     { type: string, description: "Audio filter name, keyed by its UUID" }
+  profiles.*.title:          { type: string, description: "Profile name, keyed by its UUID" }
+  channels:                  { type: string, description: "The streaming destinations getChannels lists, as JSON text" }
+  connection_status:         { type: string, description: "This controller's permission: Allowed, Denied, Pending or Not Found" }
+
+telemetry:
+  poll:
+    - name: info
+      every_ms: 2000
+      send: [{ method: GET, path: /getInfo }]
+    - name: sources
+      every_ms: 10000
+      send:
+        - { method: GET, path: /getOverlayList }
+        - { method: GET, path: /getCurrentMode }
+        - { method: GET, path: /getDefaultCamera }
+        - { method: GET, path: /getConnectionStatus }
+    - name: lists
+      every_ms: 60000
+      send:
+        - { method: GET, path: /getSceneList }
+        - { method: GET, path: /getInputs }
+        - { method: GET, path: /getProfileList }
+        - { method: GET, path: /getSoundList }
+        - { method: GET, path: /getAudioFilterList }
+        - { method: GET, path: /getVideoList }
+        - { method: GET, path: /getChannels }
+  updates:
+    - path: "^/getInfo$"
+      json:
+        button: "$.ButtonLabel"
+        pause: "$.PauseButtonLabel"
+        scene: "$.CurrentScene"
+        viewers: "$.Viewers"
+        mute: "$.Mute"
+        preview: "$.PreviewMode"
+        hiding: "$.HidingUI"
+        demo: "$.LiveDemo"
+        z_meeting: "$.ZoomInMeeting"
+        z_muted: "$.ZoomMuted"
+        z_hand: "$.ZoomHandRaised"
+        z_cam: "$.ZoomCamOn"
+        z_cloud: "$.ZoomCloudRecording"
+        z_local: "$.ZoomLocalRecording"
+        z_paused: "$.ZoomRecordingPaused"
+        z_host: "$.ZoomHosting"
+      state:
+        button_label: "{button}"
+        pause_button_label: "{pause}"
+        current_scene: "{scene}"
+        viewers: "{viewers}"
+        muted: &yesno_mute { value: "{mute}", map: { "yes": true, "no": false } }
+        preview_mode: { value: "{preview}", map: { "yes": true, "no": false } }
+        hiding_ui: { value: "{hiding}", map: { "yes": true, "no": false } }
+        live_demo: { value: "{demo}", map: { "yes": true, "no": false } }
+        zoom.in_meeting: { value: "{z_meeting}", map: { "yes": true, "no": false } }
+        zoom.muted: { value: "{z_muted}", map: { "yes": true, "no": false } }
+        zoom.hand_raised: { value: "{z_hand}", map: { "yes": true, "no": false } }
+        zoom.camera_on: { value: "{z_cam}", map: { "yes": true, "no": false } }
+        zoom.cloud_recording: { value: "{z_cloud}", map: { "yes": true, "no": false } }
+        zoom.local_recording: { value: "{z_local}", map: { "yes": true, "no": false } }
+        zoom.recording_paused: { value: "{z_paused}", map: { "yes": true, "no": false } }
+        zoom.hosting: { value: "{z_host}", map: { "yes": true, "no": false } }
+    - path: "^/getInfo$"
+      json_each: "$.*"
+      json: { value: "$" }
+      state: { "info.{key:key}": "{value}" }
+    - path: "^/getSceneList$"
+      json_each: "$.items"
+      json: { id: "$.UUID", title: "$.title", current: "$.CURRENT", locked: "$.Locked" }
+      replace: scenes
+      state:
+        "scenes.{id:key}.title": "{title}"
+        "scenes.{id:key}.index": "{index}"
+        "scenes.{id:key}.current": "{current}"
+        "scenes.{id:key}.locked": "{locked}"
+    - path: "^/getCurrentScene$"
+      json: { scene: "$[0]" }
+      state: { current_scene: "{scene}" }
+    - path: "^/getOverlayList$"
+      json_each: "$.items"
+      json: { id: "$.UUID", title: "$.title", visible: "$.Visible", comment: "$.IsComment" }
+      replace: overlays
+      state:
+        "overlays.{id:key}.title": "{title}"
+        "overlays.{id:key}.visible": "{visible}"
+        "overlays.{id:key}.comment": "{comment}"
+    - path: "^/getInputs$"
+      json_each: "$.items"
+      json: { id: "$.UUID", title: "$.title" }
+      replace: cameras
+      state: { "cameras.{id:key}.title": "{title}" }
+    - path: "^/getDefaultCamera$"
+      json: { camera: "$[0]" }
+      state: { default_camera: "{camera}" }
+    - path: "^/getCurrentMode$"
+      json: { mode: "$[0]" }
+      state: { source_mode: "{mode}" }
+    - path: "^/getVideoList$"
+      json_each: "$.items"
+      json: { title: "$.title", path: "$.UUID" }
+      replace: videos
+      state:
+        "videos.{index}.title": "{title}"
+        "videos.{index}.path": "{path}"
+    - path: "^/getSoundList$"
+      json_each: "$.items"
+      json: { id: "$.UUID", title: "$.title", duration: "$.Duration" }
+      replace: sounds
+      state:
+        "sounds.{id:key}.title": "{title}"
+        "sounds.{id:key}.duration": "{duration}"
+    - path: "^/getAudioFilterList$"
+      json_each: "$.items"
+      json: { id: "$.UUID", title: "$.title" }
+      replace: audio_filters
+      state: { "audio_filters.{id:key}.title": "{title}" }
+    - path: "^/getProfileList$"
+      json_each: "$.items"
+      json: { id: "$.UUID", title: "$.title" }
+      replace: profiles
+      state: { "profiles.{id:key}.title": "{title}" }
+    - path: "^/getChannels$"
+      json: { channels: "$" }
+      state: { channels: "{channels}" }
+    - path: "^/getConnectionStatus$"
+      json: { status: "$[0]" }
+      state: { connection_status: "{status}" }
+    - path: "^/getMute$"
+      json: { mute: "$[0]" }
+      state: { muted: *yesno_mute }
+    - path: "^/getLiveDemo$"
+      json: { demo: "$[0]" }
+      state: { live_demo: { value: "{demo}", map: { "yes": true, "no": false } } }
+    - path: "^/getHideShowUI$"
+      json: { hiding: "$[0]" }
+      state: { hiding_ui: { value: "{hiding}", map: { "yes": true, "no": false } } }
+    - path: "^/getViewers$"
+      json: { viewers: "$[0]" }
+      state: { viewers: "{viewers}" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      click_button starts and stops the live broadcast or recording, as the
+      start button does, whichever its label says; zoom_leave_meeting ends
+      the meeting for everyone unless end_for_all is off; publish_preview
+      puts preview mode's scene on air.
+  - models: [all]
+    severity: warning
+    text: >
+      Ecamm Live chooses a new port every time it starts: open the device at
+      the port mDNS discovery reports for _ecammliveremote._tcp, and again
+      after Ecamm restarts. Ecamm obeys a controller only once its user
+      allows it in Preferences > Remote Control; until then
+      connection_status reads Pending, and Denied after a refusal. Set
+      client_uuid to one GUID and keep it, or Ecamm lists the controller
+      anew.
+  - models: [all]
+    severity: warning
+    text: >
+      Many commands toggle (toggle_mute, toggle_bus_mute, toggle_pip,
+      toggle_overlay, toggle_audio_filter, toggle_preview_mode, the Zoom
+      commands, toggle_live_demo, toggle_hide_show_ui): read the state, or
+      the matching get command, before sending one to reach a known
+      setting. Ecamm asks that getInfo be read no more than every 2 s.
+  - models: [all]
+    severity: info
+    text: >
+      API limits: overlays are listed for the current scene only; audio
+      filters' on/off state, sound playback position and per-destination
+      stream health cannot be read; Ecamm documents no answer for a refused
+      or unknown command. getMute and setMute take a bus, which Ecamm does
+      not document; getMute answers no for a bus the Mac does not have.

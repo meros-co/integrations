@@ -1,5 +1,5 @@
-//! Finding Blackmagic Design devices, Meros Cameras, RTP-MIDI sessions and
-//! NMOS Nodes over Multicast DNS and DNS-SD (Bonjour).
+//! Finding Blackmagic Design devices, Ecamm Live, Meros Cameras, RTP-MIDI
+//! sessions and NMOS Nodes over Multicast DNS and DNS-SD (Bonjour).
 //!
 //! Multicast DNS (RFC 6762) carries ordinary DNS messages to 224.0.0.251 on
 //! UDP 5353; DNS-SD (RFC 6763) names each advertised service instance
@@ -35,6 +35,11 @@
 //! Query API is advertised as `_nmos-query._tcp` (Discovery - Registered
 //! Operation), with TXT `pri` (0 to 99 live, 100 and above for development)
 //! and `api_auth` as well, and is reported the same way.
+//!
+//! Ecamm documents its Remote API's advertisement (Ecamm Live Remote API
+//! v4.4): `_ecammliveremote._tcp`, with no TXT keys named. Ecamm Live binds a
+//! new port each time it starts, so an instance is reported at its SRV port,
+//! once per address and port.
 //!
 //! Apple documents RTP-MIDI's advertisement (MIDI Network Driver Protocol):
 //! each session's control port is advertised as `_apple-midi._udp`, its data
@@ -131,6 +136,7 @@ pub(crate) const SPECS: &[&str] = &[
     "blackmagic-multiview",
     "blackmagic-smartview",
     "blackmagic-videohub",
+    "ecamm-live",
     "generic-midi",
     "meros-camera",
     "midi-show-control",
@@ -262,6 +268,15 @@ const RULES: &[Rule] = &[
         class: None,
         spec: "nmos-registry",
         source: "AMWA IS-04 v1.3, Discovery - Registered Operation: a Query API advertised as _nmos-query._tcp, its port in SRV, TXT api_proto, api_ver, api_auth and pri",
+        key_txt: None,
+        srv_port: true,
+        name_txt: None,
+    },
+    Rule {
+        service: "_ecammliveremote._tcp.local",
+        class: None,
+        spec: "ecamm-live",
+        source: "Ecamm Live Remote API v4.4: the Remote API advertised over Bonjour as _ecammliveremote._tcp; Ecamm binds a new port each launch (companion-module-ecamm-live), so the SRV port is the API's",
         key_txt: None,
         srv_port: true,
         name_txt: None,
@@ -1704,6 +1719,7 @@ mod tests {
                 APPLE_MIDI,
                 "_nmos-node._tcp.local",
                 "_nmos-query._tcp.local",
+                "_ecammliveremote._tcp.local",
                 MEROS_CAMERA
             ]
         );
@@ -1956,6 +1972,37 @@ mod tests {
         let events = cache.absorb(LOCAL, &other, Heard::Scan);
         assert_eq!(events.len(), 2);
         assert!(events.iter().all(|e| discovered(e).2 == 5006));
+    }
+
+    /// Ecamm Live's answer: the Remote API as _ecammliveremote._tcp, the
+    /// port it chose at launch in SRV, no TXT keys.
+    #[cfg(feature = "ecamm-live")]
+    #[test]
+    fn ecamm_live_is_reported_at_its_srv_port() {
+        let service = labels(&["_ecammliveremote", "_tcp", "local"]);
+        let instance = labels(&["Studio Mac", "_ecammliveremote", "_tcp", "local"]);
+        let host = labels(&["studio-mac", "local"]);
+        let mut p = header(1, 3);
+        p.extend_from_slice(&service);
+        rr(&mut p, TYPE_PTR, false, 4500, &instance);
+        p.extend_from_slice(&instance);
+        let mut srv = vec![0, 0, 0, 0];
+        srv.extend_from_slice(&54321u16.to_be_bytes());
+        srv.extend_from_slice(&host);
+        rr(&mut p, TYPE_SRV, true, 120, &srv);
+        p.extend_from_slice(&instance);
+        rr(&mut p, TYPE_TXT, true, 4500, &txt_rdata(&[]));
+        p.extend_from_slice(&host);
+        rr(&mut p, TYPE_A, true, 120, &[10, 0, 0, 70]);
+        let mut cache = Cache::new(table());
+        let events = cache.absorb(LOCAL, &parse(&p).unwrap(), Heard::Scan);
+        assert_eq!(events.len(), 1);
+        let (protocol, address, port, device, models, _) = discovered(&events[0]);
+        assert_eq!(
+            (protocol, address, port, device),
+            ("mdns", "10.0.0.70", 54321, "ecamm-live")
+        );
+        assert_eq!(models, ["ecamm-live"]);
     }
 
     /// An NMOS Node's answer, as IS-04 documents it: the Node API as

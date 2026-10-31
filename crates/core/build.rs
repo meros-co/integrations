@@ -154,6 +154,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-disguise", &["disguise"]),
     ("vendor-dmxcontrol", &["dmxcontrol3"]),
     ("vendor-dtvideolabs", &["dtvideolabs-playbackpro-plus"]),
+    ("vendor-ecamm", &["ecamm-live"]),
     ("vendor-eeg", &["eeg-smart-encoder"]),
     ("vendor-epiphan", &["epiphan-pearl"]),
     ("vendor-epson", &["epson-projector"]),

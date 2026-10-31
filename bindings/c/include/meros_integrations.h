@@ -53,7 +53,7 @@ char *mi_open(const MiCore *core, const char *request);
  *           "dns_servers":[...],"dns_domains":[...]}
  * protocols: "mcp" (Sennheiser G3/G4), "ssdp" (Sony cameras), "pjlink"
  * (PJLink projectors), "mdns" (Blackmagic ATEM, Videohub, HyperDeck,
- * SmartView and MultiView, and Meros Cameras), "dns-sd" (NMOS registries in
+ * SmartView and MultiView, Ecamm Live and Meros Cameras), "dns-sd" (NMOS registries in
  * unicast DNS, asked of dns_servers in dns_domains, or of the host's own),
  * "umbra" (DMXControl 3's Umbra servers); none means every protocol that
  * finds a device in this core's catalogue.

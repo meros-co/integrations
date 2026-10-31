@@ -64,6 +64,7 @@ mod mcp_discovery;
     feature = "blackmagic-multiview",
     feature = "blackmagic-smartview",
     feature = "blackmagic-videohub",
+    feature = "ecamm-live",
     feature = "generic-midi",
     feature = "meros-camera",
     feature = "midi-show-control",
