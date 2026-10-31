@@ -689,6 +689,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check GET /List's shape on a camera that sees sources: each member a source's NDI name, its value the address and port; a member whose value holds no digit (the documented {"None":"None"}) is not taken for a source, and a reset or refresh is followed by a read of the list. ([specs/birddog.yaml:3639](specs/birddog.yaml#L3639))
 - [ ] Record the plain-text GET replies of /version, /hostname, /NDIGrpName (quoted names separated by commas assumed, from BirdDog's example) and /NDIOffSnSrc (addresses separated by commas), and what a successful POST to /NDIGrpName and /NDIOffSnSrc answers, which must not be taken for a value. ([specs/birddog.yaml:3982](specs/birddog.yaml#L3982))
 
+## birddog-central — BirdDog Central 2.0 (NDI routing and management software)
+
+- [ ] Confirm Central's control server takes POST /?cmd=<cmd>&subcmd=<subcmd> on port 8080 with its values percent-encoded (the module sends them as they are, a JSON dest value included). ([specs/birddog-central.yaml:48](specs/birddog-central.yaml#L48))
+- [ ] Record what Central answers to each command (connect, add, delete, play) and to one it cannot carry out: an unknown name, or a Pro command on Lite. ([specs/birddog-central.yaml:393](specs/birddog-central.yaml#L393))
+- [ ] Record the server info answer and what access holds on Lite and on Pro. ([specs/birddog-central.yaml:462](specs/birddog-central.yaml#L462))
+- [ ] Confirm the parameters the module sends but may have wrong: source connect with gname to reach a destination group, and dest add_srs and del_srs with hname and format (the module reads them from fields destinations may not have). ([specs/birddog-central.yaml:109](specs/birddog-central.yaml#L109))
+- [ ] Record full answers to router info, gen info and retransmtr info, and what router info's name holds (taken here as the source the router carries). ([specs/birddog-central.yaml:446](specs/birddog-central.yaml#L446))
+
 ## birddog-converters — BirdDog converters and decoders
 
 - [ ] Which converter firmware first serves API 2.0, and whether Studio and Mini units on older firmware answer /about with API 1.0's {"Version":"1.0"}. ([specs/birddog-converters.yaml:1111](specs/birddog-converters.yaml#L1111))

@@ -1,0 +1,546 @@
+spec: 1
+id: birddog-central
+name: BirdDog Central 2.0 (NDI routing and management software)
+vendor: BirdDog
+category: router
+
+# BirdDog Central 2.0 runs on a computer and routes NDI sources to BirdDog
+# decoders and other destinations, with source and destination groups,
+# routers, generators (media players) and retransmitters (Pro). Its control
+# server takes POST requests on port 8080 at /?cmd=<cmd>&subcmd=<subcmd>
+# plus parameters, each answered with JSON. BirdDog publishes no document
+# for it; it is taken from the MIT-licensed Bitfocus Companion module, and
+# every behavior is inferred (quirks, VERIFICATION.md).
+source:
+  - title: companion-module-birddog-central (Bitfocus Companion module, MIT license)
+    author: Bitfocus AS, Jamie McConchie, Bryce Seifert
+    url: https://github.com/bitfocus/companion-module-birddog-central/tree/740dcfae2d47515421d186f3304cb29cd1930f35
+    note: >
+      Read at commit 740dcfae (30 October 2026), MIT license, as the only source of the
+      protocol. index.js: POST http://<host>:8080/?cmd=<cmd>&subcmd=<subcmd>&<key>=<value>...,
+      POST /version, JSON answers; server info (version, access; the Pro features when access
+      is 0 or more), source list (ndi_find_results[0].sources, each host_name and format),
+      dest list (mdns_find_results, each host_name and ip), source and dest fav_gnames
+      (group_names), fav_glist with gname (favourite_source_groups[0] group_name and sources;
+      favourite_destination_groups[0] group_name and destinations), router list (routers,
+      each name) and info with name (router, name, src_group, url), gen list (generators,
+      each group_name), gen info with gname (generators[0]: group_name, loop TRUE or FALSE,
+      playlist, status Playing, Not Playing or Pause), gen srs_list (gen_sources), retransmtr
+      list (retransmitters) and info with name (retransmitters[0]: Name, AudioNDIname,
+      AudioPlayStatus, AudioURL, VideoNDIname, VideoPlayStatus, VideoURL); polls of server
+      info every 10 s and the lists every 3 s. actions.js: source connect with hname, format
+      and dest {"destinations": [<ip>, ...]} or with gname (a destination group); source and
+      dest add_fav_grp, del_fav_grp, add_srs and del_srs (gname, hname, format); router add,
+      del (name), link (gname, name), sconnect (hname, format, name), dconnect (name, dest);
+      gen add_fav_grp and del_fav_grp (gname), add_srs and del_srs (gname, name), play, stop,
+      pause, skip (gname), loop (gname, loop TRUE or FALSE); retransmtr add and delete
+      (name), vconnect and aconnect (hname, format, name), play, stop, astop, vstop (name).
+      companion/HELP.md: Lite (connect, generators) and Pro (groups, routers,
+      retransmitters).
+  - title: BirdDog Central 2.0 product page (read 31 October 2026)
+    author: BirdDog
+    url: https://birddog.tv/central-overview/
+    note: >
+      Manufacturer page: Central Lite 2.0 (free: 2 destinations, 1 media player) and Central
+      PRO 2.0 (unlimited destinations, source and destination groups, group routing, 4
+      routers, re-transmitter), current.
+
+transport:
+  type: http
+  port: 8080
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe: { method: POST, path: /version }
+
+ports:
+  - { port: 8080, protocol: http, role: control, note: "Central's control server on the computer running it" }
+
+models:
+  - id: central-lite
+    name: BirdDog Central Lite 2.0
+    supports: &lite
+      [get_version, get_server_info, list_sources, list_destinations, connect_source,
+      list_generators, get_generator, add_generator, delete_generator, list_generator_media,
+      add_generator_media, remove_generator_media, generator_play, generator_stop,
+      generator_pause, generator_skip, set_generator_loop]
+    verification: none
+  - id: central-pro
+    name: BirdDog Central PRO 2.0
+    supports:
+      [get_version, get_server_info, list_sources, list_destinations, connect_source,
+      list_generators, get_generator, add_generator, delete_generator, list_generator_media,
+      add_generator_media, remove_generator_media, generator_play, generator_stop,
+      generator_pause, generator_skip, set_generator_loop, connect_source_to_destination_group,
+      list_source_groups, get_source_group, add_source_group, delete_source_group,
+      add_source_to_group, remove_source_from_group, list_destination_groups,
+      get_destination_group, add_destination_group, delete_destination_group,
+      add_destination_to_group, remove_destination_from_group, list_routers, get_router,
+      add_router, delete_router, link_router, router_connect_source,
+      router_connect_destinations, list_retransmitters, get_retransmitter, add_retransmitter,
+      delete_retransmitter, retransmitter_video_source, retransmitter_audio_source,
+      retransmitter_play, retransmitter_stop, retransmitter_stop_audio,
+      retransmitter_stop_video]
+    verification: none
+
+commands:
+  get_version:
+    summary: "Read Central's software version (POST /version)"
+    send: { method: POST, path: /version }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_server_info:
+    summary: "Read the server's version and access level, which tells Lite from Pro (server info)"
+    send: { method: POST, path: /, query: { cmd: server, subcmd: info } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Sources and destinations ──────────────────────────────────────────
+  list_sources:
+    summary: "List the NDI sources Central finds, each with its host name and format (source list); also kept in sources"
+    send: { method: POST, path: /, query: { cmd: source, subcmd: list } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_destinations:
+    summary: "List the destinations Central finds, each with its host name and IP address (dest list); also kept in destinations"
+    send: { method: POST, path: /, query: { cmd: dest, subcmd: list } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  connect_source:
+    summary: "Send an NDI source to one or more destinations (source connect)"
+    params:
+      host_name: &host_name { type: string, required: true, max_length: 128, label: Source host, description: "The source's host name as Central lists it (the part before the brackets of an NDI name)." }
+      format: &format { type: string, required: true, max_length: 128, label: Source name, description: "The source's name on its host as Central lists it (format), such as CAM." }
+      destinations: &destinations { type: json, required: true, label: Destinations, description: "JSON array of the destinations' IP addresses as Central lists them, such as [\"10.0.0.21\", \"10.0.0.22\"]." }
+    send: { method: POST, path: /, query: { cmd: source, subcmd: connect, hname: "{host_name}", format: "{format}", dest: "\\{\"destinations\":{destinations}\\}" } }
+    expect: { status: 200 }
+    returns: ack
+  connect_source_to_destination_group:
+    summary: "Send an NDI source to every destination of a destination group (source connect with gname, Pro)"
+    params:
+      group: &dest_group { type: string, required: true, max_length: 128, label: Destination group, description: "The destination group's name." }
+      host_name: *host_name
+      format: *format
+    send: { method: POST, path: /, query: { cmd: source, subcmd: connect, gname: "{group}", hname: "{host_name}", format: "{format}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Source groups (Pro) ───────────────────────────────────────────────
+  list_source_groups:
+    summary: "List the source groups' names (source fav_gnames)"
+    send: { method: POST, path: /, query: { cmd: source, subcmd: fav_gnames } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_source_group:
+    summary: "Read a source group's sources (source fav_glist)"
+    params:
+      group: &src_group { type: string, required: true, max_length: 128, label: Source group, description: "The source group's name." }
+    send: { method: POST, path: /, query: { cmd: source, subcmd: fav_glist, gname: "{group}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  add_source_group:
+    summary: "Create a source group (source add_fav_grp)"
+    params: { group: *src_group }
+    send: { method: POST, path: /, query: { cmd: source, subcmd: add_fav_grp, gname: "{group}" } }
+    expect: { status: 200 }
+    returns: ack
+  delete_source_group:
+    summary: "Delete a source group (source del_fav_grp)"
+    params: { group: *src_group }
+    send: { method: POST, path: /, query: { cmd: source, subcmd: del_fav_grp, gname: "{group}" } }
+    expect: { status: 200 }
+    returns: ack
+  add_source_to_group:
+    summary: "Add an NDI source to a source group (source add_srs)"
+    params: { group: *src_group, host_name: *host_name, format: *format }
+    send: { method: POST, path: /, query: { cmd: source, subcmd: add_srs, gname: "{group}", hname: "{host_name}", format: "{format}" } }
+    expect: { status: 200 }
+    returns: ack
+  remove_source_from_group:
+    summary: "Remove an NDI source from a source group (source del_srs)"
+    params: { group: *src_group, host_name: *host_name, format: *format }
+    send: { method: POST, path: /, query: { cmd: source, subcmd: del_srs, gname: "{group}", hname: "{host_name}", format: "{format}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Destination groups (Pro) ──────────────────────────────────────────
+  list_destination_groups:
+    summary: "List the destination groups' names (dest fav_gnames)"
+    send: { method: POST, path: /, query: { cmd: dest, subcmd: fav_gnames } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_destination_group:
+    summary: "Read a destination group's destinations (dest fav_glist)"
+    params: { group: *dest_group }
+    send: { method: POST, path: /, query: { cmd: dest, subcmd: fav_glist, gname: "{group}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  add_destination_group:
+    summary: "Create a destination group (dest add_fav_grp)"
+    params: { group: *dest_group }
+    send: { method: POST, path: /, query: { cmd: dest, subcmd: add_fav_grp, gname: "{group}" } }
+    expect: { status: 200 }
+    returns: ack
+  delete_destination_group:
+    summary: "Delete a destination group (dest del_fav_grp)"
+    params: { group: *dest_group }
+    send: { method: POST, path: /, query: { cmd: dest, subcmd: del_fav_grp, gname: "{group}" } }
+    expect: { status: 200 }
+    returns: ack
+  add_destination_to_group:
+    summary: "Add a destination to a destination group (dest add_srs)"
+    params:
+      group: *dest_group
+      host_name: &dest_host { type: string, required: true, max_length: 128, label: Destination host, description: "The destination's host name as Central lists it." }
+      format: &dest_format { type: string, default: "", max_length: 128, label: Destination format, description: "The destination's format as Central lists it, if it gives one; empty otherwise." }
+    send: { method: POST, path: /, query: { cmd: dest, subcmd: add_srs, gname: "{group}", hname: "{host_name}", format: "{format}" } }
+    expect: { status: 200 }
+    returns: ack
+  remove_destination_from_group:
+    summary: "Remove a destination from a destination group (dest del_srs)"
+    params: { group: *dest_group, host_name: *dest_host, format: *dest_format }
+    send: { method: POST, path: /, query: { cmd: dest, subcmd: del_srs, gname: "{group}", hname: "{host_name}", format: "{format}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Routers (Pro) ─────────────────────────────────────────────────────
+  list_routers:
+    summary: "List the routers (router list); also kept in routers"
+    send: { method: POST, path: /, query: { cmd: router, subcmd: list } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_router:
+    summary: "Read a router: its source group, the source it carries and its URL (router info)"
+    params:
+      router: &router { type: string, required: true, max_length: 128, label: Router, description: "The router's name." }
+    send: { method: POST, path: /, query: { cmd: router, subcmd: info, name: "{router}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  add_router:
+    summary: "Create a router (router add)"
+    params: { router: *router }
+    send: { method: POST, path: /, query: { cmd: router, subcmd: add, name: "{router}" } }
+    expect: { status: 200 }
+    returns: ack
+  delete_router:
+    summary: "Delete a router (router del)"
+    params: { router: *router }
+    send: { method: POST, path: /, query: { cmd: router, subcmd: del, name: "{router}" } }
+    expect: { status: 200 }
+    returns: ack
+  link_router:
+    summary: "Link a source group to a router, whose sources it then switches between (router link)"
+    params: { group: *src_group, router: *router }
+    send: { method: POST, path: /, query: { cmd: router, subcmd: link, gname: "{group}", name: "{router}" } }
+    expect: { status: 200 }
+    returns: ack
+  router_connect_source:
+    summary: "Switch a router to an NDI source (router sconnect)"
+    params: { router: *router, host_name: *host_name, format: *format }
+    send: { method: POST, path: /, query: { cmd: router, subcmd: sconnect, hname: "{host_name}", format: "{format}", name: "{router}" } }
+    expect: { status: 200 }
+    returns: ack
+  router_connect_destinations:
+    summary: "Send a router's output to one or more destinations (router dconnect)"
+    params: { router: *router, destinations: *destinations }
+    send: { method: POST, path: /, query: { cmd: router, subcmd: dconnect, name: "{router}", dest: "\\{\"destinations\":{destinations}\\}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Generators ────────────────────────────────────────────────────────
+  list_generators:
+    summary: "List the generators (gen list); also kept in generators"
+    send: { method: POST, path: /, query: { cmd: gen, subcmd: list } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_generator:
+    summary: "Read a generator: its playlist, loop and play status (gen info)"
+    params:
+      generator: &generator { type: string, required: true, max_length: 128, label: Generator, description: "The generator's name." }
+    send: { method: POST, path: /, query: { cmd: gen, subcmd: info, gname: "{generator}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  add_generator:
+    summary: "Create a generator (gen add_fav_grp)"
+    params: { generator: *generator }
+    send: { method: POST, path: /, query: { cmd: gen, subcmd: add_fav_grp, gname: "{generator}" } }
+    expect: { status: 200 }
+    returns: ack
+  delete_generator:
+    summary: "Delete a generator (gen del_fav_grp)"
+    params: { generator: *generator }
+    send: { method: POST, path: /, query: { cmd: gen, subcmd: del_fav_grp, gname: "{generator}" } }
+    expect: { status: 200 }
+    returns: ack
+  list_generator_media:
+    summary: "List the media files generators can play (gen srs_list); also kept in generator_media"
+    send: { method: POST, path: /, query: { cmd: gen, subcmd: srs_list } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  add_generator_media:
+    summary: "Add a media file to a generator's playlist (gen add_srs)"
+    params:
+      generator: *generator
+      media: &media { type: string, required: true, max_length: 255, label: Media, description: "The media file's name as list_generator_media gives it." }
+    send: { method: POST, path: /, query: { cmd: gen, subcmd: add_srs, gname: "{generator}", name: "{media}" } }
+    expect: { status: 200 }
+    returns: ack
+  remove_generator_media:
+    summary: "Remove a media file from a generator's playlist (gen del_srs)"
+    params: { generator: *generator, media: *media }
+    send: { method: POST, path: /, query: { cmd: gen, subcmd: del_srs, gname: "{generator}", name: "{media}" } }
+    expect: { status: 200 }
+    returns: ack
+  generator_play:
+    summary: "Play a generator's playlist (gen play)"
+    params: { generator: *generator }
+    send: { method: POST, path: /, query: { cmd: gen, subcmd: play, gname: "{generator}" } }
+    expect: { status: 200 }
+    returns: ack
+  generator_stop:
+    summary: "Stop a generator (gen stop)"
+    params: { generator: *generator }
+    send: { method: POST, path: /, query: { cmd: gen, subcmd: stop, gname: "{generator}" } }
+    expect: { status: 200 }
+    returns: ack
+  generator_pause:
+    summary: "Pause a generator (gen pause)"
+    params: { generator: *generator }
+    send: { method: POST, path: /, query: { cmd: gen, subcmd: pause, gname: "{generator}" } }
+    expect: { status: 200 }
+    returns: ack
+  generator_skip:
+    summary: "Skip to a generator's next media file (gen skip)"
+    params: { generator: *generator }
+    send: { method: POST, path: /, query: { cmd: gen, subcmd: skip, gname: "{generator}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_generator_loop:
+    summary: "Loop a generator's playlist or play it once (gen loop)"
+    params:
+      generator: *generator
+      loop: { type: bool, required: true, label: Loop, description: "On loops the playlist, off plays it once." }
+    send: { method: POST, path: /, query: { cmd: gen, subcmd: loop, gname: "{generator}", loop: "{loop:map.loop}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Retransmitters (Pro) ──────────────────────────────────────────────
+  list_retransmitters:
+    summary: "List the retransmitters (retransmtr list); also kept in retransmitters"
+    send: { method: POST, path: /, query: { cmd: retransmtr, subcmd: list } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_retransmitter:
+    summary: "Read a retransmitter: its video and audio sources, their play status and URLs (retransmtr info)"
+    params:
+      retransmitter: &retransmitter { type: string, required: true, max_length: 128, label: Retransmitter, description: "The retransmitter's name." }
+    send: { method: POST, path: /, query: { cmd: retransmtr, subcmd: info, name: "{retransmitter}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  add_retransmitter:
+    summary: "Create a retransmitter (retransmtr add)"
+    params: { retransmitter: *retransmitter }
+    send: { method: POST, path: /, query: { cmd: retransmtr, subcmd: add, name: "{retransmitter}" } }
+    expect: { status: 200 }
+    returns: ack
+  delete_retransmitter:
+    summary: "Delete a retransmitter (retransmtr delete)"
+    params: { retransmitter: *retransmitter }
+    send: { method: POST, path: /, query: { cmd: retransmtr, subcmd: delete, name: "{retransmitter}" } }
+    expect: { status: 200 }
+    returns: ack
+  retransmitter_video_source:
+    summary: "Take a retransmitter's video from an NDI source (retransmtr vconnect)"
+    params: { retransmitter: *retransmitter, host_name: *host_name, format: *format }
+    send: { method: POST, path: /, query: { cmd: retransmtr, subcmd: vconnect, hname: "{host_name}", format: "{format}", name: "{retransmitter}" } }
+    expect: { status: 200 }
+    returns: ack
+  retransmitter_audio_source:
+    summary: "Take a retransmitter's audio from an NDI source (retransmtr aconnect)"
+    params: { retransmitter: *retransmitter, host_name: *host_name, format: *format }
+    send: { method: POST, path: /, query: { cmd: retransmtr, subcmd: aconnect, hname: "{host_name}", format: "{format}", name: "{retransmitter}" } }
+    expect: { status: 200 }
+    returns: ack
+  retransmitter_play:
+    summary: "Start a retransmitter (retransmtr play)"
+    params: { retransmitter: *retransmitter }
+    send: { method: POST, path: /, query: { cmd: retransmtr, subcmd: play, name: "{retransmitter}" } }
+    expect: { status: 200 }
+    returns: ack
+  retransmitter_stop:
+    summary: "Stop a retransmitter (retransmtr stop)"
+    params: { retransmitter: *retransmitter }
+    send: { method: POST, path: /, query: { cmd: retransmtr, subcmd: stop, name: "{retransmitter}" } }
+    expect: { status: 200 }
+    returns: ack
+  retransmitter_stop_audio:
+    summary: "Stop a retransmitter's audio (retransmtr astop)"
+    params: { retransmitter: *retransmitter }
+    send: { method: POST, path: /, query: { cmd: retransmtr, subcmd: astop, name: "{retransmitter}" } }
+    expect: { status: 200 }
+    returns: ack
+  retransmitter_stop_video:
+    summary: "Stop a retransmitter's video (retransmtr vstop)"
+    params: { retransmitter: *retransmitter }
+    send: { method: POST, path: /, query: { cmd: retransmtr, subcmd: vstop, name: "{retransmitter}" } }
+    expect: { status: 200 }
+    returns: ack
+
+maps:
+  loop: { "true": "TRUE", "false": "FALSE" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      BirdDog does not document Central's control server: it is read from an MIT-licensed
+      third-party module, and may change between versions. Open the device at the computer
+      running Central, port 8080. Requests are POSTs with their parameters in the query, which
+      the core percent-encodes (the module sends them as they are). Commands report done on an
+      HTTP 200; what Central answers to a request it cannot carry out (a name that does not
+      exist, a Pro request to Lite) is not known.
+  - models: [all]
+    severity: info
+    text: >
+      While monitoring, the server is read every 10 s and the sources, destinations, groups,
+      routers, generators, generator media and retransmitters every 3 s, each router, generator
+      and retransmitter read in turn after its list. Sources are kept by their place in Central's list,
+      destinations by host name, and the details of routers, generators and retransmitters by
+      name; one deleted keeps its details in state until the device is opened again. Groups, routers and retransmitters are
+      read on Lite too, where Central is assumed to answer them empty or with an error.
+  - models: [all]
+    severity: critical
+    text: >
+      connect_source, router_connect_source and router_connect_destinations change what
+      decoders and displays show at once; delete_* commands remove a group, router, generator or
+      retransmitter with no undo.
+
+state:
+  server.version:  { type: string, description: "Central's version (server info)" }
+  server.access:   { type: int, description: "Central's access level (server info); the module offers the Pro features when it is 0 or more" }
+  sources.*.host_name: { type: string, description: "An NDI source's host name, by its place in Central's list from 0" }
+  sources.*.format:    { type: string, description: "An NDI source's name on its host (format)" }
+  destinations.*.ip:   { type: string, description: "A destination's IP address, keyed by its host name" }
+  source_groups.*.name:            { type: string, description: "A source group's name, by its place in Central's list from 0" }
+  source_groups_members.*.*.host_name: { type: string, description: "The host name of each source of a source group, by group name and place from 0" }
+  source_groups_members.*.*.format:    { type: string, description: "The name on its host of each source of a source group" }
+  destination_groups.*.name:       { type: string, description: "A destination group's name, by its place in Central's list from 0" }
+  destination_groups_members.*.*.host_name: { type: string, description: "The host name of each destination of a destination group, by group name and place from 0" }
+  router_names.*:      { type: string, description: "Each router's name, by its place in Central's list from 0" }
+  generator_names.*:   { type: string, description: "Each generator's name, by its place in Central's list from 0" }
+  retransmitter_names.*: { type: string, description: "Each retransmitter's name, by its place in Central's list from 0" }
+  routers.*.source:    { type: string, description: "The source a router carries, keyed by router name" }
+  routers.*.source_group: { type: string, description: "The source group linked to a router" }
+  routers.*.url:       { type: string, description: "A router's URL as Central gives it" }
+  generators.*.status: { type: string, description: "A generator's play status: Playing, Not Playing or Pause, keyed by generator name" }
+  generators.*.loop:   { type: bool, description: "Whether a generator loops its playlist" }
+  generators.*.playlist: { type: string, description: "A generator's playlist as Central gives it, as JSON text" }
+  generator_media.*:   { type: string, description: "Each media file generators can play, by its place in Central's list from 0" }
+  retransmitters.*.audio_source: { type: string, description: "The NDI source a retransmitter's audio comes from, keyed by retransmitter name" }
+  retransmitters.*.audio_status: { type: string, description: "A retransmitter's audio play status" }
+  retransmitters.*.audio_url:    { type: string, description: "A retransmitter's audio URL" }
+  retransmitters.*.video_source: { type: string, description: "The NDI source a retransmitter's video comes from" }
+  retransmitters.*.video_status: { type: string, description: "A retransmitter's video play status" }
+  retransmitters.*.video_url:    { type: string, description: "A retransmitter's video URL" }
+
+telemetry:
+  poll:
+    - every_ms: 10000
+      send:
+        - { method: POST, path: /, query: { cmd: server, subcmd: info } }
+    - every_ms: 3000
+      send:
+        - { method: POST, path: /, query: { cmd: source, subcmd: list } }
+        - { method: POST, path: /, query: { cmd: dest, subcmd: list } }
+        - { method: POST, path: /, query: { cmd: gen, subcmd: srs_list } }
+        - { method: POST, path: /, query: { cmd: gen, subcmd: list } }
+        - { method: POST, path: /, query: { cmd: source, subcmd: fav_gnames } }
+        - { method: POST, path: /, query: { cmd: dest, subcmd: fav_gnames } }
+        - { method: POST, path: /, query: { cmd: router, subcmd: list } }
+        - { method: POST, path: /, query: { cmd: retransmtr, subcmd: list } }
+  updates:
+    - path: '^/\?cmd=server&subcmd=info$'
+      json: { version: "$.version", access: "$.access" }
+      state: { server.version: "{version}", server.access: "{access}" }
+    - path: '^/\?cmd=source&subcmd=list$'
+      json_each: "$.ndi_find_results[0].sources"
+      json: { host: "$.host_name", format: "$.format" }
+      replace: sources
+      state: { "sources.{index}.host_name": "{host}", "sources.{index}.format": "{format}" }
+    - path: '^/\?cmd=dest&subcmd=list$'
+      json_each: "$.mdns_find_results"
+      json: { host: "$.host_name", ip: "$.ip" }
+      replace: destinations
+      state: { "destinations.{host:key}.ip": "{ip}" }
+    - path: '^/\?cmd=source&subcmd=fav_gnames$'
+      json_each: "$.group_names"
+      json: { name: "$" }
+      replace: source_groups
+      state: { "source_groups.{index}.name": "{name}" }
+      then_send: [{ method: POST, path: /, query: { cmd: source, subcmd: fav_glist, gname: "{name}" } }]
+    - path: '^/\?cmd=source&subcmd=fav_glist&gname=([^&]+)$'
+      json_each: "$.favourite_source_groups[*].sources"
+      json: { group: "$^.group_name", host: "$.host_name", format: "$.format" }
+      replace: "source_groups_members.{1:url_decode:key}"
+      state: { "source_groups_members.{group:key}.{index}.host_name": "{host}", "source_groups_members.{group:key}.{index}.format": "{format}" }
+    - path: '^/\?cmd=dest&subcmd=fav_gnames$'
+      json_each: "$.group_names"
+      json: { name: "$" }
+      replace: destination_groups
+      state: { "destination_groups.{index}.name": "{name}" }
+      then_send: [{ method: POST, path: /, query: { cmd: dest, subcmd: fav_glist, gname: "{name}" } }]
+    - path: '^/\?cmd=dest&subcmd=fav_glist&gname=([^&]+)$'
+      json_each: "$.favourite_destination_groups[*].destinations"
+      json: { group: "$^.group_name", host: "$.host_name" }
+      replace: "destination_groups_members.{1:url_decode:key}"
+      state: { "destination_groups_members.{group:key}.{index}.host_name": "{host}" }
+    - path: '^/\?cmd=router&subcmd=list$'
+      json_each: "$.routers"
+      json: { name: "$.name" }
+      replace: router_names
+      state: { "router_names.{index}": "{name}" }
+      then_send: [{ method: POST, path: /, query: { cmd: router, subcmd: info, name: "{name}" } }]
+    - path: '^/\?cmd=router&subcmd=info&name=([^&]+)$'
+      json: { router: "$.router", source: "$.name", group: "$.src_group", url: "$.url" }
+      state: { "routers.{router:key}.source": "{source}", "routers.{router:key}.source_group": "{group}", "routers.{router:key}.url": "{url}" }
+    - path: '^/\?cmd=gen&subcmd=list$'
+      json_each: "$.generators"
+      json: { name: "$.group_name" }
+      replace: generator_names
+      state: { "generator_names.{index}": "{name}" }
+      then_send: [{ method: POST, path: /, query: { cmd: gen, subcmd: info, gname: "{name}" } }]
+    - path: '^/\?cmd=gen&subcmd=(?:info|add_srs|del_srs|play|stop|pause|skip|loop)&gname='
+      json_each: "$.generators"
+      json: { name: "$.group_name", status: "$.status", loop: "$.loop", playlist: "$.playlist" }
+      state:
+        "generators.{name:key}.status": "{status}"
+        "generators.{name:key}.loop": { value: "{loop}", map: { "TRUE": true, "FALSE": false, "true": true, "false": false } }
+        "generators.{name:key}.playlist": "{playlist}"
+    - path: '^/\?cmd=gen&subcmd=srs_list$'
+      json_each: "$.gen_sources"
+      json: { name: "$" }
+      replace: generator_media
+      state: { "generator_media.{index}": "{name}" }
+    - path: '^/\?cmd=retransmtr&subcmd=list$'
+      json_each: "$.retransmitters"
+      json: { name: "$" }
+      replace: retransmitter_names
+      state: { "retransmitter_names.{index}": "{name}" }
+      then_send: [{ method: POST, path: /, query: { cmd: retransmtr, subcmd: info, name: "{name}" } }]
+    - path: '^/\?cmd=retransmtr&subcmd=(?:info|vconnect|aconnect|vstop|astop|stop|play)&'
+      json_each: "$.retransmitters"
+      json:
+        name: "$.Name"
+        audio_source: "$.AudioNDIname"
+        audio_status: "$.AudioPlayStatus"
+        audio_url: "$.AudioURL"
+        video_source: "$.VideoNDIname"
+        video_status: "$.VideoPlayStatus"
+        video_url: "$.VideoURL"
+      state:
+        "retransmitters.{name:key}.audio_source": "{audio_source}"
+        "retransmitters.{name:key}.audio_status": "{audio_status}"
+        "retransmitters.{name:key}.audio_url": "{audio_url}"
+        "retransmitters.{name:key}.video_source": "{video_source}"
+        "retransmitters.{name:key}.video_status": "{video_status}"
+        "retransmitters.{name:key}.video_url": "{video_url}"

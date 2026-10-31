@@ -80,7 +80,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &["behringer-wing", "behringer-x32", "behringer-xair"],
     ),
     ("vendor-biamp", &["biamp-tesira"]),
-    ("vendor-birddog", &["birddog", "birddog-converters"]),
+    ("vendor-birddog", &["birddog", "birddog-central", "birddog-converters"]),
     (
         "vendor-blackmagic",
         &[
