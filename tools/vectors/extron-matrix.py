@@ -408,6 +408,7 @@ text(K, "get_firmware_verbose", {}, "0Q\r", device_reply="1.23-1.00(1.06-16x16 S
 text(K, "clear_global_presets", {}, E + "ZG\r", device_reply="Zpg\r\n", expect_result=ACK)
 text(K, "clear_global_preset", {"preset": 5}, E + "5ZG\r", device_reply="Zpg05\r\n", expect_result=ACK)
 text(K, "reset_output_volumes", {}, E + "ZV\r", device_reply="Zpv\r\n", expect_result=ACK)
+text(K, "mmx_reset_audio_levels", {}, E + "ZA\r", device_reply="Zpa\r\n", expect_result=ACK, **XM_MT)
 text(K, "reset_all_mutes", {}, E + "ZZ\r", device_reply="Zpz\r\n", expect_result=ACK)
 text(K, "reset_level_peaking", {}, E + "ZT\r", device_reply="Zpt\r\n", expect_result=ACK)
 text(K, "reset_skew", {}, E + "ZK\r", device_reply="Zpk\r\n", expect_result=ACK)
