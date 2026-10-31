@@ -4399,23 +4399,23 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Confirm how the player ends its messages: "ack" and "nack" with or without CR, and statuses (such as !7SSTPL) ended by CR; TEAC's later document shows them without CR. ([specs/tascam-bd-mp1.yaml:50](specs/tascam-bd-mp1.yaml#L50))
 - [ ] Confirm the host's ACK is "ack" alone (no CR after it), that each status notification answered by it is not sent again, and that a status request's own answer and ?PWR's ack want none. ([specs/tascam-bd-mp1.yaml:56](specs/tascam-bd-mp1.yaml#L56))
-- [ ] Confirm a status request is answered "ack" first, then the status, and a set with "ack" alone. ([specs/tascam-bd-mp1.yaml:134](specs/tascam-bd-mp1.yaml#L134))
-- [ ] Confirm the status notifications of the chapter and chapter count use the short forms TN and TT, the answers TNM and TTN. ([specs/tascam-bd-mp1.yaml:649](specs/tascam-bd-mp1.yaml#L649))
-- [ ] Confirm the answer to ?SCN is the direction and speed letters (!7SCNFf). ([specs/tascam-bd-mp1.yaml:675](specs/tascam-bd-mp1.yaml#L675))
-- [ ] Confirm the BD-MP1MKII's color keys are CBCX1-CBCX4 as its document writes them, not CBC1-CBC4. ([specs/tascam-bd-mp1.yaml:287](specs/tascam-bd-mp1.yaml#L287))
-- [ ] Confirm power on works only on RS-232C, and that get_power gets no answer in standby. ([specs/tascam-bd-mp1.yaml:131](specs/tascam-bd-mp1.yaml#L131))
-- [ ] Confirm the speaker setting's level form (a sign and two digits) and the delay's unit (centimeters on the BD-MP1MKII, milliseconds on the BD-MP1) and range. ([specs/tascam-bd-mp1.yaml:473](specs/tascam-bd-mp1.yaml#L473))
+- [ ] Confirm a status request is answered "ack" first, then the status, and a set with "ack" alone. ([specs/tascam-bd-mp1.yaml:129](specs/tascam-bd-mp1.yaml#L129))
+- [ ] Confirm the status notifications of the chapter and chapter count use the short forms TN and TT, the answers TNM and TTN. ([specs/tascam-bd-mp1.yaml:643](specs/tascam-bd-mp1.yaml#L643))
+- [ ] Confirm the answer to ?SCN is the direction and speed letters (!7SCNFf). ([specs/tascam-bd-mp1.yaml:669](specs/tascam-bd-mp1.yaml#L669))
+- [ ] Confirm the BD-MP1MKII's color keys are CBCX1-CBCX4 as its document writes them, not CBC1-CBC4. ([specs/tascam-bd-mp1.yaml:282](specs/tascam-bd-mp1.yaml#L282))
+- [ ] Confirm get_power gets no answer in standby. ([specs/tascam-bd-mp1.yaml:128](specs/tascam-bd-mp1.yaml#L128))
+- [ ] Confirm the speaker setting's level form (a sign and two digits) and the delay's unit (centimeters on the BD-MP1MKII, milliseconds on the BD-MP1) and range. ([specs/tascam-bd-mp1.yaml:468](specs/tascam-bd-mp1.yaml#L468))
 
 ## tascam-bd-mp4k — TASCAM BD-MP4K
 
-- [ ] Confirm how the player ends its messages: "ack" and "nack" with or without CR, and statuses (such as !7SSTPL) ended by CR; Ver. 1.01 shows them without CR. ([specs/tascam-bd-mp4k.yaml:48](specs/tascam-bd-mp4k.yaml#L48))
-- [ ] Confirm the host's ACK is "ack" alone (no CR after it), that each status notification answered by it is not sent again, and that a status request's own answer and ?PWR's ack want none. ([specs/tascam-bd-mp4k.yaml:54](specs/tascam-bd-mp4k.yaml#L54))
-- [ ] Confirm a status request is answered "ack" first, then the status, and a set with "ack" alone. ([specs/tascam-bd-mp4k.yaml:149](specs/tascam-bd-mp4k.yaml#L149))
-- [ ] Confirm the status notifications of the chapter and chapter count use the short forms TN and TT, the answers TNM and TTN. ([specs/tascam-bd-mp4k.yaml:765](specs/tascam-bd-mp4k.yaml#L765))
-- [ ] Confirm the downmix is read with ?DNM (as the document gives it) and answered DMX. ([specs/tascam-bd-mp4k.yaml:629](specs/tascam-bd-mp4k.yaml#L629))
-- [ ] Confirm the color adjustment answer is the color letter then three signed two-digit values (!7MVCR+01-02+03). ([specs/tascam-bd-mp4k.yaml:830](specs/tascam-bd-mp4k.yaml#L830))
-- [ ] Confirm power on works only on RS-232C at 57600 bit/s, and that get_power gets no answer in standby. ([specs/tascam-bd-mp4k.yaml:146](specs/tascam-bd-mp4k.yaml#L146))
-- [ ] Confirm the speaker level's form, four characters in tenths of a dB rounded to 0 or 5, and the delay in centimeters. ([specs/tascam-bd-mp4k.yaml:485](specs/tascam-bd-mp4k.yaml#L485))
+- [ ] Confirm how the player ends its messages: "ack" and "nack" with or without CR, and statuses (such as !7SSTPL) ended by CR; Ver. 1.01 shows them without CR. ([specs/tascam-bd-mp4k.yaml:45](specs/tascam-bd-mp4k.yaml#L45))
+- [ ] Confirm the host's ACK is "ack" alone (no CR after it), that each status notification answered by it is not sent again, and that a status request's own answer and ?PWR's ack want none. ([specs/tascam-bd-mp4k.yaml:51](specs/tascam-bd-mp4k.yaml#L51))
+- [ ] Confirm a status request is answered "ack" first, then the status, and a set with "ack" alone. ([specs/tascam-bd-mp4k.yaml:141](specs/tascam-bd-mp4k.yaml#L141))
+- [ ] Confirm the status notifications of the chapter and chapter count use the short forms TN and TT, the answers TNM and TTN. ([specs/tascam-bd-mp4k.yaml:755](specs/tascam-bd-mp4k.yaml#L755))
+- [ ] Confirm the downmix is read with ?DNM (as the document gives it) and answered DMX. ([specs/tascam-bd-mp4k.yaml:621](specs/tascam-bd-mp4k.yaml#L621))
+- [ ] Confirm the color adjustment answer is the color letter then three signed two-digit values (!7MVCR+01-02+03). ([specs/tascam-bd-mp4k.yaml:820](specs/tascam-bd-mp4k.yaml#L820))
+- [ ] Confirm get_power gets no answer in standby. ([specs/tascam-bd-mp4k.yaml:140](specs/tascam-bd-mp4k.yaml#L140))
+- [ ] Confirm the speaker level's form, four characters in tenths of a dB rounded to 0 or 5, and the delay in centimeters. ([specs/tascam-bd-mp4k.yaml:477](specs/tascam-bd-mp4k.yaml#L477))
 
 ## tascam-cd-400u — TASCAM CD-400U / CD-400UDAB
 

@@ -16,23 +16,20 @@ source:
     author: TEAC Corporation
     url: https://tascam.com/wp-content/uploads/downloads/products/tascam/bd-mp4k/rs232c_ethernet_protocol_bd-mp4k_v101_en.pdf
     note: >
-      Manufacturer document (retrieved 2026-10-27), offered for download with a protocol use agreement that grants
-      its use for developing compatible devices and software; nothing of it is copied here. RS-232C at 115200, 57600
-      or 38400 bit/s (57600 only in standby), 8 data bits, no parity, 1 stop bit (§2.1.2); TCP port 9030, fixed, one
-      client at a time, kept open to receive status notifications (§2.2, §3.2); message format "!7", command,
-      parameter, CR, with the device's messages shown without CR since Ver. 1.01 (§3); ack and nack and when each is
-      sent (§4.2); a new command only after ack or nack, 30 ms (IP) or 300 ms (RS-232C) reply timeout, at least 30 ms
-      between commands, BUSY (@0BDERBUSY) when the buffer is full (§4.3); status notifications answered ack by the
-      host, sent once more without it (§4.4.3); the key control (power on not over Ethernet, Wake-on-LAN instead, and
-      at 57600 bit/s), menu setting (with HDR, Dolby Vision, video and audio processing) and current status tables
-      (§5.1-5.3).
+      Manufacturer document (retrieved 2026-10-27), offered for download with a protocol use agreement that grants its
+      use for developing compatible devices and software; nothing of it is copied here. RS-232C at 115200, 57600 or
+      38400 bit/s, 8 data bits, no parity, 1 stop bit (§2.1.2); TCP port 9030, fixed, one client at a time, kept open to
+      receive status notifications (§2.2, §3.2); message format "!7", command, parameter, CR, with the device's messages
+      shown without CR since Ver. 1.01 (§3); ack and nack and when each is sent (§4.2); a new command only after ack or
+      nack, 30 ms (IP) or 300 ms (RS-232C) reply timeout, at least 30 ms between commands, BUSY (@0BDERBUSY) when the
+      buffer is full (§4.3); status notifications answered ack by the host, sent once more without it (§4.4.3); the key
+      control, menu setting (with HDR, Dolby Vision, video and audio processing) and current status tables (§5.1-5.3).
   - title: "TASCAM BD-MP4K Owner's Manual"
     author: TEAC Corporation
     url: https://tascam.com/wp-content/uploads/downloads/products/tascam/bd-mp4k/bd-mp4k_om_efsgi_ve.pdf
     note: >
-      Manufacturer document. RS-232C settings: 38400, 57600 or 115200 bit/s, 57600 whatever the setting while the
-      power is off, so power on from RS-232C needs 57600 (p.21); remote control over RS-232C or ETHERNET, the protocol
-      on the download page.
+      Manufacturer document. RS-232C settings: 38400, 57600 or 115200 bit/s (p.21); remote control over RS-232C or
+      ETHERNET, the protocol on the download page.
 
 transport:
   type: line-tcp
@@ -62,7 +59,7 @@ ports:
 models:
   - id: bd-mp4k
     name: TASCAM BD-MP4K
-    supports: [power_on, power_off, get_power, stop, play, pause, locate_chapter, skip_chapter, locate_title,
+    supports: [power_off, get_power, stop, play, pause, locate_chapter, skip_chapter, locate_title,
       skip_title, set_time_display, get_time_display, set_osd_hidden, get_osd_hidden, setup_menu, top_menu, option_menu,
       popup_menu, menu_return, audio_dialog, subtitle, enter, tray, set_resolution, get_resolution, display_info,
       color_key, home, number_key, search, get_search, set_mute, get_mute, cursor, clear, set_auto_play, get_auto_play,
@@ -135,15 +132,10 @@ maps:
   downmix: { "off": OF, dh: DH, dvs: DV, mvs: MV }
 
 commands:
-  power_on:
-    summary: Power on from standby (PWR01); on the RS-232C port only, the network port being off in standby
-    send: "!7PWR01"
-    expect: &ack { reply_contains: "ack", matches: "^ack$" }
-    returns: ack
   power_off:
     summary: Put the player in standby (PWR00); the network connection drops
     send: "!7PWR00"
-    expect: *ack
+    expect: &ack { reply_contains: "ack", matches: "^ack$" }
     returns: ack
   get_power:
     summary: "Ask whether the player is on (?PWR): answered ack when on, nothing in standby"
@@ -687,10 +679,8 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      power_on works only on the RS-232C port, at 57600 bit/s: in standby the port runs at 57600 whatever its
-      setting, and the network port does not take power on (TEAC names Wake-on-LAN for that, which the spec format
-      cannot send). get_power is answered ack when on and not at all in standby (a timeout). There is no stopped
-      status: get_status names play, pause, slow and search play and the menus only.
+      get_power is answered ack when on and not at all in standby (a timeout). There is no stopped status:
+      get_status names play, pause, slow and search play and the menus only.
   - models: [all]
     severity: info
     text: >

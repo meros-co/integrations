@@ -19,7 +19,6 @@ def _tbv(command, wire, status, value, **extra):
          expect_result={"ok": {"kind": "value", "value": value}}, **extra)
 
 
-_tb("power_on", {}, "!7PWR01\r")
 _tb("power_off", {}, "!7PWR00\r")
 _tb("get_power", {}, "!7?PWR\r")
 _tb("stop", {}, "!7STP\r")
