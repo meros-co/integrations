@@ -2,7 +2,7 @@
 
 Every integration here was written from the manufacturer's documentation and
 tested against simulated devices. Documentation is often incomplete, sometimes
-contradicts itself, and doesn't always match the firmware, so some behaviour
+contradicts itself, and doesn't always match the firmware, so some behavior
 had to be inferred or chosen. This page lists what needs checking on a real
 device.
 
@@ -12,7 +12,7 @@ the hardware are very welcome, including a single item on a single model.
 ## How to help
 
 1. Find your device below. Each item says what to check and links to the
-   spec line that describes the current behaviour.
+   spec line that describes the current behavior.
 2. Try it on the device and note the model, firmware version and what you
    saw. The exact bytes sent and received are the most useful thing you can
    include, such as a terminal session or a Wireshark capture.
@@ -25,7 +25,7 @@ the hardware are very welcome, including a single item on a single model.
      [CONTRIBUTING.md](CONTRIBUTING.md#verification)), and ticks the item
      here or removes it once it is fully answered.
 
-A result that confirms the current behaviour is as useful as one that
+A result that confirms the current behavior is as useful as one that
 corrects it. Things not listed here are welcome too: wrong ranges, missing
 commands, odd replies.
 
@@ -160,8 +160,8 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether the firmware on hand answers eParamID_XPT_DestinationAll_Status through /options, or {} as older firmware does. ([specs/aja-kumo.yaml:1618](specs/aja-kumo.yaml#L1618))
 - [ ] Confirm that a number above the router's count, and a switch to a locked destination, fail with HTTP 403 (or note the actual status). ([specs/aja-kumo.yaml:1578](specs/aja-kumo.yaml#L1578))
 - [ ] Check whether a burst of back-to-back requests (several routes or a salvo set at once, a full read on connecting) overloads the router's queue without the 0.1-0.25 s pauses AJA's examples add; the core sends one request at a time and paces nothing, since AJA documents no required gap. ([specs/aja-kumo.yaml:1633](specs/aja-kumo.yaml#L1633))
-- [ ] Confirm button colour writes in the {'classes': 'color_N'} form are accepted. ([specs/aja-kumo.yaml:1680](specs/aja-kumo.yaml#L1680))
-- [ ] Read a button colour (eParamID_Button_Settings_{n}) and its event, and check the value holds color_N as written, for a source and a destination in each bank. ([specs/aja-kumo.yaml:1690](specs/aja-kumo.yaml#L1690))
+- [ ] Confirm button color writes in the {'classes': 'color_N'} form are accepted. ([specs/aja-kumo.yaml:1680](specs/aja-kumo.yaml#L1680))
+- [ ] Read a button color (eParamID_Button_Settings_{n}) and its event, and check the value holds color_N as written, for a source and a destination in each bank. ([specs/aja-kumo.yaml:1690](specs/aja-kumo.yaml#L1690))
 - [ ] Record the values and names eParamID_SuppressPSAlarm reads, and the ids of the switching mode, reference and temperature alarm suppression from desc.json. ([specs/aja-kumo.yaml:1715](specs/aja-kumo.yaml#L1715))
 - [ ] Check what /authenticator/login answers on a unit with User Authentication Disabled (whether it still sets a session cookie). ([specs/aja-kumo.yaml:1640](specs/aja-kumo.yaml#L1640))
 - [ ] Confirm eParamID_LED_Identify turns Identify on and off (it comes from a generic AJA example, not the manual). ([specs/aja-kumo.yaml:1689](specs/aja-kumo.yaml#L1689))
@@ -180,7 +180,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## allenheath-cq — Allen & Heath CQ
 
-- [ ] Confirm the pan centre value 40 00 and level values between the p.15 table points. ([specs/allenheath-cq.yaml:199](specs/allenheath-cq.yaml#L199))
+- [ ] Confirm the pan center value 40 00 and level values between the p.15 table points. ([specs/allenheath-cq.yaml:199](specs/allenheath-cq.yaml#L199))
 - [ ] Check that a smaller CQ model ignores input and output numbers it lacks rather than erroring. ([specs/allenheath-cq.yaml:207](specs/allenheath-cq.yaml#L207))
 
 ## allenheath-dlive — Allen & Heath dLive / Avantis
@@ -266,7 +266,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that the server sends a control status message for every object on ctrl_status, so objects.*.controls.* fills for all of them, and how large it is on a big show. ([specs/analogway-picturall.yaml:443](specs/analogway-picturall.yaml#L443))
 - [ ] Confirm the object list message ends each entry with a colon (id:name:) as the D.e.e example shows. ([specs/analogway-picturall.yaml:449](specs/analogway-picturall.yaml#L449))
 - [ ] Check that lua with backslash-escaped quotes runs set_pda_value_by_index, connect and send_ui_event as sent, and what the server answers when Lua raises an error. ([specs/analogway-picturall.yaml:554](specs/analogway-picturall.yaml#L554))
-- [ ] Find the parameter names of a layer's transform, colour, crop and draw mode with object_info on a server, to give them typed commands. ([specs/analogway-picturall.yaml:576](specs/analogway-picturall.yaml#L576))
+- [ ] Find the parameter names of a layer's transform, color, crop and draw mode with object_info on a server, to give them typed commands. ([specs/analogway-picturall.yaml:576](specs/analogway-picturall.yaml#L576))
 
 ## apc-rack-pdu — APC Rack PDU (SNMP)
 
@@ -351,7 +351,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that times sent with two decimals (fadeTime=5.00) and levels with three (level_level=1.000) are accepted like the documentation's whole numbers. ([specs/avolites-titan.yaml:1814](specs/avolites-titan.yaml#L1814))
 - [ ] Check the grand master value range (0-100 as sent here, or 0-1). ([specs/avolites-titan.yaml:1816](specs/avolites-titan.yaml#L1816))
 - [ ] Check that an empty panelTimeStamp works for tap tempo and an empty oldValue for the grand master. ([specs/avolites-titan.yaml:1824](specs/avolites-titan.yaml#L1824))
-- [ ] Check which licences answer the WebAPI (consoles, Titan PC with T2/T3/TNP, Titan Go) and that T1 and Titan One do not. ([specs/avolites-titan.yaml:1771](specs/avolites-titan.yaml#L1771))
+- [ ] Check which licenses answer the WebAPI (consoles, Titan PC with T2/T3/TNP, Titan Go) and that T1 and Titan One do not. ([specs/avolites-titan.yaml:1771](specs/avolites-titan.yaml#L1771))
 - [ ] Measure the /titan/handles reply size and time on a large show, to judge the 5 s poll. ([specs/avolites-titan.yaml:1801](specs/avolites-titan.yaml#L1801))
 - [ ] Find the handle group name of the playback faders for set_group_page (Playbacks, PlaybackWindow or other). ([specs/avolites-titan.yaml:1271](specs/avolites-titan.yaml#L1271))
 - [ ] Confirm /titan/handles lists every programmed handle on the console in one answer: each poll replaces the handles state. ([specs/avolites-titan.yaml:2014](specs/avolites-titan.yaml#L2014))
@@ -455,7 +455,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which key activateDestGroup by name accepts, destGrpName (sent) or destGrName. ([specs/barco-eventmaster.yaml:1467](specs/barco-eventmaster.yaml#L1467))
 - [ ] Confirm the user key list method is listUserKeys (not listUserKey), what it returns, and that recallUserKey accepts the key userkeyName. ([specs/barco-eventmaster.yaml:1474](specs/barco-eventmaster.yaml#L1474))
 - [ ] Record the actual reply shape of powerStatus and of listCues, which the documents leave open. ([specs/barco-eventmaster.yaml:1483](specs/barco-eventmaster.yaml#L1483))
-- [ ] Check which test pattern numbers exist beyond 0 (off), 3 (colour bars) and 5 (grid). ([specs/barco-eventmaster.yaml:1486](specs/barco-eventmaster.yaml#L1486))
+- [ ] Check which test pattern numbers exist beyond 0 (off), 3 (color bars) and 5 (grid). ([specs/barco-eventmaster.yaml:1486](specs/barco-eventmaster.yaml#L1486))
 - [ ] Check what cue_transport (pause or stop with type alone and no cue id) applies to. ([specs/barco-eventmaster.yaml:1572](specs/barco-eventmaster.yaml#L1572))
 - [ ] On Encore3, check what the ApiExtControl flag in getFrameSettings means and whether it blocks API calls. ([specs/barco-eventmaster.yaml:1543](specs/barco-eventmaster.yaml#L1543))
 - [ ] Check what error codes and messages come back in result.success and the JSON-RPC error member, since none are documented. ([specs/barco-eventmaster.yaml:1433](specs/barco-eventmaster.yaml#L1433))
@@ -563,7 +563,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check how the console answers a query or set for an input or output number past its group's size, and whether CRD and MOD inputs and outputs answer with no card or module fitted (each unanswered query costs the timeout on connecting). ([specs/behringer-wing.yaml:8704](specs/behringer-wing.yaml#L8704))
 - [ ] Check whether patching an output with set_output_source (group, then number) is heard as a glitch between the two messages. ([specs/behringer-wing.yaml:8722](specs/behringer-wing.yaml#L8722))
 - [ ] Confirm that user inputs 25-56 are the user patches the console numbers 1-32, and that a user signal's tap and side apply only to inputs 1-24. ([specs/behringer-wing.yaml:8722](specs/behringer-wing.yaml#L8722))
-- [ ] Confirm the monitor bus dim and PFL dim ranges are -40 to 0 dB (the document writes 40..0) and that the monitor delay is in metres only. ([specs/behringer-wing.yaml:8740](specs/behringer-wing.yaml#L8740))
+- [ ] Confirm the monitor bus dim and PFL dim ranges are -40 to 0 dB (the document writes 40..0) and that the monitor delay is in meters only. ([specs/behringer-wing.yaml:8740](specs/behringer-wing.yaml#L8740))
 - [ ] Confirm the source solo enable values (/cfg/solo/srcsolo: OFF, CH39, AUX7 as documented) and the source solo group numbering 1-13 in input-group order. ([specs/behringer-wing.yaml:8740](specs/behringer-wing.yaml#L8740))
 - [ ] Confirm $sololed is a 0/1 int on every strip type and /$stat/sip a 0/1 int (the document's columns are misaligned for aux, bus, main and matrix). ([specs/behringer-wing.yaml:8740](specs/behringer-wing.yaml#L8740))
 - [ ] Check what the RTA and EQ-RTA range does with a value other than 30 or 60 dB. ([specs/behringer-wing.yaml:8740](specs/behringer-wing.yaml#L8740))
@@ -581,7 +581,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that once /$ctl/OSC/ronly is on, an OSC set cannot switch it off again. ([specs/behringer-wing.yaml:8841](specs/behringer-wing.yaml#L8841))
 - [ ] Check whether the console answers a query for an address the model or a control's function lacks (custom-control parameters, the other models' layer sections and pages); an unanswered query costs the timeout on connecting. ([specs/behringer-wing.yaml:8849](specs/behringer-wing.yaml#L8849))
 - [ ] Confirm the custom-control page select is set 1-16 and reported 0-15, and that the Compact's pages U1-U4, MM and D1-D4 have no lower row or encoder. ([specs/behringer-wing.yaml:8849](specs/behringer-wing.yaml#L8849))
-- [ ] Confirm the layer counts (left 7, centre and right 9, Compact 9, Rack 5), which layers are User 1 and User 2 on each, and whether the Rack has user layers. ([specs/behringer-wing.yaml:8867](specs/behringer-wing.yaml#L8867))
+- [ ] Confirm the layer counts (left 7, center and right 9, Compact 9, Rack 5), which layers are User 1 and User 2 on each, and whether the Rack has user layers. ([specs/behringer-wing.yaml:8867](specs/behringer-wing.yaml#L8867))
 - [ ] Check that a user layer's fader position takes type, index and destination as set_layer_strip sends them, and what select_layer does with 8 and 9. ([specs/behringer-wing.yaml:8867](specs/behringer-wing.yaml#L8867))
 - [ ] Check what set_daw_preset does: record the name only, or load the DAW preset. ([specs/behringer-wing.yaml:8884](specs/behringer-wing.yaml#L8884))
 - [ ] Confirm GPIO gpstate is the switchable state and $state the read state, and that set_gpio_state drives an output GPIO. ([specs/behringer-wing.yaml:8884](specs/behringer-wing.yaml#L8884))
@@ -685,7 +685,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the GET /connectTo reply per location once it is complete on the cameras (sourceHostname, sourceStreamName, sourceIP, sourcePort), and its status in encode mode. ([specs/birddog.yaml:3964](specs/birddog.yaml#L3964))
 - [ ] Confirm /operationmode answers exactly encode, decode or dual, and the P400/P4K /videooutputinterface exactly LowLatency or NormalMode, with nothing around them (read as plain text by their words). ([specs/birddog.yaml:3973](specs/birddog.yaml#L3973))
 - [ ] Confirm that reading an endpoint again straight after a POST reports the new value, and how long a camera takes to apply a change (some only after a reboot). ([specs/birddog.yaml:3998](specs/birddog.yaml#L3998))
-- [ ] Confirm a preset recall in Camera or Birddog preset mode restores the exposure, picture, white balance and colour settings that are read again after it. ([specs/birddog.yaml:4013](specs/birddog.yaml#L4013))
+- [ ] Confirm a preset recall in Camera or Birddog preset mode restores the exposure, picture, white balance and color settings that are read again after it. ([specs/birddog.yaml:4013](specs/birddog.yaml#L4013))
 - [ ] Check GET /List's shape on a camera that sees sources: each member a source's NDI name, its value the address and port; a member whose value holds no digit (the documented {"None":"None"}) is not taken for a source, and a reset or refresh is followed by a read of the list. ([specs/birddog.yaml:3639](specs/birddog.yaml#L3639))
 - [ ] Record the plain-text GET replies of /version, /hostname, /NDIGrpName (quoted names separated by commas assumed, from BirdDog's example) and /NDIOffSnSrc (addresses separated by commas), and what a successful POST to /NDIGrpName and /NDIOffSnSrc answers, which must not be taken for a value. ([specs/birddog.yaml:3982](specs/birddog.yaml#L3982))
 
@@ -728,11 +728,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm STAB, SaMw and ISOi are accepted as commands under the same names the switcher reports them by, as atem-connection sends them. ([specs/blackmagic-atem.yaml:3073](specs/blackmagic-atem.yaml#L3073))
 - [ ] Confirm CRSS bit 3 sets both video bitrates at 1092 and 1096, and the units (bits per second). ([specs/blackmagic-atem.yaml:3957](specs/blackmagic-atem.yaml#L3957))
 - [ ] Check RTMD's status bits (idle, unformatted, active, recording, bit 5 removed) on a recording model with two disks. ([specs/blackmagic-atem.yaml:3955](specs/blackmagic-atem.yaml#L3955))
-- [ ] Confirm the camera colour wheel ranges (lift ±2, gamma ±4, gain 0 to 16, offset ±8), the iris aperture value scale, the ND filter in stops, and what camera_record does on a camera without media. ([specs/blackmagic-atem.yaml:3468](specs/blackmagic-atem.yaml#L3468))
-- [ ] Confirm colour bars on is the SINT8 30 camera-control sends (seconds of bars) and how the camera reports it back. ([specs/blackmagic-atem.yaml:3427](specs/blackmagic-atem.yaml#L3427))
+- [ ] Confirm the camera color wheel ranges (lift ±2, gamma ±4, gain 0 to 16, offset ±8), the iris aperture value scale, the ND filter in stops, and what camera_record does on a camera without media. ([specs/blackmagic-atem.yaml:3468](specs/blackmagic-atem.yaml#L3468))
+- [ ] Confirm color bars on is the SINT8 30 camera-control sends (seconds of bars) and how the camera reports it back. ([specs/blackmagic-atem.yaml:3427](specs/blackmagic-atem.yaml#L3427))
 - [ ] Confirm the switcher advertises `_blackmagic._tcp` with TXT `class=AtemSwitcher` ([crates/core/src/mdns.rs:118](crates/core/src/mdns.rs#L118)) and `_switcher_ctrl._udp` ([crates/core/src/mdns.rs:123](crates/core/src/mdns.rs#L123)), as Companion's ATEM module browses for, and from which firmware on; record which models (Mini, Television Studio, Constellation) do.
 - [ ] Record what the unit advertises over mDNS (`dns-sd -B _blackmagic._tcp` and `dns-sd -L <instance> _blackmagic._tcp`, or `avahi-browse -rt _blackmagic._tcp`): every service type, the SRV port and the TXT keys and values. Only the service type and TXT `class` come from a public source (Bitfocus Companion's module manifests); the SRV port and the other TXT keys are not documented anywhere. ([crates/core/src/mdns.rs:115](crates/core/src/mdns.rs#L115))
-- [ ] Confirm TXT `name` is the product name (as Companion's MultiView 4 filter relies on), not a label the user sets: discovery narrows `models` to the catalogue model with that name. ([crates/core/src/mdns.rs:471](crates/core/src/mdns.rs#L471))
+- [ ] Confirm TXT `name` is the product name (as Companion's MultiView 4 filter relies on), not a label the user sets: discovery narrows `models` to the catalog model with that name. ([crates/core/src/mdns.rs:471](crates/core/src/mdns.rs#L471))
 - [ ] On a classic-mixer switcher (such as an ATEM Television Studio HD or 1 M/E), capture AMLv after SALN: that the source ids follow the monitor levels at 36 and are padded to 4 bytes, that the monitor has four levels at 20 to 35 (SKAARHOJ lists one and twelve unknown bytes), and the levels' full scale and whether they are linear, so they can be given in dBFS. ([specs/blackmagic-atem.yaml:3793](specs/blackmagic-atem.yaml#L3793))
 - [ ] Check that SALN starts and stops the classic mixer's AMLv levels about ten times a second, and that a new session needs it sent again, as SFLN does. ([specs/blackmagic-atem.yaml:2267](specs/blackmagic-atem.yaml#L2267))
 - [ ] Confirm the lock commands as atem-connection lays them out (LOCK u16 store, u8 state; LKOB u16 store; LKST u16 store, u8 locked), that the stills are store 0 and clip n store n, and that a client keeps its lock from LKOB to its own release whatever LKST announces in between. ([specs/blackmagic-atem.yaml:4218](specs/blackmagic-atem.yaml#L4218))
@@ -783,8 +783,8 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a propertyValueChanged event carries the property's value in the format its REST GET returns (applied as that reply), and whether any event names only the property (then read again). ([specs/blackmagic-camera.yaml:2474](specs/blackmagic-camera.yaml#L2474))
 - [ ] Confirm the login scheme with "Enabled with security" (Basic sent, Digest answered if challenged). ([specs/blackmagic-camera.yaml:2887](specs/blackmagic-camera.yaml#L2887))
 - [ ] Check which API groups each camera model implements and whether missing ones answer 501 or 404. ([specs/blackmagic-camera.yaml:2876](specs/blackmagic-camera.yaml#L2876))
-- [ ] Check that 0.0-1.0 is the range for normalised values beyond audio level. ([specs/blackmagic-camera.yaml:2911](specs/blackmagic-camera.yaml#L2911))
-- [ ] Check the ranges the camera accepts for colour correction, playback speed, focus distance and aperture number, which are not limited here. ([specs/blackmagic-camera.yaml:2908](specs/blackmagic-camera.yaml#L2908))
+- [ ] Check that 0.0-1.0 is the range for normalized values beyond audio level. ([specs/blackmagic-camera.yaml:2911](specs/blackmagic-camera.yaml#L2911))
+- [ ] Check the ranges the camera accepts for color correction, playback speed, focus distance and aperture number, which are not limited here. ([specs/blackmagic-camera.yaml:2908](specs/blackmagic-camera.yaml#L2908))
 - [ ] Confirm the format filesystem path spelling (doformatSupportedFilesystems or doFormatSupportedFilesystems). ([specs/blackmagic-camera.yaml:2920](specs/blackmagic-camera.yaml#L2920))
 - [ ] Check what body PUT /monitoring/{displayName}/focusAssist accepts ({enabled} or mode, color and intensity). ([specs/blackmagic-camera.yaml:2941](specs/blackmagic-camera.yaml#L2941))
 - [ ] Check whether a clip path in a folder must be sent with "/" encoded as %2F. ([specs/blackmagic-camera.yaml:2943](specs/blackmagic-camera.yaml#L2943))
@@ -867,7 +867,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether SmartView 4K accepts contrast and saturation. ([specs/blackmagic-smartview.yaml:448](specs/blackmagic-smartview.yaml#L448))
 - [ ] Confirm current monitors advertise `_blackmagic._tcp` with TXT `class=SmartView` (Companion's SmartView module) ([crates/core/src/mdns.rs:142](crates/core/src/mdns.rs#L142)), whether SmartScope uses the same class, and whether older firmware advertises `_smartview._tcp` (smartview-client browses it) ([crates/core/src/mdns.rs:147](crates/core/src/mdns.rs#L147)).
 - [ ] Record what the unit advertises over mDNS (`dns-sd -B _blackmagic._tcp` and `dns-sd -L <instance> _blackmagic._tcp`, or `avahi-browse -rt _blackmagic._tcp`): every service type, the SRV port and the TXT keys and values. Only the service type and TXT `class` come from a public source (Bitfocus Companion's module manifests); the SRV port and the other TXT keys are not documented anywhere. ([crates/core/src/mdns.rs:115](crates/core/src/mdns.rs#L115))
-- [ ] Confirm TXT `name` is the product name (as Companion's MultiView 4 filter relies on), not a label the user sets: discovery narrows `models` to the catalogue model with that name. ([crates/core/src/mdns.rs:471](crates/core/src/mdns.rs#L471))
+- [ ] Confirm TXT `name` is the product name (as Companion's MultiView 4 filter relies on), not a label the user sets: discovery narrows `models` to the catalog model with that name. ([crates/core/src/mdns.rs:471](crates/core/src/mdns.rs#L471))
 
 ## blackmagic-streaming — Blackmagic Web Presenter / Streaming
 
@@ -927,7 +927,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that an empty label clears it, and that the router then reports the port number alone ("3 ", or "3" with no space). ([specs/blackmagic-videohub.yaml:1191](specs/blackmagic-videohub.yaml#L1191))
 - [ ] Confirm routers advertise `_blackmagic._tcp` with TXT `class=Videohub` (Companion's Videohub module) ([crates/core/src/mdns.rs:130](crates/core/src/mdns.rs#L130)), and whether any also advertise `_videohub._tcp`, which no public source confirms and discovery does not ask for.
 - [ ] Record what the unit advertises over mDNS (`dns-sd -B _blackmagic._tcp` and `dns-sd -L <instance> _blackmagic._tcp`, or `avahi-browse -rt _blackmagic._tcp`): every service type, the SRV port and the TXT keys and values. Only the service type and TXT `class` come from a public source (Bitfocus Companion's module manifests); the SRV port and the other TXT keys are not documented anywhere. ([crates/core/src/mdns.rs:115](crates/core/src/mdns.rs#L115))
-- [ ] Confirm TXT `name` is the product name (as Companion's MultiView 4 filter relies on), not a label the user sets: discovery narrows `models` to the catalogue model with that name. ([crates/core/src/mdns.rs:471](crates/core/src/mdns.rs#L471))
+- [ ] Confirm TXT `name` is the product name (as Companion's MultiView 4 filter relies on), not a label the user sets: discovery narrows `models` to the catalog model with that name. ([crates/core/src/mdns.rs:471](crates/core/src/mdns.rs#L471))
 
 ## blustream-acm — Blustream Multicast ACM controllers
 
@@ -1209,7 +1209,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## christie-pandorasbox — Christie Pandoras Box
 
 - [ ] Confirm doubles go little-endian (as the vendor SDKs send them), not in network order as the protocol page says, with set_param_double on a known parameter. ([specs/christie-pandorasbox.yaml:2344](specs/christie-pandorasbox.yaml#L2344))
-- [ ] Confirm functions without return values are never answered, and how a refused one is signalled. ([specs/christie-pandorasbox.yaml:2337](specs/christie-pandorasbox.yaml#L2337))
+- [ ] Confirm functions without return values are never answered, and how a refused one is signaled. ([specs/christie-pandorasbox.yaml:2337](specs/christie-pandorasbox.yaml#L2337))
 - [ ] Confirm a refused function answers a negative code followed by an int error number, and what the numbers mean. ([specs/christie-pandorasbox.yaml:2337](specs/christie-pandorasbox.yaml#L2337))
 - [ ] Check the int buffer of GetSiteIds and GetPlaylistEntryIndices* carries an int count first (the C# SDK reads none). ([specs/christie-pandorasbox.yaml:2321](specs/christie-pandorasbox.yaml#L2321))
 - [ ] Check which Pandoras Box versions answer GetCurrentTimeCueInfo (295); older ones are taken to refuse it. ([specs/christie-pandorasbox.yaml:2352](specs/christie-pandorasbox.yaml#L2352))
@@ -1455,7 +1455,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the delay's reported minimum and maximum, and what Filter1, Filter2 and Filter3 do and accept with a few loudspeaker setups. ([specs/dbaudio.yaml:691](specs/dbaudio.yaml#L691))
 - [ ] On a D80 and D20, confirm the input mode positions 1 to 5 and which routing switches answer in each. ([specs/dbaudio.yaml:697](specs/dbaudio.yaml#L697))
 - [ ] Confirm switching load or input monitoring off and on again clears its errors, and what DeviceErrorText and ErrorText hold. ([specs/dbaudio.yaml:704](specs/dbaudio.yaml#L704))
-- [ ] Check the Headroom meter's unit and range, and how often the ISP, GR and OVL sensors notify under programme. ([specs/dbaudio.yaml:711](specs/dbaudio.yaml#L711))
+- [ ] Check the Headroom meter's unit and range, and how often the ISP, GR and OVL sensors notify under program. ([specs/dbaudio.yaml:711](specs/dbaudio.yaml#L711))
 - [ ] On a DS10 and DS100, find the OCP.1 port and walk the tree: record its roles and classes so they can be named here. ([specs/dbaudio.yaml:717](specs/dbaudio.yaml#L717))
 - [ ] Confirm set_device_time (SetDeviceTimeNTP, 3.2, on object 9 or 10 by family) sets the amplifier's clock. ([specs/dbaudio.yaml:579](specs/dbaudio.yaml#L579))
 
@@ -1523,7 +1523,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the name walk: `/<root>/names/?` and the strip names answered from 1, and that a strip the session lacks is simply not answered. ([specs/digico-pad.yaml:2758](specs/digico-pad.yaml#L2758))
 - [ ] Confirm `<path>/!` means something under the path changed, and that reading `<path>/?` again returns all of it. ([specs/digico-pad.yaml:3214](specs/digico-pad.yaml#L3214))
 - [ ] Record the units the console takes and sends: times in seconds (the module's table gives ms with scale 1000), fine delay in samples, pans -1 to +1, the fader's -150 dB floor. ([specs/digico-pad.yaml:2770](specs/digico-pad.yaml#L2770))
-- [ ] Record what the raw numbers mean for de-esser and gate key centre and width, EQ curve, dynamic EQ over/under, solo bus, group send tap, input type, gate mode and macro button state. ([specs/digico-pad.yaml:2770](specs/digico-pad.yaml#L2770))
+- [ ] Record what the raw numbers mean for de-esser and gate key center and width, EQ curve, dynamic EQ over/under, solo bus, group send tap, input type, gate mode and macro button state. ([specs/digico-pad.yaml:2770](specs/digico-pad.yaml#L2770))
 - [ ] Check the parameters the source marks "MAYBE?": input_type, Dynamics gate-duck-comp, the outputs' alternate_solo, and Group_Send/<n>/group. ([specs/digico-pad.yaml:2780](specs/digico-pad.yaml#L2780))
 - [ ] Confirm snapshot, macro and preset indexes, the snapshot number in hundredths, and that inserting, deleting or moving one sends `/Snapshots/!` (or `/Macros/!`, `/Presets/!`). ([specs/digico-pad.yaml:2789](specs/digico-pad.yaml#L2789))
 - [ ] Record the meter request's argument and the meter messages' form (the source says some arrive without an OSC type-tag string). ([specs/digico-pad.yaml:2799](specs/digico-pad.yaml#L2799))
@@ -1532,7 +1532,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Confirm that current SD and Quantum software still accepts the 2014 Other OSC list's /sd/ addresses, on an SD-series console and on a Quantum (225, 338, 5, 7 or 852). ([specs/digico-sd.yaml:18](specs/digico-sd.yaml#L18))
 - [ ] Check whether the console sends anything back to an Other OSC device (changes made on the surface, or echoes of received messages), and on which port. ([specs/digico-sd.yaml:4037](specs/digico-sd.yaml#L4037))
-- [ ] Record the fader position for 0 dB and a few other levels, and what the 0.0-1.0 range covers for trim, analogue gain, EQ frequency and gain, and delay. ([specs/digico-sd.yaml:4046](specs/digico-sd.yaml#L4046))
+- [ ] Record the fader position for 0 dB and a few other levels, and what the 0.0-1.0 range covers for trim, analog gain, EQ frequency and gain, and delay. ([specs/digico-sd.yaml:4046](specs/digico-sd.yaml#L4046))
 - [ ] Check what a message for a strip the session does not have does (ignored, or something else), and the real strip limits per console. ([specs/digico-sd.yaml:4055](specs/digico-sd.yaml#L4055))
 - [ ] Confirm press_macro sends macro 1 as 0 (the list's 0-255 range and the Companion module), not 1. ([specs/digico-sd.yaml:4063](specs/digico-sd.yaml#L4063))
 - [ ] Check that fire_snapshot takes the snapshot number shown on the console (and what happens for a number with no snapshot, or a decimal-numbered snapshot). ([specs/digico-sd.yaml:3764](specs/digico-sd.yaml#L3764))
@@ -1640,7 +1640,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that shotrecorder/record takes take as a decimal string (int64 in proto3 JSON) and whether stopping with engage false uses the slate and take sent. ([specs/disguise.yaml:2570](specs/disguise.yaml#L2570))
 - [ ] Check what execute_python answers when the script raises (status.code, pythonLog), whether a registered module of the same name is replaced, and where pythonApiExecutionTimeout is set. ([specs/disguise.yaml:2578](specs/disguise.yaml#L2578))
 - [ ] Check whether selectcamera with an empty cameraOverride clears the override, and that observation uids are sent as decimal strings. ([specs/disguise.yaml:2597](specs/disguise.yaml#L2597))
-- [ ] Find the units of a QuickCal lineup position (normalised 0 to 1, or pixels). ([specs/disguise.yaml:2608](specs/disguise.yaml#L2608))
+- [ ] Find the units of a QuickCal lineup position (normalized 0 to 1, or pixels). ([specs/disguise.yaml:2608](specs/disguise.yaml#L2608))
 - [ ] Find the values of the OmniCal RequestPlansFilter, the cameradiscovery discovery states, and which Designer release added the OmniCal endpoints (not in the Swagger document). ([specs/disguise.yaml:2625](specs/disguise.yaml#L2625))
 - [ ] Confirm the form of media/remove's path: an array in the Swagger document, a single string on the Media page and guide; an array is sent. ([specs/disguise.yaml:1293](specs/disguise.yaml#L1293))
 - [ ] Check the size, creationDate and lastWriteDate units of media/list (uint64 strings; the epoch of the dates is not documented), and whether provision overwrites a file already at the destination. ([specs/disguise.yaml:2413](specs/disguise.yaml#L2413))
@@ -1955,12 +1955,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## generic-midi — Generic MIDI device
 
-- [ ] Join a macOS Audio MIDI Setup network session (and rtpMIDI on Windows, and a network MIDI interface) and confirm the invitation on both ports is accepted, notes and SysEx arrive, and the session stays up for an hour with the core's clock synchronisation every 10 s. ([specs/generic-midi.yaml:429](specs/generic-midi.yaml#L429))
+- [ ] Join a macOS Audio MIDI Setup network session (and rtpMIDI on Windows, and a network MIDI interface) and confirm the invitation on both ports is accepted, notes and SysEx arrive, and the session stays up for an hour with the core's clock synchronization every 10 s. ([specs/generic-midi.yaml:429](specs/generic-midi.yaml#L429))
 - [ ] Confirm those hosts accept the core's recovery journals (J set) and its guard packets (an empty MIDI list with a journal), and that with packets to them dropped they repair notes, controllers, programs, RPN and NRPN, pitch bend, pressure, the sequencer, MTC and SysEx from the core's journal. ([specs/generic-midi.yaml:429](specs/generic-midi.yaml#L429))
 - [ ] With packet loss forced (a lossy link or dropped packets), confirm the replay of Apple's recovery journal leaves notes, controllers, programs and pitch bend as the sender has them. ([specs/generic-midi.yaml:429](specs/generic-midi.yaml#L429))
-- [ ] Host a session (link rtp_host) and join it from macOS Audio MIDI Setup (its Directory, adding the core's address and port) and from rtpMIDI on Windows: confirm both invitations are accepted, MIDI flows both ways, the initiator's clock synchronisation keeps the session up for an hour (it must come at least every 90 s), and the initiator leaving (BY) returns the core to waiting for an invitation. ([specs/generic-midi.yaml:429](specs/generic-midi.yaml#L429))
+- [ ] Host a session (link rtp_host) and join it from macOS Audio MIDI Setup (its Directory, adding the core's address and port) and from rtpMIDI on Windows: confirm both invitations are accepted, MIDI flows both ways, the initiator's clock synchronization keeps the session up for an hour (it must come at least every 90 s), and the initiator leaving (BY) returns the core to waiting for an invitation. ([specs/generic-midi.yaml:429](specs/generic-midi.yaml#L429))
 - [ ] Confirm that an initiator that has joined the core's hosted session sends its data invitation from its control port plus one, or that the core's answering the port it came from suits it, and that it accepts the core's count 1 answers and sends count 2. ([specs/generic-midi.yaml:465](specs/generic-midi.yaml#L465))
-- [ ] Capture Apple's RS packet and confirm the sequence number sits in the upper 16 bits of its 32-bit field, and that a host starting its own clock synchronisation accepts the core's count 1 answer. ([specs/generic-midi.yaml:465](specs/generic-midi.yaml#L465))
+- [ ] Capture Apple's RS packet and confirm the sequence number sits in the upper 16 bits of its 32-bit field, and that a host starting its own clock synchronization accepts the core's count 1 answer. ([specs/generic-midi.yaml:465](specs/generic-midi.yaml#L465))
 - [ ] Confirm 5004 is the port Audio MIDI Setup offers for a new session, and that the session's advertised _apple-midi._udp SRV port is its control port. ([specs/generic-midi.yaml:101](specs/generic-midi.yaml#L101))
 - [ ] Run the MTC generator into a DAW or lighting console chasing MTC over RTP-MIDI, at 24, 25, 30df and 30: confirm it locks at the time located, reads drop-frame across a minute (00:00:59:28 to 00:01:00:02), and stays within a frame of the core's clock for an hour. ([specs/generic-midi.yaml:457](specs/generic-midi.yaml#L457))
 - [ ] Against an MMC device (a DAW or recorder), confirm READ answers for selected_time_code and motion_control_tally decode as kept, including short time code updates. ([specs/generic-midi.yaml:475](specs/generic-midi.yaml#L475))
@@ -2057,7 +2057,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that DELETE /media/delete/{id}, DELETE /media/deletemapentry/{index} and PUT /media/addmapentry/... behave as their GET forms. ([specs/greenhippo-hippotizer.yaml:652](specs/greenhippo-hippotizer.yaml#L652))
 - [ ] Check how a pin name containing an underscore is written in a REST pin path. ([specs/greenhippo-hippotizer.yaml:675](specs/greenhippo-hippotizer.yaml#L675))
 - [ ] Check whether the media id and preset id path forms are told apart from map indexes and preset numbers by the segment being a number. ([specs/greenhippo-hippotizer.yaml:689](specs/greenhippo-hippotizer.yaml#L689))
-- [ ] Capture the 4.9.x REST additions (media encoding settings, strata folder, user name and colour) from the API help served at port 40512. ([specs/greenhippo-hippotizer.yaml:57](specs/greenhippo-hippotizer.yaml#L57))
+- [ ] Capture the 4.9.x REST additions (media encoding settings, strata folder, user name and color) from the API help served at port 40512. ([specs/greenhippo-hippotizer.yaml:57](specs/greenhippo-hippotizer.yaml#L57))
 - [ ] Confirm /media/map lists every filled slot (and leaves out empty ones), and /presets/<type> every bank of the type: each read replaces media_map or that type's preset_banks. ([specs/greenhippo-hippotizer.yaml:563](specs/greenhippo-hippotizer.yaml#L563))
 - [ ] Confirm POST /media/upload takes the multipart/form-data fields addToMap (true or false), mapIndex, customFolderPath and MediaFile as sent, with the file's type taken from its name, and answers 200 with mediaID. ([specs/greenhippo-hippotizer.yaml:418](specs/greenhippo-hippotizer.yaml#L418))
 
@@ -2116,18 +2116,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Confirm that playback commands take the object number as the argument (/hog/playback/go/0 with 15), as the manual says, and not in the address as the Companion module sends it. ([specs/highend-hog4.yaml:522](specs/highend-hog4.yaml#L522))
 - [ ] Check how goto_cue's float list.cue is read (15.2 sent as 15.19999981; cue 2 versus 20; point cues). ([specs/highend-hog4.yaml:531](specs/highend-hog4.yaml#L531))
-- [ ] Record the argument types of the status outputs (LED value, LED colour, command line, encoder and H-key labels, chat lines). ([specs/highend-hog4.yaml:512](specs/highend-hog4.yaml#L512))
+- [ ] Record the argument types of the status outputs (LED value, LED color, command line, encoder and H-key labels, chat lines). ([specs/highend-hog4.yaml:512](specs/highend-hog4.yaml#L512))
 - [ ] Find the address the console uses for fader level status after consolefaderrefresh. ([specs/highend-hog4.yaml:506](specs/highend-hog4.yaml#L506))
 - [ ] Check the real ranges of H keys, U keys, encoder wheels and the trackball values per model. ([specs/highend-hog4.yaml:539](specs/highend-hog4.yaml#L539))
 - [ ] Check which keys of the Hog OS 5 table work on Hog 4 OS 3.x and 4.x. ([specs/highend-hog4.yaml:549](specs/highend-hog4.yaml#L549))
 - [ ] Confirm that refreshall makes the console send every status, and whether repeating it every 60 s is noticeable on the console. ([specs/highend-hog4.yaml:504](specs/highend-hog4.yaml#L504))
 - [ ] Check whether the HPU acts on front panel keys, encoders and faders sent over OSC. ([specs/highend-hog4.yaml:571](specs/highend-hog4.yaml#L571))
-- [ ] Confirm that Hog 4 OS sends MSC on MSC Out for Go, Halt, Resume, Skip and Release, as 21.1's table of commands it recognises and sends suggests. ([specs/highend-hog4.yaml:499](specs/highend-hog4.yaml#L499))
+- [ ] Confirm that Hog 4 OS sends MSC on MSC Out for Go, Halt, Resume, Skip and Release, as 21.1's table of commands it recognizes and sends suggests. ([specs/highend-hog4.yaml:499](specs/highend-hog4.yaml#L499))
 
 ## holographics — Holographics
 
 - [ ] Confirm the REST API takes a call's data as the whole JSON body (as the vendor SDK sends it), not wrapped as {id, data}. ([specs/holographics.yaml:534](specs/holographics.yaml#L534))
-- [ ] Check that list_entries' widgetId filter is honoured when sent as the body of a GET (or whether it must be a query parameter, ?widgetId=). ([specs/holographics.yaml:293](specs/holographics.yaml#L293))
+- [ ] Check that list_entries' widgetId filter is honored when sent as the body of a GET (or whether it must be a query parameter, ?widgetId=). ([specs/holographics.yaml:293](specs/holographics.yaml#L293))
 - [ ] Confirm the Socket.IO server speaks Engine.IO 3 (Socket.IO 2) and pushes stateChanged with the whole state on every change. ([specs/holographics.yaml:421](specs/holographics.yaml#L421))
 - [ ] Record whether an entry in the state carries widgetId or widget_id. ([specs/holographics.yaml:528](specs/holographics.yaml#L528))
 - [ ] Record the reply of GET /api/update/ and /api/license/ so they can be kept in state. ([specs/holographics.yaml:385](specs/holographics.yaml#L385))
@@ -2182,7 +2182,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## joy-playdeck — PLAYDECK
 
 - [ ] Confirm a running PLAYDECK answers the REST API on 11411 as the OpenAPI document describes (the document says the implementation may follow the contract later), and which PLAYDECK version first serves it. ([specs/joy-playdeck.yaml:68](specs/joy-playdeck.yaml#L68))
-- [ ] Confirm control routes answer 200 with {"ok": true} (ActionResponse), and what a channel outside the licence answers (404 with an ErrorResponse is documented). ([specs/joy-playdeck.yaml:120](specs/joy-playdeck.yaml#L120))
+- [ ] Confirm control routes answer 200 with {"ok": true} (ActionResponse), and what a channel outside the license answers (404 with an ErrorResponse is documented). ([specs/joy-playdeck.yaml:120](specs/joy-playdeck.yaml#L120))
 - [ ] Confirm the units of the status numbers: BlockPosition, BlockDuration, BlockRemain, ClipPosition, ClipDuration, ClipRemain, ScheduleRemain and AutoplayRemain in seconds, BlockProgress and ClipProgress in percent (0 to 100), and BlockEnd, ClipEnd, ScheduleTime and AutoplayTime in Unix seconds (taken from the Companion module, the contract giving none). ([specs/joy-playdeck.yaml:1416](specs/joy-playdeck.yaml#L1416))
 - [ ] Record the value of OverlayActiveN and ActionActiveN while a button is active (kept as text as it arrives), and confirm the keys are absent while it is not. ([specs/joy-playdeck.yaml:801](specs/joy-playdeck.yaml#L801))
 - [ ] Confirm a position request with a marker and an empty timestamp seeks to the marker (the schema requires timestamp, so an empty one is sent beside the marker). ([specs/joy-playdeck.yaml:378](specs/joy-playdeck.yaml#L378))
@@ -2610,7 +2610,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether ROUTE with source 0 disconnects, as the legacy commands do. ([specs/kramer-p3000.yaml:3505](specs/kramer-p3000.yaml#L3505))
 - [ ] Check whether AUD-LVL's channel means the Audio Channel table or an input/output number on the product in use. ([specs/kramer-p3000.yaml:3622](specs/kramer-p3000.yaml#L3622))
 - [ ] Confirm the documentation inconsistencies taken as written: the LABEL query with only a port number, NAME? echoed with the question mark, the #INFO-PRST? query form, and PRST-STO/PRST-RCL replies without "nn@". ([specs/kramer-p3000.yaml:3521](specs/kramer-p3000.yaml#L3521))
-- [ ] Find the LOGIN level argument's wire spelling, so login can be modelled. ([specs/kramer-p3000.yaml:3657](specs/kramer-p3000.yaml#L3657))
+- [ ] Find the LOGIN level argument's wire spelling, so login can be modeled. ([specs/kramer-p3000.yaml:3657](specs/kramer-p3000.yaml#L3657))
 - [ ] Record the exact X-SIGNAL and X-AFV reply forms, which are matched leniently because the guide has typing errors. ([specs/kramer-p3000.yaml:3668](specs/kramer-p3000.yaml#L3668))
 - [ ] Confirm VMUTE flag 2 (blank picture) is unsupported. ([specs/kramer-p3000.yaml:3620](specs/kramer-p3000.yaml#L3620))
 - [ ] On a presentation switcher (VP-440X, VP-551X or VP-427X2), a multiviewer (MV-4X) and a streamer (KDS-EN7), record the values VID-RES, IMAGE-PROP, SCLR-AS, VIEW-MOD and W-COLOR take and answer, and which channels count from 0. ([specs/kramer-p3000.yaml:4067](specs/kramer-p3000.yaml#L4067))
@@ -3013,7 +3013,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that upload_still is answered 200 with the new still at the top level ($.id), as 3.4.5 shows, and which image types and sizes the still store accepts. ([specs/megapixel-helios.yaml:632](specs/megapixel-helios.yaml#L632))
 - [ ] Confirm that a PATCH out of range answers 200 with the unchanged value, as the document says, on current firmware. ([specs/megapixel-helios.yaml:2916](specs/megapixel-helios.yaml#L2916))
 - [ ] Record the ranges of display gains, output adjustment gain, gamma, lift, offset and saturation, which the document does not give. ([specs/megapixel-helios.yaml:199](specs/megapixel-helios.yaml#L199))
-- [ ] Confirm that a group's gains are keyed r, g, b and i, its mask l, t, b and r, and its test pattern colour r, g, b and a, and record their ranges (0-1 or 0-255). ([specs/megapixel-helios.yaml:362](specs/megapixel-helios.yaml#L362))
+- [ ] Confirm that a group's gains are keyed r, g, b and i, its mask l, t, b and r, and its test pattern color r, g, b and a, and record their ranges (0-1 or 0-255). ([specs/megapixel-helios.yaml:362](specs/megapixel-helios.yaml#L362))
 - [ ] Confirm that blackClipping can be written (it is in the processor's data and fixtures, not the API tables). ([specs/megapixel-helios.yaml:191](specs/megapixel-helios.yaml#L191))
 - [ ] Check whether redundancy mode accepts manual and single, which sys.fixtures lists beside none, failover and seamless. ([specs/megapixel-helios.yaml:286](specs/megapixel-helios.yaml#L286))
 - [ ] List the test pattern type names the processor accepts. ([specs/megapixel-helios.yaml:3005](specs/megapixel-helios.yaml#L3005))
@@ -3210,7 +3210,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the volume shortcut's value is dB, with one decimal accepted, and its range. ([specs/newtek-tricaster.yaml:431](specs/newtek-tricaster.yaml#L431))
 - [ ] Confirm the 3Play channel commands posted as XML through the net shortcut (<shortcut name="net1" value="clip_play" speed="1.000"/>) reach the 3Play, and how net_shortcut's shortcut_name key is written. ([specs/newtek-tricaster.yaml:567](specs/newtek-tricaster.yaml#L567))
 - [ ] Confirm the 3Play channel commands' number formats (three decimals sent for speed, position and distance) are accepted. ([specs/newtek-tricaster.yaml:634](specs/newtek-tricaster.yaml#L634))
-- [ ] Confirm POST /v1/file honours the Filename and Overwrite headers and answers with the stored file name as the body. ([specs/newtek-tricaster.yaml:689](specs/newtek-tricaster.yaml#L689))
+- [ ] Confirm POST /v1/file honors the Filename and Overwrite headers and answers with the stored file name as the body. ([specs/newtek-tricaster.yaml:689](specs/newtek-tricaster.yaml#L689))
 - [ ] Record the audiomixer, audio_bins, ndi_sources and filebrowser dictionaries, whose content the guide does not show, so they can be read into state rather than kept as XML. ([specs/newtek-tricaster.yaml:868](specs/newtek-tricaster.yaml#L868))
 - [ ] Confirm GET /v1/datalink lists every DataLink key as <data><key/><value/></data> elements. ([specs/newtek-tricaster.yaml:873](specs/newtek-tricaster.yaml#L873))
 - [ ] Confirm Vizrt Vectar and Viz Vectar Plus answer the same shortcuts, dictionaries and change notification websocket as a TriCaster, and their input count for the net commands. ([specs/newtek-tricaster.yaml:1084](specs/newtek-tricaster.yaml#L1084))
@@ -3266,12 +3266,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## novastar-coex — NovaStar COEX
 
 - [ ] Check which API generation each model and firmware answers: the current OpenAPI paths (/api/v1/screen/..., /api/v1/preset/...) or the 2023 manual's (/api/v1/device/screen/..., /api/v1/device/currentpreset). ([specs/novastar-coex.yaml:1161](specs/novastar-coex.yaml#L1161))
-- [ ] Confirm that the endpoints the OpenAPI pages list without /api/v1 (internal source, colour correction, 3D emitter, sync source, identify, controller name, no-signal image, thermal amount) answer with the prefix. ([specs/novastar-coex.yaml:2158](specs/novastar-coex.yaml#L2158))
+- [ ] Confirm that the endpoints the OpenAPI pages list without /api/v1 (internal source, color correction, 3D emitter, sync source, identify, controller name, no-signal image, thermal amount) answer with the prefix. ([specs/novastar-coex.yaml:2158](specs/novastar-coex.yaml#L2158))
 - [ ] Record the displayMode numbers the display state read reports for blackout and freeze. ([specs/novastar-coex.yaml:2166](specs/novastar-coex.yaml#L2166))
 - [ ] Check whether requests need the Device-Key header shown in the OpenAPI examples. ([specs/novastar-coex.yaml:2242](specs/novastar-coex.yaml#L2242))
 - [ ] Record the screenID format (the examples here assume a braced GUID-like string) and that a one-element screenIdList acts on that screen only. ([specs/novastar-coex.yaml:213](specs/novastar-coex.yaml#L213))
 - [ ] Check switch_layer_source in send-only and all-in-one modes, and what layer IDs each mode uses. ([specs/novastar-coex.yaml:452](specs/novastar-coex.yaml#L452))
-- [ ] Record the colour component range of set_test_pattern (0-4095 in the 2023 example, gray 0-255 in OpenAPI) and how to return from a test pattern to the input. ([specs/novastar-coex.yaml:622](specs/novastar-coex.yaml#L622))
+- [ ] Record the color component range of set_test_pattern (0-4095 in the 2023 example, gray 0-255 in OpenAPI) and how to return from a test pattern to the input. ([specs/novastar-coex.yaml:622](specs/novastar-coex.yaml#L622))
 - [ ] Confirm identify_controller takes a JSON body (the OpenAPI page names application/xml). ([specs/novastar-coex.yaml:834](specs/novastar-coex.yaml#L834))
 - [ ] Check whether set_working_mode to all-in-one (3) works through the API. ([specs/novastar-coex.yaml:947](specs/novastar-coex.yaml#L947))
 - [ ] Confirm MX30 and MX20 answer the same API as the MX40 Pro. ([specs/novastar-coex.yaml:68](specs/novastar-coex.yaml#L68))
@@ -3286,7 +3286,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what a receiving card's nextCabinetLinkStatus.linkStatus true means (disconnected or connected). ([specs/novastar-coex.yaml:1773](specs/novastar-coex.yaml#L1773))
 - [ ] Confirm a multifunction card's linkStatus is the string "0" or "1" (the page types it as a string). ([specs/novastar-coex.yaml:1822](specs/novastar-coex.yaml#L1822))
 - [ ] Check that the layer window, border and crop values of GET /api/v1/screen change only from VMP, and whether any undocumented endpoint writes them or creates and removes layers. ([specs/novastar-coex.yaml:2218](specs/novastar-coex.yaml#L2218))
-- [ ] Check whether any read reports the settings the API only writes (brightness limit, colour correction, 3D LUT, 3D emitter, time, per-cabinet test pattern, mapping, thermal compensation, no-signal image). ([specs/novastar-coex.yaml:2203](specs/novastar-coex.yaml#L2203))
+- [ ] Check whether any read reports the settings the API only writes (brightness limit, color correction, 3D LUT, 3D emitter, time, per-cabinet test pattern, mapping, thermal compensation, no-signal image). ([specs/novastar-coex.yaml:2203](specs/novastar-coex.yaml#L2203))
 
 ## novastar-h — NovaStar H series
 
@@ -3339,10 +3339,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Find ONYX's default OSC ports (the port ONYX listens on and the device's incoming port). ([specs/obsidian-onyx-osc.yaml:1027](specs/obsidian-onyx-osc.yaml#L1027))
 - [ ] Confirm that PF GROUP 2 is /Mx/button/5702 (the mapping prints 5701 twice). ([specs/obsidian-onyx-osc.yaml:1057](specs/obsidian-onyx-osc.yaml#L1057))
-- [ ] Record the OSC types ONYX sends for LED colour, blink and fader updates. ([specs/obsidian-onyx-osc.yaml:1066](specs/obsidian-onyx-osc.yaml#L1066))
+- [ ] Record the OSC types ONYX sends for LED color, blink and fader updates. ([specs/obsidian-onyx-osc.yaml:1066](specs/obsidian-onyx-osc.yaml#L1066))
 - [ ] Check whether playback page actions need a release (0) after the key down. ([specs/obsidian-onyx-osc.yaml:1050](specs/obsidian-onyx-osc.yaml#L1050))
 - [ ] Check what the belt execute address /Mx/belt/<id>/ does. ([specs/obsidian-onyx-osc.yaml:1060](specs/obsidian-onyx-osc.yaml#L1060))
-- [ ] Check which commands work without a licence (FREE/NOVA modes and the playback licence note). ([specs/obsidian-onyx-osc.yaml:1034](specs/obsidian-onyx-osc.yaml#L1034))
+- [ ] Check which commands work without a license (FREE/NOVA modes and the playback license note). ([specs/obsidian-onyx-osc.yaml:1034](specs/obsidian-onyx-osc.yaml#L1034))
 
 ## omt — Open Media Transport (OMT) source
 
@@ -3366,7 +3366,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm auxiliary timers 2 and 3 answer /api/auxtimer/2/... and /3/... like timer 1, and that secondarySource takes aux1 to aux3 (and aux). ([specs/ontime.yaml:1074](specs/ontime.yaml#L1074))
 - [ ] Confirm /api/message/timer takes text, visible and blink as query parameters, as it takes secondarySource and blackout. ([specs/ontime.yaml:1081](specs/ontime.yaml#L1081))
 - [ ] Check whether the HTTP API and /ws take the session password's hashed token as Authorization: Bearer, and what they answer without it. ([specs/ontime.yaml:1036](specs/ontime.yaml#L1036))
-- [ ] Record the shape of GET /data/custom-fields (label, type and colour per key are assumed). ([specs/ontime.yaml:1026](specs/ontime.yaml#L1026))
+- [ ] Record the shape of GET /data/custom-fields (label, type and color per key are assumed). ([specs/ontime.yaml:1026](specs/ontime.yaml#L1026))
 - [ ] Record the status and body of a refused playback command (an unknown event id or cue). ([specs/ontime.yaml:190](specs/ontime.yaml#L190))
 
 ## ontime-osc — Ontime (OSC API)
@@ -3447,9 +3447,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which HE models answer OSD:50 (gamma level): v1.12 marks the reply row AK-UB300 only but lists HE models in its notes. ([specs/panasonic-ptz.yaml:9608](specs/panasonic-ptz.yaml#L9608))
 - [ ] Check the AW-UE70's OSD:BF ELC limit codes (0 off, 1-4) against the UE family's 2-7. ([specs/panasonic-ptz.yaml:9650](specs/panasonic-ptz.yaml#L9650))
 - [ ] Check that QSJ:03 is no longer sent to HE cameras (v1.12 marks OSJ:03-09 UE150 only) and that OSJ:01/02 replies never come from them. ([specs/panasonic-ptz.yaml:1805](specs/panasonic-ptz.yaml#L1805))
-- [ ] Confirm the AW-HE130 colour temperature table (OSD:B1 000-078, 2000-15000 K) and the AW-HE40/UE70's 000-04B in 100 K steps. ([specs/panasonic-ptz.yaml:9328](specs/panasonic-ptz.yaml#L9328))
+- [ ] Confirm the AW-HE130 color temperature table (OSD:B1 000-078, 2000-15000 K) and the AW-HE40/UE70's 000-04B in 100 K steps. ([specs/panasonic-ptz.yaml:9328](specs/panasonic-ptz.yaml#L9328))
 - [ ] Confirm the menu keys need DUP:1 (the AW-UE usage examples send DUP). ([specs/panasonic-ptz.yaml:13538](specs/panasonic-ptz.yaml#L13538))
-- [ ] Confirm colour correction Yl_Yl_G uses OSD:1C/OSD:1D, not OSJ. ([specs/panasonic-ptz.yaml:13544](specs/panasonic-ptz.yaml#L13544))
+- [ ] Confirm color correction Yl_Yl_G uses OSD:1C/OSD:1D, not OSJ. ([specs/panasonic-ptz.yaml:13544](specs/panasonic-ptz.yaml#L13544))
 - [ ] Confirm the AWB A/B numbering difference between control (1, 2) and query (2, 3), and get_scene 0-3 for scenes 1-4. ([specs/panasonic-ptz.yaml:13523](specs/panasonic-ptz.yaml#L13523))
 - [ ] Confirm the AW-UE155 answers the AW-UE150 command set (assumed from the shared firmware; there is no AW-UE155 interface specification). ([specs/panasonic-ptz.yaml:1078](specs/panasonic-ptz.yaml#L1078))
 - [ ] Confirm the AW-UE150 pan/tilt speed modes: the document lists 0 Normal (60 deg/s), 1 Fast (180), 2 Quick (60), where the other documents give 0 normal 60, 1 fast1 90, 2 fast2 180. ([specs/panasonic-ptz.yaml:9993](specs/panasonic-ptz.yaml#L9993))
@@ -3565,7 +3565,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## planningcenter-services — Planning Center Services LIVE
 
 - [ ] Confirm the LIVE actions are POSTs to /service_types/{id}/plans/{id}/live/<action> without a live id (the documentation graph prints them under a series path with one). ([specs/planningcenter-services.yaml:209](specs/planningcenter-services.yaml#L209))
-- [ ] Confirm go_to_next_item, go_to_previous_item and toggle_control answer 200 with the Live resource, and honour include=current_item_time,next_item_time. ([specs/planningcenter-services.yaml:212](specs/planningcenter-services.yaml#L212))
+- [ ] Confirm go_to_next_item, go_to_previous_item and toggle_control answer 200 with the Live resource, and honor include=current_item_time,next_item_time. ([specs/planningcenter-services.yaml:212](specs/planningcenter-services.yaml#L212))
 - [ ] Confirm toggle_control takes control from another user who holds it, rather than failing, and what it answers when it gives control up. ([specs/planningcenter-services.yaml:223](specs/planningcenter-services.yaml#L223))
 - [ ] Record what the Live resource's relationships hold (the documentation's example has none): current_item_time, next_item_time and controller ids, and what they are when LIVE is not running. ([specs/planningcenter-services.yaml:1144](specs/planningcenter-services.yaml#L1144))
 - [ ] Check that a move without control answers 403 and not another status. ([specs/planningcenter-services.yaml:129](specs/planningcenter-services.yaml#L129))
@@ -3576,7 +3576,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record whether a refresh returns a new refresh token (rotation) and whether the old one then stops working, and what a revoked or expired refresh token answers (400 invalid_grant expected). ([specs/planningcenter-services.yaml:895](specs/planningcenter-services.yaml#L895))
 - [ ] Confirm a list that fits on one page has top-level links with self and no next, and a longer one links.next (taken from Planning Center's pco_api_ruby README): only a list without next replaces a plan's items, its plan times or the service types. ([specs/planningcenter-services.yaml:1265](specs/planningcenter-services.yaml#L1265))
 - [ ] Confirm the Live resource's included array holds only the current and next item times, and is empty or absent when LIVE is not running: each Live reply replaces plans.<plan_id>.item_times. ([specs/planningcenter-services.yaml:1165](specs/planningcenter-services.yaml#L1165))
-- [ ] Confirm the API honours X-PCO-API-Version 2018-11-01 on every request, for an application whose default version is another. ([specs/planningcenter-services.yaml:66](specs/planningcenter-services.yaml#L66))
+- [ ] Confirm the API honors X-PCO-API-Version 2018-11-01 on every request, for an application whose default version is another. ([specs/planningcenter-services.yaml:66](specs/planningcenter-services.yaml#L66))
 - [ ] Confirm creates (plans, items, notes, plan times) answer 201 with the new resource, updates 200, and deletes and item_reorder 204. ([specs/planningcenter-services.yaml:384](specs/planningcenter-services.yaml#L384))
 - [ ] Confirm a PATCH whose attributes hold one field leaves the others unchanged. ([specs/planningcenter-services.yaml:462](specs/planningcenter-services.yaml#L462))
 - [ ] Confirm an item's song, arrangement and key are set with song_id, arrangement_id and key_id as attributes, and that item_type takes only header on create. ([specs/planningcenter-services.yaml:449](specs/planningcenter-services.yaml#L449))
@@ -3750,7 +3750,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm effect chain offsets (add at, move to, delete, rename at) count from 1, matching effects.*.position. ([specs/resolume.yaml:3417](specs/resolume.yaml#L3417))
 - [ ] Confirm a move body of effects/by-id/<id> (no leading slash, as the document's example) moves an effect from any chain. ([specs/resolume.yaml:3414](specs/resolume.yaml#L3414))
 - [ ] Confirm an effect name with a space is accepted percent-encoded in effect:///video/<name>, and that /<preset> takes the preset's name. ([specs/resolume.yaml:3412](specs/resolume.yaml#L3412))
-- [ ] Confirm choice parameters (crossfader side, blend mode, play direction, colour and the rest) are set by sending the option name as value. ([specs/resolume.yaml:3426](specs/resolume.yaml#L3426))
+- [ ] Confirm choice parameters (crossfader side, blend mode, play direction, color and the rest) are set by sending the option name as value. ([specs/resolume.yaml:3426](specs/resolume.yaml#L3426))
 - [ ] Record the units and ranges of audio volume and pan, a layer's transition duration and a clip's speed, position and duration. ([specs/resolume.yaml:3439](specs/resolume.yaml#L3439))
 - [ ] Check whether adding, moving or removing an effect, or moving a layer or clip, resends the composition on the websocket (the extension reads it again after its own). ([specs/resolume.yaml:3359](specs/resolume.yaml#L3359))
 - [ ] Measure how often a playing clip's transport position is pushed, and whether effect parameters subscribe by /parameter/by-id/<id> like the rest. ([specs/resolume.yaml:3346](specs/resolume.yaml#L3346))
@@ -4068,7 +4068,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that null elements in /audio/exclusion/zones and /audio/exclusion/active keep those zones, and what the device answers. ([specs/sennheiser-tcc2.yaml:395](specs/sennheiser-tcc2.yaml#L395))
 - [ ] Confirm that the manual addresses and auto false in one message move the device, and what it answers before moving. ([specs/sennheiser-tcc2.yaml:354](specs/sennheiser-tcc2.yaml#L354))
 - [ ] Check whether the TCC2 also takes SSC over TCP 45 (Sennheiser documents UDP only). ([specs/sennheiser-tcc2.yaml:41](specs/sennheiser-tcc2.yaml#L41))
-- [ ] Record the device time's format in answers (seconds since 2000) and whether it can be set while synchronised. ([specs/sennheiser-tcc2.yaml:172](specs/sennheiser-tcc2.yaml#L172))
+- [ ] Record the device time's format in answers (seconds since 2000) and whether it can be set while synchronized. ([specs/sennheiser-tcc2.yaml:172](specs/sennheiser-tcc2.yaml#L172))
 
 ## sharp-display — Sharp professional displays (S-Format)
 
@@ -4115,7 +4115,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Check that GET 00 ALL is answered by IntelliMix Room and that its answers end. ([specs/shure-imx-room.yaml:398](specs/shure-imx-room.yaml#L398))
 - [ ] Check that the gain step keywords are accepted in lower case (inc, dec), as the document writes them. ([specs/shure-imx-room.yaml:185](specs/shure-imx-room.yaml#L185))
-- [ ] Check how licence values are padded (LIC_TYPE is documented as 10 characters). ([specs/shure-imx-room.yaml:260](specs/shure-imx-room.yaml#L260))
+- [ ] Check how license values are padded (LIC_TYPE is documented as 10 characters). ([specs/shure-imx-room.yaml:260](specs/shure-imx-room.yaml#L260))
 - [ ] Check the matrix gain REP's spacing (the document shows the gain run into the output number in one example). ([specs/shure-imx-room.yaml:343](specs/shure-imx-room.yaml#L343))
 
 ## shure-mxa — Shure Microflex Advance arrays
@@ -4548,7 +4548,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## turtleav-amp150 — Turtle AV 150W Dante amplifier
 
 - [ ] Check the master volume and mute reply texts (assumed Master volume: 50 and Master mute on), the line ending, and that port 8000 needs no login. ([specs/turtleav-amp150.yaml:682](specs/turtleav-amp150.yaml#L682))
-- [ ] Record the line and Dante wordings of the input and output replies (the document shows only Input line volume: 50 and Output speaker volume: 50), and whether they are capitalised. ([specs/turtleav-amp150.yaml:692](specs/turtleav-amp150.yaml#L692))
+- [ ] Record the line and Dante wordings of the input and output replies (the document shows only Input line volume: 50 and Output speaker volume: 50), and whether they are capitalized. ([specs/turtleav-amp150.yaml:692](specs/turtleav-amp150.yaml#L692))
 - [ ] Check the LCD and ID LED timed forms: s lcd on 15 (this document's example) or s lcd 15 (the 30W amplifier's), and the replies to r lcd and r idled. ([specs/turtleav-amp150.yaml:72](specs/turtleav-amp150.yaml#L72))
 - [ ] Check the TCP port command's spelling: s tcp/ipport 8000 (the example, sent) or s tcp/ip port 8000 (the command column). ([specs/turtleav-amp150.yaml:346](specs/turtleav-amp150.yaml#L346))
 - [ ] Record r fan's reply when the two fans differ, r auto stb's reply with auto standby off, and r trigger's with the trigger off. ([specs/turtleav-amp150.yaml:682](specs/turtleav-amp150.yaml#L682))
@@ -4720,7 +4720,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a refused or revoked token answers 401 with error_code 8000 or 8003 on the live endpoints, and that error 3200 under 401 is only a permission refusal. ([specs/vimeo-live.yaml:91](specs/vimeo-live.yaml#L91))
 - [ ] Confirm the live endpoints accept Accept application/vnd.vimeo.*+json;version=3.4 and JSON request bodies with Content-Type application/json. ([specs/vimeo-live.yaml:86](specs/vimeo-live.yaml#L86))
 - [ ] Confirm GET /me?fields=uri as the idle probe, and record the X-RateLimit figures against the 30-second poll of three requests. ([specs/vimeo-live.yaml:94](specs/vimeo-live.yaml#L94))
-- [ ] Confirm GET /me/live_events answers a page object with data (the reference shows an array), and that type, sort, direction, per_page and page are honoured. ([specs/vimeo-live.yaml:130](specs/vimeo-live.yaml#L130))
+- [ ] Confirm GET /me/live_events answers a page object with data (the reference shows an array), and that type, sort, direction, per_page and page are honored. ([specs/vimeo-live.yaml:130](specs/vimeo-live.yaml#L130))
 - [ ] Confirm GET /me/live_events/{id}/destinations answers a page object with data or a plain array, as the two rules expect. ([specs/vimeo-live.yaml:673](specs/vimeo-live.yaml#L673))
 - [ ] Confirm fields= filtering works on GET /me/live_events/{id} for stream_key, backup_stream_key, rtmp_link, rtmps_link, srt_link and srt_passphrase. ([specs/vimeo-live.yaml:157](specs/vimeo-live.yaml#L157))
 - [ ] Confirm Create an event answers 200 (not 201) with the event, its uri /live_events/{id}. ([specs/vimeo-live.yaml:199](specs/vimeo-live.yaml#L199))
@@ -4777,7 +4777,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Capture a full XML state from vMix 27 or later (with a replay, a GT title, a list, a video call and layered inputs) so the parsing can be checked against the real shape; the shapes used here are inferred from vMix's old documented example and the MIT-licensed Companion module. ([specs/vmix.yaml:87](specs/vmix.yaml#L87))
 - [ ] Confirm that the mix elements of the XML are numbered from 2 (the first extra mix), one more than the Mix command parameter. ([specs/vmix.yaml:5112](specs/vmix.yaml#L5112))
 - [ ] Confirm that the XML lists overlays 1 to 8 as the overlay channels and 9 to 16 as Stinger 1 to 8 (taken from the Companion module; vMix's own XML example predates eight channels and shows six), and what the preview attribute of an overlay means. ([specs/vmix.yaml:5175](specs/vmix.yaml#L5175))
-- [ ] Confirm that SetText, SetImage, SetColor and the other title field functions change the first field when neither SelectedName nor SelectedIndex is given, and that SelectedIndex counts text, image and colour fields in one sequence from 0, as the XML's index attribute does. ([specs/vmix.yaml:5127](specs/vmix.yaml#L5127))
+- [ ] Confirm that SetText, SetImage, SetColor and the other title field functions change the first field when neither SelectedName nor SelectedIndex is given, and that SelectedIndex counts text, image and color fields in one sequence from 0, as the XML's index attribute does. ([specs/vmix.yaml:5127](specs/vmix.yaml#L5127))
 - [ ] Confirm that SetTextColour and the countdown functions (StartCountdown, StopCountdown, PauseCountdown, SuspendCountdown, SetCountdown, ChangeCountdown, AdjustCountdown) take SelectedName or SelectedIndex, which the function reference does not say and the Companion module sends. ([specs/vmix.yaml:1434](specs/vmix.yaml#L1434))
 - [ ] Confirm the units of the recording element's duration attribute (seconds assumed) and the names of its file attributes (filename1, filename2). ([specs/vmix.yaml:5188](specs/vmix.yaml#L5188))
 - [ ] Confirm that the streaming element carries one channelN attribute per stream, numbered from 1. ([specs/vmix.yaml:5191](specs/vmix.yaml#L5191))
@@ -4792,7 +4792,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that GT image and color fields are reported as image and color elements with index and name, and whether their indexes share one sequence with the text fields. ([specs/vmix.yaml:5129](specs/vmix.yaml#L5129))
 - [ ] Confirm that a list input reports its items as list/item elements in order, with selected="true" on the selected one. ([specs/vmix.yaml:5133](specs/vmix.yaml#L5133))
 - [ ] Confirm that layers are overlay elements with a 0-based index (layer number less 1) and the layer input's key, with position (panX, panY, zoomX, zoomY, x, y, width, height) and crop (X1, Y1, X2, Y2) children, and whether a layer turned off (LayerOff) is still listed. ([specs/vmix.yaml:5135](specs/vmix.yaml#L5135))
-- [ ] Confirm the input's own position, crop and cc (colour correction) elements and their attribute names, and which vMix version first reports them. ([specs/vmix.yaml:5141](specs/vmix.yaml#L5141))
+- [ ] Confirm the input's own position, crop and cc (color correction) elements and their attribute names, and which vMix version first reports them. ([specs/vmix.yaml:5141](specs/vmix.yaml#L5141))
 - [ ] Confirm the replay element's attributes and timecode children, and what events (the selected event list) holds. ([specs/vmix.yaml:5205](specs/vmix.yaml#L5205))
 - [ ] Confirm the replay activators: ReplayPlaying, ReplayLive, ReplayRecording, ReplayQuadMode, ReplayPlayForward, ReplayPlayBackward, ReplayChannelAB/A/B, ReplayCameraN (current channel), ReplayACameraN and ReplayBCameraN. ([specs/vmix.yaml:5209](specs/vmix.yaml#L5209))
 - [ ] Confirm the dynamic element's input1 to input4 and value1 to value4 children. ([specs/vmix.yaml:5197](specs/vmix.yaml#L5197))
@@ -4848,7 +4848,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm an out-of-range set is clamped and answered OKm. ([specs/yamaha-cl-ql.yaml:5816](specs/yamaha-cl-ql.yaml#L5816))
 - [ ] On a CL and a QL, confirm the fader level, ON, pan and balance addresses from the Companion parameter list (StInCh, Mix, Mtrx, St, DCA Fader/Level and Fader/On; StInCh and Mix ToSt/Pan; StInCh, Mix, Mtrx and St Out/Balance; MuteMaster/On), and that set, get and NOTIFY set use them. ([specs/yamaha-cl-ql.yaml:5784](specs/yamaha-cl-ql.yaml#L5784))
 - [ ] Confirm the numbering inferred from the list's counts: StInCh 1-16 as ST IN 1L to 8R, St 1-3 as ST L, ST R and MONO, St/Out/Balance 1-2, MuteMaster 1-8 as the mute groups. ([specs/yamaha-cl-ql.yaml:5795](specs/yamaha-cl-ql.yaml#L5795))
-- [ ] Confirm the Label/Name, Label/Color and Label/Icon addresses on every channel type, the 8-character name limit, and the colour and icon names (Companion's chColors and chIcons; its list spells one icon "Wedge " with a trailing space). ([specs/yamaha-cl-ql.yaml:5888](specs/yamaha-cl-ql.yaml#L5888))
+- [ ] Confirm the Label/Name, Label/Color and Label/Icon addresses on every channel type, the 8-character name limit, and the color and icon names (Companion's chColors and chIcons; its list spells one icon "Wedge " with a trailing space). ([specs/yamaha-cl-ql.yaml:5888](specs/yamaha-cl-ql.yaml#L5888))
 - [ ] Confirm the send addresses (InCh and StInCh ToMix and ToMtrx; Mix and St ToMtrx; Level, On, Pan, PrePost) and that PrePost 1 is PRE and 0 POST, as on RIVAGE PM. ([specs/yamaha-cl-ql.yaml:5896](specs/yamaha-cl-ql.yaml#L5896))
 - [ ] Confirm Port/HA/Gain (hundredths of a dB, -6 to +66), the Dyna1/Dyna2 Threshold ranges (tenths of a dB) and DCA/Assign (Y = DCA 1-16) on every channel type. ([specs/yamaha-cl-ql.yaml:5904](specs/yamaha-cl-ql.yaml#L5904))
 - [ ] Check whether newer firmware adds EQ, HPF, phantom power, phase, delay, insert, dynamics type/ratio/attack/release, or mute group assignment to the RCP parameter list, which the recorded list lacks. ([specs/yamaha-cl-ql.yaml:5913](specs/yamaha-cl-ql.yaml#L5913))
@@ -4940,7 +4940,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the address uses "InCh" (the QLab guide prints "Inch"). ([specs/yamaha-tf.yaml:4732](specs/yamaha-tf.yaml#L4732))
 - [ ] On a TF, confirm the fader level and ON addresses of every channel type (InCh, StInCh, FxRtnCh, DCA, Mix, Mtrx, St, Mono), ToSt/Pan on InCh, StInCh and FxRtnCh, Mix and St Out/Balance, Mix/PanLink and MuteMaster/On, and that set, get and NOTIFY set use them. ([specs/yamaha-tf.yaml:4637](specs/yamaha-tf.yaml#L4637))
 - [ ] Confirm the numbering inferred from the list's counts: StInCh 1-4 as ST IN 1L, 1R, 2L, 2R; FxRtnCh 1-4 as FX1 L, FX1 R, FX2 L, FX2 R; St 1-2 as L and R; and whether ToStereo/Pan is an alias of ToSt/Pan. ([specs/yamaha-tf.yaml:4648](specs/yamaha-tf.yaml#L4648))
-- [ ] Confirm the Label/Name (up to 64 characters in the list), Label/Color, Label/Icon and Label/Category addresses, the colour and icon names, and the category names (the list types icon and category as binary). ([specs/yamaha-tf.yaml:4738](specs/yamaha-tf.yaml#L4738))
+- [ ] Confirm the Label/Name (up to 64 characters in the list), Label/Color, Label/Icon and Label/Category addresses, the color and icon names, and the category names (the list types icon and category as binary). ([specs/yamaha-tf.yaml:4738](specs/yamaha-tf.yaml#L4738))
 - [ ] Confirm the send addresses (InCh and StInCh ToMix, ToFx, ToMono; FxRtnCh ToMix and ToMono; Mix, St and Mono ToMtrx), and that PrePost 1 is PRE and 0 POST. ([specs/yamaha-tf.yaml:4747](specs/yamaha-tf.yaml#L4747))
 - [ ] Check whether newer TF firmware adds head-amp, EQ, dynamics, DCA or mute group assignment to the RCP parameter list, which the recorded list lacks. ([specs/yamaha-tf.yaml:4754](specs/yamaha-tf.yaml#L4754))
 - [ ] Confirm event MIXER:Lib/Scene/RecallInc and RecallDec on TF (scninfo lists them) and their replies. ([specs/yamaha-tf.yaml:4763](specs/yamaha-tf.yaml#L4763))

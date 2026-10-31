@@ -47,7 +47,7 @@ dependencies in the library.
 At run time a core can be narrowed further to some of the integrations the
 library was built with:
 `mi_core_create("{\"devices\":[\"sennheiser-ew-g3-g4\",\"shure-wireless\"]}", &error)`.
-`devices` takes spec ids, vendor groups or `"all"`. The catalogue then lists
+`devices` takes spec ids, vendor groups or `"all"`. The catalog then lists
 only those devices, `mi_open` of any other returns
 `{"error":{"error":"not_selected"}}`, and discovery runs only the protocols
 that find them. Opening a device whose integration was not built in returns
@@ -83,7 +83,7 @@ back into the host: read events with `mi_wait_events` on a thread of your own,
 and wake it with `mi_interrupt_events` to stop.
 
 Streams (a camera's live view, listed under a device's `streams` in the
-catalogue) are read the same way: `mi_stream_open` a stream, then
+catalog) are read the same way: `mi_stream_open` a stream, then
 `mi_stream_wait` for frames on a thread of your own, freeing each with
 `mi_frame_free`. Each open stream keeps only the newest frame, so a reader that
 falls behind skips frames (counted in `dropped`) rather than queueing them.

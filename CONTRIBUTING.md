@@ -5,7 +5,7 @@ reviews every change against the checklist below.
 
 ## What helps most
 
-1. **Device behaviour the documentation gets wrong or leaves out.** Add it to
+1. **Device behavior the documentation gets wrong or leaves out.** Add it to
    the spec as a quirk.
 2. **Test results from real hardware.** Most models here have only been tested
    against simulated devices. [VERIFICATION.md](VERIFICATION.md) lists what
@@ -17,13 +17,13 @@ reviews every change against the checklist below.
 
 ## Sources
 
-Write specs from the manufacturer's documentation or from behaviour you have
+Write specs from the manufacturer's documentation or from behavior you have
 observed on the device. Cite the document, its version and the page or section
 in the spec's `source` list.
 
 Don't copy code from other projects. If you learned something by reading
-another implementation, cite it and describe the behaviour in your own words.
-Only read code whose licence allows it: MIT, BSD and Apache are fine; don't use
+another implementation, cite it and describe the behavior in your own words.
+Only read code whose license allows it: MIT, BSD and Apache are fine; don't use
 GPL, LGPL or AGPL code at all.
 
 Some manufacturers license their documentation (Sony's Camera Remote Command,
@@ -145,6 +145,6 @@ interface.
       command from a sibling it doesn't have
 - [ ] Verification status matches the recorded vectors
 - [ ] Commands that can't be undone are documented or left out
-- [ ] No copied code; cited sources have compatible licences
+- [ ] No copied code; cited sources have compatible licenses
 
 Changes to SPEC.md or the schema must leave every existing spec valid.

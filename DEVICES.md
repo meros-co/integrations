@@ -402,7 +402,7 @@ Documentation is:
 
 - **Public**: the manufacturer publishes the protocol.
 - **On request**: the manufacturer supplies it on request or through a partner
-  programme.
+  program.
 - **Community**: no manufacturer document, but open implementations describe it.
 - **Reverse-engineered**: little public information.
 - **Closed** or **Unknown**: no known control path yet.
@@ -581,7 +581,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | Devices | Protocol | Documentation |
 |---|---|---|
 | Adder ALIF receivers' and transmitters' own REST API, CCS-PRO switches (AIM and XDIP are built) | REST (OpenAPI) | ALIF API file marked proprietary and confidential |
-| IHSE Draco, Black Box Boxilla, G&D (PiKVM is built) | TCP / HTTP | Not published (IHSE, Boxilla); a paid licence (G&D IP-Control-API) |
+| IHSE Draco, Black Box Boxilla, G&D (PiKVM is built) | TCP / HTTP | Not published (IHSE, Boxilla); a paid license (G&D IP-Control-API) |
 
 ### Displays and projectors
 

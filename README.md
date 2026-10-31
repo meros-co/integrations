@@ -93,7 +93,7 @@ schedule (Twitch: on start and hourly), the core does that too.
 
 A cloud service that follows one of an account's things (a YouTube broadcast,
 a Twitch channel, a Planning Center plan) can be opened before it is chosen:
-such a setting carries `select` in the catalogue, naming the command that
+such a setting carries `select` in the catalog, naming the command that
 lists the choices. Until it is set, the commands that need it fail saying so
 (each command lists the settings it `needs`) and only account-level state is
 read; setting it with `update_settings` reads the choice at once.
@@ -123,7 +123,7 @@ the same API as `serde_json::Value`, converted to and from it with `From`.
 Linking the core does not change how `serde_json` behaves in your own code.
 
 **Streams** (a camera's live view, under a device's `streams` in the
-catalogue) run only while watched, and a slow reader gets the newest frame,
+catalog) run only while watched, and a slow reader gets the newest frame,
 never a backlog (SPEC.md, Streams). The HTTP service serves a `jpeg` stream
 at `GET /v1/devices/{device}/streams/{stream}.mjpg` (MJPEG, which an `<img>`
 shows) and `.jpg` (one frame), and a Meros Camera's `meros-preview` stream
@@ -208,7 +208,7 @@ Each model records how far it has been tested.
 A model moves to `bench` or `field` only with a conformance vector recorded
 from the device. Every model is currently `none`.
 
-[VERIFICATION.md](VERIFICATION.md) lists the behaviour that most needs
+[VERIFICATION.md](VERIFICATION.md) lists the behavior that most needs
 checking on real devices, and how to report what you find.
 
 ## Repository layout
@@ -246,10 +246,10 @@ python tools/check_features.py
 
 ## Contributing
 
-Corrections, undocumented device behaviour, test results from real hardware
+Corrections, undocumented device behavior, test results from real hardware
 and new devices are all welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Licence
+## License
 
 MIT, see [LICENSE](LICENSE). Product names and trademarks belong to their
 owners.

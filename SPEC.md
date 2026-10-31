@@ -1047,7 +1047,7 @@ connection is encrypted, but the device's identity is not checked.
 
 Every spec, spec-driven or native, lists every port the integration uses and
 its default, so a consumer can show and firewall them before opening
-anything. The catalogue serves the list unchanged.
+anything. The catalog serves the list unchanged.
 
 ```yaml
 ports:
@@ -1396,7 +1396,7 @@ choice: a Page token names its one Page), or holds one at the JSON path
 `items`, and `id` and `label` are JSON paths in each (§5). A service that
 names a thing by a path rather than an id (Vimeo's `uri`,
 `/live_events/123`) gives `id_match`, a regex whose first group is the id
-within it. The catalogue serves `select` with the setting, so a
+within it. The catalog serves `select` with the setting, so a
 consumer can build its picker: open the device without the setting, run
 the command (filling `params` from the settings named), offer each
 choice's `label`, and pass the `id` chosen with `update_settings`.
@@ -1406,7 +1406,7 @@ nothing that names it is sent:
 
 - A command whose messages name it fails at once with `invalid_params`,
   saying which setting to choose and the command that lists it. The
-  catalogue lists, for each command, the selection settings it `needs`, so a
+  catalog lists, for each command, the selection settings it `needs`, so a
   consumer can tell the commands that work before the choice.
 - Telemetry `poll`, `subscribe` and `then_send` items and `on_connect`
   steps that name it are left out, as with `when_set` (§8): account-level
@@ -1498,7 +1498,7 @@ does not clamp, because a clamped value masks a caller error and produces a
 different device state than the caller requested.
 
 Every parameter, and every setting, has a `label` and a `description` for the
-person choosing a value, served by the catalogue so a consumer can build its
+person choosing a value, served by the catalog so a consumer can build its
 forms from it:
 
 ```yaml
@@ -1513,7 +1513,7 @@ params:
 ```
 
 A parameter that is a credential (a password a command sets on the device)
-takes `secret: true`, as a setting does: the catalogue serves it, so a
+takes `secret: true`, as a setting does: the catalog serves it, so a
 consumer masks the field, and the core never logs or echoes the value.
 
 The label is a short noun phrase in sentence case, the way a form names the
@@ -1586,7 +1586,7 @@ send: { method: POST, path: /api/python/execute, body: '{"script":{script:json}}
 
 Every placeholder naming a multiline parameter must be `{name:json}`, with no
 other directive, wherever it stands; `tools/validate.py` checks this and the
-core refuses to render it any other way. The catalogue serves `multiline`, so
+core refuses to render it any other way. The catalog serves `multiline`, so
 a consumer can offer a text area. Such a parameter used to be a `json`
 parameter holding a JSON string; a caller that passed a string to it passes the
 same string now and the same bytes go out, while a value that was not a string
@@ -1999,7 +1999,7 @@ telemetry vector the joined reply.
 Each message waits for its answer for the transport's `timeout_ms`. A
 command the vendor documents as slow (applying firmware, formatting media,
 a large import) gives its own, `timeout_ms` on the command, which its
-messages wait instead; the catalogue lists it:
+messages wait instead; the catalog lists it:
 
 ```yaml
 commands:
@@ -2095,7 +2095,7 @@ telemetry rules and `refusal_json` are all read this way.
 
 ## 6. Quirks
 
-Device behaviour that is not derivable from the commands above.
+Device behavior that is not derivable from the commands above.
 
 ```yaml
 quirks:
@@ -2220,7 +2220,7 @@ page of a paged list counts once, when the list is whole), on other
 transports with any reply taken as the item's answer. A timeout, an error
 status, or a lost connection leaves it where it was, so its age is how old
 the group's data is: a consumer compares it with the group's interval (the
-catalogue gives it in the key's description) to tell fresh from stale. The
+catalog gives it in the key's description) to tell fresh from stale. The
 stamp is one key per group (at most four), not per item: a group of many
 items (every channel's fader) reports one stamp, not one per item. Being in
 whole seconds, and reported only when it moves on, it changes at most once a
@@ -2233,7 +2233,7 @@ It is kept for every spec-driven device whose transport waits for each
 poll item's answer: `http`, `osc-tcp`, a line transport or `osc-udp`
 whose device answers (`reply` other than `none`), and a `ws` transport with
 `reply_match`. Elsewhere poll items go out without awaiting an answer and
-nothing times them. The catalogue adds `polled.<group>` to the spec's
+nothing times them. The catalog adds `polled.<group>` to the spec's
 `state` (type `int`, unit `s`); a spec never declares it, and its group
 names are unique (`tools/validate.py` checks both). Pushed state
 (subscriptions, a push websocket, an event stream) has no stamp: the
@@ -2616,7 +2616,7 @@ such a key; it walks the JSON objects instead. The declared path stays
 A family whose models give the same reply different meanings names the
 `models` a rule is for, as a message does (§4, "Messages per model"). The
 O.I.S. setting of a Panasonic AW-UE80 answers `OIS:2` for O.I.S. on pan and
-tilt, an AW-UE100 the same text for its hybrid stabiliser:
+tilt, an AW-UE100 the same text for its hybrid stabilizer:
 
 ```yaml
     - models: [aw-ue80]
@@ -3238,9 +3238,9 @@ device replies are implemented as Rust modules in the core, not as data. The
 format stays free of control flow; the logic lives in reviewed, tested code
 instead.
 
-A native device still has a spec. It carries everything except wire behaviour:
+A native device still has a spec. It carries everything except wire behavior:
 models, commands with their parameters and return types, settings, quirks and
-sources. That keeps the catalogue identical for both kinds of device, and gives
+sources. That keeps the catalog identical for both kinds of device, and gives
 the Rust module's parameter validation the same single source as spec-driven
 commands.
 
@@ -3290,7 +3290,7 @@ the native modules, native extensions and discovery protocols, of exactly the
 integrations it enables; vendor groups (`vendor-sennheiser`) and `all` enable
 several at once. The spec engine and transports are shared and always built.
 A core can further be started for named integrations only (`devices` in its
-options: spec ids, vendor groups or `all`), and then its catalogue lists only
+options: spec ids, vendor groups or `all`), and then its catalog lists only
 those.
 
 ### Polls
@@ -3428,7 +3428,7 @@ settings' defaults (absent for a setting with no default):
 
 A native module can publish continuous media, such as a camera's live view.
 The spec declares each stream under `streams`, keyed by a stream name in
-`snake_case`, so consumers can find it in the catalogue:
+`snake_case`, so consumers can find it in the catalog:
 
 ```yaml
 streams:

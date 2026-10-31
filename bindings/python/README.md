@@ -47,7 +47,7 @@ extension was built with:
 core = Core(devices=["sennheiser-ew-g3-g4", "shure-wireless"])
 ```
 
-`devices` takes spec ids, vendor groups or `"all"`. The catalogue then lists
+`devices` takes spec ids, vendor groups or `"all"`. The catalog then lists
 only those devices, opening any other raises `IntegrationsError`
 `not_selected`, and discovery runs only the protocols that find them. Opening
 a device whose integration was not built in raises `not_built`, naming the
