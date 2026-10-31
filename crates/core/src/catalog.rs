@@ -1033,7 +1033,7 @@ mod tests {
     }
 
     #[test]
-    fn every_poll_in_the_catalogue_says_how_often_it_runs() {
+    fn every_poll_in_the_catalog_says_how_often_it_runs() {
         let catalog = Catalog::embedded();
         for spec in catalog.devices.values() {
             for p in &spec.polls {
@@ -1067,7 +1067,7 @@ mod tests {
     }
 
     #[test]
-    fn a_states_unit_and_scale_reach_the_catalogue() {
+    fn a_states_unit_and_scale_reach_the_catalog() {
         let spec = parse(&[
             "implementation: native",
             "reason: R",

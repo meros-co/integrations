@@ -97,7 +97,7 @@ state:
     description: "envir2Temperature (CPS-MIB)"
 ```
 
-The catalogue gives `unit`, `scale` and `unit_from` with each state, in
+The catalog gives `unit`, `scale` and `unit_from` with each state, in
 every delivery.
 
 ## 2. Transports
@@ -2187,7 +2187,7 @@ time, and an item still waiting from its last round is not queued again.
 Every group says how often it is sent: `every_ms`, or `once: true` for a
 group sent only on connecting (and on each reconnection).
 `tools/validate.py` refuses a group with neither, so no poll's interval is
-left to prose. The catalogue lists the groups under the device's `polls`
+left to prose. The catalog lists the groups under the device's `polls`
 (Native modules, Polls).
 
 #### When each poll group was last answered
@@ -3320,7 +3320,7 @@ for each `polled.<name>` key the spec's `state` declares, and that each
 setting named exists (an `int` one for `every_ms`). A spec-driven device
 declares no `polls`: its polls are its `telemetry.poll` groups (§8).
 
-The catalogue lists every integration's polls under `polls`, spec-driven
+The catalog lists every integration's polls under `polls`, spec-driven
 ones built from `telemetry.poll` (each group's `name`, or its place from
 1, and its `every_ms` or `once`), with `interval_ms`, the interval at the
 settings' defaults (absent for `once`, and for a setting with no default):
