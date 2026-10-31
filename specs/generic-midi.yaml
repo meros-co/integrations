@@ -1,14 +1,13 @@
 spec: 1
 id: generic-midi
 name: Generic MIDI device
-vendor: Generic (any device or software taking MIDI 1.0 over RTP-MIDI or a MIDI port)
+vendor: Generic (any device or software taking MIDI 1.0 over RTP-MIDI)
 category: other
 implementation: native
 reason: >
   A generic sender and receiver rather than one device's protocol, over a link the spec format has no
   transport for. RTP-MIDI is a stateful session (an invitation on two UDP ports, clock synchronisation the
-  peer answers, receiver feedback, segmented SysEx and recovery journals in binary RTP packets), and a MIDI
-  port of the host is opened through the operating system's MIDI API. MIDI itself is a binary stream with
+  peer answers, receiver feedback, segmented SysEx and recovery journals in binary RTP packets). MIDI itself is a binary stream with
   running status and real-time bytes inside other messages, its 14-bit values, NRPNs and MTC are spread over
   several messages, and what is kept from them depends on what came before, none of which text framing and
   state rules can express.
@@ -82,16 +81,12 @@ source:
       timestamps are in the same units; received packets need not carry a journal.
 
 settings:
-  link: { type: enum, values: [rtp, rtp_host, port], default: rtp, label: Link,
-          description: "rtp joins the RTP-MIDI session the host offers (its control port is the device port, 5004 unless given); rtp_host hosts a session on local_port for the device's host (any host when none is given) to join; port uses MIDI ports of this computer, named by midi_input and midi_output." }
+  link: { type: enum, values: [rtp, rtp_host], default: rtp, label: Link,
+          description: "rtp joins the RTP-MIDI session the host offers (its control port is the device port, 5004 unless given); rtp_host hosts a session on local_port for the device's host (any host when none is given) to join." }
   session_name: { type: string, max_length: 64, default: "Meros", label: Session name,
                   description: "With link rtp or rtp_host, the name the core gives itself in the RTP-MIDI session, which the other host shows." }
   local_port: { type: int, min: 1024, max: 65534, label: Local RTP port,
                 description: "The local control port (the data port is the next): with link rtp leave unset to pick a free one at random; with link rtp_host the hosted session's port, 5004 unless set." }
-  midi_input: { type: string, max_length: 256, label: MIDI input port,
-                description: "With link port, the input port to receive from, as listed by the MIDI port listing; leave unset to only send." }
-  midi_output: { type: string, max_length: 256, label: MIDI output port,
-                 description: "With link port, the output port to send to, as listed by the MIDI port listing; leave unset to only receive." }
   device_id: { type: int, min: 0, max: 127, default: 127, label: Device ID,
                description: "The device ID MTC full messages and MMC commands go to when a command does not give one; 127 is all-call." }
   realtime_events: { type: bool, default: false, label: Real-time events,
@@ -103,12 +98,10 @@ ports:
   - { port: null, protocol: udp, role: feedback, listener: core, setting: local_port, when: "link rtp", note: "the core's own control port and the one after it, where the session answers; random in 49152-65534 unless local_port is set" }
   - { port: 5004, protocol: udp, role: control, listener: core, setting: local_port, when: "link rtp_host", note: "the session the core hosts: its control port, where the joining host's invitation arrives" }
   - { port: 5005, protocol: udp, role: control, listener: core, when: "link rtp_host", note: "the hosted session's data port: always its control port plus one" }
-  - { port: null, protocol: midi, role: control, setting: midi_input, when: "link port", note: "a MIDI input of this computer: a USB or other class-compliant device, or another program's port" }
-  - { port: null, protocol: midi, role: control, setting: midi_output, when: "link port", note: "a MIDI output of this computer" }
 
 models:
   - id: generic
-    name: "Any MIDI 1.0 device, over an RTP-MIDI session (give its host) or a MIDI port of this computer"
+    name: "Any MIDI 1.0 device, over an RTP-MIDI session (give its host)"
     supports: [note_on, note_off, control_change, control_change_14bit, program_change, pitch_bend,
                channel_pressure, poly_pressure, nrpn, rpn, channel_mode, sysex, raw, song_position,
                song_select, tune_request, realtime, mtc_full_frame, mtc_quarter_frame, mtc_user_bits,
@@ -358,8 +351,6 @@ state:
   session.peer_ssrc:             { type: int, description: "With link rtp or rtp_host, the other host's RTP synchronisation source" }
   session.peer_address:          { type: string, description: "With link rtp or rtp_host, the other host's control port as ip:port (hosting: the host that joined)" }
   session.local_port:            { type: int, description: "With link rtp or rtp_host, the core's control port (its data port is the next)" }
-  port.input:                    { type: string, description: "With link port, the MIDI input port opened, or \"\" when none is (changed: was null, which a state patch reads as a removal)" }
-  port.output:                   { type: string, description: "With link port, the MIDI output port opened, or \"\" when none is (changed: was null, which a state patch reads as a removal)" }
   received_count:                { type: int, description: "MIDI messages received since the device was opened" }
   channels.*.notes.*.on:         { type: bool, description: "Whether the note (key: note number) on the channel (key: 1 to 16) is on: the last note on with velocity above 0 and no note off, all notes off or all sound off since" }
   channels.*.notes.*.velocity:   { type: int, description: "The velocity of the note's last note on, or the release velocity of its last note off (0 for a note on with velocity 0)" }
@@ -409,9 +400,8 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      MIDI has no acknowledgement, so every command is unverified, and a MIDI port gives no sign of the device
-      itself: the device is connected while the port is open. An RTP-MIDI session is connected while the other
-      host answers its clock synchronisation (every 10 s, with three missed ending the session); its round
+      MIDI has no acknowledgement, so every command is unverified. An RTP-MIDI session is connected while the
+      other host answers its clock synchronisation (every 10 s, with three missed ending the session); its round
       trip is the latency.
   - models: [all]
     severity: info
@@ -441,19 +431,6 @@ quirks:
       feedback, is not fully coded, the oldest left out. A note on in the journal is marked to be played
       (Y) when it went out within 50 ms of the packet. A packet lost on the way back is repaired from the
       device's journal where it sends one (notes, controllers, programs, pitch bend and pressure).
-  - models: [all]
-    severity: info
-    text: >
-      On Windows a MIDI port can usually be open in only one program at a time (the Windows Multimedia MIDI
-      API): a port another program holds fails to open, is reported disconnected, and is tried again after
-      1 s, doubling to 30 s. Two ports with the same name are told apart by nothing: the first is used.
-  - models: [all]
-    severity: info
-    text: >
-      On Linux MIDI ports are the ALSA sequencer's, named "client:port client-number:port-number". The ALSA
-      library (libasound.so.2) is loaded when ports are first listed or opened, not linked: on a host without
-      it, or without the sequencer, no port is listed and a device on a port stays disconnected, its reason
-      saying why.
   - models: [all]
     severity: info
     text: >

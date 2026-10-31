@@ -6,7 +6,7 @@ category: other
 implementation: native
 reason: >
   MIDI Show Control travels as universal real-time SysEx over a MIDI link the spec format has no transport for
-  (an RTP-MIDI session or a MIDI port of the host, as for generic-midi), and its two-phase commit pairs each
+  (an RTP-MIDI session, as for generic-midi), and its two-phase commit pairs each
   STANDBY, GO_2PC and CANCEL with an answer by sequence number, checks a checksum over the message, and times
   the answer out by a duration the device itself states, none of which templates and state rules can express.
 
@@ -43,16 +43,12 @@ source:
       (https://developer.apple.com/library/archive/documentation/Audio/Conceptual/MIDINetworkDriverProtocol/MIDI/MIDI.html).
 
 settings:
-  link: { type: enum, values: [rtp, rtp_host, port], default: rtp, label: Link,
-          description: "rtp joins the RTP-MIDI session the host offers (its control port is the device port, 5004 unless given); rtp_host hosts a session on local_port for the device's host (any host when none is given) to join; port uses MIDI ports of this computer, named by midi_input and midi_output." }
+  link: { type: enum, values: [rtp, rtp_host], default: rtp, label: Link,
+          description: "rtp joins the RTP-MIDI session the host offers (its control port is the device port, 5004 unless given); rtp_host hosts a session on local_port for the device's host (any host when none is given) to join." }
   session_name: { type: string, max_length: 64, default: "Meros", label: Session name,
                   description: "With link rtp or rtp_host, the name the core gives itself in the RTP-MIDI session, which the other host shows." }
   local_port: { type: int, min: 1024, max: 65534, label: Local RTP port,
                 description: "The local control port (the data port is the next): with link rtp leave unset to pick a free one at random; with link rtp_host the hosted session's port, 5004 unless set." }
-  midi_input: { type: string, max_length: 256, label: MIDI input port,
-                description: "With link port, the input port to receive MSC and two-phase commit answers from; leave unset to only send." }
-  midi_output: { type: string, max_length: 256, label: MIDI output port,
-                 description: "With link port, the output port to send MSC to; leave unset to only receive." }
   device_id: { type: int, min: 0, max: 127, default: 127, label: Device ID,
                description: "The device ID commands go to when they do not give one: 0 to 111 a device, 112 to 126 groups 1 to 15, 127 all-call." }
   command_format: { type: enum, values: [lighting, moving_lights, color_changers, strobes, lasers, chasers, sound, music, cd_players, eprom_playback, audio_tape_machines, intercoms, amplifiers, audio_effects_devices, equalizers, machinery, rigging, flys, lifts, turntables, trusses, robots, animation, floats, breakaways, barges, video, video_tape_machines, video_cassette_machines, video_disc_players, video_switchers, video_effects, video_character_generators, video_still_stores, video_monitors, projection, film_projectors, slide_projectors, video_projectors, dissolvers, shutter_controls, process_control, hydraulic_oil, h2o, co2, compressed_air, natural_gas, fog, smoke, cracked_haze, pyro, fireworks, explosions, flame, smoke_pots, all_types],
@@ -65,12 +61,10 @@ ports:
   - { port: null, protocol: udp, role: feedback, listener: core, setting: local_port, when: "link rtp", note: "the core's own control port and the one after it, where the session answers; random in 49152-65534 unless local_port is set" }
   - { port: 5004, protocol: udp, role: control, listener: core, setting: local_port, when: "link rtp_host", note: "the session the core hosts: its control port, where the joining host's invitation arrives" }
   - { port: 5005, protocol: udp, role: control, listener: core, when: "link rtp_host", note: "the hosted session's data port: always its control port plus one" }
-  - { port: null, protocol: midi, role: control, setting: midi_input, when: "link port", note: "a MIDI input of this computer" }
-  - { port: null, protocol: midi, role: control, setting: midi_output, when: "link port", note: "a MIDI output of this computer" }
 
 models:
   - id: generic
-    name: "Any MSC controlled device, over an RTP-MIDI session (give its host) or a MIDI port of this computer"
+    name: "Any MSC controlled device, over an RTP-MIDI session (give its host)"
     supports: [go, stop, resume, timed_go, load, set, fire, all_off, restore, reset, go_off, go_jam_clock,
                standby_plus, standby_minus, sequence_plus, sequence_minus, start_clock, stop_clock, zero_clock,
                set_clock, mtc_chase_on, mtc_chase_off, open_cue_list, close_cue_list, open_cue_path,
@@ -290,8 +284,6 @@ state:
   session.peer_ssrc:       { type: int, description: "With link rtp or rtp_host, the other host's RTP synchronisation source" }
   session.peer_address:    { type: string, description: "With link rtp or rtp_host, the other host's control port as ip:port (hosting: the host that joined)" }
   session.local_port:      { type: int, description: "With link rtp or rtp_host, the core's control port (its data port is the next)" }
-  port.input:              { type: string, description: "With link port, the MIDI input port opened, or \"\" when none is (changed: was null, which a state patch reads as a removal)" }
-  port.output:             { type: string, description: "With link port, the MIDI output port opened, or \"\" when none is (changed: was null, which a state patch reads as a removal)" }
   last:                    { type: object, description: "The last MSC message received: {device_id, command_format, command} and what it carried: cue, list, path, time, control, value, macro, sequence, max_time, status_code, status, or hex for a command not listed" }
   cue_lists.*.command:     { type: string, description: "Per cue list received (key: the list, or default when none was given): the last of go, stop, resume, timed_go, load, go_off and go_jam_clock" }
   cue_lists.*.cue:         { type: string, description: "The cue it named, or \"\" for the next or current cue (changed: was null, which a state patch reads as a removal)" }
@@ -346,9 +338,8 @@ quirks:
     severity: info
     text: >
       Over RTP-MIDI the core joins a session the other host offers and keeps it with clock synchronisation,
-      or hosts one the other host joins and keeps (link rtp_host), the round trip reported as the latency;
-      over a MIDI port the device is connected while the port is open. See generic-midi for the link's
-      behaviour.
+      or hosts one the other host joins and keeps (link rtp_host), the round trip reported as the latency.
+      See generic-midi for the link's behavior.
   - models: [all]
     severity: info
     text: >

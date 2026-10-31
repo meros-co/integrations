@@ -1179,6 +1179,51 @@ fn recover_channel(channel: u8, toc: u8, c: &[u8], out: &mut Vec<u8>) {
     }
 }
 
+/// For the MIDI integrations' module tests: a session joined with a peer
+/// at 192.0.2.10, and the MIDI the packets a module sent carry.
+#[cfg(test)]
+pub(crate) mod testing {
+    use super::*;
+    use crate::module::Action;
+
+    /// The peer the tests' modules are opened for.
+    pub(crate) fn peer() -> IpAddr {
+        "192.0.2.10".parse().unwrap()
+    }
+
+    /// Accept the invitation among `started` (what the module's `start`
+    /// did) on both ports, through `deliver`, which hands a datagram to the
+    /// module as from the peer.
+    pub(crate) fn join(started: &[Action], mut deliver: impl FnMut(Key, SocketAddr, &[u8])) {
+        let token = started
+            .iter()
+            .find_map(|a| match a {
+                Action::UdpSend { data, .. } if data.get(2..4) == Some(b"IN") => u32_at(data, 8),
+                _ => None,
+            })
+            .expect("an invitation");
+        let ok = session_packet(b"OK", token, 0xABCD, Some("Peer"));
+        deliver(CONTROL, SocketAddr::new(peer(), DEFAULT_PORT), &ok);
+        deliver(DATA, SocketAddr::new(peer(), DEFAULT_PORT + 1), &ok);
+    }
+
+    /// The MIDI bytes carried by the RTP packets among `actions`, in order.
+    pub(crate) fn midi_sent(actions: &[Action]) -> Vec<u8> {
+        let mut decoder = Decoder::default();
+        let mut out = Vec::new();
+        for a in actions {
+            if let Action::UdpSend { socket, data, .. } = a {
+                if *socket == DATA && data.first().is_some_and(|b| b >> 6 == 2) {
+                    if let Some((midi, _)) = decoder.packet(data) {
+                        out.extend(midi);
+                    }
+                }
+            }
+        }
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

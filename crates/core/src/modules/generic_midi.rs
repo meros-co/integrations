@@ -1,6 +1,5 @@
 //! Generic MIDI: send any MIDI 1.0 message to a device over an RTP-MIDI
-//! session or a MIDI port of the host (`super::midi_link`), and keep what it
-//! sends.
+//! session (`super::midi_link`), and keep what it sends.
 //!
 //! Messages from the MIDI 1.0 Detailed Specification 4.2.1 (MMA): channel
 //! voice and mode messages, NRPN and RPN (controllers 99/98 and 101/100
@@ -43,7 +42,7 @@ use super::midi_link::{timecode, MidiLink};
 use crate::catalog::Params;
 use crate::midi::{self, Message, MtcReader, Rate, Timecode};
 use crate::module::{
-    CommandError, CommandId, Cx, Key, Module, OpenContext, Outcome, SettingsUpdate, TcpInput,
+    CommandError, CommandId, Cx, Key, Module, OpenContext, Outcome, SettingsUpdate,
 };
 
 const MTC_IDLE: Key = "mtc-idle";
@@ -1048,11 +1047,6 @@ impl Module for GenericMidi {
         self.link.socket_error(cx, socket, message);
     }
 
-    fn tcp(&mut self, cx: &mut Cx, socket: Key, input: TcpInput) {
-        let messages = self.link.tcp(cx, socket, input);
-        self.receive(cx, messages);
-    }
-
     fn timer(&mut self, cx: &mut Cx, key: Key) {
         if key == MTC_IDLE {
             cx.state(json!({"mtc": {"running": false}}));
@@ -1086,6 +1080,7 @@ mod tests {
     use super::*;
     use crate::midi::Rate;
     use crate::module::{Action, Connection};
+    use crate::modules::rtp_midi;
 
     fn ctx(settings: Value) -> OpenContext {
         OpenContext {
@@ -1099,18 +1094,18 @@ mod tests {
         }
     }
 
-    fn port_module() -> GenericMidi {
-        let mut m = GenericMidi::new(ctx(
-            json!({"link": "port", "midi_input": "In", "midi_output": "Out"}),
-        ))
-        .unwrap();
+    /// A module in an RTP-MIDI session joined with the test peer.
+    fn session_module() -> GenericMidi {
+        let mut c = ctx(json!({"local_port": 6000}));
+        c.host = rtp_midi::testing::peer();
+        let mut m = GenericMidi::new(c).unwrap();
         let mut cx = Cx::new(0);
         m.start(&mut cx);
-        let a = cx.take();
-        assert!(a.iter().any(|a| matches!(a, Action::MidiOpen { port, .. }
-            if port.input.as_deref() == Some("In") && port.output.as_deref() == Some("Out"))));
+        let started = cx.take();
         let mut cx = Cx::new(1);
-        m.tcp(&mut cx, "midi-port", TcpInput::Connected);
+        rtp_midi::testing::join(&started, |socket, from, data| {
+            m.datagram(&mut cx, socket, from, data)
+        });
         assert!(cx
             .take()
             .contains(&Action::Connection(Connection::Connected)));
@@ -1124,16 +1119,12 @@ mod tests {
     ) -> (Vec<u8>, Option<crate::module::CommandResult>) {
         let mut cx = Cx::new(10);
         m.command(&mut cx, 1, name, params.as_object().unwrap());
-        let mut sent = Vec::new();
-        let mut result = None;
-        for a in cx.take() {
-            match a {
-                Action::TcpSend { data, .. } => sent.extend(data),
-                Action::Complete { result: r, .. } => result = Some(r),
-                _ => {}
-            }
-        }
-        (sent, result)
+        let actions = cx.take();
+        let result = actions.iter().find_map(|a| match a {
+            Action::Complete { result, .. } => Some(result.clone()),
+            _ => None,
+        });
+        (rtp_midi::testing::midi_sent(&actions), result)
     }
 
     fn wire(m: &mut GenericMidi, name: &str, params: Value) -> Vec<u8> {
@@ -1144,25 +1135,23 @@ mod tests {
 
     /// What a step of the module sent, and when it asks to run again.
     fn step(actions: Vec<Action>) -> (Vec<u8>, Option<u64>, Option<Value>) {
-        let mut sent = Vec::new();
         let mut next = None;
         let mut state = None;
-        for a in actions {
+        for a in &actions {
             match a {
-                Action::TcpSend { data, .. } => sent.extend(data),
-                Action::SetTimer { key, after } if key == MTC_GENERATOR => next = Some(after),
+                Action::SetTimer { key, after } if *key == MTC_GENERATOR => next = Some(*after),
                 Action::State(patch) if patch.get("mtc_generator").is_some() => {
                     state = Some(patch["mtc_generator"].clone())
                 }
                 _ => {}
             }
         }
-        (sent, next, state)
+        (rtp_midi::testing::midi_sent(&actions), next, state)
     }
 
     #[test]
     fn the_mtc_generator_locates_runs_and_stops() {
-        let mut m = port_module();
+        let mut m = session_module();
         // Located while stopped: a full message to device 5, at 30df.
         let mut cx = Cx::new(0);
         m.command(
@@ -1236,7 +1225,7 @@ mod tests {
 
     #[test]
     fn commands_put_their_messages_on_the_wire() {
-        let mut m = port_module();
+        let mut m = session_module();
         assert_eq!(
             wire(
                 &mut m,
@@ -1393,51 +1382,30 @@ mod tests {
     }
 
     #[test]
-    fn a_closed_port_refuses_commands_and_is_opened_again() {
-        let mut m = port_module();
-        let mut cx = Cx::new(5);
-        m.tcp(
-            &mut cx,
-            "midi-port",
-            TcpInput::Closed {
-                reason: "midi: gone".into(),
-            },
-        );
-        let a = cx.take();
-        assert!(a.contains(&Action::SetTimer {
-            key: "midi-port-retry",
-            after: 1000
-        }));
+    fn commands_wait_for_the_session_and_rtp_needs_a_host() {
+        let mut c = ctx(json!({}));
+        c.host = rtp_midi::testing::peer();
+        let mut m = GenericMidi::new(c).unwrap();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
         let (_, r) = run(
             &mut m,
             "note_on",
             json!({"channel": 1, "note": 1, "velocity": 1}),
         );
         assert_eq!(r, Some(Err(CommandError::NotConnected)));
-        let mut cx = Cx::new(1005);
-        m.timer(&mut cx, "midi-port-retry");
-        assert!(cx
-            .take()
-            .iter()
-            .any(|a| matches!(a, Action::MidiOpen { .. })));
-        // An input-only port has nothing to send to.
-        let mut m = GenericMidi::new(ctx(json!({"link": "port", "midi_input": "In"}))).unwrap();
-        let (_, r) = run(
-            &mut m,
-            "note_on",
-            json!({"channel": 1, "note": 1, "velocity": 1}),
-        );
-        assert!(matches!(r, Some(Err(CommandError::InvalidParams { .. }))));
-        assert!(GenericMidi::new(ctx(json!({"link": "port"}))).is_err());
         assert!(
             GenericMidi::new(ctx(json!({"link": "rtp"}))).is_err(),
             "rtp needs a host"
         );
+        assert!(GenericMidi::new(ctx(json!({"link": "rtp_host"}))).is_ok());
     }
 
+    /// What the module does with MIDI received from the device.
     fn receive(m: &mut GenericMidi, bytes: &[u8]) -> Vec<Action> {
         let mut cx = Cx::new(100);
-        m.tcp(&mut cx, "midi-port", TcpInput::Data(bytes.to_vec()));
+        let messages = crate::midi::Parser::default().feed(bytes);
+        m.receive(&mut cx, messages);
         cx.take()
     }
 
@@ -1484,7 +1452,7 @@ mod tests {
 
     #[test]
     fn received_messages_are_kept_and_reported() {
-        let mut m = port_module();
+        let mut m = session_module();
         let a = receive(
             &mut m,
             &[
@@ -1529,7 +1497,7 @@ mod tests {
 
     #[test]
     fn mtc_and_mmc_are_kept() {
-        let mut m = port_module();
+        let mut m = session_module();
         let tc = Timecode::new(10, 0, 0, 0, Rate::Fps25).unwrap();
         let qf: Vec<u8> = midi::quarter_frames(&tc)
             .iter()

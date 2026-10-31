@@ -1,18 +1,15 @@
-//! A MIDI integration on a MIDI port of the host, through the public API,
-//! with the device played on an in-memory port: messages both ways, state
-//! and events, the port listing, and a device unplugged and plugged in
-//! again. No real MIDI port is opened.
+//! A MIDI integration in an RTP-MIDI session, through the public API: a
+//! session the core hosts, joined over loopback, with messages both ways,
+//! and which links may be opened without the device's host.
 
-use std::sync::Arc;
 use std::time::Duration;
 
 use crate::{json, value::Value};
 
 use crate::catalog::{Catalog, Params};
-use crate::midi_ports::MemoryMidi;
-use crate::{CommandError, Connection, Core, CoreOptions, Event, OpenRequest, Outcome};
+use crate::{Connection, Core, CoreOptions, OpenError, OpenRequest, Outcome};
 
-fn core(ports: Arc<MemoryMidi>) -> Core {
+fn core() -> Core {
     let catalog = Catalog::source_tree();
     let spec = catalog.device("generic-midi").unwrap().clone();
     let catalog = Catalog {
@@ -23,24 +20,10 @@ fn core(ports: Arc<MemoryMidi>) -> Core {
         CoreOptions::new().bind_address([127, 0, 0, 1].into()),
     )
     .unwrap()
-    .with_midi_ports(ports)
 }
 
 fn params(v: Value) -> Params {
     v.as_object().unwrap().clone()
-}
-
-fn open(core: &Core) -> u64 {
-    core.open(OpenRequest {
-        device: "generic-midi".into(),
-        model: "generic".into(),
-        // A device on a MIDI port needs no host.
-        host: String::new(),
-        port: None,
-        settings: params(json!({"link": "port", "midi_input": "Keys", "midi_output": "Keys"})),
-        monitor: true,
-    })
-    .unwrap()
 }
 
 async fn wait_connection(core: &Core, device: u64, want: fn(&Connection) -> bool) {
@@ -54,88 +37,28 @@ async fn wait_connection(core: &Core, device: u64, want: fn(&Connection) -> bool
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn a_device_on_a_midi_port_is_played_both_ways_and_found_again() {
-    let ports = Arc::new(MemoryMidi::default());
-    let mut sent = ports.plug("Keys");
-    let core = core(ports.clone());
-    assert_eq!(
-        core.midi_ports().unwrap(),
-        [crate::MidiPortInfo {
-            name: "Keys".into(),
-            input: true,
-            output: true
-        }]
-    );
-    let id = open(&core);
-    wait_connection(&core, id, |c| *c == Connection::Connected).await;
-
-    let result = core
-        .execute(
-            id,
-            "note_on",
-            params(json!({"channel": 10, "note": 36, "velocity": 127})),
-        )
-        .await;
-    assert_eq!(result, Ok(Outcome::Unverified));
-    let got = tokio::time::timeout(Duration::from_secs(5), sent.recv())
-        .await
-        .unwrap()
+async fn only_a_hosted_session_opens_without_a_host() {
+    let core = core();
+    let request = |settings: Value| OpenRequest {
+        device: "generic-midi".into(),
+        model: "generic".into(),
+        host: String::new(),
+        port: None,
+        settings: params(settings),
+        monitor: true,
+    };
+    let hosted = core
+        .open(request(
+            json!({"link": "rtp_host", "local_port": free_pair()}),
+        ))
         .unwrap();
-    assert_eq!(got, [0x99, 36, 127]);
-
-    // The device sends a controller and an MMC play.
-    assert!(ports.play("Keys", &[0xB0, 74, 33]));
-    assert!(ports.play("Keys", &[0xF0, 0x7F, 0x7F, 0x06, 0x02, 0xF7]));
-    tokio::time::timeout(Duration::from_secs(5), async {
-        loop {
-            let state = core.snapshot(id).unwrap().state;
-            if state["mmc"]["command"] == "play" {
-                assert_eq!(state["channels"]["1"]["cc"]["74"], 33);
-                assert_eq!(state["link"], "port");
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-    })
-    .await
-    .expect("state within 5 s");
-    let mut addresses = Vec::new();
-    tokio::time::timeout(Duration::from_secs(5), async {
-        while addresses.len() < 2 {
-            for e in core.next_events(64).await {
-                if let Event::Message { address, .. } = e {
-                    addresses.push(address);
-                }
-            }
-        }
-    })
-    .await
-    .unwrap();
-    assert_eq!(addresses, ["control_change", "mmc"]);
-
-    // Unplugged: disconnected, and commands fail until it is back.
-    ports.unplug("Keys");
-    wait_connection(
-        &core,
-        id,
-        |c| matches!(c, Connection::Disconnected { reason } if reason.starts_with("midi:")),
-    )
-    .await;
-    assert_eq!(
-        core.execute(id, "tune_request", Params::new()).await,
-        Err(CommandError::NotConnected)
-    );
-    let mut sent = ports.plug("Keys");
-    wait_connection(&core, id, |c| *c == Connection::Connected).await;
-    assert_eq!(
-        core.execute(id, "tune_request", Params::new()).await,
-        Ok(Outcome::Unverified)
-    );
-    let got = tokio::time::timeout(Duration::from_secs(5), sent.recv())
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(got, [0xF6]);
+    core.close(hosted).await;
+    // Joining needs the host offering the session.
+    assert!(core.open(request(json!({"link": "rtp"}))).is_err());
+    assert!(matches!(
+        core.open(request(json!({"link": "port"}))),
+        Err(OpenError::InvalidSettings { .. })
+    ));
 }
 
 /// Two consecutive ports free on loopback for UDP and TCP: an RTP-MIDI
@@ -177,7 +100,7 @@ async fn ask(socket: &tokio::net::UdpSocket, to: (&str, u16), packet: &[u8], wan
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_hosted_rtp_midi_session_is_joined_over_loopback() {
-    let core = core(Arc::new(MemoryMidi::default()));
+    let core = core();
     let port = free_pair();
     let id = core
         .open(OpenRequest {
@@ -245,49 +168,4 @@ async fn a_hosted_rtp_midi_session_is_joined_over_loopback() {
     })
     .await
     .expect("state within 5 s");
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn the_mtc_generator_runs_on_a_midi_port() {
-    let ports = Arc::new(MemoryMidi::default());
-    let mut sent = ports.plug("Keys");
-    let core = core(ports.clone());
-    let id = open(&core);
-    wait_connection(&core, id, |c| *c == Connection::Connected).await;
-    let result = core
-        .execute(
-            id,
-            "mtc_generator_locate",
-            params(json!({"hours": 10, "rate": "25"})),
-        )
-        .await;
-    assert_eq!(result, Ok(Outcome::Unverified));
-    let full = tokio::time::timeout(Duration::from_secs(5), sent.recv())
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(full, [0xF0, 0x7F, 0x7F, 0x01, 0x01, 0x2A, 0, 0, 0, 0xF7]);
-    assert_eq!(
-        core.execute(id, "mtc_generator_start", Params::new()).await,
-        Ok(Outcome::Unverified)
-    );
-    // A run of eight quarter frames (two frames at 25: 80 ms) carrying
-    // 10:00:00:00 at 25.
-    let mut wire = Vec::new();
-    tokio::time::timeout(Duration::from_secs(5), async {
-        while wire.len() < 16 {
-            wire.extend(sent.recv().await.unwrap());
-        }
-    })
-    .await
-    .unwrap();
-    let pieces: Vec<u8> = wire[..16].chunks(2).map(|c| c[1]).collect();
-    assert_eq!(pieces, [0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x6A, 0x72]);
-    assert_eq!(
-        core.execute(id, "mtc_generator_stop", Params::new()).await,
-        Ok(Outcome::Unverified)
-    );
-    let state = core.snapshot(id).unwrap().state;
-    assert_eq!(state["mtc_generator"]["running"], false);
-    assert_eq!(state["mtc_generator"]["rate"], "25");
 }

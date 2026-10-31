@@ -1,5 +1,4 @@
-//! MIDI 1.0 messages, as every MIDI link of the core carries them: a local
-//! MIDI port of the host, or an RTP-MIDI session.
+//! MIDI 1.0 messages, as the core's RTP-MIDI sessions carry them.
 //!
 //! From the MIDI 1.0 Detailed Specification 4.2.1 (MIDI Manufacturers
 //! Association, 1996), MIDI Time Code (MMA 4.2.1) and MIDI Machine Control
@@ -352,20 +351,6 @@ impl Parser {
         }
         out
     }
-}
-
-/// Split bytes into whole messages, each with its status byte: what a port
-/// that takes one message at a time (a local MIDI port) is given. What does
-/// not complete a message is kept for the next call.
-#[cfg_attr(
-    not(all(
-        any(feature = "generic-midi", feature = "midi-show-control"),
-        not(target_os = "android")
-    )),
-    allow(dead_code)
-)]
-pub(crate) fn split(parser: &mut Parser, bytes: &[u8]) -> Vec<Vec<u8>> {
-    parser.feed(bytes).iter().map(Message::encode).collect()
 }
 
 // --- Hex ---------------------------------------------------------------------
@@ -953,11 +938,17 @@ mod tests {
         }
         let mut p = Parser::default();
         assert_eq!(
-            split(&mut p, &[0x90, 1, 2, 3]),
+            p.feed(&[0x90, 1, 2, 3])
+                .iter()
+                .map(Message::encode)
+                .collect::<Vec<_>>(),
             vec![vec![0x90, 1, 2]],
             "a partial message waits"
         );
-        assert_eq!(split(&mut p, &[4]), vec![vec![0x90, 3, 4]]);
+        assert_eq!(
+            p.feed(&[4]).iter().map(Message::encode).collect::<Vec<_>>(),
+            vec![vec![0x90, 3, 4]]
+        );
     }
 
     #[test]

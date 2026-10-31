@@ -1,6 +1,6 @@
 //! MIDI Show Control: cue commands to lighting, sound, video, machinery and
-//! other show equipment, over an RTP-MIDI session or a MIDI port of the host
-//! (`super::midi_link`), and the MSC the equipment sends.
+//! other show equipment, over an RTP-MIDI session (`super::midi_link`), and
+//! the MSC the equipment sends.
 //!
 //! From MIDI Show Control 1.1.1 (MMA RP-002 and RP-014, two-phase commit):
 //!
@@ -50,7 +50,6 @@ use crate::catalog::Params;
 use crate::midi::{self, Message};
 use crate::module::{
     CommandError, CommandId, Cx, Key, Millis, Module, OpenContext, Outcome, SettingsUpdate,
-    TcpInput,
 };
 
 /// The command formats (MSC 1.1.1 §4.1), by code.
@@ -945,11 +944,6 @@ impl Module for MidiShowControl {
         self.link.socket_error(cx, socket, message);
     }
 
-    fn tcp(&mut self, cx: &mut Cx, socket: Key, input: TcpInput) {
-        let messages = self.link.tcp(cx, socket, input);
-        self.receive(cx, messages);
-    }
-
     fn timer(&mut self, cx: &mut Cx, key: Key) {
         if key == TRANSACTIONS {
             self.deadlines(cx);
@@ -974,18 +968,17 @@ impl Module for MidiShowControl {
 
 #[cfg(test)]
 mod tests {
-    use std::net::{IpAddr, Ipv4Addr};
-
     use super::*;
     use crate::module::{Action, CommandResult, Connection};
+    use crate::modules::rtp_midi;
 
     fn module(settings: Value) -> MidiShowControl {
-        let mut s = json!({"link": "port", "midi_input": "MSC", "midi_output": "MSC"});
+        let mut s = json!({"local_port": 6000});
         for (k, v) in settings.as_object().unwrap() {
             s[k] = v.clone();
         }
         let ctx = OpenContext {
-            host: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            host: rtp_midi::testing::peer(),
             host_name: None,
             port: None,
             model: "generic".into(),
@@ -996,8 +989,11 @@ mod tests {
         let mut m = MidiShowControl::new(ctx).unwrap();
         let mut cx = Cx::new(0);
         Module::start(&mut m, &mut cx);
+        let started = cx.take();
         let mut cx = Cx::new(1);
-        Module::tcp(&mut m, &mut cx, "midi-port", TcpInput::Connected);
+        rtp_midi::testing::join(&started, |socket, from, data| {
+            Module::datagram(&mut m, &mut cx, socket, from, data)
+        });
         assert!(cx
             .take()
             .contains(&Action::Connection(Connection::Connected)));
@@ -1012,16 +1008,12 @@ mod tests {
     ) -> (Vec<u8>, Option<CommandResult>) {
         let mut cx = Cx::new(at);
         Module::command(m, &mut cx, 7, name, params.as_object().unwrap());
-        let mut sent = Vec::new();
-        let mut result = None;
-        for a in cx.take() {
-            match a {
-                Action::TcpSend { data, .. } => sent.extend(data),
-                Action::Complete { result: r, .. } => result = Some(r),
-                _ => {}
-            }
-        }
-        (sent, result)
+        let actions = cx.take();
+        let result = actions.iter().find_map(|a| match a {
+            Action::Complete { result, .. } => Some(result.clone()),
+            _ => None,
+        });
+        (rtp_midi::testing::midi_sent(&actions), result)
     }
 
     fn wire(m: &mut MidiShowControl, name: &str, params: Value) -> Vec<u8> {
@@ -1125,7 +1117,8 @@ mod tests {
 
     fn feed(m: &mut MidiShowControl, at: Millis, bytes: &[u8]) -> Vec<Action> {
         let mut cx = Cx::new(at);
-        Module::tcp(m, &mut cx, "midi-port", TcpInput::Data(bytes.to_vec()));
+        let messages = crate::midi::Parser::default().feed(bytes);
+        m.receive(&mut cx, messages);
         cx.take()
     }
 
