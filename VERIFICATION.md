@@ -2710,6 +2710,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On MX2, record the answers to PRESET:create and PRESET:rename, and whether GET /MEDIA/PRESET lists the presets as child nodes. ([specs/lightware-lw3.yaml:3406](specs/lightware-lw3.yaml#L3406))
 - [ ] On MX2, confirm that port names cannot be set over LW3 (no property in the manual's LW3 chapter). ([specs/lightware-lw3.yaml:4523](specs/lightware-lw3.yaml#L4523))
 
+## livestream-studio — Livestream Studio 6 (TCP 9923 text API)
+
+- [ ] Confirm Studio answers no command and that a line feed alone ends one; record whether an unknown or refused command gets any message. ([specs/livestream-studio.yaml:53](specs/livestream-studio.yaml#L53))
+- [ ] Record what Studio sends on connecting (ILCC and the ILC lines, and whether program, preview, masters, graphics and record/stream states follow), and the ILC field order on current Studio 6 versions. ([specs/livestream-studio.yaml:292](specs/livestream-studio.yaml#L292))
+- [ ] Confirm Studio sends PmIS and PwIS after a Cut and after an auto or T-bar transition, not only Cut or TrAStop. ([specs/livestream-studio.yaml:303](specs/livestream-studio.yaml#L303))
+- [ ] Confirm input mute takes IAM:n:on and IAM:n:off (the Companion module sends on/off here while the master mutes and every report use 0/1). ([specs/livestream-studio.yaml:190](specs/livestream-studio.yaml#L190))
+- [ ] Find what the fader values mean: whether -60000 to 10000 is thousandths of a dB with 0 unity, and the gain range's unit. ([specs/livestream-studio.yaml:163](specs/livestream-studio.yaml#L163))
+- [ ] Find what RFIn and RFOut do, and which of FIn and FOut Studio reports while program is faded to black (the Companion module's notes contradict each other). ([specs/livestream-studio.yaml:105](specs/livestream-studio.yaml#L105))
+- [ ] Confirm the second number of GMOS, GMOH, GMPvS and GMPvH, which nothing here reads. ([specs/livestream-studio.yaml:327](specs/livestream-studio.yaml#L327))
+- [ ] Check whether opening another show file drops this connection, and that approving the address under Pending Connections lasts until then. ([specs/livestream-studio.yaml:366](specs/livestream-studio.yaml#L366))
+
 ## logos-proclaim — Logos Proclaim
 
 - [ ] Check what /appCommand/authenticate answers a wrong password with, and what /appCommand/perform answers an expired or wrong token with (401 or 403 is assumed for both), and whether a token expires. ([specs/logos-proclaim.yaml:314](specs/logos-proclaim.yaml#L314))

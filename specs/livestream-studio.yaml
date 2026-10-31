@@ -1,0 +1,386 @@
+spec: 1
+id: livestream-studio
+name: Livestream Studio 6 (TCP 9923 text API)
+vendor: Vimeo
+category: switcher
+
+# Livestream Studio 6, Vimeo's live production software for Windows, takes
+# short text commands on TCP 9923 once its Hardware Control settings allow
+# incoming connections and the operator approves the controller's address.
+# Each command is a word and colon-separated numbers ended by a line feed
+# (SPmI:2 puts input 3 on program). Studio sends no answer to a command; it
+# reports what changes in the same form (PmIS:2), and on connecting lists
+# its inputs (ILCC, then one ILC line each).
+#
+# Vimeo publishes no document for the API. Everything here comes from the
+# MIT-licensed Bitfocus Companion module, whose author wrote it against
+# Studio 6.8.20 from what Studio's users had found; its README lists what
+# the API cannot do (graphics contents, playlists, aux buses, transition
+# styles). Inputs, graphics stacks and media players are numbered from 0 on
+# the wire and from 1 here.
+source:
+  - title: Bitfocus Companion module companion-module-vimeo-livestreamstudio6 v1.0.0 (MIT), src/actions.js, src/index.js, HELP.md, README.md
+    author: Chad Carpenter and Bitfocus contributors
+    url: https://github.com/bitfocus/companion-module-vimeo-livestreamstudio6
+    note: >
+      Community code, read for its behavior only (LICENSE is MIT; no code
+      copied). TCP 9923, fixed in Studio; commands ended by LF (SPrI, SPmI,
+      RGMOS, RGMOH, RGPvS, RGMPvH, RMFP, RMIOP, RMPause, RCut, RAuto, RFIn,
+      RFOut, SIVL, IVL, SIGL, IAM, IAP, IAH, SSVL, SRVL, SVL, RVL, SM, RM,
+      SH, RH, RecStart, RecStop, StrStart, StrStop); the messages Studio
+      sends (ILCC, ILC, INC, PmIS, PwIS, SVC, SMC, SSC, RVC, RMC, RSC, FIn,
+      FOut, Cut, TrAStart, TrAStop, TrASp, TrMSp, Str* and Rec* states, GMOn,
+      GMOff, GMPvS, GMPvH, GMOS, GMOH, GPA, MIOP, MFP, MPause, AOC, AMC, ASC,
+      AVC, AGC); volume -60000 to 10000, gain 0 to 10000; enabling Allow
+      Incoming Connections per show file and approving the pending
+      connection (HELP.md).
+  - title: Getting started with Livestream Studio (Vimeo Help Center)
+    author: Vimeo
+    url: https://help.vimeo.com/hc/en-us/sections/31014119136657-Getting-started-with-Livestream-Studio
+    note: >
+      Manufacturer page. Livestream Studio continues to be supported and
+      licensed through Vimeo accounts after the Livestream platform's end in
+      2025 (lifecycle only; no protocol detail).
+
+transport:
+  type: line-tcp
+  port: 9923
+  framing: terminated
+  terminator: lf
+  encoding: utf-8
+  timeout_ms: 3000
+  # Studio answers no command; what changes it reports in its own messages.
+  reply: none
+
+maps:
+  audio_to_program: { "off": "0", always: "1", program: "2" }
+  mute_word: { "true": "on", "false": "off" }
+  master_volume: { stream: SSVL, record: SRVL }
+  master_adjust: { stream: SVL, record: RVL }
+  master_mute: { stream: SM, record: RM }
+  master_headphones: { stream: SH, record: RH }
+
+ports:
+  - { port: 9923, protocol: tcp, role: control, note: "Fixed in Livestream Studio 6; Studio must allow incoming connections and the operator approve this address" }
+
+models:
+  - id: studio6
+    name: Livestream Studio 6
+    supports:
+      [set_program, set_preview, cut, auto, fade_in, fade_out, push_graphics, pull_graphics, show_graphics_preview,
+       hide_graphics_preview, play_media, play_media_in_out, pause_media, set_input_volume, adjust_input_volume,
+       set_input_gain, set_input_mute, set_input_audio_to_program, set_input_headphones, set_master_volume,
+       adjust_master_volume, set_master_mute, set_master_headphones, start_recording, stop_recording,
+       start_streaming, stop_streaming]
+    verification: none
+    notes: >
+      Livestream Studio 6 on Windows (Studio software and Studio hardware
+      units). Three graphics stacks (GFX 1-3); media players are the inputs
+      of media type.
+
+commands:
+  set_program:
+    summary: Put an input on program (SPmI:n)
+    params:
+      input: &input { type: int, min: 1, max: 99, required: true, label: Input, description: "The input, numbered from 1 as in Studio's input list." }
+    send: "SPmI:{input:-1}"
+    returns: none
+
+  set_preview:
+    summary: Put an input on preview (SPrI:n)
+    params: { input: *input }
+    send: "SPrI:{input:-1}"
+    returns: none
+
+  cut:
+    summary: Cut preview to program (RCut)
+    send: "RCut"
+    returns: none
+
+  auto:
+    summary: Take preview to program with the current auto transition (RAuto)
+    send: "RAuto"
+    returns: none
+
+  fade_in:
+    summary: Run Studio's Fade to Black transition in (RFIn)
+    send: "RFIn"
+    returns: none
+
+  fade_out:
+    summary: Run Studio's Fade to Black transition out (RFOut)
+    send: "RFOut"
+    returns: none
+
+  push_graphics:
+    summary: Push a graphics stack to program (RGMOS:g)
+    params:
+      stack: &stack { type: int, min: 1, max: 3, required: true, label: Graphics stack, description: "The graphics stack, GFX 1 to 3." }
+    send: "RGMOS:{stack:-1}"
+    returns: none
+
+  pull_graphics:
+    summary: Pull a graphics stack off program (RGMOH:g)
+    params: { stack: *stack }
+    send: "RGMOH:{stack:-1}"
+    returns: none
+
+  show_graphics_preview:
+    summary: Show a graphics stack on preview (RGPvS:g)
+    params: { stack: *stack }
+    send: "RGPvS:{stack:-1}"
+    returns: none
+
+  hide_graphics_preview:
+    summary: Hide a graphics stack from preview (RGMPvH:g)
+    params: { stack: *stack }
+    send: "RGMPvH:{stack:-1}"
+    returns: none
+
+  play_media:
+    summary: Play a media input's whole clip (RMFP:n)
+    params:
+      input: &media_input { type: int, min: 1, max: 99, required: true, label: Media input, description: "The media player's input number, from 1." }
+    send: "RMFP:{input:-1}"
+    returns: none
+
+  play_media_in_out:
+    summary: Play a media input's clip from its in point to its out point (RMIOP:n)
+    params: { input: *media_input }
+    send: "RMIOP:{input:-1}"
+    returns: none
+
+  pause_media:
+    summary: Pause a media input (RMPause:n)
+    params: { input: *media_input }
+    send: "RMPause:{input:-1}"
+    returns: none
+
+  set_input_volume:
+    summary: Set an input's fader level (SIVL:n:level)
+    params:
+      input: *input
+      level: &level { type: int, min: -60000, max: 10000, required: true, label: Level,
+                      description: "Studio's fader value, -60000 (bottom) to 10000 (top); 0 is unity." }
+    send: "SIVL:{input:-1}:{level}"
+    returns: none
+
+  adjust_input_volume:
+    summary: Move an input's fader by an amount (IVL:n:step)
+    params:
+      input: *input
+      step: &step { type: int, min: -70000, max: 70000, required: true, label: Step,
+                    description: "How far to move the fader, in the fader's units; negative moves it down." }
+    send: "IVL:{input:-1}:{step}"
+    returns: none
+
+  set_input_gain:
+    summary: Set an input's audio gain (SIGL:n:gain)
+    params:
+      input: *input
+      gain: { type: int, min: 0, max: 10000, required: true, label: Gain, description: "Studio's gain value, 0 to 10000." }
+    send: "SIGL:{input:-1}:{gain}"
+    returns: none
+
+  set_input_mute:
+    summary: Mute or unmute an input's audio (IAM:n:on/off)
+    params:
+      input: *input
+      muted: { type: bool, required: true, label: Muted, description: "On mutes the input's audio." }
+    send: "IAM:{input:-1}:{muted:map.mute_word}"
+    returns: none
+
+  set_input_audio_to_program:
+    summary: Set when an input's audio goes to program, its AUDIO button (IAP:n:mode)
+    params:
+      input: *input
+      mode: { type: enum, values: ["off", always, program], required: true, label: Audio to program,
+              description: "off never (button off), always always on (red), program only while the input is on program (yellow)." }
+    send: "IAP:{input:-1}:{mode:map.audio_to_program}"
+    returns: none
+
+  set_input_headphones:
+    summary: Send an input's audio to the headphones or not (IAH:n:0/1)
+    params:
+      input: *input
+      enabled: { type: bool, required: true, label: Headphones, description: "On puts the input in the headphone mix." }
+    send: "IAH:{input:-1}:{enabled:bool01}"
+    returns: none
+
+  set_master_volume:
+    summary: Set the stream or record master's fader level (SSVL, SRVL)
+    params:
+      master: &master { type: enum, values: [stream, record], required: true, label: Master, description: "The stream master or the record master." }
+      level: *level
+    send: "{master:map.master_volume}:{level}"
+    returns: none
+
+  adjust_master_volume:
+    summary: Move the stream or record master's fader by an amount (SVL, RVL)
+    params:
+      master: *master
+      step: *step
+    send: "{master:map.master_adjust}:{step}"
+    returns: none
+
+  set_master_mute:
+    summary: Mute or unmute the stream or record master (SM, RM)
+    params:
+      master: *master
+      muted: { type: bool, required: true, label: Muted, description: "On mutes the master." }
+    send: "{master:map.master_mute}:{muted:bool01}"
+    returns: none
+
+  set_master_headphones:
+    summary: Send the stream or record master to the headphones or not (SH, RH)
+    params:
+      master: *master
+      enabled: { type: bool, required: true, label: Headphones, description: "On puts the master in the headphone mix." }
+    send: "{master:map.master_headphones}:{enabled:bool01}"
+    returns: none
+
+  start_recording:
+    summary: Start recording (RecStart)
+    send: "RecStart"
+    returns: none
+
+  stop_recording:
+    summary: Stop recording (RecStop)
+    send: "RecStop"
+    returns: none
+
+  start_streaming:
+    summary: Start streaming (StrStart)
+    send: "StrStart"
+    returns: none
+
+  stop_streaming:
+    summary: Stop streaming (StrStop)
+    send: "StrStop"
+    returns: none
+
+state:
+  input_count:                  { type: int, description: "Number of inputs Studio listed on connecting (ILCC)" }
+  program:                      { type: int, description: "Input on program, from 1 (PmIS)" }
+  preview:                      { type: int, description: "Input on preview, from 1 (PwIS)" }
+  inputs.*.name:                { type: string, description: "Input name (ILC, INC)" }
+  inputs.*.volume:              { type: int, description: "Fader level, -60000 to 10000 (ILC, AVC)" }
+  inputs.*.gain:                { type: int, description: "Gain, 0 to 10000 (ILC, AGC)" }
+  inputs.*.muted:               { type: bool, description: "Whether the input's audio is muted (ILC, AMC)" }
+  inputs.*.headphones:          { type: bool, description: "Whether the input is in the headphone mix (ILC, ASC)" }
+  inputs.*.audio_to_program:    { type: string, description: "When the input's audio goes to program: off, always or program (ILC, AOC)" }
+  inputs.*.type:                { type: int, description: "Studio's input type number; 3 is a media player (ILC)" }
+  inputs.*.media:               { type: string, description: "A media input's player state: full (whole clip), in_out (in to out point) or paused (MFP, MIOP, MPause)" }
+  graphics.*.active:            { type: bool, description: "Whether the graphics stack is on (GMOn, GMOff)" }
+  graphics.*.pushed:            { type: bool, description: "Whether the stack is pushed to program (GMOS) rather than pulled (GMOH)" }
+  graphics.*.preview:           { type: bool, description: "Whether the stack shows on preview (GMPvS, GMPvH)" }
+  graphics.*.push_available:    { type: bool, description: "Whether the stack can be pushed, its Push button flashing (GPA)" }
+  masters.stream.volume:        { type: int, description: "Stream master fader level (SVC)" }
+  masters.stream.muted:         { type: bool, description: "Whether the stream master is muted (SMC)" }
+  masters.stream.headphones:    { type: bool, description: "Whether the stream master is in the headphone mix (SSC)" }
+  masters.record.volume:        { type: int, description: "Record master fader level (RVC)" }
+  masters.record.muted:         { type: bool, description: "Whether the record master is muted (RMC)" }
+  masters.record.headphones:    { type: bool, description: "Whether the record master is in the headphone mix (RSC)" }
+  fade:                         { type: string, description: "Last Fade to Black report, in or out (FIn, FOut)" }
+  streaming:                    { type: string, description: "Streaming state: started, starting, stopping or stopped (StrStarted ... StrStopped)" }
+  recording:                    { type: string, description: "Recording state: started, starting, stopping or stopped (RecStarted ... RecStopped)" }
+
+telemetry:
+  updates:
+    - match: '^ILCC:(\d+)\s*$'
+      state: { input_count: "{1}" }
+    - match: '^ILC:(\d+):"(.*)":(-?\d+):(-?\d+):(\d+):(\d+):(\d+):(\d+)\s*$'
+      state:
+        "inputs.{1:+1}.name": "{2}"
+        "inputs.{1:+1}.volume": "{3}"
+        "inputs.{1:+1}.gain": "{4}"
+        "inputs.{1:+1}.muted": { value: "{5}", map: { "0": false, "1": true } }
+        "inputs.{1:+1}.headphones": { value: "{6}", map: { "0": false, "1": true } }
+        "inputs.{1:+1}.audio_to_program": { value: "{7}", map: { "0": "off", "1": always, "2": program } }
+        "inputs.{1:+1}.type": "{8}"
+    - match: '^INC:(\d+):"(.*)"\s*$'
+      state: { "inputs.{1:+1}.name": "{2}" }
+    - match: '^PmIS:(\d+)\s*$'
+      state: { program: "{1:+1}" }
+    - match: '^PwIS:(\d+)\s*$'
+      state: { preview: "{1:+1}" }
+    - match: '^AVC:(\d+):(-?\d+)\s*$'
+      state: { "inputs.{1:+1}.volume": "{2}" }
+    - match: '^AGC:(\d+):(-?\d+)\s*$'
+      state: { "inputs.{1:+1}.gain": "{2}" }
+    - match: '^AMC:(\d+):([01])\s*$'
+      state: { "inputs.{1:+1}.muted": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^ASC:(\d+):([01])\s*$'
+      state: { "inputs.{1:+1}.headphones": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^AOC:(\d+):([012])\s*$'
+      state: { "inputs.{1:+1}.audio_to_program": { value: "{2}", map: { "0": "off", "1": always, "2": program } } }
+    - match: '^MFP:(\d+)\s*$'
+      state: { "inputs.{1:+1}.media": full }
+    - match: '^MIOP:(\d+)\s*$'
+      state: { "inputs.{1:+1}.media": in_out }
+    - match: '^MPause:(\d+)\s*$'
+      state: { "inputs.{1:+1}.media": paused }
+    - match: '^GMOn:(\d+)'
+      state: { "graphics.{1:+1}.active": "true" }
+    - match: '^GMOff:(\d+)'
+      state: { "graphics.{1:+1}.active": "false" }
+    - match: '^GMOS:(\d+)'
+      state: { "graphics.{1:+1}.pushed": "true" }
+    - match: '^GMOH:(\d+)'
+      state: { "graphics.{1:+1}.pushed": "false" }
+    - match: '^GMPvS:(\d+)'
+      state: { "graphics.{1:+1}.preview": "true" }
+    - match: '^GMPvH:(\d+)'
+      state: { "graphics.{1:+1}.preview": "false" }
+    - match: '^GPA:(\d+):([01])\s*$'
+      state: { "graphics.{1:+1}.push_available": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^SVC:(-?\d+)\s*$'
+      state: { masters.stream.volume: "{1}" }
+    - match: '^SMC:([01])\s*$'
+      state: { masters.stream.muted: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^SSC:([01])\s*$'
+      state: { masters.stream.headphones: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^RVC:(-?\d+)\s*$'
+      state: { masters.record.volume: "{1}" }
+    - match: '^RMC:([01])\s*$'
+      state: { masters.record.muted: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^RSC:([01])\s*$'
+      state: { masters.record.headphones: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^F(In|Out)\s*$'
+      state: { fade: { value: "{1}", map: { "In": in, "Out": out } } }
+    - match: '^Str(Started|Starting|Stopping|Stopped)\s*$'
+      state: { streaming: { value: "{1}", map: { Started: started, Starting: starting, Stopping: stopping, Stopped: stopped } } }
+    - match: '^Rec(Started|Starting|Stopping|Stopped)\s*$'
+      state: { recording: { value: "{1}", map: { Started: started, Starting: starting, Stopping: stopping, Stopped: stopped } } }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      stop_streaming and stop_recording end the stream or recording at once.
+      set_program, cut, auto and the fade commands change what is on air.
+  - models: [all]
+    severity: warning
+    text: >
+      Studio accepts a controller only when Settings > Hardware Control has
+      Allow Incoming Connections on and the operator has allowed this
+      address under Pending Connections. The setting is saved with the show
+      file: opening or creating another show turns it off until it is set
+      again. The port, 9923, cannot be changed in Studio.
+  - models: [all]
+    severity: warning
+    text: >
+      Vimeo documents no part of this API. Studio answers no command, so
+      commands report unverified; state comes from what Studio reports when
+      something changes and from the input list it sends on connecting.
+      After a Cut or an auto transition (Cut, TrAStop) the program and
+      preview are read only from the PmIS and PwIS reports, if Studio sends
+      them.
+  - models: [all]
+    severity: info
+    text: >
+      API limits (the Companion module's README): graphics stack contents
+      and layers, media playlists, aux buses, the auto transition's style,
+      clip countdowns and stream or record quality cannot be read or
+      changed. A media player's state is known only once it changes. The
+      T-bar's transition steps (TrASp, TrMSp) are not read.

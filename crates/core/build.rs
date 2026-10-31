@@ -453,7 +453,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-vdoninja", &["vdoninja"]),
     ("vendor-ventuz", &["ventuz-director"]),
     ("vendor-videolan", &["videolan-vlc"]),
-    ("vendor-vimeo", &["vimeo-live"]),
+    ("vendor-vimeo", &["livestream-studio", "vimeo-live"]),
     ("vendor-vioso", &["vioso-exaplay"]),
     ("vendor-visualproductions", &["visualproductions-cuecore"]),
     ("vendor-vizrt", &["vizrt-trio"]),
