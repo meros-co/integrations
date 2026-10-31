@@ -91,6 +91,16 @@ source:
       USBHostRoute, UsbVbusControl, Version, VOUTMute (1 HDMI, 2 HDBaseT),
       xY$, xYAVxZ (inputs 1 USB-C, 2 DisplayPort, 3-4 HDMI; feedback
       x3AVx1, x3AVx2) p.5-15.
+  - title: "AT-OME-MS42-HDBT Application Programming Interface 1.0 (June 2024), 40315-R1"
+    author: Atlona Inc.
+    url: https://atlona.com/pdf/AT-OME-MS42-HDBT_API.pdf
+    note: >
+      Manufacturer document. RS-232, Telnet, SSH or TCP; 500 ms between
+      commands; Telnet 23; TCP 9000 (MCU, like Telnet), 9001 (HDBaseT input
+      RS-232), 9002 (HDBaseT output RS-232), 9003 (local RS-232); RS-232
+      115200 8N1 p.3-4; the MS42's command set without RepCmdTime and
+      RepeatCmd, USBHostRoute adding 4 (the remote host over HDBaseT OUT)
+      p.5-15.
   - title: "AT-OME-PS62 Application Programming Interface (version 4, October 2021, firmware 1.2.1), 40116-R4"
     author: Atlona Inc.
     url: https://atlona.com/pdf/AT-OME-PS62_API.pdf
@@ -263,9 +273,9 @@ transport:
   pacing:
     min_interval_ms: 0
     by_model:
-      - { models: [at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-st31, at-ome-sr21, at-ome-mh21, at-hdr-h2h-44ma], min_interval_ms: 500 }
+      - { models: [at-ome-ms42, at-ome-ms42-hdbt, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-st31, at-ome-sr21, at-ome-mh21, at-hdr-h2h-44ma], min_interval_ms: 500 }
   # The same API on each unit's RS-232 control port (every document: "Commands
-  # can be sent using RS-232, Telnet ..."). Line defaults: MS42, PS62 and SW32
+  # can be sent using RS-232, Telnet ..."). Line defaults: MS42, MS42-HDBT, PS62 and SW32
   # 115200 8N1, ST31A and MH21 9600 8N1 (their p.2-3), SR21 port 2 115200
   # 8N1 (p.3). The ST31's document gives none; 9600 like the ST31A is
   # inferred. The PRO3 and H2H documents give the CSpara example
@@ -308,7 +318,7 @@ maps:
   parity_digit: { none: "0", odd: "1", even: "2" }
 
 ports:
-  - { port: 23, protocol: tcp, role: control, when: "link tcp", note: "Telnet, changeable with IPPort; the Omega MS42, PS62, SR21 and MH21 also answer the same API, without a login, on TCP 9000" }
+  - { port: 23, protocol: tcp, role: control, when: "link tcp", note: "Telnet, changeable with IPPort; the Omega MS42, MS42-HDBT, PS62, SR21 and MH21 also answer the same API, without a login, on TCP 9000" }
   - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The unit's RS-232 control port, a 3- or 4-pole captive screw connector (PRO3: the master RS-232 port)" }
 
 models:
@@ -504,6 +514,25 @@ models:
       Inputs 1 USB-C, 2 DisplayPort, 3 HDMI 1, 4 HDMI 2; outputs 1 HDMI and
       2 HDBaseT. USB host routes C, 1, 2 or 3 (the remote host over
       HDBaseT).
+  - id: at-ome-ms42-hdbt
+    name: Atlona AT-OME-MS42-HDBT (Omega 4x2 matrix switcher with USB hub and HDBaseT input)
+    supports:
+      [route, get_routing, set_output_video, get_output_video, set_output_mute, get_output_mute,
+       get_input_signals, power_on, power_off, get_power, reboot, set_blink, get_blink,
+       set_display_button, get_display_button, set_front_panel_lock, set_8021x, get_8021x,
+       set_dhcp, get_dhcp, set_static_ip, get_network, set_analog_audio, get_analog_audio,
+       set_hdmi_5v_keep, get_hdmi_5v_keep, send_display_serial, set_usb_host_logic, get_usb_host_logic,
+       set_usb_host_route, get_usb_host_route, set_usb_vbus, get_usb_vbus, factory_reset, get_model,
+       get_firmware]
+    verification: none
+    notes: >
+      Four inputs to outputs 1 HDMI and 2 HDBaseT. The rear panel numbers the
+      inputs 1 HDBaseT IN, 2 USB-C, 3 and 4 HDMI; the API document repeats
+      the MS42's wording (1 USB-C, 2 DisplayPort), so route takes the rear
+      panel's numbers. USB host routes C, 1, 2, 3 (the remote host over
+      HDBaseT IN) or 4 (over HDBaseT OUT). The RS-232 ports of the HDBaseT
+      input and output and the local port pass raw bytes on TCP 9001, 9002
+      and 9003.
   - id: at-ome-ps62
     name: Atlona AT-OME-PS62 (Omega 6x2 matrix presentation switcher with USB)
     supports:
@@ -711,7 +740,7 @@ commands:
       muted:  { type: bool, required: true, label: Muted, description: "On mutes the output's audio; off unmutes it." }
     send:
       - { models: [at-ome-st31], message: "VOUTMute {output} {muted:map.onoff}" }
-      - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-sr21, at-uhd-clso-840], message: "VOUTMute{output} {muted:map.onoff}" }
+      - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ms42-hdbt, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-sr21, at-uhd-clso-840], message: "VOUTMute{output} {muted:map.onoff}" }
     expect: { reply_contains: "VOUTMute", not_contains: "Command FAILED" }
     returns: ack
 
@@ -720,7 +749,7 @@ commands:
     params: { output: *zone }
     send:
       - { models: [at-ome-st31], message: "VOUTMute {output} sta" }
-      - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-sr21, at-uhd-clso-840], message: "VOUTMute{output} sta" }
+      - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ms42-hdbt, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-sr21, at-uhd-clso-840], message: "VOUTMute{output} sta" }
     expect: { reply_contains: "VOUTMute", matches: ' (on|off)$' }
     returns: value
 
@@ -1657,7 +1686,7 @@ commands:
   get_firmware:
     summary: Read the firmware version (Version; VersionMCU on the H2H)
     send:
-      - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-uhd-clso-840, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-st31, at-ome-sr21, at-ome-mh21], message: "Version" }
+      - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-uhd-clso-840, at-ome-ms42, at-ome-ms42-hdbt, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-st31, at-ome-sr21, at-ome-mh21], message: "Version" }
       - { models: [at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-uhd-clso-601], message: "VersionMCU" }
     expect: { matches: '^(?:Firmware |V)?(\d[\w.]*)$' }
     returns: value
@@ -2201,10 +2230,10 @@ commands:
   set_usb_host_route:
     summary: Choose the USB host (USBHostRoute port; UsbHostRoute on the MH21)
     params:
-      host: { type: enum, values: [C, "1", "2", "3", local, remote], required: true, label: USB host,
-              description: "MS42: C (USB-C), 1 or 2 (USB host ports), 3 (the remote host over HDBaseT); MH21: 1 (USB-C) or 2 (USB host); SR21: local (the unit's USB port) or remote (over HDBaseT)." }
+      host: { type: enum, values: [C, "1", "2", "3", "4", local, remote], required: true, label: USB host,
+              description: "MS42: C (USB-C), 1 or 2 (USB host ports), 3 (the remote host over HDBaseT); MS42-HDBT: the same, and 4 (the remote host over HDBaseT OUT); MH21: 1 (USB-C) or 2 (USB host); SR21: local (the unit's USB port) or remote (over HDBaseT)." }
     send:
-      - { models: [at-ome-ms42, at-ome-sr21], message: "USBHostRoute {host}" }
+      - { models: [at-ome-ms42, at-ome-ms42-hdbt, at-ome-sr21], message: "USBHostRoute {host}" }
       - { models: [at-ome-mh21], message: "UsbHostRoute {host}" }
     expect: { reply_contains: "HostRoute ", not_contains: "Command FAILED" }
     returns: ack
@@ -2212,7 +2241,7 @@ commands:
   get_usb_host_route:
     summary: Read the USB host (USBHostRoute sta)
     send:
-      - { models: [at-ome-ms42, at-ome-sr21], message: "USBHostRoute sta" }
+      - { models: [at-ome-ms42, at-ome-ms42-hdbt, at-ome-sr21], message: "USBHostRoute sta" }
       - { models: [at-ome-mh21], message: "UsbHostRoute sta" }
     expect: { reply_contains: "HostRoute ", matches: 'HostRoute (\S+)$' }
     returns: value
@@ -2382,13 +2411,13 @@ telemetry:
     # What changes in use: routing, power, signal presence.
     - every_ms: 5000
       send:
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "Status" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ms42-hdbt, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "Status" }
         - { models: [at-ome-mh21], message: "Statusx1" }
         - { models: [at-ome-st31, at-ome-sr21, at-uhd-clso-840], message: "Status" }
         - { models: [at-ome-st31, at-uhd-clso-840, at-uhd-clso-601], message: "PWSTA" }
         - { models: [at-ome-st31, at-ome-sr21, at-uhd-clso-840, at-uhd-clso-601], message: "InputStatus" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "PWSTA" }
-        - { models: [at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "InputStatus" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ms42-hdbt, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "PWSTA" }
+        - { models: [at-ome-ms42, at-ome-ms42-hdbt, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "InputStatus" }
         - { models: [at-ome-mh21], message: "InputStatus1" }
         - { models: [at-ome-mh21], message: "InputStatus2" }
     # What an operator configures: read on connecting and every minute.
@@ -2406,14 +2435,14 @@ telemetry:
         - { models: [at-hdr-h2h-44ma], message: "PreNameGet2" }
         - { models: [at-hdr-h2h-44ma], message: "PreNameGet3" }
         - { models: [at-hdr-h2h-44ma], message: "PreNameGet4" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "Type" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "Version" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ms42-hdbt, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "Type" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-ome-ms42, at-ome-ms42-hdbt, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "Version" }
         - { models: [at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma], message: "VersionMCU" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "IPCFG" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ms42-hdbt, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "IPCFG" }
         - { models: [at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-mh21], message: "System sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "Blink sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ms42-hdbt, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "Blink sta" }
         - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma], message: "Broadcast sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "IPDHCP sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ms42-hdbt, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "IPDHCP sta" }
         - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-mh21], message: "IPLogin sta" }
         - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-mh21], message: "IPPort sta" }
         - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m], message: "syslock sta" }
@@ -2427,8 +2456,8 @@ telemetry:
         - { models: [at-uhd-pro3-44m], message: "x2$ sta" }
         - { models: [at-uhd-pro3-44m], message: "x3$ sta" }
         - { models: [at-uhd-pro3-44m], message: "x4$ sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "x1$ sta" }
-        - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-sw32, at-ome-st31a], message: "x2$ sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ms42-hdbt, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "x1$ sta" }
+        - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ms42-hdbt, at-ome-sw32, at-ome-st31a], message: "x2$ sta" }
         - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma], message: "x3$ sta" }
         - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma], message: "x4$ sta" }
         - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma], message: "x5$ sta" }
@@ -2447,8 +2476,8 @@ telemetry:
         - { models: [at-uhd-pro3-1616m], message: "x18$ sta" }
         - { models: [at-uhd-pro3-1616m], message: "x19$ sta" }
         - { models: [at-uhd-pro3-1616m], message: "x20$ sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "VOUTMute1 sta" }
-        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "VOUTMute2 sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ms42-hdbt, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "VOUTMute1 sta" }
+        - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ms42, at-ome-ms42-hdbt, at-ome-ps62, at-ome-sw32, at-ome-st31a], message: "VOUTMute2 sta" }
         - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ps62], message: "VOUTMute3 sta" }
         - { models: [at-uhd-pro3-44m, at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma, at-hdr-h2h-44m, at-hdr-h2h-44ma, at-ome-ps62], message: "VOUTMute4 sta" }
         - { models: [at-uhd-pro3-66m, at-uhd-pro3-88m, at-uhd-pro3-1616m, at-hdr-h2h-88ma], message: "VOUTMute5 sta" }
@@ -2503,17 +2532,17 @@ telemetry:
         - { models: [at-ome-mh21], message: "InputFormat1" }
         - { models: [at-ome-mh21], message: "InputFormat2" }
         # Omega settings.
-        - { models: [at-ome-ms42, at-ome-sw32, at-ome-st31a], message: "DispBtn sta" }
-        - { models: [at-ome-ms42, at-ome-sw32, at-ome-st31a], message: "IP802.1x sta" }
-        - { models: [at-ome-ms42, at-ome-sw32, at-ome-st31a], message: "LRAUD sta" }
-        - { models: [at-ome-ms42, at-ome-st31a], message: "OutHdmi5vKeep sta" }
+        - { models: [at-ome-ms42, at-ome-ms42-hdbt, at-ome-sw32, at-ome-st31a], message: "DispBtn sta" }
+        - { models: [at-ome-ms42, at-ome-ms42-hdbt, at-ome-sw32, at-ome-st31a], message: "IP802.1x sta" }
+        - { models: [at-ome-ms42, at-ome-ms42-hdbt, at-ome-sw32, at-ome-st31a], message: "LRAUD sta" }
+        - { models: [at-ome-ms42, at-ome-ms42-hdbt, at-ome-st31a], message: "OutHdmi5vKeep sta" }
         - { models: [at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "CommaWait sta" }
-        - { models: [at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "RepeatCmd sta" }
-        - { models: [at-ome-ms42, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "RepCmdTime sta" }
+        - { models: [at-ome-ms42, at-ome-ms42-hdbt, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "RepeatCmd sta" }
+        - { models: [at-ome-ms42, at-ome-ms42-hdbt, at-ome-sw32, at-ome-st31a, at-ome-mh21], message: "RepCmdTime sta" }
         - { models: [at-ome-st31a, at-ome-mh21], message: "RHostName" }
-        - { models: [at-ome-ms42], message: "USBHostLogic sta" }
-        - { models: [at-ome-ms42], message: "USBHostRoute sta" }
-        - { models: [at-ome-ms42], message: "UsbVbusControl sta" }
+        - { models: [at-ome-ms42, at-ome-ms42-hdbt], message: "USBHostLogic sta" }
+        - { models: [at-ome-ms42, at-ome-ms42-hdbt], message: "USBHostRoute sta" }
+        - { models: [at-ome-ms42, at-ome-ms42-hdbt], message: "UsbVbusControl sta" }
         - { models: [at-ome-mh21], message: "UsbHostRoute sta" }
         - { models: [at-ome-mh21], message: "UsbMode sta" }
         # The AT-UHD-CLSO-601.
@@ -2984,7 +3013,7 @@ quirks:
       x3Vx1 for a unit with inputs 1-2, taken as a document error; the route
       is read from whatever input the answer names. The SR21 has no sta for
       DispBtn, so its display button state is not read.
-  - models: [at-ome-ms42, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-st31, at-ome-sr21, at-ome-mh21]
+  - models: [at-ome-ms42, at-ome-ms42-hdbt, at-ome-ps62, at-ome-sw32, at-ome-st31a, at-ome-st31, at-ome-sr21, at-ome-mh21]
     severity: info
     text: >
       Atlona asks for 500 ms between commands on Omega switchers, which the

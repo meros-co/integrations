@@ -330,6 +330,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] AT-UHD-CLSO-601: the output resolution command is VFmtRes (the syntax line says VidOutRes) and the aspect values are full, overscan, underscan, letterbox, panscan and follow (the example answers fill) ([specs/atlona-matrix.yaml:1716](specs/atlona-matrix.yaml#L1716))
 - [ ] AT-UHD-CLSO-601: InputStatus without an input answers one digit per input, and VersionMCU and VersionVSRX answer V followed by the version ([specs/atlona-matrix.yaml:1666](specs/atlona-matrix.yaml#L1666))
 - [ ] AT-UHD-CLSO-601 and AT-UHD-CLSO-840: the RS-232 control port's factory line is 115200 8N1 (the documents give the CSpara example only) ([specs/atlona-matrix.yaml:272](specs/atlona-matrix.yaml#L272))
+- [ ] AT-OME-MS42-HDBT: route numbers the inputs as the rear panel does (1 HDBaseT IN, 2 USB-C, 3 and 4 HDMI), not as the API document's MS42 wording (1 USB-C, 2 DisplayPort) ([specs/atlona-matrix.yaml:517](specs/atlona-matrix.yaml#L517))
 
 ## atlona-ms52w — Atlona AT-OME-MS52W and AT-UHD-SW-510W switchers (Telnet JSON API)
 
