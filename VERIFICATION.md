@@ -4403,6 +4403,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check how often a VidiU Go stops answering status reads and whether a 2 s poll makes it worse. ([specs/teradek-vidiu.yaml:119](specs/teradek-vidiu.yaml#L119))
 - [ ] Record which json.cgi geti keys a VidiU Go answers, and whether it takes a matching write (seti) for settings. ([specs/teradek-vidiu.yaml:119](specs/teradek-vidiu.yaml#L119))
 
+## teradek-vidiu-x — Teradek VidiU X streaming encoder (MQTT over WebSocket)
+
+- [ ] Confirm the encoder's MQTT broker answers at ws://<encoder>/mqtt with the mqtt subprotocol, MQTT 3.1.1, and the web interface's user name and password. ([specs/teradek-vidiu-x.yaml:52](specs/teradek-vidiu-x.yaml#L52))
+- [ ] Record the payloads of System/Product, Session/0/Record/Info and Session/0/Stream/0/Info, including how sizes, percentages and uptimes are worded and the full lists of record and stream states. ([specs/teradek-vidiu-x.yaml:110](specs/teradek-vidiu-x.yaml#L110))
+- [ ] Check whether commands need to be retained and need the reply subscription the module makes (<topic>/+), what the encoder publishes there, and whether it removes the retained command. ([specs/teradek-vidiu-x.yaml:97](specs/teradek-vidiu-x.yaml#L97))
+- [ ] Record which stream actions each platform needs (publish and unpublish against broadcast, preview and complete), and the other topics the encoder takes commands and publishes status on (settings, network, battery). ([specs/teradek-vidiu-x.yaml:68](specs/teradek-vidiu-x.yaml#L68))
+
 ## timemachines-clock — TimeMachines clocks, timers and time servers (Locator Protocol API)
 
 - [ ] Record a clock's 40-byte status and confirm bytes 20 to 39 (alarm, days, digits value, WiFi signal, name). ([specs/timemachines-clock.yaml:261](specs/timemachines-clock.yaml#L261))

@@ -1,0 +1,122 @@
+spec: 1
+id: teradek-vidiu-x
+name: Teradek VidiU X streaming encoder (MQTT over WebSocket)
+vendor: Teradek
+category: other
+implementation: native
+reason: >
+  The VidiU X is controlled over MQTT 3.1.1 carried in WebSocket binary messages (ws://<encoder>/mqtt):
+  a session protocol with CONNECT and CONNACK, packet identifiers, QoS 2 handshakes and keep alive pings,
+  and commands published to a topic named with the time they are sent. The core's MQTT client does the
+  session; this module names the encoder's topics and reads their JSON payloads into state.
+
+# The VidiU X runs an MQTT broker its web interface talks to over a
+# WebSocket. Status is published on System/Product, Session/0/Record/Info
+# and Session/0/Stream/0/Info as JSON; a command is a message {} published
+# at QoS 2, retained, on <prefix>/<command>/<milliseconds since 1970>.
+# Teradek publishes no document for it; it is taken from the MIT-licensed
+# Bitfocus Companion module, and every behavior is inferred (quirks,
+# VERIFICATION.md).
+source:
+  - title: companion-module-teradek-vidiux (Bitfocus Companion module, MIT license)
+    author: Joseph Adams and contributors
+    url: https://github.com/bitfocus/companion-module-teradek-vidiux/tree/b53c7db951e9cf8aaf837b578d4131c30164bfb3
+    note: >
+      Read at commit b53c7db9 (18 October 2026), MIT license (Copyright 2022 Joseph Adams), as
+      the only source of the protocol. src/api.js: MQTT over ws://<host>/mqtt with the device's
+      user name and password (admin and admin by default, src/config.js); subscriptions to
+      System/Product, Session/0/Record/Info and Session/0/Stream/0/Info; payloads are JSON:
+      System/Product name, the record Info's State, Percent Used, Size, Used, Available, Uptime
+      and State Details, the stream Info's State, Uptime and State Details; a command publishes
+      {} at QoS 2, retained, on <topic>/<Date.now()> and subscribes to <that topic>/+.
+      index.js: record prefix Session/0/Record, stream prefix Session/0/Stream/0.
+      src/actions.js: record start and stop; stream publish, unpublish, Sharelink/publish,
+      Sharelink/unpublish, broadcast, halt, cancel, preview, endpreview and complete.
+      companion/HELP.md: for the VidiU X only, not the original VidiU; record states
+      (Recording, Ready, Invalid, Not Ready, Preparing, Offline) and stream states (Live, Ready,
+      Playing, Invalid).
+  - title: "MQTT Version 3.1.1, OASIS Standard (29 October 2014), with Errata 01"
+    author: OASIS
+    url: http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html
+    note: >
+      The session the core's MQTT client speaks (the generic-mqtt spec): CONNECT with user name
+      and password, PUBLISH at QoS 2, SUBSCRIBE, PINGREQ, and WebSocket transport with the mqtt
+      subprotocol and binary messages (§6).
+
+settings:
+  username: { type: string, max_length: 1024, default: admin, label: User name,
+    description: "The encoder's user name; admin unless it was changed." }
+  password: { type: string, secret: true, max_length: 1024, default: admin, label: Password,
+    description: "The encoder's password; admin unless it was changed." }
+
+ports:
+  - { port: 80, protocol: ws, role: control, note: "the encoder's MQTT broker over a WebSocket at /mqtt" }
+
+models:
+  - id: vidiu-x
+    name: Teradek VidiU X
+    supports: [start_recording, stop_recording, stream, send_command, subscribe]
+    verification: none
+
+commands:
+  start_recording:
+    summary: "Start recording (Session/0/Record/start)"
+    returns: ack
+  stop_recording:
+    summary: "Stop recording (Session/0/Record/stop)"
+    returns: ack
+  stream:
+    summary: "Control the stream (Session/0/Stream/0/<action>): publish starts it and unpublish stops it on most platforms"
+    params:
+      action: { type: enum, values: [publish, unpublish, sharelink_publish, sharelink_unpublish, broadcast, halt, cancel, preview, end_preview, complete],
+        required: true, label: Action,
+        description: "publish and unpublish start and stop the stream; sharelink_publish and sharelink_unpublish do so for Sharelink; broadcast, halt, cancel, preview, end_preview and complete are the steps of platforms with a preview before going live." }
+    returns: ack
+  send_command:
+    summary: "Send any command the encoder takes, as {} published on <topic>/<time> (for commands not named here)"
+    params:
+      topic: { type: string, required: true, max_length: 1024, pattern: '^[A-Za-z0-9_]+(/[A-Za-z0-9_]+)*$', label: Command topic,
+        description: "The command's topic without the time, such as Session/0/Record/start." }
+    returns: ack
+  subscribe:
+    summary: "Subscribe to more of the encoder's topics; their payloads are kept in topics.<topic>"
+    params:
+      filter: { type: string, required: true, max_length: 1024, pattern: '^[A-Za-z0-9_+#/ ]+$', label: Topic filter,
+        description: "The topic filter, + for one level and # for every level below, such as Session/0/#." }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Teradek does not document this protocol: it is the web interface's own, read from an
+      MIT-licensed third-party module, and may change with firmware. Open the device at the
+      encoder's address; the user name and password are the web interface's. A command reports
+      done when the encoder's broker confirms the message (QoS 2), not when the encoder has acted
+      on it; its effect shows in the record and stream states.
+  - models: [all]
+    severity: info
+    text: >
+      Commands are published retained, as the module does, so the broker keeps one retained
+      message per command sent; each topic is used once, as its name holds the time. The record
+      and stream Info payloads are read for their known fields; sizes and percentages are kept as
+      the encoder words them.
+  - models: [all]
+    severity: critical
+    text: >
+      stream unpublish (or halt and complete) ends a live stream at once, and stop_recording closes
+      the recording.
+
+state:
+  device.name:          { type: string, description: "The encoder's name (System/Product name)" }
+  recording.state:      { type: string, description: "The recorder's state: Recording, Ready, Invalid, Not Ready, Preparing or Offline" }
+  recording.percent_used: { type: string, description: "Recording media used, as the encoder words it (Percent Used)" }
+  recording.size:       { type: string, description: "The recording media's size, as the encoder words it" }
+  recording.used:       { type: string, description: "Recording media used, as the encoder words it" }
+  recording.available:  { type: string, description: "Recording media free, as the encoder words it" }
+  recording.uptime:     { type: string, description: "How long the recording has run, as hh:mm:ss" }
+  recording.details:    { type: string, description: "More about the recorder's state (State Details), such as why it is not ready" }
+  streaming.state:      { type: string, description: "The stream's state: Live, Ready, Playing or Invalid" }
+  streaming.uptime:     { type: string, description: "How long the stream has run, as hh:mm:ss" }
+  streaming.details:    { type: string, description: "More about the stream's state (State Details)" }
+  topics.*.payload:     { type: string, description: "The last payload on a topic subscribed with subscribe, keyed by the topic name" }

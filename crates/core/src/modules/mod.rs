@@ -141,7 +141,7 @@ mod midi_link;
 mod midi_show_control;
 #[cfg(feature = "generic-modbus")]
 mod modbus;
-#[cfg(feature = "generic-mqtt")]
+#[cfg(any(feature = "generic-mqtt", feature = "teradek-vidiu-x"))]
 mod mqtt;
 #[cfg(feature = "nec-display")]
 mod nec_display;
@@ -282,6 +282,8 @@ mod swp02;
 mod swp08;
 #[cfg(feature = "tally-arbiter")]
 mod tally_arbiter;
+#[cfg(feature = "teradek-vidiu-x")]
+mod teradek_vidiux;
 #[cfg(feature = "biamp-tesira")]
 mod tesira;
 #[cfg(feature = "timemachines-clock")]
@@ -535,6 +537,8 @@ pub(crate) fn construct(
         "generic-modbus" => Ok(Box::new(modbus::Modbus::new(context)?)),
         #[cfg(feature = "generic-mqtt")]
         "generic-mqtt" => Ok(Box::new(mqtt::Mqtt::new(context)?)),
+        #[cfg(feature = "teradek-vidiu-x")]
+        "teradek-vidiu-x" => Ok(Box::new(teradek_vidiux::VidiuX::new(context)?)),
         #[cfg(feature = "generic-ntp")]
         "generic-ntp" => Ok(Box::new(generic_ntp::GenericNtp::new(context)?)),
         #[cfg(feature = "timemachines-clock")]

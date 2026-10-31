@@ -105,6 +105,7 @@ NATIVE = {
     "softouch-easyworship": "JSON lines over TCP (the port EasyWorship advertises over Bonjour)",
     "sony-camera": "PTP-IP over TCP 15740, or through SSH",
     "tally-arbiter": "Socket.IO 4 over a WebSocket on 4455",
+    "teradek-vidiu-x": "MQTT 3.1.1 over a WebSocket on 80 (/mqtt)",
     "timemachines-clock": "Locator Protocol binary datagrams over UDP 7372",
     "tsl-umd-display": "TSL UMD over UDP, or TCP for V5.0; sends",
     "tsl-umd-listener": "TSL UMD over UDP, or TCP for V3.1 and V5.0; receives",

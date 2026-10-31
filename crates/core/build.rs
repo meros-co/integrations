@@ -80,7 +80,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &["behringer-wing", "behringer-x32", "behringer-xair"],
     ),
     ("vendor-biamp", &["biamp-tesira"]),
-    ("vendor-birddog", &["birddog", "birddog-central", "birddog-converters"]),
+    (
+        "vendor-birddog",
+        &["birddog", "birddog-central", "birddog-converters"],
+    ),
     (
         "vendor-blackmagic",
         &[
@@ -421,7 +424,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "tascam-ss-r250n",
         ],
     ),
-    ("vendor-teradek", &["teradek-prism", "teradek-vidiu"]),
+    (
+        "vendor-teradek",
+        &["teradek-prism", "teradek-vidiu", "teradek-vidiu-x"],
+    ),
     ("vendor-timemachines", &["timemachines-clock"]),
     ("vendor-tinkerlist", &["cuez-automator"]),
     (
