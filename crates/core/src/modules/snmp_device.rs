@@ -8,12 +8,13 @@
 //!   agent implements and nothing it does not. Each object found is named
 //!   by the profile: a scalar at its path, a table column at its path with
 //!   the row's index in place of each `*`. Enumerations become their MIB
-//!   labels (in snake case), octet strings text (a MAC address in hex),
-//!   TimeTicks hundredths of a second, and a number the profile scales (a
-//!   count of tenths of a volt) a float in its unit. Only values that changed are
-//!   reported; a table row the agent no longer lists leaves state.
-//! - The system group (RFC 3418) is read on opening; sysUpTime.0 is read
-//!   with every poll and is the liveness check, as for generic-snmp.
+//!   labels (in snake case), octet strings text (a MAC address in hex), and
+//!   a number the profile scales (a count of tenths of a volt, TimeTicks'
+//!   hundredths of a second) a float in its unit. Only values that changed
+//!   are reported; a table row the agent no longer lists leaves state.
+//! - The system group (RFC 3418) is read on opening, sysUpTime.0 in
+//!   seconds; it is read with every poll and is the liveness check, as for
+//!   generic-snmp.
 //! - A command named by the profile SETs one object, with the row given by
 //!   its index parameters, then reads its table or group again, so state
 //!   shows what the agent did with it (a control object usually reads back
@@ -146,6 +147,19 @@ fn system_group() -> Vec<(&'static str, Oid)> {
     .into_iter()
     .map(|(n, i)| (n, Oid(vec![1, 3, 6, 1, 2, 1, 1, i, 0])))
     .collect()
+}
+
+/// TimeTicks (hundredths of a second) in seconds.
+fn seconds(ticks: u32) -> f64 {
+    f64::from(ticks) / 100.0
+}
+
+/// A system group value in state: sysUpTime.0 in seconds.
+fn system_json(value: &Value) -> Json {
+    match value {
+        Value::TimeTicks(t) => json!(seconds(*t)),
+        v => v.to_json(),
+    }
 }
 
 fn sys_up_time() -> Oid {
@@ -497,7 +511,7 @@ impl SnmpDevice {
                     for (name, oid) in system_group() {
                         if let Some(vb) = varbinds.iter().find(|v| v.oid == oid) {
                             if !vb.value.is_exception() {
-                                system.insert(name.into(), vb.value.to_json());
+                                system.insert(name.into(), system_json(&vb.value));
                             }
                         }
                     }
@@ -619,7 +633,7 @@ impl SnmpDevice {
             "source": n.source.to_string(),
             "trap_oid": n.trap_oid.as_ref().map(Oid::to_string),
             "name": name,
-            "uptime": n.uptime,
+            "uptime": n.uptime.map(seconds),
             "varbinds": varbinds,
         });
         if let Some((enterprise, agent, generic, specific)) = &n.v1 {
@@ -1079,6 +1093,8 @@ mod tests {
         assert!(actions.contains(&Action::Connection(Connection::Connected)));
         let s = state(&actions);
         assert_eq!(s["system"]["description"], "Rack PDU");
+        // sysUpTime.0's 500 hundredths, in seconds.
+        assert_eq!(s["system"]["uptime"], 5.0);
         assert_eq!(s["device"]["name"], "pdu-a");
         assert_eq!(s["device"]["load"], 42);
         assert_eq!(s["outlets"]["1"]["name"], "Encoder");
@@ -1388,6 +1404,42 @@ mod tests {
             (line.kind.as_str(), line.unit.as_deref()),
             ("float", Some("V"))
         );
+    }
+
+    #[test]
+    #[cfg(all(feature = "apc-ups", feature = "ups-mib"))]
+    fn apc_and_ups_mib_numbers_read_in_their_units() {
+        let kind = |profile: &Profile, path: &str| {
+            profile
+                .objects
+                .iter()
+                .find(|o| o.path == path)
+                .map(|o| o.kind)
+                .unwrap()
+        };
+        let apc = &crate::modules::apc_ups_profile::PROFILE;
+        let ups = &crate::modules::ups_mib_profile::PROFILE;
+        // Tenths of a hertz, and TimeTicks as seconds.
+        let hz = decode(kind(ups, "output_frequency"), &Value::Integer(600));
+        assert_eq!(hz, Some(json!(60.0)));
+        let alarm = decode(kind(ups, "alarm.*.time"), &Value::TimeTicks(12_345));
+        assert_eq!(alarm, Some(json!(123.45)));
+        assert!(apc
+            .objects
+            .iter()
+            .any(|o| matches!(o.kind, Kind::Scaled(100))));
+        let catalog = crate::catalog::Catalog::embedded();
+        for id in ["apc-rack-pdu", "apc-ups", "ups-mib", "generic-snmp"] {
+            let spec = catalog.device(id).unwrap();
+            for (path, field) in &spec.state {
+                assert!(field.scale.is_none(), "{id}: {path} keeps a scale");
+            }
+            let uptime = &spec.state["system.uptime"];
+            assert_eq!(
+                (uptime.kind.as_str(), uptime.unit.as_deref()),
+                ("float", Some("s"))
+            );
+        }
     }
 
     #[test]

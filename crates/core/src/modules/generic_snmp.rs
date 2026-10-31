@@ -70,6 +70,19 @@ fn system_group() -> Vec<(&'static str, Oid)> {
     .collect()
 }
 
+/// TimeTicks (hundredths of a second) in seconds.
+fn seconds(ticks: u32) -> f64 {
+    f64::from(ticks) / 100.0
+}
+
+/// A system group value in state: sysUpTime.0 in seconds.
+fn system_json(value: &Value) -> Json {
+    match value {
+        Value::TimeTicks(t) => json!(seconds(*t)),
+        v => v.to_json(),
+    }
+}
+
 /// What a request was for.
 enum Purpose {
     Command(CommandId),
@@ -335,7 +348,7 @@ impl GenericSnmp {
                     for (name, oid) in system_group() {
                         if let Some(vb) = varbinds.iter().find(|v| v.oid == oid) {
                             if !vb.value.is_exception() {
-                                system.insert(name.into(), vb.value.to_json());
+                                system.insert(name.into(), system_json(&vb.value));
                             }
                         }
                     }
@@ -448,7 +461,7 @@ impl GenericSnmp {
             "version": n.version.name(),
             "source": n.source.to_string(),
             "trap_oid": n.trap_oid.as_ref().map(Oid::to_string),
-            "uptime": n.uptime,
+            "uptime": n.uptime.map(seconds),
             "varbinds": varbinds,
         });
         if let Some((enterprise, agent, generic, specific)) = &n.v1 {
@@ -796,7 +809,7 @@ mod tests {
         let s = state(&actions);
         assert_eq!(s["version"], "v2c");
         assert_eq!(s["system"]["description"], "Rack PDU");
-        assert_eq!(s["system"]["uptime"], 500);
+        assert_eq!(s["system"]["uptime"], 5.0);
         assert_eq!(
             s["values"]["voltage"],
             json!({ "oid": "1.3.6.1.4.1.99.1.1.0", "type": "gauge32", "number": 230, "text": "230" })

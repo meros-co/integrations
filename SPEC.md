@@ -77,7 +77,8 @@ state:
 
 An integration reports a number in its unit wherever it can: the core
 divides a device's count of tenths or hundredths and reports a `float` with
-no `scale` (CyberPower's PDUs and UPSs: 1203 tenths of a volt is 120.3), and
+no `scale` (the APC, CyberPower and UPS-MIB integrations: 1203 tenths of a
+volt is 120.3; every SNMP integration's `system.uptime` is in seconds), and
 a command writing such a value takes it in the unit too. `scale` is for
 integrations that report the number as the device counts it; it is 1 when
 absent. A ratio (a power factor) has a `scale` or a float value and no

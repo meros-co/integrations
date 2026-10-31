@@ -694,7 +694,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 1, 2],
         path: "basic_battery.time_on_battery",
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 1, 3],
@@ -714,7 +714,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 2, 3],
         path: "adv_battery.run_time_remaining",
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 2, 4],
@@ -789,7 +789,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 2, 15],
         path: "adv_battery.estimated_charge_time",
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 2, 16],
@@ -854,32 +854,32 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 1],
         path: "high_prec_battery.capacity",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 2],
         path: "high_prec_battery.temperature",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 3],
         path: "high_prec_battery.nominal_voltage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 4],
         path: "high_prec_battery.actual_voltage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 5],
         path: "high_prec_battery.current",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 6],
         path: "high_prec_battery.total_dc_current",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 7, 1, 2],
@@ -889,7 +889,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 7, 1, 3],
         path: "high_prec_battery_actual_voltage.*.voltage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 8, 1, 2],
@@ -899,7 +899,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 8, 1, 3],
         path: "high_prec_total_dc_current.*.frame_current",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 9, 1, 3],
@@ -909,7 +909,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 9, 1, 4],
         path: "high_prec_battery_current.*.*.frame_current",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 10, 1],
@@ -1014,22 +1014,22 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 12],
         path: "high_prec_battery.active_power",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 13],
         path: "high_prec_battery.extd_battery_temperature",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 14],
         path: "high_prec_battery.maximum_module_temperature",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 15],
         path: "high_prec_battery.minimum_module_temperature",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 16],
@@ -1044,7 +1044,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 3, 18],
         path: "high_prec_battery.state_of_health",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 4],
@@ -1139,7 +1139,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 6, 1, 4],
         path: "battery_cab_string.*.current",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 2, 6, 1, 5],
@@ -1359,37 +1359,37 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 3, 3, 1],
         path: "high_prec_input.line_voltage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 3, 3, 2],
         path: "high_prec_input.max_line_voltage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 3, 3, 3],
         path: "high_prec_input.min_line_voltage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 3, 3, 4],
         path: "high_prec_input.frequency",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 3, 3, 5],
         path: "high_prec_input.energy_usage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 3, 3, 6],
         path: "high_prec_input.bypass_voltage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 3, 3, 7],
         path: "high_prec_input.bypass_frequency",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 3, 3, 8],
@@ -1399,7 +1399,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 3, 3, 9],
         path: "high_prec_input.dc_current",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 4, 1, 1],
@@ -1559,32 +1559,32 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 4, 3, 1],
         path: "high_prec_output.voltage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 4, 3, 2],
         path: "high_prec_output.frequency",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 4, 3, 3],
         path: "high_prec_output.load",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 4, 3, 4],
         path: "high_prec_output.current",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 4, 3, 5],
         path: "high_prec_output.efficiency",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 4, 3, 6],
         path: "high_prec_output.energy_usage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 1, 1],
@@ -1629,7 +1629,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 5],
         path: "adv_config.alarm_timer",
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 6],
@@ -1644,22 +1644,22 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 8],
         path: "adv_config.low_battery_run_time",
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 9],
         path: "adv_config.return_delay",
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 10],
         path: "adv_config.shutoff_delay",
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 11],
         path: "adv_config.ups_sleep_time",
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 12],
@@ -1674,7 +1674,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 14],
         path: "adv_config.batt_exhaust_thresh",
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 15],
@@ -1744,12 +1744,12 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 29],
         path: "adv_config.min_return_runtime",
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 30],
         path: "adv_config.basic_signal_low_battery_duration",
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 31],
@@ -1854,7 +1854,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 52],
         path: "adv_config.signal_flash_voltage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 53],
@@ -1899,7 +1899,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 61],
         path: "adv_config.reboot_duration",
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 62],
@@ -1924,12 +1924,12 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 66],
         path: "adv_config.auto_shutdown_time_on_battery",
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 67],
         path: "adv_config.auto_shutdown_runtime_remaining",
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 68],
@@ -2354,7 +2354,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 9, 3, 3, 1, 23],
         path: "phase_output_phase.*.*.energy_usage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 10, 1, 1],
@@ -2714,7 +2714,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 2, 2, 1, 11],
         path: "diag_pm.*.ambient_temperature",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 2, 3, 1, 2],
@@ -2814,7 +2814,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 3, 2, 1, 9],
         path: "diag_battery.*.frame_temperature",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 3, 2, 1, 10],
@@ -2849,7 +2849,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 3, 4, 1, 5],
         path: "diag_battery_frame.*.temperature",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 4, 1],
@@ -3009,7 +3009,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 4, 8, 1, 8],
         path: "diag_sub_sys_external_switch_gear.*.temperature",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 4, 9],
@@ -3264,7 +3264,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 4, 28, 1, 6],
         path: "diag_sub_sys_usr_supp_batt_monitor.*.temperature",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 4, 29],
@@ -3439,7 +3439,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 5, 1, 9, 1, 8],
         path: "diag_sub_feed_breaker.*.subfeed_breaker_current",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 5, 1, 10],
@@ -3459,7 +3459,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 5, 1, 11, 1, 4],
         path: "diag_sub_feed_phase.*.current_alternate",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 5, 1, 12],
@@ -3469,7 +3469,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 5, 1, 13],
         path: "diag_switch_gear.switchgear_ambient_temperature",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 5, 1, 14],
@@ -3499,7 +3499,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 5, 1, 15, 1, 6],
         path: "diag_usr_supp_switchgear_monitor.*.temperature",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 5, 2, 1],
@@ -3549,7 +3549,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 7, 2, 1, 2],
         path: "diagnostic_power_cabinet.*.ambient_temperature",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 8, 1],
@@ -3634,7 +3634,7 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 11, 1],
         path: "diagnostic_temperature.ambient_temperature",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 13, 12, 1],
@@ -3959,22 +3959,22 @@ static OBJECTS: [Object; 727] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 17, 1, 2, 1, 2],
         path: "dc_output_status.*.voltage_nominal",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 17, 1, 2, 1, 3],
         path: "dc_output_status.*.current_rating",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 17, 1, 2, 1, 4],
         path: "dc_output_status.*.voltage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 17, 1, 2, 1, 5],
         path: "dc_output_status.*.current",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 17, 1, 2, 1, 6],
@@ -4379,7 +4379,7 @@ static SETTERS: [Setter; 143] = [
     Setter {
         command: "set_adv_config_alarm_timer",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 5],
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
         wire: Wire::TimeTicks,
         indexes: &[],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2],
@@ -4406,7 +4406,7 @@ static SETTERS: [Setter; 143] = [
     Setter {
         command: "set_adv_config_low_battery_run_time",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 8],
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
         wire: Wire::TimeTicks,
         indexes: &[],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2],
@@ -4415,7 +4415,7 @@ static SETTERS: [Setter; 143] = [
     Setter {
         command: "set_adv_config_return_delay",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 9],
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
         wire: Wire::TimeTicks,
         indexes: &[],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2],
@@ -4424,7 +4424,7 @@ static SETTERS: [Setter; 143] = [
     Setter {
         command: "set_adv_config_shutoff_delay",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 10],
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
         wire: Wire::TimeTicks,
         indexes: &[],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2],
@@ -4433,7 +4433,7 @@ static SETTERS: [Setter; 143] = [
     Setter {
         command: "set_adv_config_ups_sleep_time",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 11],
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
         wire: Wire::TimeTicks,
         indexes: &[],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2],
@@ -4451,7 +4451,7 @@ static SETTERS: [Setter; 143] = [
     Setter {
         command: "set_adv_config_batt_exhaust_thresh",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 14],
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
         wire: Wire::TimeTicks,
         indexes: &[],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2],
@@ -4577,7 +4577,7 @@ static SETTERS: [Setter; 143] = [
     Setter {
         command: "set_adv_config_min_return_runtime",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 29],
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
         wire: Wire::TimeTicks,
         indexes: &[],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2],
@@ -4586,7 +4586,7 @@ static SETTERS: [Setter; 143] = [
     Setter {
         command: "set_adv_config_basic_signal_low_battery_duration",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 30],
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
         wire: Wire::TimeTicks,
         indexes: &[],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2],
@@ -4757,7 +4757,7 @@ static SETTERS: [Setter; 143] = [
     Setter {
         command: "set_adv_config_signal_flash_voltage",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 52],
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
         wire: Wire::Integer,
         indexes: &[],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2],
@@ -4838,7 +4838,7 @@ static SETTERS: [Setter; 143] = [
     Setter {
         command: "set_adv_config_reboot_duration",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 61],
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
         wire: Wire::TimeTicks,
         indexes: &[],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2],
@@ -4883,7 +4883,7 @@ static SETTERS: [Setter; 143] = [
     Setter {
         command: "set_adv_config_auto_shutdown_time_on_battery",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 66],
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
         wire: Wire::TimeTicks,
         indexes: &[],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2],
@@ -4892,7 +4892,7 @@ static SETTERS: [Setter; 143] = [
     Setter {
         command: "set_adv_config_auto_shutdown_runtime_remaining",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2, 67],
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
         wire: Wire::TimeTicks,
         indexes: &[],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 1, 5, 2],

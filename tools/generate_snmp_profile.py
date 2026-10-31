@@ -46,12 +46,14 @@ PROFILES = {
         "models": ["rack-pdu-2g", "rack-pdu"],
         "roots": [{"name": "rPDU2", "models": ["rack-pdu-2g"]}, {"name": "rPDU", "models": ["rack-pdu"]}],
         "trap_prefixes": ["1.3.6.1.4.1.318.0."], "traps_module": "powernet_traps",
+        "si": True,
     },
     "apc-ups": {
         "title": "APC UPS", "mib": "PowerNet-MIB", "mib_version": "v4.6.0",
         "models": ["ups"],
         "roots": [{"name": "ups", "models": ["ups"]}],
         "trap_prefixes": ["1.3.6.1.4.1.318.0."], "traps_module": "powernet_traps",
+        "si": True,
     },
     "cyberpower-pdu": {
         "title": "CyberPower PDU", "mib": "CPS-MIB", "mib_version": "v2.13",
@@ -81,6 +83,7 @@ PROFILES = {
         "trap_prefixes": ["1.3.6.1.2.1.33.2."],
         "oid_choices": {"upsTestId": "upsWellKnownTests", "upsAlarmDescr": "upsWellKnownAlarms"},
         "locks": {"upsTestId": "upsTestSpinLock"},
+        "si": True,
     },
 }
 
@@ -875,7 +878,7 @@ COMMON_STATE = r'''  polled.status: { type: int, unit: s, description: "When the
   version: { type: string, description: "The SNMP version used: v1, v2c or v3" }
   system.description: { type: string, description: "sysDescr.0: the agent's description of the device" }
   system.object_id: { type: string, description: "sysObjectID.0: the vendor's OID for the device type" }
-  system.uptime: { type: int, unit: s, scale: 0.01, description: "sysUpTime.0, in hundredths of a second (TimeTicks)" }
+  system.uptime: { type: float, unit: s, description: "sysUpTime.0, its TimeTicks in seconds" }
   system.contact: { type: string, description: "sysContact.0" }
   system.name: { type: string, description: "sysName.0" }
   system.location: { type: string, description: "sysLocation.0" }
@@ -884,7 +887,7 @@ COMMON_STATE = r'''  polled.status: { type: int, unit: s, description: "When the
   engine.time: { type: int, unit: s, description: "v3: the agent's snmpEngineTime when last heard" }
   local_engine_id: { type: string, description: "With trap_port: this receiver's snmpEngineID in hex, to configure on agents sending v3 informs" }
   traps.count: { type: int, description: "Notifications received since opening" }
-  traps.last: { type: object, description: "The last notification: {kind (trap or inform), version, source, trap_oid, name (the MIB's name for it, or null), uptime, varbinds, and for v1 enterprise, agent_address, generic_trap, specific_trap, and for v3 user}" }
+  traps.last: { type: object, description: "The last notification: {kind (trap or inform), version, source, trap_oid, name (the MIB's name for it, or null), uptime (the agent's uptime when it sent it, in seconds), varbinds, and for v1 enterprise, agent_address, generic_trap, specific_trap, and for v3 user}" }
 '''
 
 

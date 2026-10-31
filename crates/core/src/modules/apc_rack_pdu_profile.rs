@@ -300,17 +300,17 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 1, 1, 7],
         path: "device_config.*.low_load_power_threshold",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 1, 1, 8],
         path: "device_config.*.near_overload_power_threshold",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 1, 1, 9],
         path: "device_config.*.overload_power_threshold",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 1, 1, 10],
@@ -395,7 +395,7 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 2, 1, 13],
         path: "device_properties.*.device_power_rating",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 3, 1, 2],
@@ -415,12 +415,12 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 3, 1, 5],
         path: "device_status.*.power",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 3, 1, 6],
         path: "device_status.*.peak_power",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 3, 1, 7],
@@ -435,7 +435,7 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 3, 1, 9],
         path: "device_status.*.energy",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 3, 1, 10],
@@ -470,12 +470,12 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 3, 1, 16],
         path: "device_status.*.apparent_power",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 3, 1, 17],
         path: "device_status.*.power_factor",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 3, 1, 18],
@@ -565,7 +565,7 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 6, 3, 1, 5],
         path: "phase_status.*.current",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 6, 3, 1, 6],
@@ -575,22 +575,22 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 6, 3, 1, 7],
         path: "phase_status.*.power",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 6, 3, 1, 8],
         path: "phase_status.*.apparent_power",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 6, 3, 1, 9],
         path: "phase_status.*.power_factor",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 6, 3, 1, 10],
         path: "phase_status.*.peak_current",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 6, 3, 1, 11],
@@ -680,12 +680,12 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 8, 3, 1, 5],
         path: "bank_status.*.current",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 8, 3, 1, 6],
         path: "bank_status.*.peak_current",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 8, 3, 1, 7],
@@ -905,7 +905,7 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 9, 4, 3, 1, 6],
         path: "outlet_metered_status.*.current",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 9, 4, 3, 1, 7],
@@ -930,7 +930,7 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 9, 4, 3, 1, 11],
         path: "outlet_metered_status.*.energy",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 9, 4, 3, 1, 12],
@@ -1080,12 +1080,12 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 10, 2, 2, 1, 7],
         path: "sensor_temp_humidity_status.*.temp_f",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 10, 2, 2, 1, 8],
         path: "sensor_temp_humidity_status.*.temp_c",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 10, 2, 2, 1, 9],
@@ -1105,12 +1105,12 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 10, 2, 2, 1, 12],
         path: "sensor_temp_humidity_status.*.temp_peak_f",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 10, 2, 2, 1, 13],
         path: "sensor_temp_humidity_status.*.temp_peak_c",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 10, 2, 2, 1, 14],
@@ -1215,7 +1215,7 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 10, 6, 1, 1, 6],
         path: "sensor_analog_voltage_status.*.hundredth_volts",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 10, 6, 1, 1, 7],
@@ -1240,17 +1240,17 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 10, 6, 2, 1, 5],
         path: "sensor_analog_voltage_config.*.thresh_min",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 10, 6, 2, 1, 6],
         path: "sensor_analog_voltage_config.*.thresh_max",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 10, 6, 2, 1, 7],
         path: "sensor_analog_voltage_config.*.hysteresis",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 10, 6, 2, 1, 8],
@@ -1265,12 +1265,12 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 11, 2],
         path: "group.total_power",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 11, 3],
         path: "group.total_energy",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 11, 4],
@@ -1320,17 +1320,17 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 14, 1, 1, 5],
         path: "adv_bank_config.*.low_load_current_threshold",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 14, 1, 1, 6],
         path: "adv_bank_config.*.near_overload_current_threshold",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 14, 1, 1, 7],
         path: "adv_bank_config.*.overload_current_threshold",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 14, 1, 1, 8],
@@ -1355,17 +1355,17 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 15, 1, 1, 5],
         path: "adv_phase_config.*.low_load_current_threshold",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 15, 1, 1, 6],
         path: "adv_phase_config.*.near_overload_current_threshold",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 15, 1, 1, 7],
         path: "adv_phase_config.*.overload_current_threshold",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 15, 1, 1, 8],
@@ -1540,7 +1540,7 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 12, 2, 3, 1, 1, 2],
         path: "load_status.*.load",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 12, 2, 3, 1, 1, 3],
@@ -1715,7 +1715,7 @@ static OBJECTS: [Object; 319] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 12, 3, 5, 1, 1, 7],
         path: "outlet_status.*.load",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 12, 3, 6, 1, 1, 2],
@@ -1833,7 +1833,7 @@ static SETTERS: [Setter; 97] = [
     Setter {
         command: "set_device_config_low_load_power_threshold",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 1, 1, 7],
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
         wire: Wire::Integer,
         indexes: &["index"],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 1, 1],
@@ -1842,7 +1842,7 @@ static SETTERS: [Setter; 97] = [
     Setter {
         command: "set_device_config_near_overload_power_threshold",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 1, 1, 8],
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
         wire: Wire::Integer,
         indexes: &["index"],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 1, 1],
@@ -1851,7 +1851,7 @@ static SETTERS: [Setter; 97] = [
     Setter {
         command: "set_device_config_overload_power_threshold",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 1, 1, 9],
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
         wire: Wire::Integer,
         indexes: &["index"],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 4, 1, 1],
@@ -2310,7 +2310,7 @@ static SETTERS: [Setter; 97] = [
     Setter {
         command: "set_sensor_analog_voltage_config_thresh_min",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 10, 6, 2, 1, 5],
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
         wire: Wire::Integer,
         indexes: &["index"],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 10, 6, 2, 1],
@@ -2319,7 +2319,7 @@ static SETTERS: [Setter; 97] = [
     Setter {
         command: "set_sensor_analog_voltage_config_thresh_max",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 10, 6, 2, 1, 6],
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
         wire: Wire::Integer,
         indexes: &["index"],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 10, 6, 2, 1],
@@ -2328,7 +2328,7 @@ static SETTERS: [Setter; 97] = [
     Setter {
         command: "set_sensor_analog_voltage_config_hysteresis",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 10, 6, 2, 1, 7],
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
         wire: Wire::Integer,
         indexes: &["index"],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 10, 6, 2, 1],
@@ -2364,7 +2364,7 @@ static SETTERS: [Setter; 97] = [
     Setter {
         command: "set_adv_bank_config_low_load_current_threshold",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 14, 1, 1, 5],
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
         wire: Wire::Integer,
         indexes: &["index"],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 14, 1, 1],
@@ -2373,7 +2373,7 @@ static SETTERS: [Setter; 97] = [
     Setter {
         command: "set_adv_bank_config_near_overload_current_threshold",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 14, 1, 1, 6],
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
         wire: Wire::Integer,
         indexes: &["index"],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 14, 1, 1],
@@ -2382,7 +2382,7 @@ static SETTERS: [Setter; 97] = [
     Setter {
         command: "set_adv_bank_config_overload_current_threshold",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 14, 1, 1, 7],
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
         wire: Wire::Integer,
         indexes: &["index"],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 14, 1, 1],
@@ -2409,7 +2409,7 @@ static SETTERS: [Setter; 97] = [
     Setter {
         command: "set_adv_phase_config_low_load_current_threshold",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 15, 1, 1, 5],
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
         wire: Wire::Integer,
         indexes: &["index"],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 15, 1, 1],
@@ -2418,7 +2418,7 @@ static SETTERS: [Setter; 97] = [
     Setter {
         command: "set_adv_phase_config_near_overload_current_threshold",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 15, 1, 1, 6],
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
         wire: Wire::Integer,
         indexes: &["index"],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 15, 1, 1],
@@ -2427,7 +2427,7 @@ static SETTERS: [Setter; 97] = [
     Setter {
         command: "set_adv_phase_config_overload_current_threshold",
         oid: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 15, 1, 1, 7],
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
         wire: Wire::Integer,
         indexes: &["index"],
         reread: &[1, 3, 6, 1, 4, 1, 318, 1, 1, 26, 15, 1, 1],

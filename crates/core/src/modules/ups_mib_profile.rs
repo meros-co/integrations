@@ -129,12 +129,12 @@ static OBJECTS: [Object; 55] = [
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 2, 5],
         path: "battery.voltage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 2, 6],
         path: "battery.current",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 2, 7],
@@ -154,7 +154,7 @@ static OBJECTS: [Object; 55] = [
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 3, 3, 1, 2],
         path: "input.*.frequency",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 3, 3, 1, 3],
@@ -164,7 +164,7 @@ static OBJECTS: [Object; 55] = [
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 3, 3, 1, 4],
         path: "input.*.current",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 3, 3, 1, 5],
@@ -179,7 +179,7 @@ static OBJECTS: [Object; 55] = [
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 4, 2],
         path: "output_frequency",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 4, 3],
@@ -194,7 +194,7 @@ static OBJECTS: [Object; 55] = [
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 3],
         path: "output.*.current",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 4, 4, 1, 4],
@@ -209,7 +209,7 @@ static OBJECTS: [Object; 55] = [
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 5, 1],
         path: "bypass_frequency",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 5, 2],
@@ -224,7 +224,7 @@ static OBJECTS: [Object; 55] = [
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 5, 3, 1, 3],
         path: "bypass.*.current",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 5, 3, 1, 4],
@@ -244,7 +244,7 @@ static OBJECTS: [Object; 55] = [
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 6, 2, 1, 3],
         path: "alarm.*.time",
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 7, 1],
@@ -269,12 +269,12 @@ static OBJECTS: [Object; 55] = [
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 7, 5],
         path: "test.start_time",
-        kind: Kind::Ticks,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 7, 6],
         path: "test.elapsed_time",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 8, 1],
@@ -309,7 +309,7 @@ static OBJECTS: [Object; 55] = [
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 9, 2],
         path: "config.input_freq",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 9, 3],
@@ -319,7 +319,7 @@ static OBJECTS: [Object; 55] = [
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 9, 4],
         path: "config.output_freq",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 9, 5],
@@ -447,7 +447,7 @@ static SETTERS: [Setter; 17] = [
     Setter {
         command: "set_config_input_freq",
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 9, 2],
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
         wire: Wire::Integer,
         indexes: &[],
         reread: &[1, 3, 6, 1, 2, 1, 33, 1, 9],
@@ -465,7 +465,7 @@ static SETTERS: [Setter; 17] = [
     Setter {
         command: "set_config_output_freq",
         oid: &[1, 3, 6, 1, 2, 1, 33, 1, 9, 4],
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
         wire: Wire::Integer,
         indexes: &[],
         reread: &[1, 3, 6, 1, 2, 1, 33, 1, 9],
