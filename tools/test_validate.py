@@ -396,6 +396,73 @@ class Renewals(unittest.TestCase):
         self.assertEqual(validate.renewal_checks(doc), [])
 
 
+class SentAgain(unittest.TestCase):
+    def doc(self, **top):
+        return dict({"telemetry": {
+            "websocket": {"path": "/ws", "send": ["{}"], "every_ms": 1000},
+            "zeromq": {"subscribe": {"port": 1, "topics": ["a"]},
+                       "publish": {"port": 2, "send": [["g"]], "every_ms": 30000}}}}, **top)
+
+    def test_each_send_again_says_whether_it_reads_renews_or_keeps_alive(self):
+        doc = self.doc()
+        errors = validate.resend_checks(doc)
+        self.assertEqual(len(errors), 2)
+        self.assertTrue(errors[0].startswith("telemetry.websocket.every_ms: sent again every 1000 ms, "
+                                             "but not said what for"), errors)
+        self.assertTrue(errors[1].startswith("telemetry.zeromq.publish.every_ms: sent again every 30000 ms"))
+        doc = self.doc(polls=[{"name": "websocket", "every_ms": 1000, "reads": "State"},
+                              {"name": "zeromq", "every_ms": 30000, "reads": "Lists"}])
+        self.assertEqual(validate.resend_checks(doc), [])
+        self.assertEqual(validate.poll_interval_checks(doc), [])
+        doc = self.doc(renewals=[{"name": "zeromq", "every_ms": 30000, "renews": "Z"}])
+        doc["telemetry"]["websocket"]["keepalive"] = True
+        self.assertEqual(validate.resend_checks(doc), [])
+        self.assertEqual(validate.renewal_checks(doc), [])
+
+    def test_a_send_again_is_said_once_and_at_its_interval(self):
+        doc = self.doc(polls=[{"name": "websocket", "every_ms": 5000, "reads": "State"},
+                              {"name": "zeromq", "every_ms": 30000, "reads": "Lists"}],
+                       renewals=[{"name": "zeromq", "every_ms": 30000, "renews": "Z"}])
+        doc["telemetry"]["websocket"]["keepalive"] = True
+        errors = validate.resend_checks(doc)
+        self.assertIn("polls and renewals both list 'zeromq'", errors)
+        self.assertIn("telemetry.websocket.every_ms: said to be more than one of polls, renewals and "
+                      "keepalive (polls, keepalive)", errors)
+        self.assertIn("telemetry.zeromq.publish.every_ms: said to be more than one of polls, renewals and "
+                      "keepalive (polls, renewals)", errors)
+        self.assertIn("polls[0].every_ms: 5000, but its telemetry sends again every 1000 ms",
+                      validate.poll_interval_checks(doc))
+        # A keepalive with nothing sent again, and a poll of it, are refused.
+        doc = {"telemetry": {"websocket": {"path": "/ws", "send": ["{}"], "keepalive": True}},
+               "polls": [{"name": "websocket", "every_ms": 1000, "reads": "State"}]}
+        self.assertIn("telemetry.websocket.keepalive: sends nothing again (no every_ms)",
+                      validate.resend_checks(doc))
+        self.assertIn("polls[0]: telemetry.websocket sends nothing again (no every_ms)",
+                      validate.poll_interval_checks(doc))
+        # Any other poll of a spec-driven device is still refused.
+        doc = self.doc(polls=[{"name": "status", "every_ms": 1000, "reads": "S"}])
+        self.assertTrue(any(e.startswith("polls: a spec-driven") for e in validate.poll_interval_checks(doc)))
+
+    def test_each_websocket_in_a_list_is_named_by_its_place(self):
+        doc = {"telemetry": {"websocket": [{"path": "/a", "send": ["{}"]},
+                                           {"path": "/b", "send": ["{}"], "every_ms": 2000}]},
+               "polls": [{"name": "websocket_2", "every_ms": 2000, "reads": "B"}]}
+        self.assertEqual(validate.resend_checks(doc), [])
+        self.assertEqual(validate.poll_interval_checks(doc), [])
+        del doc["polls"]
+        self.assertEqual(len(validate.resend_checks(doc)), 1)
+        self.assertTrue(validate.resend_checks(doc)[0].startswith("telemetry.websocket[1].every_ms"))
+
+    def test_the_schema_takes_keepalive_true_only(self):
+        import json
+        import jsonschema
+        schema = json.loads((validate.ROOT / "schema" / "device-spec-1.json").read_text("utf-8"))
+        ws = dict(schema["$defs"]["pushWebsocket"], **{"$defs": schema["$defs"]})
+        v = jsonschema.Draft202012Validator(ws)
+        self.assertFalse(list(v.iter_errors({"path": "/ws", "send": "x", "every_ms": 5000, "keepalive": True})))
+        self.assertTrue(list(v.iter_errors({"path": "/ws", "send": "x", "every_ms": 5000, "keepalive": False})))
+
+
 class Units(unittest.TestCase):
     def test_a_step_goes_in_scale_and_a_unit_from_names_a_string_state(self):
         import json

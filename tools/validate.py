@@ -1507,9 +1507,11 @@ def poll_interval_checks(doc: dict) -> list[str]:
         where = where.removesuffix(".send")
         if "every_ms" not in group and group.get("once") is not True:
             errors.append(f"{where}: give every_ms, or once: true for a poll sent only on connecting")
-    if not native and "polls" in doc and not doc.get("extension"):
+    resent = {} if native else resent_telemetry(doc)
+    if not native and not doc.get("extension") and any(p.get("name") not in resent for p in polls):
         errors.append("polls: a spec-driven device's polls are its telemetry.poll groups; "
-                      "only a native extension's own reads go under polls")
+                      "only a native extension's own reads, and a websocket or zeromq "
+                      "every_ms that reads state, go under polls")
         return errors
     # A spec-driven device's groups are listed under polls too (by name, or
     # their place from 1), so an extension's polls take other names.
@@ -1528,6 +1530,8 @@ def poll_interval_checks(doc: dict) -> list[str]:
         if "every_ms" not in poll and poll.get("once") is not True:
             errors.append(f"{where}: give every_ms, or once: true for a read made only on connecting")
         every = poll.get("every_ms")
+        if poll.get("name") in resent:
+            errors += resent_interval_errors(where, every, resent[poll["name"]])
         if isinstance(every, dict):
             name = every.get("setting")
             spec = settings.get(name)
@@ -1564,6 +1568,71 @@ def unit_checks(doc: dict) -> list[str]:
     return errors
 
 
+def resent_telemetry(doc: dict) -> dict[str, tuple[str, dict]]:
+    """What a spec-driven device's telemetry can send again at its own
+    `every_ms` beside its poll groups and subscribe, by the name it takes
+    under `polls` or `renewals`: `websocket` (in a list of websockets,
+    `websocket_<n>`, its place from 1) and `zeromq`, each with where it is
+    and its block (empty where there is none)."""
+    telemetry = doc.get("telemetry")
+    telemetry = telemetry if isinstance(telemetry, dict) else {}
+    out: dict[str, tuple[str, dict]] = {}
+    ws = telemetry.get("websocket")
+    if isinstance(ws, list):
+        for i, w in enumerate(ws):
+            if isinstance(w, dict):
+                out[f"websocket_{i + 1}"] = (f"telemetry.websocket[{i}]", w)
+    else:
+        out["websocket"] = ("telemetry.websocket", ws if isinstance(ws, dict) else {})
+    zmq = telemetry.get("zeromq")
+    publish = zmq.get("publish") if isinstance(zmq, dict) else None
+    out["zeromq"] = ("telemetry.zeromq.publish", publish if isinstance(publish, dict) else {})
+    return out
+
+
+def resent_interval_errors(where: str, every, resent: tuple[str, dict]) -> list[str]:
+    """A poll or renewal of a websocket's or ZeroMQ publisher's messages
+    runs at the `every_ms` its telemetry gives."""
+    path, block = resent
+    if block.get("every_ms") is None:
+        return [f"{where}: {path} sends nothing again (no every_ms)"]
+    if every != block["every_ms"]:
+        return [f"{where}.every_ms: {every}, but its telemetry sends again every {block['every_ms']} ms"]
+    return []
+
+
+def resend_checks(doc: dict) -> list[str]:
+    """Every periodic send says what it is (SPEC.md, Native modules, Polls
+    and Renewals): a spec-driven device's websocket or ZeroMQ publisher sent
+    again at its `every_ms` is a poll where it reads state, a renewal where
+    it renews a subscription, or `keepalive: true` where it only keeps the
+    connection open; exactly one. Nothing is both a poll and a renewal."""
+    errors: list[str] = []
+    polls = {p.get("name") for p in doc.get("polls") or []}
+    renewals = {r.get("name") for r in doc.get("renewals") or []}
+    for n in sorted(polls & renewals, key=str):
+        errors.append(f"polls and renewals both list '{n}'")
+    if doc.get("implementation") == "native":
+        return errors
+    for name, (where, block) in resent_telemetry(doc).items():
+        keepalive = block.get("keepalive") is True
+        if block.get("every_ms") is None:
+            if keepalive:
+                errors.append(f"{where}.keepalive: sends nothing again (no every_ms)")
+            continue
+        said = [w for w, yes in (("polls", name in polls), ("renewals", name in renewals),
+                                 ("keepalive", keepalive)) if yes]
+        if not said:
+            errors.append(f"{where}.every_ms: sent again every {block['every_ms']} ms, but not said what for: "
+                          f"a poll named {name} under polls where it reads state, a renewal named {name} "
+                          f"under renewals where it renews a subscription, or keepalive: true where it "
+                          f"only keeps the connection open")
+        elif len(said) > 1:
+            errors.append(f"{where}.every_ms: said to be more than one of polls, renewals and keepalive "
+                          f"({', '.join(said)})")
+    return errors
+
+
 def renewal_checks(doc: dict) -> list[str]:
     """Every subscription renewed on a timer says how often (SPEC.md,
     Native modules, Renewals). A spec-driven device's `telemetry.subscribe`
@@ -1580,8 +1649,7 @@ def renewal_checks(doc: dict) -> list[str]:
     telemetry = block(doc, "telemetry")
     renewals = doc.get("renewals") or []
     # What a spec-driven device's telemetry sends again, by renewal name.
-    resent = {"websocket": block(telemetry, "websocket").get("every_ms"),
-              "zeromq": block(block(telemetry, "zeromq"), "publish").get("every_ms")}
+    resent = resent_telemetry(doc)
     names = [r.get("name") for r in renewals]
     if not native and block(telemetry, "subscribe").get("every_ms") is not None:
         names.append("subscribe")
@@ -1596,12 +1664,7 @@ def renewal_checks(doc: dict) -> list[str]:
             errors.append(f"{where}: give every_ms, how often the subscription is renewed")
         if not native:
             if name in resent:
-                if resent[name] is None:
-                    errors.append(f"{where}: telemetry.{name if name == 'websocket' else 'zeromq.publish'} "
-                                  f"sends nothing again (no every_ms)")
-                elif every != resent[name]:
-                    errors.append(f"{where}.every_ms: {every}, but its telemetry sends again "
-                                  f"every {resent[name]} ms")
+                errors += resent_interval_errors(where, every, resent[name])
             elif not doc.get("extension"):
                 errors.append(f"{where}: a spec-driven device's telemetry.subscribe renewal is worked out "
                               f"from its telemetry; only a native extension's own, websocket or zeromq "
@@ -1673,7 +1736,7 @@ def main() -> int:
 
         errors = cross_field_checks(doc, rel) + port_checks(doc) + label_checks(doc)
         errors += pacing_checks(doc) + acknowledge_checks(doc) + select_checks(doc) + polled_checks(doc)
-        errors += poll_interval_checks(doc) + renewal_checks(doc) + unit_checks(doc)
+        errors += poll_interval_checks(doc) + renewal_checks(doc) + resend_checks(doc) + unit_checks(doc)
 
         # Spec ids are the consumer-facing contract; they must be unique.
         spec_id = doc["id"]

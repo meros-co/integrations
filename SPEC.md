@@ -2190,7 +2190,9 @@ group sent only on connecting (and on each reconnection).
 left to prose. The catalog lists the groups under the device's `polls`
 (Native modules, Polls), and a `subscribe` sent again at its `every_ms` as
 the renewal named `subscribe` under `renewals`, not as a poll (Native
-modules, Renewals).
+modules, Renewals). A `telemetry.websocket` or `telemetry.zeromq.publish`
+sent again at its own `every_ms` says what it is: a poll, a renewal or a
+keep-alive (Native modules, Polls).
 
 #### When each poll group was last answered
 
@@ -2902,6 +2904,7 @@ telemetry:
     send:                     # sent each time it opens: the subscriptions
       - '{"action":"subscribe","parameter":"/composition/master"}'
     every_ms: 5000            # optional: send them again at this interval
+    keepalive: true           # with every_ms: they only keep the socket open
 ```
 
 `scheme` may name the HTTP transport's own scheme setting, an enum of
@@ -2970,8 +2973,11 @@ connection.
 `every_ms` sends the `send` items again at that interval while the websocket
 is open: a keepalive a device requires of a client (mimoLive closes a socket
 that sends nothing for 15 seconds), or a request a device answers with its
-state (FreeShow's variables). Text that arrives in binary frames (OpenLP's
-state) goes to the rules as text when it is UTF-8.
+state (FreeShow's variables). Each says which: `keepalive: true` for a
+keep-alive, the poll named `websocket` under `polls` for a read of state,
+or the renewal named `websocket` under `renewals` for a subscription sent
+again (Native modules, Polls and Renewals). Text that arrives in binary
+frames (OpenLP's state) goes to the rules as text when it is UTF-8.
 
 A device that pushes a changed value in the format its REST GET returns
 names where with `as_reply`, as for `telemetry.sse` (below): each JSON
@@ -3061,7 +3067,9 @@ beside the HTTP Gateway that takes its commands) names the bus under
 first frame; with `publish`, it also opens a PUB socket on `publish.port`
 and publishes `send` each time that socket connects, and again every
 `every_ms` when given (requests the device answers on the bus, such as a
-read of its whole state):
+read of its whole state, declared as the poll named `zeromq` under `polls`;
+a subscription is the renewal named `zeromq`, and `keepalive: true` marks
+messages that only keep the connection open):
 
 ```yaml
 telemetry:
@@ -3319,8 +3327,31 @@ request, keep-alives that read nothing, and a read a command or a push sets
 off are not polls. The interval is the time from one round's start to the
 next. `tools/validate.py` requires `every_ms` or `once` on every poll, a poll
 for each `polled.<name>` key the spec's `state` declares, and that each
-setting named exists (an `int` one for `every_ms`). A spec-driven device
-declares no `polls`: its polls are its `telemetry.poll` groups (§8).
+setting named exists (an `int` one for `every_ms`). A spec-driven device's
+polls are its `telemetry.poll` groups (§8), worked out from its telemetry
+and never declared.
+
+A spec-driven device declares under `polls` only its native extension's own
+reads, and a read of state its `telemetry.websocket` (named `websocket`; in
+a list of websockets, `websocket_<n>`, its place from 1) or its
+`telemetry.zeromq.publish` (named `zeromq`) sends again at its `every_ms`,
+at that same interval:
+
+```yaml
+polls:
+  - name: websocket
+    every_ms: 1000                            # the telemetry's every_ms
+    reads: "Every variable the state lists, by the data event the device answers with their values"
+```
+
+Every such `every_ms` says what it is, exactly one of: a poll under `polls`
+where the messages read state, a renewal under `renewals` where they renew
+a subscription (Renewals, below), or `keepalive: true` on the websocket or
+publisher where they only keep the connection open, reading and renewing
+nothing. `tools/validate.py` refuses an `every_ms` that says none or more
+than one, a poll or renewal at another interval than its telemetry's, and a
+name listed under both `polls` and `renewals`, for any integration; the
+catalog refuses the same.
 
 The catalog lists every integration's polls under `polls`, spec-driven
 ones built from `telemetry.poll` (each group's `name`, or its place from
@@ -3376,8 +3407,9 @@ It declares only its native extension's own renewals, and a renewal of its
 `telemetry.zeromq.publish` messages (named `zeromq`), where those messages
 are subscriptions, at the `every_ms` its telemetry gives; `tools/validate.py`
 checks that interval against the telemetry's. A `websocket` or `zeromq`
-`every_ms` that only keeps the connection open or asks for state is no
-renewal and is not declared.
+`every_ms` that asks for state is the poll of that name (Polls, above), and
+one that only keeps the connection open says `keepalive: true`; neither is
+a renewal.
 
 The catalog lists every integration's renewals under `renewals`, the
 `subscribe` renewal first, each with `interval_ms`, the interval at the

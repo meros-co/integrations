@@ -272,6 +272,58 @@ pub(crate) fn poll_group_names(telemetry: Option<&Value>) -> Vec<String> {
     }
 }
 
+/// What a spec-driven device's telemetry sends again at its own `every_ms`
+/// beside its poll groups and `subscribe` (SPEC.md, Native modules, Polls
+/// and Renewals), by the name it takes under `polls` or `renewals`:
+/// `websocket` (in a list of websockets, `websocket_<n>`, its place from 1)
+/// and `zeromq`, each with its `every_ms` where it gives one.
+pub(crate) fn resent_telemetry(telemetry: Option<&Value>) -> Vec<(String, Option<u64>)> {
+    let every = |v: &Value| v.get("every_ms").and_then(Value::as_u64);
+    let mut out = Vec::new();
+    match telemetry.and_then(|t| t.get("websocket")) {
+        Some(Value::Array(list)) => {
+            for (i, w) in list.iter().enumerate() {
+                out.push((format!("websocket_{}", i + 1), every(w)));
+            }
+        }
+        Some(w) => out.push(("websocket".into(), every(w))),
+        None => {}
+    }
+    if let Some(p) = telemetry
+        .and_then(|t| t.get("zeromq"))
+        .and_then(|z| z.get("publish"))
+    {
+        out.push(("zeromq".into(), every(p)));
+    }
+    out
+}
+
+/// A spec-driven device's declared poll or renewal of what its telemetry
+/// sends again: `Ok(true)` where `name` is one and runs at the `every_ms`
+/// its telemetry gives, `Ok(false)` where `name` is no such send.
+fn check_resent(
+    telemetry: Option<&Value>,
+    what: &str,
+    name: &str,
+    every: Option<&PollEvery>,
+) -> Result<bool, String> {
+    let Some((_, sent)) = resent_telemetry(telemetry)
+        .into_iter()
+        .find(|(n, _)| n == name)
+    else {
+        return Ok(false);
+    };
+    match (sent, every) {
+        (None, _) => Err(format!(
+            "{what}.{name}: its telemetry sends nothing again (no every_ms)"
+        )),
+        (Some(ms), Some(PollEvery::Fixed(d))) if *d == ms => Ok(true),
+        (Some(ms), _) => Err(format!(
+            "{what}.{name}: its telemetry sends again every {ms} ms; every_ms says otherwise"
+        )),
+    }
+}
+
 /// Whether a spec-driven transport waits for the answer to each poll item,
 /// so a poll group's answers can be timed: HTTP and OSC over TCP always, a
 /// line or OSC transport whose device answers, a websocket whose replies
@@ -617,12 +669,16 @@ impl DeviceSpec {
     /// poll's interval at the settings' defaults.
     fn expand_polls(&mut self) -> Result<(), String> {
         if self.implementation == Implementation::Spec {
-            if !self.polls.is_empty() && self.extension.is_none() {
-                return Err(
-                    "polls: a spec-driven device's polls are its telemetry.poll groups".into(),
-                );
-            }
             let telemetry = self.telemetry.as_ref();
+            for poll in &self.polls {
+                let resent = check_resent(telemetry, "polls", &poll.name, poll.every_ms.as_ref())?;
+                if !resent && self.extension.is_none() {
+                    return Err(format!(
+                        "polls.{}: a spec-driven device's polls are its telemetry.poll groups; only a native extension's own reads, and a websocket or zeromq every_ms that reads state, are declared",
+                        poll.name
+                    ));
+                }
+            }
             let groups: Vec<Value> = match telemetry.and_then(|t| t.get("poll")) {
                 Some(Value::Array(g)) => g.clone(),
                 Some(one) => vec![one.clone()],
@@ -666,10 +722,16 @@ impl DeviceSpec {
     /// renewal's interval at the settings' defaults.
     fn expand_renewals(&mut self) -> Result<(), String> {
         if self.implementation == Implementation::Spec {
-            if let Some(r) = self.renewals.iter().find(|r| {
-                r.name == "subscribe"
-                    || (self.extension.is_none() && r.name != "websocket" && r.name != "zeromq")
-            }) {
+            for r in &self.renewals {
+                let resent = check_resent(
+                    self.telemetry.as_ref(),
+                    "renewals",
+                    &r.name,
+                    Some(&r.every_ms),
+                )?;
+                if r.name != "subscribe" && (resent || self.extension.is_some()) {
+                    continue;
+                }
                 return Err(format!(
                     "renewals.{}: a spec-driven device's telemetry.subscribe renewal is worked out \
                      from its telemetry; only a native extension's own, websocket or \
@@ -705,6 +767,16 @@ impl DeviceSpec {
         for r in &mut self.renewals {
             r.interval_ms = interval_at_defaults(&self.settings, &r.every_ms)
                 .map_err(|e| format!("renewals.{}: {e}", r.name))?;
+        }
+        if let Some(r) = self
+            .renewals
+            .iter()
+            .find(|r| self.polls.iter().any(|p| p.name == r.name))
+        {
+            return Err(format!(
+                "renewals.{}: also a poll; a periodic send is a poll or a renewal, never both",
+                r.name
+            ));
         }
         Ok(())
     }
@@ -1194,6 +1266,121 @@ mod tests {
             let push = g4.renewals.iter().find(|r| r.name == "push").unwrap();
             assert_eq!(push.interval_ms, Some(8_000));
             assert!(g4.polls.iter().all(|p| p.name != "push"));
+        }
+    }
+
+    #[test]
+    fn a_websocket_or_zeromq_read_sent_again_is_a_poll() {
+        let spec = parse(&[
+            "transport: { type: http, port: 80 }",
+            "telemetry:",
+            "  websocket: { path: /ws, send: '{\"get\":\"state\"}', every_ms: 1000 }",
+            "  zeromq:",
+            "    subscribe: { port: 1, topics: [a] }",
+            "    publish: { port: 2, send: [[g]], every_ms: 30000 }",
+            "  poll: { once: true, send: [{ method: GET, path: /a }] }",
+            "  updates: []",
+            "polls:",
+            "  - { name: websocket, every_ms: 1000, reads: State }",
+            "  - { name: zeromq, every_ms: 30000, reads: Lists }",
+        ])
+        .unwrap();
+        let names: Vec<_> = spec.polls.iter().map(|p| p.name.as_str()).collect();
+        assert_eq!(names, ["1", "websocket", "zeromq"]);
+        assert_eq!(spec.polls[1].interval_ms, Some(1000));
+        assert_eq!(spec.polls[2].interval_ms, Some(30000));
+        assert!(spec.renewals.is_empty());
+        let out = serde_json::to_value(&spec).unwrap();
+        assert_eq!(
+            out["polls"][1],
+            serde_json::json!({"name": "websocket", "every_ms": 1000, "reads": "State",
+                               "interval_ms": 1000})
+        );
+        // Another interval than the telemetry's is refused.
+        let off = parse(&[
+            "transport: { type: http, port: 80 }",
+            "telemetry: { websocket: { path: /ws, send: x, every_ms: 1000 }, updates: [] }",
+            "polls: [{ name: websocket, every_ms: 5000, reads: S }]",
+        ]);
+        assert!(off.unwrap_err().contains("sends again every 1000 ms"));
+        // So is a read of a websocket that sends nothing again.
+        let none = parse(&[
+            "transport: { type: http, port: 80 }",
+            "telemetry: { websocket: { path: /ws, send: x }, updates: [] }",
+            "polls: [{ name: websocket, every_ms: 1000, reads: S }]",
+        ]);
+        assert!(none.unwrap_err().contains("sends nothing again"));
+        // A spec-driven device's own name is still refused.
+        let own = parse(&[
+            "transport: { type: http, port: 80 }",
+            "telemetry: { websocket: { path: /ws, send: x, every_ms: 1000 }, updates: [] }",
+            "polls: [{ name: status, every_ms: 1000, reads: S }]",
+        ]);
+        assert!(own.unwrap_err().contains("telemetry.poll groups"));
+        // And one send is never both a poll and a renewal.
+        let both = parse(&[
+            "transport: { type: http, port: 80 }",
+            "telemetry: { websocket: { path: /ws, send: x, every_ms: 1000 }, updates: [] }",
+            "polls: [{ name: websocket, every_ms: 1000, reads: S }]",
+            "renewals: [{ name: websocket, every_ms: 1000, renews: S }]",
+        ]);
+        assert!(both.unwrap_err().contains("never both"));
+    }
+
+    #[test]
+    fn every_send_again_in_the_catalog_is_a_poll_a_renewal_or_a_keepalive() {
+        let catalog = Catalog::embedded();
+        for spec in catalog.devices.values() {
+            for p in &spec.polls {
+                assert!(
+                    spec.renewals.iter().all(|r| r.name != p.name),
+                    "{}: {} is both a poll and a renewal",
+                    spec.id,
+                    p.name
+                );
+            }
+            let telemetry = spec.telemetry.as_ref();
+            let blocks: Vec<&Value> = match telemetry.and_then(|t| t.get("websocket")) {
+                Some(Value::Array(list)) => list.iter().collect(),
+                Some(w) => vec![w],
+                None => Vec::new(),
+            };
+            let publish = telemetry
+                .and_then(|t| t.get("zeromq"))
+                .and_then(|z| z.get("publish"));
+            let blocks = blocks.into_iter().chain(publish);
+            for ((name, every), block) in resent_telemetry(telemetry).into_iter().zip(blocks) {
+                let Some(ms) = every else { continue };
+                let poll = spec.polls.iter().find(|p| p.name == name);
+                let renewal = spec.renewals.iter().find(|r| r.name == name);
+                let keepalive = block.get("keepalive") == Some(&Value::Bool(true));
+                let said = usize::from(poll.is_some())
+                    + usize::from(renewal.is_some())
+                    + usize::from(keepalive);
+                assert_eq!(said, 1, "{}: {name} every {ms} ms", spec.id);
+                let interval = poll
+                    .and_then(|p| p.interval_ms)
+                    .or(renewal.and_then(|r| r.interval_ms));
+                if !keepalive {
+                    assert_eq!(interval, Some(ms), "{}: {name}", spec.id);
+                }
+            }
+        }
+        if let Some(freeshow) = catalog.device("freeshow") {
+            let ws = freeshow.polls.iter().find(|p| p.name == "websocket");
+            assert_eq!(ws.and_then(|p| p.interval_ms), Some(1000));
+        }
+        if let Some(pixotope) = catalog.device("pixotope") {
+            let zmq = pixotope.polls.iter().find(|p| p.name == "zeromq");
+            assert_eq!(zmq.and_then(|p| p.interval_ms), Some(30_000));
+        }
+        if let Some(pharos) = catalog.device("pharos-designer") {
+            assert!(pharos.polls.iter().all(|p| p.name != "websocket"));
+            assert!(pharos.renewals.iter().any(|r| r.name == "websocket"));
+        }
+        if let Some(pikvm) = catalog.device("pikvm") {
+            assert!(pikvm.polls.iter().all(|p| p.name != "websocket"));
+            assert!(pikvm.renewals.is_empty());
         }
     }
 
