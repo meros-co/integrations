@@ -56,7 +56,7 @@ pub(crate) enum Message {
         channel: u8,
         pressure: u8,
     },
-    /// 0 to 16383, 8192 at the centre.
+    /// 0 to 16383, 8192 at the center.
     PitchBend {
         channel: u8,
         value: u16,
@@ -489,7 +489,7 @@ impl Timecode {
         let fps = rate.fps();
         let mut n = n;
         if rate == Rate::Fps30Drop {
-            // 17982 labelled frames per ten minutes, 1798 per minute after
+            // 17982 labeled frames per ten minutes, 1798 per minute after
             // the first of each ten.
             let tens = n / 17982;
             let rest = n % 17982;
@@ -506,7 +506,7 @@ impl Timecode {
         }
     }
 
-    /// The time `frames` labelled frames later (or earlier), across midnight.
+    /// The time `frames` labeled frames later (or earlier), across midnight.
     pub(crate) fn add_frames(self, frames: i64) -> Timecode {
         let day = Timecode {
             hours: 23,
@@ -807,7 +807,7 @@ pub(crate) fn mmc_speed_value(b: &[u8]) -> Option<f64> {
 }
 
 /// The Standard Time Specification with subframes (`hr mn sc fr ff`) that
-/// MMC and MSC share: the rate in the hours byte, the colour frame, reserved
+/// MMC and MSC share: the rate in the hours byte, the color frame, reserved
 /// and sign bits clear, and `ff` hundredths of a frame.
 pub(crate) fn standard_time(tc: &Timecode, subframes: u8) -> [u8; 5] {
     [

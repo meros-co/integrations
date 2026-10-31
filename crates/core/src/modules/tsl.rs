@@ -5,7 +5,7 @@
 //!   4-5), then 16 ASCII characters. Over UDP, one packet per datagram.
 //! - V4.0: V3.1, then a checksum (two's complement of the sum of the V3.1
 //!   bytes, modulo 128), a VBC byte (minor version in bits 4-6, XDATA count in
-//!   bits 0-3) and two XDATA bytes of 2-bit colour tallies (LH, text, RH) for
+//!   bits 0-3) and two XDATA bytes of 2-bit color tallies (LH, text, RH) for
 //!   the left and right displays.
 //! - V5.0: little-endian PBC (byte count of what follows), VER, FLAGS (bit 0
 //!   UTF-16LE text, bit 1 screen control), SCREEN, then display messages:
@@ -66,7 +66,7 @@ struct Update {
     index: u16,
     text: Option<String>,
     brightness: u8,
-    /// LH, text, RH colour tallies.
+    /// LH, text, RH color tallies.
     tally: Option<[&'static str; 3]>,
     /// V4.0's right display.
     right: Option<[&'static str; 3]>,

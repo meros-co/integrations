@@ -877,7 +877,7 @@ mod tests {
         );
         assert!(go("run {script}", script.clone(), spec).is_err());
         assert!(go("{script:upper:json}", script, spec).is_err());
-        // The catalogue accepts its control characters; any other string's
+        // The catalog accepts its control characters; any other string's
         // are refused.
         let (_, specs) = values(json!({}), spec);
         let given = json!({"script": "a\nb"}).as_object().unwrap().clone();

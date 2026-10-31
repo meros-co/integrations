@@ -19,7 +19,7 @@ use super::{
 /// Sharpening levels (camera-control `state.d.ts` VideoSharpeningLevel).
 pub(super) const SHARPENING: [&str; 4] = ["off", "low", "medium", "high"];
 
-/// Colour wheels: name, parameter in category 8, and the range of red,
+/// Color wheels: name, parameter in category 8, and the range of red,
 /// green, blue and luma (Blackmagic's camera control protocol, as the
 /// cameras' manuals give it; 15.99 is the most 5.11 fixed point holds).
 pub(super) const WHEELS: [(&str, u8, f64, f64); 4] = [
@@ -120,7 +120,7 @@ impl Atem {
                 want(CC_SINT16, 1)?;
                 json!({"overlays": v[0] != 0.0})
             }
-            // Bits: 1 zebra, 2 focus assist, 4 false colour.
+            // Bits: 1 zebra, 2 focus assist, 4 false color.
             (4, 1) => {
                 want(CC_SINT16, 1)?;
                 let bits = v[0] as i64;

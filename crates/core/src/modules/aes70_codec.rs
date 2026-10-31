@@ -30,7 +30,7 @@ pub(crate) const SYNC: u8 = 0x3B;
 pub(crate) const PROTOCOL_VERSION: u16 = 1;
 /// Sync byte and header.
 pub(crate) const PDU_HEADER: usize = 10;
-/// A PDU larger than this is taken for garbage and the stream resynchronised.
+/// A PDU larger than this is taken for garbage and the stream resynchronized.
 pub(crate) const MAX_PDU: usize = 16 * 1024 * 1024;
 
 pub(crate) const TYPE_COMMAND: u8 = 0;

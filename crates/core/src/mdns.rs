@@ -93,7 +93,7 @@
 //!   (address, integration) is reported once, and a Meros Camera once per
 //!   TXT `id`; either is reported again only when its models, name, address
 //!   or port change.
-//! - For Blackmagic, `models` is the one catalogue model whose name is TXT
+//! - For Blackmagic, `models` is the one catalog model whose name is TXT
 //!   `name` (with or without the "Blackmagic " prefix, ignoring case), or
 //!   every model of the integration when TXT `name` is absent or names none of
 //!   them. A Meros Camera's TXT `name` is the camera's own name, reported as
@@ -144,7 +144,7 @@ pub(crate) const SPECS: &[&str] = &[
     "nmos-registry",
 ];
 
-/// One way to recognise a device: instances of `service` (whose TXT `class`
+/// One way to recognize a device: instances of `service` (whose TXT `class`
 /// is `class`, when given) are devices of `spec`. `source` is what the rule
 /// rests on.
 #[derive(Debug, PartialEq)]
@@ -620,7 +620,7 @@ fn identify(service: &str, txt: Option<&[(String, Option<String>)]>) -> Identity
     }
 }
 
-/// The catalogue model named by `product` (TXT `name`): the one model whose
+/// The catalog model named by `product` (TXT `name`): the one model whose
 /// name is it, with or without the "Blackmagic " prefix, ignoring case.
 fn model_named(models: &[(String, String)], product: &str) -> Option<String> {
     fn bare(s: &str) -> &str {
@@ -643,7 +643,7 @@ fn model_named(models: &[(String, String)], product: &str) -> Option<String> {
     }
 }
 
-/// What discovery needs of one integration in the core's catalogue.
+/// What discovery needs of one integration in the core's catalog.
 #[derive(Debug)]
 struct SpecInfo {
     port: u16,

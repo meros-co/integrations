@@ -17,7 +17,7 @@ text(VH, "set_processing_unit_route", {"unit": 2, "source": 4}, "PROCESSING UNIT
 text(VH, "set_frame_buffer_route", {"frame": 1, "source": 8}, "FRAME BUFFER ROUTING:\n0 7\n\n",
      model="workgroup-videohub")
 
-# Labels (p.3-4). Doc example: output 7 relabelled is "6 new output label seven".
+# Labels (p.3-4). Doc example: output 7 relabeled is "6 new output label seven".
 text(VH, "set_input_label", {"input": 1, "label": "VTR 1"}, "INPUT LABELS:\n0 VTR 1\n\n")
 text(VH, "set_output_label", {"output": 7, "label": "new output label seven"},
      "OUTPUT LABELS:\n6 new output label seven\n\n",

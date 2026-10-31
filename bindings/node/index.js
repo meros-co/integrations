@@ -167,7 +167,7 @@ class Core extends EventEmitter {
   }
 
   /**
-   * Watch a stream the catalogue declares under the device's `streams`.
+   * Watch a stream the catalog declares under the device's `streams`.
    * Returns a Stream emitting 'frame' and 'end'. Throws an IntegrationsError
    * ('unknown_stream', 'unsupported_for_model', 'closed').
    */

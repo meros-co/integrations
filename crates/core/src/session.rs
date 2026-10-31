@@ -201,7 +201,7 @@ pub(crate) struct Session {
     sockets: HashMap<Key, Socket>,
     streams: HashMap<Key, Stream>,
     tcp: HashMap<Key, crate::tcp::Connection>,
-    /// SSH sessions shared by this device's tunnelled streams.
+    /// SSH sessions shared by this device's tunneled streams.
     ssh: crate::ssh::Sessions,
     /// Files being written, by key.
     files: HashMap<Key, crate::files::Writer>,
@@ -1224,7 +1224,7 @@ impl Session {
     async fn teardown(&mut self, error: CommandError) {
         let mut cx = self.cx();
         self.module.stop(&mut cx);
-        // What the module sends on stopping (a subscription cancelled, a
+        // What the module sends on stopping (a subscription canceled, a
         // QUIT) is waited for, within FLUSH, so a host that exits right after
         // closing does not cut it off.
         let mut flushing: Vec<futures_util::future::BoxFuture<'static, ()>> = Vec::new();

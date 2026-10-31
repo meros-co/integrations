@@ -35,7 +35,7 @@ pub struct Frame {
     pub dropped: u64,
 }
 
-/// Why a stream cannot be watched. Serialised like a command error.
+/// Why a stream cannot be watched. Serialized like a command error.
 #[derive(Debug, Clone, PartialEq, Serialize, thiserror::Error)]
 #[serde(tag = "error", rename_all = "snake_case")]
 pub enum StreamError {

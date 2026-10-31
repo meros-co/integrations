@@ -634,7 +634,7 @@ fn text_setting(settings: &Params, name: &str) -> String {
         .to_string()
 }
 
-/// A GUID from the friendly name, so the camera recognises this initiator
+/// A GUID from the friendly name, so the camera recognizes this initiator
 /// across restarts without anything being stored.
 fn derived_guid(friendly_name: &str) -> [u8; 16] {
     let digest = Sha256::digest(format!("meros-sony-camera:{friendly_name}").as_bytes());
@@ -4426,7 +4426,7 @@ mod tests {
                 Action::TcpOpenSsh { socket, tunnel } if *socket == CMD => Some(tunnel.clone()),
                 _ => None,
             })
-            .expect("a tunnelled command connection");
+            .expect("a tunneled command connection");
         assert_eq!(
             tunnel.ssh,
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 7)), 22)
@@ -4530,7 +4530,7 @@ mod tests {
             run("set_property", json!({"code": "D21D", "value": 1})),
             Err(CommandError::DeviceError { code: Some(c), .. }) if c == "read_only"
         ));
-        // Greyed out in the current mode.
+        // Grayed out in the current mode.
         assert!(matches!(
             run("set_shutter_speed", json!({"value": "1/100"})),
             Err(CommandError::DeviceError { code: Some(c), .. }) if c == "not_available"

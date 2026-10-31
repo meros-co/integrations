@@ -12,7 +12,7 @@ _X32_NUMBERED = [
     ("bus", "bus", lambda n: f"/bus/{n:02d}"),
     ("matrix", "matrix", lambda n: f"/mtx/{n:02d}"),
 ]
-# Every numbered strip and both mains: fader, mute, name, colour, icon.
+# Every numbered strip and both mains: fader, mute, name, color, icon.
 for stem, p, pre in _X32_NUMBERED:
     binary(X, f"set_{stem}_fader", {p: 6, "level": 0.75}, osc(f"{pre(6)}/mix/fader", ("f", 0.75)))
     binary(X, f"mute_{stem}", {p: 6, "muted": True}, osc(f"{pre(6)}/mix/on", ("i", 0)),

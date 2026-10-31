@@ -51,7 +51,7 @@ pub(crate) enum Decode {
     FrameRate,
     /// A point: x in the upper 16 bits, y in the lower 16.
     Point,
-    /// An AF frame: height and width in the upper 32 bits, its centre x and
+    /// An AF frame: height and width in the upper 32 bits, its center x and
     /// y in the lower 32, 16 bits each.
     Frame,
 }
@@ -1426,7 +1426,7 @@ const BASE_LOOK_OUTPUT: &[(i128, &str)] = &[
     (0x0102, "hlg_legal"),
 ];
 
-/// Properties read by code that has its own commands: tally lamps by colour,
+/// Properties read by code that has its own commands: tally lamps by color,
 /// audio channels by number, and position targets.
 pub(crate) const TALLY: [(&str, u16); 3] = [("red", 0xE0D2), ("green", 0xE0D3), ("yellow", 0xE0D4)];
 pub(crate) const AUDIO_LEVEL_CONTROL: [u16; 4] = [0xE048, 0xE049, 0xE04A, 0xE04B];

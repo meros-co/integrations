@@ -64,7 +64,7 @@ http(P, "shutter", {"value": 2}, "GET", PTZ + "post_image_value&shutter&2")
 http(P, "meter_region", {"region": 1}, "GET", PTZ + "post_image_value&meter&1")
 http(P, "dynamic_range", {"level": 5}, "GET", PTZ + "post_image_value&drc&5")
 
-# Colour (p.18-36)
+# Color (p.18-36)
 http(P, "white_balance_mode", {"mode": "5"}, "GET", PTZ + "post_image_value&wbmode&5")
 http(P, "white_balance_one_push", {}, "GET", PTZ + "post_image_value&onepush&0")
 http(P, "color_temperature", {"index": 31}, "GET", PTZ + "post_image_value&colortemp&31")

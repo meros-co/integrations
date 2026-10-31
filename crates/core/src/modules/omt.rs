@@ -84,7 +84,7 @@ pub(crate) fn metadata_frame(xml: &str) -> Vec<u8> {
     out
 }
 
-/// The tally string the sender recognises, exactly as the protocol writes
+/// The tally string the sender recognizes, exactly as the protocol writes
 /// it, typo included.
 pub(crate) fn tally_xml(preview: bool, program: bool) -> String {
     format!(
@@ -720,7 +720,7 @@ mod tests {
             socket: SOCKET,
             to: m.device
         }));
-        // The retry the loss armed is cancelled after it.
+        // The retry the loss armed is canceled after it.
         let set = a
             .iter()
             .rposition(|x| matches!(x, Action::SetTimer { key: RETRY, .. }));

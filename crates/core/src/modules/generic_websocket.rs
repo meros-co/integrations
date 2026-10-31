@@ -1,5 +1,5 @@
 //! Generic WebSocket client: send text, bytes or JSON to a device or service
-//! the catalogue does not cover yet, and see what comes back.
+//! the catalog does not cover yet, and see what comes back.
 //!
 //! Semantics from RFC 6455 (The WebSocket Protocol, 2011):
 //!

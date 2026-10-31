@@ -1,4 +1,4 @@
-//! Generic HTTP: make any request to a device the catalogue does not cover
+//! Generic HTTP: make any request to a device the catalog does not cover
 //! yet, and optionally poll one URL into state.
 //!
 //! Semantics from RFC 9110 (HTTP Semantics, 2022):

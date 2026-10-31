@@ -280,8 +280,8 @@ fn flag(value: &str) -> Option<bool> {
     }
 }
 
-/// The sony-camera models in the core's catalogue, as (id, name), taken
-/// when the core is built: parsing a catalogue again at the first discovery
+/// The sony-camera models in the core's catalog, as (id, name), taken
+/// when the core is built: parsing a catalog again at the first discovery
 /// would hold up an async worker for seconds.
 fn sony_models(catalog: &crate::catalog::Catalog) -> Arc<[(String, String)]> {
     catalog
@@ -295,7 +295,7 @@ fn sony_models(catalog: &crate::catalog::Catalog) -> Arc<[(String, String)]> {
         .unwrap_or_default()
 }
 
-/// The catalogue model a camera's `X_ModelName` names: the model whose id is
+/// The catalog model a camera's `X_ModelName` names: the model whose id is
 /// that name, or whose name has it as a whole token (`ILCE-7M4` in "Sony
 /// Alpha 7 IV (ILCE-7M4)"; whole tokens, so ILCE-7RM4 never matches
 /// ILCE-7RM4A). Sony's documents call the PXW-Z380 the PXW-Z300.
@@ -357,7 +357,7 @@ enum Known {
 /// scans and description fetches.
 struct Shared {
     events: Arc<EventQueue>,
-    /// The catalogue's sony-camera models, as (id, name).
+    /// The catalog's sony-camera models, as (id, name).
     models: Arc<[(String, String)]>,
     client: reqwest::Client,
     known: Mutex<HashMap<String, Known>>,
@@ -992,7 +992,7 @@ mod tests {
         assert_eq!(m("PXW-Z300").as_deref(), Some("pxw-z380"));
         assert_eq!(m("ILCE-7M3"), None);
         assert_eq!(m(""), None);
-        // And against the embedded catalogue.
+        // And against the embedded catalog.
         assert_eq!(
             match_model("ILCE-7M4", &sony_models(&Catalog::embedded())).as_deref(),
             Some("ilce-7m4")

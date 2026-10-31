@@ -102,7 +102,7 @@ class Core:
 
         devices: the only integrations this core works with: spec ids,
         vendor groups ("vendor-sennheiser") or "all"; every integration in
-        the build when None. The catalogue then lists only them,
+        the build when None. The catalog then lists only them,
         opening any other raises IntegrationsError "not_selected", and
         discovery runs only their protocols. Raises RuntimeError for an id
         the build does not include."""
@@ -137,7 +137,7 @@ class Core:
         SmartView and MultiView, Ecamm Live and Meros Cameras), "dns-sd" (NMOS
         registries in unicast DNS), "umbra" (DMXControl 3's Umbra servers);
         none means every protocol that finds a device in this core's
-        catalogue. Hints are addresses where devices were last seen;
+        catalog. Hints are addresses where devices were last seen;
         "dns_servers" and "dns_domains" replace the host's own DNS servers and
         domains for a "dns-sd" scan. Found devices arrive as {"event": "discovered", ...}
         events."""
@@ -201,7 +201,7 @@ class Core:
 
     def open_stream(self, device: int, stream: str) -> Stream:
         """Watch a stream declared under the device's "streams" in the
-        catalogue. Raises IntegrationsError ("unknown_stream",
+        catalog. Raises IntegrationsError ("unknown_stream",
         "unsupported_for_model", "closed")."""
         result = json.loads(self._native.open_stream(device, stream))
         if "error" in result:

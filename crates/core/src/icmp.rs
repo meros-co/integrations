@@ -48,7 +48,7 @@ pub(crate) async fn echo(request: EchoRequest) -> EchoResult {
     }
 }
 
-/// The data an echo request carries: a recognisable repeating pattern, the
+/// The data an echo request carries: a recognizable repeating pattern, the
 /// same in every request, so a reply can be checked against it.
 fn payload(size: u16) -> Vec<u8> {
     (0..size).map(|i| b'a' + (i % 23) as u8).collect()

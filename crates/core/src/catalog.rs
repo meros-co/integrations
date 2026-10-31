@@ -1,4 +1,4 @@
-//! The catalogue: every device spec, parsed once from the embedded YAML, plus
+//! The catalog: every device spec, parsed once from the embedded YAML, plus
 //! the parameter validation every command passes through before a module sees
 //! it. SPEC.md §4 defines the rules; this is their only implementation.
 
@@ -59,7 +59,7 @@ pub struct DeviceSpec {
     /// live view, keyed by stream name. Watched with `Core::open_stream`.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub streams: BTreeMap<String, StreamSpec>,
-    /// Wire behaviour for spec-driven devices, kept verbatim for the spec engine.
+    /// Wire behavior for spec-driven devices, kept verbatim for the spec engine.
     #[serde(default, skip_serializing)]
     pub transport: Option<Value>,
     #[serde(default, skip_serializing)]
@@ -149,7 +149,7 @@ pub struct CommandSpec {
     pub params: BTreeMap<String, ParamSpec>,
     #[serde(default = "default_returns")]
     pub returns: String,
-    /// Wire behaviour for spec-driven commands, kept verbatim for the spec engine.
+    /// Wire behavior for spec-driven commands, kept verbatim for the spec engine.
     #[serde(default, skip_serializing)]
     pub send: Option<Value>,
     #[serde(default, skip_serializing)]
@@ -841,7 +841,7 @@ pub struct Catalog {
 impl Catalog {
     /// Parse the embedded specs. A spec that fails to parse is a build defect,
     /// caught by the test suite, so this panics rather than returning a partial
-    /// catalogue that silently lacks a device.
+    /// catalog that silently lacks a device.
     pub fn embedded() -> Catalog {
         let mut devices = BTreeMap::new();
         for (file, text) in EMBEDDED_SPECS {

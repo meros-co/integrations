@@ -2,7 +2,7 @@
 # "Name: value" blocks ended by a blank line (Ultimatte 12 manual, February
 # 2026, Developer Information p.85-100). The wire forms follow the manual's
 # own examples: "control:\nbacking color: blue" and "matte density: 273"
-# (p.85, written with the table's capitalisation), "CONTROL:\nMatte Density:
+# (p.85, written with the table's capitalization), "CONTROL:\nMatte Density:
 # 100" and "Offset Matte Density: 10" (p.89), the header-only status request
 # "CONTROL:" (p.90), the FILE and GPI blocks (p.90-91), "BG 1 Frame Buffer
 # Index: 1" (p.91) and "CCU Camera Id: 5" (p.91). Functions are sent as Yes

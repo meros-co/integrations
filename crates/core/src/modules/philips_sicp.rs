@@ -3,7 +3,7 @@
 //!
 //! Written from Philips's "SICP V2.03" command document (section numbers
 //! below are that document's) and the Q Line user manual for the LAN and
-//! power-save behaviour; see the spec's sources.
+//! power-save behavior; see the spec's sources.
 //!
 //! - A message is MsgSize (the whole message's length, itself and the
 //!   checksum included, 3 to 40), Control (the monitor ID, 1 to 255; 0

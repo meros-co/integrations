@@ -8,7 +8,7 @@
 //! - dLive and Avantis ([`super::allenheath_dlive`]): the channel type is
 //!   chosen by MIDI channel offset from a base channel N and the channel by
 //!   note number; mutes are Note On, levels and assignments 7-bit NRPN,
-//!   names, colours, sends and every "get" are SysEx with the header
+//!   names, colors, sends and every "get" are SysEx with the header
 //!   `F0 00 00 1A 50 10 01 00`.
 //! - AHM ([`super::allenheath_ahm`]): the same shape on fixed MIDI channels
 //!   0-3, with the header `F0 00 00 1A 50 12 01 00`.

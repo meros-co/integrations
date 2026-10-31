@@ -164,7 +164,7 @@ _bc("set_detail_sharpening", {"enabled": False}, "PUT", "/video/detailSharpening
 _bc("get_detail_sharpening_level", {}, "GET", "/video/detailSharpeningLevel")
 _bc("set_detail_sharpening_level", {"level": "High"}, "PUT", "/video/detailSharpeningLevel", '{"level":"High"}')
 
-# Colour correction (p.66-70)
+# Color correction (p.66-70)
 _bc("get_color_lift", {}, "GET", "/colorCorrection/lift")
 _bc("set_color_lift", {"red": 0.1, "green": 0.0, "blue": -0.1, "luma": 0.0}, "PUT", "/colorCorrection/lift",
     '{"red":0.100,"green":0.000,"blue":-0.100,"luma":0.000}', http_reply={"status": 204}, expect_result=_ACK)

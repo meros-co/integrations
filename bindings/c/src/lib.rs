@@ -136,7 +136,7 @@ pub unsafe extern "C" fn mi_string_free(s: *mut c_char) {
     }
 }
 
-/// The catalogue as JSON.
+/// The catalog as JSON.
 ///
 /// # Safety
 /// `core` must be a live core.

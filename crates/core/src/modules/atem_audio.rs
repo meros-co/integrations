@@ -48,7 +48,7 @@ pub(super) const SHAPES: [&str; 6] = [
     "high_shelf",
 ];
 
-/// Fairlight input configurations and analogue input levels, by bit (Sofie
+/// Fairlight input configurations and analog input levels, by bit (Sofie
 /// `enums/index.ts:347-358`).
 pub(super) const CONFIGURATIONS: [&str; 3] = ["mono", "stereo", "dual_mono"];
 pub(super) const INPUT_LEVELS: [&str; 3] = ["microphone", "consumer_line", "pro_line"];

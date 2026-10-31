@@ -291,7 +291,7 @@ pub(crate) struct LakeDlm {
     meter_poll: Millis,
     parameter_poll: Millis,
     configuration_poll: Millis,
-    /// The device's frame id, given or learnt from its answer.
+    /// The device's frame id, given or learned from its answer.
     frame_id: Option<(u32, u32)>,
     connected: bool,
     socket_open: bool,

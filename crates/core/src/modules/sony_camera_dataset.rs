@@ -340,7 +340,7 @@ pub(crate) enum Form {
 /// Whether the camera offers a property right now.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Enabled {
-    /// Greyed out: the value is not meaningful.
+    /// Grayed out: the value is not meaningful.
     No,
     Yes,
     /// Shown, but cannot be changed.

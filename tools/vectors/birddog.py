@@ -333,7 +333,7 @@ _bd("set_wb_phase", {"level": 7}, "POST", _BD_W, '{"Phase":"7"}')
 _bd("set_wb_select", {"select": "FL LIGHT"}, "POST", _BD_W, '{"Select":"FL LIGHT"}')
 _bd("set_wb_speed", {"speed": 3}, "POST", _BD_W, '{"Speed":"3"}')
 
-# Colour matrix (2.0 COLOURMATRIX; 2.1 Colour Matrix Setup)
+# Color matrix (2.0 COLOURMATRIX; 2.1 Colour Matrix Setup)
 _BD_CM = "/birddogcmsetup"
 _bd("get_colour_matrix", {}, "GET", _BD_CM)
 _bd("set_colour_matrix", {"body": {"BlueHue": "35", "RedHue": "35"}}, "POST", _BD_CM, '{"BlueHue":"35","RedHue":"35"}')

@@ -140,7 +140,7 @@ async fn a_hosted_rtp_midi_session_is_joined_over_loopback() {
     let n = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             let (n, _) = data.recv_from(&mut buf).await.unwrap();
-            // Skip anything but RTP (clock synchronisation is the joiner's).
+            // Skip anything but RTP (clock synchronization is the joiner's).
             if buf[0] >> 6 == 2 && n > 13 && buf[12] & 0x0F == 3 {
                 return n;
             }

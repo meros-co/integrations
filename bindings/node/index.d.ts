@@ -33,7 +33,7 @@ export interface DiscoverRequest {
    * 'pjlink' (PJLink projectors), 'mdns' (Blackmagic ATEM, Videohub,
    * HyperDeck, SmartView and MultiView, Ecamm Live and Meros Cameras), 'umbra'
    * (DMXControl 3's Umbra servers). Empty means
-   * every protocol that finds a device in this core's catalogue; naming one
+   * every protocol that finds a device in this core's catalog; naming one
    * that finds none is an error.
    */
   protocols?: string[];
@@ -107,7 +107,7 @@ export type Event =
       source: string;
     }
   /**
-   * `count` state patches were discarded; resynchronise from snapshots.
+   * `count` state patches were discarded; resynchronize from snapshots.
    * `messages` message events were discarded past the queue's hard ceiling
    * (absent when none were).
    */
@@ -169,7 +169,7 @@ export interface CoreOptions {
   /**
    * The only integrations this core works with: spec ids, vendor groups
    * ('vendor-sennheiser') or 'all'; every integration in the build when
-   * absent. The catalogue then lists only them, opening any other throws
+   * absent. The catalog then lists only them, opening any other throws
    * 'not_selected', and discovery runs only their protocols. A name the
    * build does not include makes the constructor throw.
    */
@@ -234,7 +234,7 @@ export class Core extends EventEmitter {
    */
   closeAll(graceMs?: number): Promise<void>;
   /**
-   * Watch a stream declared under the device's `streams` in the catalogue,
+   * Watch a stream declared under the device's `streams` in the catalog,
    * such as a camera's 'live' preview. Throws an IntegrationsError
    * ('unknown_stream', 'unsupported_for_model', 'closed').
    */

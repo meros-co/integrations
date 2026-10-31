@@ -96,7 +96,7 @@ DESCRIPTIONS = {
     "unversioned": "On returns every kind without its version suffix, off returns them with version suffixes where there are any.",
     "inputVolumeMul": "Volume as a linear multiplier, 1.0 for unchanged; give this or the volume in dB.",
     "inputVolumeDb": "Volume in dB, 0 for unchanged; give this or the volume as a multiplier.",
-    "inputAudioBalance": "Audio balance from 0.0 (left) to 1.0 (right), 0.5 centred.",
+    "inputAudioBalance": "Audio balance from 0.0 (left) to 1.0 (right), 0.5 centered.",
     "inputMuted": "On mutes the input, off unmutes it.",
     "filterEnabled": "On enables the filter, off disables it.",
     "position": "New T-bar position from 0.0 to 1.0.",

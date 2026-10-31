@@ -13,7 +13,7 @@
 //!
 //! `--devices` names the only integrations the service works with (spec ids,
 //! vendor groups such as `vendor-sennheiser`, or `all`), for a product that
-//! uses only some: the catalogue lists only them, opening any other is refused
+//! uses only some: the catalog lists only them, opening any other is refused
 //! with `not_selected`, and discovery runs only the protocols that find them.
 //! A name the build does not include stops the service at startup. Which
 //! integrations are built into the service at all is chosen when it is built:
@@ -22,7 +22,7 @@
 //!
 //! | Method and path              | Body / query                          | Returns                    |
 //! |------------------------------|---------------------------------------|----------------------------|
-//! | GET  /v1/catalog             |                                       | the catalogue              |
+//! | GET  /v1/catalog             |                                       | the catalog              |
 //! | POST /v1/open                | an OpenRequest                        | {device} or {error}        |
 //! | POST /v1/discover            | {action, protocols?, hints?, dns_servers?, dns_domains?} | {ok} or {error} |
 //! | POST /v1/execute             | {device, command, params}             | {ok} or {error}            |
@@ -46,7 +46,7 @@
 //! Videohub, HyperDeck, SmartView and MultiView, Ecamm Live, Meros Cameras, and RTP-MIDI
 //! sessions), `dns-sd` (NMOS registries advertised in unicast DNS) and
 //! `umbra` (DMXControl 3's Umbra servers); none
-//! means every protocol that finds a device in the service's catalogue.
+//! means every protocol that finds a device in the service's catalog.
 //! `hints` are addresses where devices were last seen; `dns_servers` and
 //! `dns_domains` replace the host's own DNS servers and domains for a
 //! `dns-sd` scan.
@@ -78,7 +78,7 @@
 //! listens on loopback unless told otherwise.
 //!
 //! Streams (a camera's live view, declared under a device's `streams` in the
-//! catalogue) are served as media rather than JSON, by their format. A `jpeg`
+//! catalog) are served as media rather than JSON, by their format. A `jpeg`
 //! stream is served as `.mjpg`, `multipart/x-mixed-replace`, which a browser's
 //! `<img>` shows as live video, and as `.jpg`, one JPEG. Since an `<img>`
 //! cannot send a header, these two also accept the token as

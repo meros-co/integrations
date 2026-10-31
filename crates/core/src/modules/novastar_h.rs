@@ -22,7 +22,7 @@
 //!   `body` parameter's fields where the endpoint takes nested structures.
 //!   `call` sends any endpoint with a body given whole.
 //! - The splicer does not push in any documented form, so the module polls:
-//!   the initialisation status (which is also the liveness check), the
+//!   the initialization status (which is also the liveness check), the
 //!   screen list, inputs, outputs, background images and signal source
 //!   playlists, and for each listed screen its details (brightness, gamma,
 //!   FTB, freeze, background, size, 3D, OSD), layers, presets, current
@@ -32,7 +32,7 @@
 //!   item a later read no longer lists leaves state.
 //!
 //! Opened for commands only (`monitor` false), the module asks only the
-//! initialisation status at the poll interval, as its liveness check, and
+//! initialization status at the poll interval, as its liveness check, and
 //! reads nothing else, not even after a command. Each answered request
 //! reports its round trip.
 

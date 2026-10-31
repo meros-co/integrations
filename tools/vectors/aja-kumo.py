@@ -213,7 +213,7 @@ telemetry(KUMO, "not-json", inbound_http={
     "body": "<html><head><title>403 Forbidden</title></head></html>"},
     expect_state={})
 
-# Button colours read back (the value as AJA's scripts write it; assumed to
+# Button colors read back (the value as AJA's scripts write it; assumed to
 # read back the same); AJA's bank numbering decides source or destination.
 # The event forms go through the aja-config-events extension, tested in its
 # session test.

@@ -25,7 +25,7 @@ MiCore *mi_core_new(void);
  *           "devices":["<spec id>",...]}, or NULL for defaults.
  * devices: the only integrations this core works with (spec ids, vendor
  * groups such as "vendor-sennheiser", or "all"); absent means every
- * integration in the build. The catalogue then lists only them, mi_open of any other
+ * integration in the build. The catalog then lists only them, mi_open of any other
  * fails with "not_selected", and discovery runs only their protocols.
  * NULL if the options are invalid (including an unknown device id) or the
  * core cannot start. */
@@ -56,7 +56,7 @@ char *mi_open(const MiCore *core, const char *request);
  * SmartView and MultiView, Ecamm Live and Meros Cameras), "dns-sd" (NMOS registries in
  * unicast DNS, asked of dns_servers in dns_domains, or of the host's own),
  * "umbra" (DMXControl 3's Umbra servers); none means every protocol that
- * finds a device in this core's catalogue.
+ * finds a device in this core's catalog.
  * returns: {"ok":true} or {"error":{...}}; found devices arrive as
  * {"event":"discovered",...} events. */
 char *mi_discover(const MiCore *core, const char *request);
@@ -110,7 +110,7 @@ void mi_reconnect_all(const MiCore *core);
 void mi_close_all(const MiCore *core, uint32_t grace_ms);
 
 /* Streams: continuous media such as a camera's live view, declared in the
- * catalogue under a device's "streams". Frames do not come as events: each
+ * catalog under a device's "streams". Frames do not come as events: each
  * open stream holds only the newest frame, and frames replaced before they
  * were taken are counted in `dropped`. The device produces frames only while
  * at least one stream is open on it.

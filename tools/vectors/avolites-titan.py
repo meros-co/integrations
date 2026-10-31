@@ -189,7 +189,7 @@ telemetry(AV, "highlight", inbound_http={"path": "/titan/get/2/Programmer/Editor
           expect_state={"programmer": {"highlight": True}})
 
 
-# ── Full control: recording, colour, masked clears, timers, timelines, levels ──
+# ── Full control: recording, color, masked clears, timers, timelines, levels ──
 # Property sets are a POST of the value as text (introduction, Set Property
 # Value). Types the documentation gives no wire form for are written as the
 # spec's quirks describe them (hsi_hue/hsi_saturation/hsi_intensity, mask

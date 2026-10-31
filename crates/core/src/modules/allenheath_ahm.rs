@@ -7,7 +7,7 @@
 //!   gain, pad and phantom power are 7-bit NRPN (17, 18, 19, 1A, 1B), and
 //!   NRPN 20 steps a level up (7F) or down (3F) (p.2-3).
 //! - SysEx header `F0 00 00 1A 50 12 01 00`: crosspoint send levels and
-//!   mutes, playback, source selectors, rooms, names and colours, and every
+//!   mutes, playback, source selectors, rooms, names and colors, and every
 //!   "get" (`0N 01 ...`) (p.2-6).
 //! - Presets are bank and Program Change on channel 0 (p.4).
 //! - With TLS/SSL encryption the processor listens on 51327, and the first
@@ -140,8 +140,8 @@ impl Ahm {
     }
 
     /// A source selector message after `00 08 CH`: either the get reply
-    /// (count, current, a colour per source, then NUL-terminated names) or the
-    /// message sent on a selection (number, colour, name), p.5.
+    /// (count, current, a color per source, then NUL-terminated names) or the
+    /// message sent on a selection (number, color, name), p.5.
     fn source_selector(zone: u8, rest: &[u8]) -> Vec<Update> {
         let p = format!("zones.{}", zone as u32 + 1);
         if let Some(sources) = Self::source_list(rest) {
@@ -614,7 +614,7 @@ mod tests {
             ),
             h("00 0E 00 01 7F")
         );
-        // p.6: name and colour gets.
+        // p.6: name and color gets.
         assert_eq!(
             b(
                 &mut m,
@@ -662,7 +662,7 @@ mod tests {
         let (mut m, _) = connected(ahm(), &[0xFE]);
         let a = run(&mut m, 10, "get_source", json!({"zone": 2}));
         assert_eq!(sent(&a), [h("01 01 0F 08 01")]);
-        // Two sources, the second selected: colours red, blue; "A", "BC".
+        // Two sources, the second selected: colors red, blue; "A", "BC".
         let a = feed(&mut m, 20, &h("00 08 01 02 01 01 04 41 00 42 43 00"));
         assert!(a.contains(&Action::Complete {
             id: 1,

@@ -299,7 +299,7 @@ pub(crate) struct StreamEntry {
 }
 
 /// Element and RootElement: the Qualified types are the same elements with
-/// an [`Id::Path`]. Templates are recognised and not decoded (a consumer may
+/// an [`Id::Path`]. Templates are recognized and not decoded (a consumer may
 /// "discard all Template definitions or references").
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Element {
@@ -573,7 +573,7 @@ pub(crate) fn decode(payload: &[u8]) -> Result<Vec<Root>, String> {
             ROOT_ELEMENT_COLLECTION => Root::Elements(items(inner).filter_map(element).collect()),
             // The DTD makes StreamCollection APPLICATION 6 and StreamEntry 5;
             // the prose of "Application defined types" swaps them. A
-            // collection is recognised by its place under Root either way.
+            // collection is recognized by its place under Root either way.
             STREAM_COLLECTION | STREAM_ENTRY => {
                 Root::Streams(items(inner).filter_map(stream_entry).collect())
             }
@@ -1191,7 +1191,7 @@ mod tests {
 
     #[test]
     fn templates_unknown_fields_and_garbage() {
-        // A template among elements is recognised and skipped over.
+        // A template among elements is recognized and skipped over.
         let template = ber::constructed(
             Tag::app(QUALIFIED_TEMPLATE),
             &[ber::ctx(0, ber::roid(&[1, 9]))],

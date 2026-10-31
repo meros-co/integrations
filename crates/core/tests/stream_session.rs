@@ -93,7 +93,7 @@ async fn frames_flow_only_while_watched() {
         .unwrap();
     connected(&core, id).await;
 
-    // The catalogue says what can be watched.
+    // The catalog says what can be watched.
     let streams = &api::catalog(&core)["devices"]["http-snapshot"]["streams"];
     assert_eq!(streams["live"]["format"], "jpeg");
 

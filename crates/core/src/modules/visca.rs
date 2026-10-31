@@ -2090,7 +2090,7 @@ impl Visca {
             code: Some(format!("{code:02X}")),
             message: error_meaning(code).into(),
         };
-        // An error for a command already executing (cancelled, or found not
+        // An error for a command already executing (canceled, or found not
         // executable after its ACK).
         // Without sequence numbers an error belongs to the message awaiting
         // its first reply, if there is one.
@@ -2127,7 +2127,7 @@ impl Visca {
         let mut msg = f.msg;
         match (msg.kind, code) {
             (Kind::Cancel(s), 0x04) => {
-                // y0 6p 04 answers the cancel; the cancelled command gets no
+                // y0 6p 04 answers the cancel; the canceled command gets no
                 // Completion (p.7).
                 self.cancelled(cx);
                 if let Some(i) = self.executing.iter().position(|e| e.socket == s) {
@@ -2797,7 +2797,7 @@ mod tests {
             assert_eq!(&got, value, "{name}");
             assert_eq!(&at_path(def.path, got), st, "{name}");
         }
-        // Five pan digits are recognised from the reply's length.
+        // Five pan digits are recognized from the reply's length.
         assert_eq!(
             decode(Decode::PanTilt, &h("90 50 0F 06 03 05 09 00 00 00 00 FF")).unwrap(),
             json!({"pan": -0x09CA7, "tilt": 0})
@@ -3058,7 +3058,7 @@ mod tests {
         let mut cx = Cx::new(SONY_DRIVE_GAP);
         m.command(&mut cx, 2, "cancel", &params(json!({"socket": 1})));
         drain(&mut cx);
-        // y0 6p 04: the command in socket 1 was cancelled (p.7).
+        // y0 6p 04: the command in socket 1 was canceled (p.7).
         m.datagram(
             &mut cx,
             SOCKET,

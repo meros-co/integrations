@@ -1,10 +1,10 @@
 //! The spec engine: the only interpreter of the YAML device format.
 //!
-//! One module drives every spec-driven device. Its behaviour is SPEC.md's, and
+//! One module drives every spec-driven device. Its behavior is SPEC.md's, and
 //! every rule in SPEC.md is implemented here once: templates in `template`,
 //! framing in `framing`, OSC in `osc`, reply evaluation in `expect`.
 //!
-//! Commands are serialised per device. A reply is matched to the command in
+//! Commands are serialized per device. A reply is matched to the command in
 //! flight and nothing else, so a late or unsolicited message can never be taken
 //! as the answer to a later command. Liveness probes queue like commands for the
 //! same reason.

@@ -1,7 +1,7 @@
 //! What the camera reports about itself beyond its properties, and the
 //! commands that go with it: display string lists (the camera's own names for
 //! base looks, scene files, buttons and more), lens focus tables, the zoom and
-//! focus preset list, the OSD overlay image, restriction, licence and
+//! focus preset list, the OSD overlay image, restriction, license and
 //! operation-result lists, the clock and time zone, stream destination
 //! settings, eframing, the camera's physical buttons, dials and levers,
 //! pixel shift shooting, and user base look management.
@@ -239,7 +239,7 @@ pub(super) fn parse_display_lists(data: &[u8]) -> Result<Vec<DisplayList>, Strin
     Ok(out)
 }
 
-/// Lens focus conversion tables: normalised focus position to distance.
+/// Lens focus conversion tables: normalized focus position to distance.
 pub(super) fn parse_lens_information(data: &[u8]) -> Result<Value, String> {
     let info = unwrap(data)?;
     let mut r = Reader::new(info);
@@ -369,7 +369,7 @@ pub(super) fn parse_licenses(data: &[u8]) -> Result<Value, String> {
     for _ in 0..count {
         let length = r.u32()? as usize;
         if length < 4 || length - 4 > r.remaining() {
-            return Err("licence entry does not fit".into());
+            return Err("license entry does not fit".into());
         }
         let body: Vec<u8> = (0..length - 4).map(|_| r.u8()).collect::<Result<_, _>>()?;
         let mut e = Reader::new(&body);
@@ -581,7 +581,7 @@ pub(super) fn encode_stream(version: u16, s: &StreamWrite) -> Result<Vec<u8>, St
 }
 
 /// An eframing command: the type, and for single or PTZ the crop rectangle
-/// as fractions of the picture (0 to 1), normalised to a denominator of 1.
+/// as fractions of the picture (0 to 1), normalized to a denominator of 1.
 pub(super) fn encode_eframing(
     version: u32,
     kind: u8,

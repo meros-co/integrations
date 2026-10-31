@@ -33,7 +33,7 @@ pub(super) const DIRECTIONS: [&str; 10] = [
 ];
 
 /// DVE fields: name, mask bit and offset in CKDV, offset in KeDV, width,
-/// scale. Size and position in thousandths, rotation and colours in tenths,
+/// scale. Size and position in thousandths, rotation and colors in tenths,
 /// border widths in hundredths, softness, opacity and altitude as is.
 const DVE: [(&str, u32, usize, usize, W, f64); 25] = [
     ("size_x", 0, 8, 4, W::U32, 1000.0),
@@ -119,7 +119,7 @@ const ADVANCED: [(&str, u32, usize, usize, W); 11] = [
 /// Advanced chroma sample: name, mask bit, offset in CACC, offset in KACC,
 /// width, scale (Sofie `MixEffectKeyAdvancedChromaSampleCommand.ts:5-42,
 /// 60-74`): the cursor in thousandths of the frame's units, its size in
-/// hundredths, the sampled colour in ten-thousandths.
+/// hundredths, the sampled color in ten-thousandths.
 const SAMPLE: [(&str, u32, usize, usize, W, f64); 6] = [
     ("cursor_x", 2, 6, 4, W::I16, 1000.0),
     ("cursor_y", 3, 8, 6, W::I16, 1000.0),
@@ -348,7 +348,7 @@ impl Atem {
                 one(b"CACC", body.done(0, W::U8)?)
             }
             // M/E, keyer, rsv, bits: 0 key adjustments, 1 chroma
-            // correction, 2 colour adjustments (Sofie
+            // correction, 2 color adjustments (Sofie
             // `MixEffectKeyAdvancedChromaSampleResetCommand.ts:20-40`).
             "reset_usk_advanced_chroma" => {
                 let (me, keyer) = self.check_keyer(params)?;

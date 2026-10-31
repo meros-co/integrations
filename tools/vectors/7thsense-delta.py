@@ -1,7 +1,7 @@
 # 7thSense Delta (7thsense-delta): external control commands ended by CR on
 # TCP 23, as the Delta v2.8 external control reference writes them (PLAY,
 # GOTOFRAME n [play], GOTOTIME 0:1:0:15 30.00, LAYERFADE layer %, TL=X...),
-# answered OK (recognised) or BAD (not recognised); the STATUS block of the
+# answered OK (recognized) or BAD (not recognized); the STATUS block of the
 # return-codes topic, lines ended by CR LF.
 DL = "7thsense-delta"
 OK = {"ok": {"kind": "ack"}}
@@ -79,7 +79,7 @@ _d("artnet", {"input": True, "output": False}, "ARTNET inputenable=y outputenabl
 _d("external_control_comms", {"enabled": True}, "EXTCTRLCOMMS enable=true")
 _d("shutdown_pc", {"immediate": True}, "SHUTDOWN_PC immediate")
 _d("send_command", {"command": "TESTPATTERN pattern=grid enable=true"}, "TESTPATTERN pattern=grid enable=true")
-# An unrecognised command is answered BAD.
+# An unrecognized command is answered BAD.
 V.append({"spec": DL, "command": "send_command", "file": "send_command.bad", "input": {"command": "PLAYY"},
           "expect_wire": "PLAYY\r", "device_reply": "BAD\r\n", "expect_result": {"error": {"error": "device_error"}}})
 

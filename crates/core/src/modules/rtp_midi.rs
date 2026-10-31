@@ -15,7 +15,7 @@
 //!   version 2, the initiator's token, the sender's SSRC and, for `IN` and
 //!   `OK`, a NUL-terminated UTF-8 name, all 32-bit fields big-endian. An
 //!   unanswered invitation is sent again every second, twelve times.
-//! - Clock synchronisation (`CK`) runs on the data ports: `FF FF 'C' 'K'`,
+//! - Clock synchronization (`CK`) runs on the data ports: `FF FF 'C' 'K'`,
 //!   SSRC, a count byte and three unused, then three 64-bit timestamps in
 //!   units of 100 microseconds. The initiator sends count 0 with its time,
 //!   the responder count 1 adding its own, the initiator count 2 adding its
@@ -35,7 +35,7 @@
 //! then commands each after a delta time (1 to 4 bytes, 7 bits each, high bit
 //! set on all but the last; the first command's only when Z is set), running
 //! status within a packet, and SysEx whole or in segments
-//! (`F0..F0`, `F7..F0`, `F7..F7`, cancelled by `F7 F4`, a dropped F7 coded
+//! (`F0..F0`, `F7..F0`, `F7..F7`, canceled by `F7 F4`, a dropped F7 coded
 //! as F5). The core sends whole messages with delta times of 0, segments a
 //! SysEx longer than fits in one packet, and puts a recovery journal in
 //! every packet (J set; [`super::rtp_journal`]). After MIDI goes out it
@@ -54,8 +54,8 @@
 //! dropped.
 //!
 //! Liveness: a session gives no sign of the peer but its answers, so the
-//! peer's reply to each clock synchronisation is its proof of life and its
-//! round trip is the device's latency. Synchronisation runs every 1.5 s six
+//! peer's reply to each clock synchronization is its proof of life and its
+//! round trip is the device's latency. Synchronization runs every 1.5 s six
 //! times after joining, then every 10 s; three unanswered in a row end the
 //! session, which is then invited again after 1 s, doubling to 30 s, as after
 //! a refusal, an unanswered invitation or the peer's `BY`.
@@ -65,7 +65,7 @@
 //! and sends to the ports the invitations came from. Only the device's host
 //! may join when one is given, otherwise any host; while one host is in the
 //! session another's invitation is refused (`NO`). The initiator keeps the
-//! session with clock synchronisation, which the core answers (the round
+//! session with clock synchronization, which the core answers (the round
 //! trip of the exchange is the latency); Apple has it run at least once a
 //! minute, so a session with none for 90 s is ended (`BY`), and the core
 //! waits for an invitation again, as after the peer's `BY`.
@@ -102,7 +102,7 @@ const RETRY_MIN: Millis = 1000;
 const RETRY_MAX: Millis = 30_000;
 const GUARD_FIRST: Millis = 100;
 const GUARD_MAX: Millis = 1000;
-/// Hosting, a session whose initiator has not synchronised clocks for this
+/// Hosting, a session whose initiator has not synchronized clocks for this
 /// long is ended, and how often that is checked.
 const PEER_SYNC_TIMEOUT: Millis = 90_000;
 const WATCH_EVERY: Millis = 10_000;
@@ -143,7 +143,7 @@ pub(crate) struct Rtp {
     /// may join, if any.
     hosting: bool,
     only: Option<IpAddr>,
-    /// Hosting: when the initiator last synchronised clocks.
+    /// Hosting: when the initiator last synchronized clocks.
     last_sync: Millis,
     name: String,
     /// The local control port the operator fixed, if any.
@@ -164,7 +164,7 @@ pub(crate) struct Rtp {
     /// The last sequence number received, for feedback.
     received_seq: Option<u16>,
     feedback_armed: bool,
-    /// The timestamp of the clock synchronisation awaiting its answer.
+    /// The timestamp of the clock synchronization awaiting its answer.
     sync_sent: Option<u64>,
     syncs: u32,
     misses: u32,
@@ -1278,7 +1278,7 @@ mod tests {
         );
         let a = cx.take();
         assert!(a.contains(&Action::Connection(Connection::Connected)));
-        // Clock synchronisation starts at once, count 0 with our time.
+        // Clock synchronization starts at once, count 0 with our time.
         let s = sent(&a);
         assert_eq!(s[0].2, sync_packet(rtp.ssrc, 0, [200, 0, 0]));
         (rtp, token)
@@ -1299,7 +1299,7 @@ mod tests {
         let a = cx.take();
         assert!(a.contains(&Action::RoundTrip(5)));
         assert_eq!(sent(&a)[0].2, sync_packet(rtp.ssrc, 2, [200, 99_999, 250]));
-        // The peer's own synchronisation is answered.
+        // The peer's own synchronization is answered.
         let mut cx = Cx::new(30);
         rtp.datagram(
             &mut cx,
@@ -1598,7 +1598,7 @@ mod tests {
     #[test]
     fn a_hosted_session_is_joined_synchronised_and_left() {
         let mut rtp = hosted();
-        // The initiator's synchronisation is answered, and the end of its
+        // The initiator's synchronization is answered, and the end of its
         // exchange gives the round trip.
         let mut cx = Cx::new(30);
         rtp.datagram(
@@ -1727,7 +1727,7 @@ mod tests {
         section.extend_from_slice(&list);
         let (midi, _) = d.packet(&rtp_packet(1, &section)).unwrap();
         assert_eq!(midi, [0x90, 60, 100, 0x90, 61, 101, 0xF8]);
-        // A long list (B set), a SysEx cancelled, then a dropped-F7 SysEx.
+        // A long list (B set), a SysEx canceled, then a dropped-F7 SysEx.
         let list = [
             0xF0, 1, 0xF0, 0x00, 0xF7, 0xF4, 0x00, 0xF0, 2, 3, 0xF5, 0x00, 0xC1, 9,
         ];

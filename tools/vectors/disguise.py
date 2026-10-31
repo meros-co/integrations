@@ -404,7 +404,7 @@ telemetry(DG, "easing-functions", inbound_http={"path": _SP + "easingfunctions",
 telemetry(DG, "sockpuppet-live-reread", inbound_http={"path": _SP + "live", "body": _ENV_OK},
           expect_then_send=[{"method": "GET", "target": _SP + "patches"}], expect_state={})
 
-# ── Colour: CDLs ──
+# ── Color: CDLs ──
 _dg("get_cdls", {}, "GET", "/api/session/colour/cdls")
 _dg("set_cdl", {"cdl": "wall grade", "slope_r": 1.1, "offset_b": -0.02, "power_g": 0.9, "saturation": 0.8},
     "POST", "/api/session/colour/cdl",

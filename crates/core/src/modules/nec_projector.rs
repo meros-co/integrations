@@ -664,7 +664,7 @@ impl NecProjector {
     fn data(&mut self, cx: &mut Cx, bytes: &[u8]) {
         self.buf.extend_from_slice(bytes);
         loop {
-            // Resynchronise on a plausible header: a reply's class byte.
+            // Resynchronize on a plausible header: a reply's class byte.
             let start = self
                 .buf
                 .iter()

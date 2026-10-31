@@ -1,5 +1,5 @@
 //! A core started for some devices: Sennheiser and Shure wireless only. Its
-//! catalogue, open and discovery know nothing else.
+//! catalog, open and discovery know nothing else.
 
 #![cfg(all(
     feature = "sennheiser-digital-6000",
@@ -55,7 +55,7 @@ fn the_catalogue_holds_only_the_selected_devices() {
     let mut expected = WIRELESS.to_vec();
     expected.sort();
     assert_eq!(ids, expected);
-    // The JSON every binding returns is the same catalogue.
+    // The JSON every binding returns is the same catalog.
     let catalog = api::catalog(&core);
     assert_eq!(
         catalog["devices"].as_object().unwrap().len(),

@@ -64,7 +64,7 @@ pub enum Event {
         source: String,
     },
     /// Events were discarded because the consumer fell behind: `count` state
-    /// patches (read each affected device's snapshot to resynchronise) and,
+    /// patches (read each affected device's snapshot to resynchronize) and,
     /// only past a ceiling of [`MESSAGE_CEILING`] queued events, `messages`
     /// message events, which cannot be recovered.
     Dropped {

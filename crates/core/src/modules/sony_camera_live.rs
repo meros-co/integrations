@@ -28,7 +28,7 @@ use super::*;
 pub(super) const LIVE: &str = "live";
 /// Ask the camera for the next image.
 pub(super) const LIVE_NEXT: Key = "live-next";
-/// The tunnelled HTTP live view of a pan/tilt body.
+/// The tunneled HTTP live view of a pan/tilt body.
 pub(super) const LIVE_HTTP: Key = "live-http";
 /// No data on that connection for too long, or time to open it again.
 pub(super) const LIVE_HTTP_WAIT: Key = "live-http-wait";
@@ -360,7 +360,7 @@ impl SonyCamera {
         }
     }
 
-    // ----- pan/tilt bodies: the tunnelled HTTP stream -----
+    // ----- pan/tilt bodies: the tunneled HTTP stream -----
 
     fn live_http_open(&mut self, cx: &mut Cx, url: &Url) {
         cx.tcp_open_ssh(LIVE_HTTP, self.tunnel(&url.host, url.port));

@@ -1209,7 +1209,7 @@ quirks:
       request returns none, and kept whole. A playlist deleted in ProPresenter
       keeps its last items in playlist_items until the device is opened
       again. Auto-advance can
-      only be cancelled (transport_layer_auto_advance_delete); the API has no
+      only be canceled (transport_layer_auto_advance_delete); the API has no
       way to turn it on. The RTMP stream key in the capture settings is never
       kept.
 '''

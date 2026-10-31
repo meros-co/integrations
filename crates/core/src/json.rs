@@ -1,7 +1,7 @@
 //! The JSON surface every binding exposes.
 //!
 //! Bindings pass JSON in and out and do nothing else, so the shape of every
-//! value a consumer sees is defined here, once. A binding that serialised
+//! value a consumer sees is defined here, once. A binding that serialized
 //! results itself could differ from the others in a field name or an omitted
 //! null; this module is why none can.
 

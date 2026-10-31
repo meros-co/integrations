@@ -1,7 +1,7 @@
 'use strict';
 
 // Drives a simulated Digital 6000 through the Node binding, proving the
-// binding passes the core's behaviour through unchanged: connection events,
+// binding passes the core's behavior through unchanged: connection events,
 // state, acknowledged commands, and errors as rejected promises.
 
 const test = require('node:test');

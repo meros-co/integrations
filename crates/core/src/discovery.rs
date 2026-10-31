@@ -25,7 +25,7 @@ use crate::catalog::Catalog;
 use crate::session::Services;
 
 /// Each discovery protocol and the specs whose devices it reports. A core
-/// runs a protocol only when its catalogue holds one of them: a build
+/// runs a protocol only when its catalog holds one of them: a build
 /// without that integration, or a core started for other devices, has no use
 /// for the protocol's traffic, and asking for it by name is an error.
 pub const PROTOCOLS: &[(&str, &[&str])] = &[
@@ -63,7 +63,7 @@ pub struct DiscoverRequest {
     /// RTP-MIDI sessions, NMOS Nodes and registries), `dns-sd` (NMOS
     /// registries advertised in unicast DNS) and `umbra` (DMXControl 3).
     /// Empty means every protocol that finds a device in this core's
-    /// catalogue; naming one that finds none of them is an error.
+    /// catalog; naming one that finds none of them is an error.
     #[serde(default)]
     pub protocols: Vec<String>,
     /// Addresses where devices were last seen. An MCP scan also sweeps their
@@ -132,7 +132,7 @@ pub(crate) struct Discovery {
     mdns: crate::mdns::Mdns,
     #[cfg(feature = "nmos-registry")]
     dns_sd: crate::dns_sd::DnsSd,
-    /// The protocols that find a device in the core's catalogue.
+    /// The protocols that find a device in the core's catalog.
     available: Vec<&'static str>,
 }
 

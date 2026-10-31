@@ -1082,7 +1082,7 @@ impl Qsys {
         }
     }
 
-    /// A catalogue reply into `design.components`: each component's type,
+    /// A catalog reply into `design.components`: each component's type,
     /// and its controls' names once they are read.
     fn catalogue(&mut self, cx: &mut Cx, method: &str, result: &Value) {
         match method {
@@ -1373,7 +1373,7 @@ impl Qsys {
                 self.engine(cx, status);
             }
         } else if p.purpose == Purpose::Catalogue {
-            // Names only: the values a catalogue read carries are not kept,
+            // Names only: the values a catalog read carries are not kept,
             // since nothing keeps them current.
             self.catalogue(cx, &p.method, &result);
         } else if let Some(patch) = result_patch(&p.method, &result) {

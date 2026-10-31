@@ -1,6 +1,6 @@
 """Generate an SNMP integration's spec sections and the native module's
 profile from the vendor's MIB, which is not kept in this repository (its
-licence is the vendor's): download it, then
+license is the vendor's): download it, then
 
     python tools/generate_snmp_profile.py <spec-id> <mib file>
 

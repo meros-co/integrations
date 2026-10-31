@@ -262,7 +262,7 @@ pub struct CoreOptions {
     /// The integrations this core works with: spec ids, vendor groups
     /// (`vendor-sennheiser`: those of the vendor's integrations in the build)
     /// or `all`. Absent means every integration in the build. With a list,
-    /// the catalogue holds only those specs, opening any other device fails
+    /// the catalog holds only those specs, opening any other device fails
     /// with `not_selected`, discovery runs only the protocols that find them,
     /// and only they are reported as discovered. A name the build does not
     /// include fails construction.
@@ -371,7 +371,7 @@ impl Core {
     }
 
     /// The discovery protocols this core runs: those that find a device in
-    /// its catalogue ([`DISCOVERY_PROTOCOLS`] says which finds which).
+    /// its catalog ([`DISCOVERY_PROTOCOLS`] says which finds which).
     pub fn discovery_protocols(&self) -> &[&'static str] {
         self.discovery.protocols()
     }

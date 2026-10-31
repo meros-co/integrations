@@ -3,7 +3,7 @@
 //! live view from a URL on their own localhost, and video-only cameras serve
 //! their MediaProfile and clips the same way. The core's HTTP client cannot
 //! reach a camera's localhost, so this module writes the request and reads
-//! the response from the tunnelled stream.
+//! the response from the tunneled stream.
 //!
 //! Only what those responses need is handled: a status line, headers, and a
 //! body framed by Content-Length, chunked transfer coding, or the end of the

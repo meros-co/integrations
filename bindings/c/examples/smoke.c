@@ -1,5 +1,5 @@
 /* Builds against meros_integrations.h and the static library, and exercises
- * the interface from C: start a core, read the catalogue, refuse a bad open
+ * the interface from C: start a core, read the catalog, refuse a bad open
  * and a stream or reconnect of a device that is not open, poll events, and
  * free everything it was given. */
 #include <stdio.h>

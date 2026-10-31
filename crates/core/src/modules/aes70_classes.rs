@@ -155,7 +155,7 @@ pub(crate) fn kind(class: &[u16]) -> Option<&'static str> {
         .map(|(_, n)| *n)
 }
 
-/// How a property's value is marshalled, and shown in state.
+/// How a property's value is marshaled, and shown in state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Ty {
     Bool,

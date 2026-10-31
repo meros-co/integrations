@@ -1007,7 +1007,7 @@ mod tests {
         }
         // 0 dB is 62, the document's own note (p.5).
         assert_eq!(LEVEL.encode(0.0), Some(0x62));
-        // Trim: "0dB = 40" (p.7); pan centre 25 (p.5).
+        // Trim: "0dB = 40" (p.7); pan center 25 (p.5).
         assert_eq!(TRIM.encode(0.0), Some(0x40));
         assert_eq!(PAN.encode(0.0), Some(0x25));
         assert_eq!(PAN.encode(100.0), Some(0x4A));
@@ -1050,7 +1050,7 @@ mod tests {
             ),
             hex("B0 63 40 B0 62 20 B0 06 3F B0 26 06")
         );
-        // Pan centre to LR (VX 07), p.5.
+        // Pan center to LR (VX 07), p.5.
         assert_eq!(
             b(
                 &mut m,

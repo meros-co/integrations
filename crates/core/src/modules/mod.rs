@@ -2,7 +2,7 @@
 //! module for each native one. A native module or native extension is
 //! compiled only with the feature of the integration (spec id) that uses it,
 //! the same feature that embeds the spec (build.rs), so a spec in the
-//! catalogue always has its module and no other integration's code is built.
+//! catalog always has its module and no other integration's code is built.
 //! A module shared by several integrations (one protocol, several product
 //! lines) is compiled when any of them is.
 
@@ -652,7 +652,7 @@ mod tests {
     }
 
     /// Every native module, opened with no port, uses the control port its
-    /// spec declares, so the catalogue's defaults are the ones in force.
+    /// spec declares, so the catalog's defaults are the ones in force.
     #[test]
     fn native_modules_use_the_control_port_their_spec_declares() {
         let catalog = Catalog::source_tree();

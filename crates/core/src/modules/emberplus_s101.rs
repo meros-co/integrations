@@ -44,7 +44,7 @@ pub(crate) const FLAG_EMPTY: u8 = 0x20;
 pub(crate) const GLOW_VERSION: [u8; 2] = [50, 2];
 
 /// "The payload size of an Ember+ packet is limited to 1024 bytes"
-/// (Behaviour rules, "Message length"). Longer messages are split.
+/// (Behavior rules, "Message length"). Longer messages are split.
 pub(crate) const MAX_PACKET_PAYLOAD: usize = 1024;
 
 /// A frame (or an assembled message) larger than this is not Ember+.

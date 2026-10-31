@@ -613,7 +613,7 @@ async fn simulated_camera(setup: impl FnOnce(&mut Camera)) -> (u16, Shared, mpsc
 
 /// The PTP 3 body: Alpha 7S III properties and controls.
 fn ptp3_body(c: &mut Camera) {
-    // White balance: auto; daylight, shade and colour temperature allowed.
+    // White balance: auto; daylight, shade and color temperature allowed.
     c.props.insert(
         0x5005,
         prop(UINT16, true, 0x0002, &[0x0002, 0x0004, 0x8011, 0x8012]),

@@ -152,7 +152,7 @@ async fn shure_end_to_end() {
     );
 
     core.close(id).await;
-    // The metering subscription is cancelled before the socket closes.
+    // The metering subscription is canceled before the socket closes.
     tokio::time::timeout(Duration::from_secs(2), async {
         while !received
             .lock()
@@ -167,7 +167,7 @@ async fn shure_end_to_end() {
 }
 
 /// Shutting down closes every device before returning: the metering
-/// subscription is cancelled on the wire by the time `close_all` returns, and
+/// subscription is canceled on the wire by the time `close_all` returns, and
 /// nothing new is accepted afterwards.
 #[tokio::test(flavor = "multi_thread")]
 async fn close_all_ends_what_each_device_started() {

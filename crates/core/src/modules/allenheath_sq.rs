@@ -209,7 +209,7 @@ pub(crate) static PAN_TABLE: &[(f64, u16)] = &[
     (100.0, 0x3FFF),
 ];
 
-/// CQ p.15: the same table with centre at 40 00.
+/// CQ p.15: the same table with center at 40 00.
 pub(crate) static CQ_PAN_TABLE: &[(f64, u16)] = &[
     (-100.0, 0x0000),
     (-90.0, 0x0333),

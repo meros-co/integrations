@@ -9,13 +9,13 @@ the committed spec or vector module differs from what it writes.
 DiGiCo publishes no copy of the command set. Its addresses, value types and
 ranges are restated here from the parameter table of DiGiCo's MIT-licensed
 Bitfocus Companion module (digico_osc.csv and digico_entities.csv), and the
-query, list and change-notice behaviour from that module's code: every
+query, list and change-notice behavior from that module's code: every
 address below a strip number is a parameter, a query is the address with
 "/?" appended and no arguments (or one int, an index), the console answers
 on the address itself and sends "<path>/!" when something under <path>
 changed. Times are sent in seconds (the module divides milliseconds by
 1000), levels in dB, frequencies in Hz. Nothing of it is documented by
-DiGiCo, so every behaviour is a quirk and a VERIFICATION.md item.
+DiGiCo, so every behavior is a quirk and a VERIFICATION.md item.
 """
 import json
 import struct
@@ -232,14 +232,14 @@ def dynamics(mode_leaf, gate_mode=False):
           "Multiband compressor low-pass crossover in Hz, 20 to 20000.", "comp_lp_crossover"),
         P("Dynamics/comp_HP_crossover", "dynamics.compressor.hp_crossover", N(20, 20000, "Hz"), "HP crossover",
           "Multiband compressor high-pass crossover in Hz, 20 to 20000.", "comp_hp_crossover"),
-        P("Dynamics/desser_centre_freq", "dynamics.de_esser.centre", R(0, 255), "De-esser centre",
-          "De-esser centre frequency as the console's number, 0 to 255; the source gives no unit.",
+        P("Dynamics/desser_centre_freq", "dynamics.de_esser.centre", R(0, 255), "De-esser center",
+          "De-esser center frequency as the console's number, 0 to 255; the source gives no unit.",
           "de_esser_centre"),
         P("Dynamics/desser_freq_width", "dynamics.de_esser.width", R(0, 255), "De-esser width",
           "De-esser frequency width as the console's number, 0 to 255; the source gives no unit.",
           "de_esser_width"),
-        P("Dynamics/gate_centre_freq", "dynamics.gate.key_centre", R(0, 255), "Gate key centre",
-          "Gate or ducker key filter centre frequency as the console's number, 0 to 255; the source gives no "
+        P("Dynamics/gate_centre_freq", "dynamics.gate.key_centre", R(0, 255), "Gate key center",
+          "Gate or ducker key filter center frequency as the console's number, 0 to 255; the source gives no "
           "unit.", "gate_key_centre"),
         P("Dynamics/gate_freq_width", "dynamics.gate.key_width", R(0, 255), "Gate key width",
           "Gate or ducker key filter width as the console's number, 0 to 255; the source gives no unit.",
@@ -267,10 +267,10 @@ INPUT_ONLY = [
     P("Channel_Input/phantom", "phantom", B(), "Phantom power", "True switches 48 V phantom power on.", "phantom"),
     P("Channel_Input/alt_phantom", "alt_phantom", B(), "Alternate phantom power",
       "True switches 48 V phantom power on for the alternate input.", "alt_phantom"),
-    P("Channel_Input/analog_gain", "analog_gain", N(-20, 60, "dB"), "Analogue gain",
-      "Analogue preamp gain in dB, -20 to +60.", "analog_gain"),
-    P("Channel_Input/alt_analog_gain", "alt_analog_gain", N(-20, 60, "dB"), "Alternate analogue gain",
-      "Analogue preamp gain of the alternate input in dB, -20 to +60.", "alt_analog_gain"),
+    P("Channel_Input/analog_gain", "analog_gain", N(-20, 60, "dB"), "Analog gain",
+      "Analog preamp gain in dB, -20 to +60.", "analog_gain"),
+    P("Channel_Input/alt_analog_gain", "alt_analog_gain", N(-20, 60, "dB"), "Alternate analog gain",
+      "Analog preamp gain of the alternate input in dB, -20 to +60.", "alt_analog_gain"),
     P("Channel_Input/input_pad", "pad", B(), "Pad", "True switches the input pad in.", "pad"),
     P("Channel_Input/alt_input_pad", "alt_pad", B(), "Alternate pad",
       "True switches the alternate input's pad in.", "alt_pad"),
@@ -849,7 +849,7 @@ category: mixer
 # digico-sd spec), it reads back: state is read on opening and kept current
 # from what the console sends. DiGiCo does not publish the command set; it is
 # taken from DiGiCo's own MIT-licensed Bitfocus Companion module, and every
-# behaviour is inferred (quirks, VERIFICATION.md). This file is written by
+# behavior is inferred (quirks, VERIFICATION.md). This file is written by
 # tools/generate_digico_pad.py.
 
 source:
@@ -864,7 +864,7 @@ source:
       Enable column, and Load: the iPad command set for the console (one for SD8, SD9 and SD11, another
       for SD5, SD7 and SD10), loaded once, Clear All before loading another. The console's Local IP
       address at the bottom of the panel (pages 1-2). It does not list the commands.
-  - title: companion-module-digico-osc (Bitfocus Companion module, MIT licence)
+  - title: companion-module-digico-osc (Bitfocus Companion module, MIT license)
     author: DiGiCo and Bitfocus AS contributors
     url: https://github.com/bitfocus/companion-module-digico-osc/tree/0d5290d3ef85bad58057aa6917f84e5435ab8ed9
     note: >
@@ -974,7 +974,7 @@ QUIRKS = """quirks:
     severity: info
     text: >
       DiGiCo does not document the DiGiCo Pad command set. Every address, type, range, unit and
-      behaviour here is taken from DiGiCo's MIT-licensed Bitfocus Companion module (its parameter table
+      behavior here is taken from DiGiCo's MIT-licensed Bitfocus Companion module (its parameter table
       and code); TN324 documents only how the device is set up. Each is listed in VERIFICATION.md to be
       checked on a console. Where DiGiCo's own documents say otherwise, they win.
 
@@ -1017,7 +1017,7 @@ QUIRKS = """quirks:
     text: >
       Units: levels and gains are in dB, frequencies in Hz, times in seconds (the module's table gives
       milliseconds with a scale of 1000, so the console takes and sends seconds), fine delay in samples,
-      pans from -1 to +1. A fader at -150 dB is the bottom of its travel. De-esser and gate key centre
+      pans from -1 to +1. A fader at -150 dB is the bottom of its travel. De-esser and gate key center
       and width, the EQ curve, dynamic EQ over/under, the solo bus, a group's send tap, the input type,
       the gate mode and macro button states are kept as the console's numbers: the source does not
       say what they mean.

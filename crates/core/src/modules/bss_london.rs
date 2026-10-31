@@ -12,7 +12,7 @@
 //! - Over Ethernet nothing is acknowledged: a set is unverified. A
 //!   subscription is answered by a SET (or SET%, or SET STRING) carrying the
 //!   current value and then by one on every change, or periodically for a
-//!   meter. A read is a subscription cancelled once its value has arrived.
+//!   meter. A read is a subscription canceled once its value has arrived.
 //! - Addresses come from the London Architect design, so commands take them
 //!   as parameters; the `subscriptions` setting lists what to keep current.
 //!   Subscriptions are made again after every reconnection.

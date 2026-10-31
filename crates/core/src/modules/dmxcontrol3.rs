@@ -2834,7 +2834,7 @@ mod tests {
         let requests = rig.feed_server(actions);
         assert!(
             requests.iter().any(|r| matches!(r, Request::Cancel { .. })),
-            "the call is cancelled"
+            "the call is canceled"
         );
     }
 

@@ -700,7 +700,7 @@ fn numbers_of(node: Node) -> Map<String, Value> {
 }
 
 /// A layer's or an input's own position (as `transform`, beside the input's
-/// playback position), crop and colour correction, when vMix reports them.
+/// playback position), crop and color correction, when vMix reports them.
 fn placement(node: Node, entry: &mut Map<String, Value>) {
     for (element, key) in [("position", "transform"), ("crop", "crop"), ("cc", "cc")] {
         if let Some(found) = child(node, element) {
@@ -787,7 +787,7 @@ fn read_input(node: Node, numbers: &BTreeMap<&str, i64>) -> Map<String, Value> {
     placement(node, &mut entry);
 
     // Title fields, by index: `<text index="0" name="Headline.Text">Hello</text>`,
-    // and the same for images and colours.
+    // and the same for images and colors.
     for (element, key) in [("text", "texts"), ("image", "images"), ("color", "colors")] {
         for field in node.children().filter(|n| n.has_tag_name(element)) {
             let Some(index) = field.attribute("index") else {
@@ -2033,7 +2033,7 @@ mod tests {
     }
 
     /// Inputs in the shape vMix 27 reports them: a clip, a GT title, a list,
-    /// a video call and an input with layers, position, crop and colour
+    /// a video call and an input with layers, position, crop and color
     /// correction.
     const INPUTS_XML: &str = r#"<vmix><version>27.0.0.49</version><edition>Pro</edition><inputs><input key="clip" number="1" type="Video" title="Opener.mp4" shortTitle="Opener" state="Running" position="12345.6" duration="60000" loop="True" muted="False" volume="100" balance="0" solo="False" soloPFL="False" audiobusses="M" meterF1="0" meterF2="0" gainDb="0" selectedIndex="1" markIn="1000" markOut="50000" frameDelay="2" volumeF1="1" volumeF2="1">Opener.mp4</input><input key="gt" number="2" type="GT" title="Lower third.gtzip" shortTitle="Lower third" state="Paused" position="0" duration="0" loop="False" selectedIndex="0">Lower third.gtzip<text index="0" name="Headline.Text">Hello  world</text><text index="1" name="Description.Text"></text><image index="2" name="Logo.Source">C:\Logos\logo.png</image><color index="3" name="Bar.Fill.Color">#FF0000FF</color></input><input key="list" number="3" type="VideoList" title="Clips" state="Paused" position="0" duration="0" loop="False" selectedIndex="2">Clips<list><item>C:\Clips\a.mp4</item><item selected="true">C:\Clips\b.mp4</item></list></input><input key="call" number="4" type="VideoCall" title="Guest" state="Running" position="0" duration="0" loop="False" muted="False" volume="100" audiobusses="M" callPassword="secret" callConnected="True" callVideoSource="Output1" callAudioSource="Master">Guest</input><input key="pip" number="5" type="Colour" title="PiP" state="Paused" position="0" duration="0" loop="False">PiP<overlay index="0" key="clip"><position panX="-0.5" panY="0.5" zoomX="0.5" zoomY="0.5"/><crop X1="0" Y1="0" X2="1" Y2="0.9"/></overlay><overlay index="9" key="gone"/><position panX="0.1" zoomX="1.5" zoomY="1.5"/><crop X1="0.1" Y1="0" X2="1" Y2="1"/><cc hue="0.2" saturation="0" liftR="0.1" gainY="1.2"/></input></inputs><preview>2</preview><active>1</active></vmix>"#;
 

@@ -2301,7 +2301,7 @@ impl Atem {
                 let index = (int(params, "generator") - 1).clamp(0, 255) as u8;
                 if !self.topology.color_generators.contains(&index) {
                     return Err(invalid(format!(
-                        "colour generator {} does not exist",
+                        "color generator {} does not exist",
                         index as u32 + 1
                     )));
                 }
@@ -2775,7 +2775,7 @@ impl Atem {
                 one(b"CRSS", b)
             }
             // Camera control (CCmd): category 0 lens, 1 video; lens 0 focus,
-            // 3 aperture normalised, 9 continuous zoom speed; video 2 manual
+            // 3 aperture normalized, 9 continuous zoom speed; video 2 manual
             // white balance, 5 exposure in us, 13 gain in dB (camera-control
             // `ids.d.ts` and the data types in `commandSender/baseGenerator.ts`
             // lensFocus, lensIrisNormalised, lensSetContinuousZoomSpeed,

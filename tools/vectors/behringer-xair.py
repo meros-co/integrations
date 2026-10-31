@@ -23,7 +23,7 @@ _XA_NUMBERED = [
 # Single strips: (command stem, wire prefix).
 _XA_SINGLE = [("aux", "/rtn/aux"), ("main", "/lr")]
 
-# Fader, mute, name and colour on every strip.
+# Fader, mute, name and color on every strip.
 for stem, p, pre in _XA_NUMBERED:
     n = 4 if stem != "channel" else 16
     binary(XA, f"set_{stem}_fader", {p: n, "level": 0.75}, osc(f"{pre(n)}/mix/fader", ("f", 0.75)))

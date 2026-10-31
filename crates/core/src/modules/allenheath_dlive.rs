@@ -12,9 +12,9 @@
 //!   (40), PEQ (1A-29), HPF (30, 31): NRPN with the channel as parameter MSB
 //!   and a 7-bit value (p.2-7).
 //! - SysEx header `F0 00 00 1A 50 10 01 00`, then `0N` (the channel type's
-//!   MIDI channel): names, colours, send levels and assignments, preamp pad
+//!   MIDI channel): names, colors, send levels and assignments, preamp pad
 //!   and phantom power, and every "get" (`0N 05 ...`) (p.2-7). Avantis
-//!   documents only the name and colour gets.
+//!   documents only the name and color gets.
 //! - Preamp gain is Pitch Bend on the base channel, `EN MP GV` (p.4).
 //! - Scenes are bank (CC 00) and Program Change on the base channel; the
 //!   MixRack and Avantis recall scenes 1-500 and send the same message when a
@@ -861,7 +861,7 @@ impl Dlive {
             (0x02 | 0x03, [note, name @ ..]) => channel(*note)
                 .map(|p| vec![(format!("{p}.name"), Value::from(midi::read_name(name)))])
                 .unwrap_or_default(),
-            // Colour reply (05) or set (06).
+            // Color reply (05) or set (06).
             (0x05 | 0x06, [note, col]) => match (channel(*note), COLOURS.get(*col as usize)) {
                 (Some(p), Some(c)) => vec![(format!("{p}.colour"), Value::from(*c))],
                 _ => Vec::new(),
@@ -1068,7 +1068,7 @@ mod tests {
             ),
             [h("0B 0C 3F 00"), h("0B 0A 3F")].concat()
         );
-        // Name and colour, p.4: "A" is 41, Red is 01.
+        // Name and color, p.4: "A" is 41, Red is 01.
         assert_eq!(
             b(
                 &mut m,
@@ -1303,7 +1303,7 @@ mod tests {
         let s = state(&feed(&mut m, 10, &hex("B0 00 01 C0 00")));
         assert_eq!(s["cue"]["last_recall_id"], 128);
         let all = drain_sync(&mut m, &a);
-        // Name and colour for 509 channels, mute for all, fader for all but
+        // Name and color for 509 channels, mute for all, fader for all but
         // mute groups, main assignment for inputs; no preamps on a Surface.
         assert_eq!(all.len(), 509 * 3 + 501 + 128);
         assert_eq!(all[0], h("00 01 00"));

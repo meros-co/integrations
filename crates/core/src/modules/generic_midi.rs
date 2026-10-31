@@ -28,7 +28,7 @@
 //!
 //! MIDI carries no acknowledgement, so every command is `unverified`.
 //! Opening for commands only changes nothing: the module asks the device for
-//! nothing, and an RTP-MIDI session's clock synchronisation is part of
+//! nothing, and an RTP-MIDI session's clock synchronization is part of
 //! keeping the session, not monitoring.
 
 use std::net::SocketAddr;
@@ -1460,7 +1460,7 @@ mod tests {
                 0xB0, 7, 99, // volume
                 0xB0, 0, 1, 0xB0, 32, 2, 0xC0, 9, // bank and program
                 0xB0, 99, 1, 0xB0, 98, 2, 0xB0, 6, 3, 0xB0, 38, 4, // NRPN 130 = 3/4
-                0xE0, 0, 0x40, // pitch bend centre
+                0xE0, 0, 0x40, // pitch bend center
                 0xF8, 0xFE, // clock, active sensing: not reported
                 0xFA,
             ],

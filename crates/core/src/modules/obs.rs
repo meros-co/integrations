@@ -1740,7 +1740,7 @@ impl Module for Obs {
             cx.complete(id, Err(CommandError::NotConnected));
             return;
         }
-        // The catalogue has already checked the command and its parameters.
+        // The catalog has already checked the command and its parameters.
         let (request_type, data) = request_for(name, params);
         let then = self.then_read(name, params);
         self.request(cx, Purpose::Command { id, then }, &request_type, data);

@@ -413,7 +413,7 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                    for e in doc.get("ports") or [] if isinstance(e, dict)):
             errors.append("the extension 'ma-msc-ethernet' needs a udp feedback port, listener core, setting msc_port")
     if native:
-        # Wire behaviour lives in the Rust module; the spec is catalogue only.
+        # Wire behavior lives in the Rust module; the spec is catalog only.
         if not doc.get("reason"):
             errors.append("implementation: native requires a 'reason'")
         for key in ("transport", "on_connect", "codes", "telemetry"):

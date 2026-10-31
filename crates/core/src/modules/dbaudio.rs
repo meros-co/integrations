@@ -2,7 +2,7 @@
 //! the amplifiers' objects named and their controls as commands.
 //!
 //! d&b publishes its amplifiers' AES70 objects in its own integration
-//! plug-ins: the Q-SYS plug-in (a Lua script under a BSD-style licence) lists
+//! plug-ins: the Q-SYS plug-in (a Lua script under a BSD-style license) lists
 //! the object numbers of each amplifier family, and the AMX module's
 //! interface specification gives the OCP.1 port and an example PDU. The
 //! object numbers are built from four fields, `type << 28 | record << 20 |

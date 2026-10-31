@@ -5,7 +5,7 @@
 //! define it: a POST of {"body", "sign", "pId", "timeStamp"} whose sign is
 //! Base64 of the hexadecimal MD5 of timeStamp + pId, and a timeStamp within a
 //! minute of its own clock (it answers status 11, incorrect device time,
-//! otherwise). It serves the initialisation status, a screen list, a
+//! otherwise). It serves the initialization status, a screen list, a
 //! screen's brightness and the current preset, sets the brightness and loads
 //! presets.
 

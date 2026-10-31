@@ -4,7 +4,7 @@
 //! Each stream is a `direct-tcpip` channel. Streams to the same device with the
 //! same login share one SSH session, so a protocol needing two connections
 //! (PTP-IP's command and event connections) logs in once. To the module a
-//! tunnelled stream looks like any TCP stream: `Connected`, `Data`, `Closed`.
+//! tunneled stream looks like any TCP stream: `Connected`, `Data`, `Closed`.
 //!
 //! A host key that does not match the configured fingerprint, or a login the
 //! device refuses, closes the stream with a reason starting `ssh refused:`.

@@ -356,7 +356,7 @@ impl Client {
                         self.calls.remove(&call);
                         let status = match reason {
                             http2::CANCEL => {
-                                Status::new(code::CANCELLED, "the server cancelled the call")
+                                Status::new(code::CANCELLED, "the server canceled the call")
                             }
                             0x7 => Status::new(code::UNAVAILABLE, "the server refused the stream"),
                             other => Status::new(
@@ -838,7 +838,7 @@ mod tests {
                 call,
                 status: Status {
                     code: code::CANCELLED,
-                    message: "the server cancelled the call".into()
+                    message: "the server canceled the call".into()
                 }
             }]
         );

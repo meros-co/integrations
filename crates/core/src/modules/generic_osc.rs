@@ -1,4 +1,4 @@
-//! Generic OSC: send any OSC message to a device the catalogue does not cover
+//! Generic OSC: send any OSC message to a device the catalog does not cover
 //! yet, and keep what it sends back.
 //!
 //! Wire format from The Open Sound Control 1.0 Specification (Matt Wright,
