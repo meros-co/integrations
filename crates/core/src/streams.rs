@@ -505,8 +505,6 @@ mod tests {
             shared_tcp: Default::default(),
             http: crate::http::HttpClients::new().unwrap(),
             streams: Default::default(),
-            serial: Arc::new(crate::serial::HostPorts),
-            midi: Arc::new(crate::midi_ports::HostMidi),
         });
         let calls = Arc::new(Mutex::new(Vec::new()));
         let snapshot = Arc::new(Mutex::new(DeviceSnapshot {

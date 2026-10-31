@@ -57,34 +57,6 @@ to build with.
 `cargo test -p meros-integrations-c` plays the shared script, which needs a
 build with every integration (the default).
 
-## Serial ports
-
-A device can be reached on a serial port of this machine (RS-232, RS-422, a
-USB serial adapter): a serial-only device, or one whose spec offers both
-links, chosen with the `link` setting (`"tcp"` or `"serial"`). The
-`serial_port` setting names the port. `mi_serial_ports(core)` lists this
-machine's ports to choose from, as `{"ok":[{"name":"COM3"},...]}` (names
-only; empty on Android and iOS):
-`mi_open(core, "{\"device\":\"extron-matrix\",\"model\":\"mmx-42-62\",\"settings\":{\"link\":\"serial\",\"serial_port\":\"COM3\"}}")`
-needs no host.
-
-## MIDI ports
-
-A MIDI device can be reached on a MIDI port of this machine (a USB or other
-class-compliant MIDI interface or instrument, or another program's port):
-`generic-midi` and `midi-show-control` take the `link` setting `"port"` and
-name the ports in `midi_input` and `midi_output`. `mi_midi_ports(core)`
-lists this machine's ports to choose from, as
-`{"ok":[{"name":"...","input":true,"output":true},...]}` (empty in a build
-without a MIDI integration and on Android).
-
-On Linux the ALSA library is not linked: it is loaded when MIDI ports are
-first listed or opened, so building needs no ALSA headers and a machine
-without `libasound.so.2` (the `libasound2` or `alsa-lib` package) still
-runs; there the list is empty and a device on a MIDI port stays
-disconnected, its reason saying the ALSA library could not be loaded. The
-same holds on a machine without the ALSA sequencer (no sound support).
-
 ## Files sent to devices
 
 A command's `binary` parameter (a show file, a media file, an image) takes

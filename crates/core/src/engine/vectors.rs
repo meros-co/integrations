@@ -267,12 +267,7 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         .and_then(Value::as_object)
         .cloned()
         .unwrap_or_default();
-    // A serial port has no default; a vector need not name one.
-    let mut settings = settings;
-    for (name, value) in serial_port(spec) {
-        settings.entry(name).or_insert(value);
-    }
-    let settings = crate::catalog::validate_settings(&spec.settings, &settings, &model.id)
+    let settings = crate::catalog::validate(&spec.settings, &settings)
         .map_err(|e| format!("settings: {e}"))?;
     let ctx = OpenContext {
         host: HOST,
@@ -283,7 +278,6 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         settings,
         monitor: true,
     };
-    let link = spec.serial_link(&model.id, &ctx.settings);
     let mut engine = SpecEngine::new(Arc::new(spec.clone()), ctx)?;
     // Vectors check what is sent, not when: pacing (SPEC.md §2) has its own
     // engine tests.
@@ -291,13 +285,10 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     let mut cx = Cx::new(0);
     engine.start(&mut cx);
     let mut connected = cx.take();
-    check_link(link, &connected)?;
-    if connected.iter().any(|a| {
-        matches!(
-            a,
-            Action::TcpOpen { .. } | Action::TcpOpenTls { .. } | Action::SerialOpen { .. }
-        )
-    }) {
+    if connected
+        .iter()
+        .any(|a| matches!(a, Action::TcpOpen { .. } | Action::TcpOpenTls { .. }))
+    {
         let mut cx = Cx::new(1);
         engine.tcp(&mut cx, "device", TcpInput::Connected);
         // A login that waits for the device's prompts is given each in turn
@@ -691,12 +682,7 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         .cloned()
         .unwrap_or_default();
     let params = validate(&command_spec.params, &input).map_err(|e| format!("input: {e}"))?;
-    // A serial port has no default; a vector need not name one.
-    let mut settings = settings;
-    for (name, value) in serial_port(spec) {
-        settings.entry(name).or_insert(value);
-    }
-    let settings = crate::catalog::validate_settings(&spec.settings, &settings, &model.id)
+    let settings = crate::catalog::validate(&spec.settings, &settings)
         .map_err(|e| format!("settings: {e}"))?;
 
     let ctx = OpenContext {
@@ -708,7 +694,6 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         settings,
         monitor: true,
     };
-    let link = spec.serial_link(&model.id, &ctx.settings);
     let mut engine = SpecEngine::new(Arc::new(spec.clone()), ctx)?;
     // Vectors check what is sent, not when: pacing (SPEC.md §2) has its own
     // engine tests.
@@ -719,14 +704,11 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     let mut cx = Cx::new(0);
     engine.start(&mut cx);
     let started = cx.take();
-    check_link(link, &started)?;
     let mut cx = Cx::new(1);
-    if started.iter().any(|a| {
-        matches!(
-            a,
-            Action::TcpOpen { .. } | Action::TcpOpenTls { .. } | Action::SerialOpen { .. }
-        )
-    }) {
+    if started
+        .iter()
+        .any(|a| matches!(a, Action::TcpOpen { .. } | Action::TcpOpenTls { .. }))
+    {
         engine.tcp(&mut cx, "device", TcpInput::Connected);
         // A login that waits for the device's prompts is given each in turn
         // (Sharp's user name, then password).
@@ -810,8 +792,6 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         "a 01 OK01x",
         // Sharp NEC's ASCII control commands: every response starts with ">".
         ">ok",
-        // The Leitch pass-through prompt after each command (Videohub RS-422).
-        ">",
         // TEAC's TASCAM protocols: a return command (machine ID 0, then 8F,
         // the software version).
         "08F0100",
@@ -1129,32 +1109,6 @@ fn every_spec_driven_command_has_a_vector() {
     );
 }
 
-/// A spec reaching its device over TCP or a serial port (a `serial` block):
-/// the engine opened the link the vector's settings choose, so a vector with
-/// `link: serial` is played on the serial port.
-fn check_link(serial: Option<bool>, started: &[Action]) -> Result<(), String> {
-    let opened_serial = started
-        .iter()
-        .any(|a| matches!(a, Action::SerialOpen { .. }));
-    let opened_tcp = started
-        .iter()
-        .any(|a| matches!(a, Action::TcpOpen { .. } | Action::TcpOpenTls { .. }));
-    match serial {
-        Some(true) if !opened_serial => Err("link serial did not open the serial port".into()),
-        Some(false) if !opened_tcp => Err("link tcp did not open a TCP connection".into()),
-        _ => Ok(()),
-    }
-}
-
-/// A serial port for a spec that declares one, which has no default.
-fn serial_port(spec: &crate::catalog::DeviceSpec) -> crate::catalog::Params {
-    let mut given = crate::catalog::Params::new();
-    if spec.settings.contains_key("serial_port") {
-        given.insert("serial_port".into(), "COM1".into());
-    }
-    given
-}
-
 #[test]
 fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
     let catalog = Catalog::source_tree();
@@ -1188,17 +1142,13 @@ fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
             channels: model.channels,
             // With no value for a required setting (a token), the defaults
             // of the others, as a host opening it would have them.
-            settings: crate::catalog::validate_settings(
-                &spec.settings,
-                &serial_port(spec),
-                &model.id,
-            )
-            .unwrap_or_else(|_| {
-                spec.settings
-                    .iter()
-                    .filter_map(|(k, p)| p.default.clone().map(|d| (k.clone(), d)))
-                    .collect()
-            }),
+            settings: crate::catalog::validate(&spec.settings, &crate::catalog::Params::new())
+                .unwrap_or_else(|_| {
+                    spec.settings
+                        .iter()
+                        .filter_map(|(k, p)| p.default.clone().map(|d| (k.clone(), d)))
+                        .collect()
+                }),
             monitor: true,
         };
         if let Err(e) = SpecEngine::new(Arc::new(spec.clone()), ctx) {

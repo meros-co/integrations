@@ -25,16 +25,8 @@ transport:
     groups:
       pan_tilt: { match: "^#P", min_interval_ms: 300, by_model: [{ models: [fast], min_interval_ms: 150 }] }
       power: { match: "^POWR", after_ms: 5000 }
-  serial:
-    baud_rate: 9600
-    data_bits: 8
-    parity: none
-    stop_bits: 1
-    flow_control: none
-    overrides: { pacing: { min_interval_ms: 50, from: reply } }
 ports:
-  - { port: 9990, protocol: tcp, role: control, when: "link tcp" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial" }
+  - { port: 9990, protocol: tcp, role: control }
 models:
   - { id: m, name: M, supports: [pan, ask, power, both], verification: none }
   - { id: fast, name: Fast, supports: [pan, ask, power, both], verification: none }
@@ -179,18 +171,6 @@ fn polls_are_paced_like_commands() {
     assert_eq!(pace_timer(&a), Some(95));
     let a = at(100, |cx| e.timer(cx, PACE));
     assert_eq!(sent(&a), ["QSV"]);
-}
-
-#[test]
-fn a_serial_link_takes_the_pacing_its_overrides_give() {
-    let mut e = open("m", json!({"link": "serial", "serial_port": "COM9"}), false);
-    at(0, |cx| e.command(cx, 1, "pan", &speed(1)));
-    // 50 ms from the reply, not from the message.
-    reply(&mut e, 40);
-    let a = at(45, |cx| e.command(cx, 2, "pan", &speed(2)));
-    assert_eq!(pace_timer(&a), Some(45));
-    let a = at(90, |cx| e.timer(cx, PACE));
-    assert_eq!(sent(&a), ["#P2"]);
 }
 
 #[test]

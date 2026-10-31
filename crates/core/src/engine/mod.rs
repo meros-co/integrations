@@ -95,13 +95,9 @@ const RECONNECT_MAX: Millis = 30_000;
 
 #[derive(Debug)]
 enum Transport {
-    /// Text over TCP, or over a serial port of the host (`line-serial`),
-    /// which differs only in what is opened.
+    /// Text over TCP.
     LineTcp {
         port: u16,
-        /// `line-serial`: the port and its line settings, from the
-        /// settings (SPEC.md §2).
-        serial: Option<crate::module::SerialPort>,
         send: SendFraming,
         reply: ReplyFraming,
         ascii: bool,
@@ -206,7 +202,7 @@ fn keepalive_of(t: &Value, transport: &Transport) -> Result<Option<(Value, Milli
         return Ok(None);
     };
     if !matches!(transport, Transport::LineTcp { .. } | Transport::Ws { .. }) {
-        return Err("transport.keepalive is for line-tcp, line-serial and ws".into());
+        return Err("transport.keepalive is for line-tcp and ws".into());
     }
     let item = k
         .get("send")
@@ -1614,11 +1610,9 @@ impl SpecEngine {
     pub(crate) fn new(spec: Arc<DeviceSpec>, ctx: OpenContext) -> Result<SpecEngine, String> {
         let t = spec.transport.clone().ok_or("spec has no transport")?;
         let kind = str_field(&t, "type").ok_or("transport has no type")?;
-        // A serial port has no number: it is named in the settings. A
-        // device with no standard port (`port: null`, a program whose port
+        // A device with no standard port (`port: null`, a program whose port
         // the operator chooses) is opened with the port given.
         let spec_port = match t.get("port") {
-            _ if kind == "line-serial" => 0,
             Some(Value::Null) => match ctx.port {
                 Some(p) => p,
                 None => {
@@ -1631,9 +1625,6 @@ impl SpecEngine {
                 .and_then(Value::as_u64)
                 .ok_or("transport has no port")? as u16,
         };
-        if kind == "line-serial" && t.get("endpoints").is_some() {
-            return Err("transport.endpoints needs a network transport, not line-serial".into());
-        }
         // `https_port`: the default port when the operator chooses HTTPS.
         let https_port = match t.get("https_port") {
             None => None,
@@ -1690,25 +1681,13 @@ impl SpecEngine {
             );
         }
         let transport = match kind {
-            "line-tcp" | "line-serial" => {
-                // `line-serial`, or a `line-tcp` transport's `serial` block
-                // with the device's link on its serial port (SPEC.md §2),
-                // where the block's `overrides` replace the framing and
-                // reply keys the vendor documents differently there.
-                let on_serial = kind == "line-serial"
-                    || spec.serial_link(&ctx.model, &ctx.settings) == Some(true);
-                let mut t = t.clone();
-                if on_serial && kind == "line-tcp" {
-                    if let Some(map) = t.as_object_mut() {
-                        map.extend(spec.serial_overrides(&ctx.model));
-                    }
-                }
+            "line-tcp" => {
                 let framing = str_field(&t, "framing").unwrap_or("terminated");
                 let open = str_field(&t, "open").unwrap_or("").to_string();
                 let close = str_field(&t, "close").unwrap_or("").to_string();
                 // A delimited reply ends at `close`; with replies framed
-                // otherwise, `close` may be empty (a prefix only, such as
-                // Roland's STX on RS-232, or the payload as it is).
+                // otherwise, `close` may be empty (a prefix only, or the
+                // payload as it is).
                 if framing == "delimited"
                     && close.trim().is_empty()
                     && t.get("reply_framing").is_none()
@@ -1781,21 +1760,8 @@ impl SpecEngine {
                     Some(p) => Some(Regex::new(p).map_err(|e| format!("reply_match: {e}"))?),
                     None => None,
                 };
-                if on_serial && !spec.serial_model(&ctx.model) {
-                    return Err(format!(
-                        "model {} has no serial port for link serial: use link tcp",
-                        ctx.model
-                    ));
-                }
-                if !on_serial && spec.serial_block().is_some() && ctx.host.is_unspecified() {
-                    return Err("a TCP link needs the device's host".into());
-                }
                 Transport::LineTcp {
                     port,
-                    serial: match on_serial {
-                        true => Some(crate::module::SerialPort::from_settings(&ctx.settings)?),
-                        false => None,
-                    },
                     send,
                     reply,
                     ascii: str_field(&t, "encoding") != Some("utf-8"),
@@ -1805,8 +1771,7 @@ impl SpecEngine {
                         Some(p) => Some(Regex::new(p).map_err(|e| format!("error_match: {e}"))?),
                         None => None,
                     },
-                    // TLS is the TCP link's: a serial port has none.
-                    tls: (line_tls && !on_serial).then(|| {
+                    tls: line_tls.then(|| {
                         (
                             url_host(&ctx),
                             t.get("accept_invalid_certs").and_then(Value::as_bool) == Some(true),
@@ -2313,12 +2278,7 @@ impl SpecEngine {
         let sse = spec.telemetry.as_ref().and_then(|t| t.get("sse"));
         let events_json = sse.and_then(|e| str_field(e, "format")) == Some("json");
         let events_reply = as_reply_of(sse.and_then(|e| e.get("as_reply")), "telemetry.sse")?;
-        // `pacing`, or on a serial link the `pacing` its `overrides` give.
-        let serial_pacing = (kind == "line-tcp"
-            && spec.serial_link(&ctx.model, &ctx.settings) == Some(true))
-        .then(|| spec.serial_overrides(&ctx.model).remove("pacing"))
-        .flatten();
-        let pacer = Pacer::parse(serial_pacing.as_ref().or(t.get("pacing")), &ctx.model)?;
+        let pacer = Pacer::parse(t.get("pacing"), &ctx.model)?;
         let oauth = match &transport {
             Transport::Http {
                 auth: HttpAuth::OAuth2,
@@ -2523,8 +2483,7 @@ impl SpecEngine {
 
     /// A declared endpoint (`transport.endpoints`), by name.
     fn endpoint(&self, name: &str) -> Result<&Endpoint, String> {
-        // Beside a `serial` block, a device on its serial port may have been
-        // opened without a host: its HTTP servers cannot be reached then.
+        // A device opened without a host has no HTTP server to reach.
         if self.host.is_unspecified() {
             return Err(format!(
                 "endpoint '{name}' needs the device's host: open it with one to reach its HTTP server"
@@ -3816,14 +3775,11 @@ impl SpecEngine {
     fn connect(&mut self, cx: &mut Cx) {
         let replies = self.transport.replies();
         match &self.transport {
-            Transport::LineTcp {
-                reply, serial, tls, ..
-            } => {
+            Transport::LineTcp { reply, tls, .. } => {
                 self.framer = Some(Framer::new(reply.clone()));
                 let to = SocketAddr::new(self.host, self.port());
-                match (serial, tls) {
-                    (Some(port), _) => cx.serial_open(SOCKET, port.clone()),
-                    (None, Some((server_name, accept_invalid_certs))) => cx.tcp_open_tls(
+                match tls {
+                    Some((server_name, accept_invalid_certs)) => cx.tcp_open_tls(
                         SOCKET,
                         TlsTarget {
                             to,
@@ -3833,7 +3789,7 @@ impl SpecEngine {
                             alpn: Vec::new(),
                         },
                     ),
-                    (None, None) => cx.tcp_open(SOCKET, to),
+                    None => cx.tcp_open(SOCKET, to),
                 }
             }
             Transport::OscTcp { framing, .. } => {
@@ -3904,19 +3860,6 @@ impl SpecEngine {
         for (index, step) in steps.iter().enumerate().skip(from) {
             if !for_model(step, &self.ctx.model) {
                 continue;
-            }
-            // `link`: a step for the network or for the serial port only.
-            if let Some(link) = step.get("link").and_then(Value::as_str) {
-                let serial = matches!(
-                    self.transport,
-                    Transport::LineTcp {
-                        serial: Some(_),
-                        ..
-                    }
-                );
-                if (link == "serial") != serial {
-                    continue;
-                }
             }
             let (item, when_set, prompt, refused, accepted, await_reply) = match step {
                 Value::Object(m) if m.contains_key("send") => (
@@ -5729,12 +5672,11 @@ impl Module for SpecEngine {
             Ok(fresh) => fresh,
             Err(reason) => return SettingsUpdate::Rejected(reason),
         };
-        // Another serial port, or other line settings, or TLS turned on or
-        // off (and with it the port): the link is opened again, by building
-        // the device afresh.
+        // TLS turned on or off (and with it the port): the connection is
+        // opened again, by building the device afresh.
         let link = |e: &SpecEngine| match &e.transport {
-            Transport::LineTcp { serial, tls, .. } => (serial.clone(), tls.clone(), e.port()),
-            _ => (None, None, 0),
+            Transport::LineTcp { tls, .. } => (tls.clone(), e.port()),
+            _ => (None, 0),
         };
         if link(self) != link(&fresh) {
             return SettingsUpdate::Restart;
@@ -9875,63 +9817,6 @@ commands:
         assert_eq!(completed(&a), vec![(4, Err(CommandError::Timeout))]);
         assert!(!a.iter().any(|a| matches!(a, Action::TcpClose { .. })));
         assert_eq!(e.link, Connection::Connected);
-    }
-
-    #[test]
-    fn endpoints_beside_a_serial_link_need_the_host() {
-        let text = LINE_ENDPOINT.replace(
-            "  probe: ping\n",
-            "  probe: ping\n  serial: { baud_rate: 9600, data_bits: 8, parity: none, stop_bits: 1, flow_control: none }\n",
-        )
-        .replace(
-            "  - { port: 9993, protocol: tcp, role: control }\n",
-            "  - { port: 9993, protocol: tcp, role: control, when: \"link tcp\" }\n  - { port: null, protocol: serial, role: control, setting: serial_port, when: \"link serial\" }\n",
-        );
-        let spec = DeviceSpec::from_yaml(&text).unwrap();
-        let open = |host: IpAddr| {
-            let settings = crate::catalog::validate(
-                &spec.settings,
-                json!({"link": "serial", "serial_port": "COM9"})
-                    .as_object()
-                    .unwrap(),
-            )
-            .unwrap();
-            let mut e = SpecEngine::new(
-                Arc::new(spec.clone()),
-                OpenContext {
-                    host,
-                    host_name: None,
-                    port: None,
-                    model: "m".into(),
-                    channels: None,
-                    settings,
-                    monitor: false,
-                },
-            )
-            .unwrap();
-            let mut cx = Cx::new(0);
-            e.start(&mut cx);
-            assert!(cx
-                .take()
-                .iter()
-                .any(|a| matches!(a, Action::SerialOpen { .. })));
-            let mut cx = Cx::new(1);
-            e.command(&mut cx, 1, "csr", &Params::new());
-            cx.take()
-        };
-        // With a host, the endpoint is reached over the network.
-        let a = open(IpAddr::V4(Ipv4Addr::LOCALHOST));
-        assert_eq!(
-            requests(&a).remove(0).1.url,
-            "http://127.0.0.1:80/admin/api/v1/csr"
-        );
-        // Without one, there is no HTTP server to reach.
-        let a = open(IpAddr::V4(Ipv4Addr::UNSPECIFIED));
-        assert!(requests(&a).is_empty());
-        assert!(matches!(
-            completed(&a).as_slice(),
-            [(1, Err(CommandError::InvalidParams { message }))] if message.contains("needs the device's host")
-        ));
     }
 
     #[test]

@@ -93,18 +93,6 @@ impl NativeCore {
         Json(json::catalog(&self.core))
     }
 
-    /// The host's serial ports: `{ok: [{name}]}` or `{error}`.
-    #[napi]
-    pub fn serial_ports(&self) -> Json {
-        Json(json::serial_ports(&self.core))
-    }
-
-    /// The host's MIDI ports: `{ok: [{name, input, output}]}` or `{error}`.
-    #[napi]
-    pub fn midi_ports(&self) -> Json {
-        Json(json::midi_ports(&self.core))
-    }
-
     /// `{device}` or `{error}`.
     #[napi]
     pub fn open(&self, request: Json) -> Json {

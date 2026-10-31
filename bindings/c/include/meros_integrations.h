@@ -40,17 +40,6 @@ void mi_string_free(char *s);
 /* Every device spec: models, commands, parameters, quirks. */
 char *mi_catalog(const MiCore *core);
 
-/* The host's serial ports, for the serial_port setting of a device on one:
- * {"ok":[{"name":"COM3"},...]} or {"error":{...}}. Names only; empty on
- * Android and iOS. */
-char *mi_serial_ports(const MiCore *core);
-
-/* The host's MIDI ports, for the midi_input and midi_output settings of a
- * device on one: {"ok":[{"name":"...","input":true,"output":false},...]} or
- * {"error":{...}}. Empty in a build without a MIDI integration and on
- * Android. */
-char *mi_midi_ports(const MiCore *core);
-
 /* request: {"device":"<spec id>","model":"<model id>","host":"<ip or name>",
  *           "port":<optional>,"settings":{...},"monitor":<optional bool>}
  * "monitor":false opens the device for commands only: no subscription,

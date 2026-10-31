@@ -56,28 +56,6 @@ test('the shared binding script', async () => {
         case 'catalog':
           assert.deepStrictEqual(at(core.catalog(), step.path), step.expect, label);
           break;
-        case 'serial_ports': {
-          // Whatever ports this machine has: names only.
-          const result = core.serialPorts();
-          assert.ok(Array.isArray(result.ok), `${label}: ${JSON.stringify(result)}`);
-          for (const port of result.ok) {
-            assert.deepStrictEqual(Object.keys(port), ['name'], label);
-            assert.strictEqual(typeof port.name, 'string', label);
-          }
-          break;
-        }
-        case 'midi_ports': {
-          // Whatever ports this machine has: name, input, output.
-          const result = core.midiPorts();
-          assert.ok(Array.isArray(result.ok), `${label}: ${JSON.stringify(result)}`);
-          for (const port of result.ok) {
-            assert.deepStrictEqual(Object.keys(port).sort(), ['input', 'name', 'output'], label);
-            assert.strictEqual(typeof port.name, 'string', label);
-            assert.strictEqual(typeof port.input, 'boolean', label);
-            assert.strictEqual(typeof port.output, 'boolean', label);
-          }
-          break;
-        }
         case 'open': {
           const result = core.open(step.request);
           if (step.expect) assert.deepStrictEqual(stripMessages(result), step.expect, label);

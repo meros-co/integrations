@@ -68,20 +68,6 @@ class SharedScript(unittest.TestCase):
             op = step["op"]
             if op == "catalog":
                 self.assertEqual(at(json.loads(native.catalog()), step["path"]), step["expect"], label)
-            elif op == "serial_ports":
-                # Whatever ports this machine has: names only.
-                result = json.loads(native.serial_ports())
-                for port in result["ok"]:
-                    self.assertEqual(list(port), ["name"], label)
-                    self.assertIsInstance(port["name"], str, label)
-            elif op == "midi_ports":
-                # Whatever ports this machine has: name, input, output.
-                result = json.loads(native.midi_ports())
-                for port in result["ok"]:
-                    self.assertEqual(sorted(port), ["input", "name", "output"], label)
-                    self.assertIsInstance(port["name"], str, label)
-                    self.assertIsInstance(port["input"], bool, label)
-                    self.assertIsInstance(port["output"], bool, label)
             elif op == "open":
                 result = json.loads(native.open(json.dumps(step["request"])))
                 if "expect" in step:
@@ -152,12 +138,6 @@ class SharedScript(unittest.TestCase):
             core.execute(device, "route_video", {"input": -1, "output": 1})
         self.assertEqual(caught.exception.code, "invalid_params")
         core.close(device)
-        # Whatever serial ports this machine has, by name only.
-        for port in core.serial_ports():
-            self.assertEqual(list(port), ["name"])
-        # And MIDI ports, with their directions.
-        for port in core.midi_ports():
-            self.assertEqual(sorted(port), ["input", "name", "output"])
 
     def test_reconnect(self):
         core = Core(bind_address=LOOPBACK)

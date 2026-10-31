@@ -73,7 +73,6 @@ mod mcp_discovery;
 mod mdns;
 #[cfg(any(feature = "generic-midi", feature = "midi-show-control"))]
 mod midi;
-mod midi_ports;
 #[cfg(all(test, feature = "generic-midi"))]
 mod midi_session_tests;
 pub mod module;
@@ -86,9 +85,6 @@ mod oauth_validate_session_tests;
 mod pjlink_discovery;
 #[cfg(feature = "dmxcontrol3")]
 mod protobuf;
-mod serial;
-#[cfg(test)]
-mod serial_session_tests;
 mod session;
 #[cfg(feature = "sony-camera")]
 mod ssdp;
@@ -122,7 +118,6 @@ use tokio::sync::{mpsc, oneshot};
 pub use catalog::{Catalog, Params};
 pub use discovery::{DiscoverAction, DiscoverRequest, PROTOCOLS as DISCOVERY_PROTOCOLS};
 pub use events::Event;
-pub use midi_ports::MidiPortInfo;
 pub use module::{CommandError, CommandResult, Connection, Outcome};
 pub use session::{DeviceId, DeviceSnapshot};
 pub use streams::{Frame, StreamError, StreamHandle};
@@ -132,15 +127,6 @@ use session::{Services, Session, SessionMsg};
 
 /// Events held for a consumer that is not draining them.
 const EVENT_CAPACITY: usize = 10_000;
-
-/// A serial port of the host ([`Core::serial_ports`]).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SerialPortInfo {
-    /// What the `serial_port` setting takes: `COM3` on Windows, a device
-    /// path such as `/dev/ttyUSB0` (Linux) or `/dev/cu.usbserial-1420`
-    /// (macOS) elsewhere.
-    pub name: String,
-}
 
 /// How to reach one device.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -154,10 +140,7 @@ pub struct OpenRequest {
     /// keep the name, so a TLS certificate is checked against it. May be
     /// empty or left out for an integration on which only the core listens
     /// (every one of its `ports` is `listener: core`), such as `osc-listener`,
-    /// which hears any sender; it is then `0.0.0.0`. Likewise for a device
-    /// on a serial port or a MIDI port of the host (a `serial` or `midi`
-    /// entry in its `ports`): the port is named in its settings, and a
-    /// module that can also use the network refuses to do so without a host.
+    /// which hears any sender; it is then `0.0.0.0`.
     #[serde(default)]
     pub host: String,
     /// The device's port, when it is not the protocol's default: many devices
@@ -371,8 +354,6 @@ impl Core {
                 shared_tcp: Default::default(),
                 http: http::HttpClients::new().map_err(std::io::Error::other)?,
                 streams: Default::default(),
-                serial: Arc::new(serial::HostPorts),
-                midi: Arc::new(midi_ports::HostMidi),
             }),
             closing: AtomicBool::new(false),
             in_flight: Arc::new(AtomicUsize::new(0)),
@@ -386,56 +367,6 @@ impl Core {
     pub fn discover(&self, request: DiscoverRequest) -> Result<(), String> {
         let _runtime = self.runtime().enter();
         self.discovery.handle(&self.services, request)
-    }
-
-    /// This core with its serial ports opened through `ports`, for tests
-    /// that play a device on an in-memory port.
-    #[cfg(test)]
-    pub(crate) fn with_serial_ports(mut self, ports: Arc<dyn serial::SerialPorts>) -> Core {
-        Arc::get_mut(&mut self.services)
-            .expect("set before any device is opened")
-            .serial = ports;
-        self
-    }
-
-    /// This core with its MIDI ports opened through `ports`, for tests that
-    /// play a device on an in-memory port.
-    #[cfg(test)]
-    pub(crate) fn with_midi_ports(mut self, ports: Arc<dyn midi_ports::MidiPorts>) -> Core {
-        Arc::get_mut(&mut self.services)
-            .expect("set before any device is opened")
-            .midi = ports;
-        self
-    }
-
-    /// The host's MIDI ports, for a consumer choosing the ones a device on a
-    /// MIDI port uses (the `midi_input` and `midi_output` settings): each
-    /// name, and whether it is an input, an output or both. Empty in a build
-    /// without a MIDI integration, on Android, and on a host whose MIDI
-    /// system cannot be reached (on Linux: no `libasound.so.2`, which is
-    /// loaded at first use rather than linked, or no ALSA sequencer).
-    pub fn midi_ports(&self) -> Result<Vec<MidiPortInfo>, String> {
-        self.services
-            .midi
-            .list()
-            .map_err(|e| format!("MIDI ports could not be listed: {e}"))
-    }
-
-    /// The host's serial ports, for a consumer choosing the one a device on
-    /// a serial port is wired to (the `serial_port` setting). Names only:
-    /// the port library gives no description or USB ids. Empty on Android
-    /// and iOS, which have no serial port an app can open.
-    pub fn serial_ports(&self) -> Result<Vec<SerialPortInfo>, String> {
-        self.services
-            .serial
-            .list()
-            .map(|names| {
-                names
-                    .into_iter()
-                    .map(|name| SerialPortInfo { name })
-                    .collect()
-            })
-            .map_err(|e| format!("serial ports could not be listed: {e}"))
     }
 
     /// The discovery protocols this core runs: those that find a device in
@@ -475,41 +406,10 @@ impl Core {
                 device: request.device.clone(),
                 model: request.model.clone(),
             })?;
-        let settings = catalog::validate_settings(&spec.settings, &request.settings, &model.id)
+        let settings = catalog::validate(&spec.settings, &request.settings)
             .map_err(|message| OpenError::InvalidSettings { message })?;
-        // A spec reaching the device over TCP or a serial port (a `serial`
-        // block): link serial needs the port and no host, link tcp a host.
-        let serial_link = spec.serial_link(&model.id, &settings);
-        if serial_link == Some(true) {
-            if !spec.serial_model(&model.id) {
-                return Err(OpenError::InvalidSettings {
-                    message: format!(
-                        "model {} has no serial port for link serial: use link tcp",
-                        model.id
-                    ),
-                });
-            }
-            if settings
-                .get("serial_port")
-                .and_then(crate::value::Value::as_str)
-                .is_none_or(|p| p.trim().is_empty())
-            {
-                return Err(OpenError::InvalidSettings {
-                    message: "link serial needs the serial_port setting: the host's serial port"
-                        .into(),
-                });
-            }
-        }
-        if serial_link == Some(false) && request.host.trim().is_empty() {
-            return Err(OpenError::UnresolvableHost {
-                host: String::new(),
-                message: "link tcp needs the device's host; link serial needs none".into(),
-            });
-        }
         let host = if request.host.trim().is_empty()
-            && (spec.core_listens_only()
-                || spec.uses_midi()
-                || (spec.uses_serial() && serial_link != Some(false)))
+            && (spec.core_listens_only() || spec.hosts_session(&settings))
         {
             IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)
         } else {
@@ -533,7 +433,6 @@ impl Core {
         })?;
         let reconfigure = session::Reconfigure {
             declared: spec.settings.clone(),
-            model: model.id.clone(),
             settings: context.settings.clone(),
             build: {
                 let spec = spec.clone();

@@ -75,10 +75,8 @@ pub struct DeviceSpec {
 pub struct PortSpec {
     /// The default; `None` when there is none and it must be given.
     pub port: Option<u16>,
-    /// `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls`, `ssh`, `serial`
-    /// (a serial port on the host, named by its `setting`, with no number),
-    /// `midi` (a MIDI port on the host, likewise) or `icmp` (ICMP echo, with
-    /// no number).
+    /// `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls`, `ssh` or `icmp`
+    /// (ICMP echo, with no number).
     pub protocol: String,
     /// `control` (where commands go; `OpenRequest::port` overrides it),
     /// `push`, `feedback`, `notification` or `discovery`.
@@ -196,12 +194,6 @@ pub struct ParamSpec {
     /// can set to silence, as its state reports it (SPEC.md §4).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub negative_infinity: bool,
-    /// The default for the models named here, in place of `default`: a
-    /// serial line setting whose factory value differs by model (a `serial`
-    /// block's `by_model`, SPEC.md §2). Listed in the catalogue; a spec does
-    /// not declare it on a setting itself.
-    #[serde(default, skip_deserializing, skip_serializing_if = "Option::is_none")]
-    pub default_by_model: Option<BTreeMap<String, Value>>,
     /// A setting that picks one of the account's things (a broadcast, a
     /// channel, a plan): it may be left empty when the device is opened, and
     /// `command` lists the choices (SPEC.md §2, "Settings chosen after
@@ -278,7 +270,7 @@ pub(crate) fn polls_answered(transport: &Value) -> bool {
     let reply = transport.get("reply").and_then(Value::as_str);
     match transport.get("type").and_then(Value::as_str) {
         Some("http" | "osc-tcp") => true,
-        Some("line-tcp" | "line-serial") => reply != Some("none"),
+        Some("line-tcp") => reply != Some("none"),
         Some("osc-udp" | "line-udp") => reply == Some("to-source"),
         Some("ws") => reply != Some("none") && transport.get("reply_match").is_some(),
         _ => false,
@@ -402,27 +394,20 @@ impl DeviceSpec {
         !self.ports.is_empty() && self.ports.iter().all(|p| p.listener == "core")
     }
 
-    /// Whether the device can be reached on a serial port of the host, so it
-    /// may be opened without a network host (SPEC.md §2, Ports).
-    pub fn uses_serial(&self) -> bool {
-        self.ports.iter().any(|p| p.protocol == "serial")
-    }
-
-    /// Whether the device can be reached on a MIDI port of the host, so it
-    /// may be opened without a network host (SPEC.md §2, Ports).
-    pub fn uses_midi(&self) -> bool {
-        self.ports.iter().any(|p| p.protocol == "midi")
+    /// Whether these (validated) settings have the core host a session for
+    /// any host to join (`link` `rtp_host`, the MIDI integrations' hosted
+    /// RTP-MIDI session), so the device can be opened without a host.
+    pub fn hosts_session(&self, settings: &Params) -> bool {
+        settings.get("link").and_then(Value::as_str) == Some("rtp_host")
     }
 
     pub fn model(&self, id: &str) -> Option<&ModelSpec> {
         self.models.iter().find(|m| m.id == id)
     }
 
-    /// Parse a spec, and add the settings its transport's `serial` block
-    /// stands for (SPEC.md §2, "The same protocol on a serial port").
+    /// Parse a spec, and add what its settings and telemetry imply.
     pub(crate) fn from_yaml(text: &str) -> Result<DeviceSpec, String> {
         let mut spec: DeviceSpec = crate::yaml::from_str(text).map_err(|e| e.to_string())?;
-        spec.expand_serial()?;
         spec.expand_select()?;
         spec.expand_polled()?;
         Ok(spec)
@@ -556,473 +541,6 @@ impl DeviceSpec {
         }
         Ok(())
     }
-
-    /// The `serial` block of a `line-tcp` transport: the same protocol on a
-    /// serial port of the host, chosen per device by the `link` setting.
-    pub(crate) fn serial_block(&self) -> Option<&Map<String, Value>> {
-        let t = self.transport.as_ref()?;
-        if t.get("type").and_then(Value::as_str) != Some("line-tcp") {
-            return None;
-        }
-        t.get("serial").and_then(Value::as_object)
-    }
-
-    /// Whether a device of `model` with these (validated) settings uses the
-    /// serial port: `None` for a spec with no `serial` block. With no `link`
-    /// given, a model in `serial_only` uses its serial port, any other the
-    /// network.
-    pub(crate) fn serial_link(&self, model: &str, settings: &Params) -> Option<bool> {
-        let block = self.serial_block()?;
-        Some(match settings.get("link").and_then(Value::as_str) {
-            Some(link) => link == "serial",
-            None => names_model(block.get("serial_only"), model),
-        })
-    }
-
-    /// Whether `model` has the serial port of the `serial` block: every model
-    /// unless `models` names some.
-    pub(crate) fn serial_model(&self, model: &str) -> bool {
-        self.serial_block().is_none_or(|b| match b.get("models") {
-            None => true,
-            some => names_model(some, model),
-        })
-    }
-
-    /// The transport keys that differ on the serial port for `model`: every
-    /// entry of the block's `overrides` that is for the model (one naming no
-    /// `models` is for all), laid over one another in order. Empty for a
-    /// spec with no `serial` block or no `overrides`.
-    pub(crate) fn serial_overrides(&self, model: &str) -> Map<String, Value> {
-        let mut out = Map::new();
-        let entries = match self.serial_block().and_then(|b| b.get("overrides")) {
-            Some(Value::Array(list)) => list.clone(),
-            Some(one) => vec![one.clone()],
-            None => return out,
-        };
-        for entry in entries.iter().filter_map(Value::as_object) {
-            if entry.contains_key("models") && !names_model(entry.get("models"), model) {
-                continue;
-            }
-            for (k, v) in entry {
-                if k != "models" {
-                    out.insert(k.clone(), v.clone());
-                }
-            }
-        }
-        out
-    }
-
-    /// Add the `link` setting and the six serial settings a `serial` block
-    /// stands for. A spec declaring any of them itself is refused, as is a
-    /// block that is not one the core can open a port with.
-    fn expand_serial(&mut self) -> Result<(), String> {
-        let Some(t) = self.transport.as_ref() else {
-            return Ok(());
-        };
-        let Some(block) = t.get("serial") else {
-            return Ok(());
-        };
-        if t.get("type").and_then(Value::as_str) != Some("line-tcp") {
-            return Err("transport.serial is for a line-tcp transport".into());
-        }
-        let block = block
-            .as_object()
-            .ok_or("transport.serial must be a mapping")?
-            .clone();
-        for key in block.keys() {
-            if ![
-                "link",
-                "serial_only",
-                "models",
-                "baud_rate",
-                "data_bits",
-                "parity",
-                "stop_bits",
-                "flow_control",
-                "overrides",
-            ]
-            .contains(&key.as_str())
-            {
-                return Err(format!("transport.serial.{key} is not a serial block key"));
-            }
-        }
-        for key in ["serial_only", "models"] {
-            if let Some(list) = block.get(key) {
-                let ids = list
-                    .as_array()
-                    .filter(|a| !a.is_empty())
-                    .ok_or(format!("transport.serial.{key} must list model ids"))?;
-                for id in ids {
-                    let id = id.as_str().unwrap_or_default();
-                    if self.model(id).is_none() {
-                        return Err(format!("transport.serial.{key}: no model '{id}'"));
-                    }
-                }
-            }
-        }
-        if let Some(overrides) = block.get("overrides") {
-            let entries = match overrides {
-                Value::Array(list) if !list.is_empty() => list.clone(),
-                Value::Object(_) => vec![overrides.clone()],
-                _ => {
-                    return Err(
-                        "transport.serial.overrides must be a mapping or a list of them".into(),
-                    )
-                }
-            };
-            for entry in &entries {
-                let entry = entry
-                    .as_object()
-                    .ok_or("transport.serial.overrides: each entry is a mapping")?;
-                for key in entry.keys() {
-                    if !SERIAL_OVERRIDES.contains(&key.as_str()) && key != "models" {
-                        return Err(format!(
-                            "transport.serial.overrides.{key}: not a framing, reply or pacing key a \
-                             serial port can change"
-                        ));
-                    }
-                }
-                if let Some(list) = entry.get("models") {
-                    let ids = list
-                        .as_array()
-                        .filter(|a| !a.is_empty())
-                        .ok_or("transport.serial.overrides.models must list model ids")?;
-                    for id in ids {
-                        let id = id.as_str().unwrap_or_default();
-                        if self.model(id).is_none() {
-                            return Err(format!(
-                                "transport.serial.overrides.models: no model '{id}'"
-                            ));
-                        }
-                    }
-                }
-            }
-        }
-        let link = match block.get("link") {
-            None => "tcp",
-            Some(v) => match v.as_str() {
-                Some(l @ ("tcp" | "serial")) => l,
-                _ => return Err("transport.serial.link must be tcp or serial".into()),
-            },
-        };
-        let only = block.contains_key("serial_only");
-        if link == "serial" && only {
-            return Err(
-                "transport.serial: serial_only names the models that default to \
-                        serial, so link stays tcp"
-                    .into(),
-            );
-        }
-        let mut add = BTreeMap::new();
-        add.insert(
-            "link".to_string(),
-            ParamSpec {
-                values: Some(vec!["tcp".into(), "serial".into()]),
-                default: (!only).then(|| Value::from(link)),
-                ..setting(
-                    ParamType::Enum,
-                    "Link",
-                    if only {
-                        "tcp reaches the device over the network at its host and port; serial \
-                         speaks the same protocol on a serial port of the host. Left out, the \
-                         models reached only on a serial port use serial, the others tcp."
-                    } else {
-                        "tcp reaches the device over the network at its host and port; serial \
-                         speaks the same protocol on a serial port of the host."
-                    },
-                )
-            },
-        );
-        add.insert(
-            "serial_port".to_string(),
-            ParamSpec {
-                max_length: Some(256),
-                ..setting(
-                    ParamType::String,
-                    "Serial port",
-                    "With link serial, the host's serial port wired to the device: COM3 on \
-                     Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS.",
-                )
-            },
-        );
-        let serial_models = block.get("models").cloned();
-        let line = |name: &str| -> Result<Line, String> {
-            match block.get(name) {
-                None => Err(format!(
-                    "transport.serial.{name}: give the device's documented value"
-                )),
-                Some(Value::Object(m)) => {
-                    for key in m.keys() {
-                        if !["default", "values", "by_model"].contains(&key.as_str()) {
-                            return Err(format!("transport.serial.{name}.{key}: not a key here"));
-                        }
-                    }
-                    let default = m
-                        .get("default")
-                        .cloned()
-                        .ok_or(format!("transport.serial.{name}: no default"))?;
-                    let values = m
-                        .get("values")
-                        .and_then(Value::as_array)
-                        .cloned()
-                        .ok_or(format!("transport.serial.{name}: no values"))?;
-                    if !values.contains(&default) {
-                        return Err(format!(
-                            "transport.serial.{name}: the default is not one of the values"
-                        ));
-                    }
-                    let entries = match m.get("by_model") {
-                        None => Vec::new(),
-                        Some(Value::Array(list)) if !list.is_empty() => list.clone(),
-                        Some(_) => {
-                            return Err(format!(
-                                "transport.serial.{name}.by_model: a list of {{models, default}}"
-                            ))
-                        }
-                    };
-                    let mut by_model = Vec::new();
-                    let mut seen = std::collections::BTreeSet::new();
-                    for entry in &entries {
-                        let Some(entry) = entry.as_object().filter(|e| {
-                            e.len() == 2 && e.contains_key("models") && e.contains_key("default")
-                        }) else {
-                            return Err(format!(
-                                "transport.serial.{name}.by_model: each entry is {{models, default}}"
-                            ));
-                        };
-                        let value = entry["default"].clone();
-                        if !values.contains(&value) {
-                            return Err(format!(
-                                "transport.serial.{name}.by_model: {value} is not one of the values"
-                            ));
-                        }
-                        let ids =
-                            entry["models"]
-                                .as_array()
-                                .filter(|a| !a.is_empty())
-                                .ok_or(format!(
-                                    "transport.serial.{name}.by_model: models must list model ids"
-                                ))?;
-                        let mut names = Vec::new();
-                        for id in ids {
-                            let id = id.as_str().unwrap_or_default();
-                            if self.model(id).is_none() {
-                                return Err(format!(
-                                    "transport.serial.{name}.by_model: no model '{id}'"
-                                ));
-                            }
-                            if serial_models.is_some() && !names_model(serial_models.as_ref(), id) {
-                                return Err(format!(
-                                    "transport.serial.{name}.by_model: model '{id}' has no \
-                                     serial port"
-                                ));
-                            }
-                            if !seen.insert(id.to_string()) {
-                                return Err(format!(
-                                    "transport.serial.{name}.by_model: model '{id}' is named \
-                                     twice"
-                                ));
-                            }
-                            names.push(id.to_string());
-                        }
-                        by_model.push((names, value));
-                    }
-                    Ok((default, values, by_model))
-                }
-                Some(one) => Ok((one.clone(), vec![one.clone()], Vec::new())),
-            }
-        };
-        // Each entry's default for each model it names, as the setting holds
-        // its values, and the words the description adds for them.
-        let per_model = |by_model: &[(Vec<String>, Value)], show: &dyn Fn(&Value) -> Value| {
-            let map: BTreeMap<String, Value> = by_model
-                .iter()
-                .flat_map(|(ids, v)| ids.iter().map(move |id| (id.clone(), show(v))))
-                .collect();
-            let words: String = by_model
-                .iter()
-                .map(|(ids, v)| {
-                    let v = show(v);
-                    let v = v.as_str().map_or_else(|| v.to_string(), str::to_string);
-                    format!(", {v} on {}", ids.join(", "))
-                })
-                .collect();
-            ((!map.is_empty()).then_some(map), words)
-        };
-        let (default, values, by_model) = line("baud_rate")?;
-        if values.iter().any(|v| v.as_u64().is_none_or(|n| n == 0)) {
-            return Err("transport.serial.baud_rate: bits per second, above 0".into());
-        }
-        add.insert(
-            "baud_rate".to_string(),
-            if values.len() == 1 {
-                ParamSpec {
-                    min: default.as_f64(),
-                    max: default.as_f64(),
-                    default: Some(default.clone()),
-                    ..setting(
-                        ParamType::Int,
-                        "Baud rate",
-                        &format!(
-                            "With link serial, bits per second: the device's port runs at \
-                             {default}."
-                        ),
-                    )
-                }
-            } else {
-                let (default_by_model, words) =
-                    per_model(&by_model, &|v| Value::from(v.to_string()));
-                ParamSpec {
-                    values: Some(values.iter().map(|v| v.to_string()).collect()),
-                    default: Some(Value::from(default.to_string())),
-                    default_by_model,
-                    ..setting(
-                        ParamType::Enum,
-                        "Baud rate",
-                        &format!(
-                            "With link serial, bits per second, as set on the device's port \
-                             ({default} unless changed there{words})."
-                        ),
-                    )
-                }
-            },
-        );
-        for (name, label, low, high, what) in [
-            ("data_bits", "Data bits", 5, 8, "bits per character"),
-            ("stop_bits", "Stop bits", 1, 2, "stop bits"),
-        ] {
-            let (default, values, by_model) = line(name)?;
-            let mut n: Vec<u64> = values.iter().filter_map(Value::as_u64).collect();
-            n.sort_unstable();
-            n.dedup();
-            if n.len() != values.len()
-                || n.iter().any(|v| !(low..=high).contains(v))
-                || n[n.len() - 1] - n[0] + 1 != n.len() as u64
-            {
-                return Err(format!(
-                    "transport.serial.{name}: whole numbers from {low} to {high}, with no gaps"
-                ));
-            }
-            let (default_by_model, words) = per_model(&by_model, &|v| v.clone());
-            add.insert(
-                name.to_string(),
-                ParamSpec {
-                    min: Some(n[0] as f64),
-                    max: Some(n[n.len() - 1] as f64),
-                    default: Some(default.clone()),
-                    default_by_model,
-                    ..setting(
-                        ParamType::Int,
-                        label,
-                        &format!(
-                            "With link serial, {what}, as set on the device's port ({default} \
-                             by default{words})."
-                        ),
-                    )
-                },
-            );
-        }
-        for (name, label, choices, what) in [
-            (
-                "parity",
-                "Parity",
-                &["none", "odd", "even"][..],
-                "the parity",
-            ),
-            (
-                "flow_control",
-                "Flow control",
-                &["none", "xon-xoff", "rts-cts"][..],
-                "how the port paces what is sent",
-            ),
-        ] {
-            let (default, values, by_model) = line(name)?;
-            let values: Vec<String> = values
-                .iter()
-                .map(|v| v.as_str().unwrap_or_default().to_string())
-                .collect();
-            if values.iter().any(|v| !choices.contains(&v.as_str())) {
-                return Err(format!(
-                    "transport.serial.{name}: one of {}",
-                    choices.join(", ")
-                ));
-            }
-            let (default_by_model, words) = per_model(&by_model, &|v| v.clone());
-            add.insert(
-                name.to_string(),
-                ParamSpec {
-                    values: Some(values),
-                    default: Some(default.clone()),
-                    default_by_model,
-                    ..setting(
-                        ParamType::Enum,
-                        label,
-                        &format!(
-                            "With link serial, {what}, as set on the device's port ({} by \
-                             default{words}).",
-                            default.as_str().unwrap_or_default()
-                        ),
-                    )
-                },
-            );
-        }
-        for (name, spec) in add {
-            if self.settings.contains_key(&name) {
-                return Err(format!(
-                    "settings.{name}: transport.serial declares it; leave it out"
-                ));
-            }
-            self.settings.insert(name, spec);
-        }
-        Ok(())
-    }
-}
-
-/// A serial line setting from a `serial` block: its default, its values,
-/// and the defaults of the models named in `by_model`.
-type Line = (Value, Vec<Value>, Vec<(Vec<String>, Value)>);
-
-/// Whether a list of model ids holds `model`.
-/// The transport keys a `serial` block's `overrides` may change: how a
-/// message is framed, how replies are told apart, and how messages are
-/// paced (SPEC.md §2, "The same protocol on a serial port").
-pub(crate) const SERIAL_OVERRIDES: &[&str] = &[
-    "framing",
-    "open",
-    "close",
-    "terminator",
-    "reply_framing",
-    "reply_terminators",
-    "reply_fence",
-    "reply_match",
-    "error_match",
-    "pacing",
-];
-
-fn names_model(list: Option<&Value>, model: &str) -> bool {
-    list.and_then(Value::as_array)
-        .is_some_and(|ids| ids.iter().any(|id| id.as_str() == Some(model)))
-}
-
-/// A setting a `serial` block adds, before its type's own fields.
-fn setting(kind: ParamType, label: &str, description: &str) -> ParamSpec {
-    ParamSpec {
-        kind,
-        label: Some(label.into()),
-        description: Some(description.into()),
-        min: None,
-        max: None,
-        values: None,
-        max_length: None,
-        pattern: None,
-        default: None,
-        required: false,
-        secret: false,
-        multiline: false,
-        negative_infinity: false,
-        default_by_model: None,
-        select: None,
-    }
 }
 
 /// Specs keyed by id: every embedded one, or a core's selection of them.
@@ -1143,24 +661,6 @@ pub fn vendor_groups() -> &'static [(&'static str, &'static [&'static str])] {
 /// containing control characters. Never clamps or strips: a corrected value
 /// would produce a device state the caller did not ask for.
 pub fn validate(declared: &BTreeMap<String, ParamSpec>, given: &Params) -> Result<Params, String> {
-    validate_inner(declared, given, None)
-}
-
-/// [`validate`] for a device's settings: a setting whose default differs by
-/// model (`default_by_model`) takes the default of `model`.
-pub fn validate_settings(
-    declared: &BTreeMap<String, ParamSpec>,
-    given: &Params,
-    model: &str,
-) -> Result<Params, String> {
-    validate_inner(declared, given, Some(model))
-}
-
-fn validate_inner(
-    declared: &BTreeMap<String, ParamSpec>,
-    given: &Params,
-    model: Option<&str>,
-) -> Result<Params, String> {
     for name in given.keys() {
         if !declared.contains_key(name) {
             return Err(format!("unknown parameter '{name}'"));
@@ -1169,9 +669,8 @@ fn validate_inner(
 
     let mut out = Params::new();
     for (name, spec) in declared {
-        let for_model = model.and_then(|m| spec.default_by_model.as_ref()?.get(m));
         let value = match given.get(name) {
-            Some(Value::Null) | None => match for_model.or(spec.default.as_ref()) {
+            Some(Value::Null) | None => match spec.default.as_ref() {
                 Some(default) => default.clone(),
                 None if spec.required => return Err(format!("'{name}' is required")),
                 None => continue,

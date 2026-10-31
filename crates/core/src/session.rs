@@ -65,9 +65,6 @@ pub(crate) type Build = Box<dyn Fn(Params) -> Result<Box<dyn Module>, String> + 
 /// module afresh from new ones.
 pub(crate) struct Reconfigure {
     pub(crate) declared: std::collections::BTreeMap<String, ParamSpec>,
-    /// The model the device was opened as: a setting's default can be the
-    /// model's own.
-    pub(crate) model: String,
     pub(crate) settings: Params,
     pub(crate) build: Build,
 }
@@ -155,10 +152,6 @@ pub(crate) struct Services {
     pub(crate) http: HttpClients,
     /// Frames of every device's streams, outside the event queue.
     pub(crate) streams: Arc<crate::streams::Streams>,
-    /// Where serial ports are opened: the host's, or a test's in-memory ones.
-    pub(crate) serial: Arc<dyn crate::serial::SerialPorts>,
-    /// Where MIDI ports are opened: the host's, or a test's in-memory ones.
-    pub(crate) midi: Arc<dyn crate::midi_ports::MidiPorts>,
 }
 
 /// What any consumer can read about a device without asking it.
@@ -312,9 +305,7 @@ impl Session {
         };
         let mut merged = reconfigure.settings.clone();
         merged.extend(delta);
-        let settings =
-            crate::catalog::validate_settings(&reconfigure.declared, &merged, &reconfigure.model)
-                .map_err(invalid)?;
+        let settings = crate::catalog::validate(&reconfigure.declared, &merged).map_err(invalid)?;
         let mut cx = self.cx();
         let update = self.module.update_settings(&mut cx, &settings);
         if update == SettingsUpdate::Applied {
@@ -715,32 +706,6 @@ impl Session {
                         generation,
                         tunnel,
                         self.ssh.clone(),
-                        self.inbound_tx.clone(),
-                    );
-                    self.tcp.insert(socket, connection);
-                }
-                Action::SerialOpen { socket, port } => {
-                    self.close_tcp(socket);
-                    let generation = self.next_generation;
-                    self.next_generation += 1;
-                    let connection = crate::serial::spawn(
-                        socket,
-                        generation,
-                        port,
-                        self.services.serial.clone(),
-                        self.inbound_tx.clone(),
-                    );
-                    self.tcp.insert(socket, connection);
-                }
-                Action::MidiOpen { socket, port } => {
-                    self.close_tcp(socket);
-                    let generation = self.next_generation;
-                    self.next_generation += 1;
-                    let connection = crate::midi_ports::spawn(
-                        socket,
-                        generation,
-                        port,
-                        self.services.midi.clone(),
                         self.inbound_tx.clone(),
                     );
                     self.tcp.insert(socket, connection);
@@ -1580,8 +1545,6 @@ mod tests {
             shared_tcp: Default::default(),
             http: crate::http::HttpClients::new().unwrap(),
             streams: Default::default(),
-            serial: Arc::new(crate::serial::HostPorts),
-            midi: Arc::new(crate::midi_ports::HostMidi),
         });
         let snapshot = Arc::new(Mutex::new(DeviceSnapshot {
             connection: crate::module::Connection::Connecting,
@@ -1690,8 +1653,6 @@ mod tests {
             shared_tcp: Default::default(),
             http: crate::http::HttpClients::new().unwrap(),
             streams: Default::default(),
-            serial: Arc::new(crate::serial::HostPorts),
-            midi: Arc::new(crate::midi_ports::HostMidi),
         });
         let snapshot = Arc::new(Mutex::new(DeviceSnapshot {
             connection: Connection::Connecting,

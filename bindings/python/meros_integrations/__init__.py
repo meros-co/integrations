@@ -116,25 +116,6 @@ class Core:
     def catalog(self) -> dict[str, Any]:
         return json.loads(self._native.catalog())
 
-    def serial_ports(self) -> list[dict[str, str]]:
-        """The host's serial ports, [{"name": "COM3"}, ...], for the
-        serial_port setting of a device wired to one: names only, empty on a
-        phone. Raises IntegrationsError if they cannot be listed."""
-        result = json.loads(self._native.serial_ports())
-        if "error" in result:
-            raise IntegrationsError(result["error"])
-        return result["ok"]
-
-    def midi_ports(self) -> list[dict[str, Any]]:
-        """The host's MIDI ports, [{"name": ..., "input": True, "output":
-        True}, ...], for the midi_input and midi_output settings of a MIDI
-        device on one: empty in a build without a MIDI integration and on
-        Android. Raises IntegrationsError if they cannot be listed."""
-        result = json.loads(self._native.midi_ports())
-        if "error" in result:
-            raise IntegrationsError(result["error"])
-        return result["ok"]
-
     def open(self, request: dict[str, Any]) -> int:
         """Start a session; returns the device id. Connects in the background.
 
