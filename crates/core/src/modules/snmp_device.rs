@@ -9,7 +9,8 @@
 //!   by the profile: a scalar at its path, a table column at its path with
 //!   the row's index in place of each `*`. Enumerations become their MIB
 //!   labels (in snake case), octet strings text (a MAC address in hex),
-//!   TimeTicks hundredths of a second. Only values that changed are
+//!   TimeTicks hundredths of a second, and a number the profile scales (a
+//!   count of tenths of a volt) a float in its unit. Only values that changed are
 //!   reported; a table row the agent no longer lists leaves state.
 //! - The system group (RFC 3418) is read on opening; sysUpTime.0 is read
 //!   with every poll and is the liveness check, as for generic-snmp.
@@ -62,6 +63,10 @@ pub(crate) enum Kind {
     Int,
     /// TimeTicks: hundredths of a second.
     Ticks,
+    /// A number counting 1/divisor of its unit (tenths of a volt, TimeTicks'
+    /// hundredths of a second), reported in the unit as a float. A SET
+    /// takes the unit and sends the count.
+    Scaled(u32),
     /// An OCTET STRING as text.
     Text,
     /// An OCTET STRING of address bytes, in lowercase hex separated by colons.
@@ -152,7 +157,15 @@ fn decode(kind: Kind, value: &Value) -> Option<Json> {
     let number = match value {
         Value::Integer(n) => Some(*n),
         Value::Gauge32(n) | Value::Counter32(n) | Value::TimeTicks(n) => Some(i64::from(*n)),
-        Value::Counter64(n) => return matches!(kind, Kind::Int | Kind::Ticks).then(|| json!(n)),
+        Value::Counter64(n) => {
+            return match kind {
+                Kind::Int | Kind::Ticks => Some(json!(n)),
+                // Exact to 2^53, beyond any count a meter reaches.
+                #[allow(clippy::cast_precision_loss)]
+                Kind::Scaled(d) => Some(json!(*n as f64 / f64::from(d))),
+                _ => None,
+            };
+        }
         _ => None,
     };
     match (kind, value) {
@@ -171,6 +184,8 @@ fn decode(kind: Kind, value: &Value) -> Option<Json> {
             })
         }
         (Kind::Int | Kind::Ticks, _) => number.map(|n| json!(n)),
+        #[allow(clippy::cast_precision_loss)]
+        (Kind::Scaled(d), _) => number.map(|n| json!(n as f64 / f64::from(d))),
         (Kind::Mac, Value::OctetString(b)) => Some(json!(b
             .iter()
             .map(|x| format!("{x:02x}"))
@@ -649,10 +664,22 @@ impl SnmpDevice {
         let given = params
             .get("value")
             .ok_or_else(|| invalid("'value' is required".into()))?;
-        let number = || {
-            given
+        let number = || match setter.kind {
+            // The value in the unit, sent as a count of 1/divisor of it.
+            Kind::Scaled(d) => {
+                let count = given
+                    .as_f64()
+                    .map(|v| v * f64::from(d))
+                    .ok_or_else(|| invalid("'value' must be a number".into()))?;
+                if (count - count.round()).abs() > 1e-6 || !count.is_finite() {
+                    return Err(invalid(format!("'value' must be a multiple of 1/{d}")));
+                }
+                #[allow(clippy::cast_possible_truncation)]
+                Ok(count.round() as i64)
+            }
+            _ => given
                 .as_i64()
-                .ok_or_else(|| invalid("'value' must be a whole number".into()))
+                .ok_or_else(|| invalid("'value' must be a whole number".into())),
         };
         let value = match (setter.kind, setter.wire) {
             (Kind::Enum(labels), _) => {
@@ -1265,11 +1292,13 @@ mod tests {
         for (id, profile) in profiles() {
             let spec = catalog.device(id).expect("the spec");
             for o in profile.objects {
-                assert!(
-                    spec.state.contains_key(&declared(o.path)),
-                    "{id}: {} is not declared",
-                    o.path
-                );
+                let field = spec.state.get(&declared(o.path));
+                let field = field.unwrap_or_else(|| panic!("{id}: {} is not declared", o.path));
+                // A scaled number is a float in its unit, with no scale left.
+                if let Kind::Scaled(_) = o.kind {
+                    assert_eq!(field.kind, "float", "{id}: {}", o.path);
+                    assert!(field.scale.is_none(), "{id}: {}", o.path);
+                }
             }
             let raw = ["get", "walk", "set", "refresh"];
             for name in spec.commands.keys() {
@@ -1305,5 +1334,86 @@ mod tests {
             decode(Kind::Ticks, &Value::TimeTicks(360_000)),
             Some(json!(360_000))
         );
+    }
+
+    #[test]
+    fn a_scaled_number_is_reported_in_its_unit() {
+        // 1203 tenths of a volt (CPS-MIB's upsAdvanceInputLineVoltage).
+        assert_eq!(
+            decode(Kind::Scaled(10), &Value::Gauge32(1203)),
+            Some(json!(120.3))
+        );
+        assert_eq!(
+            decode(Kind::Scaled(10), &Value::Integer(-15)),
+            Some(json!(-1.5))
+        );
+        // Hundredths: a power factor, and TimeTicks as seconds.
+        assert_eq!(
+            decode(Kind::Scaled(100), &Value::Integer(98)),
+            Some(json!(0.98))
+        );
+        assert_eq!(
+            decode(Kind::Scaled(100), &Value::TimeTicks(6000)),
+            Some(json!(60.0))
+        );
+        assert_eq!(
+            decode(Kind::Scaled(10), &Value::Counter64(12_345)),
+            Some(json!(1234.5))
+        );
+        assert_eq!(decode(Kind::Scaled(10), &Value::NoSuchInstance), None);
+    }
+
+    #[test]
+    #[cfg(feature = "cyberpower-ups")]
+    fn a_cyberpower_voltage_reads_in_volts_and_its_runtime_in_seconds() {
+        let profile = &crate::modules::cyberpower_ups_profile::PROFILE;
+        let kind = |path: &str| {
+            profile
+                .objects
+                .iter()
+                .find(|o| o.path == path)
+                .map(|o| o.kind)
+                .unwrap()
+        };
+        let volts = decode(kind("advance_input.line_voltage"), &Value::Gauge32(1203));
+        assert_eq!(volts, Some(json!(120.3)));
+        let runtime = decode(
+            kind("advance_battery.run_time_remaining"),
+            &Value::TimeTicks(360_000),
+        );
+        assert_eq!(runtime, Some(json!(3600.0)));
+        let catalog = crate::catalog::Catalog::embedded();
+        let line = &catalog.device("cyberpower-ups").unwrap().state["advance_input.line_voltage"];
+        assert_eq!(
+            (line.kind.as_str(), line.unit.as_deref()),
+            ("float", Some("V"))
+        );
+    }
+
+    #[test]
+    fn a_scaled_object_is_set_in_its_unit() {
+        let m = open(true);
+        let delay = Setter {
+            command: "set_return_delay",
+            oid: &[1, 3, 6, 1, 4, 1, 99, 2],
+            kind: Kind::Scaled(100),
+            wire: Wire::TimeTicks,
+            indexes: &[],
+            reread: &[1, 3, 6, 1, 4, 1, 99],
+            lock: &[],
+        };
+        let vb = m
+            .setter(&delay, json!({ "value": 60 }).as_object().unwrap())
+            .unwrap();
+        assert_eq!(vb.value, Value::TimeTicks(6000));
+        let vb = m
+            .setter(&delay, json!({ "value": 1.25 }).as_object().unwrap())
+            .unwrap();
+        assert_eq!(vb.value, Value::TimeTicks(125));
+        // Finer than the object counts is refused, not rounded.
+        assert!(matches!(
+            m.setter(&delay, json!({ "value": 0.005 }).as_object().unwrap()),
+            Err(CommandError::InvalidParams { .. })
+        ));
     }
 }

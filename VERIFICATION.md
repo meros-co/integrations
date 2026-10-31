@@ -1365,12 +1365,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a step index counts the trigger itself as 0, and what /api/trigger/step/<n> answers past the last step. ([specs/cuez-automator.yaml:104](specs/cuez-automator.yaml#L104))
 - [ ] Record the shapes of /api/timer, /api/macro/ and /api/trigger/current so timers, macros and the current trigger can be kept in state. ([specs/cuez-automator.yaml:241](specs/cuez-automator.yaml#L241))
 
+## cyberpower-pdu — CyberPower PDU (SNMP)
+
+- [ ] Check the units and steps taken from the MIB's descriptions against the PDU's display: phase, bank, outlet and source voltages and currents in tenths (reported as volts and amps), energy in tenths of a kilowatt-hour, power factors in hundredths. ([specs/cyberpower-pdu.yaml:1076](specs/cyberpower-pdu.yaml#L1076))
+- [ ] Record the units the MIB does not state: ePDU2DeviceInfoRating, ePDU2OutletMeteredInfoRating and ePDU2OutletMonitoredInfoRating, ePDUIdentDeviceRating and ePDUIdentDeviceBreakerRating, and the ATS source configuration's nominal voltage and range values. ([specs/cyberpower-pdu.yaml:1076](specs/cyberpower-pdu.yaml#L1076))
+- [ ] Check envir2Temperature reads in hundredths of the unit envir2TempUnit names, and that its thresholds follow the same unit in whole degrees. ([specs/cyberpower-pdu.yaml:1045](specs/cyberpower-pdu.yaml#L1045))
+
 ## cyberpower-ups — CyberPower UPS (SNMP)
 
 - [ ] Walk a UPS through an RMCARD205 and an RMCARD305 and check which groups each fills, and that every table is keyed by single integer indexes. ([specs/cyberpower-ups.yaml:33](specs/cyberpower-ups.yaml#L33))
-- [ ] Check that the UPS control objects read back their idle value after a SET, and when a turn-off or sleep shows in the output status. ([specs/cyberpower-ups.yaml:698](specs/cyberpower-ups.yaml#L698))
-- [ ] Check the units taken from the MIB's descriptions against the UPS's display. ([specs/cyberpower-ups.yaml:693](specs/cyberpower-ups.yaml#L693))
-- [ ] Receive a v1 trap (on battery, then back on line) and check it is named and that the poll after it shows the change. ([specs/cyberpower-ups.yaml:704](specs/cyberpower-ups.yaml#L704))
+- [ ] Check that the UPS control objects read back their idle value after a SET, and when a turn-off or sleep shows in the output status. ([specs/cyberpower-ups.yaml:707](specs/cyberpower-ups.yaml#L707))
+- [ ] Check the units and steps taken from the MIB's descriptions against the UPS's display: input, output and battery voltages in tenths of a volt (reported as volts), frequencies in tenths of a hertz, currents in tenths of an amp, upsAdvanceBatteryLife in hundredths of a percent. ([specs/cyberpower-ups.yaml:698](specs/cyberpower-ups.yaml#L698))
+- [ ] Check what the TimeTicks configuration objects (upsAdvanceConfigAlarmTimer, ReturnDelay, ShutoffDelay, SleepDelay, LowBatteryRunTime) carry: the MIB declares TimeTicks (hundredths of a second, as the core reads and writes them) but describes their values in whole seconds (0 to 600, 60 to 5940). If an agent sends seconds, a 600 s delay reads as 6 s. ([specs/cyberpower-ups.yaml:572](specs/cyberpower-ups.yaml#L572))
+- [ ] Record the units the MIB does not state (upsAdvanceBatteryVoltageRating), and check upsAdvanceConfigMinReturnCapacity is a percentage, as given from the MIB's battery capacity. ([specs/cyberpower-ups.yaml:543](specs/cyberpower-ups.yaml#L543))
+- [ ] Receive a v1 trap (on battery, then back on line) and check it is named and that the poll after it shows the change. ([specs/cyberpower-ups.yaml:713](specs/cyberpower-ups.yaml#L713))
 
 ## dahua-ptz — Dahua and Amcrest PTZ cameras (HTTP CGI, public subset)
 

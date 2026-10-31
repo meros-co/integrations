@@ -369,12 +369,12 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 3, 4, 1, 5],
         path: "device_status.*.current_load",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 3, 4, 1, 6],
         path: "device_status.*.current_peak_load",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 3, 4, 1, 7],
@@ -389,7 +389,7 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 3, 4, 1, 9],
         path: "device_status.*.energy",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 3, 4, 1, 10],
@@ -424,7 +424,7 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 3, 4, 1, 16],
         path: "device_status.*.power_factor",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 3, 4, 1, 17],
@@ -524,12 +524,12 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 4, 4, 1, 5],
         path: "phase_status.*.load",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 4, 4, 1, 6],
         path: "phase_status.*.voltage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 4, 4, 1, 7],
@@ -544,12 +544,12 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 4, 4, 1, 9],
         path: "phase_status.*.power_factor",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 4, 4, 1, 10],
         path: "phase_status.*.peak_load",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 4, 4, 1, 11],
@@ -564,7 +564,7 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 4, 4, 1, 13],
         path: "phase_status.*.line_to_line_voltage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 5, 1],
@@ -634,12 +634,12 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 5, 4, 1, 5],
         path: "bank_status.*.load",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 5, 4, 1, 6],
         path: "bank_status.*.peak_load",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 5, 4, 1, 7],
@@ -844,7 +844,7 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 6, 2, 4, 1, 6],
         path: "outlet_metered_status.*.load",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 6, 2, 4, 1, 7],
@@ -869,7 +869,7 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 6, 2, 4, 1, 11],
         path: "outlet_metered_status.*.energy",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 6, 2, 4, 1, 12],
@@ -954,7 +954,7 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 8, 3],
         path: "group.total_energy",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 8, 4],
@@ -1079,27 +1079,27 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 9, 4, 1, 4],
         path: "source_status.*.nominal_frequency",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 9, 4, 1, 5],
         path: "source_status.*.source_a_voltage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 9, 4, 1, 6],
         path: "source_status.*.source_b_voltage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 9, 4, 1, 7],
         path: "source_status.*.source_a_frequency",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 9, 4, 1, 8],
         path: "source_status.*.source_b_frequency",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 6, 9, 4, 1, 9],
@@ -1294,7 +1294,7 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 3, 2, 3, 1, 1, 2],
         path: "load_status.*.load",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 3, 2, 3, 1, 1, 3],
@@ -1314,7 +1314,7 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 3, 2, 3, 1, 1, 6],
         path: "load_status.*.voltage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 3, 2, 3, 1, 1, 7],
@@ -1329,12 +1329,12 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 3, 2, 3, 1, 1, 9],
         path: "load_status.*.power_factor",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 3, 2, 3, 1, 1, 10],
         path: "load_status.*.energy",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 3, 2, 3, 1, 1, 11],
@@ -1514,7 +1514,7 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 3, 3, 5, 1, 1, 7],
         path: "outlet_status.*.load",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 3, 3, 5, 1, 1, 8],
@@ -1544,7 +1544,7 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 3, 3, 5, 1, 1, 13],
         path: "outlet_status.*.energy",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 3, 3, 5, 1, 1, 14],
@@ -1619,12 +1619,12 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 3, 5, 7],
         path: "status.input_voltage",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 3, 5, 8],
         path: "status.input_frequency",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 4, 1, 1],
@@ -1639,7 +1639,7 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 4, 2, 1],
         path: "environment.temp.temperature",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 4, 2, 2],
@@ -1664,7 +1664,7 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 4, 2, 6],
         path: "environment.temp.temperature_celsius",
-        kind: Kind::Int,
+        kind: Kind::Scaled(10),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 4, 2, 7],
@@ -1774,7 +1774,7 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 8, 2, 3, 1, 3],
         path: "environment2.temp.*.temperature",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 8, 2, 3, 1, 4],
@@ -1809,7 +1809,7 @@ static OBJECTS: [Object; 341] = [
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 8, 3, 2, 1, 3],
         path: "environment2.humid.*.humidity",
-        kind: Kind::Int,
+        kind: Kind::Scaled(100),
     },
     Object {
         oid: &[1, 3, 6, 1, 4, 1, 3808, 1, 1, 8, 3, 2, 1, 4],
