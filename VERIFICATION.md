@@ -502,7 +502,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] DP100/XLM main version is read with version read 0x60 0x00 0x01. ([specs/barco-projection-protocol.yaml:1070](specs/barco-projection-protocol.yaml#L1070))
 - [ ] Lamp power and nominal current: length and unit. ([specs/barco-projection-protocol.yaml:1004](specs/barco-projection-protocol.yaml#L1004))
 - [ ] Older models' color balance read with a preset byte echoes the preset. ([specs/barco-projection-protocol.yaml:815](specs/barco-projection-protocol.yaml#L815))
-- [ ] Which older RS-232 commands each product line (Galaxy, Helios, ELM, SLM, BarcoData/Graphics/Reality/Vision) answers; the catalog does not say per product. ([specs/barco-projection-protocol.yaml:304](specs/barco-projection-protocol.yaml#L304))
+- [ ] Which older RS-232 catalog commands the SLM answers; the catalog does not say per product. Also record the TCP port on which the SLM, DP100 and XLM take this protocol over their network port. ([specs/barco-projection-protocol.yaml:304](specs/barco-projection-protocol.yaml#L304))
 - [ ] Lens commands move one step per message. ([specs/barco-projection-protocol.yaml:1331](specs/barco-projection-protocol.yaml#L1331))
 
 ## barco-pulse — Barco Pulse projectors
@@ -1773,19 +1773,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On SMX, record a virtual plane definition and its read-back (Mpv), and whether Esc ZXXX clears virtual planes. ([spec](specs/extron-matrix.yaml#L1767))
 - [ ] Check what a DXP HD 4K PLUS answers for global presets 17-32, and how DXP DVI and SMX treat names longer than 12 characters. ([spec](specs/extron-matrix.yaml#L2040))
 - [ ] Check that the 2-minute poll's extra queries (network, EDID, HDCP authorization, formats, transmitter inputs, slot and virtual planes) are answered with E-codes, not silence, on the models that lack them. ([spec](specs/extron-matrix.yaml#L2040))
-- [ ] On an MMX 42/62 behind a serial-to-Ethernet interface's raw TCP port (an IPL T S at 2001), confirm the CR sent after every command is ignored and the replies come back one per line, ending CR LF. ([spec](specs/extron-matrix.yaml#L2078))
-- [ ] On an MMX, confirm the poll's queries that are not MMX commands are answered E10 rather than ignored (a silent unit would hold each for the 3-second timeout every 2 minutes). ([spec](specs/extron-matrix.yaml#L2092))
-- [ ] On an MMX, record the part number reply (the guide prints Nnn-nnn-nn: with or without a leading N) and the bare tie views (In05). ([spec](specs/extron-matrix.yaml#L936))
-- [ ] On an MMX, record the I reply's exact spacing (V1*03 A1*03 V2*05 A2*06 Vmt1*0 Amt1*0 Vmt2*1 Amt2*0 assumed) and whether input numbers are padded. ([spec](specs/extron-matrix.yaml#L2808))
-- [ ] On an MMX, check whether front panel mutes or level changes send any message (only front panel ties are documented), and whether set_input_attenuation takes 0 (g with 00). ([spec](specs/extron-matrix.yaml#L306))
-- [ ] On an MVX 44-88, confirm Esc nVC (the examples) reads a preset's ties, not Esc n1VC (the symbol line). ([specs/extron-matrix.yaml:2049](specs/extron-matrix.yaml#L2049))
-- [ ] On an MVX 44-88, confirm n*40# reads the output level (the example) and record its answer. ([specs/extron-matrix.yaml:2101](specs/extron-matrix.yaml#L2101))
-- [ ] On an MVX 128-1616, record the Esc VM answer (a digit per output assumed, with or without separators). ([specs/extron-matrix.yaml:3477](specs/extron-matrix.yaml#L3477))
-- [ ] On an MVX, confirm front panel ties are reported as Qik only, and record the answer of a bare tie query (12 or In12). ([specs/extron-matrix.yaml:406](specs/extron-matrix.yaml#L406))
 - [ ] On an MTPX Plus in verbose mode 3, record the VC answer (tagged Vgp or bare) for starting outputs 1 and 17. ([specs/extron-matrix.yaml:2842](specs/extron-matrix.yaml#L2842))
 - [ ] On an MTPX Plus, record the answers of the twisted-pair commands (Typ, Lrpt, Ipek, Iseq, Oseq, Opek, Opol) in verbose mode 3. ([specs/extron-matrix.yaml:2202](specs/extron-matrix.yaml#L2202))
 - [ ] On an MTPX Plus, confirm the input grouping answer (GrI in the example, Gri in the syntax). ([specs/extron-matrix.yaml:2373](specs/extron-matrix.yaml#L2373))
-- [ ] On an MMX 32 VGA A, confirm the capitalized answers (OUT02 IN01 ALL, VMT2*1, AMT1) and the I answer. ([specs/extron-matrix.yaml:443](specs/extron-matrix.yaml#L443))
 
 ## extron-switcher — Extron IN-series scaling presentation switchers
 
@@ -1805,17 +1795,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the auto-switch priority order is sent and answered with spaces between the inputs (Esc P8 7 1 2 3 4 5 6AUSW). ([spec](specs/extron-switcher.yaml#L650))
 - [ ] Confirm the image position and size replies carry signed, zero-padded positions (Ximg1,-0010*+0020*01920*01080; IN1608 without 1,) and the shift replies HctrI1*-0002 and Hctr+0012. ([spec](specs/extron-switcher.yaml#L2882))
 - [ ] Confirm the embedded-audio OIDs 30012-30015 with H: which of each pair is the left channel (the guide's example takes 30012 as the right). ([spec](specs/extron-switcher.yaml#L1331))
-- [ ] On an IN1604 behind a serial-to-Ethernet interface's raw TCP port (an IPL T S at 2001), confirm the CR sent after every command is ignored, Esc 3CV is accepted on RS-232, and no password is asked. ([spec](specs/extron-switcher.yaml#L2490))
-- [ ] On an IN1604, record which queries answer tagged in verbose mode 3 where the guide prints only a bare value: the analog timing and picture views with the input (Hsrt2*128, Cont2*064), Esc A EDID (EdidA2*41), Esc I AFMT, Esc OSCN, Esc MUTM, Esc CN (Ipn), 2i, and the preset names (Pnam1*01,name); bare names and descriptions cannot be read. ([spec](specs/extron-switcher.yaml#L2511))
-- [ ] On an IN1604, check whether automatic Auto-Image (n*1A) works for inputs 2-4 (the guide shows input 1 only). ([spec](specs/extron-switcher.yaml#L2511))
-- [ ] On an IN1604, record the unsolicited signal message (In00 with spaces between digits assumed, as in the tagged 0LS reply) and whether one is sent at all. ([spec](specs/extron-switcher.yaml#L3149))
-- [ ] On an IN1604, check whether an output format change from the front panel or menu is reported (Vtpo3), and that Esc 1*VTPO's reply has the same text, which is why the format is read only from the replies to its own set and view. ([spec](specs/extron-switcher.yaml#L3060))
-- [ ] On an IN1604, record the preset delete reply (printed PrstX1*X2)), and whether it also clears the preset's name. ([spec](specs/extron-switcher.yaml#L2042))
-- [ ] On an IN1604, record the zero padding and sign of the gain and volume replies (Aud-06, Vol-20) and the separator of the audio mute view (0 1). ([spec](specs/extron-switcher.yaml#L2173))
-- [ ] On an IN1604, check the EDID and output rate codes against the guide's table (no 27 or 28) and what Esc A n*0EDID (automatic) answers. ([spec](specs/extron-switcher.yaml#L1669))
-- [ ] On an IN1604, record the internal temperature reply (the guide prints xxx.x degrees Celsius) and its tagged form (20Stat). ([spec](specs/extron-switcher.yaml#L2386))
-- [ ] On an IN1604, record the ranges the unit accepts for total pixels, active pixels and active lines (the guide gives only +/-512 or 256 of the signal's default). ([spec](specs/extron-switcher.yaml#L1786))
-- [ ] Confirm 8 data bits on the IN1606/IN1608 and IN1604 Remote port (not stated) and which stop bits the IN1806/IN1808 Esc...CP command accepts (1 assumed). ([spec](specs/extron-switcher.yaml#L126))
+- [ ] Confirm 8 data bits on the IN1606/IN1608 Remote port (not stated) and which stop bits the IN1806/IN1808 Esc...CP command accepts (1 assumed). ([spec](specs/extron-switcher.yaml#L126))
 
 ## ezcoo-matrix — Ezcoo HDMI matrices
 
@@ -3531,7 +3511,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On dual controllers over IP, record the unsolicited DUAL CONTROLLER STATUS RESPONSE on a changeover. ([specs/probel-swp08.yaml:504](specs/probel-swp08.yaml#L504))
 - [ ] Record name responses with name counts below 16, where a community parser reports the names starting one byte later. ([specs/probel-swp08.yaml:550](specs/probel-swp08.yaml#L550))
 - [ ] On Ultrix, confirm the SW-P-08 server port (8910) and how the Protocol Variant setting answers general and extended commands. ([specs/probel-swp08.yaml:198](specs/probel-swp08.yaml#L198))
-- [ ] On an NK-3RD, confirm matrix 0 and level 0 on the wire address NK level 1, and that no tally dump is answered. ([specs/probel-swp08.yaml:213](specs/probel-swp08.yaml#L213))
 
 ## propresenter — ProPresenter
 
