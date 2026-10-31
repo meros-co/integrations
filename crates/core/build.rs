@@ -134,7 +134,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-datavideo", &["datavideo-switcher"]),
     ("vendor-dbaudio", &["dbaudio"]),
     ("vendor-denon", &["denon-dn500av", "denon-dn500bd"]),
-    ("vendor-dev-core", &["mixingstation"]),
+    ("vendor-dev-core", &["mixingstation", "mixingstation-api"]),
     ("vendor-dhd", &["dhd-aes67", "dhd-control-api", "dhd-ecp"]),
     ("vendor-digico", &["digico-pad", "digico-sd"]),
     (

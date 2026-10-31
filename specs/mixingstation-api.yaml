@@ -1,0 +1,275 @@
+spec: 1
+id: mixingstation-api
+name: Mixing Station desktop (REST and WebSocket API)
+vendor: dev-core
+category: mixer
+
+# Mixing Station's desktop app serves its REST API over a WebSocket too:
+# each request is a JSON object {path, method, body}, answered with the same
+# path and method, the body and an error field. The WebSocket also pushes
+# the app's state (/app/state), the values of subscribed data paths and the
+# meters of a metering subscription. Data paths address one console
+# parameter whatever the console (ch.0.mix.lvl is channel 1's fader). The
+# OSC API of the same app is the mixingstation spec.
+source:
+  - title: "APIs (Mixing Station Docs, read 31 October 2026)"
+    author: dev-core
+    url: https://mixingstation.app/ms-docs/use-cases/apis
+    note: >
+      Manufacturer document. Desktop only; REST (and WebSocket) enabled with its port in Global
+      settings; the API explorer at http://localhost:<port> lists every endpoint; data types
+      bool, float, long/int and string, plain or normalized values; no authentication by
+      default, write access disabled or password-protected in Permissions, the same for
+      WebSockets. The WebSocket envelope: requests {path, method, body}, responses echo path,
+      method and body and add error. Value subscriptions: POST /console/data/subscribe with
+      path (a * wildcard, ch.*.mix.lvl) and format val, the response holding the initial
+      values. Metering: POST /console/metering2/subscribe with id, interval (30-1000 ms, per
+      client, the last wins), binary and params (type and index; 0 channel meters, 1 the same
+      plus gate and dynamics side-chain input and gain reduction, 10 RTA, 11 RF channel meters
+      indexed rfDeviceId<<8|rfChannelId), at most 500 values, data on /console/metering2/{id},
+      body.v an array of arrays in dB per requested parameter (gain reduction negative,
+      inactive channels included), body.b base64 int16 big-endian dB × 100 when binary;
+      unsubscribe with an empty params list or POST /console/metering/unsubscribe with the id.
+      MS Scenes (endpoints named only in the app), recall progress as app state sceneRecall,
+      lastError. App state at /app/state with a top state and a detailed state, and extra data
+      such as progress.
+  - title: "App states (Mixing Station Docs, read 31 October 2026)"
+    author: dev-core
+    url: https://mixingstation.app/ms-docs/use-cases/app-states
+    note: >
+      Manufacturer document. Top states IDLE, CONNECTING, CONNECTED, RECONNECTING; states under
+      them SEARCHING, PRE_PASSWORD, SYNCHRONIZING, SYNC_ERROR, POST_PASSWORD, CONNECTION_LOST,
+      BACKGROUND_SYNC, SCENE_RECALL.
+  - title: "Mixing Station Docs, print edition: Global settings (API, Permissions) and Program arguments"
+    author: dev-core
+    url: https://mixingstation.app/ms-docs/print_page
+    note: >
+      Manufacturer document. -web=<port> (the web server, disabled by default); API access in
+      Global settings, desktop only; write access and a write password in Permissions (work in
+      progress).
+  - title: companion-module-devcore-mixingstation (Bitfocus Companion module, MIT license)
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-devcore-mixingstation/tree/b4018aa54e87119c05b43c3b302db0cb92f6cd12
+    note: >
+      Read at commit b4018aa5 (30 October 2026), MIT license, for the endpoints the document
+      leaves to the in-app explorer. src/ms/MixingStation.ts: ws://<host>:<port>/, GET
+      /app/state on connecting and its pushes (state, topState, msg, progress in Model.ts),
+      POST /console/data/subscribe and /console/data/unsubscribe with {path, format: val}, GET
+      /console/information, POST /console/data/set/<path>/val with {value, fade} (fade in ms,
+      Mixing Station 3.2.0 or later per companion/HELP.md), GET /console/data/get/<path>/val
+      answered with {value, format}, values pushed on paths starting /console/data/get/, GET
+      /console/data/definitions2/<path> (type, unit, min, max, delta, enums, tap, constraints),
+      GET /console/data/paths (a tree of val and child), GET /app/mixers/available (consoles
+      with consoleId, manufacturer, name, modelEnums), POST /app/mixers/offline {consoleId,
+      modelId} and /app/mixers/connect {consoleId, ip}; a message with error set is an error.
+      companion/HELP.md: Mixing Station 2.4.1 or later, port usually 8080, on/off values 1/0.
+
+transport:
+  type: ws
+  port: null
+  path: /
+  scheme: ws
+  timeout_ms: 3000
+  reply: expected
+
+settings:
+  subscribe_path: { type: string, default: "ch.*.mix.lvl", max_length: 128, pattern: '^[A-Za-z0-9_*]+(\.[A-Za-z0-9_*]+)*$',
+    label: Subscribed values,
+    description: "The data path subscribed on connecting, * standing for any index, so its values are kept in state; ch.*.mix.lvl is every channel's fader. More are subscribed with subscribe." }
+
+ports:
+  - { port: null, protocol: ws, role: control, note: "the REST port set in Mixing Station's global settings or with -web=<port>, often 8080; give it when opening the device" }
+
+models:
+  - id: mixingstation-desktop
+    name: Mixing Station desktop (Windows, macOS, Linux)
+    supports: [get_app_state, get_console_information, get_available_mixers, connect_mixer, start_offline,
+      get_data_paths, get_definition, get_value, set_value, set_value_int, set_value_bool, set_value_text,
+      subscribe, unsubscribe, subscribe_meters, unsubscribe_meters]
+    verification: none
+
+commands:
+  get_app_state:
+    summary: "Read the app's state (GET /app/state): its top state, its detailed state, a message and progress"
+    send: '{"path":"/app/state","method":"GET","body":null}'
+    expect:
+      reply_json: { "$.path": "/app/state" }
+      not_contains: '"error":"'
+      json_path: "$.body"
+    returns: value
+  get_console_information:
+    summary: "Read the connected console's channel types and counts, channel colors, RTA frequencies and dBFS offset (GET /console/information)"
+    send: '{"path":"/console/information","method":"GET","body":null}'
+    expect:
+      reply_json: { "$.path": "/console/information", "$.method": "GET" }
+      not_contains: '"error":"'
+      json_path: "$.body"
+    returns: value
+  get_available_mixers:
+    summary: "List the consoles Mixing Station can connect to, with their console and model ids (GET /app/mixers/available)"
+    send: '{"path":"/app/mixers/available","method":"GET","body":null}'
+    expect:
+      reply_json: { "$.path": "/app/mixers/available", "$.method": "GET" }
+      not_contains: '"error":"'
+      json_path: "$.body"
+    returns: value
+  connect_mixer:
+    summary: "Connect Mixing Station to a console (POST /app/mixers/connect)"
+    params:
+      console_id: &console_id { type: int, min: 0, max: 2147483647, required: true, label: Console, description: "The console family's id, as get_available_mixers lists it." }
+      ip: { type: string, required: true, max_length: 253, pattern: '^[A-Za-z0-9.:\[\]-]+$', label: Console address, description: "The console's IP address or host name." }
+    send: '{"path":"/app/mixers/connect","method":"POST","body":{"consoleId":{console_id},"ip":{ip:json}}}'
+    returns: none
+  start_offline:
+    summary: "Start Mixing Station's offline mode for a console model (POST /app/mixers/offline)"
+    params:
+      console_id: *console_id
+      model_id: { type: int, min: 0, max: 2147483647, required: true, label: Model, description: "The model's id among the console's models, as get_available_mixers lists them." }
+    send: '{"path":"/app/mixers/offline","method":"POST","body":{"consoleId":{console_id},"modelId":{model_id}}}'
+    returns: none
+  get_data_paths:
+    summary: "Read every data path of the connected console, as a tree (GET /console/data/paths)"
+    send: '{"path":"/console/data/paths","method":"GET","body":null}'
+    expect:
+      reply_json: { "$.path": "/console/data/paths", "$.method": "GET" }
+      not_contains: '"error":"'
+      json_path: "$.body"
+    returns: value
+  get_definition:
+    summary: "Read a parameter's definition: type, unit, range, step and named values (GET /console/data/definitions2/<path>)"
+    params:
+      path: &path { type: string, required: true, max_length: 128, pattern: '^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$', label: Data path,
+        description: "The parameter's data path, numbered from 0, such as ch.0.mix.lvl for channel 1's fader; get_data_paths lists them." }
+    send: '{"path":"/console/data/definitions2/{path}","method":"GET","body":null}'
+    expect:
+      reply_json: { "$.path": "/console/data/definitions2/{path}", "$.method": "GET" }
+      not_contains: '"error":"'
+      json_path: "$.body"
+    returns: value
+  get_value:
+    summary: "Read a parameter's plain value by data path (GET /console/data/get/<path>/val)"
+    params: { path: *path }
+    send: '{"path":"/console/data/get/{path}/val","method":"GET","body":null}'
+    expect:
+      reply_json: { "$.path": "/console/data/get/{path}/val", "$.method": "GET" }
+      not_contains: '"error":"'
+      json_path: "$.body.value"
+    returns: value
+  set_value:
+    summary: "Set a parameter to a number in its own unit, such as a level in dB, optionally fading (POST /console/data/set/<path>/val)"
+    params:
+      path: *path
+      value: { type: float, required: true, label: Value, description: "The value in the parameter's own unit (a fader level in dB, a frequency in Hz)." }
+      fade_ms: &fade { type: int, min: 0, max: 600000, default: 0, label: Fade time, description: "Milliseconds to fade to the value, 0 for at once (Mixing Station 3.2.0 or later)." }
+    send: '{"path":"/console/data/set/{path}/val","method":"POST","body":{"value":{value:.6f},"fade":{fade_ms}}}'
+    returns: none
+  set_value_int:
+    summary: "Set a parameter to a whole number, such as an index or a named value's id (POST /console/data/set/<path>/val)"
+    params:
+      path: *path
+      value: { type: int, required: true, label: Value, description: "The whole-number value; 1 and 0 for on and off." }
+      fade_ms: *fade
+    send: '{"path":"/console/data/set/{path}/val","method":"POST","body":{"value":{value},"fade":{fade_ms}}}'
+    returns: none
+  set_value_bool:
+    summary: "Set an on/off parameter (POST /console/data/set/<path>/val)"
+    params:
+      path: *path
+      value: { type: bool, required: true, label: Value, description: "On or off." }
+    send: '{"path":"/console/data/set/{path}/val","method":"POST","body":{"value":{value},"fade":0}}'
+    returns: none
+  set_value_text:
+    summary: "Set a text parameter, such as a name (POST /console/data/set/<path>/val)"
+    params:
+      path: *path
+      value: { type: string, required: true, max_length: 256, label: Value, description: "The text." }
+    send: '{"path":"/console/data/set/{path}/val","method":"POST","body":{"value":{value:json},"fade":0}}'
+    returns: none
+  subscribe:
+    summary: "Subscribe to a data path's values, * standing for any index; their values come at once and on every change, into state (POST /console/data/subscribe)"
+    params:
+      path: &sub_path { type: string, required: true, max_length: 128, pattern: '^[A-Za-z0-9_*]+(\.[A-Za-z0-9_*]+)*$', label: Data path,
+        description: "The data path, * for any index: ch.*.mix.lvl is every channel's fader, ch.0.mix.on channel 1's on switch." }
+    send: '{"path":"/console/data/subscribe","method":"POST","body":{"path":"{path}","format":"val"}}'
+    returns: none
+  unsubscribe:
+    summary: "Stop a data path's subscription (POST /console/data/unsubscribe)"
+    params: { path: *sub_path }
+    send: '{"path":"/console/data/unsubscribe","method":"POST","body":{"path":"{path}","format":"val"}}'
+    returns: none
+  subscribe_meters:
+    summary: "Subscribe to meters under an id, kept in meters.<id> (POST /console/metering2/subscribe); an empty list ends the subscription"
+    params:
+      id: &meter_id { type: int, min: 0, max: 2147483647, required: true, label: Subscription id, description: "The id the meters are sent and kept under." }
+      interval_ms: { type: int, min: 30, max: 1000, default: 100, label: Interval, description: "Milliseconds between meter updates, 30 to 1000; one interval for every subscription of this client, the last given wins." }
+      params: { type: json, required: true, label: Meters,
+        description: "JSON array of the meters wanted, each {\"type\": t, \"index\": i}: type 0 a channel's meters, 1 the same with gate and dynamics side-chain input and gain reduction, 10 the RTA, 11 an RF channel (index rfDeviceId × 256 + rfChannelId); at most 500 values in all." }
+    send: '{"path":"/console/metering2/subscribe","method":"POST","body":{"id":{id},"interval":{interval_ms},"binary":false,"params":{params}}}'
+    returns: none
+  unsubscribe_meters:
+    summary: "End a meter subscription (POST /console/metering/unsubscribe)"
+    params: { id: *meter_id }
+    send: '{"path":"/console/metering/unsubscribe","method":"POST","body":{"id":{id}}}'
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The API runs in Mixing Station's desktop app, which must have its REST API enabled with a
+      port in Global settings (or -web=<port>); open the device at the computer running it with
+      that port. Write access can be turned off, or protected by a password, in Permissions; how
+      a client gives that password is not documented, so a protected app refuses this client's
+      writes. The parameters depend on the console Mixing Station is connected to; get_data_paths
+      and get_definition describe them. MS Scene endpoints are named only in the app's API
+      explorer and are not built here; a scene recall shows as the app state SCENE_RECALL.
+  - models: [all]
+    severity: info
+    text: >
+      While monitoring, the core reads the app state and subscribes to the subscribe_path setting;
+      every value that arrives is kept by its data path under values (numbers), switches (on/off)
+      or texts (anything else, text that reads true or false aside), and the app state under app.
+      Values pushed for a subscription are assumed to arrive on /console/data/get/<path>, with or
+      without /val, as the reply to a get does. Sets, subscriptions and connections report done
+      when sent; the reply, with its error, is not awaited.
+  - models: [all]
+    severity: info
+    text: >
+      Meters are kept as meters.<id>.<n>.<m>: the m-th value in dB of the n-th meter asked for
+      (both from 0), in the order Mixing Station sends them for each type. Channel meters' values
+      and their order are not documented; gain reduction is negative.
+
+state:
+  app.top_state: { type: string, description: "Mixing Station's top state: idle, connecting, connected or reconnecting" }
+  app.state:     { type: string, description: "The detailed state, such as synchronizing, sceneRecall or connectionLost" }
+  app.message:   { type: string, description: "The message the app gives with its state, if any" }
+  app.progress:  { type: float, description: "Progress of the state's work, such as a scene recall or a synchronization" }
+  values.*:      { type: float, description: "A subscribed parameter's number value, keyed by its data path, such as ch.0.mix.lvl" }
+  switches.*:    { type: bool, description: "A subscribed on/off parameter's value, keyed by its data path" }
+  texts.*:       { type: string, description: "A subscribed text parameter's value, keyed by its data path" }
+  meters.*.*.*:  { type: float, unit: dB, description: "Meter values in dB, by subscription id, by the meter's place in the subscription and by the value's place in that meter, from 0" }
+
+telemetry:
+  subscribe:
+    send:
+      - '{"path":"/app/state","method":"GET","body":null}'
+      - '{"path":"/console/data/subscribe","method":"POST","body":{"path":"{settings.subscribe_path}","format":"val"}}'
+  updates:
+    - json_match: { "$.path": "^/app/state$" }
+      json: { top: "$.body.topState", state: "$.body.state", msg: "$.body.msg", progress: "$.body.progress" }
+      state: { app.top_state: "{top}", app.state: "{state}", app.message: "{msg}", app.progress: "{progress}" }
+    - json_match: { "$.path": "^/console/data/get/([^/]+?)(?:/val)?$", "$.body.value": "^-?[0-9]" }
+      json: { value: "$.body.value" }
+      state: { "values.{1:key}": "{value}" }
+    - json_match: { "$.path": "^/console/data/get/([^/]+?)(?:/val)?$", "$.body.value": "^(true|false)$" }
+      json: { value: "$.body.value" }
+      state: { "switches.{1:key}": "{value}" }
+    - json_match:
+        "$.path": "^/console/data/get/([^/]+?)(?:/val)?$"
+        "$.body.value": '(?s)^(?:[^-0-9tf].*|t(?:[^r].*)?|tr(?:[^u].*)?|tru(?:[^e].*)?|true.+|f(?:[^a].*)?|fa(?:[^l].*)?|fal(?:[^s].*)?|fals(?:[^e].*)?|false.+|-(?:[^0-9].*)?|)$'
+      json: { value: "$.body.value" }
+      state: { "texts.{1:key}": "{value}" }
+    - json_match: { "$.path": "^/console/metering2/(\\d+)$" }
+      json_each: "$.body.v[*]"
+      json: { level: "$" }
+      state: { "meters.{1}.{^index}.{index}": "{level}" }

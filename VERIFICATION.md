@@ -3025,6 +3025,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] /hi/v resent every 4 seconds keeps the subscription alive, and Mixing Station answers to the address and port the subscription came from. ([specs/mixingstation.yaml:137](specs/mixingstation.yaml#L137))
 - [ ] An on/off parameter takes T or F (OSC's true and false); the documentation lists bool as a data type without naming its type tag. ([specs/mixingstation.yaml:91](specs/mixingstation.yaml#L91))
 
+## mixingstation-api — Mixing Station desktop (REST and WebSocket API)
+
+- [ ] Confirm the WebSocket opens at ws://<host>:<REST port>/ and answers each {path, method, body} request with the same path and method, the body and error (null on success). ([specs/mixingstation-api.yaml:67](specs/mixingstation-api.yaml#L67))
+- [ ] Record the message a value subscription pushes: its path (/console/data/get/<path> with or without /val), its method and body, and what the subscribe request's own answer holds for the initial values. ([specs/mixingstation-api.yaml:226](specs/mixingstation-api.yaml#L226))
+- [ ] Check whether POST requests (set, subscribe, connect, offline, metering) are answered, and with what. ([specs/mixingstation-api.yaml:226](specs/mixingstation-api.yaml#L226))
+- [ ] Record the order and meaning of the values in a type 0 and a type 1 meter, per console. ([specs/mixingstation-api.yaml:235](specs/mixingstation-api.yaml#L235))
+- [ ] Check how a client gives the write password set in Permissions, and what a write without it is answered. ([specs/mixingstation-api.yaml:216](specs/mixingstation-api.yaml#L216))
+- [ ] Record the MS Scene endpoints and lastError from the app's API explorer, so scenes can be read and recalled. ([specs/mixingstation-api.yaml:216](specs/mixingstation-api.yaml#L216))
+- [ ] Check what a * wildcard matches in a subscription path (one index, or several levels), and the format names other than val (normalized values). ([specs/mixingstation-api.yaml:76](specs/mixingstation-api.yaml#L76))
+
 ## modulopi-kinetic — Modulo Pi Modulo Kinetic
 
 - [ ] Confirm the websocket path (/ is used) and whether wss uses a self-signed certificate when SSL is on. ([specs/modulopi-kinetic.yaml:45](specs/modulopi-kinetic.yaml#L45))
