@@ -3687,6 +3687,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that a choice control's cmvv aspect 2 lists its choices as the strings, with zero values and positions, as the document's slope example shows, and note any vector control longer than 16 elements (its values and positions are not kept). ([specs/qsys-ecp.yaml:582](specs/qsys-ecp.yaml#L582))
 - [ ] Check that an sg every 30 s keeps the connection open while a scheduled change group is pushing. ([specs/qsys-ecp.yaml:385](specs/qsys-ecp.yaml#L385))
 
+## rationalacoustics-smaart — Rational Acoustics Smaart (Smaart API over WebSocket)
+
+- [ ] Confirm Smaart accepts the password set on connecting without first being asked (the Companion modules send it after a get answers authenticationRequired), and record the answer to a wrong password. ([specs/rationalacoustics-smaart.yaml:75](specs/rationalacoustics-smaart.yaml#L75))
+- [ ] Record the answer to a bare get (sequenceNumber 2): its fields beside authenticationRequired, such as the API or Smaart version. ([specs/rationalacoustics-smaart.yaml:121](specs/rationalacoustics-smaart.yaml#L121))
+- [ ] Confirm every request is answered, carrying its sequenceNumber back, also on success, and what a success answer holds. ([specs/rationalacoustics-smaart.yaml:121](specs/rationalacoustics-smaart.yaml#L121))
+- [ ] Check whether Smaart v9 (API v4) takes set tabs activeTab, which its Companion module lists as pending an API update, and start_tab_measurements. ([specs/rationalacoustics-smaart.yaml:134](specs/rationalacoustics-smaart.yaml#L134))
+- [ ] Confirm the generator gain takes a decimal level in dB FS and its range. ([specs/rationalacoustics-smaart.yaml:157](specs/rationalacoustics-smaart.yaml#L157))
+- [ ] Confirm the capture action (v8.5 and later) and the traceFilePath rename on Smaart v9. ([specs/rationalacoustics-smaart.yaml:173](specs/rationalacoustics-smaart.yaml#L173))
+- [ ] Check how Smaart on Windows names the modifiers in keypress strings (command, option) and which keys need Smaart to have focus. ([specs/rationalacoustics-smaart.yaml:191](specs/rationalacoustics-smaart.yaml#L191))
+- [ ] Check what option + H does on v9 (SPL mode) and on v8 and Di (SPL history). ([specs/rationalacoustics-smaart.yaml:289](specs/rationalacoustics-smaart.yaml#L289))
+
 ## red-rcp2 — RED DSMC3 cameras (RCP2 over WebSocket)
 
 - [ ] Check every message form, parameter id, value scale and enumeration in this spec against RED's RCP2 documents (behind a RED account login) or a camera; none comes from RED's own documentation. ([specs/red-rcp2.yaml:434](specs/red-rcp2.yaml#L434))

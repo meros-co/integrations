@@ -1,0 +1,402 @@
+spec: 1
+id: rationalacoustics-smaart
+name: Rational Acoustics Smaart (Smaart API over WebSocket)
+vendor: Rational Acoustics
+category: other
+
+# Smaart's API takes JSON requests on a WebSocket, once enabled in Smaart's
+# API menu: ws://<host>:<port>/api/v4/ for Smaart v9 and later, /api/v3/
+# for Smaart v8.3 to v8.5 and Smaart Di 2.1 and later. A request names an
+# action (get, set, capture, issueCommand), a target (signalGenerator,
+# activeMeasurements, tabs, or a tab or measurement by name) and a list of
+# properties, with a sequenceNumber the answer carries back; an answer that
+# fails holds response.error, one of the API's error words. issueCommand
+# sends Smaart a keystroke, so the view commands below are its keyboard
+# shortcuts.
+#
+# Rational Acoustics gives the API document (the Smaart API SDK) on request
+# only; this spec follows the MIT-licensed Companion modules for each API
+# version, which use a fixed sequenceNumber for each request. A password, when
+# one is set in Smaart, is sent on connecting.
+source:
+  - title: Bitfocus Companion module companion-module-rationalacoustics-smaart4 v1.0.0 (MIT), index.js, HELP.md
+    author: Bitfocus contributors
+    url: https://github.com/bitfocus/companion-module-rationalacoustics-smaart4
+    note: >
+      Community code, read for its behavior only (LICENSE is MIT; no code
+      copied). Smaart v9 and later, API v4: ws://host:port/api/v4/; a get with
+      sequenceNumber 1 on opening, answered with response.authenticationRequired
+      when a password is set, then a set of the password; response.error
+      "incorect password"; the requests with their fixed sequence numbers:
+      reset averages (10, set activeMeasurements runningAverage 0), start a
+      tab's measurements (12, target tabName and allMeasurements, active
+      true), signal generator on or off (13, active) and level (14, gain in dB
+      FS, -200 to 0), delay tracking (15, allTransferFunctionMeasurements
+      trackingDelay), issueCommand keypresses (16); the keystrokes of each
+      view command (zoom, zoom presets, cursor keys, Z order, hide traces,
+      peak hold, input and SPL meters, real-time, impulse and SPL modes, view
+      presets, Y offsets, bars, locked cursor, preferred plot); tab selection
+      pending an API update.
+  - title: Bitfocus Companion module companion-module-rationalacoustics-smaart3 v2.x (MIT), src/index.js, src/actions.js, src/errors.js, companion/HELP.md
+    author: Todd Murphy, Phillip Ivan Pietruschka and Bitfocus contributors
+    url: https://github.com/bitfocus/companion-module-rationalacoustics-smaart3
+    note: >
+      Community code, read for its behavior only (LICENSE is MIT; no code
+      copied). Smaart v8.3 to v8.5 and Smaart Di 2.1 and later, API v3:
+      ws://host:26000/api/v3/ by default; the same requests, plus tab
+      selection (set tabs activeTab), capture (action capture of a
+      measurement by name, v8.5 and later) and trace rename (set traceFilePath
+      name); the API's error words and their meanings (parse error, timeout,
+      unknown target, unknown action, unkown property, unknown value, read
+      only, not implemented, signal generator required, measurement not
+      active, authentication required, incorrect password, internal error).
+  - title: Integration with 3rd Party Products (Rational Acoustics)
+    author: Rational Acoustics
+    url: https://www.rationalacoustics.com/pages/integration-with-3rd-party-products
+    note: >
+      Manufacturer page: the API is a JSON text command structure over a
+      WebSocket connection, free to use, its SDK given on request (lifecycle
+      and protocol outline only).
+
+transport:
+  type: ws
+  port: 26000
+  path: "/api/{settings.api_version}/"
+  scheme: ws
+  timeout_ms: 3000
+  reply: expected
+
+settings:
+  api_version: { type: enum, values: [v4, v3], default: v4, label: API version,
+                 description: "v4 for Smaart v9 and later; v3 for Smaart v8.3 to v8.5 and Smaart Di 2.1 and later." }
+  password: { type: string, secret: true, max_length: 128, default: "", label: API password,
+              description: "The password set in Smaart's API menu; leave empty when none is set." }
+
+on_connect:
+  - when_set: password
+    send: '{"sequenceNumber":1,"action":"set","properties":[{"password":{settings.password:json}}]}'
+    await_reply: true
+    refused: '"(incorrect|incorect) password"'
+
+maps:
+  zoom_direction: { in: "+", out: "-" }
+  view_key: { spectrum: S, transfer: T, user_1: "1", user_2: "2", user_3: "3", user_4: "4", user_5: "5", user_6: "6", user_7: "7", user_8: "8", user_9: "9", multi_spectrum: "0" }
+  zoom_key: { default: "5", zoom_1: "1", zoom_2: "2", zoom_3: "3", zoom_4: "4" }
+  bar_key: { control: O, command: U, data: B }
+  z_order_key: { forward: Z, backward: "shift + Z" }
+
+ports:
+  - { port: 26000, protocol: ws, role: control, note: "Smaart's API port, set in its API menu" }
+
+models:
+  - id: smaart-v9
+    name: Smaart v9 and later (Smaart Suite, Smaart RT), API v4
+    supports:
+      [get_status, reset_averages, start_tab_measurements, set_generator, set_generator_level, set_delay_tracking,
+       press_key, zoom_x, zoom_y, zoom_xy, zoom_preset, cursor_key, cycle_z_order, hide_trace, hide_all_traces,
+       toggle_peak_hold, toggle_input_meters, toggle_input_meter_orientation, real_time_mode, impulse_mode,
+       spl_mode, toggle_spl_meters, select_view, top_trace_y_offset, clear_top_trace_y_offset, clear_all_y_offsets,
+       toggle_bar, lock_cursor_to_peak, clear_locked_cursor, move_locked_cursor, cycle_preferred_plot]
+    verification: none
+    notes: Set api_version to v4.
+  - id: smaart-v8
+    name: Smaart v8.3 to v8.5, API v3
+    supports:
+      &v3_cmds
+      [get_status, reset_averages, select_tab, start_tab_measurements, set_generator, set_generator_level,
+       set_delay_tracking, capture_trace, rename_trace, press_key, zoom_x, zoom_y, zoom_xy, zoom_preset, cursor_key,
+       cycle_z_order, hide_trace, hide_all_traces, toggle_peak_hold, toggle_input_meters,
+       toggle_input_meter_orientation, spl_mode, toggle_spl_meters, select_view, top_trace_y_offset,
+       clear_top_trace_y_offset, clear_all_y_offsets, toggle_bar, lock_cursor_to_peak, clear_locked_cursor,
+       move_locked_cursor, cycle_preferred_plot]
+    verification: none
+    notes: Set api_version to v3. Capture needs v8.5.
+  - id: smaart-di
+    name: Smaart Di 2.1 and later, API v3
+    supports: *v3_cmds
+    verification: none
+    notes: Set api_version to v3.
+
+commands:
+  get_status:
+    summary: Ask Smaart for its API status (get); its answer says whether a password is required
+    send: '{"sequenceNumber":2,"action":"get"}'
+    expect: { reply_json: { "$.sequenceNumber": "2" }, json_path: "$.response" }
+    returns: value
+
+  # ── Measurements and generator ───────────────────────────────────────────
+  reset_averages:
+    summary: Reset the running averages of the active tab's measurements (set activeMeasurements runningAverage 0)
+    send: '{"sequenceNumber":10,"action":"set","target":"activeMeasurements","properties":[{"runningAverage":0}]}'
+    expect: { reply_json: { "$.sequenceNumber": "10" }, not_contains: '"error"' }
+    returns: ack
+
+  select_tab:
+    summary: Make a tab active by its name (set tabs activeTab)
+    params:
+      tab: &tab { type: string, max_length: 128, required: true, label: Tab, description: "The tab's name, as shown in Smaart." }
+    send: '{"sequenceNumber":11,"action":"set","target":"tabs","properties":[{"activeTab":{tab:json}}]}'
+    expect: { reply_json: { "$.sequenceNumber": "11" }, not_contains: '"error"' }
+    returns: ack
+
+  start_tab_measurements:
+    summary: Start every measurement of a tab (set a tab's allMeasurements active)
+    params: { tab: *tab }
+    send: '{"sequenceNumber":12,"action":"set","target":{"tabName":{tab:json},"measurementName":"allMeasurements"},"properties":[{"active":true}]}'
+    expect: { reply_json: { "$.sequenceNumber": "12" }, not_contains: '"error"' }
+    returns: ack
+
+  set_generator:
+    summary: Start or stop the signal generator (set signalGenerator active)
+    params:
+      active: { type: bool, required: true, label: Generator on, description: "On starts the signal generator; off stops it." }
+    send: '{"sequenceNumber":13,"action":"set","target":"signalGenerator","properties":[{"active":{active}}]}'
+    expect: { reply_json: { "$.sequenceNumber": "13" }, not_contains: '"error"' }
+    returns: ack
+
+  set_generator_level:
+    summary: Set the signal generator's level (set signalGenerator gain)
+    params:
+      level: { type: float, min: -200.0, max: 0.0, required: true, label: Level, description: "The generator's level in dB FS, -200 to 0." }
+    send: '{"sequenceNumber":14,"action":"set","target":"signalGenerator","properties":[{"gain":{level:.1f}}]}'
+    expect: { reply_json: { "$.sequenceNumber": "14" }, not_contains: '"error"' }
+    returns: ack
+
+  set_delay_tracking:
+    summary: Turn delay tracking of the active tab's transfer function measurements on or off (allTransferFunctionMeasurements trackingDelay)
+    params:
+      tracking: { type: bool, required: true, label: Delay tracking, description: "On tracks each transfer function's delay; off stops." }
+    send: '{"sequenceNumber":15,"action":"set","target":{"measurementName":"allTransferFunctionMeasurements"},"properties":[{"trackingDelay":{tracking}}]}'
+    expect: { reply_json: { "$.sequenceNumber": "15" }, not_contains: '"error"' }
+    returns: ack
+
+  capture_trace:
+    summary: Capture a measurement's current trace (capture)
+    params:
+      measurement: { type: string, max_length: 128, required: true, label: Measurement, description: "The measurement's name, as shown in Smaart." }
+    send: '{"sequenceNumber":17,"action":"capture","target":{"measurementName":{measurement:json}}}'
+    expect: { reply_json: { "$.sequenceNumber": "17" }, not_contains: '"error"' }
+    returns: ack
+
+  rename_trace:
+    summary: Rename a captured trace by its file (set traceFilePath name)
+    params:
+      path: { type: string, max_length: 1024, required: true, label: Trace file, description: "The trace file's full path and name on the Smaart computer." }
+      name: { type: string, max_length: 128, required: true, label: Name, description: "The trace's new name." }
+    send: '{"sequenceNumber":18,"action":"set","target":{"traceFilePath":{path:json}},"properties":[{"name":{name:json}}]}'
+    expect: { reply_json: { "$.sequenceNumber": "18" }, not_contains: '"error"' }
+    returns: ack
+
+  # ── Keyboard commands (issueCommand) ─────────────────────────────────────
+  press_key:
+    summary: Send Smaart any keyboard shortcut (issueCommand keypress)
+    params:
+      keypress: { type: string, max_length: 64, required: true, label: Keys,
+                  description: "The keystroke as Smaart writes it: modifiers and a key joined by \" + \", such as shift + command + H or cursor up." }
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":{keypress:json}}]}'
+    expect: &ok16 { reply_json: { "$.sequenceNumber": "16" }, not_contains: '"error"' }
+    returns: ack
+
+  zoom_x:
+    summary: Zoom the frequency (X) axis in or out (option + command + or -)
+    params:
+      direction: &zoom { type: enum, values: [in, out], required: true, label: Zoom, description: "in zooms in; out zooms out." }
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"option + command{direction:map.zoom_direction}"}]}'
+    expect: *ok16
+    returns: ack
+
+  zoom_y:
+    summary: Zoom the amplitude (Y) axis in or out (+ or -)
+    params: { direction: *zoom }
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"{direction:map.zoom_direction}"}]}'
+    expect: *ok16
+    returns: ack
+
+  zoom_xy:
+    summary: Zoom both axes in or out (command + or -)
+    params: { direction: *zoom }
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"command{direction:map.zoom_direction}"}]}'
+    expect: *ok16
+    returns: ack
+
+  zoom_preset:
+    summary: Recall a zoom preset (option + 1-5)
+    params:
+      preset: { type: enum, values: [default, zoom_1, zoom_2, zoom_3, zoom_4], required: true, label: Zoom preset,
+                description: "default the default zoom, or zoom presets 1 to 4." }
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"option + {preset:map.zoom_key}"}]}'
+    expect: *ok16
+    returns: ack
+
+  cursor_key:
+    summary: Press an arrow key (cursor up, down, left or right)
+    params:
+      direction: &four_way { type: enum, values: [up, down, left, right], required: true, label: Direction, description: "The arrow key to press." }
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"cursor {direction}"}]}'
+    expect: *ok16
+    returns: ack
+
+  cycle_z_order:
+    summary: Bring the next or previous trace to the front (Z, shift + Z)
+    params:
+      direction: { type: enum, values: [forward, backward], required: true, label: Direction, description: "forward the next trace, backward the previous one." }
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"{direction:map.z_order_key}"}]}'
+    expect: *ok16
+    returns: ack
+
+  hide_trace:
+    summary: Hide the top trace (H)
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"H"}]}'
+    expect: *ok16
+    returns: ack
+
+  hide_all_traces:
+    summary: Hide every trace (shift + command + H)
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"shift + command + H"}]}'
+    expect: *ok16
+    returns: ack
+
+  toggle_peak_hold:
+    summary: Toggle peak hold (P)
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"P"}]}'
+    expect: *ok16
+    returns: ack
+
+  toggle_input_meters:
+    summary: Show or hide the input meters (shift + E)
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"shift + E"}]}'
+    expect: *ok16
+    returns: ack
+
+  toggle_input_meter_orientation:
+    summary: Turn the input meters between horizontal and vertical (shift + option + E)
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"shift + option + E"}]}'
+    expect: *ok16
+    returns: ack
+
+  real_time_mode:
+    summary: Switch to real-time mode (R)
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"R"}]}'
+    expect: *ok16
+    returns: ack
+
+  impulse_mode:
+    summary: Switch to impulse mode (I)
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"I"}]}'
+    expect: *ok16
+    returns: ack
+
+  spl_mode:
+    summary: Switch to SPL mode in v9, or toggle the SPL history in v8 and Di (option + H)
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"option + H"}]}'
+    expect: *ok16
+    returns: ack
+
+  toggle_spl_meters:
+    summary: Show or hide the SPL meters (E)
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"E"}]}'
+    expect: *ok16
+    returns: ack
+
+  select_view:
+    summary: Select a view preset (S, T, 0-9)
+    params:
+      view: { type: enum, values: [spectrum, transfer, user_1, user_2, user_3, user_4, user_5, user_6, user_7, user_8, user_9, multi_spectrum],
+              required: true, label: View, description: "spectrum, transfer, user views 1 to 9, or multi_spectrum." }
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"{view:map.view_key}"}]}'
+    expect: *ok16
+    returns: ack
+
+  top_trace_y_offset:
+    summary: Move the top trace up or down (command + cursor up or down)
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: Direction, description: "up or down." }
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"command + cursor {direction}"}]}'
+    expect: *ok16
+    returns: ack
+
+  clear_top_trace_y_offset:
+    summary: Clear the top trace's Y offset (Y)
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"Y"}]}'
+    expect: *ok16
+    returns: ack
+
+  clear_all_y_offsets:
+    summary: Clear every trace's Y offset (command + Y)
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"command + Y"}]}'
+    expect: *ok16
+    returns: ack
+
+  toggle_bar:
+    summary: Show or hide the control, command or data bar (O, U, B)
+    params:
+      bar: { type: enum, values: [control, command, data], required: true, label: Bar, description: "The bar to show or hide." }
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"{bar:map.bar_key}"}]}'
+    expect: *ok16
+    returns: ack
+
+  lock_cursor_to_peak:
+    summary: Lock the cursor to the peak (command + P)
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"command + P"}]}'
+    expect: *ok16
+    returns: ack
+
+  clear_locked_cursor:
+    summary: Clear the locked cursor (command + X)
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"command + X"}]}'
+    expect: *ok16
+    returns: ack
+
+  move_locked_cursor:
+    summary: Move the locked cursor left or right (command + cursor left or right)
+    params:
+      direction: { type: enum, values: [left, right], required: true, label: Direction, description: "left or right." }
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"command + cursor {direction}"}]}'
+    expect: *ok16
+    returns: ack
+
+  cycle_preferred_plot:
+    summary: Cycle the preferred plot (M)
+    send: '{"sequenceNumber":16,"action":"issueCommand","properties":[{"keypress":"M"}]}'
+    expect: *ok16
+    returns: ack
+
+state:
+  authentication_required: { type: bool, description: "Whether Smaart's API asks for a password (response.authenticationRequired)" }
+  last_error:              { type: string, description: "The last error word Smaart answered with, such as unknown target (response.error)" }
+
+telemetry:
+  poll:
+    - every_ms: 10000
+      send: ['{"sequenceNumber":2,"action":"get"}']
+  updates:
+    - json_match: { "$.response.authenticationRequired": "^(true|false)$" }
+      json: { required: "$.response.authenticationRequired" }
+      state: { authentication_required: "{required}" }
+    - json_match: { "$.response.error": "^(.+)$" }
+      json: {}
+      state: { last_error: "{1}" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Rational Acoustics gives the API document on request only, so this spec
+      covers what the open Companion modules use: the generator, averages,
+      delay tracking, tab measurements, captures, trace names and keyboard
+      shortcuts. Measurement data, trace lists and other gets are not read.
+      issueCommand keystrokes act on the window that has focus in Smaart.
+  - models: [all]
+    severity: info
+    text: >
+      The API must be enabled in Smaart's API menu, with its port and
+      optional password. Each request carries a fixed sequenceNumber, as the
+      Companion modules send them, so two of the same kind in flight at once
+      cannot be told apart. A refused request answers with response.error,
+      kept as last_error.
+  - models: [smaart-v9]
+    severity: info
+    text: >
+      Selecting a tab by name awaits an API update in Smaart v9 (the v4
+      Companion module lists it as pending); start_tab_measurements is sent
+      as for v3.

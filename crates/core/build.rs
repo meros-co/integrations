@@ -319,6 +319,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-ptzoptics", &["ptzoptics"]),
     ("vendor-qlcplus", &["qlcplus"]),
     ("vendor-qsc", &["qsys", "qsys-ecp"]),
+    ("vendor-rationalacoustics", &["rationalacoustics-smaart"]),
     ("vendor-red", &["red-rcp2"]),
     (
         "vendor-renewedvision",
