@@ -208,7 +208,7 @@ async fn a_9pin_deck_is_read_and_driven() {
             model: "generic".into(),
             host: "127.0.0.1".into(),
             port: Some(port),
-            settings: params(json!({"link": "tcp"})),
+            settings: params(json!({})),
             monitor: true,
         })
         .unwrap();
@@ -273,7 +273,7 @@ async fn opened_for_commands_only_the_deck_is_not_polled() {
             model: "generic".into(),
             host: "127.0.0.1".into(),
             port: Some(port),
-            settings: params(json!({"link": "tcp"})),
+            settings: params(json!({})),
             monitor: false,
         })
         .unwrap();

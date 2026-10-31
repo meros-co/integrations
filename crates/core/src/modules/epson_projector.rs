@@ -1,5 +1,4 @@
-//! Epson projectors over ESC/VP21, on TCP 3629 (ESC/VP.net) or a serial
-//! port.
+//! Epson projectors over ESC/VP21, on TCP 3629 (ESC/VP.net).
 //!
 //! Protocol from Epson's ESC/VP21 Command User's Guide for Business
 //! Projectors (Rev. A, 2013) and its ESC/VP21 command list workbook (Rev. T,
@@ -29,10 +28,8 @@
 //!   lamp hours and every other setting the model's family reads every
 //!   minute while it is on (in standby most commands answer ERR, §3.1); the
 //!   serial number on connecting and on `refresh`.
-//! - The `link` setting chooses TCP or a serial port of the host (9600 bit/s,
-//!   8 data bits, no parity, 1 stop bit and no flow control by default,
-//!   guide appendix). A link that drops or a port that fails is opened again
-//!   after 1 s, doubling to 30 s; three requests in a row unanswered close it.
+//! - A connection that drops is opened again after 1 s, doubling to 30 s;
+//!   three requests in a row unanswered close it.
 //!
 //! Opened for commands only (`monitor` false), nothing is polled and no set
 //! is followed by a read; every 5 s the null command shows the projector is
@@ -40,14 +37,15 @@
 //! request reports its round trip as the device's latency.
 
 use std::collections::VecDeque;
+use std::net::SocketAddr;
 
 use crate::{json, value::Value};
 
 use super::epson_projector_commands::COMMANDS;
 use crate::catalog::{DeviceSpec, Params};
 use crate::module::{
-    CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, PollStamps, TcpInput,
+    CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    PollStamps, TcpInput,
 };
 
 pub(crate) const DEFAULT_PORT: u16 = 3629;
@@ -161,8 +159,7 @@ enum Phase {
 }
 
 pub(crate) struct EpsonProjector {
-    link: Link,
-    tcp: bool,
+    to: SocketAddr,
     monitor: bool,
     /// Keywords the model's family reads (its `get_*` commands).
     reads: Vec<&'static str>,
@@ -196,14 +193,13 @@ impl EpsonProjector {
                 _ => None,
             })
             .collect();
-        let link = Link::from_settings(&ctx, DEFAULT_PORT)?;
-        Ok(EpsonProjector::with(link, reads, ctx.monitor))
+        let to = crate::module::tcp_address(&ctx, DEFAULT_PORT)?;
+        Ok(EpsonProjector::with(to, reads, ctx.monitor))
     }
 
-    fn with(link: Link, reads: Vec<&'static str>, monitor: bool) -> EpsonProjector {
+    fn with(to: SocketAddr, reads: Vec<&'static str>, monitor: bool) -> EpsonProjector {
         EpsonProjector {
-            tcp: matches!(link, Link::Tcp(_)),
-            link,
+            to,
             monitor,
             reads,
             phase: Phase::Closed,
@@ -280,7 +276,7 @@ impl EpsonProjector {
         self.phase = Phase::Opening;
         self.buf.clear();
         cx.connection(Connection::Connecting);
-        self.link.open(cx, SOCKET);
+        cx.tcp_open(SOCKET, self.to);
     }
 
     fn lost(&mut self, cx: &mut Cx, reason: String) {
@@ -652,13 +648,9 @@ impl Module for EpsonProjector {
                     return;
                 }
                 self.buf.clear();
-                if self.tcp {
-                    self.phase = Phase::Handshake;
-                    cx.tcp_send(SOCKET, CONNECT.to_vec());
-                    cx.set_timer(REPLY, HANDSHAKE_TIMEOUT);
-                } else {
-                    self.ready(cx);
-                }
+                self.phase = Phase::Handshake;
+                cx.tcp_send(SOCKET, CONNECT.to_vec());
+                cx.set_timer(REPLY, HANDSHAKE_TIMEOUT);
             }
             TcpInput::Data(bytes) => {
                 if matches!(self.phase, Phase::Handshake | Phase::Open) {
@@ -730,21 +722,9 @@ mod tests {
     use crate::session::merge_patch;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-    fn module(tcp: bool, monitor: bool, reads: Vec<&'static str>) -> EpsonProjector {
-        let link = if tcp {
-            Link::Tcp(SocketAddr::new(
-                IpAddr::V4(Ipv4Addr::new(10, 0, 0, 50)),
-                DEFAULT_PORT,
-            ))
-        } else {
-            Link::Serial(
-                crate::module::SerialPort::from_settings(
-                    json!({"serial_port": "COM3"}).as_object().unwrap(),
-                )
-                .unwrap(),
-            )
-        };
-        EpsonProjector::with(link, reads, monitor)
+    fn module(monitor: bool, reads: Vec<&'static str>) -> EpsonProjector {
+        let to = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 50)), DEFAULT_PORT);
+        EpsonProjector::with(to, reads, monitor)
     }
 
     fn sent(actions: &[Action]) -> Vec<Vec<u8>> {
@@ -793,10 +773,21 @@ mod tests {
         cx.take()
     }
 
-    fn opened(m: &mut EpsonProjector) -> Vec<Action> {
+    fn connected(m: &mut EpsonProjector) -> Vec<Action> {
         let mut cx = Cx::new(0);
         m.start(&mut cx);
         m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        cx.take()
+    }
+
+    /// Connected, with the ESC/VP.net header answered: what the projector
+    /// is first asked.
+    fn opened(m: &mut EpsonProjector) -> Vec<Action> {
+        connected(m);
+        let mut answer = b"ESC/VP.net".to_vec();
+        answer.extend_from_slice(&[0x10, 0x03, 0x00, 0x00, 0x20, 0x00]);
+        let mut cx = Cx::new(0);
+        m.tcp(&mut cx, SOCKET, TcpInput::Data(answer));
         cx.take()
     }
 
@@ -818,8 +809,8 @@ mod tests {
 
     #[test]
     fn the_network_link_sends_the_connect_header_first() {
-        let mut m = module(true, true, vec!["LAMP", "SOURCE"]);
-        let a = opened(&mut m);
+        let mut m = module(true, vec!["LAMP", "SOURCE"]);
+        let a = connected(&mut m);
         assert_eq!(sent(&a), [CONNECT.to_vec()]);
         // The answer header, then the first poll.
         let mut answer = b"ESC/VP.net".to_vec();
@@ -837,8 +828,8 @@ mod tests {
 
     #[test]
     fn a_wrong_answer_to_the_header_drops_the_link() {
-        let mut m = module(true, true, vec![]);
-        opened(&mut m);
+        let mut m = module(true, vec![]);
+        connected(&mut m);
         let a = feed(&mut m, b"HTTP/1.1 400 Bad Req");
         assert!(a
             .iter()
@@ -865,7 +856,7 @@ mod tests {
             ("get_amx_beacon", json!({}), "AMX\r"),
         ];
         for (i, (name, p, line)) in cases.iter().enumerate() {
-            let mut m = module(false, false, vec![]);
+            let mut m = module(false, vec![]);
             opened(&mut m);
             drain(&mut m);
             let a = run(&mut m, i as u64 + 1, name, p.clone());
@@ -875,7 +866,7 @@ mod tests {
 
     #[test]
     fn a_query_reply_reaches_state_and_err_fails() {
-        let mut m = module(false, false, vec![]);
+        let mut m = module(false, vec![]);
         opened(&mut m);
         drain(&mut m);
         run(&mut m, 1, "get_brightness", json!({}));
@@ -905,7 +896,7 @@ mod tests {
 
     #[test]
     fn a_set_is_read_back_when_monitoring() {
-        let mut m = module(false, true, vec![]);
+        let mut m = module(true, vec![]);
         opened(&mut m);
         drain(&mut m);
         run(&mut m, 1, "set_brightness", json!({"value": "100"}));
@@ -916,7 +907,7 @@ mod tests {
 
     #[test]
     fn standby_reads_only_status_and_on_reads_the_rest() {
-        let mut m = module(false, true, vec!["PWR", "LAMP", "SOURCE", "BRIGHT"]);
+        let mut m = module(true, vec!["PWR", "LAMP", "SOURCE", "BRIGHT"]);
         let a = opened(&mut m);
         assert_eq!(sent_text(&a), ["PWR?\r"]);
         let mut lines = vec![];
@@ -937,7 +928,7 @@ mod tests {
 
     #[test]
     fn opened_for_commands_only_it_sends_only_the_null_command() {
-        let mut m = module(false, false, vec!["LAMP"]);
+        let mut m = module(false, vec!["LAMP"]);
         let a = opened(&mut m);
         assert_eq!(sent_text(&a), ["\r"]);
         let a = feed(&mut m, b":");
@@ -951,7 +942,7 @@ mod tests {
 
     #[test]
     fn a_round_trip_is_reported() {
-        let mut m = module(false, false, vec![]);
+        let mut m = module(false, vec![]);
         opened(&mut m);
         let a = feed(&mut m, b":");
         assert!(a.contains(&Action::RoundTrip(20)));
@@ -959,7 +950,7 @@ mod tests {
 
     #[test]
     fn three_unanswered_requests_reopen_the_link() {
-        let mut m = module(false, false, vec![]);
+        let mut m = module(false, vec![]);
         opened(&mut m);
         let mut cx = Cx::new(0);
         for _ in 0..3 {

@@ -1,5 +1,6 @@
 //! Video disk servers over VDCP (the Video Disk Control Protocol, Louth's,
-//! now Imagine Communications'): the `vdcp` integration.
+//! now Imagine Communications'): the `vdcp` integration, over TCP to the
+//! server's VDCP port or a serial-to-Ethernet converter's.
 //!
 //! - A message is STX (02), a byte count (the bytes from CMD-1 to the last
 //!   data byte), CMD-1 (a command type and a unit address), CMD-2, the data
@@ -35,8 +36,8 @@ use crate::{
 
 use crate::catalog::Params;
 use crate::module::{
-    CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, SerialPort, TcpInput,
+    CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    TcpInput,
 };
 
 const SOCKET: Key = "vdcp";
@@ -273,7 +274,7 @@ enum Phase {
 }
 
 pub(crate) struct Vdcp {
-    link: Link,
+    to: std::net::SocketAddr,
     monitor: bool,
     port: i8,
     lock: bool,
@@ -293,19 +294,12 @@ pub(crate) struct Vdcp {
 
 impl Vdcp {
     pub(crate) fn new(ctx: OpenContext) -> Result<Vdcp, String> {
-        let link = match ctx.settings.get("link").and_then(Value::as_str) {
-            None | Some("serial") => Link::Serial(SerialPort::from_settings(&ctx.settings)?),
-            Some("tcp") => {
-                let port = ctx
-                    .port
-                    .ok_or("the server's TCP port has no standard number: give it when opening")?;
-                if ctx.host.is_unspecified() {
-                    return Err("a TCP link needs the server's host".into());
-                }
-                Link::Tcp(std::net::SocketAddr::new(ctx.host, port))
-            }
-            Some(other) => return Err(format!("link '{other}' is not serial or tcp")),
-        };
+        if ctx.port.is_none() {
+            return Err(
+                "the server's TCP port has no standard number: give it when opening".into(),
+            );
+        }
+        let to = crate::module::tcp_address(&ctx, 0)?;
         let port = ctx
             .settings
             .get("port")
@@ -313,7 +307,7 @@ impl Vdcp {
             .unwrap_or(0)
             .clamp(-127, 127) as i8;
         Ok(Vdcp {
-            link,
+            to,
             monitor: ctx.monitor,
             port,
             lock: ctx
@@ -709,7 +703,7 @@ impl Vdcp {
         self.phase = Phase::Connecting;
         self.buf.clear();
         cx.connection(Connection::Connecting);
-        self.link.open(cx, SOCKET);
+        cx.tcp_open(SOCKET, self.to);
     }
 
     fn lost(&mut self, cx: &mut Cx, reason: String) {
@@ -1458,7 +1452,7 @@ mod tests {
 
     /// Opened for commands only on output port 1: open, select, device type.
     fn idle() -> Vdcp {
-        let mut m = module(false, json!({"link": "tcp", "port": 1}));
+        let mut m = module(false, json!({"port": 1}));
         let mut cx = Cx::new(0);
         m.start(&mut cx);
         m.tcp(&mut cx, SOCKET, TcpInput::Connected);
@@ -1529,7 +1523,7 @@ mod tests {
 
     #[test]
     fn port_status_becomes_state_and_reads_added_ids() {
-        let mut m = module(true, json!({"link": "tcp"}));
+        let mut m = module(true, json!({}));
         let mut cx = Cx::new(0);
         m.start(&mut cx);
         m.tcp(&mut cx, SOCKET, TcpInput::Connected);
@@ -1577,10 +1571,7 @@ mod tests {
 
     #[test]
     fn variable_ids_use_the_length_byte_forms() {
-        let mut m = module(
-            false,
-            json!({"link": "tcp", "port": 0, "variable_ids": true}),
-        );
+        let mut m = module(false, json!({"port": 0, "variable_ids": true}));
         let mut cx = Cx::new(0);
         m.start(&mut cx);
         m.tcp(&mut cx, SOCKET, TcpInput::Connected);

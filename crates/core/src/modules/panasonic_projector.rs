@@ -1,7 +1,7 @@
 //! Panasonic projectors over their control commands, on TCP 1024
-//! (NTCONTROL) or a serial port.
+//! (NTCONTROL).
 //!
-//! Protocol from the "Control commands via LAN" and RS-232C chapters of
+//! Protocol from the "Control commands via LAN" chapter of
 //! Panasonic's projector Operating Instructions (here the PT-RZ120 Functional
 //! Manual, DPQP1239ZF) and the per-series Control Commands lists, which give
 //! every command, query and reply.
@@ -17,19 +17,13 @@
 //!   (busy or not accepted now), `ERR4` (timeout), `ERR5` (wrong length) and
 //!   `ERRA` (password mismatch). `ERRA` is terminal: nothing is sent again
 //!   until the device is opened again with corrected credentials.
-//! - On the serial port a command is STX, `AD`, the projector ID (`ZZ` for
-//!   all, `01`-`64`, or a group `0A`-`0Z`), `;`, the command, ETX; the
-//!   answer is STX, the reply, ETX, or `ER401` (cannot be executed now) or
-//!   `ER402` (invalid parameter). Commands are sent 0.5 s after the previous
-//!   answer, and 60 s after the light source starts lighting, as the manual
-//!   asks.
 //! - The projector pushes nothing, so state is polled: the power status
 //!   every 5 s, and while the projector is on, every query the model's
 //!   command list has, one sweep a minute at most.
 //!
 //! Opened for commands only (`monitor` false), only the power query runs
 //! every 5 s, as the liveness check (the projector sends nothing unasked,
-//! and over the network each command is its own connection). Replies to
+//! and each command is its own connection). Replies to
 //! commands still update the state, and every answered request reports its
 //! round trip as the device's latency.
 
@@ -42,8 +36,8 @@ use md5::{Digest, Md5};
 use super::panasonic_projector_commands::COMMANDS;
 use crate::catalog::{DeviceSpec, Params};
 use crate::module::{
-    CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, PollStamps, SerialPort, TcpInput,
+    CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    PollStamps, TcpInput,
 };
 
 pub(crate) const DEFAULT_PORT: u16 = 1024;
@@ -51,23 +45,15 @@ const SOCKET: Key = "ntcontrol";
 const REPLY: Key = "reply";
 const POLL: Key = "poll";
 const RETRY: Key = "retry";
-const PACE: Key = "pace";
 
 /// The manual asks for a time-out of 10 s or more.
 const REPLY_TIMEOUT: Millis = 10_000;
 const POLL_EVERY: Millis = 5_000;
 const SWEEP_EVERY: u32 = 12;
-/// Serial: 0.5 s after an answer before the next command.
-const SERIAL_GAP: Millis = 500;
-/// Serial: 60 s after the light source starts lighting before the next
-/// command (RS-232C "Attention").
-const LIGHTING_GAP: Millis = 60_000;
 const MISSES: u32 = 3;
 const RETRY_MIN: Millis = 1_000;
 const RETRY_MAX: Millis = 30_000;
 const MAX_REPLY: usize = 4096;
-const STX: u8 = 0x02;
-const ETX: u8 = 0x03;
 
 /// How a generated command is sent.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -174,20 +160,16 @@ impl Job {
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Phase {
     Idle,
-    /// TCP: connecting, then waiting for `NTCONTROL`.
+    /// Connecting, then waiting for `NTCONTROL`.
     Connecting,
     Greeting,
     /// The command is sent; its answer is awaited.
     Sent,
-    /// Serial: the port is opening.
-    Opening,
     Closed,
 }
 
 pub(crate) struct PanasonicProjector {
-    tcp: Option<SocketAddr>,
-    serial: Option<SerialPort>,
-    id: String,
+    to: SocketAddr,
     user: String,
     password: String,
     monitor: bool,
@@ -196,7 +178,6 @@ pub(crate) struct PanasonicProjector {
     /// The model's inputs, as set_input_select takes them.
     inputs: &'static [&'static str],
     phase: Phase,
-    port_open: bool,
     reachable: bool,
     powered: bool,
     /// The power has been read since the link opened.
@@ -210,7 +191,6 @@ pub(crate) struct PanasonicProjector {
     in_flight: Option<(Job, Millis)>,
     /// When each poll was last answered (`polled.status`, SPEC.md §8).
     stamps: PollStamps,
-    paced: bool,
     cycle: u32,
 }
 
@@ -234,31 +214,23 @@ impl PanasonicProjector {
             .collect();
         let s = &ctx.settings;
         let text = |k: &str, d: &str| s.get(k).and_then(Value::as_str).unwrap_or(d).to_string();
-        let link = Link::from_settings(&ctx, DEFAULT_PORT)?;
-        let mut m = PanasonicProjector::with(link, reads, ctx.monitor);
+        let to = crate::module::tcp_address(&ctx, DEFAULT_PORT)?;
+        let mut m = PanasonicProjector::with(to, reads, ctx.monitor);
         m.inputs = model_inputs(&model.id);
-        m.id = text("projector_id", "ZZ");
         m.user = text("username", "dispadmin");
         m.password = text("password", "");
         Ok(m)
     }
 
-    fn with(link: Link, reads: Vec<(&'static str, &'static str)>, monitor: bool) -> Self {
-        let (tcp, serial) = match link {
-            Link::Tcp(a) => (Some(a), None),
-            Link::Serial(p) => (None, Some(p)),
-        };
+    fn with(to: SocketAddr, reads: Vec<(&'static str, &'static str)>, monitor: bool) -> Self {
         PanasonicProjector {
-            tcp,
-            serial,
-            id: "ZZ".into(),
+            to,
             user: "dispadmin".into(),
             password: String::new(),
             monitor,
             reads,
             inputs: &[],
             phase: Phase::Idle,
-            port_open: false,
             reachable: false,
             powered: false,
             power_known: false,
@@ -270,7 +242,6 @@ impl PanasonicProjector {
             polls: VecDeque::new(),
             in_flight: None,
             stamps: PollStamps::default(),
-            paced: false,
             cycle: 0,
         }
     }
@@ -296,16 +267,9 @@ impl PanasonicProjector {
         self.cycle = self.cycle.wrapping_add(1);
     }
 
-    /// Send the next job: over TCP open a connection for it, on serial
-    /// send it on the open port.
+    /// Send the next job, on a connection opened for it.
     fn pump(&mut self, cx: &mut Cx) {
-        if self.refused.is_some() || self.in_flight.is_some() || self.paced {
-            return;
-        }
-        if self.tcp.is_some() && self.phase != Phase::Idle {
-            return;
-        }
-        if self.serial.is_some() && (!self.port_open || self.phase != Phase::Idle) {
+        if self.refused.is_some() || self.in_flight.is_some() || self.phase != Phase::Idle {
             return;
         }
         let Some(job) = self.commands.pop_front().or_else(|| self.polls.pop_front()) else {
@@ -313,16 +277,8 @@ impl PanasonicProjector {
         };
         self.buf.clear();
         cx.set_timer(REPLY, REPLY_TIMEOUT);
-        if let Some(addr) = self.tcp {
-            self.phase = Phase::Connecting;
-            cx.tcp_open(SOCKET, addr);
-        } else {
-            let mut out = vec![STX];
-            out.extend_from_slice(format!("AD{};{}", self.id, job.line).as_bytes());
-            out.push(ETX);
-            cx.tcp_send(SOCKET, out);
-            self.phase = Phase::Sent;
-        }
+        self.phase = Phase::Connecting;
+        cx.tcp_open(SOCKET, self.to);
         self.in_flight = Some((job, cx.now()));
     }
 
@@ -341,7 +297,7 @@ impl PanasonicProjector {
         self.polls.clear();
     }
 
-    /// The projector stopped answering or the port failed.
+    /// The projector stopped answering or the connection failed.
     fn lost(&mut self, cx: &mut Cx, reason: String) {
         let r = reason.clone();
         self.fail_all(cx, || CommandError::Transport { message: r.clone() });
@@ -351,7 +307,6 @@ impl PanasonicProjector {
         self.misses = 0;
         self.reachable = false;
         self.power_known = false;
-        self.port_open = false;
         self.phase = Phase::Closed;
         cx.log(Level::Debug, format!("Panasonic projector: {reason}"));
         cx.connection(Connection::Disconnected { reason });
@@ -414,17 +369,8 @@ impl PanasonicProjector {
             self.reachable = true;
             cx.connection(Connection::Connected);
         }
-        // Over the network the reply carries "00" before the data.
-        let reply = match self.tcp {
-            Some(_) => reply.strip_prefix("00").unwrap_or(reply),
-            None => reply,
-        };
-        // The light source starts lighting: power on accepted while not
-        // known to be on, or the power read on after it was read standby.
-        let was_on = self.power_known && self.powered;
-        let lighting = error_meaning(reply).is_none()
-            && !was_on
-            && (job.line == "PON" || (job.line == "QPW" && reply == "001" && self.power_known));
+        // The reply carries "00" before the data.
+        let reply = reply.strip_prefix("00").unwrap_or(reply);
         if job.line == "PON" && error_meaning(reply).is_none() {
             // On from now: the read that follows does not light it again.
             self.powered = true;
@@ -471,15 +417,9 @@ impl PanasonicProjector {
         if let Some(id) = job.command {
             cx.complete(id, result);
         }
-        if self.tcp.is_some() {
-            cx.tcp_close(SOCKET);
-            self.phase = Phase::Idle;
-            self.pump(cx);
-        } else {
-            self.phase = Phase::Idle;
-            self.paced = true;
-            cx.set_timer(PACE, if lighting { LIGHTING_GAP } else { SERIAL_GAP });
-        }
+        cx.tcp_close(SOCKET);
+        self.phase = Phase::Idle;
+        self.pump(cx);
     }
 
     fn data(&mut self, cx: &mut Cx, bytes: &[u8]) {
@@ -488,45 +428,28 @@ impl PanasonicProjector {
             self.lost(cx, "an answer longer than the protocol allows".into());
             return;
         }
-        if self.tcp.is_some() {
-            while let Some(end) = self.buf.iter().position(|&b| b == b'\r') {
-                let raw: Vec<u8> = self.buf.drain(..=end).collect();
-                let line = String::from_utf8_lossy(&raw[..raw.len() - 1])
-                    .trim()
-                    .to_string();
-                match self.phase {
-                    Phase::Greeting => self.greeting(cx, &line),
-                    Phase::Sent => {
-                        if line == "ERRA" {
-                            self.refuse(
-                                cx,
-                                "the projector refused the user name or password (ERRA)".into(),
-                            );
-                        } else {
-                            self.answered(cx, &line);
-                        }
+        while let Some(end) = self.buf.iter().position(|&b| b == b'\r') {
+            let raw: Vec<u8> = self.buf.drain(..=end).collect();
+            let line = String::from_utf8_lossy(&raw[..raw.len() - 1])
+                .trim()
+                .to_string();
+            match self.phase {
+                Phase::Greeting => self.greeting(cx, &line),
+                Phase::Sent => {
+                    if line == "ERRA" {
+                        self.refuse(
+                            cx,
+                            "the projector refused the user name or password (ERRA)".into(),
+                        );
+                    } else {
+                        self.answered(cx, &line);
                     }
-                    _ => {}
                 }
-                if self.phase == Phase::Closed || self.phase == Phase::Idle {
-                    self.buf.clear();
-                    return;
-                }
+                _ => {}
             }
-        } else {
-            while let (Some(s), Some(e)) = (
-                self.buf.iter().position(|&b| b == STX),
-                self.buf.iter().position(|&b| b == ETX),
-            ) {
-                if e < s {
-                    self.buf.drain(..=e);
-                    continue;
-                }
-                let frame: Vec<u8> = self.buf.drain(..=e).collect();
-                let text = String::from_utf8_lossy(&frame[s + 1..frame.len() - 1]).to_string();
-                if self.phase == Phase::Sent {
-                    self.answered(cx, &text);
-                }
+            if self.phase == Phase::Closed || self.phase == Phase::Idle {
+                self.buf.clear();
+                return;
             }
         }
     }
@@ -603,8 +526,6 @@ fn error_meaning(reply: &str) -> Option<&'static str> {
         "ERR3" => "busy, or not accepted now",
         "ERR4" => "timeout, or not accepted now",
         "ERR5" => "wrong data length",
-        "ER401" => "the command cannot be executed now",
-        "ER402" => "invalid parameter",
         _ => return None,
     })
 }
@@ -623,13 +544,8 @@ impl Module for PanasonicProjector {
             cx.state(json!({ "inputs": { "available": self.inputs } }));
         }
         cx.connection(Connection::Connecting);
-        if let Some(port) = self.serial.clone() {
-            self.phase = Phase::Opening;
-            cx.serial_open(SOCKET, port);
-        } else {
-            self.queue_cycle(false);
-            self.pump(cx);
-        }
+        self.queue_cycle(false);
+        self.pump(cx);
         cx.set_timer(POLL, POLL_EVERY);
     }
 
@@ -666,14 +582,7 @@ impl Module for PanasonicProjector {
         }
         match input {
             TcpInput::Connected => {
-                if self.serial.is_some() {
-                    if self.phase == Phase::Opening {
-                        self.port_open = true;
-                        self.phase = Phase::Idle;
-                        self.queue_cycle(false);
-                        self.pump(cx);
-                    }
-                } else if self.phase == Phase::Connecting {
+                if self.phase == Phase::Connecting {
                     self.phase = Phase::Greeting;
                 }
             }
@@ -683,13 +592,12 @@ impl Module for PanasonicProjector {
                 }
             }
             TcpInput::Closed { reason } => {
-                // Over TCP the projector closes each connection after
-                // answering; only a close before the answer is a failure.
-                let failed = self.serial.is_some()
-                    || matches!(
-                        self.phase,
-                        Phase::Connecting | Phase::Greeting | Phase::Sent
-                    );
+                // The projector closes each connection after answering;
+                // only a close before the answer is a failure.
+                let failed = matches!(
+                    self.phase,
+                    Phase::Connecting | Phase::Greeting | Phase::Sent
+                );
                 if failed && self.phase != Phase::Closed {
                     self.lost(cx, reason);
                 }
@@ -703,18 +611,8 @@ impl Module for PanasonicProjector {
         }
         match key {
             RETRY => {
-                if self.serial.is_some() {
-                    self.phase = Phase::Opening;
-                    cx.connection(Connection::Connecting);
-                    cx.serial_open(SOCKET, self.serial.clone().expect("serial"));
-                } else {
-                    self.phase = Phase::Idle;
-                    self.queue_cycle(false);
-                    self.pump(cx);
-                }
-            }
-            PACE => {
-                self.paced = false;
+                self.phase = Phase::Idle;
+                self.queue_cycle(false);
                 self.pump(cx);
             }
             POLL => {
@@ -730,19 +628,14 @@ impl Module for PanasonicProjector {
                         cx.complete(id, Err(CommandError::Timeout));
                     }
                     self.misses += 1;
-                    if self.tcp.is_some() || self.misses >= MISSES {
-                        if self.tcp.is_some() && self.misses < MISSES && self.reachable {
-                            // One lost exchange: try the next on a new connection.
-                            cx.tcp_close(SOCKET);
-                            self.phase = Phase::Idle;
-                            self.pump(cx);
-                            return;
-                        }
-                        self.lost(cx, "the projector stopped answering".into());
+                    if self.misses < MISSES && self.reachable {
+                        // One lost exchange: try the next on a new connection.
+                        cx.tcp_close(SOCKET);
+                        self.phase = Phase::Idle;
+                        self.pump(cx);
                         return;
                     }
-                    self.phase = Phase::Idle;
-                    self.pump(cx);
+                    self.lost(cx, "the projector stopped answering".into());
                 }
             }
             _ => {}
@@ -763,26 +656,12 @@ mod tests {
 
     fn tcp_module(monitor: bool, password: &str) -> PanasonicProjector {
         let mut m = PanasonicProjector::with(
-            Link::Tcp(SocketAddr::new(
-                IpAddr::V4(Ipv4Addr::new(10, 0, 0, 60)),
-                DEFAULT_PORT,
-            )),
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 60)), DEFAULT_PORT),
             vec![("QIN", "input_select")],
             monitor,
         );
         m.password = password.into();
         m
-    }
-
-    fn serial_module() -> PanasonicProjector {
-        PanasonicProjector::with(
-            Link::Serial(
-                SerialPort::from_settings(json!({"serial_port": "COM4"}).as_object().unwrap())
-                    .unwrap(),
-            ),
-            vec![],
-            false,
-        )
     }
 
     fn sent(actions: &[Action]) -> Vec<Vec<u8>> {
@@ -914,112 +793,6 @@ mod tests {
             completed(&a, 2),
             Some(Err(CommandError::DeviceError { .. }))
         ));
-    }
-
-    #[test]
-    fn serial_frames_carry_stx_the_id_and_etx_and_are_paced() {
-        let mut m = serial_module();
-        let mut cx = Cx::new(0);
-        m.start(&mut cx);
-        let a = input(&mut m, TcpInput::Connected);
-        assert_eq!(sent(&a), [b"\x02ADZZ;QPW\x03".to_vec()]);
-        let mut cx = Cx::new(0);
-        m.command(
-            &mut cx,
-            1,
-            "set_power",
-            json!({"on": true}).as_object().unwrap(),
-        );
-        assert!(sent(&cx.take()).is_empty());
-        let a = data(&mut m, b"\x02000\x03");
-        assert_eq!(state(&a)["power"], "standby");
-        // The next command waits 0.5 s.
-        assert!(sent(&a).is_empty());
-        let mut cx = Cx::new(500);
-        m.timer(&mut cx, PACE);
-        assert_eq!(sent(&cx.take()), [b"\x02ADZZ;PON\x03".to_vec()]);
-        let a = data(&mut m, b"\x02ER401\x03");
-        assert!(matches!(
-            completed(&a, 1),
-            Some(Err(CommandError::DeviceError { .. }))
-        ));
-    }
-
-    #[test]
-    fn serial_commands_wait_60_s_once_the_light_source_lights() {
-        let mut m = serial_module();
-        let mut cx = Cx::new(0);
-        m.start(&mut cx);
-        input(&mut m, TcpInput::Connected);
-        data(&mut m, b"000");
-        let mut cx = Cx::new(10);
-        m.command(
-            &mut cx,
-            1,
-            "set_power",
-            json!({"on": true}).as_object().unwrap(),
-        );
-        let mut cx = Cx::new(500);
-        m.timer(&mut cx, PACE);
-        assert_eq!(sent(&cx.take()), [b"ADZZ;PON".to_vec()]);
-        let mut cx = Cx::new(10);
-        m.command(
-            &mut cx,
-            2,
-            "set_input_select",
-            json!({"value": "HD1"}).as_object().unwrap(),
-        );
-        let a = data(&mut m, b"PON");
-        assert!(a.contains(&Action::SetTimer {
-            key: PACE,
-            after: LIGHTING_GAP
-        }));
-        assert!(sent(&a).is_empty());
-        let mut cx = Cx::new(60_000);
-        m.timer(&mut cx, PACE);
-        assert_eq!(sent(&cx.take()), [b"ADZZ;IIS:HD1".to_vec()]);
-        data(&mut m, b"IIS:HD1");
-        // Read on afterwards: the light source is not lit again.
-        m.polls.push_back(Job::query("QPW", None));
-        let mut cx = Cx::new(0);
-        m.timer(&mut cx, PACE);
-        let a = data(&mut m, b"001");
-        assert!(a.contains(&Action::SetTimer {
-            key: PACE,
-            after: SERIAL_GAP
-        }));
-        // Already on: power on lights nothing, and the gap is 0.5 s.
-        m.commands.push_back(Job::query("PON", None));
-        let mut cx = Cx::new(0);
-        m.timer(&mut cx, PACE);
-        let a = data(&mut m, b"PON");
-        assert!(a.contains(&Action::SetTimer {
-            key: PACE,
-            after: SERIAL_GAP
-        }));
-    }
-
-    #[test]
-    fn serial_commands_wait_60_s_after_the_power_is_read_turning_on() {
-        let mut m = serial_module();
-        let mut cx = Cx::new(0);
-        m.start(&mut cx);
-        // The first read says nothing about lighting.
-        input(&mut m, TcpInput::Connected);
-        let a = data(&mut m, b"001");
-        assert!(a.contains(&Action::SetTimer {
-            key: PACE,
-            after: SERIAL_GAP
-        }));
-        m.powered = false;
-        m.polls.push_back(Job::query("QPW", None));
-        let mut cx = Cx::new(0);
-        m.timer(&mut cx, PACE);
-        let a = data(&mut m, b"001");
-        assert!(a.contains(&Action::SetTimer {
-            key: PACE,
-            after: LIGHTING_GAP
-        }));
     }
 
     #[test]

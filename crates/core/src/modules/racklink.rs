@@ -1,6 +1,6 @@
 //! Middle Atlantic RackLink power products over their control protocol
 //! (I-00472 Rev G, and the INFOCOMM 4:2012 additions): binary messages on
-//! TCP 60000, or on a Premium unit's RS-232 port.
+//! TCP 60000.
 //!
 //! - A message is 0xFE, the length of its envelope, the envelope
 //!   (destination 0x00, command, subcommand, data), a checksum (the sum of
@@ -32,8 +32,8 @@ use crate::{
 
 use crate::catalog::Params;
 use crate::module::{
-    CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, PollStamps, TcpInput,
+    CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    PollStamps, TcpInput,
 };
 
 const SOCKET: Key = "racklink";
@@ -312,7 +312,7 @@ struct Job {
 }
 
 pub(crate) struct RackLink {
-    link: Link,
+    to: std::net::SocketAddr,
     monitor: bool,
     /// When each poll was last answered (`polled.<group>`, SPEC.md §8).
     stamps: PollStamps,
@@ -715,11 +715,8 @@ impl RackLink {
     pub(crate) fn new(ctx: OpenContext) -> Result<RackLink, String> {
         let s = &ctx.settings;
         let text = |k: &str, d: &str| s.get(k).and_then(Value::as_str).unwrap_or(d).to_string();
-        let link = Link::from_settings(&ctx, DEFAULT_PORT)?;
+        let to = crate::module::tcp_address(&ctx, DEFAULT_PORT)?;
         let premium = ctx.model != "racklink-select";
-        if matches!(link, Link::Serial(_)) && ctx.model != "racklink-premium" {
-            return Err("only RackLink Premium has an RS-232 control port".into());
-        }
         let username = text("username", "user");
         let password = text("password", "");
         if username.contains('|') {
@@ -728,7 +725,7 @@ impl RackLink {
             );
         }
         Ok(RackLink {
-            link,
+            to,
             monitor: ctx.monitor,
             stamps: PollStamps::default(),
             premium,
@@ -1029,7 +1026,7 @@ impl RackLink {
 
     fn open_link(&mut self, cx: &mut Cx) {
         cx.connection(Connection::Connecting);
-        self.link.open(cx, SOCKET);
+        cx.tcp_open(SOCKET, self.to);
     }
 }
 

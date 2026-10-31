@@ -1,5 +1,5 @@
 //! NEC (Sharp NEC) large-format displays: the "External Control" protocol
-//! over TCP 7142 or an RS-232C port of the host. This is the displays'
+//! over TCP 7142. This is the displays'
 //! protocol, not the projectors'.
 //!
 //! Written from NEC's "External Control" documents for the M series
@@ -43,8 +43,8 @@ use crate::{
 
 use crate::catalog::Params;
 use crate::module::{
-    CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, TcpInput,
+    CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    TcpInput,
 };
 
 const SOCKET: Key = "nec";
@@ -770,7 +770,7 @@ fn identity() -> Vec<Vec<Step>> {
 type Answer = (Value, Value, Option<Value>);
 
 pub(crate) struct NecDisplay {
-    link: Link,
+    to: std::net::SocketAddr,
     monitor: bool,
     monitor_id: u8,
     poll_ms: Millis,
@@ -793,10 +793,10 @@ pub(crate) struct NecDisplay {
 impl NecDisplay {
     pub(crate) fn new(ctx: OpenContext) -> Result<NecDisplay, String> {
         let s = &ctx.settings;
-        let link = Link::from_settings(&ctx, DEFAULT_PORT)?;
+        let to = crate::module::tcp_address(&ctx, DEFAULT_PORT)?;
         let num = |key: &str, default: u64| s.get(key).and_then(Value::as_u64).unwrap_or(default);
         Ok(NecDisplay {
-            link,
+            to,
             monitor: ctx.monitor,
             monitor_id: num("monitor_id", 1).clamp(1, 100) as u8,
             poll_ms: num("poll_ms", 5_000).max(1_000),
@@ -1058,7 +1058,7 @@ impl NecDisplay {
     fn open_link(&mut self, cx: &mut Cx) {
         self.closed = false;
         cx.connection(Connection::Connecting);
-        self.link.open(cx, SOCKET);
+        cx.tcp_open(SOCKET, self.to);
     }
 }
 
@@ -1499,17 +1499,11 @@ mod tests {
     }
 
     #[test]
-    fn the_serial_link_and_a_packet_interval() {
-        let mut m = module(
-            true,
-            json!({"link": "serial", "serial_port": "COM5", "packet_interval_ms": 600}),
-        );
+    fn a_packet_interval_holds_the_next_message() {
+        let mut m = module(true, json!({"packet_interval_ms": 600}));
         let mut cx = Cx::new(0);
         m.start(&mut cx);
-        assert!(cx
-            .take()
-            .iter()
-            .any(|a| matches!(a, Action::SerialOpen { port, .. } if port.baud_rate == 9600)));
+        cx.take();
         let mut cx = Cx::new(0);
         m.tcp(&mut cx, SOCKET, TcpInput::Connected);
         cx.take();

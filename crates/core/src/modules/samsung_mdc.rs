@@ -1,5 +1,5 @@
 //! Samsung MDC (Multiple Display Control) for Samsung signage displays, over
-//! TCP (RJ45, port 1515), its secured TLS mode, or a serial port (RS-232C).
+//! TCP (RJ45, port 1515) or its secured TLS mode.
 //!
 //! Wire format from Samsung's "Multiple Display Control Protocol" Ver. 15.0
 //! (2020-11-06); section numbers below are that document's.
@@ -15,7 +15,8 @@
 //!   three times 2 s apart until acknowledged (§2.1.11). Every command's layout
 //!   comes from the generated table (`samsung_mdc_table.rs`), and a reply with
 //!   several documented layouts is decoded by its length.
-//! - Displays on an RS-232C chain share the link and are told apart by ID
+//! - Displays on an RS-232C chain behind the networked one share its
+//!   connection and are told apart by ID
 //!   (§1.1): the `display_id` setting and `chain_ids` name them, and state is
 //!   kept per display under `displays.<id>`. ID 0xFE reaches every display and
 //!   none answers (§1.2.1), so such a command is unverified.
@@ -48,8 +49,8 @@ use crate::{
 use super::samsung_mdc_table::DEFS;
 use crate::catalog::Params;
 use crate::module::{
-    CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, PollStamps, SerialPort, TcpInput, TlsTarget,
+    CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    PollStamps, TcpInput, TlsTarget,
 };
 
 /// MDC over RJ45 (§1.2.2).
@@ -524,7 +525,7 @@ enum Phase {
 }
 
 pub(crate) struct SamsungMdc {
-    link: Link,
+    to: std::net::SocketAddr,
     host: IpAddr,
     pin: Option<String>,
     mac: Option<[u8; 6]>,
@@ -588,7 +589,7 @@ impl SamsungMdc {
             }
         }
         Ok(SamsungMdc {
-            link: Link::from_settings(&ctx, DEFAULT_PORT)?,
+            to: crate::module::tcp_address(&ctx, DEFAULT_PORT)?,
             host: ctx.host,
             pin,
             mac,
@@ -620,11 +621,12 @@ impl SamsungMdc {
         self.deframer = Deframer::default();
         self.text.clear();
         cx.connection(Connection::Connecting);
-        match (&self.link, &self.pin) {
-            (Link::Tcp(to), Some(_)) => cx.tcp_open_tls(
+        let to = self.to;
+        match &self.pin {
+            Some(_) => cx.tcp_open_tls(
                 SOCKET,
                 TlsTarget {
-                    to: *to,
+                    to,
                     server_name: to.ip().to_string(),
                     // The display's certificate is its own, signed by no
                     // public root; the library this follows checks none.
@@ -633,12 +635,8 @@ impl SamsungMdc {
                     alpn: Vec::new(),
                 },
             ),
-            (link, _) => link.open(cx, SOCKET),
+            None => cx.tcp_open(SOCKET, to),
         }
-    }
-
-    fn is_serial(&self) -> bool {
-        matches!(self.link, Link::Serial(SerialPort { .. }))
     }
 
     // ── Jobs ────────────────────────────────────────────────────────────────
@@ -967,7 +965,7 @@ impl SamsungMdc {
             ),
             None => {}
         }
-        if job.power_on && !self.is_serial() {
+        if job.power_on {
             // §2.1.11: reconnect 10 s after a power on over RJ45.
             if let Some(id) = job.command {
                 cx.complete(id, Ok(Outcome::Ack));
@@ -1120,7 +1118,7 @@ impl Module for SamsungMdc {
         if matches!(self.phase, Phase::Closed | Phase::Refused) {
             // A display that is off over RJ45 takes power on only by
             // Wake-on-LAN (§2.1.11).
-            if job.power_on && !self.is_serial() && self.wake(cx) {
+            if job.power_on && self.wake(cx) {
                 cx.complete(id, Ok(Outcome::Unverified));
             } else if self.phase == Phase::Refused {
                 cx.complete(
@@ -1147,20 +1145,14 @@ impl Module for SamsungMdc {
                     return;
                 }
                 match &self.pin {
-                    Some(pin) if !self.is_serial() => {
+                    Some(pin) => {
                         self.phase = Phase::Auth;
                         cx.tcp_send(SOCKET, pin.as_bytes().to_vec());
                         cx.set_timer(AUTH_TIMER, AUTH_TIMEOUT);
                     }
-                    _ => {
-                        if self.is_serial() {
-                            // A serial port gives no sign of the display:
-                            // only its replies show it is there.
-                            self.ready(cx);
-                        } else {
-                            self.set_connected(cx);
-                            self.ready(cx);
-                        }
+                    None => {
+                        self.set_connected(cx);
+                        self.ready(cx);
                     }
                 }
             }
@@ -1839,21 +1831,5 @@ mod tests {
         assert!(a
             .iter()
             .any(|a| matches!(a, Action::Connection(Connection::Unauthorized { .. }))));
-    }
-
-    #[test]
-    fn a_serial_link_opens_the_port_and_waits_for_a_reply() {
-        let mut m = module(false, json!({"link": "serial", "serial_port": "COM5"}));
-        let mut cx = Cx::new(0);
-        m.start(&mut cx);
-        let a = cx.take();
-        assert!(a.iter().any(|a| matches!(a, Action::SerialOpen { port, .. } if port.path == "COM5" && port.baud_rate == 9600)));
-        let mut cx = Cx::new(0);
-        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
-        let a = cx.take();
-        assert_eq!(sent(&a), [frame(0x11, 0, &[])]);
-        assert!(!a.contains(&Action::Connection(Connection::Connected)));
-        let a = feed_at(&mut m, 0, &reply(0, true, 0x11, &[1]));
-        assert!(a.contains(&Action::Connection(Connection::Connected)));
     }
 }

@@ -4,8 +4,6 @@
 //! bytes, checksum, 0xFF, with 0x80, 0xFE and 0xFF escaped), acknowledges
 //! what it knows with 0x00 0x06 and answers the reads it knows with the
 //! request's bytes and the value; anything else it refuses with 0x00 0x15.
-//! The serial link is the same module on a serial port, tested in the
-//! module's own tests.
 
 #![cfg(feature = "barco-projection-protocol")]
 

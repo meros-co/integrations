@@ -128,7 +128,7 @@ fn open(core: &Core, port: u16, monitor: bool) -> meros_integrations::DeviceId {
         model: "bz".into(),
         host: "127.0.0.1".into(),
         port: Some(port),
-        settings: params(json!({"link": "tcp"})),
+        settings: params(json!({})),
         monitor,
     })
     .unwrap()

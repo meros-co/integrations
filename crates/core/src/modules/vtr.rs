@@ -3,8 +3,8 @@
 //! `grassvalley-amp` integrations.
 //!
 //! - A message is CMD-1 (the command type in the high nibble, the number of
-//!   data bytes in the low one), CMD-2 (the command), the data and, on a
-//!   serial link, a checksum: the low byte of the sum of the bytes before it.
+//!   data bytes in the low one), CMD-2 (the command), the data and, in the
+//!   binary form, a checksum: the low byte of the sum of the bytes before it.
 //!   The device answers every message: ACK (10 01), NAK (11 12 and an error
 //!   byte), or the data asked for (12 11 the device type, 7X the sense
 //!   returns, and for AMP 8X its own returns). One message is in flight at a
@@ -12,10 +12,9 @@
 //! - AMP's extended messages (a clip name of any length) put 2, A or E in the
 //!   count nibble and the real count in the two bytes after CMD-2; so do its
 //!   8X returns that carry names.
-//! - Sony 9-pin goes over the host's serial port (38400 bit/s, 8 data bits,
-//!   odd parity) or, the same bytes, through a serial-to-Ethernet converter.
-//!   AMP goes over a serial port the same way, or over TCP 3811, where each
-//!   message is ASCII: `CMDS`, its length in characters as four decimal
+//! - Sony 9-pin (RS-422 on the device) goes through a serial-to-Ethernet
+//!   converter, which carries the binary messages unchanged. AMP goes over
+//!   TCP 3811, where each message is ASCII: `CMDS`, its length in characters as four decimal
 //!   digits, the message's bytes as hexadecimal digits, then LF, with no
 //!   checksum; the server answers in hexadecimal digits too. A TCP
 //!   connection first opens an AMP channel (`CRAT`, the channel's name) or a
@@ -37,8 +36,8 @@ use crate::{
 
 use crate::catalog::Params;
 use crate::module::{
-    CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, SerialPort, TcpInput,
+    CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    TcpInput,
 };
 
 const SOCKET: Key = "vtr";
@@ -65,8 +64,8 @@ pub(crate) enum Dialect {
     Amp,
 }
 
-/// How messages travel: binary with a checksum (serial, or a converter), or
-/// AMP's hexadecimal text over TCP.
+/// How messages travel: binary with a checksum (Sony 9-pin through a
+/// converter), or AMP's hexadecimal text over TCP.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Wire {
     Binary,
@@ -383,7 +382,7 @@ enum Phase {
 pub(crate) struct Vtr {
     dialect: Dialect,
     wire: Wire,
-    link: Link,
+    to: std::net::SocketAddr,
     monitor: bool,
     channel: String,
     phase: Phase,
@@ -576,24 +575,17 @@ fn nak_text(bits: u8) -> String {
 
 impl Vtr {
     pub(crate) fn new(dialect: Dialect, ctx: OpenContext) -> Result<Vtr, String> {
-        let link_setting = ctx.settings.get("link").and_then(Value::as_str);
-        let link = match (dialect, link_setting) {
-            (_, Some("serial")) => Link::Serial(SerialPort::from_settings(&ctx.settings)?),
-            (Dialect::Amp, None | Some("tcp")) => Link::from_settings(&ctx, 3811)?,
-            (Dialect::Sony, None | Some("tcp")) => {
-                let port = ctx.port.ok_or(
-                    "a serial-to-Ethernet converter has no standard port: give the converter's port",
-                )?;
-                if ctx.host.is_unspecified() {
-                    return Err("a TCP link needs the converter's host".into());
+        let (to, wire) = match dialect {
+            Dialect::Amp => (crate::module::tcp_address(&ctx, 3811)?, Wire::Hex),
+            Dialect::Sony => {
+                if ctx.port.is_none() {
+                    return Err(
+                        "a serial-to-Ethernet converter has no standard port: give the converter's port"
+                            .into(),
+                    );
                 }
-                Link::Tcp(std::net::SocketAddr::new(ctx.host, port))
+                (crate::module::tcp_address(&ctx, 0)?, Wire::Binary)
             }
-            (_, Some(other)) => return Err(format!("link '{other}' is not tcp or serial")),
-        };
-        let wire = match (&link, dialect) {
-            (Link::Tcp(_), Dialect::Amp) => Wire::Hex,
-            _ => Wire::Binary,
         };
         let channel = ctx
             .settings
@@ -604,7 +596,7 @@ impl Vtr {
         Ok(Vtr {
             dialect,
             wire,
-            link,
+            to,
             monitor: ctx.monitor,
             channel,
             phase: Phase::Closed,
@@ -1061,7 +1053,7 @@ impl Vtr {
         self.phase = Phase::Connecting;
         self.buf.clear();
         cx.connection(Connection::Connecting);
-        self.link.open(cx, SOCKET);
+        cx.tcp_open(SOCKET, self.to);
     }
 
     fn lost(&mut self, cx: &mut Cx, reason: String) {
@@ -1646,8 +1638,8 @@ impl Module for Vtr {
                     cx.tcp_send(SOCKET, request.into_bytes());
                     cx.set_timer(REPLY_TIMER, REPLY_TIMEOUT);
                 } else {
-                    // A serial line shows nothing of the device: it is
-                    // reported connected once it answers.
+                    // A converter's connection shows nothing of the
+                    // device: it is reported connected once it answers.
                     self.ready(cx);
                 }
             }
@@ -1800,7 +1792,7 @@ mod tests {
     /// A Sony deck opened for commands only, past its device type request.
     #[cfg(feature = "sony-9pin")]
     fn sony_idle() -> Vtr {
-        let mut m = module("sony-9pin", false, json!({"link": "tcp"}));
+        let mut m = module("sony-9pin", false, json!({}));
         let mut cx = Cx::new(0);
         m.start(&mut cx);
         m.tcp(&mut cx, SOCKET, TcpInput::Connected);
@@ -1908,7 +1900,7 @@ mod tests {
         m.timer(&mut cx, FAST_TIMER);
         assert_eq!(sent(&cx.take()), [bin(&[0x00, 0x11])]);
         // Monitored, the status and time follow the device type.
-        let mut m = module("sony-9pin", true, json!({"link": "tcp"}));
+        let mut m = module("sony-9pin", true, json!({}));
         let mut cx = Cx::new(0);
         m.start(&mut cx);
         m.tcp(&mut cx, SOCKET, TcpInput::Connected);

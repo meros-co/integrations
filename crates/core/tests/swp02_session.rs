@@ -1,9 +1,8 @@
-//! An SW-P-02 router simulated on real TCP (the `tcp` link), driven through
-//! the public API. The simulator frames and checks messages as SW-P-88 Issue
-//! 1 §3.1 does (FFh, command, data, 7-bit two's complement checksum) and
-//! answers INTERROGATE with TALLY, CONNECT with CONNECTED, CONNECT ON GO with
-//! its acknowledge and GO with GO DONE ACKNOWLEDGE. The serial link is the
-//! same module on a serial port, tested in the module's own tests.
+//! An SW-P-02 router simulated on real TCP, driven through the public API.
+//! The simulator frames and checks messages as SW-P-88 Issue 1 §3.1 does
+//! (FFh, command, data, 7-bit two's complement checksum) and answers
+//! INTERROGATE with TALLY, CONNECT with CONNECTED, CONNECT ON GO with its
+//! acknowledge and GO with GO DONE ACKNOWLEDGE.
 
 #![cfg(feature = "probel-swp02")]
 
@@ -132,7 +131,7 @@ fn open(core: &Core, port: u16, monitor: bool) -> meros_integrations::DeviceId {
         model: "generic".into(),
         host: "127.0.0.1".into(),
         port: Some(port),
-        settings: params(json!({"link": "tcp", "destinations": 4})),
+        settings: params(json!({"destinations": 4})),
         monitor,
     })
     .unwrap()

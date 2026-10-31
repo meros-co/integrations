@@ -1,7 +1,8 @@
 //! Barco's binary Barco Projection Protocol for its older projectors: the
 //! HDX series, the PGWU-61B family, and the LCD/DLP projectors of the RS-232
 //! catalog (BarcoData, BarcoGraphics, BarcoReality, BarcoVision, Galaxy,
-//! Helios, ELM, SLM, DP100, XLM), over TCP 43680 or a serial port.
+//! Helios, ELM, SLM, DP100, XLM), over TCP 43680 (or a serial-to-Ethernet
+//! converter's port).
 //!
 //! Wire format from Barco's "HDX series/Apollo Command Catalog" R5905447/03
 //! §2, the "PGWU-61B Command Catalog" R5905746/03 §2 and "RS232 Commands for
@@ -11,8 +12,7 @@
 //! - A message is 0xFE, the device address, the command bytes, a checksum
 //!   (the address plus the command bytes, modulo 256) and 0xFF. Inside, 0x80,
 //!   0xFE and 0xFF are sent as 0x80 then 0x00, 0x7E or 0x7F (§2.1). Over
-//!   Ethernet the address is 0; on a serial port it is the projector's, and
-//!   the `address` setting gives it. The address is escaped like the rest.
+//!   Ethernet the address is 0. The address is escaped like the rest.
 //! - Every request is answered first by an acknowledgement, 0x00 0x06, or a
 //!   refusal, 0x00 0x15; a read is then answered by a response that repeats
 //!   the request's command bytes (and its data, except where the table says
@@ -30,8 +30,7 @@
 //!   connecting. A read refused, or unanswered twice, is not polled again
 //!   until reconnecting or `refresh`, since no family answers every read.
 //! - A setting changed by a command is read back after its acknowledgement.
-//! - The link is TCP (the default) or a serial port of the host. The device
-//!   is connected once it answers; three requests in a row unanswered report
+//! - The device is connected once it answers; three requests in a row unanswered report
 //!   it disconnected. A link that fails is opened again after 1 s, doubling
 //!   to 30 s.
 //!
@@ -51,12 +50,14 @@ use crate::{
 use super::barco_projection_table::DEFS;
 use crate::catalog::Params;
 use crate::module::{
-    CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, TcpInput,
+    CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    TcpInput,
 };
 
 /// TCP 0xAAA0 (§2.2).
 pub(crate) const DEFAULT_PORT: u16 = 43680;
+/// Over Ethernet the address is always 0 (§2.1).
+const ADDRESS: u8 = 0;
 
 const SOCKET: Key = "bpp";
 const REPLY_TIMER: Key = "reply";
@@ -1057,9 +1058,7 @@ struct InFlight {
 }
 
 pub(crate) struct BarcoProjection {
-    link: Link,
-    tcp: bool,
-    address: u8,
+    to: std::net::SocketAddr,
     fam: u8,
     monitor: bool,
     poll_ms: Millis,
@@ -1128,8 +1127,7 @@ impl BarcoProjection {
         let fam = family(&ctx.model)
             .ok_or_else(|| format!("no projector family for model '{}'", ctx.model))?;
         let s = &ctx.settings;
-        let link = Link::from_settings(&ctx, DEFAULT_PORT)?;
-        let tcp = matches!(link, Link::Tcp(_));
+        let to = crate::module::tcp_address(&ctx, DEFAULT_PORT)?;
         let num = |key: &str, default: u64| s.get(key).and_then(Value::as_u64).unwrap_or(default);
         let reads = DEFS
             .iter()
@@ -1141,14 +1139,7 @@ impl BarcoProjection {
             })
             .collect();
         Ok(BarcoProjection {
-            link,
-            tcp,
-            // Over Ethernet the address is always 0 (§2.1).
-            address: if tcp {
-                0
-            } else {
-                num("address", 1).min(255) as u8
-            },
+            to,
             fam,
             monitor: ctx.monitor,
             poll_ms: num("poll_ms", 5_000).max(500),
@@ -1229,7 +1220,7 @@ impl BarcoProjection {
         let Some(job) = self.queue.pop_front() else {
             return;
         };
-        cx.tcp_send(SOCKET, frame(self.address, &job.body));
+        cx.tcp_send(SOCKET, frame(ADDRESS, &job.body));
         cx.set_timer(REPLY_TIMER, REPLY_TIMEOUT);
         cx.set_timer(PROBE_TIMER, PROBE_EVERY);
         self.in_flight = Some(InFlight {
@@ -1366,11 +1357,7 @@ impl BarcoProjection {
         }
     }
 
-    fn received(&mut self, cx: &mut Cx, address: u8, body: Vec<u8>) {
-        // On a serial chain, only this projector's messages.
-        if !self.tcp && address != self.address {
-            return;
-        }
+    fn received(&mut self, cx: &mut Cx, body: Vec<u8>) {
         self.heard(cx);
         let Some(flight) = self.in_flight.as_ref() else {
             return;
@@ -1435,7 +1422,7 @@ impl BarcoProjection {
     fn open_link(&mut self, cx: &mut Cx) {
         self.closed = false;
         cx.connection(Connection::Connecting);
-        self.link.open(cx, SOCKET);
+        cx.tcp_open(SOCKET, self.to);
     }
 
     fn raw(&mut self, cx: &mut Cx, id: CommandId, params: &Params) {
@@ -1536,8 +1523,8 @@ impl Module for BarcoProjection {
                 self.pump(cx);
             }
             TcpInput::Data(bytes) => {
-                for (address, body) in self.deframer.feed(&bytes) {
-                    self.received(cx, address, body);
+                for (_, body) in self.deframer.feed(&bytes) {
+                    self.received(cx, body);
                 }
             }
             TcpInput::Closed { reason } => self.lost(cx, reason),
@@ -1605,7 +1592,7 @@ impl Module for BarcoProjection {
 mod tests {
     use super::*;
     use crate::catalog::{validate, Catalog};
-    use crate::module::{Action, CommandResult, FlowControl, Parity, SerialPort};
+    use crate::module::{Action, CommandResult};
     use crate::session::merge_patch;
     use std::collections::BTreeSet;
     use std::net::{IpAddr, Ipv4Addr};
@@ -1900,46 +1887,6 @@ mod tests {
             .unwrap(),
             "warp.areas.all.scale_vertical"
         );
-    }
-
-    #[test]
-    fn the_serial_link_uses_the_address_and_the_catalog_s_line_settings() {
-        let mut m = module(
-            "galaxy",
-            false,
-            json!({"link": "serial", "serial_port": "/dev/ttyUSB0", "address": 5}),
-        );
-        let mut cx = Cx::new(0);
-        m.start(&mut cx);
-        let ports: Vec<SerialPort> = cx
-            .take()
-            .into_iter()
-            .filter_map(|a| match a {
-                Action::SerialOpen { port, .. } => Some(port),
-                _ => None,
-            })
-            .collect();
-        assert_eq!(
-            ports,
-            [SerialPort {
-                path: "/dev/ttyUSB0".into(),
-                baud_rate: 9600,
-                data_bits: 8,
-                parity: Parity::None,
-                stop_bits: 1,
-                flow_control: FlowControl::None,
-            }]
-        );
-        let mut cx = Cx::new(0);
-        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
-        // Commands only: the status read is the liveness check, to address 5.
-        assert_eq!(sent(&cx.take()), [frame(5, &[0x67])]);
-        // Another projector's answer on the chain is not this one's.
-        let a = feed(&mut m, 1, &frame(6, &[0x67, 0x01]));
-        assert!(state(&a).as_object().unwrap().is_empty());
-        let a = feed(&mut m, 2, &[ack(5), frame(5, &[0x67, 0x01])].concat());
-        assert_eq!(state(&a)["status"]["projector_on"], true);
-        assert!(a.contains(&Action::Connection(Connection::Connected)));
     }
 
     #[test]

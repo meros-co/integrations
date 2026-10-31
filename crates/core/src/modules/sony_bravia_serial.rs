@@ -1,6 +1,6 @@
-//! Sony BRAVIA Professional Displays over RS-232C serial control (or a
-//! serial-to-Ethernet converter), from the BRAVIA Professional Displays
-//! Knowledge Center's "Serial Control" pages.
+//! Sony BRAVIA Professional Displays over their RS-232C serial control
+//! protocol, reached through a serial-to-Ethernet converter, from the BRAVIA
+//! Professional Displays Knowledge Center's "Serial Control" pages.
 //!
 //! - A control is 0x8C 0x00, the function, a length (the data bytes plus the
 //!   checksum), the data and a checksum; a query is 0x83 0x00, the function,
@@ -26,8 +26,8 @@ use crate::{json, value::Value};
 
 use crate::catalog::Params;
 use crate::module::{
-    CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, PollStamps, SerialPort, TcpInput,
+    CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    PollStamps, TcpInput,
 };
 
 const SOCKET: Key = "bravia";
@@ -131,7 +131,7 @@ enum Phase {
 }
 
 pub(crate) struct SonyBraviaSerial {
-    link: Link,
+    to: std::net::SocketAddr,
     monitor: bool,
     /// When each poll was last answered (`polled.<group>`, SPEC.md §8).
     stamps: PollStamps,
@@ -251,21 +251,15 @@ const KEYS: &[(&str, u8, u8)] = &[
 
 impl SonyBraviaSerial {
     pub(crate) fn new(ctx: OpenContext) -> Result<SonyBraviaSerial, String> {
-        let link = match ctx.settings.get("link").and_then(Value::as_str) {
-            None | Some("serial") => Link::Serial(SerialPort::from_settings(&ctx.settings)?),
-            Some("tcp") => {
-                let port = ctx.port.ok_or(
-                    "a serial-to-Ethernet converter has no standard port: give the converter's port",
-                )?;
-                if ctx.host.is_unspecified() {
-                    return Err("a TCP link needs the converter's host".into());
-                }
-                Link::Tcp(std::net::SocketAddr::new(ctx.host, port))
-            }
-            Some(other) => return Err(format!("link '{other}' is not serial or tcp")),
-        };
+        if ctx.port.is_none() {
+            return Err(
+                "a serial-to-Ethernet converter has no standard port: give the converter's port"
+                    .into(),
+            );
+        }
+        let to = crate::module::tcp_address(&ctx, 0)?;
         Ok(SonyBraviaSerial {
-            link,
+            to,
             monitor: ctx.monitor,
             stamps: PollStamps::default(),
             phase: Phase::Closed,
@@ -447,7 +441,7 @@ impl SonyBraviaSerial {
         self.phase = Phase::Connecting;
         self.buf.clear();
         cx.connection(Connection::Connecting);
-        self.link.open(cx, SOCKET);
+        cx.tcp_open(SOCKET, self.to);
     }
 
     fn lost(&mut self, cx: &mut Cx, reason: String) {
@@ -643,8 +637,8 @@ impl Module for SonyBraviaSerial {
                     return;
                 }
                 self.phase = Phase::Ready;
-                // A serial line shows nothing of the display: it is reported
-                // connected once it answers.
+                // A converter's connection shows nothing of the display: it
+                // is reported connected once it answers.
                 self.queue_poll(POWER);
                 if self.monitor {
                     self.polls.push_back(Self::query_job(ID, Read::Id));
@@ -732,9 +726,9 @@ mod tests {
         let spec = Catalog::source_tree().devices["sony-bravia-serial"].clone();
         let settings = validate(&spec.settings, settings.as_object().unwrap()).unwrap();
         SonyBraviaSerial::new(OpenContext {
-            host: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            host: IpAddr::V4(Ipv4Addr::new(192, 0, 2, 9)),
             host_name: None,
-            port: None,
+            port: Some(4001),
             model: "bz".into(),
             channels: None,
             settings,
@@ -787,7 +781,7 @@ mod tests {
 
     /// Opened for commands only, past its first power query.
     fn idle() -> SonyBraviaSerial {
-        let mut m = module(false, json!({"serial_port": "COM7"}));
+        let mut m = module(false, json!({}));
         let mut cx = Cx::new(0);
         m.start(&mut cx);
         m.tcp(&mut cx, SOCKET, TcpInput::Connected);
@@ -864,7 +858,7 @@ mod tests {
         m.timer(&mut cx, POLL_TIMER);
         assert_eq!(sent(&cx.take()), [query(POWER)]);
         // Monitored, it asks the ID and product information, then polls.
-        let mut m = module(true, json!({"serial_port": "COM7"}));
+        let mut m = module(true, json!({}));
         let mut cx = Cx::new(0);
         m.start(&mut cx);
         m.tcp(&mut cx, SOCKET, TcpInput::Connected);

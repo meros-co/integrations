@@ -1,5 +1,5 @@
 //! NEC and Sharp NEC projectors over NEC's binary control commands, on TCP
-//! 7142 or a serial port.
+//! 7142.
 //!
 //! Protocol from NEC's Projector Control Command Reference Manual
 //! (BDT140013 revision 7.1, 2020) and Sharp NEC's (VDT24004 revision 1.0,
@@ -23,9 +23,7 @@
 //!   model's family supports is asked (the appendix's "Supported Command
 //!   List"), and a query the projector refuses as not supported (00h 01h) is
 //!   not asked again until the device is opened again.
-//! - The `link` setting chooses TCP or a serial port of the host (§1.1, the
-//!   PC CONTROL port). A connection that drops or a port that fails is
-//!   opened again after 1 s, doubling to 30 s; three requests in a row
+//! - A connection that drops is opened again after 1 s, doubling to 30 s; three requests in a row
 //!   unanswered close it and open it again.
 //!
 //! Opened for commands only (`monitor` false), nothing is polled and no set
@@ -45,8 +43,8 @@ use crate::{
 use super::nec_projector_models::{Family, FAMILIES};
 use crate::catalog::Params;
 use crate::module::{
-    CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, PollStamps, TcpInput,
+    CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    PollStamps, TcpInput,
 };
 
 pub(crate) const DEFAULT_PORT: u16 = 7142;
@@ -397,7 +395,7 @@ enum Phase {
 }
 
 pub(crate) struct NecProjector {
-    link: Link,
+    to: std::net::SocketAddr,
     family: &'static Family,
     monitor: bool,
     phase: Phase,
@@ -422,13 +420,13 @@ impl NecProjector {
             .iter()
             .find(|f| f.id == ctx.model)
             .ok_or_else(|| format!("no NEC projector model '{}'", ctx.model))?;
-        let link = Link::from_settings(&ctx, DEFAULT_PORT)?;
-        Ok(NecProjector::with(link, family, ctx.monitor))
+        let to = crate::module::tcp_address(&ctx, DEFAULT_PORT)?;
+        Ok(NecProjector::with(to, family, ctx.monitor))
     }
 
-    fn with(link: Link, family: &'static Family, monitor: bool) -> NecProjector {
+    fn with(to: std::net::SocketAddr, family: &'static Family, monitor: bool) -> NecProjector {
         NecProjector {
-            link,
+            to,
             family,
             monitor,
             phase: Phase::Closed,
@@ -623,7 +621,7 @@ impl NecProjector {
         self.phase = Phase::Opening;
         self.buf.clear();
         cx.connection(Connection::Connecting);
-        self.link.open(cx, SOCKET);
+        cx.tcp_open(SOCKET, self.to);
     }
 
     /// The link failed or the projector stopped answering: fail what waits
@@ -1813,10 +1811,7 @@ mod tests {
 
     fn module(id: &str, monitor: bool) -> NecProjector {
         NecProjector::with(
-            Link::Tcp(SocketAddr::new(
-                IpAddr::V4(Ipv4Addr::new(10, 0, 0, 40)),
-                DEFAULT_PORT,
-            )),
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 40)), DEFAULT_PORT),
             family(id),
             monitor,
         )

@@ -1,5 +1,5 @@
 //! Philips professional displays: SICP, the Serial / Ethernet Interface
-//! Communication Protocol, over TCP 5000 or an RS-232 port of the host.
+//! Communication Protocol, over TCP 5000.
 //!
 //! Written from Philips's "SICP V2.03" command document (section numbers
 //! below are that document's) and the Q Line user manual for the LAN and
@@ -40,8 +40,8 @@ use crate::{
 
 use crate::catalog::Params;
 use crate::module::{
-    CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, TcpInput,
+    CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    TcpInput,
 };
 
 const SOCKET: Key = "sicp";
@@ -1240,7 +1240,7 @@ fn first_leaf(patch: &Value) -> Value {
 }
 
 pub(crate) struct PhilipsSicp {
-    link: Link,
+    to: std::net::SocketAddr,
     monitor: bool,
     monitor_id: u8,
     group: Option<u8>,
@@ -1261,11 +1261,11 @@ pub(crate) struct PhilipsSicp {
 impl PhilipsSicp {
     pub(crate) fn new(ctx: OpenContext) -> Result<PhilipsSicp, String> {
         let s = &ctx.settings;
-        let link = Link::from_settings(&ctx, DEFAULT_PORT)?;
+        let to = crate::module::tcp_address(&ctx, DEFAULT_PORT)?;
         let num = |key: &str, default: u64| s.get(key).and_then(Value::as_u64).unwrap_or(default);
         let group_byte = s.get("group_byte").and_then(Value::as_bool).unwrap_or(true);
         Ok(PhilipsSicp {
-            link,
+            to,
             monitor: ctx.monitor,
             monitor_id: num("monitor_id", 1).clamp(1, 255) as u8,
             group: group_byte.then_some(0),
@@ -1466,7 +1466,7 @@ impl PhilipsSicp {
     fn open_link(&mut self, cx: &mut Cx) {
         self.closed = false;
         cx.connection(Connection::Connecting);
-        self.link.open(cx, SOCKET);
+        cx.tcp_open(SOCKET, self.to);
     }
 }
 
@@ -1781,21 +1781,15 @@ mod tests {
     }
 
     #[test]
-    fn the_serial_link_and_the_monitor_id_are_used() {
-        let mut m = module(
-            true,
-            json!({"link": "serial", "serial_port": "COM4", "monitor_id": 3, "group_byte": false}),
-        );
+    fn the_monitor_id_is_used() {
+        let mut m = module(true, json!({"monitor_id": 3, "group_byte": false}));
         let mut cx = Cx::new(0);
         m.start(&mut cx);
-        assert!(cx
-            .take()
-            .iter()
-            .any(|a| matches!(a, Action::SerialOpen { port, .. } if port.baud_rate == 9600)));
+        cx.take();
         let mut cx = Cx::new(0);
         m.tcp(&mut cx, SOCKET, TcpInput::Connected);
         assert_eq!(sent(&cx.take()), [vec![0x04, 0x03, 0x19, 0x1E]]);
-        // Another display's report on the chain is not the answer.
+        // Another display's report is not the answer.
         let a = feed(&mut m, 1, &frame(2, None, &[0x19, 0x02]));
         assert!(state(&a).as_object().unwrap().is_empty());
         let a = feed(&mut m, 1, &frame(3, None, &[0x19, 0x02]));

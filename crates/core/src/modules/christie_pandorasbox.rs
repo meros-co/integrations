@@ -34,8 +34,8 @@ use crate::{
 
 use crate::catalog::Params;
 use crate::module::{
-    CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, TcpInput,
+    CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    TcpInput,
 };
 
 use super::pandorasbox_commands::COMMANDS;
@@ -378,7 +378,7 @@ fn timecode(m: &Map<String, Value>, h: &str, mi: &str, s: &str, f: &str) -> Opti
 }
 
 pub(crate) struct PandorasBox {
-    link: Link,
+    to: std::net::SocketAddr,
     monitor: bool,
     domain: i32,
     sequences: Vec<i32>,
@@ -398,7 +398,7 @@ pub(crate) struct PandorasBox {
 impl PandorasBox {
     pub(crate) fn new(ctx: OpenContext) -> Result<PandorasBox, String> {
         let s = &ctx.settings;
-        let link = Link::from_settings(&ctx, DEFAULT_PORT)?;
+        let to = crate::module::tcp_address(&ctx, DEFAULT_PORT)?;
         let domain = s.get("domain").and_then(Value::as_i64).unwrap_or(0);
         let domain = i32::try_from(domain).map_err(|_| "domain is out of range".to_string())?;
         let sequences = s
@@ -419,7 +419,7 @@ impl PandorasBox {
             .unwrap_or(500)
             .max(100);
         Ok(PandorasBox {
-            link,
+            to,
             monitor: ctx.monitor,
             domain,
             sequences,
@@ -675,7 +675,7 @@ impl PandorasBox {
     fn open_link(&mut self, cx: &mut Cx) {
         self.closed = false;
         cx.connection(Connection::Connecting);
-        self.link.open(cx, SOCKET);
+        cx.tcp_open(SOCKET, self.to);
     }
 }
 

@@ -1,6 +1,6 @@
-//! Datavideo switchers over DVIP, Datavideo's Ethernet control protocol, and
-//! their RS-232 ports. Written from Datavideo's own documents (see the spec's
-//! sources); section numbers below are theirs.
+//! Datavideo switchers over DVIP, Datavideo's Ethernet control protocol.
+//! Written from Datavideo's own documents (see the spec's sources); section
+//! numbers below are theirs.
 //!
 //! Three protocols, by model:
 //!
@@ -16,15 +16,12 @@
 //!   mini pictures and files. The real-time port sends the whole machine
 //!   state as control/value pairs in its first packet and every change after
 //!   it, one packet a field, each to be answered by the controller with a
-//!   packet of its own (3.2). The SE-1200MU and SE-4000 RS-232 ports carry a
-//!   GVG100-style protocol (count, effects address, command, message) whose
-//!   70/F0 commands wrap the same GET and SET of control IDs, so the same
-//!   control table serves both links; over RS-232 nothing is pushed and
-//!   state is polled.
-//! - SE-2200, "DVIP Serial Control Protocol": blocks of sync AAH, a byte
+//!   packet of its own (3.2).
+//! - SE-2200, "DVIP Serial Control Protocol" (as the document is named):
+//!   blocks of sync AAH, a byte
 //!   count, effect address FFH, command 20H (a panel button), 21H (T-bar) or
-//!   22H (status) and a checksum, on RS-232/422 or through the DVIP board's
-//!   TCP 5002 with DVIP's 2-byte length header. Nothing is pushed: the
+//!   22H (status) and a checksum, through the DVIP board's TCP 5002 with
+//!   DVIP's 2-byte length header. Nothing is pushed: the
 //!   status is polled.
 //! - Every DVIP device, "DVIP Ethernet Control Operation Guide" 3.5-3.6: UDP
 //!   5002 packets of a 2-byte length, type 81H and a command, for network
@@ -53,8 +50,8 @@ use super::datavideo_switcher_table::{
 };
 use crate::catalog::Params;
 use crate::module::{
-    Bind, CommandError, CommandId, Connection, Cx, FileInput, Key, Level, Link, Millis, Module,
-    OpenContext, Outcome, PollStamps, SerialPort, TcpInput,
+    Bind, CommandError, CommandId, Connection, Cx, FileInput, Key, Level, Millis, Module,
+    OpenContext, Outcome, PollStamps, TcpInput,
 };
 
 const CMD: Key = "command";
@@ -81,9 +78,6 @@ const RETRY_MIN: Millis = 1_000;
 const RETRY_MAX: Millis = 30_000;
 /// Bytes asked for per GET_FILE_DATA, and sent per STORE_FILE_DATA.
 const CHUNK: usize = 1024;
-/// GVG messages are at most 127 bytes: 2 + 4n for a read, 2 + 8n for a write.
-const SERIAL_GETS: usize = 30;
-const SERIAL_SETS: usize = 15;
 
 const NULL_PACKET: [u8; 8] = [8, 0, 0, 0, 0, 0, 0, 0];
 
@@ -748,7 +742,7 @@ impl Dvip {
 }
 
 // ---------------------------------------------------------------------------
-// Processor-unit switchers: the Ethernet Control Protocol and its RS-232 form.
+// Processor-unit switchers: the Ethernet Control Protocol.
 
 const OPEN_DATA_FILE: u32 = 2;
 const CLOSE_DATA_FILE: u32 = 4;
@@ -787,20 +781,11 @@ enum Req {
     SetFileName(u32, u32, String),
     MiniPic(u32),
     ChromaAuto(u32),
-    OpenData {
-        kind: u32,
-        number: u32,
-        write: bool,
-    },
+    OpenData { kind: u32, number: u32, write: bool },
     ReadData,
-    StoreData {
-        chunk: u32,
-        data: Vec<u8>,
-    },
+    StoreData { chunk: u32, data: Vec<u8> },
     CloseData,
     FileEvent(u32),
-    /// A GVG message over RS-232 answered by a status byte.
-    Gvg(Vec<u8>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -830,12 +815,6 @@ impl Job {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-enum PLink {
-    Tcp(IpAddr),
-    Serial(SerialPort),
-}
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Phase {
     Closed,
@@ -846,20 +825,17 @@ enum Phase {
 
 struct Processor {
     family: Family,
-    link: PLink,
+    host: IpAddr,
     controller: Option<u16>,
     port: Option<u16>,
     monitor: bool,
     /// When each poll was last answered (`polled.<group>`, SPEC.md §8).
     stamps: PollStamps,
-    poll_ms: Millis,
     table: Vec<Control>,
     by_path: HashMap<String, usize>,
     by_id: HashMap<u32, usize>,
     present: Vec<Present>,
     present_words: HashMap<u32, u32>,
-    fast: Vec<u32>,
-    cursor: usize,
     rt_port: u16,
     cmd_port: u16,
     phase: Phase,
@@ -889,7 +865,7 @@ enum FileOp {
 }
 
 impl Processor {
-    fn new(family: Family, link: PLink, ctx: &OpenContext, poll_ms: Millis) -> Processor {
+    fn new(family: Family, ctx: &OpenContext) -> Processor {
         let controller = match ctx.settings.get("controller").and_then(Value::as_str) {
             Some(n) if n != "auto" => n.parse().ok(),
             _ => None,
@@ -901,34 +877,18 @@ impl Processor {
             .map(|(i, c)| (c.path.clone(), i))
             .collect();
         let by_id = table.iter().enumerate().map(|(i, c)| (c.id, i)).collect();
-        let fast = table
-            .iter()
-            .filter(|c| {
-                let p = c.path.as_str();
-                matches!(p, "program" | "preview" | "transition.type" | "wipe.level")
-                    || p.starts_with("tally.")
-                    || p.starts_with("ftb.")
-                    || (p.starts_with("keyers.") && p.ends_with(".on"))
-                    || (p.starts_with("dsks.") && p.ends_with(".on"))
-                    || (p.starts_with("transitions.") && p.ends_with(".state"))
-            })
-            .map(|c| c.id)
-            .collect();
         Processor {
             family,
-            link,
+            host: ctx.host,
             controller,
             port: ctx.port,
             monitor: ctx.monitor,
             stamps: PollStamps::default(),
-            poll_ms,
             table,
             by_path,
             by_id,
             present: present(family),
             present_words: HashMap::new(),
-            fast,
-            cursor: 0,
             rt_port: 5001,
             cmd_port: 5002,
             phase: Phase::Closed,
@@ -949,10 +909,6 @@ impl Processor {
         }
     }
 
-    fn serial(&self) -> bool {
-        matches!(self.link, PLink::Serial(_))
-    }
-
     fn control(&self, path: &str) -> Result<&Control, CommandError> {
         self.by_path
             .get(path)
@@ -968,62 +924,24 @@ impl Processor {
         self.cmd_buf.clear();
         self.req_buf.clear();
         cx.connection(Connection::Connecting);
-        match &self.link {
-            PLink::Serial(port) => {
-                self.phase = Phase::Connecting;
-                Link::Serial(port.clone()).open(cx, CMD);
-            }
-            PLink::Tcp(host) => {
-                let host = *host;
-                if let Some(port) = self.port {
-                    self.cmd_port = port;
-                    self.rt_port = port.saturating_sub(1);
-                } else if let Some(n) = self.controller {
-                    self.rt_port = 5001 + 2 * (n - 1);
-                    self.cmd_port = self.rt_port + 1;
-                } else {
-                    self.phase = Phase::Requesting;
-                    cx.tcp_open(REQ, SocketAddr::new(host, REQUEST_PORT));
-                    return;
-                }
-                self.phase = Phase::Connecting;
-                cx.tcp_open(CMD, SocketAddr::new(host, self.cmd_port));
-            }
+        if let Some(port) = self.port {
+            self.cmd_port = port;
+            self.rt_port = port.saturating_sub(1);
+        } else if let Some(n) = self.controller {
+            self.rt_port = 5001 + 2 * (n - 1);
+            self.cmd_port = self.rt_port + 1;
+        } else {
+            self.phase = Phase::Requesting;
+            cx.tcp_open(REQ, SocketAddr::new(self.host, REQUEST_PORT));
+            return;
         }
-    }
-
-    fn host(&self) -> Option<IpAddr> {
-        match &self.link {
-            PLink::Tcp(h) => Some(*h),
-            PLink::Serial(_) => None,
-        }
+        self.phase = Phase::Connecting;
+        cx.tcp_open(CMD, SocketAddr::new(self.host, self.cmd_port));
     }
 
     // --- Requests on the wire.
 
     fn encode(&self, req: &Req) -> Vec<u8> {
-        if self.serial() {
-            return match req {
-                Req::Set(pairs) => {
-                    let mut out = vec![(2 + 8 * pairs.len()) as u8, 0x00, 0xF0];
-                    for (i, v) in pairs {
-                        out.extend_from_slice(&i.to_le_bytes());
-                        out.extend_from_slice(&v.to_le_bytes());
-                    }
-                    out
-                }
-                Req::Get(ids) => {
-                    let mut out = vec![(2 + 4 * ids.len()) as u8, 0x00, 0x70];
-                    for i in ids {
-                        out.extend_from_slice(&i.to_le_bytes());
-                    }
-                    out
-                }
-                Req::Gvg(message) => message.clone(),
-                // Planned only for TCP.
-                _ => Vec::new(),
-            };
-        }
         let words: Vec<u32> = match req {
             Req::Get(ids) => std::iter::once(0).chain(ids.iter().copied()).collect(),
             Req::Set(pairs) => std::iter::once(1)
@@ -1062,7 +980,6 @@ impl Processor {
                 out.extend_from_slice(data);
                 return sized(out);
             }
-            Req::Gvg(_) => Vec::new(),
         };
         sized(words.iter().flat_map(|w| w.to_le_bytes()).collect())
     }
@@ -1075,14 +992,6 @@ impl Processor {
             None => self.queue.push_back(job),
         }
         self.pump(cx);
-    }
-
-    fn queue_read(&mut self, ids: Vec<u32>) {
-        let limit = if self.serial() { SERIAL_GETS } else { 256 };
-        for chunk in ids.chunks(limit) {
-            self.queue
-                .push_back(Job::internal(Req::Get(chunk.to_vec())));
-        }
     }
 
     fn pump(&mut self, cx: &mut Cx) {
@@ -1188,36 +1097,20 @@ impl Processor {
     fn cmd_data(&mut self, cx: &mut Cx, bytes: &[u8]) {
         self.cmd_buf.extend_from_slice(bytes);
         loop {
-            let packet = if self.serial() {
-                // GVG: the count, then that many bytes.
-                let Some(&count) = self.cmd_buf.first() else {
-                    return;
-                };
-                let total = 1 + count as usize;
-                if count == 0 {
-                    self.cmd_buf.remove(0);
-                    continue;
-                }
-                if self.cmd_buf.len() < total {
-                    return;
-                }
-                self.cmd_buf.drain(..total).collect::<Vec<u8>>()
-            } else {
-                let Some(size) = le32(&self.cmd_buf, 0) else {
-                    return;
-                };
-                let size = size as usize;
-                if !(8..=16 * 1024 * 1024).contains(&size) {
-                    // Out of step: nothing can be trusted, start again.
-                    cx.log(Level::Warning, format!("bad packet size {size}, resyncing"));
-                    self.cmd_buf.clear();
-                    return;
-                }
-                if self.cmd_buf.len() < size {
-                    return;
-                }
-                self.cmd_buf.drain(..size).collect::<Vec<u8>>()
+            let Some(size) = le32(&self.cmd_buf, 0) else {
+                return;
             };
+            let size = size as usize;
+            if !(8..=16 * 1024 * 1024).contains(&size) {
+                // Out of step: nothing can be trusted, start again.
+                cx.log(Level::Warning, format!("bad packet size {size}, resyncing"));
+                self.cmd_buf.clear();
+                return;
+            }
+            if self.cmd_buf.len() < size {
+                return;
+            }
+            let packet = self.cmd_buf.drain(..size).collect::<Vec<u8>>();
             self.reply(cx, &packet);
         }
     }
@@ -1229,11 +1122,7 @@ impl Processor {
         cx.cancel_timer(REPLY_TIMER);
         cx.round_trip(cx.now().saturating_sub(sent_at));
         self.heard(cx);
-        let result = if self.serial() {
-            self.serial_reply(cx, &req, packet)
-        } else {
-            self.tcp_reply(cx, &mut job, &req, packet)
-        };
+        let result = self.tcp_reply(cx, &mut job, &req, packet);
         if result.is_ok() && job.id.is_none() && self.monitor {
             self.stamps.answered(cx, "status");
         }
@@ -1265,43 +1154,6 @@ impl Processor {
             }
         }
         self.pump(cx);
-    }
-
-    fn serial_reply(
-        &mut self,
-        cx: &mut Cx,
-        req: &Req,
-        packet: &[u8],
-    ) -> Result<Option<Value>, CommandError> {
-        match (req, packet) {
-            (Req::Get(ids), [_, _, 0xF0, values @ ..]) => {
-                let pairs: Vec<(u32, u32)> = ids
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(n, &i)| le32(values, 4 * n).map(|v| (i, v)))
-                    .collect();
-                Ok(self.apply(cx, &pairs))
-            }
-            (_, [1, status]) => {
-                if status & 0x80 != 0 {
-                    Ok(None)
-                } else if status & 0x40 != 0 {
-                    Err(device_error(
-                        Some(format!("{status:02x}")),
-                        "the switcher reported a protocol error",
-                    ))
-                } else {
-                    Err(device_error(
-                        Some(format!("{status:02x}")),
-                        "the switcher ignored the command (inhibited or invalid)",
-                    ))
-                }
-            }
-            _ => Err(device_error(
-                None,
-                format!("unexpected reply {packet:02x?}"),
-            )),
-        }
     }
 
     fn tcp_reply(
@@ -1447,10 +1299,8 @@ impl Processor {
     }
 
     fn open_rt(&mut self, cx: &mut Cx) {
-        if let Some(host) = self.host() {
-            self.rt_buf.clear();
-            cx.tcp_open(RT, SocketAddr::new(host, self.rt_port));
-        }
+        self.rt_buf.clear();
+        cx.tcp_open(RT, SocketAddr::new(self.host, self.rt_port));
     }
 
     // --- Connection life.
@@ -1463,42 +1313,13 @@ impl Processor {
         self.queue
             .push_front(Job::internal(Req::Get(vec![id(SECTION_STATUS, 0)])));
         if self.monitor {
-            if self.serial() {
-                self.queue_poll();
-                cx.set_timer(POLL_TIMER, self.poll_ms);
-            } else {
-                for n in 0..inputs(self.family) {
-                    self.queue.push_back(Job::internal(Req::InputName(n)));
-                }
-                self.open_rt(cx);
+            for n in 0..inputs(self.family) {
+                self.queue.push_back(Job::internal(Req::InputName(n)));
             }
+            self.open_rt(cx);
         }
         cx.set_timer(PROBE_TIMER, PROBE_EVERY);
         self.pump(cx);
-    }
-
-    /// Over RS-232: the fast-changing controls, and the next part of the
-    /// rest, so every control is read in turn.
-    fn poll(&mut self, cx: &mut Cx) {
-        if self.queue.iter().any(|j| j.id.is_none()) {
-            return;
-        }
-        self.queue_poll();
-        self.pump(cx);
-    }
-
-    fn queue_poll(&mut self) {
-        self.queue_read(self.fast.clone());
-        let mut rest: Vec<u32> = self.table.iter().map(|c| c.id).collect();
-        for p in &self.present {
-            rest.extend((0..p.words).map(|w| id(p.section, w)));
-        }
-        if self.cursor >= rest.len() {
-            self.cursor = 0;
-        }
-        let end = (self.cursor + SERIAL_GETS).min(rest.len());
-        self.queue_read(rest[self.cursor..end].to_vec());
-        self.cursor = end;
     }
 
     fn lost(&mut self, cx: &mut Cx, reason: String) {
@@ -1524,7 +1345,7 @@ impl Processor {
                 );
             }
         }
-        for key in [REPLY_TIMER, PROBE_TIMER, POLL_TIMER, RT_RETRY_TIMER] {
+        for key in [REPLY_TIMER, PROBE_TIMER, RT_RETRY_TIMER] {
             cx.cancel_timer(key);
         }
         if self.rt_open {
@@ -1556,9 +1377,7 @@ impl Processor {
                         self.rt_port = (i & 0xFFFF) as u16;
                         self.cmd_port = self.rt_port + 1;
                         self.phase = Phase::Connecting;
-                        if let Some(host) = self.host() {
-                            cx.tcp_open(CMD, SocketAddr::new(host, self.cmd_port));
-                        }
+                        cx.tcp_open(CMD, SocketAddr::new(self.host, self.cmd_port));
                     }
                     other => self.lost(
                         cx,
@@ -1621,10 +1440,6 @@ impl Processor {
                 }
                 cx.set_timer(PROBE_TIMER, PROBE_EVERY);
             }
-            POLL_TIMER if self.phase == Phase::Open && self.monitor => {
-                self.poll(cx);
-                cx.set_timer(POLL_TIMER, self.poll_ms);
-            }
             _ => {}
         }
     }
@@ -1680,14 +1495,12 @@ impl Processor {
     fn set_job(&self, id: CommandId, values: Vec<(u32, u32)>) -> Job {
         let ids: Vec<u32> = values.iter().map(|(i, _)| *i).collect();
         let mut steps = VecDeque::new();
-        let limit = if self.serial() { SERIAL_SETS } else { 256 };
-        for chunk in values.chunks(limit) {
+        for chunk in values.chunks(256) {
             steps.push_back(Req::Set(chunk.to_vec()));
         }
         // Read back what was written.
         let readable: Vec<u32> = ids;
-        let limit = if self.serial() { SERIAL_GETS } else { 256 };
-        for chunk in readable.chunks(limit) {
+        for chunk in readable.chunks(256) {
             steps.push_back(Req::Get(chunk.to_vec()));
         }
         Job {
@@ -1722,16 +1535,6 @@ impl Processor {
             )));
         }
         Ok(n as u32)
-    }
-
-    fn tcp_only(&self, name: &str) -> Result<(), CommandError> {
-        if self.serial() {
-            Err(bad(format!(
-                "'{name}' is part of the Ethernet protocol only: open the switcher with link tcp"
-            )))
-        } else {
-            Ok(())
-        }
     }
 
     fn plan(
@@ -1877,7 +1680,6 @@ impl Processor {
                 set(values)
             }
             "chroma_key_auto" => {
-                self.tcp_only(name)?;
                 let k = self.keyer(p)?;
                 Ok(Some(Job {
                     id: Some(cid),
@@ -1904,7 +1706,6 @@ impl Processor {
                 }))
             }
             "get_input_name" => {
-                self.tcp_only(name)?;
                 let n = self.input(p)?;
                 Ok(Some(Job {
                     id: Some(cid),
@@ -1913,17 +1714,13 @@ impl Processor {
                     value: None,
                 }))
             }
-            "get_file_name" => {
-                self.tcp_only(name)?;
-                Ok(Some(Job {
-                    id: Some(cid),
-                    steps: VecDeque::from([Req::FileName(file_type(p)?, int(p, "number")? as u32)]),
-                    returns: Returns::Value,
-                    value: None,
-                }))
-            }
+            "get_file_name" => Ok(Some(Job {
+                id: Some(cid),
+                steps: VecDeque::from([Req::FileName(file_type(p)?, int(p, "number")? as u32)]),
+                returns: Returns::Value,
+                value: None,
+            })),
             "set_file_name" => {
-                self.tcp_only(name)?;
                 let kind = file_type(p)?;
                 let number = int(p, "number")? as u32;
                 let new = text(p, "name")?.to_string();
@@ -1937,17 +1734,13 @@ impl Processor {
                     value: None,
                 }))
             }
-            "get_mini_pic" => {
-                self.tcp_only(name)?;
-                Ok(Some(Job {
-                    id: Some(cid),
-                    steps: VecDeque::from([Req::MiniPic(int(p, "number")? as u32)]),
-                    returns: Returns::Value,
-                    value: None,
-                }))
-            }
+            "get_mini_pic" => Ok(Some(Job {
+                id: Some(cid),
+                steps: VecDeque::from([Req::MiniPic(int(p, "number")? as u32)]),
+                returns: Returns::Value,
+                value: None,
+            })),
             "export_file" => {
-                self.tcp_only(name)?;
                 let kind = file_type(p)?;
                 let number = int(p, "number")? as u32;
                 let path = text(p, "path")?;
@@ -1971,34 +1764,6 @@ impl Processor {
                     value: None,
                 }))
             }
-            "press_button" | "set_lamp" | "menu_select" | "all_stop" => {
-                if !self.serial() {
-                    return Err(bad(format!(
-                        "'{name}' is part of the RS-232 protocol only: open the switcher with link serial"
-                    )));
-                }
-                let message = match name {
-                    "press_button" => vec![0x03, 0x00, 0xFB, int(p, "button")? as u8],
-                    "set_lamp" => vec![
-                        0x03,
-                        0x00,
-                        if boolean(p, "on")? { 0xC6 } else { 0xC7 },
-                        int(p, "button")? as u8,
-                    ],
-                    "menu_select" => {
-                        let menu = int(p, "menu")? as u8;
-                        let sub = opt_int(p, "sub_menu").unwrap_or(0) as u8;
-                        vec![0x03, 0x00, 0xDE, (sub << 4) | (menu & 0x0F)]
-                    }
-                    _ => vec![0x03, 0x00, 0xF2, 0x00],
-                };
-                Ok(Some(Job {
-                    id: Some(cid),
-                    steps: VecDeque::from([Req::Gvg(message)]),
-                    returns: Returns::Ack,
-                    value: None,
-                }))
-            }
             other => Err(CommandError::UnknownCommand {
                 command: other.to_string(),
             }),
@@ -2012,12 +1777,11 @@ impl Processor {
         }
         if name == "import_file" {
             match (
-                self.tcp_only(name),
                 file_type(params),
                 int(params, "number"),
                 text(params, "path"),
             ) {
-                (Ok(()), Ok(kind), Ok(number), Ok(path)) => {
+                (Ok(kind), Ok(number), Ok(path)) => {
                     if self.file_job.is_some()
                         || self.queue.iter().any(|j| j.returns == Returns::File)
                     {
@@ -2033,9 +1797,7 @@ impl Processor {
                         },
                     ));
                 }
-                (Err(e), ..) | (_, Err(e), ..) | (_, _, Err(e), _) | (.., Err(e)) => {
-                    cx.complete(id, Err(e))
-                }
+                (Err(e), ..) | (_, Err(e), _) | (.., Err(e)) => cx.complete(id, Err(e)),
             }
             return;
         }
@@ -2221,8 +1983,7 @@ struct S2Job {
 }
 
 struct Se2200 {
-    link: Link,
-    tcp: bool,
+    to: std::net::SocketAddr,
     monitor: bool,
     poll_ms: Millis,
     open: bool,
@@ -2237,11 +1998,9 @@ struct Se2200 {
 }
 
 impl Se2200 {
-    fn new(link: Link, monitor: bool, poll_ms: Millis) -> Se2200 {
-        let tcp = matches!(link, Link::Tcp(_));
+    fn new(to: SocketAddr, monitor: bool, poll_ms: Millis) -> Se2200 {
         Se2200 {
-            link,
-            tcp,
+            to,
             monitor,
             poll_ms,
             open: false,
@@ -2259,19 +2018,15 @@ impl Se2200 {
     fn open_link(&mut self, cx: &mut Cx) {
         cx.connection(Connection::Connecting);
         self.buf.clear();
-        self.link.open(cx, CMD);
+        cx.tcp_open(CMD, self.to);
     }
 
     fn wrap(&self, block: Vec<u8>) -> Vec<u8> {
-        if self.tcp {
-            // DVIP's header: the whole packet's length, big-endian.
-            let len = block.len() + 2;
-            let mut out = vec![(len >> 8) as u8, len as u8];
-            out.extend(block);
-            out
-        } else {
-            block
-        }
+        // DVIP's header: the whole packet's length, big-endian.
+        let len = block.len() + 2;
+        let mut out = vec![(len >> 8) as u8, len as u8];
+        out.extend(block);
+        out
     }
 
     fn pump(&mut self, cx: &mut Cx) {
@@ -2338,33 +2093,18 @@ impl Se2200 {
     fn data(&mut self, cx: &mut Cx, bytes: &[u8]) {
         self.buf.extend_from_slice(bytes);
         loop {
-            let message: Vec<u8> = if self.tcp {
-                if self.buf.len() < 2 {
-                    return;
-                }
-                let len = u16::from_be_bytes([self.buf[0], self.buf[1]]) as usize;
-                if len < 3 {
-                    self.buf.clear();
-                    return;
-                }
-                if self.buf.len() < len {
-                    return;
-                }
-                self.buf.drain(..len).skip(2).collect()
-            } else {
-                let Some(&count) = self.buf.first() else {
-                    return;
-                };
-                let count = count as usize;
-                if count < 2 {
-                    self.buf.remove(0);
-                    continue;
-                }
-                if self.buf.len() < count {
-                    return;
-                }
-                self.buf.drain(..count).collect()
-            };
+            if self.buf.len() < 2 {
+                return;
+            }
+            let len = u16::from_be_bytes([self.buf[0], self.buf[1]]) as usize;
+            if len < 3 {
+                self.buf.clear();
+                return;
+            }
+            if self.buf.len() < len {
+                return;
+            }
+            let message: Vec<u8> = self.buf.drain(..len).skip(2).collect();
             self.reply(cx, &message);
         }
     }
@@ -2616,11 +2356,6 @@ pub(crate) fn family_of(model: &str) -> Option<Family> {
     }
 }
 
-/// The models whose RS-232 port takes the documented protocol.
-fn has_serial(model: &str) -> bool {
-    matches!(model, "se-1200mu" | "se-4000" | "se-2200")
-}
-
 impl DatavideoSwitcher {
     pub(crate) fn new(ctx: OpenContext) -> Result<DatavideoSwitcher, String> {
         let s = &ctx.settings;
@@ -2629,20 +2364,13 @@ impl DatavideoSwitcher {
             .and_then(Value::as_u64)
             .unwrap_or(1_000)
             .max(100);
-        let serial = s.get("link").and_then(Value::as_str) == Some("serial");
-        if serial && !has_serial(&ctx.model) {
-            return Err(format!(
-                "the {} has no RS-232 control port Datavideo documents: use link tcp",
-                ctx.model.to_uppercase()
-            ));
-        }
         let dvip_port = s
             .get("dvip_port")
             .and_then(Value::as_u64)
             .map(|p| p as u16)
             .unwrap_or(DVIP_PORT);
         let standalone = ctx.model == "se-650";
-        if (standalone || !serial) && ctx.host.is_unspecified() {
+        if ctx.host.is_unspecified() {
             return Err("give the switcher's address as host".into());
         }
         let dvip = Dvip::new(
@@ -2652,15 +2380,10 @@ impl DatavideoSwitcher {
             poll_ms.max(1_000),
         );
         let protocol = if let Some(family) = family_of(&ctx.model) {
-            let link = if serial {
-                PLink::Serial(SerialPort::from_settings(&ctx.settings)?)
-            } else {
-                PLink::Tcp(ctx.host)
-            };
-            Protocol::Processor(Box::new(Processor::new(family, link, &ctx, poll_ms)))
+            Protocol::Processor(Box::new(Processor::new(family, &ctx)))
         } else if ctx.model == "se-2200" {
             Protocol::Se2200(Box::new(Se2200::new(
-                Link::from_settings(&ctx, DVIP_PORT)?,
+                crate::module::tcp_address(&ctx, DVIP_PORT)?,
                 ctx.monitor,
                 poll_ms,
             )))
@@ -2694,21 +2417,11 @@ impl Module for DatavideoSwitcher {
             Protocol::Se2200(s) => s.open_link(cx),
             Protocol::DvipOnly => {}
         }
-        // On a serial link the switcher's address may be unknown.
-        if !self.dvip.to.ip().is_unspecified() {
-            self.dvip.start(cx);
-        }
+        self.dvip.start(cx);
     }
 
     fn command(&mut self, cx: &mut Cx, id: CommandId, name: &str, params: &Params) {
         if DVIP_COMMANDS.contains(&name) {
-            if self.dvip.to.ip().is_unspecified() {
-                cx.complete(
-                    id,
-                    Err(bad("DVIP commands need the switcher's address as host")),
-                );
-                return;
-            }
             self.dvip.command(cx, id, name, params);
             return;
         }
@@ -3065,7 +2778,7 @@ mod tests {
         let a = run(&mut m, 32, "press_button", json!({"button": 74}));
         assert!(matches!(
             completed(&a, 32),
-            Some(Err(CommandError::InvalidParams { .. }))
+            Some(Err(CommandError::UnknownCommand { .. }))
         ));
     }
 
@@ -3313,63 +3026,6 @@ mod tests {
         ));
     }
 
-    fn serial_settings() -> Value {
-        json!({"link": "serial", "serial_port": "COM9"})
-    }
-
-    #[test]
-    fn rs232_wraps_the_same_controls_and_polls() {
-        let mut m = module("se-4000", true, serial_settings());
-        assert!(start(&mut m)
-            .iter()
-            .any(|x| matches!(x, Action::SerialOpen { .. })));
-        let a = tcp(&mut m, 0, CMD, TcpInput::Connected);
-        // 3.4.16: get controls, a count of 02 + 4n, effects address 00, 70.
-        assert_eq!(sent(&a, CMD), [hex("06 00 70 00 00 00 00")]);
-        let a = data(&mut m, 2, CMD, &hex("06 00 f0 02 00 00 00"));
-        assert_eq!(state(&a), json!({"status": {"connection": "connected"}}));
-        assert!(a.contains(&Action::Connection(Connection::Connected)));
-        // Then the poll, at most 30 controls a message.
-        let polls = sent(&a, CMD);
-        assert_eq!(polls.len(), 1);
-        assert_eq!(polls[0][2], 0x70);
-        assert!(polls[0].len() <= 127);
-
-        let mut m = module("se-1200mu", false, serial_settings());
-        start(&mut m);
-        tcp(&mut m, 0, CMD, TcpInput::Connected);
-        data(&mut m, 0, CMD, &hex("06 00 f0 02 00 00 00"));
-        // Program 2 (SE-1200 control 86): F0, then read back with 70.
-        let a = run(&mut m, 1, "set_program", json!({"source": 2}));
-        assert_eq!(sent(&a, CMD), [hex("0a 00 f0 56 00 02 00 02 00 00 00")]);
-        let a = data(&mut m, 0, CMD, &hex("01 80"));
-        assert_eq!(sent(&a, CMD), [hex("06 00 70 56 00 02 00")]);
-        let a = data(&mut m, 0, CMD, &hex("06 00 f0 02 00 00 00"));
-        assert_eq!(state(&a), json!({"program": 2}));
-        assert_eq!(completed(&a, 1), Some(Ok(Outcome::Ack)));
-        // Panel buttons exist only here.
-        let a = run(&mut m, 2, "press_button", json!({"button": 0x4a}));
-        assert_eq!(sent(&a, CMD), [hex("03 00 fb 4a")]);
-        let a = data(&mut m, 0, CMD, &hex("01 40"));
-        assert!(matches!(
-            completed(&a, 2),
-            Some(Err(CommandError::DeviceError { .. }))
-        ));
-        let a = run(&mut m, 3, "menu_select", json!({"menu": 1, "sub_menu": 2}));
-        assert_eq!(sent(&a, CMD), [hex("03 00 de 21")]);
-        let a = run(&mut m, 4, "get_input_name", json!({"input": 1}));
-        assert!(matches!(
-            completed(&a, 4),
-            Some(Err(CommandError::InvalidParams { .. }))
-        ));
-    }
-
-    #[test]
-    fn models_without_a_serial_port_refuse_it() {
-        assert!(DatavideoSwitcher::new(context("se-3200", true, serial_settings())).is_err());
-        assert!(DatavideoSwitcher::new(context("hs-4000", true, serial_settings())).is_err());
-    }
-
     #[test]
     fn se2200_blocks_follow_its_examples() {
         // 1.4.2.1 and 1.4.3.1.
@@ -3394,16 +3050,13 @@ mod tests {
     }
 
     #[test]
-    fn se2200_over_rs232_and_dvip_tcp() {
-        let mut m = module(
-            "se-2200",
-            true,
-            json!({"link": "serial", "serial_port": "COM3", "baud_rate": "115200", "parity": "none"}),
-        );
-        start(&mut m);
+    fn se2200_over_dvip_tcp() {
+        let mut m = module("se-2200", true, json!({}));
+        assert_eq!(opened(&start(&mut m)), [(CMD, DVIP_PORT)]);
+        // TCP 5002 with DVIP's length header.
         let a = tcp(&mut m, 0, CMD, TcpInput::Connected);
-        assert_eq!(sent(&a, CMD), [hex("aa 03 ff 22 24")]);
-        let a = data(&mut m, 4, CMD, &hex("09 80 21 01 00 00 00 00 00"));
+        assert_eq!(sent(&a, CMD), [hex("00 07 aa 03 ff 22 24")]);
+        let a = data(&mut m, 4, CMD, &hex("00 0b 09 80 21 01 00 00 00 00 00"));
         assert!(a.contains(&Action::Connection(Connection::Connected)));
         assert!(a.contains(&Action::RoundTrip(4)));
         assert_eq!(state(&a)["program"], json!(1));
@@ -3414,32 +3067,32 @@ mod tests {
             "set_feature",
             json!({"feature": "logo_1", "on": false}),
         );
-        assert_eq!(sent(&a, CMD), [hex("aa 03 ff 22 24")]);
+        assert_eq!(sent(&a, CMD), [hex("00 07 aa 03 ff 22 24")]);
         run(
             &mut m,
             2,
             "set_feature",
             json!({"feature": "logo_1", "on": true}),
         );
-        let a = data(&mut m, 0, CMD, &hex("09 80 21 01 00 00 00 00 00"));
+        let a = data(&mut m, 0, CMD, &hex("00 0b 09 80 21 01 00 00 00 00 00"));
         assert_eq!(completed(&a, 1), Some(Ok(Outcome::Ack)));
-        assert_eq!(sent(&a, CMD), [hex("aa 04 ff 20 4c 6f")]);
-        let a = data(&mut m, 0, CMD, &hex("02 80"));
-        assert_eq!(sent(&a, CMD), [hex("aa 03 ff 22 24")]);
-        let a = data(&mut m, 0, CMD, &hex("09 80 21 01 01 00 00 00 00"));
+        assert_eq!(sent(&a, CMD), [hex("00 08 aa 04 ff 20 4c 6f")]);
+        let a = data(&mut m, 0, CMD, &hex("00 04 02 80"));
+        assert_eq!(sent(&a, CMD), [hex("00 07 aa 03 ff 22 24")]);
+        let a = data(&mut m, 0, CMD, &hex("00 0b 09 80 21 01 01 00 00 00 00"));
         assert_eq!(completed(&a, 2), Some(Ok(Outcome::Ack)));
         assert_eq!(state(&a)["features"]["logo_1"], json!(true));
         // Black on program is source 7; the switcher ignores it outside
         // remote mode.
         let a = run(&mut m, 3, "set_program", json!({"source": 7}));
-        assert_eq!(sent(&a, CMD), [hex("aa 04 ff 20 21 44")]);
-        let a = data(&mut m, 0, CMD, &hex("02 20"));
+        assert_eq!(sent(&a, CMD), [hex("00 08 aa 04 ff 20 21 44")]);
+        let a = data(&mut m, 0, CMD, &hex("00 04 02 20"));
         assert!(matches!(
             completed(&a, 3),
             Some(Err(CommandError::DeviceError { .. }))
         ));
 
-        // Over the DVIP board: TCP 5002 with DVIP's length header.
+        // Opened for commands only.
         let mut m = module("se-2200", false, json!({}));
         assert_eq!(opened(&start(&mut m)), [(CMD, DVIP_PORT)]);
         let a = tcp(&mut m, 0, CMD, TcpInput::Connected);

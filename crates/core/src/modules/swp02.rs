@@ -1,5 +1,4 @@
-//! Probel SW-P-02, the General Switcher Communication Protocol, on a serial
-//! port or over TCP.
+//! Probel SW-P-02, the General Switcher Communication Protocol, over TCP.
 //!
 //! Wire format from Pro-Bel's SW-P-88 Issue 1 (2001), §1-§4, section
 //! numbers below being that document's.
@@ -26,11 +25,12 @@
 //!   every `poll_ms`, as Pro-Bel controllers interrogate in the background
 //!   (§3.3.1), and by the CONNECTED messages the router broadcasts; after a
 //!   GO that set crosspoints they are interrogated again at once.
-//! - The `link` setting chooses a serial port of the host (RS-422/RS-485 or
-//!   RS-232, §2) or TCP. A port that fails, or a connection that drops, is
-//!   opened again after 1 s, doubling to 30 s. The port being open says
-//!   nothing of the router: the device is connected once a message arrives,
-//!   and disconnected when three requests in a row go unanswered.
+//! - SW-P-02 over TCP has no standard port: the router's (or a
+//!   serial-to-Ethernet converter's) is given when the device is opened. A
+//!   connection that drops is opened again after 1 s, doubling to 30 s. The
+//!   connection being open says nothing of the router: the device is
+//!   connected once a message arrives, and disconnected when three requests
+//!   in a row go unanswered.
 //!
 //! Opened for commands only (`monitor` false), nothing is interrogated
 //! beyond what commands ask, except one INTERROGATE of destination 1 after
@@ -44,8 +44,8 @@ use crate::{json, value::Value};
 
 use crate::catalog::Params;
 use crate::module::{
-    CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, PollStamps, TcpInput,
+    CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    PollStamps, TcpInput,
 };
 
 const SOCKET: Key = "swp02";
@@ -184,7 +184,7 @@ struct Job {
 }
 
 pub(crate) struct Swp02 {
-    link: Link,
+    to: std::net::SocketAddr,
     monitor: bool,
     /// When each poll was last answered (`polled.<group>`, SPEC.md §8).
     stamps: PollStamps,
@@ -204,25 +204,13 @@ pub(crate) struct Swp02 {
 impl Swp02 {
     pub(crate) fn new(ctx: OpenContext) -> Result<Swp02, String> {
         let s = &ctx.settings;
-        let tcp = s.get("link").and_then(Value::as_str) == Some("tcp");
-        if tcp && ctx.port.is_none() {
+        if ctx.port.is_none() {
             return Err("SW-P-02 over TCP has no standard port: give the router's port".into());
         }
-        // Serial unless the settings choose TCP: the protocol's own link.
-        let mut settings = s.clone();
-        if !tcp {
-            settings.insert("link".into(), "serial".into());
-        }
-        let link = Link::from_settings(
-            &OpenContext {
-                settings,
-                ..ctx.clone()
-            },
-            0,
-        )?;
+        let to = crate::module::tcp_address(&ctx, 0)?;
         let num = |key: &str, default: u64| s.get(key).and_then(Value::as_u64).unwrap_or(default);
         Ok(Swp02 {
-            link,
+            to,
             monitor: ctx.monitor,
             stamps: PollStamps::default(),
             destinations: num("destinations", 16).clamp(1, 1024) as u16,
@@ -396,7 +384,7 @@ impl Swp02 {
     fn open_link(&mut self, cx: &mut Cx) {
         self.closed = false;
         cx.connection(Connection::Connecting);
-        self.link.open(cx, SOCKET);
+        cx.tcp_open(SOCKET, self.to);
     }
 }
 
@@ -549,7 +537,7 @@ impl Module for Swp02 {
 mod tests {
     use super::*;
     use crate::catalog::{validate, Catalog};
-    use crate::module::{Action, CommandResult, FlowControl, Parity, SerialPort};
+    use crate::module::{Action, CommandResult};
     use crate::session::merge_patch;
     use std::net::{IpAddr, Ipv4Addr};
 
@@ -557,9 +545,9 @@ mod tests {
         let spec = Catalog::source_tree().devices["probel-swp02"].clone();
         let settings = validate(&spec.settings, settings.as_object().unwrap()).unwrap();
         Swp02::new(OpenContext {
-            host: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            host: IpAddr::V4(Ipv4Addr::new(192, 0, 2, 2)),
             host_name: None,
-            port: None,
+            port: Some(2002),
             model: "generic".into(),
             channels: None,
             settings,
@@ -650,34 +638,8 @@ mod tests {
     }
 
     #[test]
-    fn the_serial_link_is_opened_with_the_protocol_defaults() {
-        let mut m = module(true, json!({"serial_port": "/dev/ttyUSB0"}));
-        let mut cx = Cx::new(0);
-        m.start(&mut cx);
-        let ports: Vec<SerialPort> = cx
-            .take()
-            .into_iter()
-            .filter_map(|a| match a {
-                Action::SerialOpen { port, .. } => Some(port),
-                _ => None,
-            })
-            .collect();
-        assert_eq!(
-            ports,
-            [SerialPort {
-                path: "/dev/ttyUSB0".into(),
-                baud_rate: 38400,
-                data_bits: 8,
-                parity: Parity::Even,
-                stop_bits: 1,
-                flow_control: FlowControl::None,
-            }]
-        );
-    }
-
-    #[test]
     fn monitored_it_interrogates_each_destination_and_keeps_tallies() {
-        let mut m = module(true, json!({"serial_port": "COM1", "destinations": 2}));
+        let mut m = module(true, json!({"destinations": 2}));
         let a = opened(&mut m);
         assert_eq!(sent(&a), [frame(&[INTERROGATE, 0, 0])]);
         let a = feed(&mut m, 5, &frame(&[TALLY, 0, 0, 9]));
@@ -698,7 +660,7 @@ mod tests {
 
     #[test]
     fn commands_wait_for_their_own_reply() {
-        let mut m = module(false, json!({"serial_port": "COM1"}));
+        let mut m = module(false, json!({}));
         let a = opened(&mut m);
         // Commands only: one interrogate of destination 1 as the liveness check.
         assert_eq!(sent(&a), [frame(&[INTERROGATE, 0, 0])]);
@@ -746,8 +708,8 @@ mod tests {
     }
 
     #[test]
-    fn unanswered_requests_report_the_router_gone_and_a_failed_port_is_reopened() {
-        let mut m = module(false, json!({"serial_port": "COM1"}));
+    fn unanswered_requests_report_the_router_gone_and_a_dropped_connection_is_reopened() {
+        let mut m = module(false, json!({}));
         opened(&mut m);
         feed(&mut m, 1, &frame(&[TALLY, 0, 0, 0]));
         let mut gone = Vec::new();
@@ -761,13 +723,13 @@ mod tests {
         assert!(gone
             .iter()
             .any(|a| matches!(a, Action::Connection(Connection::Disconnected { .. }))));
-        // An unplugged adapter closes the port; it is opened again.
+        // A dropped connection is opened again.
         let mut cx = Cx::new(0);
         m.tcp(
             &mut cx,
             SOCKET,
             TcpInput::Closed {
-                reason: "unplugged".into(),
+                reason: "reset".into(),
             },
         );
         assert!(cx.take().contains(&Action::SetTimer {
@@ -779,14 +741,13 @@ mod tests {
         assert!(cx
             .take()
             .iter()
-            .any(|a| matches!(a, Action::SerialOpen { .. })));
+            .any(|a| matches!(a, Action::TcpOpen { .. })));
     }
 
     #[test]
     fn tcp_needs_a_port() {
         let spec = Catalog::source_tree().devices["probel-swp02"].clone();
-        let settings =
-            validate(&spec.settings, json!({"link": "tcp"}).as_object().unwrap()).unwrap();
+        let settings = validate(&spec.settings, json!({}).as_object().unwrap()).unwrap();
         let ctx = OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(192, 0, 2, 2)),
             host_name: None,

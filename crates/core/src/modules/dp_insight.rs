@@ -1,5 +1,5 @@
 //! Digital Projection INSIGHT 4K Laser projectors: the binary protocol on
-//! TCP 43728, or the same messages on the RS-232 port (38400 8N1).
+//! TCP 43728.
 //!
 //! Written from Digital Projection's Protocol Guide 115-482F (Rev F, October
 //! 2016), "INSIGHT 4K Laser Series" (pages 61-90); see the spec's sources.
@@ -27,8 +27,8 @@ use crate::{json, value::Value};
 
 use crate::catalog::Params;
 use crate::module::{
-    CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
-    Outcome, TcpInput,
+    CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    TcpInput,
 };
 
 const SOCKET: Key = "insight";
@@ -343,7 +343,7 @@ fn plan(name: &str, params: &Params) -> Result<(Request, Vec<Read>), CommandErro
 }
 
 pub(crate) struct DpInsight {
-    link: Link,
+    to: std::net::SocketAddr,
     monitor: bool,
     poll_ms: Millis,
     open: bool,
@@ -358,7 +358,7 @@ pub(crate) struct DpInsight {
 
 impl DpInsight {
     pub(crate) fn new(ctx: OpenContext) -> Result<DpInsight, String> {
-        let link = Link::from_settings(&ctx, DEFAULT_PORT)?;
+        let to = crate::module::tcp_address(&ctx, DEFAULT_PORT)?;
         let poll_ms = ctx
             .settings
             .get("poll_ms")
@@ -366,7 +366,7 @@ impl DpInsight {
             .unwrap_or(5_000)
             .max(1_000);
         Ok(DpInsight {
-            link,
+            to,
             monitor: ctx.monitor,
             poll_ms,
             open: false,
@@ -495,7 +495,7 @@ impl DpInsight {
     fn open_link(&mut self, cx: &mut Cx) {
         self.closed = false;
         cx.connection(Connection::Connecting);
-        self.link.open(cx, SOCKET);
+        cx.tcp_open(SOCKET, self.to);
     }
 }
 
@@ -877,17 +877,6 @@ mod tests {
             Some(Ok(Outcome::Value { value: json!(15) }))
         );
         assert_eq!(state(&a), json!({"title": 15}));
-    }
-
-    #[test]
-    fn the_serial_link_uses_38400() {
-        let mut m = module(true, json!({"link": "serial", "serial_port": "COM5"}));
-        let mut cx = Cx::new(0);
-        m.start(&mut cx);
-        assert!(cx
-            .take()
-            .iter()
-            .any(|a| matches!(a, Action::SerialOpen { port, .. } if port.baud_rate == 38400)));
     }
 
     #[test]

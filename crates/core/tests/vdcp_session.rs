@@ -182,7 +182,7 @@ async fn a_server_is_read_cued_and_played() {
             model: "generic".into(),
             host: "127.0.0.1".into(),
             port: Some(port),
-            settings: params(json!({"link": "tcp", "port": 1})),
+            settings: params(json!({"port": 1})),
             monitor: true,
         })
         .unwrap();
@@ -254,7 +254,7 @@ async fn opened_for_commands_only_the_server_is_not_polled() {
             model: "generic".into(),
             host: "127.0.0.1".into(),
             port: Some(port),
-            settings: params(json!({"link": "tcp", "port": 1})),
+            settings: params(json!({"port": 1})),
             monitor: false,
         })
         .unwrap();
