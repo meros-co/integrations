@@ -350,5 +350,26 @@ class PollIntervals(unittest.TestCase):
         self.assertIn("polls: two polls named '1'", validate.poll_interval_checks(doc))
 
 
+class Units(unittest.TestCase):
+    def test_a_step_goes_in_scale_and_a_unit_from_names_a_string_state(self):
+        import json
+        import jsonschema
+        schema = json.loads((validate.ROOT / "schema" / "device-spec-1.json").read_text("utf-8"))
+        field = schema["properties"]["state"]["additionalProperties"]
+        bad = {"type": "int", "unit": "0.1 V", "description": "Tenths"}
+        self.assertTrue(list(jsonschema.Draft202012Validator(field).iter_errors(bad)))
+        good = {"type": "int", "unit": "V", "scale": 0.1, "description": "Tenths"}
+        self.assertFalse(list(jsonschema.Draft202012Validator(field).iter_errors(good)))
+        doc = {"state": {"u": {"type": "int", "description": "U"},
+                         "t": {"type": "float", "unit": "°C", "unit_from": {"state": "u", "units": {"c": "°C"}},
+                               "description": "T"},
+                         "h": {"type": "float", "unit_from": {"state": "nope", "units": {"c": "°C"}},
+                               "description": "H"}}}
+        errors = validate.unit_checks(doc)
+        self.assertIn("state.t: unit and unit_from both given; keep one", errors)
+        self.assertIn("state.t.unit_from.state: 'u' is not a string state", errors)
+        self.assertIn("state.h.unit_from.state: no state 'nope'", errors)
+
+
 if __name__ == "__main__":
     unittest.main()

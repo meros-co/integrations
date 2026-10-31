@@ -17,6 +17,15 @@ the vendor's notification names), formatted with rustfmt. Every object of
 the subtrees PROFILES names becomes state, every writable one a command
 named after it; names, OIDs, syntaxes, units and enumeration labels are the
 MIB's facts, and no MIB text is copied. Review the diff, then run the checks.
+
+Each number's unit and step come from the MIB: the profile's `units` table
+(each object's unit and divisor as its DESCRIPTION states them), its UNITS
+clause, or the DESCRIPTION's wording. A profile with `si` reports a number
+counted in steps of a fraction of its unit (tenths of a volt, TimeTicks) in
+that unit, as a float: the module divides it, and a command writing it takes
+the unit and multiplies. Without `si` the number is reported as the agent
+counts it and the state's `scale` gives the step (SPEC.md §1, Units and
+scale).
 """
 import json
 import re
@@ -298,43 +307,65 @@ def snake_words(ws):
 
 
 UNIT_PATTERNS = [
-    (r'tenths of (?:amps|amperes|a\b)', '0.1 A'),
-    (r'hundredths of (?:amps|amperes)', '0.01 A'),
-    (r'tenths of (?:volts|vac|vdc|v\b)', '0.1 V'),
-    (r'hundredths of (?:a )?volts?', '0.01 V'),
-    (r'tenths of (?:hertz|hz)', '0.1 Hz'),
-    (r'hundredths of (?:kilowatts|kw\b)', '0.01 kW'),
-    (r'tenths of (?:kilowatts|kw\b)', '0.1 kW'),
-    (r'hundredths of (?:kilovoltamps|kilovolt-amps|kva)', '0.01 kVA'),
-    (r'tenths of (?:kilowatt[- ]hours|kwh)', '0.1 kWh'),
-    (r'hundredths of (?:kilowatt[- ]hours|kwh)', '0.01 kWh'),
-    (r'tenths of (?:degrees? )?(?:celsius|c\b)', '0.1 °C'),
-    (r'tenths of (?:degrees? )?(?:fahrenheit|f\b)', '0.1 °F'),
-    (r'tenths of (?:a )?percent', '0.1 %'),
-    (r'tenths of (?:watts|w\b)', '0.1 W'),
-    (r'in hundredths\b', '0.01'),
-    (r'\b(?:measured )?in (?:volts|vac)\b', 'V'),
-    (r'\b(?:measured )?in (?:amps|amperes)\b', 'A'),
-    (r'\b(?:measured )?in watts\b', 'W'),
-    (r'\b(?:measured )?in (?:hertz|hz)\b', 'Hz'),
-    (r'\b(?:measured )?in seconds\b|\bdelay, in seconds\b', 's'),
-    (r'\b(?:measured )?in minutes\b', 'min'),
-    (r'\bin percent\b', '%'),
-    (r'\bin (?:degrees )?celsius\b', '°C'),
-    (r'\bin (?:degrees )?fahrenheit\b', '°F'),
+    (r'tenths of (?:amps|amperes|a\b)', ('A', 10)),
+    (r'hundredths of (?:amps|amperes)', ('A', 100)),
+    (r'tenths of (?:volts|vac|vdc|v\b)', ('V', 10)),
+    (r'hundredths of (?:a )?volts?', ('V', 100)),
+    (r'tenths of (?:hertz|hz)', ('Hz', 10)),
+    (r'hundredths of (?:kilowatts|kw\b)', ('kW', 100)),
+    (r'tenths of (?:kilowatts|kw\b)', ('kW', 10)),
+    (r'hundredths of (?:kilovoltamps|kilovolt-amps|kva)', ('kVA', 100)),
+    (r'tenths of (?:kilowatt[- ]hours|kwh)', ('kWh', 10)),
+    (r'hundredths of (?:kilowatt[- ]hours|kwh)', ('kWh', 100)),
+    (r'tenths of (?:degrees? )?(?:celsius|c\b)', ('°C', 10)),
+    (r'tenths of (?:degrees? )?(?:fahrenheit|f\b)', ('°F', 10)),
+    (r'tenths of (?:a )?percent', ('%', 10)),
+    (r'tenths of (?:watts|w\b)', ('W', 10)),
+    (r'in hundredths\b', (None, 100)),
+    (r'\b(?:measured )?in (?:volts|vac)\b', ('V', 1)),
+    (r'\b(?:measured )?in (?:amps|amperes)\b', ('A', 1)),
+    (r'\b(?:measured )?in watts\b', ('W', 1)),
+    (r'\b(?:measured )?in (?:hertz|hz)\b', ('Hz', 1)),
+    (r'\b(?:measured )?in seconds\b|\bdelay, in seconds\b', ('s', 1)),
+    (r'\b(?:measured )?in minutes\b', ('min', 1)),
+    (r'\bin percent\b', ('%', 1)),
+    (r'\bin (?:degrees )?celsius\b', ('°C', 1)),
+    (r'\bin (?:degrees )?fahrenheit\b', ('°F', 1)),
 ]
 
+# A UNITS clause's words, as unit symbols; a number before them is the step
+# ("0.1 Hertz").
+UNIT_WORDS = {'seconds': 's', 'second': 's', 'minutes': 'min', 'percent': '%', 'volts': 'V',
+              'rms volts': 'V', 'volt dc': 'V', 'amps': 'A', 'rms amp': 'A', 'amp dc': 'A',
+              'watts': 'W', 'hertz': 'Hz', 'volt-amps': 'VA', 'degrees centigrade': '°C'}
 
-def unit_of(o):
+# Units and steps a MIB states in words the patterns above do not read,
+# keyed by object: (unit, divisor), the number counting 1/divisor of the
+# unit; a unit of None for a ratio; ('@<object>', divisor, suffix) for a
+# unit named by another object's value (UNIT_FROM).
+UNITS = {}
+
+# The unit each value of an object naming a unit means.
+UNIT_FROM = {}
+
+
+def unit_of(o, cfg=None):
+    """An object's (unit, divisor): the number counts 1/divisor of the unit;
+    (None, 1) when the MIB gives none."""
+    known = UNITS.get((cfg or {}).get('units'), {}).get(o['name'])
+    if known:
+        return known
     if o.get('units'):
-        return o['units']
+        m = re.match(r'^0\.(0*)1\s+(.*)$', o['units'])
+        words_, divisor = (m.group(2), 10 ** (len(m.group(1)) + 1)) if m else (o['units'], 1)
+        return UNIT_WORDS.get(words_.lower(), words_), divisor
     if o.get('base') == 'timeticks' or o.get('syntax', '').startswith('TimeInterval'):
-        return '1/100 s'
+        return 's', 100
     d = o.get('description', '').lower()
     for pat, unit in UNIT_PATTERNS:
         if re.search(pat, d):
             return unit
-    return None
+    return None, 1
 
 
 def generate(d, cfg):
@@ -428,9 +459,17 @@ def generate(d, cfg):
                 while all(len(w) > common + 1 and w[common] == ws[0][common] for w in ws):
                     common += 1
                 labels = [(v['oid'], snake_words(w[common:])) for v, w in zip(kids, ws)]
-            objects.append({'oid': o['oid'], 'path': path, 'kind': kind, 'labels': labels})
-            unit = unit_of(o)
-            stype = {'enum': 'string', 'int': 'int', 'ticks': 'int'}.get(kind, 'string')
+            known = unit_of(o, cfg) if kind in ('int', 'ticks') else (None, 1)
+            unit, divisor = known[0], known[1]
+            unit_from = None
+            if unit and unit.startswith('@'):
+                unit_from = (unit[1:], known[2])
+                unit = None
+            if cfg.get('si') and divisor > 1:
+                # Reported in the unit: the module divides.
+                kind = 'scaled'
+            objects.append({'oid': o['oid'], 'path': path, 'kind': kind, 'labels': labels, 'divisor': divisor})
+            stype = {'enum': 'string', 'int': 'int', 'ticks': 'int', 'scaled': 'float'}.get(kind, 'string')
             desc = f"{o['name']} ({cfg['mib']})"
             if kind in ('enum', 'choice') and labels:
                 desc += ': ' + ', '.join(l for _, l in labels)
@@ -439,6 +478,10 @@ def generate(d, cfg):
             sd = {'type': stype}
             if unit:
                 sd['unit'] = unit
+            if unit_from:
+                sd['unit_from'] = unit_from
+            if divisor > 1 and kind != 'scaled':
+                sd['scale'] = 1 / divisor
             sd['description'] = desc
             state[path] = sd
             writable = 'write' in o.get('access', '') or 'create' in o.get('access', '')
@@ -447,8 +490,12 @@ def generate(d, cfg):
             name = 'set_' + path.replace('.*', '').replace('.', '_')
             if name in commands:
                 name = 'set_' + snake_words(words(o['name']))
-            wire = {'enum': 'Integer', 'ticks': 'TimeTicks', 'text': 'OctetString', 'ip': 'IpAddress',
-                    'choice': 'ObjectIdentifier'}.get(kind)
+            wire = None
+            if kind == 'scaled':
+                wire = 'TimeTicks' if o.get('base') == 'timeticks' else (
+                    'Gauge32' if re.match(r'(Gauge|Unsigned32)', o.get('syntax', '')) else 'Integer')
+            wire = wire or {'enum': 'Integer', 'ticks': 'TimeTicks', 'text': 'OctetString', 'ip': 'IpAddress',
+                            'choice': 'ObjectIdentifier'}.get(kind)
             if kind == 'int':
                 syn = o.get('syntax', '')
                 wire = 'Gauge32' if re.match(r'(Gauge|Unsigned32)', syn) else 'Integer'
@@ -465,10 +512,15 @@ def generate(d, cfg):
             if kind in ('enum', 'choice'):
                 vp = {'type': 'enum', 'values': [l for _, l in labels], **vp,
                       'description': f"The new {human}, as {cfg['mib']} names its values."}
+            elif kind == 'scaled':
+                lo, hi = o.get('range', (0, 4294967295) if wire in ('Gauge32', 'TimeTicks') else (INT_MIN, INT_MAX))
+                vp = {'type': 'float', 'min': lo / divisor, 'max': hi / divisor, **vp,
+                      'description': f"The new {human}, in {unit or 'units'}, in steps of {1 / divisor:g}."}
             elif kind in ('int', 'ticks'):
                 lo, hi = o.get('range', (0, 4294967295) if wire in ('Gauge32', 'TimeTicks') else (INT_MIN, INT_MAX))
-                vp = {'type': 'int', 'min': lo, 'max': hi, **vp,
-                      'description': f"The new {human}" + (f", in {unit}." if unit else ", as the MIB counts it.")}
+                step = f"1/{divisor} " if divisor > 1 else ''
+                in_unit = f", in {step}{unit}." if unit else ", as the MIB counts it."
+                vp = {'type': 'int', 'min': lo, 'max': hi, **vp, 'description': f"The new {human}{in_unit}"}
             elif kind == 'text':
                 lo, hi = o.get('size', (0, 255))
                 vp = {'type': 'string', 'max_length': hi, **vp, 'description': f"The new {human}."}
@@ -481,6 +533,7 @@ def generate(d, cfg):
                               'params': params, 'returns': 'ack'}
             lock = cfg.get('locks', {}).get(o['name'])
             setters.append({'command': name, 'oid': o['oid'], 'kind': kind, 'labels': labels, 'wire': wire,
+                            'divisor': divisor,
                             'lock': d[lock]['oid'] if lock else '',
                             'indexes': index_params, 'reread': reread})
             for m in root['models']:
@@ -518,6 +571,17 @@ def generate(d, cfg):
         state = {rename.get(k, k): v for k, v in state.items()}
         for o in objects:
             o['path'] = rename.get(o['path'], o['path'])
+    # A unit named by another object: that object's state path.
+    by_name = {}
+    for path, sd in state.items():
+        m = re.match(r'(\w+) \(', sd['description'])
+        if m:
+            by_name[m.group(1)] = path
+    for path, sd in state.items():
+        if 'unit_from' in sd:
+            source, suffix = sd['unit_from']
+            sd['unit_from'] = {'state': by_name[source],
+                               'units': {k: v + suffix for k, v in UNIT_FROM[source].items()}}
     return objects, setters, traps, state, commands, supports
 
 
@@ -550,6 +614,8 @@ def rust(cfg, objects, setters, traps):
         return '&[' + ', '.join(s.split('.')) + ']'
 
     def kind(o):
+        if o['kind'] == 'scaled':
+            return f"Kind::Scaled({o['divisor']})"
         return {'int': 'Kind::Int', 'ticks': 'Kind::Ticks', 'text': 'Kind::Text', 'mac': 'Kind::Mac',
                 'ip': 'Kind::Ip', 'oid': 'Kind::Oid'}.get(o['kind']) or (
             f"Kind::Choice(&{choices[tuple(o['labels'])]})" if o['kind'] == 'choice'
@@ -591,6 +657,10 @@ def yaml_value(v):
         return 'true' if v else 'false'
     if isinstance(v, int):
         return str(v)
+    if isinstance(v, float):
+        return repr(v)
+    if isinstance(v, dict):
+        return '{ ' + ', '.join(f"{k}: {yaml_value(x)}" for k, x in v.items()) + ' }'
     if isinstance(v, list):
         return '[' + ', '.join(yaml_value(x) for x in v) + ']'
     s = str(v)
@@ -702,7 +772,7 @@ COMMON_STATE = r'''  polled.status: { type: int, unit: s, description: "When the
   version: { type: string, description: "The SNMP version used: v1, v2c or v3" }
   system.description: { type: string, description: "sysDescr.0: the agent's description of the device" }
   system.object_id: { type: string, description: "sysObjectID.0: the vendor's OID for the device type" }
-  system.uptime: { type: int, unit: "1/100 s", description: "sysUpTime.0, in hundredths of a second (TimeTicks)" }
+  system.uptime: { type: int, unit: s, scale: 0.01, description: "sysUpTime.0, in hundredths of a second (TimeTicks)" }
   system.contact: { type: string, description: "sysContact.0" }
   system.name: { type: string, description: "sysName.0" }
   system.location: { type: string, description: "sysLocation.0" }

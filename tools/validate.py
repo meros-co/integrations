@@ -1544,6 +1544,26 @@ def poll_interval_checks(doc: dict) -> list[str]:
     return errors
 
 
+def unit_checks(doc: dict) -> list[str]:
+    """A state's unit is a unit, its step is `scale`, and a unit named by
+    another state names a declared string state (SPEC.md §1, Units and
+    scale)."""
+    errors: list[str] = []
+    state = doc.get("state") or {}
+    for key, field in state.items():
+        unit_from = field.get("unit_from")
+        if unit_from is None:
+            continue
+        if "unit" in field:
+            errors.append(f"state.{key}: unit and unit_from both given; keep one")
+        source = state.get(unit_from.get("state"))
+        if source is None:
+            errors.append(f"state.{key}.unit_from.state: no state '{unit_from.get('state')}'")
+        elif source.get("type") != "string":
+            errors.append(f"state.{key}.unit_from.state: '{unit_from.get('state')}' is not a string state")
+    return errors
+
+
 def label_checks(doc: dict) -> list[str]:
     """Every parameter and setting has a label and a description (SPEC.md §4)."""
     errors = []
@@ -1598,7 +1618,7 @@ def main() -> int:
 
         errors = cross_field_checks(doc, rel) + port_checks(doc) + label_checks(doc)
         errors += pacing_checks(doc) + acknowledge_checks(doc) + select_checks(doc) + polled_checks(doc)
-        errors += poll_interval_checks(doc)
+        errors += poll_interval_checks(doc) + unit_checks(doc)
 
         # Spec ids are the consumer-facing contract; they must be unique.
         spec_id = doc["id"]

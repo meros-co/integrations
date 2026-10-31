@@ -367,9 +367,28 @@ pub(crate) fn decode_binary(text: &str) -> Option<Vec<u8>> {
 pub struct StateField {
     #[serde(rename = "type")]
     pub kind: String,
+    /// The unit the value is reported in, a symbol with no number in front
+    /// (SPEC.md §1, Units and scale).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unit: Option<String>,
+    /// What one step of the reported number is worth in `unit`: the quantity
+    /// is the value times this (0.1 for tenths). 1 when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scale: Option<f64>,
+    /// In place of `unit`: the state naming the unit, for a device whose
+    /// unit the operator chooses.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unit_from: Option<UnitFrom>,
     pub description: String,
+}
+
+/// A unit named by another state (SPEC.md §1, Units and scale).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UnitFrom {
+    /// The declared string state whose value names the unit.
+    pub state: String,
+    /// Each value of that state and the unit it means.
+    pub units: BTreeMap<String, String>,
 }
 
 /// One periodic read of a device and how often it runs (SPEC.md, Native
@@ -644,6 +663,8 @@ impl DeviceSpec {
                 StateField {
                     kind: "int".into(),
                     unit: Some("s".into()),
+                    scale: None,
+                    unit_from: None,
                     description: format!(
                         "When the poll group {name} ({every}) was last answered, in Unix \
                          seconds: its data is as old as this"
@@ -1043,6 +1064,24 @@ mod tests {
             assert_eq!(status.name, "status");
             assert_eq!(status.interval_ms, Some(10_000));
         }
+    }
+
+    #[test]
+    fn a_states_unit_and_scale_reach_the_catalogue() {
+        let spec = parse(&[
+            "implementation: native",
+            "reason: R",
+            "state:",
+            "  volts: { type: int, unit: V, scale: 0.1, description: Tenths }",
+            "  unit: { type: string, description: U }",
+            "  temp: { type: float, unit_from: { state: unit, units: { c: °C, f: °F } }, description: T }",
+        ])
+        .unwrap();
+        let out = serde_json::to_value(&spec).unwrap();
+        assert_eq!(out["state"]["volts"]["unit"], "V");
+        assert_eq!(out["state"]["volts"]["scale"], 0.1);
+        assert_eq!(out["state"]["temp"]["unit_from"]["state"], "unit");
+        assert_eq!(out["state"]["temp"]["unit_from"]["units"]["f"], "°F");
     }
 
     /// The features in Cargo.toml's [features], each with its list.

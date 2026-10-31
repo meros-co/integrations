@@ -60,6 +60,45 @@ removal. A telemetry rule removes with `{delete: true}` (§8) and never writes
 `null`, and `tools/validate.py` refuses a rule or map that does; native
 modules follow the same rule.
 
+#### Units and scale
+
+A number's `unit` is the unit it is reported in, a symbol with nothing in
+front of it: `V`, `A`, `W`, `VA`, `kWh`, `Hz`, `s`, `ms`, `°C`, `%`, `dB`.
+Where the reported number counts a fraction of the unit, as a device that
+sends a voltage in tenths of a volt does, `scale` says what one step is
+worth: the quantity in `unit` is the value times `scale`.
+
+```yaml
+state:
+  input.voltage: { type: float, unit: V, description: "The input voltage" }          # 120.3
+  battery.voltage: { type: int, unit: V, scale: 0.1, description: "The battery voltage, as the device counts it" }   # 1203 is 120.3 V
+  power_factor: { type: float, description: "The output power factor, a ratio from 0 to 1" }
+```
+
+An integration reports a number in its unit wherever it can: the core
+divides a device's count of tenths or hundredths and reports a `float` with
+no `scale`, and a command writing such a value takes it in the unit too. `scale` is for
+integrations that report the number as the device counts it; it is 1 when
+absent. A ratio (a power factor) has a `scale` or a float value and no
+unit. `tools/validate.py` refuses a unit that begins with a number (`"0.1 V"`),
+so a step is always in `scale`, never in the unit's text.
+
+A device whose unit the operator chooses (an EnviroSensor set to Celsius or
+Fahrenheit) names it with `unit_from` in place of `unit`: the declared
+string state that says which, and the unit each of its values means:
+
+```yaml
+state:
+  environment2.temp_unit: { type: string, description: "celsius or fahrenheit" }
+  environment2.temp.*.temperature:
+    type: float
+    unit_from: { state: environment2.temp_unit, units: { celsius: °C, fahrenheit: °F } }
+    description: "envir2Temperature (CPS-MIB)"
+```
+
+The catalogue gives `unit`, `scale` and `unit_from` with each state, in
+every delivery.
+
 ## 2. Transports
 
 One transport per spec. The core implements each transport once. A device that
