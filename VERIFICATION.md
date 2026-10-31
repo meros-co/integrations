@@ -1269,6 +1269,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that servers send LSta regularly even while no layer changes, since 15 s without a message reopens the connection. ([specs/citp-msex.yaml:185](specs/citp-msex.yaml#L185))
 - [ ] Check that a media server's PLoc names its MSEX listening port, and that its StFr preview frames (JPEG or fJPG) arrive on 239.224.0.180 or 224.0.0.180 port 4809 after RqSt. ([specs/citp-msex.yaml:205](specs/citp-msex.yaml#L205))
 
+## clearcom-ccm — Clear-Com Arcadia, FreeSpeak II and FreeSpeak Edge base stations (CCM REST API)
+
+- [ ] Confirm Arcadia's sign-in (POST /auth/local/login {logemail: admin, logpassword} answered {jwt}), that the token goes as Authorization Bearer, how long it lasts, and that an expired one is answered 401; and that a FreeSpeak II base needs no sign-in. ([specs/clearcom-ccm.yaml:78](specs/clearcom-ccm.yaml#L78))
+- [ ] Check whether a FreeSpeak Edge base speaks as Arcadia does (sign-in, /api/1/devices/endpoints, /api/2/rolesets), or as the FreeSpeak II base does. ([specs/clearcom-ccm.yaml:106](specs/clearcom-ccm.yaml#L106))
+- [ ] Confirm the Socket.IO server is Engine.IO 3 at /socket.io/ on both stations, whether Arcadia's needs the bearer token on its opening request, and which events each sends after live:update, EndpointInit, GpiInit and GpoInit. ([specs/clearcom-ccm.yaml:446](specs/clearcom-ccm.yaml#L446))
+- [ ] Record the endpoint res and port res paths the stations give, to confirm change_association, join, leave and nulling at /api/1/devices/<id>/endpoints/<endpoint> and /api/1/devices/<id>/interfaces/<interface>/ports/<port>. ([specs/clearcom-ccm.yaml:252](specs/clearcom-ccm.yaml#L252))
+- [ ] Check which named commands each station takes: call_all_endpoints and rmk_all_endpoints on a FreeSpeak II base, port_call and setGPO on Arcadia, setGPI and GPI events on a FreeSpeak II base. ([specs/clearcom-ccm.yaml:264](specs/clearcom-ccm.yaml#L264))
+- [ ] Record an endpoint's liveStatus on Arcadia (rssi or RSSI, batteryLevel, keyState, callState) and the GPI polarity each station reports. ([specs/clearcom-ccm.yaml:320](specs/clearcom-ccm.yaml#L320))
+- [ ] Record the API's own description (GET /api/1/schemas/clearcom_api.json) on each station and firmware, so its settings can be named commands. ([specs/clearcom-ccm.yaml:149](specs/clearcom-ccm.yaml#L149))
+
 ## clock-8001 — Clock-8001
 
 - [ ] Confirm the default command and feedback port 1245 and that feedback is broadcast as one bundle on every change. ([specs/clock-8001.yaml:57](specs/clock-8001.yaml#L57))

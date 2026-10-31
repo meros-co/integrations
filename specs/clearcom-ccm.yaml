@@ -1,0 +1,657 @@
+spec: 1
+id: clearcom-ccm
+name: Clear-Com Arcadia, FreeSpeak II and FreeSpeak Edge base stations (CCM REST API)
+vendor: Clear-Com
+category: other
+
+# Clear-Com's IP base stations are configured from the Core Configuration
+# Manager (CCM), a web app served by the station itself, over a REST API on
+# port 80 (/api/1 and /api/2, JSON) with Socket.IO for live events. Arcadia
+# signs its users in (POST /auth/local/login, a JWT as Authorization
+# Bearer); the FreeSpeak II base asks for nothing. The station serves its
+# own OpenAPI description at /api/1/schemas/clearcom_api.json. Clear-Com
+# publishes no document for the API; it is taken from two MIT-licensed
+# Bitfocus Companion modules, and every behavior is inferred (quirks,
+# VERIFICATION.md).
+source:
+  - title: companion-module-clearcom-rest (Bitfocus Companion module, MIT license)
+    author: Bitfocus AS, Andrew Broughton
+    url: https://github.com/bitfocus/companion-module-clearcom-rest/tree/34e908ec8a1c75d2963049ca80a1b2e68831dc65
+    note: >
+      Read at commit 34e908ec (6 October 2026), MIT license, for Arcadia (companion/manifest.json
+      names Arcadia; HELP.md says master stations with a REST API, like the Arcadia and Edge).
+      src/main.ts: POST /auth/local/login {logemail: admin, logpassword} answered {jwt}.
+      src/network.ts: Authorization Bearer <jwt>, Accept application/json, JSON bodies; 401
+      re-login; POST /auth/refresh {jwtversion} every 30 s idle; GET /api/1/devices/1
+      (deviceType_name, device_label, versionSW, device_liveStatus), /api/1/devices/interfaces/ports
+      (port_id, port_label, port_desc, port_config_type, res, with ?gids=), /api/1/devices/endpoints
+      (id, label, type, gid, res, isGateway, liveStatus with status, association.dpId,
+      batteryLevel, rssi, linkQuality, keyState, callState), /api/2/rolesets (id, name, label,
+      gid, sessions), /api/2/keysets, /api/1/connections/liveStatus (id, label), /api/1/devices/1/gpio
+      (type 0 GPI, settings.events), <port res>/nulling (GET and POST, nulling Idle or a state);
+      Socket.IO at /socket.io with the bearer, events DiscoveryInit, live:connections, live:roles,
+      live:rolesets (rolesets gids), live:ports and live:endpoints (gids), live:devices, live:gpios,
+      init, EndpointUpdated ([{endpointId, path, value}], paths liveStatus, liveStatus.keyState,
+      liveStatus.callState) and GpiUpdated ({gpiId, path: liveStatus, value: {status}}, active
+      low). src/arcadia.ts: PUT <res>/<setting> {gid, <key>: value} for the station's settings as
+      its schema describes them, PUT /api/2/keysets, POST /api/1/devices/1/endpoints[/<id>]/rmk,
+      POST .../endpoints[/<id>]/call {active, text, gid}, POST <port res>/join and /leave
+      {target: /api/1/connections/<id>}, POST <endpoint res>/changeassociation {gid,
+      association: {gid}}. src/actions.ts: POST, PUT and DELETE /api/1/devices/1/gpi/<n>/events[/<id>]
+      {source, destination, action xpt or call}, POST /api/1/devices/1/setGPI {id, enabled}.
+      src/loadSchemas.ts: GET /api/1/schemas/clearcom_api.json and its referenced schemas.
+      src/config.ts: endpoint types HMS-4X, HRM-4X, HKB-2X, HBP-2X, FSII-BP, E-BP, NEP, V-Series.
+  - title: companion-module-clearcom-freespeakii (Bitfocus Companion module, MIT license)
+    author: Bitfocus AS, Javen Kazebee
+    url: https://github.com/bitfocus/companion-module-clearcom-freespeakii/tree/8b822aa42269fafa7f5486bc20c6c85d781497d5
+    note: >
+      Read at commit 8b822aa4 (7 October 2026), MIT license, for the FreeSpeak II base
+      (FSII-BASE-II). README.md and HELP.md: no published control API, the CCM web UI's REST
+      (/api/1, JSON, port 80) and Socket.IO 2 (Engine.IO 3) interface, no authentication, device
+      id 1 unless linked. src/api.ts: GET /api/1/devices/<d>/liveStatus (uptime, version, label,
+      state), /api/1/devices/<d>/endpoints, /api/1/roles, /api/1/connections,
+      /api/1/connections/liveStatus (participants with joinState and events.call),
+      /api/1/devices/<d>/gpio (type 0 GPI, 1 GPO, liveStatus status and forced),
+      /api/1/devices/<d>/interfaces/<hw 0-4>/ports; POST /api/1/devices/<d>/endpoints/<id>/call
+      {active, text}, /rmk {}, /changerole {id}, POST
+      /api/1/devices/<d>/interfaces/<hw>/ports/<port id>/join and /leave {target}, /gpo
+      {enabled, timeout 4000}, POST /api/1/devices/<d>/setGPO {id, enabled true, false or null to
+      release}; writes spaced 50 ms; never GET /api/1/events without an id. src/socket.ts:
+      live:update {<topic>: start} for devices, interfaces, ports, roles, connections, vpl, calls,
+      alerts and endpoints, then EndpointInit, GpiInit and GpoInit, on each connection.
+      src/main.ts: EndpointInit {result: [...]}, EndpointUpdated {endpointId, path, value},
+      EndpointAdded, EndpointRemoved, GpiInit and GpoInit {result: [...]}, GpiUpdated and
+      GpoUpdated, live:<topic> answered by re-reading the matching list. src/types.ts: endpoint
+      liveStatus (status, role 65535 while offline, antennaIndex, keyState [{keysetIndex,
+      currentState, volume}], batteryType, batteryLevel, longevity {hours, minutes}, RSSI,
+      linkQuality, frameErrorRate, callState); port_id = device << 16 | hw << 8 | index.
+
+transport:
+  type: http
+  port: 80
+  scheme: http
+  timeout_ms: 5000
+  headers:
+    Accept: application/json
+  # Arcadia signs in; the FreeSpeak II base needs nothing, so its password
+  # stays empty and no session is used.
+  session:
+    when_set: password
+    login: { method: POST, path: /auth/local/login, content_type: application/json,
+             body: '{"logemail":"admin","logpassword":{settings.password:json}}' }
+    capture: { json: $.jwt, header: Authorization, scheme: Bearer }
+    relogin: { status: [401] }
+    refused: { status: [401, 403] }
+
+settings:
+  password: { type: string, secret: true, default: "", max_length: 128, label: Admin password,
+    description: "The station's admin password, for an Arcadia (which signs in as admin); leave empty for a FreeSpeak II base, which asks for none." }
+  device_id: { type: int, min: 1, max: 255, default: 1, label: Device ID,
+    description: "The station's device id in the API: 1 unless it is one of several linked stations." }
+
+ports:
+  - { port: 80, protocol: http, role: control, note: "the station's web server: CCM's REST API" }
+  - { port: 80, protocol: ws, role: push, note: "Socket.IO at /socket.io/ on the same port: live events" }
+
+models:
+  - id: arcadia
+    name: Clear-Com Arcadia Central Station
+    supports: &arcadia
+      [get, put, post, delete, get_schema, get_device, get_device_live_status, list_endpoints,
+      list_roles, list_keysets, list_connections, get_connections_live_status, list_ports,
+      list_gpio, call_endpoint, call_all_endpoints, rmk_endpoint, rmk_all_endpoints,
+      change_association, port_join, port_leave, start_port_nulling, get_port_nulling, set_gpi,
+      add_gpi_event, update_gpi_event, delete_gpi_event]
+    verification: none
+  - id: freespeak-edge
+    name: Clear-Com FreeSpeak Edge base station (FSE-BASE)
+    supports: *arcadia
+    verification: none
+  - id: freespeak-ii
+    name: Clear-Com FreeSpeak II base station (FSII-BASE-II)
+    supports:
+      [get, put, post, delete, get_schema, get_device, get_device_live_status, list_endpoints,
+      list_roles, list_connections, get_connections_live_status, list_interface_ports, list_gpio,
+      call_endpoint, rmk_endpoint, change_role, port_join, port_leave, port_call, set_gpo,
+      release_gpo]
+    verification: none
+
+commands:
+  # ── Any resource ──────────────────────────────────────────────────────
+  get:
+    summary: "Read any API resource, such as 1/devices/1/endpoints (GET /api/<path>)"
+    params:
+      path: &api_path { type: string, required: true, max_length: 512, pattern: '^[0-9]+(/[A-Za-z0-9_.-]+)+$', label: Path,
+        description: "The resource's path after /api/, starting with the API version: 1/devices/1/liveStatus, 2/rolesets. The station's schema (get_schema) lists them." }
+    send: { method: GET, path: "/api/{path:path}" }
+    expect: { status: [200], json_path: "$" }
+    returns: value
+  put:
+    summary: "Change any API resource with a JSON body (PUT /api/<path>), such as a setting as the schema describes it"
+    params:
+      path: *api_path
+      body: &api_body { type: json, required: true, label: Body, description: "The JSON body the schema gives for the request, such as {\"gid\": \"...\", \"port_label\": \"PL1\"}." }
+    send: { method: PUT, path: "/api/{path:path}", content_type: application/json, body: "{body}" }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+  post:
+    summary: "Send any API action with a JSON body (POST /api/<path>)"
+    params: { path: *api_path, body: *api_body }
+    send: { method: POST, path: "/api/{path:path}", content_type: application/json, body: "{body}" }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+  delete:
+    summary: "Delete any API resource (DELETE /api/<path>)"
+    params: { path: *api_path }
+    send: { method: DELETE, path: "/api/{path:path}" }
+    expect: { status: [200, 204] }
+    returns: ack
+  get_schema:
+    summary: "Read the station's own OpenAPI description of its API (GET /api/1/schemas/clearcom_api.json)"
+    send: { method: GET, path: /api/1/schemas/clearcom_api.json }
+    expect: { status: [200], json_path: "$" }
+    returns: value
+
+  # ── Reads ─────────────────────────────────────────────────────────────
+  get_device:
+    summary: "Read the station: type, label, firmware and live status (GET /api/1/devices/<id>)"
+    send: { method: GET, path: "/api/1/devices/{settings.device_id}" }
+    expect: { status: [200], json_path: "$" }
+    returns: value
+  get_device_live_status:
+    summary: "Read the station's live status: uptime, version, label and state (GET /api/1/devices/<id>/liveStatus)"
+    send: { method: GET, path: "/api/1/devices/{settings.device_id}/liveStatus" }
+    expect: { status: [200], json_path: "$" }
+    returns: value
+  list_endpoints:
+    summary: "List the endpoints (beltpacks, key panels, antennas) with their live status; also kept in endpoints"
+    send:
+      - { models: [arcadia, freespeak-edge], method: GET, path: /api/1/devices/endpoints }
+      - { models: [freespeak-ii], method: GET, path: "/api/1/devices/{settings.device_id}/endpoints" }
+    expect: { status: [200], json_path: "$" }
+    returns: value
+  list_roles:
+    summary: "List the roles (Arcadia's role sets); also kept in roles"
+    send:
+      - { models: [arcadia, freespeak-edge], method: GET, path: /api/2/rolesets }
+      - { models: [freespeak-ii], method: GET, path: /api/1/roles }
+    expect: { status: [200], json_path: "$" }
+    returns: value
+  list_keysets:
+    summary: "List the key sets of every role (GET /api/2/keysets)"
+    send: { method: GET, path: /api/2/keysets }
+    expect: { status: [200], json_path: "$" }
+    returns: value
+  list_connections:
+    summary: "List the connections: partylines and groups (GET /api/1/connections); also kept in connections"
+    send: { method: GET, path: /api/1/connections }
+    expect: { status: [200], json_path: "$" }
+    returns: value
+  get_connections_live_status:
+    summary: "Read each connection's participants, who is talking and calling (GET /api/1/connections/liveStatus)"
+    send: { method: GET, path: /api/1/connections/liveStatus }
+    expect: { status: [200], json_path: "$" }
+    returns: value
+  list_ports:
+    summary: "List every audio port of the station (GET /api/1/devices/interfaces/ports); also kept in ports"
+    send: { method: GET, path: /api/1/devices/interfaces/ports }
+    expect: { status: [200], json_path: "$" }
+    returns: value
+  list_interface_ports:
+    summary: "List an interface's audio ports (GET /api/1/devices/<id>/interfaces/<interface>/ports); also kept in ports"
+    params:
+      interface: &interface { type: int, min: 0, max: 255, required: true, label: Interface,
+        description: "The interface's hardware index, 0 to 4 on a FreeSpeak II base; a port's id holds it as (port >> 8) & 255." }
+    send: { method: GET, path: "/api/1/devices/{settings.device_id}/interfaces/{interface}/ports" }
+    expect: { status: [200], json_path: "$" }
+    returns: value
+  list_gpio:
+    summary: "List the GPIs and GPOs with their state (GET /api/1/devices/<id>/gpio); also kept in gpis and gpos"
+    send: { method: GET, path: "/api/1/devices/{settings.device_id}/gpio" }
+    expect: { status: [200], json_path: "$" }
+    returns: value
+
+  # ── Endpoints ─────────────────────────────────────────────────────────
+  call_endpoint:
+    summary: "Start or stop a call signal to an endpoint, with an optional text (POST /api/1/devices/<id>/endpoints/<endpoint>/call)"
+    params:
+      endpoint: &endpoint { type: int, min: 0, max: 2147483647, required: true, label: Endpoint, description: "The endpoint's id, as list_endpoints gives it." }
+      active: &call_active { type: bool, default: true, label: Calling, description: "On starts the call signal, off stops it." }
+      text: &call_text { type: string, default: "", max_length: 64, label: Call text, description: "Text shown with the call; empty for none." }
+    send: { method: POST, path: "/api/1/devices/{settings.device_id}/endpoints/{endpoint}/call", content_type: application/json,
+            body: '{"active":{active},"text":{text:json}}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+  call_all_endpoints:
+    summary: "Start or stop a call signal to every endpoint (POST /api/1/devices/<id>/endpoints/call)"
+    params: { active: *call_active, text: *call_text }
+    send: { method: POST, path: "/api/1/devices/{settings.device_id}/endpoints/call", content_type: application/json,
+            body: '{"active":{active},"text":{text:json}}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+  rmk_endpoint:
+    summary: "Remote mic kill: turn off an endpoint's talk keys (POST /api/1/devices/<id>/endpoints/<endpoint>/rmk)"
+    params: { endpoint: *endpoint }
+    send: { method: POST, path: "/api/1/devices/{settings.device_id}/endpoints/{endpoint}/rmk", content_type: application/json, body: "{}" }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+  rmk_all_endpoints:
+    summary: "Remote mic kill on every endpoint (POST /api/1/devices/<id>/endpoints/rmk)"
+    send: { method: POST, path: "/api/1/devices/{settings.device_id}/endpoints/rmk", content_type: application/json, body: "{}" }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+  change_role:
+    summary: "Give a beltpack another role (POST /api/1/devices/<id>/endpoints/<endpoint>/changerole)"
+    params:
+      endpoint: *endpoint
+      role: { type: int, min: 0, max: 2147483647, required: true, label: Role, description: "The role's id, as list_roles gives it." }
+    send: { method: POST, path: "/api/1/devices/{settings.device_id}/endpoints/{endpoint}/changerole", content_type: application/json,
+            body: '{"id":{role}}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+  change_association:
+    summary: "Give an endpoint another role set (POST /api/1/devices/<id>/endpoints/<endpoint>/changeassociation)"
+    params:
+      endpoint: *endpoint
+      endpoint_gid: { type: string, required: true, max_length: 128, label: Endpoint gid, description: "The endpoint's gid, as list_endpoints gives it." }
+      roleset_gid: { type: string, required: true, max_length: 128, label: Role set gid, description: "The role set's gid, as list_roles gives it." }
+    send: { method: POST, path: "/api/1/devices/{settings.device_id}/endpoints/{endpoint}/changeassociation", content_type: application/json,
+            body: '{"gid":{endpoint_gid:json},"association":{"gid":{roleset_gid:json}}}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+
+  # ── Ports ─────────────────────────────────────────────────────────────
+  port_join:
+    summary: "Join an audio port to a connection (POST .../interfaces/<interface>/ports/<port>/join)"
+    params:
+      interface: *interface
+      port: &port { type: int, min: 0, max: 2147483647, required: true, label: Port, description: "The port's id, as the port lists give it." }
+      connection: &connection { type: int, min: 0, max: 2147483647, required: true, label: Connection, description: "The connection's id, as list_connections gives it." }
+    send: { method: POST, path: "/api/1/devices/{settings.device_id}/interfaces/{interface}/ports/{port}/join", content_type: application/json,
+            body: '{"target":"/api/1/connections/{connection}"}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+  port_leave:
+    summary: "Take an audio port out of a connection (POST .../interfaces/<interface>/ports/<port>/leave)"
+    params: { interface: *interface, port: *port, connection: *connection }
+    send: { method: POST, path: "/api/1/devices/{settings.device_id}/interfaces/{interface}/ports/{port}/leave", content_type: application/json,
+            body: '{"target":"/api/1/connections/{connection}"}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+  port_call:
+    summary: "Send a call signal out of a 2-wire or 4-wire port (POST .../ports/<port>/gpo)"
+    params:
+      interface: *interface
+      port: *port
+      enabled: { type: bool, default: true, label: Calling, description: "On starts the call signal, off stops it." }
+      timeout_ms: { type: int, min: 0, max: 600000, default: 4000, label: Timeout, description: "Milliseconds after which the station ends the signal by itself." }
+    send: { method: POST, path: "/api/1/devices/{settings.device_id}/interfaces/{interface}/ports/{port}/gpo", content_type: application/json,
+            body: '{"enabled":{enabled},"timeout":{timeout_ms}}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+  start_port_nulling:
+    summary: "Start auto-nulling a 2-wire port (POST .../ports/<port>/nulling); its progress is read with get_port_nulling"
+    params: { interface: *interface, port: *port }
+    send: { method: POST, path: "/api/1/devices/{settings.device_id}/interfaces/{interface}/ports/{port}/nulling", content_type: application/json, body: "{}" }
+    expect: { status: [200, 201], json_path: "$.nulling" }
+    returns: value
+  get_port_nulling:
+    summary: "Read a 2-wire port's nulling state, Idle when it is not nulling (GET .../ports/<port>/nulling)"
+    params: { interface: *interface, port: *port }
+    send: { method: GET, path: "/api/1/devices/{settings.device_id}/interfaces/{interface}/ports/{port}/nulling" }
+    expect: { status: [200], json_path: "$.nulling" }
+    returns: value
+
+  # ── GPIO ──────────────────────────────────────────────────────────────
+  set_gpo:
+    summary: "Force a GPO on or off (POST /api/1/devices/<id>/setGPO)"
+    params:
+      gpo: &gpio_id { type: int, min: 0, max: 255, required: true, label: GPIO, description: "The GPI or GPO id, as list_gpio gives it." }
+      enabled: { type: bool, required: true, label: "On", description: "On closes the output, off opens it." }
+    send: { method: POST, path: "/api/1/devices/{settings.device_id}/setGPO", content_type: application/json, body: '{"id":{gpo},"enabled":{enabled}}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+  release_gpo:
+    summary: "Release a forced GPO back to the station's own logic (POST /api/1/devices/<id>/setGPO with enabled null)"
+    params: { gpo: *gpio_id }
+    send: { method: POST, path: "/api/1/devices/{settings.device_id}/setGPO", content_type: application/json, body: '{"id":{gpo},"enabled":null}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+  set_gpi:
+    summary: "Assert or release a GPI by software (POST /api/1/devices/<id>/setGPI)"
+    params:
+      gpi: *gpio_id
+      enabled: { type: bool, required: true, label: Asserted, description: "On asserts the input, off releases it." }
+    send: { method: POST, path: "/api/1/devices/{settings.device_id}/setGPI", content_type: application/json, body: '{"id":{gpi},"enabled":{enabled}}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+  add_gpi_event:
+    summary: "Add what a GPI does: route a source to a destination, or call (POST /api/1/devices/<id>/gpi/<gpi>/events)"
+    params:
+      gpi: *gpio_id
+      source: &ev_source { type: string, required: true, max_length: 256, label: Source, description: "The event's source, as the station names it (a resource path)." }
+      destination: &ev_destination { type: string, required: true, max_length: 256, label: Destination, description: "The event's destination, as the station names it (a resource path)." }
+      action: &ev_action { type: enum, values: [xpt, call], required: true, label: Action, description: "xpt routes the source to the destination (a crosspoint); call sends a call signal." }
+    send: { method: POST, path: "/api/1/devices/{settings.device_id}/gpi/{gpi}/events", content_type: application/json,
+            body: '{"source":{source:json},"destination":{destination:json},"action":"{action}"}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+  update_gpi_event:
+    summary: "Change a GPI event (PUT /api/1/devices/<id>/gpi/<gpi>/events/<event>)"
+    params:
+      gpi: *gpio_id
+      event: &ev_id { type: int, min: 0, max: 2147483647, required: true, label: Event, description: "The event's id, from list_gpio's settings.events." }
+      source: *ev_source
+      destination: *ev_destination
+      action: *ev_action
+    send: { method: PUT, path: "/api/1/devices/{settings.device_id}/gpi/{gpi}/events/{event}", content_type: application/json,
+            body: '{"source":{source:json},"destination":{destination:json},"action":"{action}"}' }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+  delete_gpi_event:
+    summary: "Remove a GPI event (DELETE /api/1/devices/<id>/gpi/<gpi>/events/<event>)"
+    params: { gpi: *gpio_id, event: *ev_id }
+    send: { method: DELETE, path: "/api/1/devices/{settings.device_id}/gpi/{gpi}/events/{event}" }
+    expect: { status: [200, 204] }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Clear-Com does not publish this API: it is the CCM web app's own, read from MIT-licensed
+      third-party modules, and may change with firmware. Every setting the station offers is
+      reached with get, put, post and delete as its own schema (get_schema) describes it; the
+      named commands cover what the modules use. An Arcadia signs in as admin with the password
+      setting and its token (a JWT) goes as Authorization Bearer, signed in again on a 401; a
+      FreeSpeak II base needs no password. The FreeSpeak Edge base is assumed to speak as Arcadia
+      does. Writes are best sent one at a time (the station is an embedded server); a write is
+      done on the HTTP status.
+  - models: [all]
+    severity: info
+    text: >
+      While monitoring, the station, its endpoints, roles, connections, ports and GPIO are read on
+      opening and every 30 s, the connections' live status every 5 s, and Socket.IO events
+      (Engine.IO 3) on /socket.io/ keep them current: endpoint updates and GPIO changes are read
+      directly, and each live:<topic> event reads its list again. The Socket.IO connection is
+      opened without the Arcadia's bearer token, which Arcadia may refuse; the polls then keep
+      state.
+  - models: [all]
+    severity: critical
+    text: >
+      rmk_endpoint and rmk_all_endpoints turn off talk keys on live beltpacks; port_join,
+      port_leave, change_role and change_association change who hears whom at once; put, post and
+      delete can change or remove any of the station's configuration, and reboot or reset it.
+
+state:
+  device.label:   { type: string, description: "The station's label" }
+  device.type:    { type: string, description: "The station's type name (deviceType_name), such as NEP-ARCADIA" }
+  device.version: { type: string, description: "The station's firmware version" }
+  device.state:   { type: string, description: "The station's state (liveStatus)" }
+  device.uptime:  { type: int, unit: s, description: "The station's uptime (liveStatus)" }
+  endpoints.*.label:  { type: string, description: "An endpoint's label, keyed by endpoint id" }
+  endpoints.*.type:   { type: string, description: "An endpoint's type, such as FSII-BP, HBP-2X or FSII-Antenna" }
+  endpoints.*.gid:    { type: string, description: "An endpoint's gid, as change_association takes it" }
+  endpoints.*.status: { type: string, description: "An endpoint's status: online or offline" }
+  endpoints.*.role:   { type: int, description: "The role an endpoint holds now, 65535 while offline (FreeSpeak II)" }
+  endpoints.*.role_label: { type: string, description: "The label of the role an endpoint is set to" }
+  endpoints.*.battery_level: { type: int, unit: "%", description: "A beltpack's battery charge" }
+  endpoints.*.battery_type:  { type: string, description: "A beltpack's battery type" }
+  endpoints.*.rssi:          { type: int, description: "A beltpack's received signal strength" }
+  endpoints.*.link_quality:  { type: int, description: "A beltpack's link quality" }
+  endpoints.*.frame_error_rate: { type: float, description: "A beltpack's frame error rate" }
+  endpoints.*.antenna:       { type: int, description: "The antenna a beltpack is on (antennaIndex)" }
+  endpoints.*.call_state:    { type: string, description: "A beltpack's call state as the station gives it (callState)" }
+  endpoints.*.key_state:     { type: string, description: "A beltpack's keys, as JSON text: each key set's index, state (off, listen, talk+listen...) and volume" }
+  endpoints.*.longevity_hours:   { type: int, unit: h, description: "A beltpack's battery time left, hours" }
+  endpoints.*.longevity_minutes: { type: int, unit: min, description: "A beltpack's battery time left, minutes past the hours" }
+  roles.*.label: { type: string, description: "A role's (or role set's) label, keyed by role id" }
+  roles.*.name:  { type: string, description: "A role set's name (Arcadia)" }
+  roles.*.type:  { type: string, description: "A role's type, such as FSII-BP" }
+  roles.*.gid:   { type: string, description: "A role set's gid (Arcadia), as change_association takes it" }
+  connections.*.label: { type: string, description: "A connection's label, keyed by connection id" }
+  connections.*.type:  { type: string, description: "A connection's type: partyline or group" }
+  connections.*.participants: { type: string, description: "A connection's participants with their join state and events (talk, call), as JSON text" }
+  ports.*.label:       { type: string, description: "An audio port's label, keyed by port id" }
+  ports.*.description: { type: string, description: "An audio port's description" }
+  ports.*.config_type: { type: string, description: "An audio port's type: 2W, 4W, SA, PGM..." }
+  ports.*.online:      { type: bool, description: "Whether an audio port is online" }
+  gpis.*.label:  { type: string, description: "A GPI's label, keyed by its id" }
+  gpis.*.status: { type: bool, description: "A GPI's state as the station reports it (Arcadia reports the physical level, active low)" }
+  gpos.*.label:  { type: string, description: "A GPO's label, keyed by its id" }
+  gpos.*.status: { type: bool, description: "A GPO's state" }
+  gpos.*.forced: { type: bool, description: "Whether a GPO is forced by set_gpo rather than following the station's logic" }
+
+telemetry:
+  poll:
+    - every_ms: 5000
+      send:
+        - { method: GET, path: /api/1/connections/liveStatus }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: "/api/1/devices/{settings.device_id}" }
+        - { method: GET, path: "/api/1/devices/{settings.device_id}/liveStatus" }
+        - { models: [arcadia, freespeak-edge], method: GET, path: /api/1/devices/endpoints }
+        - { models: [freespeak-ii], method: GET, path: "/api/1/devices/{settings.device_id}/endpoints" }
+        - { models: [arcadia, freespeak-edge], method: GET, path: /api/2/rolesets }
+        - { models: [freespeak-ii], method: GET, path: /api/1/roles }
+        - { method: GET, path: /api/1/connections }
+        - { models: [arcadia, freespeak-edge], method: GET, path: /api/1/devices/interfaces/ports }
+        - { models: [freespeak-ii], method: GET, path: "/api/1/devices/{settings.device_id}/interfaces/0/ports" }
+        - { models: [freespeak-ii], method: GET, path: "/api/1/devices/{settings.device_id}/interfaces/1/ports" }
+        - { models: [freespeak-ii], method: GET, path: "/api/1/devices/{settings.device_id}/interfaces/2/ports" }
+        - { models: [freespeak-ii], method: GET, path: "/api/1/devices/{settings.device_id}/interfaces/3/ports" }
+        - { models: [freespeak-ii], method: GET, path: "/api/1/devices/{settings.device_id}/interfaces/4/ports" }
+        - { method: GET, path: "/api/1/devices/{settings.device_id}/gpio" }
+  websocket:
+    path: /socket.io/
+    socketio: { engine_io: 3 }
+    send:
+      - '["live:update",{"devices":"start"}]'
+      - '["live:update",{"interfaces":"start"}]'
+      - '["live:update",{"ports":"start"}]'
+      - '["live:update",{"roles":"start"}]'
+      - '["live:update",{"connections":"start"}]'
+      - '["live:update",{"vpl":"start"}]'
+      - '["live:update",{"calls":"start"}]'
+      - '["live:update",{"endpoints":"start"}]'
+      - '["EndpointInit",{}]'
+      - '["GpiInit",{}]'
+      - '["GpoInit",{}]'
+  updates:
+    # ── REST reads ──
+    - path: '^/api/1/devices/\d+$'
+      json: { label: "$.device_label", type: "$.deviceType_name", version: "$.versionSW" }
+      state: { device.label: "{label}", device.type: "{type}", device.version: "{version}" }
+    - path: '^/api/1/devices/\d+/liveStatus$'
+      json: { uptime: "$.uptime", version: "$.version", label: "$.label", state: "$.state" }
+      state: { device.uptime: "{uptime}", device.version: "{version}", device.label: "{label}", device.state: "{state}" }
+    - path: '^/api/1/devices/(?:\d+/)?endpoints$'
+      json_each: "$"
+      json: &endpoint_fields
+        id: "$.id"
+        label: "$.label"
+        type: "$.type"
+        gid: "$.gid"
+        role_label: "$.role.label"
+        status: "$.liveStatus.status"
+        role: "$.liveStatus.role"
+        battery_level: "$.liveStatus.batteryLevel"
+        battery_type: "$.liveStatus.batteryType"
+        rssi: "$.liveStatus.RSSI"
+        link_quality: "$.liveStatus.linkQuality"
+        frame_error_rate: "$.liveStatus.frameErrorRate"
+        antenna: "$.liveStatus.antennaIndex"
+        call_state: "$.liveStatus.callState"
+        key_state: "$.liveStatus.keyState"
+        hours: "$.liveStatus.longevity.hours"
+        minutes: "$.liveStatus.longevity.minutes"
+      replace: endpoints
+      state: &endpoint_state
+        "endpoints.{id}.label": "{label}"
+        "endpoints.{id}.type": "{type}"
+        "endpoints.{id}.gid": "{gid}"
+        "endpoints.{id}.role_label": "{role_label}"
+        "endpoints.{id}.status": "{status}"
+        "endpoints.{id}.role": "{role}"
+        "endpoints.{id}.battery_level": "{battery_level}"
+        "endpoints.{id}.battery_type": "{battery_type}"
+        "endpoints.{id}.rssi": "{rssi}"
+        "endpoints.{id}.link_quality": "{link_quality}"
+        "endpoints.{id}.frame_error_rate": "{frame_error_rate}"
+        "endpoints.{id}.antenna": "{antenna}"
+        "endpoints.{id}.call_state": "{call_state}"
+        "endpoints.{id}.key_state": "{key_state}"
+        "endpoints.{id}.longevity_hours": "{hours}"
+        "endpoints.{id}.longevity_minutes": "{minutes}"
+    - path: '^/api/1/devices/(?:\d+/)?endpoints$'
+      json_each: "$"
+      json: { id: "$.id", rssi: "$.liveStatus.rssi" }
+      state: { "endpoints.{id}.rssi": "{rssi}" }
+    - path: '^/api/(?:1/roles|2/rolesets)$'
+      json_each: "$"
+      json: { id: "$.id", label: "$.label", name: "$.name", type: "$.type", gid: "$.gid" }
+      replace: roles
+      state: { "roles.{id}.label": "{label}", "roles.{id}.name": "{name}", "roles.{id}.type": "{type}", "roles.{id}.gid": "{gid}" }
+    - path: '^/api/1/connections$'
+      json_each: "$"
+      json: { id: "$.id", label: "$.label", type: "$.type" }
+      state: { "connections.{id}.label": "{label}", "connections.{id}.type": "{type}" }
+    - path: '^/api/1/connections/liveStatus$'
+      json_each: "$"
+      json: { id: "$.id", label: "$.label", participants: "$.participants" }
+      state: { "connections.{id}.label": "{label}", "connections.{id}.participants": "{participants}" }
+    - path: '^/api/1/devices/(?:\d+/)?interfaces/(?:\d+/)?ports$'
+      json_each: "$"
+      json: { id: "$.port_id", label: "$.port_label", description: "$.port_desc", type: "$.port_config_type", online: "$.liveStatus.online" }
+      state: { "ports.{id}.label": "{label}", "ports.{id}.description": "{description}", "ports.{id}.config_type": "{type}", "ports.{id}.online": "{online}" }
+    - path: '^/api/1/devices/\d+/gpio$'
+      json_each: "$"
+      each_match: { "$.type": "^0$" }
+      json: { id: "$.id", label: "$.label", status: "$.liveStatus.status" }
+      replace: gpis
+      state: { "gpis.{id}.label": "{label}", "gpis.{id}.status": "{status}" }
+    - path: '^/api/1/devices/\d+/gpio$'
+      json_each: "$"
+      each_match: { "$.type": "^1$" }
+      json: { id: "$.id", label: "$.label", status: "$.liveStatus.status", forced: "$.liveStatus.forced" }
+      replace: gpos
+      state: { "gpos.{id}.label": "{label}", "gpos.{id}.status": "{status}", "gpos.{id}.forced": "{forced}" }
+    # ── Socket.IO events ──
+    - json_match: { "$.event": "^EndpointInit$" }
+      json_each: "$.data.result"
+      json: *endpoint_fields
+      state: *endpoint_state
+    - json_match: { "$.event": "^EndpointUpdated$", "$.data.endpointId": "^(\\d+)$", "$.data.path": "^liveStatus$" }
+      json: &live_fields
+        status: "$.data.value.status"
+        role: "$.data.value.role"
+        battery_level: "$.data.value.batteryLevel"
+        battery_type: "$.data.value.batteryType"
+        rssi: "$.data.value.RSSI"
+        link_quality: "$.data.value.linkQuality"
+        frame_error_rate: "$.data.value.frameErrorRate"
+        antenna: "$.data.value.antennaIndex"
+        call_state: "$.data.value.callState"
+        key_state: "$.data.value.keyState"
+      state: &live_state
+        "endpoints.{1}.status": "{status}"
+        "endpoints.{1}.role": "{role}"
+        "endpoints.{1}.battery_level": "{battery_level}"
+        "endpoints.{1}.battery_type": "{battery_type}"
+        "endpoints.{1}.rssi": "{rssi}"
+        "endpoints.{1}.link_quality": "{link_quality}"
+        "endpoints.{1}.frame_error_rate": "{frame_error_rate}"
+        "endpoints.{1}.antenna": "{antenna}"
+        "endpoints.{1}.call_state": "{call_state}"
+        "endpoints.{1}.key_state": "{key_state}"
+    - json_match: { "$.event": "^EndpointUpdated$", "$.data.endpointId": "^(\\d+)$", "$.data.path": "^liveStatus\\.keyState$" }
+      json: { value: "$.data.value" }
+      state: { "endpoints.{1}.key_state": "{value}" }
+    - json_match: { "$.event": "^EndpointUpdated$", "$.data.endpointId": "^(\\d+)$", "$.data.path": "^liveStatus\\.callState$" }
+      json: { value: "$.data.value" }
+      state: { "endpoints.{1}.call_state": "{value}" }
+    # Arcadia sends a list of updates in one event.
+    - json_match: { "$.event": "^EndpointUpdated$" }
+      json_each: "$.data"
+      each_match: { "$.path": "^liveStatus$" }
+      json:
+        id: "$.endpointId"
+        status: "$.value.status"
+        battery_level: "$.value.batteryLevel"
+        rssi: "$.value.rssi"
+        link_quality: "$.value.linkQuality"
+        call_state: "$.value.callState"
+        key_state: "$.value.keyState"
+      state:
+        "endpoints.{id}.status": "{status}"
+        "endpoints.{id}.battery_level": "{battery_level}"
+        "endpoints.{id}.rssi": "{rssi}"
+        "endpoints.{id}.link_quality": "{link_quality}"
+        "endpoints.{id}.call_state": "{call_state}"
+        "endpoints.{id}.key_state": "{key_state}"
+    - json_match: { "$.event": "^EndpointUpdated$" }
+      json_each: "$.data"
+      each_match: { "$.path": "^liveStatus\\.keyState$" }
+      json: { id: "$.endpointId", value: "$.value" }
+      state: { "endpoints.{id}.key_state": "{value}" }
+    - json_match: { "$.event": "^EndpointUpdated$" }
+      json_each: "$.data"
+      each_match: { "$.path": "^liveStatus\\.callState$" }
+      json: { id: "$.endpointId", value: "$.value" }
+      state: { "endpoints.{id}.call_state": "{value}" }
+    - json_match: { "$.event": "^(?:EndpointAdded|EndpointRemoved)$" }
+      json: {}
+      then_send:
+        - { models: [arcadia, freespeak-edge], method: GET, path: /api/1/devices/endpoints }
+        - { models: [freespeak-ii], method: GET, path: "/api/1/devices/{settings.device_id}/endpoints" }
+    - json_match: { "$.event": "^GpiInit$" }
+      json_each: "$.data.result"
+      json: { id: "$.id", label: "$.label", status: "$.liveStatus.status" }
+      state: { "gpis.{id}.label": "{label}", "gpis.{id}.status": "{status}" }
+    - json_match: { "$.event": "^GpoInit$" }
+      json_each: "$.data.result"
+      json: { id: "$.id", label: "$.label", status: "$.liveStatus.status", forced: "$.liveStatus.forced" }
+      state: { "gpos.{id}.label": "{label}", "gpos.{id}.status": "{status}", "gpos.{id}.forced": "{forced}" }
+    - json_match: { "$.event": "^GpiUpdated$", "$.data.result.id": "^(\\d+)$" }
+      json: { status: "$.data.result.liveStatus.status" }
+      state: { "gpis.{1}.status": "{status}" }
+    - json_match: { "$.event": "^GpiUpdated$", "$.data.gpiId": "^(\\d+)$", "$.data.path": "^liveStatus$" }
+      json: { status: "$.data.value.status" }
+      state: { "gpis.{1}.status": "{status}" }
+    - json_match: { "$.event": "^GpoUpdated$", "$.data.result.id": "^(\\d+)$" }
+      json: { status: "$.data.result.liveStatus.status", forced: "$.data.result.liveStatus.forced" }
+      state: { "gpos.{1}.status": "{status}", "gpos.{1}.forced": "{forced}" }
+    - json_match: { "$.event": "^live:(?:connections|calls)$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/1/connections/liveStatus }]
+    - json_match: { "$.event": "^live:vpl$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/1/connections }]
+    - json_match: { "$.event": "^live:(?:roles|rolesets)$" }
+      json: {}
+      then_send:
+        - { models: [arcadia, freespeak-edge], method: GET, path: /api/2/rolesets }
+        - { models: [freespeak-ii], method: GET, path: /api/1/roles }
+    - json_match: { "$.event": "^live:endpoints$" }
+      json: {}
+      then_send:
+        - { models: [arcadia, freespeak-edge], method: GET, path: /api/1/devices/endpoints }
+        - { models: [freespeak-ii], method: GET, path: "/api/1/devices/{settings.device_id}/endpoints" }
+    - json_match: { "$.event": "^live:(?:ports|interfaces)$" }
+      json: {}
+      then_send:
+        - { models: [arcadia, freespeak-edge], method: GET, path: /api/1/devices/interfaces/ports }
+        - { models: [freespeak-ii], method: GET, path: "/api/1/devices/{settings.device_id}/interfaces/0/ports" }
+        - { models: [freespeak-ii], method: GET, path: "/api/1/devices/{settings.device_id}/interfaces/1/ports" }
+        - { models: [freespeak-ii], method: GET, path: "/api/1/devices/{settings.device_id}/interfaces/2/ports" }
+        - { models: [freespeak-ii], method: GET, path: "/api/1/devices/{settings.device_id}/interfaces/3/ports" }
+        - { models: [freespeak-ii], method: GET, path: "/api/1/devices/{settings.device_id}/interfaces/4/ports" }
+    - json_match: { "$.event": "^live:devices$" }
+      json: {}
+      then_send:
+        - { method: GET, path: "/api/1/devices/{settings.device_id}" }
+        - { method: GET, path: "/api/1/devices/{settings.device_id}/liveStatus" }
+    - json_match: { "$.event": "^live:gpios$" }
+      json: {}
+      then_send: [{ method: GET, path: "/api/1/devices/{settings.device_id}/gpio" }]
