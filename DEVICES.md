@@ -469,7 +469,6 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 | Devices | Protocol | Documentation |
 |---|---|---|
-| DiGiCo SD and Quantum series: feedback (the DiGiCo Pad / iPad command set) | OSC over UDP | Community |
 | Soundcraft Vi / Si | HiQnet | Unknown |
 | Waves eMotion LV1 | Unknown | Unknown |
 | Midas PRO series / HD96 | OSC / proprietary | Unknown |
