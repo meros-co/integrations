@@ -11,8 +11,8 @@ reason: >
   logarithmic byte pair. Replies are read against the request in flight, one at a time, and nothing is pushed.
 
 # The serial remote protocol of Sony's broadcast VTRs (BVW-75 and its family), which nearly every deck, disk
-# recorder and video server still emulates on its RS-422 "9-pin" port. The device is reached on a serial port of
-# the host (an RS-422 adapter) or through a serial-to-Ethernet converter at its host and port, which carries the
+# recorder and video server still emulates on its RS-422 "9-pin" port. The device is reached through a
+# serial-to-Ethernet converter at its host and port, which carries the
 # same bytes. Grass Valley's AMP, which extends the protocol and also runs over TCP, is the grassvalley-amp spec.
 source:
   - title: "Sony VIDEOCASSETTE RECORDER / PLAYER U-matic SERIES PROTOCOL OF REMOTE-1 (9 Pin) CONNECTOR, 1st Edition (9-967-242-01, 1989)"
@@ -49,20 +49,8 @@ source:
       (12 11 F0 1A), current time sense requests and returns (74.04, 74.06, 74.00, 74.05/74.07, 78.04/78.06, 70.0D
       when the time data is missing), status sense, edit preset sense (61.30, 7X.30) and its status bits.
 
-settings:
-  link: { type: enum, values: [serial, tcp], default: serial, label: Link,
-    description: "serial uses a serial port of the host (an RS-422 adapter); tcp reaches the device's 9-pin port through a serial-to-Ethernet converter at the device's host and port." }
-  serial_port: { type: string, max_length: 256, label: Serial port,
-    description: "With link serial, the host's serial port wired to the device's 9-pin port: COM3 on Windows, /dev/ttyUSB0 on Linux." }
-  baud_rate: { type: enum, values: ["9600", "19200", "38400"], default: "38400", label: Baud rate, description: "The protocol runs at 38400 bit/s; some devices can be set slower." }
-  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "The protocol uses 8 data bits." }
-  parity: { type: enum, values: [odd], default: odd, label: Parity, description: "The protocol uses odd parity." }
-  stop_bits: { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "The protocol uses 1 stop bit." }
-  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "The protocol uses no flow control." }
-
 ports:
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-422 on the device's 9-pin D-sub (REMOTE-1), through an RS-422 adapter; the host is the controller" }
-  - { port: null, protocol: tcp, role: control, when: "link tcp", note: "a serial-to-Ethernet converter's port, given when the device is opened" }
+  - { port: null, protocol: tcp, role: control, note: "a serial-to-Ethernet converter's port, given when the device is opened" }
 
 models:
   - id: generic
@@ -335,8 +323,8 @@ quirks:
     text: >
       Nothing is pushed: monitored, the core asks the status bytes and the best time every 250 ms and the points,
       timer 1, the LTC user bits, the generator, the preroll time, the timer mode and the edit preset every 5 s;
-      opened for commands only, it asks the device type every 10 s while idle as the liveness check. A serial
-      port shows nothing of the device, which is reported connected once it answers. A device that refuses ten
+      opened for commands only, it asks the device type every 10 s while idle as the liveness check. The
+      converter's connection shows nothing of the device, which is reported connected once it answers. A device that refuses ten
       status bytes is asked four from then on.
   - models: [all]
     severity: info

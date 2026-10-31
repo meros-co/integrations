@@ -132,13 +132,6 @@ transport:
   # A reply has "result" or "error"; a notification has neither.
   reply_match: '"(?:result|error)"\s*:'
   probe: '{"jsonrpc":"2.0","method":"property.get","params":{"property":"system.state"},"id":1}'
-  # The same JSON-RPC API on the RS232 port, 19200 8N1, no flow control (every catalog).
-  serial:
-    baud_rate: 19200
-    data_bits: 8
-    parity: none
-    stop_bits: 1
-    flow_control: none
   endpoints:
     files:
       port: { setting: http_port }
@@ -157,10 +150,9 @@ on_connect:
     await_reply: true
 
 ports:
-  - { port: 9091, protocol: tls, role: control, when: "link tcp, scheme tls", note: "Pulse API, JSON-RPC 2.0 over TLS (self-signed certificate)" }
-  - { port: 9090, protocol: tcp, role: control, when: "link tcp, scheme tcp", note: "Pulse API, JSON-RPC 2.0, raw; off by default from Pulse 2.10 (see the quirks)" }
+  - { port: 9091, protocol: tls, role: control, when: "scheme tls", note: "Pulse API, JSON-RPC 2.0 over TLS (self-signed certificate)" }
+  - { port: 9090, protocol: tcp, role: control, when: "scheme tcp", note: "Pulse API, JSON-RPC 2.0, raw; off by default from Pulse 2.10 (see the quirks)" }
   - { port: 80, protocol: http, role: control, setting: http_port, note: "web server file endpoints (/api/...); 443 over https" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS232, D-sub 9 (male on the projector): a straight cable, pins 2, 3 and 5" }
 
 models:
   - id: i600
@@ -5076,16 +5068,6 @@ quirks:
       Waking a projector from ECO takes Wake-on-LAN with its MAC address, its power key, the remote
       control, or the text :POWR1 followed by CR on its RS232 port (catalogs, ECO mode); the network
       API is not reachable in ECO, so power_on cannot wake it.
-
-  - models: [all]
-    severity: info
-    text: >
-      Serial: every catalog documents the same JSON-RPC API on the RS232 port, 19200 baud, no parity,
-      8 data bits, 1 stop bit, no flow control, D-sub 9 (9-pin male on the projector, straight cable,
-      pins 2, 3 and 5), identical for I600, UDM, UDX, F70, F80, F90, HDX 4K and XDL: link serial sends
-      the same messages there, framed the same way. The file endpoints are the web server's: on link
-      serial they are reached at the host the projector was opened with, and not at all without one.
-      The scheme setting (TLS) is the network link's.
 
   - models: [all]
     severity: info

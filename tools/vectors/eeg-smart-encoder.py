@@ -38,5 +38,3 @@ _eg("delete_all_xds_packets", {}, "\x01L -all\r")
 _eg("block_xds_class", {"class": "01"}, "\x01T -0100\r")
 _eg("unblock_xds_class", {"class": "01"}, "\x01T 0100\r")
 _eg("set_serial_port_p2", {"baud": "9600", "bits": "8", "parity": "n"}, "\x01I P2 9600 8 n\r")
-# The same command on the serial port.
-_eg("enable_xds_entry", {}, "\x01O XDS O\r", settings={"link": "serial", "serial_port": "COM3"}, file="enable_xds_entry-serial")

@@ -19,7 +19,7 @@ def _tbv(command, wire, status, value, **extra):
          expect_result={"ok": {"kind": "value", "value": value}}, **extra)
 
 
-_tb("power_on", {}, "!7PWR01\r", settings={"link": "serial"})
+_tb("power_on", {}, "!7PWR01\r")
 _tb("power_off", {}, "!7PWR00\r")
 _tb("get_power", {}, "!7?PWR\r")
 _tb("stop", {}, "!7STP\r")
@@ -95,8 +95,6 @@ _tbv("get_title_count", "!7?STG\r", "!7TGN0003", "0003")
 _tbv("get_title", "!7?SGN\r", "!7GNM0001", "0001")
 _tbv("get_elapsed", "!7?SET\r", "!7SET0010203", "0010203")
 _tbv("get_remaining", "!7?SRT\r", "!7SRT1235959", "1235959")
-# The same messages on the RS-232C port.
-_tbv("get_status", "!7?SST\r", "!7SSTPL", "PL", settings={"link": "serial"}, file="get_status-serial")
 
 telemetry(TB, "disc", inbound="!7MSTTO\r", expect_state={"disc": {"status": "tray_open"}})
 telemetry(TB, "status", inbound="!7SSTPP\r", expect_state={"transport": {"status": "pause"}})

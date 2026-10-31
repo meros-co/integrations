@@ -51,21 +51,8 @@ source:
       (page 4), supported commands (page 5), input terminals (page 6), aspects (pages 7-8), light modes (page
       9), base model types (page 10), selection signal types (pages 11-12) and sub inputs (page 13).
 
-settings:
-  # tcp: TCP 7142 (§1.2). serial: the PC CONTROL port, RS-232C (§1.1).
-  link: { type: enum, values: [tcp, serial], default: tcp, label: Link, description: "tcp reaches the projector over its LAN port (TCP 7142); serial uses an RS-232 port of the host wired to the projector's PC CONTROL port." }
-  serial_port: { type: string, max_length: 256, label: Serial port, description: "With link serial, the host's serial port wired to the projector's PC CONTROL port: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
-  # §1.2: 115200, 38400, 19200, 9600 or 4800 bit/s, by model (appendix page 10). The manual names no default.
-  baud_rate: { type: enum, values: ["4800", "9600", "19200", "38400", "115200"], default: "38400", label: Baud rate, description: "With link serial, bits per second as set on the projector; each model's notes list the speeds it offers." }
-  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "With link serial, bits per character; the manual gives 8." }
-  parity: { type: enum, values: [none], default: none, label: Parity, description: "With link serial, no parity, as the manual gives." }
-  stop_bits: { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "With link serial, one stop bit, as the manual gives." }
-  # The pinout wires RTS and CTS (§1.1) but the conditions name no flow control (§1.2).
-  flow_control: { type: enum, values: [none, rts-cts], default: none, label: Flow control, description: "With link serial, none unless the projector's port needs RTS/CTS, which its pinout wires but the manual does not require." }
-
 ports:
-  - { port: 7142, protocol: tcp, role: control, when: "link tcp" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232C PC CONTROL port (D-SUB 9P), cross cable" }
+  - { port: 7142, protocol: tcp, role: control }
 
 models:
   - id: np4100
@@ -1216,12 +1203,6 @@ quirks:
       2020 appendix, page 4 of the 2024 one), and some only over serial in a power-saving standby; in another
       standby mode the projector does not answer on the LAN, and the device shows as disconnected until it is
       powered from elsewhere.
-  - models: [all]
-    severity: info
-    text: >
-      With link serial the module opens the host's serial port and speaks the same frames as over TCP; the
-      port open is the connection, and a port that fails (a USB adapter unplugged) is reopened like a dropped
-      connection. The speed must match the projector's; each model's notes list the speeds it offers.
   - models: [np-pa1004ul, np-pa803ul, np-pa803u, np-pa622u, np-pa621u, np-ph3501ql, np-ph1202hl, np-px1005ql, np-px1004ul, np-px602ul, np-p605ul]
     severity: info
     text: >

@@ -72,22 +72,9 @@ transport:
   # A template cannot hold a bare identifier in braces ("{i}" is a placeholder), so the probe is the
   # protocol query, which has a ? in it.
   probe: "{P_?}"
-  # The same protocol on the RS-232 (or factory-fitted RS-422) control port, set to protocol #1: MX8x8
-  # Pro manual 6.3, 7.2.9-7.2.10 and 11.2 (9600 8N1 default); MX-FR manual 4.10.1-4.10.4 and 7.5.4-7.5.5
-  # (MX-CPU2: 57600 8N1 default, RS232BAUD 9600 to 115200; "no difference between the connection types");
-  # UMX-HDMI-140 manual 4.6.1-4.6.2, 6.6.1-6.6.3 and 11.6 (Control mode with the LW2 protocol, the factory
-  # protocol; 57600 8N1 default; RS232_LOCAL_FORMAT 4800 to 115200 baud, N/E/O parity, 1, 1.5 or 2 stop
-  # bits, 8 or 9 data bits).
-  serial:
-    baud_rate: { default: 57600, values: [4800, 7200, 9600, 14400, 19200, 38400, 57600, 115200] }
-    data_bits: 8
-    parity: { default: none, values: [none, even, odd] }
-    stop_bits: { default: 1, values: [1, 2] }
-    flow_control: none
 
 ports:
-  - { port: 10001, protocol: tcp, role: control, when: "link tcp" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The RS-232 control port: 9-pole D-sub (MX8x8 Pro, MX-CPU2; RS-422 when so ordered) or 3-pole Phoenix (UMX-HDMI-140)" }
+  - { port: 10001, protocol: tcp, role: control }
 
 models:
   - id: mx-pro
@@ -668,20 +655,6 @@ commands:
     returns: ack
 
 quirks:
-  - models: [all]
-    severity: info
-    text: >
-      With link serial the matrix is driven on its RS-232 control port with the same bracketed commands and
-      answers as over TCP 10001. The port must speak the Lightware protocol (#1, {P_1} or the front panel; a
-      port set to P#2 does not answer these commands), and on the UMX-HDMI-140 be in Control mode with the
-      LW2 protocol (set_rs232_mode, set_rs232_protocol; LW2 is the factory protocol). Factory rates differ:
-      9600 on the MX8x8 Pro (manual 11.2, which documents no way to change it), 57600 on the MX-CPU2 and the
-      UMX-HDMI-140, so the link's baud_rate must be set to the matrix's. A rate changed over the serial port
-      is answered at the new rate (MX-FR 7.5.5). The UMX's 9 data bits and 1.5 stop bits are not offered. On
-      the UMX-HDMI-140-Plus the Cleartext login covers the RS-232 port, unlike TCP 10001, and LW2 has no
-      login command, so a Plus with the login on cannot be driven over its serial port with LW2. Answers to
-      switch, mute, lock and preset commands made on other interfaces also arrive on the serial port
-      (MX-FR 4.10.2). Flow control is not documented; none is used.
   - models: [all]
     severity: critical
     text: >

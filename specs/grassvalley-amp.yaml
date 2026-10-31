@@ -9,8 +9,7 @@ reason: >
   and runs it over TCP 3811 as ASCII: a channel request (CRAT) answered before any command, then each message as
   CMDS, a four-digit length and its bytes in hexadecimal, answered in hexadecimal with no delimiter, so a reply's
   length comes from its own first bytes (and, for name returns, from a length inside it). Clip and folder lists
-  are read with a first request and then next requests until one comes back empty. On a serial port the same
-  messages are binary with a checksum.
+  are read with a first request and then next requests until one comes back empty.
 
 # AMP channels are named by the server (Vtr1, Vtr2, ... on K2; PGM1 on some); a channel-less session takes the
 # clip and folder commands that need no channel. The full AMP Specification document is Grass Valley's and is
@@ -48,21 +47,11 @@ source:
       hexadecimal without a prefix or line end, List First ID sent as a2140000.
 
 settings:
-  link: { type: enum, values: [tcp, serial], default: tcp, label: Link,
-    description: "tcp reaches the server's AMP socket over the network; serial uses an RS-422 port of the host wired to a channel's 9-pin port." }
   channel: { type: string, max_length: 32, pattern: "^[!-~]*$", default: Vtr1, label: AMP channel,
     description: "The channel to control over TCP, as the server names it (Vtr1 for a K2's first channel); empty opens a channel-less session for clip and folder commands." }
-  serial_port: { type: string, max_length: 256, label: Serial port,
-    description: "With link serial, the host's serial port wired to the channel's RS-422 port: COM3 on Windows, /dev/ttyUSB0 on Linux." }
-  baud_rate: { type: enum, values: ["38400"], default: "38400", label: Baud rate, description: "38400 bit/s, as the 9-pin protocol." }
-  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "8 data bits." }
-  parity: { type: enum, values: [odd], default: odd, label: Parity, description: "Odd parity." }
-  stop_bits: { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "1 stop bit." }
-  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "No flow control." }
 
 ports:
-  - { port: 3811, protocol: tcp, role: control, when: "link tcp", note: "the AMP socket (IANA assigned); one channel per connection" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "a channel's RS-422 9-pin port" }
+  - { port: 3811, protocol: tcp, role: control, note: "the AMP socket (IANA assigned); one channel per connection" }
 
 models:
   - id: k2

@@ -43,23 +43,6 @@ transport:
   # greeting are not replies.
   reply_match: '^[\x02\x11\x13]*(ACK|ERR:[0-9]+;|VER:)'
   probe: "ACS;"
-  # The RS-232 connector takes the same commands with stx (02H) before each
-  # and nothing after its ";", and answers ACK as the byte 06H (p.58-59):
-  # 9600 or 38400 bps (38400 by default, p.50), no parity, 8 data bits, 1
-  # stop bit, XON/XOFF flow control (p.58).
-  serial:
-    baud_rate: { default: 38400, values: [9600, 38400] }
-    data_bits: 8
-    parity: none
-    stop_bits: 1
-    flow_control: { default: xon-xoff, values: [xon-xoff, none] }
-    overrides:
-      framing: delimited
-      open: "\u0002"
-      close: ""
-      reply_framing: terminated
-      reply_terminators: [";", "\u0006"]
-      reply_match: '^[\x02\x11\x13]*(\x06|ERR:[0-9]+;|VER:)'
 
 settings:
   password:
@@ -75,13 +58,11 @@ settings:
 # the critical quirk: it is sent on connecting, not in answer to the prompt.
 on_connect:
   - when_set: password
-    link: tcp
     after_prompt: "Enter password:"
     send: "{settings.password}"
 
 ports:
-  - { port: 8023, protocol: tcp, role: control, when: "link tcp" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The RS-232 connector, DB-9 male: a crossover (null-modem) cable" }
+  - { port: 8023, protocol: tcp, role: control }
 
 models:
   - id: v-600uhd
@@ -325,19 +306,9 @@ quirks:
     text: >
       Send one command at a time and wait for ACK before the next (p.59); the
       queue does this. Over LAN, ACK has no semicolon and no stx ("A C K LF"),
-      while ERR:n; and VER:V-600UHD,a; keep their semicolons. On RS-232 (link
-      serial) commands start with stx and ACK is the single byte 06H, so
-      every command accepts either form. Error codes: ERR:0 syntax error,
+      while ERR:n; and VER:V-600UHD,a; keep their semicolons; every command
+      also accepts ACK as the single byte 06H, as on RS-232. Error codes: ERR:0 syntax error,
       ERR:5 out of range.
-
-  - models: [all]
-    severity: warning
-    text: >
-      RS-232 control is off by default: set the menu Remote Control, RS-232
-      to On, and Baudrate to the rate chosen here (38400 by default), before
-      using link serial (p.50). The network password is a LAN setting and is
-      not sent on RS-232. The manual documents no line ending after a reply
-      on RS-232; replies there end at ";" or the ACK byte.
 
   - models: [all]
     severity: info

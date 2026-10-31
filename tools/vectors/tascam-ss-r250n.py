@@ -115,10 +115,6 @@ _tsv("get_folder_name", {"folder": 24}, "07F4A592400\r\n", "0FF4AD92400Show", "S
 _tsv("get_file_name", {"file": 12}, "07F4A5A1200\r\n", "0FF4ADA1200Intro.wav", "Intro.wav")
 _tsv("get_folder_count", {}, "07F4A5D\r\n", "0FF4ADD010024002400", "010024002400")
 _tsv("get_file_count", {"folder": 2}, "07F4A5E0200\r\n", "0FF4ADE0200080016000900", "080016000900")
-# The same commands on the RS-232C port: LF before, CR after.
-text(TS, "play", {}, "\n012\r", settings={"link": "serial"}, file="play-serial")
-text(TS, "get_status", {}, "\n050\r", settings={"link": "serial"}, device_reply="\n0D011\r",
-     expect_result={"ok": {"kind": "value", "value": "11"}}, file="get_status-serial")
 
 telemetry(TS, "change-status", inbound="0F600\r\n", expect_state={}, expect_then_send=["050\r\n"])
 telemetry(TS, "change-track", inbound="0F603\r\n", expect_state={}, expect_then_send=["055\r\n", "05D\r\n"])

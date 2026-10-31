@@ -91,21 +91,10 @@ settings:
   # The device number this client protects destinations as (§3.1.7).
   protect_device: { type: int, min: 0, max: 1023, default: 0, label: Protect device, description: "The device number this client protects destinations as; choose one the controller's configuration leaves free." }
 
-  # tcp: SW-P-08 over IP (§11). serial: an RS-232 or RS-422 port of the host, the protocol's original
-  # physical layer (SW-P-88 §6.1: typically 9600 baud on RS-232, 38400 on RS-422, 8 data bits, no parity,
-  # 1 stop bit, parity where the controller supports it). The framing and messages are the same on both.
-  link: { type: enum, values: [tcp, serial], default: tcp, label: Link, description: "tcp reaches the controller over IP at its host and port; serial uses an RS-232 or RS-422 port of the host." }
-  serial_port: { type: string, max_length: 256, label: Serial port, description: "With link serial, the host's serial port wired to the controller: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
-  baud_rate: { type: int, min: 1200, max: 115200, default: 38400, label: Baud rate, description: "With link serial, bits per second as set on the controller's port: typically 38400 on RS-422 and 9600 on RS-232." }
-  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "With link serial, bits per character; SW-P-08 uses 8." }
-  parity: { type: enum, values: [none, even, odd], default: none, label: Parity, description: "With link serial, the parity set on the controller's port; none unless the controller is set to use one." }
-  stop_bits: { type: int, min: 1, max: 2, default: 1, label: Stop bits, description: "With link serial, stop bits as set on the controller's port; normally 1." }
-  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "With link serial, no flow control: SW-P-08 paces itself with acknowledgements." }
 
 ports:
-  - { port: 2008, protocol: tcp, role: control, when: "link tcp", note: "SW-P-08 over IP has no fixed port: 2008 is a common choice" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232 or RS-422 port of the host, wired to the controller's SW-P-08 port" }
-  - { port: 8910, protocol: tcp, role: control, when: "model ross-ultrix with link tcp", note: "Ross Ultrix's SW-P-08 server listens on 8910 by default: give it when the device is opened" }
+  - { port: 2008, protocol: tcp, role: control, note: "SW-P-08 over IP has no fixed port: 2008 is a common choice" }
+  - { port: 8910, protocol: tcp, role: control, when: "model ross-ultrix", note: "Ross Ultrix's SW-P-08 server listens on 8910 by default: give it when the device is opened" }
 
 models:
   - id: generic
@@ -208,7 +197,7 @@ models:
       17, 19, 21, 97, 100-105, 120, 121, 124 and the extended 129, 130, 138, 140, 142, 147, 149, 228-233,
       248, 252. No master protect, source association names, update name, tie-lines, maintenance or dual
       controller status. The server listens on TCP 8910, not 2008 (Table 18, p.76): give the port when
-      opening. Serial needs a USB-serial adapter on the Ultrix, 38400 8N1 by default (Table 28). UMD labels
+      opening. UMD labels
       repeat the source labels (16 characters).
   - id: ross-nk-3rd
     name: "Ross NK-3RD third-party interface for NK Series routers (RS-422)"
@@ -436,14 +425,6 @@ quirks:
       destination of the configured matrix and level, and the name requests (§3.1.18-§3.1.25) every
       source and destination name, so the keys of matrices.<m>.levels.<l>.destinations and
       matrices.<m>.levels.<l>.sources after those reads are the router's destinations and sources.
-  - models: [all]
-    severity: info
-    text: >
-      With link serial the module opens the host's serial port and speaks the same frames as over TCP; the
-      port open is the connection, and a port that fails (a USB adapter unplugged) is reopened like a dropped
-      connection. Speed and parity must match the controller's port setting; SW-P-88 §6.1 gives 9600 baud on
-      RS-232 and 38400 on RS-422 as typical, and a mismatch shows as frames never acknowledged.
-
   - models: [all]
     severity: critical
     text: >

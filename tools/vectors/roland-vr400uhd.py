@@ -10,9 +10,6 @@ def rv4(command, input, wire, **extra):
 
 
 rv4("select_program_scene", {"scene": 1}, "set,97,46,0,0\n", device_reply="ack,97,46,0,0\n", expect_result=RV4_OK)
-# The same on the RS-232 connector (link serial, guide p.2).
-rv4("select_program_scene", {"scene": 1}, "set,97,46,0,0\n", device_reply="ack,97,46,0,0\n",
-    expect_result=RV4_OK, settings={"link": "serial"}, file="select_program_scene-serial")
 rv4("select_preset_scene", {"scene": 64}, "set,97,46,1,63\n", device_reply="err,set,97,46,1,63\n",
     expect_result={"error": {"error": "device_error"}})
 rv4("cut", {}, "set,98,43,0,1\n", device_reply="ack,98,43,0,1\n", expect_result=RV4_OK)

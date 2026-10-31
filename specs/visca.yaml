@@ -115,39 +115,12 @@ source:
       model is listed here.
 
 settings:
-  # sony-ip (UDP with Sony's 8-byte header), raw-tcp or raw-udp (no header),
-  # or serial: an RS-232 or RS-422 port of the host, messages addressed to
-  # camera_address. Unset: the model's own (raw-tcp for PTZOptics, sony-ip
-  # otherwise). The port defaults to 52381, 5678 or 1259 by transport.
-  transport: { type: enum, values: ["sony-ip", "raw-tcp", "raw-udp", "serial"],
+  # sony-ip (UDP with Sony's 8-byte header), raw-tcp or raw-udp (no header).
+  # Unset: the model's own (raw-tcp for PTZOptics, sony-ip otherwise). The
+  # port defaults to 52381, 5678 or 1259 by transport.
+  transport: { type: enum, values: ["sony-ip", "raw-tcp", "raw-udp"],
     label: Transport,
-    description: "sony-ip (UDP with Sony's header, port 52381), raw-tcp (port 5678), raw-udp (port 1259) or serial (an RS-232 or RS-422 port of the host, no host needed); unset uses the model's own." }
-  # Transport serial: the camera's VISCA address on the chain, 1-7.
-  camera_address: { type: int, min: 1, max: 7, default: 1,
-    label: Camera address,
-    description: "Serial only: the camera's VISCA address on the RS-232/RS-422 chain, 1 for the first camera." }
-  # Transport serial: send Address Set and IF_Clear broadcast on opening the port.
-  address_set: { type: bool, default: true,
-    label: Address Set on opening,
-    description: "Serial only: on sends Address Set (88 30 01 FF), which numbers the chain's cameras from 1, and IF_Clear broadcast when the port opens; off leaves the addresses as set." }
-  serial_port: { type: string, max_length: 256,
-    label: Serial port,
-    description: "Serial only: the host's serial port wired to the camera's VISCA RS-232 or RS-422 connector: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
-  baud_rate: { type: int, min: 1200, max: 115200, default: 9600,
-    label: Baud rate,
-    description: "Serial only: bits per second as set on the camera, 9600 by default; Lumens and Marshall cameras also take 38400." }
-  data_bits: { type: int, min: 8, max: 8, default: 8,
-    label: Data bits,
-    description: "Serial only: VISCA uses 8 data bits." }
-  parity: { type: enum, values: [none], default: none,
-    label: Parity,
-    description: "Serial only: VISCA uses no parity." }
-  stop_bits: { type: int, min: 1, max: 1, default: 1,
-    label: Stop bits,
-    description: "Serial only: VISCA uses 1 stop bit." }
-  flow_control: { type: enum, values: [none], default: none,
-    label: Flow control,
-    description: "Serial only: VISCA uses no flow control." }
+    description: "sony-ip (UDP with Sony's header, port 52381), raw-tcp (port 5678) or raw-udp (port 1259); unset uses the model's own." }
   # Bind local UDP 52381 because the camera replies there rather than to the
   # sending port. Unset: on for Canon, off otherwise.
   fixed_reply_port: { type: bool,
@@ -166,7 +139,6 @@ ports:
   - { port: 52381, protocol: udp, role: control, when: "transport sony-ip (the Sony, BirdDog, Lumens, Marshall, AVer, Canon and Datavideo models)" }
   - { port: 5678, protocol: tcp, role: control, when: "transport raw-tcp (PTZOptics)" }
   - { port: 1259, protocol: udp, role: control, when: "transport raw-udp (PTZOptics)" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "transport serial", note: "the camera's VISCA RS-232 or RS-422 connector, wired to a serial port of the host" }
 
 models:
   - id: sony-visca-ip
@@ -1123,16 +1095,6 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Transport serial: each message carries the camera's address (8x, x = camera_address) and its replies
-      come from y0 with y = x + 8 (Lumens RS-232 command set p.1-2); replies from other cameras on the chain
-      are ignored, and so are the broadcast answers to Address Set (88 30 0w FF) and IF_Clear. A port is
-      opened by one device only, so a chain of cameras on one port is driven as one camera. Address Set on
-      opening (address_set) renumbers the chain from 1, which a camera needs after power-up; turn it off
-      when another controller on the chain assigns addresses. Speed 9600 by default; Lumens and Marshall
-      cameras also take 38400, set on the camera.
-  - models: [all]
-    severity: info
-    text: >
       Opened for commands only (monitor false), the core sends no inquiry poll and no inquiry after a command
       to read back what it changed: state changes only when a reply to the host's own inquiry carries it. The
       version inquiry is still sent on the poll interval as the liveness check.
@@ -1258,9 +1220,9 @@ quirks:
   - models: [datavideo]
     severity: critical
     text: >
-      Datavideo's protocol document covers RS-232/RS-422 only and gives no IP framing or port: transport
-      serial follows it. The model still defaults to Sony VISCA over IP on 52381 for cameras on the network;
-      set transport and the port to what the camera's network settings show. Datavideo has no pan/tilt position inquiry, so pan/tilt is not polled successfully.
+      Datavideo's protocol document covers RS-232/RS-422 only and gives no IP framing or port: the model
+      defaults to Sony VISCA over IP on 52381 for cameras on the network; set transport and the port to what
+      the camera's network settings show. Datavideo has no pan/tilt position inquiry, so pan/tilt is not polled successfully.
   - models: [all]
     severity: info
     text: >

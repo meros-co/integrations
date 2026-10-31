@@ -1,6 +1,6 @@
 spec: 1
 id: panasonic-projector
-name: Panasonic projectors (control commands over NTCONTROL or RS-232C)
+name: Panasonic projectors (control commands over NTCONTROL)
 vendor: Panasonic
 category: display
 implementation: native
@@ -8,9 +8,8 @@ reason: >
   Over the network every command is a connection of its own that the projector closes after answering: it
   greets with "NTCONTROL 1" and an 8-character random number in protect mode, which the controller must
   answer with the MD5 hash of the user name, password and that random number before the command, or with
-  "NTCONTROL 0" without protection; ERRA refuses the password. On RS-232C a command is framed by STX and ETX
-  with the projector's ID, and the next may go only 0.5 s after the answer. The projector pushes nothing, so
-  state is a paced poll.
+  "NTCONTROL 0" without protection; ERRA refuses the password. The projector pushes nothing, so state is a
+  poll.
 
 source:
   - title: "Operating Instructions, Functional Manual, DLP Projector Commercial Use, Model No. PT-RZ120 (DPQP1239ZF/X1), Chapter 7, Control commands via LAN and <SERIAL/MULTI PROJECTOR SYNC IN> terminals"
@@ -48,21 +47,11 @@ source:
       section titles and bytes disagree in places, and the bytes are taken.
 
 settings:
-  # tcp: NTCONTROL, TCP 1024 by default. serial: the <SERIAL IN> (RS-232C) terminal.
-  link: { type: enum, values: [tcp, serial], default: tcp, label: Link, description: "tcp reaches the projector over the LAN (NTCONTROL, TCP 1024 by default); serial uses an RS-232 port of the host wired to its SERIAL IN terminal." }
-  username: { type: string, max_length: 64, default: dispadmin, label: User name, description: "With link tcp, the web control administrator's user name, used only when the projector is in protect mode; dispadmin by default." }
-  password: { type: string, secret: true, max_length: 64, default: "", label: Password, description: "With link tcp, the web control administrator's password; empty for a projector without one (NTCONTROL 0)." }
-  projector_id: { type: string, pattern: "^(ZZ|0[1-9]|[1-5][0-9]|6[0-4]|0[A-Z])$", default: ZZ, label: Projector ID, description: "With link serial, the ID the commands address: ZZ for all, 01-64 for one projector, 0A-0Z for a group." }
-  serial_port: { type: string, max_length: 256, label: Serial port, description: "With link serial, the host's serial port wired to the projector's SERIAL IN terminal: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
-  baud_rate: { type: enum, values: ["9600", "19200", "38400"], default: "9600", label: Baud rate, description: "With link serial, bits per second as set in the projector's RS-232C menu, 9600 by default." }
-  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "With link serial, 8 data bits." }
-  parity: { type: enum, values: [none, even, odd], default: none, label: Parity, description: "With link serial, the parity set in the projector's RS-232C menu, none by default." }
-  stop_bits: { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "With link serial, one stop bit." }
-  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "With link serial, no flow control." }
+  username: { type: string, max_length: 64, default: dispadmin, label: User name, description: "The web control administrator's user name, used only when the projector is in protect mode; dispadmin by default." }
+  password: { type: string, secret: true, max_length: 64, default: "", label: Password, description: "The web control administrator's password; empty for a projector without one (NTCONTROL 0)." }
 
 ports:
-  - { port: 1024, protocol: tcp, role: control, when: "link tcp", note: "NTCONTROL; the projector's COMMAND PORT setting can change it" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232C, D-Sub 9-pin SERIAL IN" }
+  - { port: 1024, protocol: tcp, role: control, note: "NTCONTROL; the projector's COMMAND PORT setting can change it" }
 
 models:
   - id: pt-rq50k
@@ -16355,9 +16344,9 @@ quirks:
       Commands and their values differ by series: each model lists only the commands its series' control
       command list documents, and each set command takes the value exactly as that list writes it after the
       command (HD1, +032, 1, COLORTEMP1); the summaries list the documented values across all series. A
-      value the projector does not take is answered ERR2 (network) or ER402 (serial). Within a series some
+      value the projector does not take is answered ERR2. Within a series some
       commands apply only to some models or need an upgrade kit, which the lists mark with symbols the core
-      does not carry; such a command is answered ERR1, ERR2 or ER401.
+      does not carry; such a command is answered ERR1 or ERR2.
   - models: [all]
     severity: info
     text: >
@@ -16372,11 +16361,3 @@ quirks:
       Query replies are kept in state as the projector sends them (settings.<name>); only the power is
       decoded. The poll reads every query while the projector is on, one sweep a minute at most (in standby
       most are refused), and the power always.
-  - models: [all]
-    severity: warning
-    text: >
-      On RS-232C, a projector answers a command addressed to ID ALL (ZZ) or a group only when its RESPONSE (ID
-      ALL) or RESPONSE (ID GROUP) setting is on; otherwise every command times out. The manual asks for 60 s
-      after the light source lights before commands, and for 0.5 s between an answer and the next command,
-      which the module keeps on the serial port: the next command waits 60 s after a power on the projector
-      accepts while not known to be on, or after the power is read on where it was last read standby.

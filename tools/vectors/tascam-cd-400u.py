@@ -50,10 +50,6 @@ _tc("set_play_area", {"area": "folder_skip"}, ["07F074F0F\r\n", "07F074FFF\r\n"]
 _tcv("get_play_area", {}, "07F074FFF\r\n", "0FF07CF01", "01")
 _tc("enter", {}, "07F704901\r\n")
 _tc("back", {"action": "hold"}, "07F704A20\r\n")
-# The same commands on the RS-232C port: LF before, CR after.
-text(TC, "play", {}, "\n012\r", settings={"link": "serial"}, file="play-serial")
-text(TC, "get_status", {}, "\n050\r", settings={"link": "serial"}, device_reply="\n0D010\r",
-     expect_result={"ok": {"kind": "value", "value": "10"}}, file="get_status-serial")
 
 telemetry(TC, "change-status", inbound="0F600\r\n", expect_state={}, expect_then_send=["050\r\n"])
 telemetry(TC, "change-track", inbound="0F603\r\n", expect_state={},

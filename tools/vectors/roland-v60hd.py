@@ -13,9 +13,6 @@ def r60(command, input, wire, **extra):
 
 # Video (p.21)
 r60("select_pgm", {"xpt": 1}, "\x02PGM:0;", device_reply="\x06", expect_result=R60_OK)
-# The same on the RS-232 connector (link serial, p.20).
-r60("select_pgm", {"xpt": 1}, "\x02PGM:0;", device_reply="\x06", expect_result=R60_OK,
-    settings={"link": "serial"}, file="select_pgm-serial")
 r60("select_pst", {"xpt": 8}, "\x02PST:7;", device_reply="\x02ERR:5;", expect_result=R60_ERR)
 r60("select_aux", {"xpt": 6}, "\x02AUX:5;")
 r60("set_transition", {"effect": 2}, "\x02TRS:2;")

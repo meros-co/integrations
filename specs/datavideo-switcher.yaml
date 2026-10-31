@@ -1,6 +1,6 @@
 spec: 1
 id: datavideo-switcher
-name: Datavideo switchers (DVIP and RS-232)
+name: Datavideo switchers (DVIP)
 vendor: Datavideo
 category: switcher
 implementation: native
@@ -9,8 +9,7 @@ reason: >
   ints or floats, control IDs packing a section, sub-section, input and control number, read and written with
   GET_CONTROL and SET_CONTROL on a command port, while a second, real-time port sends the whole state in its
   first packet and every change after it, one packet a video field, each of which the controller must answer. A
-  free pair of the four controller port pairs is asked for on a third port first. Their RS-232 ports wrap the
-  same control IDs in GVG100-style messages (a count, an effects address, a command). The SE-2200 takes
+  free pair of the four controller port pairs is asked for on a third port first. The SE-2200 takes
   checksummed blocks of panel buttons and returns a status bit field, and every DVIP device answers binary UDP
   management packets of a length, a type and a command.
 
@@ -96,23 +95,12 @@ source:
     note: "An earlier SE-1200MU serial document giving 57600 bit/s, where the 2019 document gives 19200."
 
 settings:
-  link: { type: enum, values: [tcp, serial], default: tcp, label: Link,
-    description: "tcp reaches the switcher over Ethernet; serial uses an RS-232 port of the host (SE-1200MU and SE-4000 RS-232, SE-2200 RS-232/422)." }
   controller: { type: enum, values: [auto, "1", "2", "3", "4"], default: auto, label: Controller ports,
     description: "Which of the four controller port pairs to use (1: real-time 5001 and command 5002, up to 4: 5007 and 5008); auto asks port 5009 for a free pair. On the SE-1200MU pair 1 is the RMC-260 panel's." }
   poll_ms: { type: int, min: 100, max: 3600000, default: 1000, label: Read interval,
-    description: "Milliseconds between status reads where nothing is pushed: over RS-232, on the SE-2200, and DVIP network reads on the SE-650." }
+    description: "Milliseconds between status reads where nothing is pushed: on the SE-2200, and DVIP network reads on the SE-650." }
   dvip_port: { type: int, min: 1, max: 65535, default: 5002, label: DVIP UDP port,
     description: "The UDP port of DVIP's management commands (network settings, identity, presets), 5002." }
-  serial_port: { type: string, max_length: 256, label: Serial port,
-    description: "With link serial, the host's serial port wired to the switcher: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
-  baud_rate: { type: enum, values: ["19200", "57600", "115200"], default: "19200", label: Baud rate,
-    description: "With link serial, the speed: 19200 for the SE-1200MU and SE-4000, 115200 for the SE-2200." }
-  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "With link serial, 8 data bits." }
-  parity: { type: enum, values: [odd, none], default: odd, label: Parity,
-    description: "With link serial, odd for the SE-1200MU and SE-4000, none for the SE-2200." }
-  stop_bits: { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "With link serial, one stop bit." }
-  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "With link serial, no flow control." }
 
 ports:
   - { port: 5009, protocol: tcp, role: control, when: "processor-unit models, controller auto", note: "connection request channel: answers with a free real-time port" }
@@ -125,7 +113,6 @@ ports:
   - { port: 5008, protocol: tcp, role: control, when: "processor-unit models, controller 4", note: "command port 4 (real-time 5007)" }
   - { port: 5007, protocol: tcp, role: control, when: "processor-unit models, controller 4", note: "real-time port 4" }
   - { port: 5002, protocol: udp, role: control, setting: dvip_port, when: "DVIP management commands, every model", note: "DVIP UDP packets (type 81H) to the switcher" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "SE-1200MU or SE-4000 RS-232 (19200 8O1), SE-2200 RS-232/422 (115200 8N1)" }
 
 models:
   - id: se-1200mu
@@ -133,11 +120,11 @@ models:
     supports: [set_control, get_control, set_program, set_preview, cut, auto, set_transition, set_transition_duration,
       set_wipe_pattern, set_transition_position, set_next_transition, set_keyer, set_keyer_sources, set_dsk, dsk_auto,
       fade_to_black, set_input_freeze, load_memory, store_memory, delete_memory, load_still, store_still, grab_still,
-      delete_still, get_input_name, get_file_name, set_file_name, get_mini_pic, export_file, import_file, press_button,
-      set_lamp, menu_select, all_stop, get_network, get_identity, get_presets, recall_preset, set_dhcp, set_ip_address,
+      delete_still, get_input_name, get_file_name, set_file_name, get_mini_pic, export_file, import_file,
+      get_network, get_identity, get_presets, recall_preset, set_dhcp, set_ip_address,
       set_netmask, set_gateway, set_dns, set_host_name, reboot]
     verification: none
-    notes: "SE-1200 Ethernet Control Protocol E1 and RS-232 Control Protocol E1: two keyers, two DSKs, a DVE tile."
+    notes: "SE-1200 Ethernet Control Protocol E1: two keyers, two DSKs, a DVE tile."
   - id: hs-1300
     name: Datavideo HS-1300
     supports: [set_control, get_control, set_program, set_preview, cut, auto, set_transition, set_transition_duration,
@@ -174,10 +161,9 @@ models:
       set_wipe_pattern, set_transition_position, set_next_transition, set_keyer, set_keyer_sources, set_dsk, dsk_auto,
       fade_to_black, set_aux, set_input_freeze, load_memory, store_memory, delete_memory, load_still, store_still,
       grab_still, delete_still, chroma_key_auto, get_input_name, get_file_name, set_file_name, get_mini_pic,
-      export_file, import_file, press_button, set_lamp, menu_select, all_stop, get_network, get_identity, get_presets,
-      recall_preset, set_dhcp, set_ip_address, set_netmask, set_gateway, set_dns, set_host_name, reboot]
+      export_file, import_file, get_network, get_identity, get_presets, recall_preset, set_dhcp, set_ip_address, set_netmask, set_gateway, set_dns, set_host_name, reboot]
     verification: none
-    notes: "SE-4000 Ethernet Control Protocol E1 and RS-232 Control Protocol E1: 8 inputs, four keyers with PinPs."
+    notes: "SE-4000 Ethernet Control Protocol E1: 8 inputs, four keyers with PinPs."
   - id: hs-4000
     name: Datavideo HS-4000
     supports: [set_control, get_control, set_program, set_preview, cut, auto, set_transition, set_transition_duration,
@@ -194,7 +180,7 @@ models:
       set_transition_speed, set_t_bar, set_feature, get_network, get_identity, get_presets, recall_preset, set_dhcp,
       set_ip_address, set_netmask, set_gateway, set_dns, set_host_name, reboot]
     verification: none
-    notes: "SE-2200 DVIP Serial Control Protocol 1.0, over RS-232/422 or the DVIP board's TCP 5002."
+    notes: "SE-2200 DVIP Serial Control Protocol 1.0, over the DVIP board's TCP 5002."
   - id: se-650
     name: Datavideo SE-650
     supports: [get_network, get_identity, get_presets, recall_preset, set_dhcp, set_ip_address, set_netmask, set_gateway,
@@ -204,7 +190,7 @@ models:
 
 commands:
   set_control:
-    summary: "Set any writable control by its state path, such as keyers.1.opacity, then read it back (SET_CONTROL 1, or F0 over RS-232)"
+    summary: "Set any writable control by its state path, such as keyers.1.opacity, then read it back (SET_CONTROL 1)"
     params:
       control: { type: string, max_length: 64, pattern: "^[a-z0-9_]+(\\.[a-z0-9_]+)*$", required: true, label: Control,
         description: "The control's state path, as the state lists it for this model, such as program, wipe.level, keyers.2.chroma.hue or inputs.3.freeze." }
@@ -212,7 +198,7 @@ commands:
         description: "The value as text: a number within the control's range, true or false for an on/off control, or one of an enumerated control's names (or its number)." }
     returns: ack
   get_control:
-    summary: "Read one control by its state path (GET_CONTROL 0, or 70 over RS-232)"
+    summary: "Read one control by its state path (GET_CONTROL 0)"
     params:
       control: { type: string, max_length: 64, pattern: "^[a-z0-9_]+(\\.[a-z0-9_]+)*$", required: true, label: Control,
         description: "The control's state path, such as status.software_version or memory.state." }
@@ -394,29 +380,6 @@ commands:
         description: "The file's number; for clips and animated logos, bits 9-0 the clip or logo and bits 23-16 the frame." }
       path: { type: string, max_length: 1024, required: true, label: Host file, description: "A file on the host, as export_file writes it." }
     returns: value
-  press_button:
-    summary: "Press a control panel button as if pressed on the panel (RS-232 pushbutton select FB)"
-    params:
-      button: { type: int, min: 0, max: 127, required: true, label: Button,
-        description: "The button's number from Table 5 of the model's RS-232 document, such as 4A cut, 0B auto trans, 1F fade to black, 60-66 the menu keys." }
-    returns: ack
-  set_lamp:
-    summary: "Turn a panel button's function on or off (RS-232 pushbutton/lamp C6 on, C7 off)"
-    params:
-      button: { type: int, min: 0, max: 127, required: true, label: Button, description: "The button's number from Table 5 of the model's RS-232 document." }
-      'on': { type: bool, required: true, label: 'On', description: "On selects the function; off clears a toggle (it does nothing to one-shot and group buttons)." }
-    returns: ack
-  menu_select:
-    summary: "Show a menu page on the multiviewer (RS-232 menu select DE)"
-    params:
-      menu: { type: int, min: 0, max: 15, required: true, label: Menu,
-        description: "0 start, 1 keyer, 2 chroma, 3 PinP, 4 flex source, 5 inputs, 6 outputs, 7 audio, 8 files, 9 setup (SE-3200 and SE-4000 numbering)." }
-      sub_menu: { type: int, min: 0, max: 15, default: 0, label: Sub-menu,
-        description: "For keyer, chroma and PinP: 1-4 keys, 5-6 DSKs; for files: 1 user, 2 still, 3 clip, 4 logo, 5 animated logo." }
-    returns: ack
-  all_stop:
-    summary: "Stop every transition, return control to the T-bar, select mix and come out of black (RS-232 all stop F2)"
-    returns: ack
   get_status:
     summary: "Read the SE-2200's status (22H): buses, wipe, speed, toggles and T-bar"
     returns: value
@@ -510,7 +473,7 @@ commands:
 
 state:
   polled.status: { type: int, unit: s, description: "When the status poll (every poll_ms) was last answered, in Unix seconds: the polled state is as old as this" }
-  # Processor units, from the real-time port (pushed) or polled over RS-232. Enumerated values are names;
+  # Processor units, from the real-time port (pushed). Enumerated values are names;
   # a value the documents do not name arrives as its number.
   status.connection: { type: string, description: "The processor's connection status: none, pending or connected (read only)" }
   status.system_version: { type: int, description: "System header version (read only)" }
@@ -903,18 +866,6 @@ quirks:
       arrives and import_file writes 1024-byte chunks numbered from 0, sizing each STORE_FILE_DATA packet by its
       true length (the document's size formula is 4 bytes short), then signals FILE_EVENT; the documents do not
       describe the files' contents. These, get_mini_pic, chroma_key_auto and the file names are Ethernet only.
-  - models: [se-1200mu, se-4000]
-    severity: info
-    text: >
-      Over RS-232 (19200 bit/s, 8 data bits, odd parity, 1 stop bit) the 70/F0 control commands carry control
-      IDs and values little-endian, as on Ethernet (the serial documents do not say), at most 30 reads or 15
-      writes a message. press_button, set_lamp, menu_select and all_stop exist only there. Datavideo's 2017
-      SE-1200MU guide for the RMC-260 gives 57600 bit/s; the 2019 document's 19200 is the default.
-  - models: [se-3200, hs-3200, hs-1300, hs-4000]
-    severity: info
-    text: >
-      Ethernet only: the SE-3200's RS-232 port serves its keyboard and the HS-3200 has none (SE-3200 RS-232
-      document); no serial document covers the HS-1300 or HS-4000.
   - models: [hs-1300, hs-4000]
     severity: warning
     text: >

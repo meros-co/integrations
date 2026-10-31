@@ -1,6 +1,6 @@
 spec: 1
 id: epson-projector
-name: Epson projectors (ESC/VP21, over ESC/VP.net or serial)
+name: Epson projectors (ESC/VP21 over ESC/VP.net)
 vendor: Epson
 category: display
 implementation: native
@@ -48,20 +48,8 @@ source:
       password exchange itself is described only in Epson's ESC/VP.net Software Development Manual, which is
       marked confidential, so it is not built (see the quirks).
 
-settings:
-  # tcp: ESC/VP.net, TCP 3629. serial: the RS-232C port (guide appendix).
-  link: { type: enum, values: [tcp, serial], default: tcp, label: Link, description: "tcp reaches the projector over the LAN (ESC/VP.net, TCP 3629); serial uses an RS-232 port of the host wired to the projector's RS-232C port." }
-  serial_port: { type: string, max_length: 256, label: Serial port, description: "With link serial, the host's serial port wired to the projector's RS-232C port: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
-  # Guide appendix: 9600. SPEED offers 9600, 19200, 38400 and 57600 on the models that have it.
-  baud_rate: { type: enum, values: ["9600", "19200", "38400", "57600"], default: "9600", label: Baud rate, description: "With link serial, bits per second: 9600 as Epson ships it, or the speed set with the SPEED command or the projector's menu." }
-  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "With link serial, 8 data bits, as the guide gives." }
-  parity: { type: enum, values: [none], default: none, label: Parity, description: "With link serial, no parity, as the guide gives." }
-  stop_bits: { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "With link serial, one stop bit, as the guide gives." }
-  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "With link serial, no flow control, as the guide gives." }
-
 ports:
-  - { port: 3629, protocol: tcp, role: control, when: "link tcp" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232C, D-Sub 9-pin; select RS-232C in the projector's advanced settings" }
+  - { port: 3629, protocol: tcp, role: control }
 
 models:
   - id: eb-l200-series-2020
@@ -4076,8 +4064,7 @@ quirks:
       A projector whose Command Communication is set to Protected, or that has a Monitor Password set, needs
       ESC/VP.net's password exchange (version 2.0 with the Web Control Password, or 1.0 with the Monitor
       Password). Epson documents that exchange only in its confidential ESC/VP.net Software Development Manual,
-      so it is not built: set Command Communication to Compatible with no Monitor Password, or use the serial
-      link. Such a projector refuses or ignores the connect header, and the device is reported disconnected
+      so it is not built: set Command Communication to Compatible with no Monitor Password. Such a projector refuses or ignores the connect header, and the device is reported disconnected
       with that reason.
   - models: [all]
     severity: info

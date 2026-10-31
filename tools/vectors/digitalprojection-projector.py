@@ -1033,5 +1033,3 @@ telemetry(DPJ, "state-water-pump2", inbound="ack water.pump2 = TEST 1.0\r", expe
 telemetry(DPJ, "state-water-pump3", inbound="ack water.pump3 = TEST 1.0\r", expect_state=dpj_state("sensors.water_pump3", 'TEST 1.0'))
 telemetry(DPJ, "state-wired-rc-status", inbound="ack wired.rc.status = 1\r", expect_state=dpj_state("info.wired_rc_status", 1))
 telemetry(DPJ, "state-power-upper-ack", inbound="ACK power = 1\r", expect_state={"power": True})
-# The same on the RS-232 port (link serial).
-dpj("get", {'setting': 'brightness'}, "*brightness ?\r", device_reply="ack brightness = 100\r", expect_result={'ok': {'kind': 'value', 'value': '100'}}, settings={"link": "serial"}, file="get-serial")

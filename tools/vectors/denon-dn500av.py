@@ -16,7 +16,6 @@ def _avt(name, inbound, state, **extra):
     telemetry(AV, name, inbound=inbound, expect_state=state, **extra)
 
 
-_av("standby", {}, "PWSTANDBY\r", settings={"link": "serial", "serial_port": "COM3"}, file="standby-serial")
 _av("power_on", {}, 'PWON\r')
 _av("standby", {}, 'PWSTANDBY\r')
 _avv("get_power", {}, 'PW?\r', 'PWON\r', 'ON')

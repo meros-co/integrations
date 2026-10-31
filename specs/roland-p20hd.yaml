@@ -42,17 +42,6 @@ transport:
   # commands are answered by their data frame alone (p.77-78).
   reply_match: '^[\x02\x11\x13]*(\x06|\x15|ERR:[0-9]+;|VER:|Q[A-Z]{2}:)'
   probe: "ACS"
-  # The same commands and framing on the RS-232 connector ("Remote Control
-  # Commands (LAN/RS-232)", p.77-78): 9600 or 38400 bps, no parity, 8 data
-  # bits, 1 stop bit (p.56); XON and XOFF are sent on RS-232 only (p.78);
-  # Baudrate 9600 by default, and Remote Control must be set to PC (p.56,
-  # p.70).
-  serial:
-    baud_rate: { default: 9600, values: [9600, 38400] }
-    data_bits: 8
-    parity: none
-    stop_bits: 1
-    flow_control: { default: xon-xoff, values: [xon-xoff, none] }
 
 settings:
   user_id:
@@ -76,23 +65,19 @@ settings:
 # The manual gives no prompt, so the steps are sent on connecting, each
 # waiting for its ACK before anything else is sent. A NAK (15H) is the
 # documented refusal (p.77).
-# USR, PSS and QIT apply only when connected over LAN (p.77): over RS-232
-# there is no login, so these steps are sent over TCP only.
+# USR, PSS and QIT apply only when connected over LAN (p.77).
 on_connect:
   - when_set: user_id
-    link: tcp
     send: "USR:{settings.user_id}"
     await_reply: true
     refused: '^\x15$'
   - when_set: password
-    link: tcp
     send: "PSS:{settings.password}"
     await_reply: true
     refused: '^\x15$'
 
 ports:
-  - { port: 8023, protocol: tcp, role: control, when: "link tcp" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The RS-232 connector, DB-9 male: a crossover (null-modem) cable" }
+  - { port: 8023, protocol: tcp, role: control }
 
 models:
   - id: p-20hd
@@ -587,16 +572,6 @@ state:
   device.version:       { type: string, description: "Version from VER" }
 
 quirks:
-  - models: [all]
-    severity: info
-    text: >
-      With link serial the replayer is driven on its RS-232 connector with the same commands, STX framing
-      and replies as over LAN (p.77-78). Remote Control in the RS-232 menu must be set to PC (Off by
-      default, p.56 and p.70), and the link's baud rate must match Baudrate there (9600 by default).
-      There is no login over RS-232 (USR and PSS are LAN only, p.77), so the login steps are sent over
-      TCP only, and the five-minute idle disconnect is described for LAN only (p.53). The serial settings
-      table has no flow-control row (p.56); XON/XOFF are listed as RS-232-only commands (p.78), so
-      XON/XOFF flow control is used by default.
   - models: [all]
     severity: critical
     text: >

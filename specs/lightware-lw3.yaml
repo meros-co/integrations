@@ -152,19 +152,6 @@ transport:
   # never the reply to a command.
   reply_match: '^[pmnoc][-rwmEOFs] '
   probe: 'GET /.SerialNumber'
-  # The same LW3 on the RS-232 port of the MX2 and the UMX-HDMI-140 only: MX2 manual 4.2.4, 9.19.1-9.19.2
-  # and 13.3 (RS-232 control on, protocol LW3, 57600 8N1 by default; Baudrate 200 to 115200; spec sheet:
-  # parity none, odd or even, stop bits 1, 1.5 or 2); UMX-HDMI-140 manual 4.6.2, 7.16.1-7.16.6 and 11.6
-  # (Control mode with ControlProtocol LW3, the factory protocol being LW2; 57600 8N1; 4800 to 115200). The
-  # /V1 products' serial ports pass data through and do not take LW3 (MMX2 4.11.1, Taurus UCX 5.14 and
-  # 8.18, DCX 5.12.1, UCX-TPX 5.14.1).
-  serial:
-    models: [mx2, umx]
-    baud_rate: { default: 57600, values: [200, 300, 600, 1200, 1800, 2400, 4800, 7200, 9600, 14400, 19200, 38400, 57600, 115200] }
-    data_bits: 8
-    parity: { default: none, values: [none, odd, even] }
-    stop_bits: { default: 1, values: [1, 2] }
-    flow_control: none
 
 # Cleartext login password (UMX-HDMI-140-Plus and other products with the
 # Basic IT security pack). Left empty when the login is not enabled.
@@ -190,8 +177,7 @@ maps:
   umx_parity: { None: "0", Odd: "1", Even: "2" }
 
 ports:
-  - { port: 6107, protocol: tcp, role: control, when: "link tcp" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The RS-232 port of an MX2 (3-pole Phoenix, 9-pole D-sub on -R models) or a UMX-HDMI-140 (3-pole Phoenix)" }
+  - { port: 6107, protocol: tcp, role: control }
 
 models:
   - id: mx2
@@ -4327,19 +4313,6 @@ telemetry:
         "audio.outputs.1.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
 
 quirks:
-  - models: [mx2, umx]
-    severity: info
-    text: >
-      With link serial the MX2 or UMX-HDMI-140 is driven on its RS-232 port with the same LW3 commands,
-      answers and change notifications as over TCP 6107 (lines end CR LF). The port must take LW3: on the
-      MX2 RS-232 control on and protocol LW3 (the factory settings, MX2 4.2.4); on the UMX Control mode
-      (umx_set_serial_mode or LDC) with ControlProtocol LW3 (umx_set_serial_protocol), which is not the factory protocol (LW2, UMX
-      11.6), so a UMX is first switched over TCP or LDC. Both start at 57600 8N1; the link's line settings
-      must match the port's, and 1.5 stop bits and 9 data bits are not offered. The Cleartext login covers
-      the serial port too (UMX 7.5), so the login step is sent on either link; when a serial login ends is
-      not documented. Flow control is not documented; none is used. The MMX2, Taurus UCX, DCX and UCX-TPX
-      take no LW3 on their serial ports, which pass data through (link serial is refused for them), and
-      their USB port's LW3 control is announced for later firmware.
   - models: [all]
     severity: critical
     text: >

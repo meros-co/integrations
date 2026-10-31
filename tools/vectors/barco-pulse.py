@@ -580,8 +580,6 @@ telemetry(BP, 'notification-emitted', model='udx',
           inbound='{"jsonrpc":"2.0","method":"signal.callback","params":{"signal":[{"notification.emitted":{"id":"42"}}]}}',
           expect_state={'signals': {'last': {'name': 'notification.emitted', 'arguments': '{"id":"42"}'}}},
           expect_then_send=[_GET % 'notification.count', '{"jsonrpc":"2.0","method":"notification.list","id":1}'])
-# The same JSON-RPC API on the RS232 port (link serial).
-text(BP, 'get_property', {'property': 'image.brightness'}, '{"jsonrpc":"2.0","method":"property.get","params":{"property":"image.brightness"},"id":1}', device_reply='{"jsonrpc":"2.0","result":0.15,"id":1}', expect_result={'ok': {'kind': 'value', 'value': 0.15}}, settings={"link": "serial"}, file="get_property-serial")
 # File endpoints: downloads saved to the host file named (never written by
 # a vector), uploads streamed as the multipart field file.
 V.append({'spec': BP, 'command': 'download_bio_log', 'input': {'to': {'file': 'download_bio_log.dat'}}, 'expect_request': {'method': 'GET', 'port': 80, 'target': '/api/bio/logger/transfer'}})

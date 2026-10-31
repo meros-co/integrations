@@ -5,7 +5,7 @@ vendor: Sharp
 category: display
 
 # Sharp's S-Format protocol: a four-character command and a four-character parameter, ended by CR, over
-# RS-232C (link serial) or TCP 10008, where a user name and password prompt comes first. Newer models also offer the NEC-style binary
+# RS-232C or TCP 10008, where a user name and password prompt comes first. Newer models also offer the NEC-style binary
 # protocol on TCP 7142 instead (their "command format" setting); that protocol is the nec-display spec's.
 source:
   - title: "INTERACTIVE DISPLAY OPERATION MANUAL for S-Format command, PN-LA862, PN-LA752, PN-LA652 (2023-08, revised 2024-03)"
@@ -78,18 +78,6 @@ transport:
     from: reply
     groups:
       power_or_reset: { match: "^(POWR|RSET)[0-9]", after_ms: 60000 }
-  # The same commands and replies on the RS-232C input terminal, with no
-  # login: 8 data bits, no parity, 1 stop bit, no flow control on every
-  # family; 9600 bps fixed on PN-LA, PN-LC (p.1), PN-HW2 (p.2), PN-ME2 (p.2)
-  # and PN-M2/P6 (p.2); 9600, 19200 or 38400 bps, 38400 by default, on
-  # PN-HB/HM (p.38) and PN-R903A (p.32). The baud rate setting defaults to
-  # each family's factory rate.
-  serial:
-    baud_rate: { default: 9600, values: [9600, 19200, 38400], by_model: [{ models: [pn-hb, pn-r903a], default: 38400 }] }
-    data_bits: 8
-    parity: none
-    stop_bits: 1
-    flow_control: none
 
 settings:
   username: { type: string, max_length: 32, pattern: "^[!-~]*$", default: "", label: User name, description: "The display's user name for LAN control; empty when none is set, in which case only CR is sent." }
@@ -97,19 +85,16 @@ settings:
 
 # The display asks for a user name and a password on every connection, set or not, and answers OK. Sharp
 # documents no answer to a wrong one.
-# The login is a LAN procedure only; RS-232C takes commands at once.
+# The login is a LAN procedure only.
 on_connect:
-  - link: tcp
-    after_prompt: "Login:"
+  - after_prompt: "Login:"
     send: "{settings.username}"
-  - link: tcp
-    after_prompt: "Password:"
+  - after_prompt: "Password:"
     send: "{settings.password}"
     await_reply: true
 
 ports:
-  - { port: 10008, protocol: tcp, role: control, when: "link tcp", note: "the S-Format data port (configurable on the PN-R903A); an RS-232C display behind a serial-to-Ethernet bridge is reached at the bridge's port" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The RS-232C input terminal: a straight cable on PN-LA, PN-LC, PN-HB/HM and PN-R903A, a crossed cable on PN-HW2, PN-ME2 and PN-M2/P6" }
+  - { port: 10008, protocol: tcp, role: control, note: "the S-Format data port (configurable on the PN-R903A); an RS-232C display behind a serial-to-Ethernet bridge is reached at the bridge's port" }
 
 models:
   - id: pn-la
@@ -5727,19 +5712,9 @@ quirks:
       Daisy-chain addressing (IDSL, IDLK, the + repeater) is not offered: commands always go to the display
       this connection reaches. A display with an ID number set ends each reply with it, which is read past.
       RS-232C and LAN control exclude each other (set_control_select, CTLS): the menu's display control
-      select (PN-HB/HM, p.38 and p.49; RS-232C/LAN on the PN-R903A, p.32 and p.44) must be RS-232C for link
-      serial and LAN for link tcp, and with one chosen the other path is not controlled (nor APPLICATION on
+      select (PN-HB/HM, p.38 and p.49; RS-232C/LAN on the PN-R903A, p.32 and p.44) must be LAN, and with one
+      chosen the other path is not controlled (nor APPLICATION on
       the PN-HB/HM). LOCKED and UNSELECTED say control is prohibited or on the other path.
-  - models: [all]
-    severity: warning
-    text: >
-      On the RS-232C terminal (link serial) the commands and replies are the LAN ones and there is no login.
-      The PN-LA, PN-LC, PN-HW2, PN-ME2 and PN-M2/P6 run at 9600 bps only; the PN-HB/HM and PN-R903A at
-      9600, 19200 or 38400 bps as set in their menu (communication speed, BAUD), 38400 from the factory,
-      which is the baud rate setting's default for them; after changing the display's rate, change the
-      setting to match. Every display on a chain must match. The PN-LA takes commands on RS-232C only with
-      COMMAND (RS-232C) on (ADMIN, CONTROL FUNCTION; set_rs232_command), and the PN-LC only with its command
-      format set to S-Format.
   - models: [pn-la]
     severity: critical
     text: >

@@ -11,9 +11,6 @@ def val(v):
 
 text(K, "set_power", {"on": True}, "power on\r", device_reply=">ok\r", expect_result=OK)
 text(K, "set_power", {"on": False}, "power off\r", device_reply=">ok\r", expect_result=OK, file="set_power-off")
-# The same on the PC CONTROL port (NP-P627UL manual p.139).
-text(K, "set_power", {"on": True}, "power on\r", device_reply=">ok\r", expect_result=OK,
-     settings={"link": "serial"}, file="set_power-serial")
 text(K, "get_power", {}, "power\r", device_reply=">power warming\r", expect_result=val("warming"))
 text(K, "get_power_info", {}, "power ?\r", device_reply=">power cur=off,sel=on|off\r",
      expect_result=val("cur=off,sel=on|off"))

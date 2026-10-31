@@ -113,29 +113,6 @@ transport:
   # p.44): their frames are replies.
   reply_match: 'ACK;|ERR:[0-9]+;|^[\x02\x11\x13]*(GRCH|AMCH|SPCH|QAUXCH|SRTIST|BSY):'
   probe: "ACS;"
-  # The RS-232 connector of V-160HD, V-80HD, VR-120HD and VR-6HD takes the
-  # same commands (Basic Control Commands p.2; each Remote Control Guide,
-  # RS-232 Interface): 9600, 38400 or 115200 bps (115200 by default in the
-  # Reference Manuals' menu lists), no parity, 8 data bits, 1 stop bit; the
-  # V-1-4K has none. A command ends at its ";", so nothing follows it on the
-  # serial port. V-160HD, VR-120HD and VR-6HD want stx (02H) before each
-  # command there (stx is optional only over LAN, and ERR:6 "no stx" is
-  # RS-232 only); the V-80HD's command format has no stx. Replies end at ";",
-  # or at the ack byte (06H) the guides list among the control codes.
-  serial:
-    models: [v-160hd, v-80hd, vr-120hd, vr-6hd]
-    baud_rate: { default: 115200, values: [9600, 38400, 115200] }
-    data_bits: 8
-    parity: none
-    stop_bits: 1
-    flow_control: { default: xon-xoff, values: [xon-xoff, none] }
-    overrides:
-      - framing: delimited
-        close: ""
-        reply_framing: terminated
-        reply_terminators: [";", "\u0006"]
-        reply_match: 'ACK;|ERR:[0-9]+;|^[\x02\x11\x13]*(\x06|(GRCH|AMCH|SPCH|QAUXCH|SRTIST|BSY):)'
-      - { models: [v-160hd, vr-120hd, vr-6hd], open: "\u0002" }
 
 settings:
   password:
@@ -154,14 +131,12 @@ settings:
 # without it fails at the device (ERR:0) rather than in the catalogue.
 on_connect:
   - when_set: password
-    link: tcp
     after_prompt: "Enter password:"
     send: "{settings.password}"
     refused: "^(Authentication error|Wait a moment)"
 
 ports:
-  - { port: 8023, protocol: tcp, role: control, when: "link tcp" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The RS-232 connector, DB-9 male, on V-160HD, V-80HD, VR-120HD and VR-6HD: a crossover (null-modem) cable" }
+  - { port: 8023, protocol: tcp, role: control }
 
 models:
   - id: v-160hd
@@ -3274,25 +3249,6 @@ quirks:
       lists, so commands are sent without it over LAN. Error replies: ERR:0
       syntax error, ERR:4 invalid (controlled by another setting), ERR:5 out
       of range; ERR:6 (no stx) is RS-232 only.
-
-  - models: [v-160hd, v-80hd, vr-120hd, vr-6hd]
-    severity: warning
-    text: >
-      On RS-232 (link serial) each command is sent with nothing after its
-      ";", which the command format names as the end of a command (Remote
-      Control Guides, Command Format), and on V-160HD, VR-120HD and VR-6HD
-      with stx before it, which RS-232 requires there (ERR:6 otherwise); the
-      V-80HD's format has no stx and none is sent. Replies end at ";" or at a
-      bare ack byte (06H): the V-160HD, VR-120HD and VR-6HD guides list the
-      answer to DTH as "ack" and name ack 06H a control code, so set_parameter
-      accepts ACK; or 06H; over LAN only ACK; is taken. The menu RS-232 must
-      be ON (the default on V-160HD, VR-120HD and VR-6HD) and BAUDRATE match
-      the setting here: 115200 is the default the V-160HD, VR-120HD and
-      VR-6HD Reference Manuals mark; the V-80HD Reference Manual marks none.
-      Flow control is not in the communication standards, but the command
-      lists name xon (11H) and xoff (13H) as flow control the switcher sends,
-      so XON/XOFF is the default. The network password is for LAN only and is
-      not sent on RS-232. The V-1-4K has no RS-232 connector.
 
   - models: [all]
     severity: warning

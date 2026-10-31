@@ -11,9 +11,6 @@ def r62(command, input, wire, **extra):
 
 # Video (p.27-28)
 r62("select_pgm", {"xpt": 2}, "\x02PGM:1;", device_reply="\x06", expect_result=R62_OK)
-# The same on the RS-232 connector (link serial, p.26).
-r62("select_pgm", {"xpt": 2}, "\x02PGM:1;", device_reply="\x06", expect_result=R62_OK,
-    settings={"link": "serial"}, file="select_pgm-serial")
 r62("select_pst", {"xpt": 3}, "\x02PST:2;", device_reply="\x02ERR:4;",
     expect_result={"error": {"error": "device_error"}})          # DISSOLVE mode, p.30
 r62("select_aux", {"xpt": 8}, "\x02AUX:7;")

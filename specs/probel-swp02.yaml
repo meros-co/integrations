@@ -33,22 +33,12 @@ source:
     note: "Corroboration from a third-party implementation: INTERROGATE, TALLY, CONNECT and CONNECTED only."
 
 settings:
-  # serial: an RS-422/RS-485 or RS-232 port of the host, the protocol's own link (§2). tcp: SW-P-02 carried
-  # over TCP by a router or gateway that offers it, at the port given when the device is opened.
-  link: { type: enum, values: [serial, tcp], default: serial, label: Link, description: "serial uses an RS-422, RS-485 or RS-232 port of the host; tcp reaches a router or gateway that carries SW-P-02 over TCP at the device's host and port." }
-  serial_port: { type: string, max_length: 256, label: Serial port, description: "With link serial, the host's serial port wired to the router: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
-  baud_rate: { type: int, min: 1200, max: 115200, default: 38400, label: Baud rate, description: "With link serial, bits per second as set on the router's port; 38400 normally." }
-  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "With link serial, bits per character; SW-P-02 uses 8." }
-  parity: { type: enum, values: [even, none, odd], default: even, label: Parity, description: "With link serial, the parity set on the router's port; even normally." }
-  stop_bits: { type: int, min: 1, max: 2, default: 1, label: Stop bits, description: "With link serial, stop bits as set on the router's port; 1 normally." }
-  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "With link serial, no flow control: SW-P-02 has none." }
   # Destinations 1..destinations are interrogated every poll_ms to keep state current.
   destinations: { type: int, min: 1, max: 1024, default: 16, label: Destinations read, description: "How many destinations, from destination 1, are interrogated to keep state current." }
   poll_ms: { type: int, min: 100, max: 3600000, default: 1000, label: Read interval, description: "Milliseconds between rounds of interrogating those destinations." }
 
 ports:
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-422/RS-485 or RS-232 port of the host, wired to the router's SW-P-02 port" }
-  - { port: null, protocol: tcp, role: control, when: "link tcp", note: "SW-P-02 over TCP has no standard port: the port is given when the device is opened" }
+  - { port: null, protocol: tcp, role: control, note: "SW-P-02 over TCP has no standard port: the port is given when the device is opened" }
 
 models:
   - id: generic
@@ -113,7 +103,7 @@ quirks:
     text: >
       The protocol has no negative acknowledgement (§3.3.1): a router that does not implement a command, or a
       route it refuses, simply sends nothing, and the command fails with a timeout after 1 s. Three requests
-      in a row unanswered report the router disconnected until it is heard again; the serial port being open
+      in a row unanswered report the router disconnected until it is heard again; the connection being open
       says nothing of the router.
   - models: [all]
     severity: info
@@ -140,5 +130,6 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      SW-P-02 over TCP is offered for routers and gateways that carry it, with the messages as on the serial
-      line; the document read describes only the serial link, so the TCP form is unconfirmed.
+      SW-P-02 over TCP is offered for routers and gateways that carry it, and for serial-to-Ethernet
+      converters, with the messages as on the serial line; the document read describes only the serial
+      line, so the TCP form is unconfirmed.

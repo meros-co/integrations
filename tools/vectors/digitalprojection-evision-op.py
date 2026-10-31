@@ -299,5 +299,3 @@ telemetry(DPO, "state-video-tint", inbound="OP VIDEO.TINT = 100\r", model="e-vis
 telemetry(DPO, "state-volume", inbound="OP VOLUME = 10\r", expect_state=dpo_state("settings.volume", 10))
 telemetry(DPO, "state-zoom", inbound="OP ZOOM = 10\r", expect_state=dpo_state("settings.zoom", 10))
 telemetry(DPO, "state-bright-na", inbound="OP BRIGHT = NA\r", state_before={"settings": {"bright": 50}}, expect_state={"settings": {"bright": 50}})
-# The same on the RS-232 port (link serial).
-dpo("set_h_pos", {'value': 0}, "op h.pos = 0\r", settings={"link": "serial"}, file="set_h_pos-serial")

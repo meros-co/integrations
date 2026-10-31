@@ -1,7 +1,7 @@
 spec: 1
 id: generic-tcp-udp
-name: Generic TCP, UDP or serial device
-vendor: Generic (any device taking text or binary commands over TCP, UDP or a serial port)
+name: Generic TCP or UDP device
+vendor: Generic (any device taking text or binary commands over TCP or UDP)
 category: other
 implementation: native
 reason: >
@@ -9,8 +9,7 @@ reason: >
   as text with escapes for bytes a parameter cannot hold, or as hex. Received data is split into messages at
   a terminator chosen in the settings, kept in state as the last message and a bounded recent list, and a
   request waits for the next received message, optionally one matching a regex, within a timeout of the
-  operator's choosing. A TCP connection, or a serial port of the host, is kept open and opened again with
-  backoff.
+  operator's choosing. A TCP connection is kept open and opened again with backoff.
 
 source:
   - title: "RFC 9293: Transmission Control Protocol (TCP)"
@@ -23,19 +22,12 @@ source:
     author: "J. Postel (1980)"
     url: "https://www.rfc-editor.org/rfc/rfc768"
     note: "Datagrams are delivered whole or not at all, without acknowledgement, so a datagram always ends a message."
-  - title: "TIA-232-F: Interface Between Data Terminal Equipment and Data Circuit-Terminating Equipment Employing Serial Binary Data Interchange"
-    author: "Telecommunications Industry Association (1997)"
-    note: >
-      A serial line carries characters with no message boundaries, framed by the speed, data bits, parity and
-      stop bits both ends are set to, so messages are delimited by a terminator as over TCP. The same holds
-      for RS-422 (TIA-422) and for USB serial adapters, which the operating system presents as serial ports.
 
 settings:
   # tcp: a persistent connection, reconnected 1 s after a failure, doubling to 30 s. udp: datagrams.
-  # serial: a serial port of the host, kept open like a TCP connection; no host or port is needed.
-  protocol: { type: enum, values: [tcp, udp, serial], default: tcp,
+  protocol: { type: enum, values: [tcp, udp], default: tcp,
               label: Protocol,
-              description: "With tcp one connection is kept open and reconnected after a failure (1 s, doubling to 30 s); with udp, datagrams are sent and received; with serial, the serial_port setting's port is kept open the same way as a TCP connection." }
+              description: "With tcp one connection is kept open and reconnected after a failure (1 s, doubling to 30 s); with udp, datagrams are sent and received." }
   # Where received data is split into messages; the terminator is removed and empty messages are dropped.
   # any: CR, LF or CRLF, whichever the device uses. none: one datagram, or one TCP read, is one message.
   terminator: { type: enum, values: [any, cr, lf, crlf, custom, none], default: any,
@@ -55,19 +47,6 @@ settings:
   listen_port: { type: int, min: 1, max: 65535,
                  label: Local UDP port,
                  description: "UDP only: a fixed local port to receive on and send from, for a device that sends to a port configured on it; leave unset for an ephemeral port." }
-  # serial only: the port and its line settings, as the device is set.
-  serial_port: { type: string, max_length: 256, label: Serial port,
-                 description: "Serial only: the host's serial port: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
-  baud_rate: { type: int, min: 50, max: 4000000, default: 9600, label: Baud rate,
-               description: "Serial only: bits per second, as set on the device." }
-  data_bits: { type: int, min: 5, max: 8, default: 8, label: Data bits,
-               description: "Serial only: bits per character, 5 to 8, as set on the device." }
-  parity: { type: enum, values: [none, odd, even], default: none, label: Parity,
-            description: "Serial only: the parity bit, as set on the device." }
-  stop_bits: { type: int, min: 1, max: 2, default: 1, label: Stop bits,
-               description: "Serial only: 1 or 2 stop bits, as set on the device." }
-  flow_control: { type: enum, values: [none, xon-xoff, rts-cts], default: none, label: Flow control,
-                  description: "Serial only: none, software (XON/XOFF) or hardware (RTS/CTS) flow control, as the device uses." }
   # How many received messages 'recent' keeps.
   recent_size: { type: int, min: 1, max: 1000, default: 20,
                  label: Recent messages kept,
@@ -75,12 +54,11 @@ settings:
 
 ports:
   - { port: null, protocol: tcp, role: control, note: "a generic device has no standard port: the port is given when the device is opened; UDP when the protocol setting is udp" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "protocol serial", note: "a serial port of the host: RS-232, RS-422 or a USB serial adapter" }
   - { port: null, protocol: udp, role: feedback, listener: core, setting: listen_port, note: "optional, over UDP: where the device sends" }
 
 models:
   - id: generic
-    name: "Any device taking commands over TCP or UDP (give the device's port) or a serial port"
+    name: "Any device taking commands over TCP or UDP (give the device's port)"
     supports: [send_text, send_hex, request]
     verification: none
 
@@ -89,8 +67,8 @@ commands:
     summary: >
       Send text, then the send terminator. Escapes: \r CR, \n LF, \t TAB, \0 NUL, \\ a backslash, \xNN the
       byte with hex value NN (two digits, such as \x03; a byte, not a character). Any other backslash
-      sequence is refused. The rest is sent as UTF-8. Returns unverified: neither TCP, UDP nor a serial line
-      says whether the device acted on it
+      sequence is refused. The rest is sent as UTF-8. Returns unverified: neither TCP nor UDP says whether
+      the device acted on it
     params:
       text: { type: string, max_length: 65536, required: true,
               label: Text,
@@ -136,13 +114,12 @@ quirks:
     severity: info
     text: >
       Over UDP the device is reported unmonitored: UDP has no connection, so whether the device is there is
-      not known. It is reported alive whenever it sends something. Over TCP the connection state is reported,
-      and on a serial port whether the port is open: a serial line gives no sign of the device itself, so use
-      request to check it answers.
+      not known. It is reported alive whenever it sends something. Over TCP the connection state is reported:
+      a connection gives no sign of the device itself, so use request to check it answers.
   - models: [all]
     severity: info
     text: >
-      Over TCP or a serial port with terminator none, a message is whatever one read returns: neither keeps the device's
+      Over TCP with terminator none, a message is whatever one read returns: TCP does not keep the device's
       message boundaries, so one reply can arrive as two messages or two as one. Set a terminator when the
       device uses one. Text with no terminator yet is held until one arrives, 64 KiB gather, or the
       connection closes, when it is taken as a message, so a device that answers and then closes is heard.

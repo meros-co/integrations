@@ -1,15 +1,16 @@
 RVM = "roland-vmixer"
-# Roland V-Mixers (V-Mixer RS-232C Reference v2.2; M-200i Telnet Reference):
-# on RS-232C stx (02H) + three letters + ":" parameters + ";", nothing after
-# it, and ack is the byte 06H. Only the M-200i also takes the set over Telnet,
-# where stx is dropped, lines end in CR LF and ack is the text OK. The first
-# model, the M-480, has only the serial port, so its vectors play there.
+# Roland V-Mixer M-200i (V-Mixer RS-232C Reference v2.2; M-200i Telnet
+# Reference): over Telnet three letters + ":" parameters + ";", each line
+# ending in CR LF, and ack is the text OK.
 RVM_OK = {"ok": {"kind": "ack"}}
 RVM_ERR = {"error": {"error": "device_error"}}
 
 
 def rvm(command, input, wire, **extra):
-    text(RVM, command, input, "\x02" + wire, **extra)
+    reply = extra.get("device_reply")
+    if reply is not None:
+        extra["device_reply"] = "OK\r\n" if reply == "\x06" else reply.removeprefix("\x02") + "\r\n"
+    text(RVM, command, input, wire + "\r\n", model="m-200i", **extra)
 
 
 def rvm200(command, input, wire, **extra):
@@ -21,8 +22,6 @@ def rvm_value(v):
 
 
 rvm("set_phantom", {"channel": "I1", "enabled": True}, "PTC:I1,1;", device_reply="\x06", expect_result=RVM_OK)
-rvm200("set_phantom", {"channel": "I1", "enabled": True}, "PTC:I1,1;", device_reply="OK\r\n", expect_result=RVM_OK,
-       file="set_phantom-telnet")
 rvm("get_phantom", {"channel": "R1L"}, "PTQ:R1L;", device_reply="\x02PTS:R1L,1;", expect_result=rvm_value("1"))
 rvm("set_polarity", {"channel": "I48", "enabled": False}, "PSC:I48,0;")
 rvm("get_polarity", {"channel": "I2"}, "PSQ:I2;", device_reply="\x02PSS:I2,0;", expect_result=rvm_value("0"))
@@ -83,8 +82,6 @@ rvm("set_display_brightness", {"brightness": 50}, "DBC:50;")
 rvm("get_display_brightness", {}, "DBQ;", device_reply="\x02DBS:50;", expect_result=rvm_value("50"))
 rvm("set_panel_brightness", {"brightness": 100}, "PBC:100;")
 rvm("get_panel_brightness", {}, "PBQ;", device_reply="\x02PBS:100;", expect_result=rvm_value("100"))
-rvm("set_lamp_brightness", {"brightness": 0}, "LBC:0;")
-rvm("get_lamp_brightness", {}, "LBQ;", device_reply="\x02LBS:0;", expect_result=rvm_value("0"))
 rvm("set_monitor_dimmer", {"enabled": True}, "DMC:1;")
 rvm("get_monitor_dimmer", {}, "DMQ;", device_reply="\x02DMS:1;", expect_result=rvm_value("1"))
 rvm("recorder_transport", {"action": "play"}, "RTC:P;")
@@ -107,7 +104,7 @@ rvm("resend_last_reply", {}, "ERR:0;")
 
 
 def rvmt(name, inbound, **extra):
-    telemetry(RVM, name, inbound="\x02" + inbound, **extra)
+    telemetry(RVM, name, inbound=inbound + "\r\n", model="m-200i", **extra)
 
 
 rvmt("name", 'CNS:I1,"VOCAL ";', expect_state={"channels": {"I1": {"name": "VOCAL "}}})
@@ -138,7 +135,6 @@ rvmt("blackout", "BLS:0;", expect_state={"console": {"blackout": False}})
 rvmt("dimmer", "DMS:1;", expect_state={"console": {"monitor_dimmer": True}})
 rvmt("display-brightness", "DBS:50;", expect_state={"brightness": {"display": 50}})
 rvmt("panel-brightness", "PBS:20;", expect_state={"brightness": {"panel": 20}})
-rvmt("lamp-brightness", "LBS:0;", expect_state={"brightness": {"lamp": 0}})
 rvmt("recorder-status", "RTS:0;", expect_state={"recorder": {"status": "stopped"}})
 rvmt("recorder-position", "RLS:34s;", expect_state={"recorder": {"position": "34s"}})
 rvmt("recorder-song", "RIS:2,5;", expect_state={"recorder": {"song": 2, "song_count": 5}})

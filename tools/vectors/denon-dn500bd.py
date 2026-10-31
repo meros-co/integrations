@@ -139,8 +139,6 @@ _dbv("get_sample_rate", "@0?fs\r", "@0Fs48", "48")
 _dbv("get_artist", "@0?at\r", "@0at The Band", "The Band")
 _dbv("get_title", "@0?ti\r", "@0tiFeature", "Feature")
 _dbv("get_album", "@0?al\r", "@0alLive", "Live")
-# The same messages on the RS-232C port.
-_dbv("get_status", "@0?ST\r", "@0STPL", "PL", settings={"link": "serial"}, file="get_status-serial")
 
 telemetry(DB, "disc", inbound="@0CDUF\r", expect_state={"disc": {"status": "unformatted"}})
 telemetry(DB, "status", inbound="@0STED\r", expect_state={"transport": {"status": "menu"}})

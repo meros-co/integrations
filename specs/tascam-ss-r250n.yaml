@@ -53,15 +53,6 @@ transport:
   # At least 20 ms between commands (p.7).
   pacing:
     min_interval_ms: 20
-  # RS-232C: LF before each message and CR after it (p.5); every setting is chosen on the unit (p.102).
-  serial:
-    baud_rate: { default: 57600, values: [4800, 9600, 19200, 38400, 57600] }
-    data_bits: { default: 8, values: [7, 8] }
-    parity: { default: none, values: [none, odd, even] }
-    stop_bits: { default: 1, values: [1, 2] }
-    flow_control: none
-    overrides:
-      - { framing: delimited, open: "\n", close: "\r", reply_framing: line }
 
 settings:
   password: { type: string, secret: true, max_length: 32, default: "", label: Password,
@@ -70,15 +61,12 @@ settings:
 # Enter first, then the password at "Enter Password", on the network only. TEAC documents no answer to a
 # wrong password.
 on_connect:
-  - link: tcp
-    send: ""
-  - link: tcp
-    after_prompt: "Enter Password"
+  - send: ""
+  - after_prompt: "Enter Password"
     send: "{settings.password}"
 
 ports:
-  - { port: 23, protocol: tcp, role: control, when: "link tcp", note: "the Telnet server; three connections at once" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232C, D-sub 9-pin female; pin 9 carries 12 V for the RC-SS150" }
+  - { port: 23, protocol: tcp, role: control, note: "the Telnet server; three connections at once" }
 
 models:
   - id: ss-cdr250n

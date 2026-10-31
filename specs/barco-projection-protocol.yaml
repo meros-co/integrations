@@ -50,26 +50,13 @@ source:
       commands with the projector types each applies to, and an appendix summarizing every command's bytes.
 
 settings:
-  link: { type: enum, values: [tcp, serial], default: tcp, label: Link,
-    description: "tcp reaches the projector's network port (HDX, PGWU, networked DLP models) or a serial-to-Ethernet converter; serial uses an RS-232 (or RS-422) port of the host wired to the projector." }
-  address: { type: int, min: 0, max: 255, default: 1, label: Projector address,
-    description: "With link serial, the projector's address as set in its menu (several projectors can share one line); over TCP the address is always 0." }
-  serial_port: { type: string, max_length: 256, label: Serial port,
-    description: "With link serial, the host's serial port wired to the projector: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
-  baud_rate: { type: int, min: 1200, max: 115200, default: 9600, label: Baud rate,
-    description: "With link serial, bits per second as set on the projector (its menu or DIP switches); the catalogs leave the rate to the owner's manual." }
-  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "With link serial, 8 bits per character." }
-  parity: { type: enum, values: [none], default: none, label: Parity, description: "With link serial, no parity." }
-  stop_bits: { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "With link serial, one stop bit." }
-  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "With link serial, no flow control." }
   poll_ms: { type: int, min: 500, max: 3600000, default: 5000, label: Status read interval,
     description: "Milliseconds between reads of power, lamp, source, shutter, freeze and mute." }
   refresh_ms: { type: int, min: 1000, max: 86400000, default: 60000, label: Full read interval,
     description: "Milliseconds between reads of every other setting; identity and network are read on connecting." }
 
 ports:
-  - { port: 43680, protocol: tcp, role: control, when: "link tcp", note: "TCP 0xAAA0 on the HDX and PGWU; for an RS-232-only projector, the port of a serial-to-Ethernet converter, given when the device is opened" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232 (D-sub 9, RS232 IN) or RS-422 port of the host wired to the projector" }
+  - { port: 43680, protocol: tcp, role: control, note: "TCP 0xAAA0 on the HDX and PGWU; for an RS-232-only projector, the port of a serial-to-Ethernet converter, given when the device is opened" }
 
 models:
   - id: hdx-w12
@@ -2796,12 +2783,6 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Over TCP the address is always 0; on a serial line it is the projector's (the address setting), messages
-      from other addresses on the chain are ignored, and the address byte is escaped like the rest of the
-      message.
-  - models: [all]
-    severity: info
-    text: >
       The three catalogs give one command different layouts by family (for example 0x21 0x45 answers a C string
       on the HDX, a preset number on the PGWU, and either on older models), so each model's family decides how a
       command is sent and read. Commands taking a value that a family lacks (a preset, a focus direction, a
@@ -2873,5 +2854,4 @@ quirks:
       Projectors that cannot sense the shutter answer undetermined, reported as in_between. The status byte's
       freeze bit is significant only on projectors that show one image at a time, and the 800-peripheral bit not
       on the BD5000, BD8000 and BD8000LC. set_baud_rate is acknowledged at the old rate and switches after; an
-      invalid rate gives 9600, so change the baud_rate setting to match. set_address is acknowledged from the
-      old address; change the address setting to match.
+      invalid rate gives 9600. set_address is acknowledged from the old address.

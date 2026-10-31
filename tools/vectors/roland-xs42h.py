@@ -13,9 +13,6 @@ def rx4(command, input, wire, **extra):
 
 
 rx4("set_transition_time", {"time": 4000}, "set,10,19,0,4000\n", device_reply="ack,10,19,0,4000\n", expect_result=RX4_OK)
-# The same on the RS-232 connector (link serial, p.28).
-rx4("set_transition_time", {"time": 4000}, "set,10,19,0,4000\n", device_reply="ack,10,19,0,4000\n",
-    expect_result=RX4_OK, settings={"link": "serial"}, file="set_transition_time-serial")
 rx4("recall_scene", {"scene": 10}, "set,11,11,0,9\n", device_reply="err,set,11,11,0,9\n",
     expect_result={"error": {"error": "device_error"}})
 rx4("select_output_input", {"output": 2, "input": 5}, "set,11,10,1,4\n")

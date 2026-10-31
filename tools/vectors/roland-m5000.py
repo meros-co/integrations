@@ -20,8 +20,6 @@ def rm5_value(v):
 
 
 rm5("set_phantom", {"channel": "I1", "enabled": True}, "PTC:I1,1;", device_reply="OK\r\n", expect_result=RM5_OK)
-text(RM5, "set_phantom", {"channel": "I1", "enabled": True}, "\x02PTC:I1,1;", device_reply="\x06",
-     expect_result=RM5_OK, settings={"link": "serial"}, file="set_phantom-serial")
 rm5("get_phantom", {"channel": "I128"}, "PTQ:I128;", device_reply="PTS:I128,0;\r\n", expect_result=rm5_value("0"))
 rm5("set_eq", {"channel": "MA2", "enabled": False}, "EQC:MA2,0;")
 rm5("get_eq", {"channel": "SG64"}, "EQQ:SG64;", device_reply="EQS:SG64,1;\r\n", expect_result=rm5_value("1"))
@@ -101,5 +99,3 @@ rm5t("reac", "RCS:B,1;", expect_state={"reac": {"B": {"status": "establishing"}}
 rm5t("reac-error", "EPS:D1,2;", expect_state={"reac": {"D1": {"error": "transmission"}}})
 rm5t("console-error", "ERS:1;", expect_state={"device": {"error": 1}})
 rm5t("version", "VRS:1.200;", expect_state={"device": {"version": "1.200"}})
-telemetry(RM5, "serial-fader", inbound="\x02FDS:I2,-10.0;", settings={"link": "serial"},
-          expect_state={"channels": {"I2": {"fader": "-10.0"}}})

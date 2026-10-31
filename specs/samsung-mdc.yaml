@@ -10,8 +10,8 @@ reason: >
   (the sum of every byte after the header, modulo 256), and each answer is 0xAA 0xFF, the ID, a length, 'A' or
   'N', the command it answers and its values, so replies are framed by their length and matched to the request
   by command and ID, one request at a time. Many replies have several layouts told apart only by their length
-  (timers, maintenance, sound, multi-screen). Displays on an RS-232C chain share one port and are addressed by
-  ID. The secured mode of newer firmware greets with plain text, then takes a TLS handshake and a PIN on the
+  (timers, maintenance, sound, multi-screen). Displays on an RS-232C chain behind a networked one are addressed
+  by ID. The secured mode of newer firmware greets with plain text, then takes a TLS handshake and a PIN on the
   same connection. Nothing is pushed, so state comes from a paced poll.
 
 source:
@@ -40,9 +40,7 @@ settings:
   display_id: { type: int, min: 0, max: 253, default: 0, label: Display ID,
     description: "The ID set on the display (its MDC or Device ID); commands without a display_id go to it." }
   chain_ids: { type: string, max_length: 1024, pattern: "^([0-9]{1,3}(,[0-9]{1,3})*)?$", default: "", label: Chained display IDs,
-    description: "IDs of further displays reached through this one's RS-232C loop-out (or the same serial port), comma-separated, such as 2,3,4; each is polled and kept in state." }
-  link: { type: enum, values: [tcp, serial], default: tcp, label: Link,
-    description: "tcp reaches the display over its network port (1515); serial uses an RS-232C port of the host." }
+    description: "IDs of further displays reached through this one's RS-232C loop-out, comma-separated, such as 2,3,4; each is polled and kept in state." }
   pin: { type: string, secret: true, pattern: "^([0-9]{4})?$", default: "", label: Secured protocol PIN,
     description: "The 4-digit PIN of the display's secured MDC mode (TLS); empty for a display with the secured protocol off." }
   mac_address: { type: string, pattern: "^(([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2})?$", default: "", label: MAC address,
@@ -53,17 +51,9 @@ settings:
     description: "Seconds between reads of power, input, volume, mute and the error status; 0 reads them only on connecting." }
   refresh_interval_s: { type: int, min: 0, max: 86400, default: 300, label: Full refresh interval,
     description: "Seconds between reads of every setting the display supports; 0 reads them only on connecting and on refresh." }
-  serial_port: { type: string, max_length: 256, label: Serial port,
-    description: "With link serial, the host's serial port wired to the display's RS-232C IN: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
-  baud_rate: { type: int, min: 9600, max: 9600, default: 9600, label: Baud rate, description: "With link serial, MDC runs at 9600 bit/s." }
-  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "With link serial, MDC uses 8 data bits." }
-  parity: { type: enum, values: [none], default: none, label: Parity, description: "With link serial, MDC uses no parity." }
-  stop_bits: { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "With link serial, MDC uses 1 stop bit." }
-  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "With link serial, MDC uses no flow control." }
 
 ports:
-  - { port: 1515, protocol: tcp, role: control, when: "link tcp", note: "MDC over RJ45; with a PIN the same port carries the secured (TLS) mode after a plain-text greeting" }
-  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232C, D-sub 9-pin or the display's stereo jack, wired to a serial port of the host" }
+  - { port: 1515, protocol: tcp, role: control, note: "MDC over RJ45; with a PIN the same port carries the secured (TLS) mode after a plain-text greeting" }
   - { port: 9, protocol: udp, role: control, when: "mac_address set", note: "Wake-on-LAN packet to wol_address and to the display, when it is off" }
 
 models:
@@ -2892,9 +2882,8 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Addressing (§1.1, §1.2): over RS-232C each display on a chain has a unique ID from 0 to 253 and the
-      host's port reaches them all; over RJ45 the display answers only its own ID, and displays chained to its
-      RS-232C OUT are reached through it by theirs. chain_ids names those further displays: each is polled and
+      Addressing (§1.1, §1.2): each display on a chain has a unique ID from 0 to 253; over RJ45 the display
+      answers only its own ID, and displays chained to its RS-232C OUT are reached through it by theirs. chain_ids names those further displays: each is polled and
       kept in state under its ID, and commands reach one with display_id. display_id 254 (0xFE) addresses every
       display at once; they act but none acknowledges, so the command is reported unverified.
   - models: [all]

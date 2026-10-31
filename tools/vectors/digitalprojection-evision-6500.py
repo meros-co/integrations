@@ -97,5 +97,3 @@ telemetry(DPV, "state-filter-hours", request="V99G0005", inbound="P1234\r", expe
 telemetry(DPV, "state-status", request="V99G0007", inbound="P1234\r", expect_state={'status': 1234})
 telemetry(DPV, "state-firmware-version", request="V99G0008", inbound="PV04\r", expect_state={'device': {'firmware_version': 'V04'}})
 telemetry(DPV, "state-source", request="V99G0220", inbound="P1234\r", expect_state={'input': 1234})
-# The same on the RS-232 port (link serial).
-dpv("get_brightness", {}, "V99G0101\r", device_reply="P0\r", expect_result={"ok": {"kind": "value", "value": "0"}}, settings={"link": "serial"}, file="get_brightness-serial")

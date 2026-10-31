@@ -592,5 +592,3 @@ telemetry(C2, "bst-test-l001-001-00003-sample", inbound="(BST+TEST!L001 001 0000
 telemetry(C2, "bst-test-l000-001-00012-other", inbound="(BST+TEST!L000 001 00012 \"Other\")", expect_state={'options': {'self_tests': {'12': {'name': 'Other', 'available': False}}}})
 telemetry(C2, "bst-000-passed", inbound="(BST!000 \"--Passed--\")", expect_state={'self_test': {'results': {'0': {'result': '--Passed--'}}}})
 telemetry(C2, "bst-test-001-fail-no-response-on-pin-1", inbound="(BST+TEST!001 \"Fail\" \"no response on pin 1\")", expect_state={'self_test': {'results': {'1': {'result': 'Fail', 'detail': 'no response on pin 1'}}}})
-# The same on the RS232 IN port (link serial).
-_t("get_power", {}, "(PWR?)", settings={"link": "serial"}, file="get_power-serial")
