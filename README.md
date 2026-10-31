@@ -55,13 +55,15 @@ the options JSON in C, `new Core({ devices })` in Node, `Core(devices=...)` in
 Python, `--devices a,b,c` for the HTTP service). Only those devices are
 listed, opened and discovered.
 
-**The catalogue** (`catalog` in every package, `GET /v1/catalog` from the
+**The catalog** (`catalog` in every package, `GET /v1/catalog` from the
 HTTP service) describes every integration in the build: its models,
 commands and their parameters, settings, state (each number with its
 `unit`, and `scale` where it is reported as the device counts it), every
 periodic read with how often it runs (`polls`, with `interval_ms` at the
-default settings), and every port it uses with its default (`ports`),
-including the integrations that have no default port and need one given.
+default settings), every subscription it renews on a timer (`renewals`,
+listed apart from the polls, with `interval_ms` the same way), and every
+port it uses with its default (`ports`), including the integrations that
+have no default port and need one given.
 
 **When opening a device**, the core normally keeps its state current:
 it subscribes to changes, reads the state on connecting, and polls where it

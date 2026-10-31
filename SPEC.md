@@ -2188,7 +2188,9 @@ Every group says how often it is sent: `every_ms`, or `once: true` for a
 group sent only on connecting (and on each reconnection).
 `tools/validate.py` refuses a group with neither, so no poll's interval is
 left to prose. The catalog lists the groups under the device's `polls`
-(Native modules, Polls).
+(Native modules, Polls), and a `subscribe` sent again at its `every_ms` as
+the renewal named `subscribe` under `renewals`, not as a poll (Native
+modules, Renewals).
 
 #### When each poll group was last answered
 
@@ -3329,6 +3331,63 @@ settings' defaults (absent for `once`, and for a setting with no default):
 "polls": [
   {"name": "status", "every_ms": {"setting": "poll_interval_ms"}, "interval_ms": 10000,
    "reads": "sysUpTime.0, the liveness check, and a walk of the device's subtrees"}
+]
+```
+
+### Renewals
+
+A native module that sends a subscription again on a timer, so that it does
+not lapse or so that a device that dropped it takes it again, declares each
+such renewal under `renewals`, with how often it runs. Renewals are not
+polls, and are listed apart from them:
+
+```yaml
+renewals:
+  - name: push
+    every_ms: 8000                            # a fixed interval
+    renews: "The 60 s Push subscription, which makes the device send every configuration attribute again"
+    note: "Not when opened for commands only"
+  - name: meters
+    every_ms: { setting: meter_renew_s, scale: 1000 }   # a setting's value
+    when_set: meters                          # only while meters is set
+    renews: "The meter report, without which the device stops sending meters"
+```
+
+| Field | Meaning |
+|---|---|
+| `name` | The renewal's name |
+| `every_ms` | A number of milliseconds, or `{setting: <name>}`, an `int` setting's value, with `scale` as for polls |
+| `when_set` | A setting the renewal runs only while it is set: not empty, not `false` and not `0` |
+| `renews` | What it renews |
+| `note` | When it runs and how the interval varies, where it does (only while a stream is watched, only after a silence, at once when the device ends the subscription) |
+
+A renewal is a subscription, registration or stream request sent again on a
+timer. A subscription made once on connecting and again only after a
+reconnection, a retry of one refused, and a keep-alive that renews nothing
+are not renewals; a renewal whose only purpose is the liveness check and
+that keeps nothing from lapsing is a poll. `tools/validate.py` requires
+`every_ms` on every renewal, unique names, and that each setting named
+exists (an `int` one for `every_ms`).
+
+A spec-driven device's `telemetry.subscribe` with `every_ms` (§8) is the
+renewal named `subscribe`, worked out from its telemetry and never declared.
+It declares only its native extension's own renewals, and a renewal of its
+`telemetry.websocket` messages (named `websocket`) or of its
+`telemetry.zeromq.publish` messages (named `zeromq`), where those messages
+are subscriptions, at the `every_ms` its telemetry gives; `tools/validate.py`
+checks that interval against the telemetry's. A `websocket` or `zeromq`
+`every_ms` that only keeps the connection open or asks for state is no
+renewal and is not declared.
+
+The catalog lists every integration's renewals under `renewals`, the
+`subscribe` renewal first, each with `interval_ms`, the interval at the
+settings' defaults (absent for a setting with no default):
+
+```json
+"renewals": [
+  {"name": "subscribe", "every_ms": 9000, "interval_ms": 9000},
+  {"name": "meters", "every_ms": 4000, "when_set": "meters", "interval_ms": 4000,
+   "renews": "The meter report on the native interface (TCP port 2222), without which the console stops sending meters after 5 s; it also keeps that connection open"}
 ]
 ```
 

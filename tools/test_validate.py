@@ -350,6 +350,52 @@ class PollIntervals(unittest.TestCase):
         self.assertIn("polls: two polls named '1'", validate.poll_interval_checks(doc))
 
 
+class Renewals(unittest.TestCase):
+    def schema_errors(self, fragment):
+        import json
+        import jsonschema
+        schema = json.loads((validate.ROOT / "schema" / "device-spec-1.json").read_text("utf-8"))
+        sub = dict(schema["$defs"]["renewal"], **{"$defs": schema["$defs"]})
+        return list(jsonschema.Draft202012Validator(sub).iter_errors(fragment))
+
+    def test_a_malformed_native_renewal_fails(self):
+        doc = {"implementation": "native",
+               "settings": {"renew_s": {"type": "int"}, "name": {"type": "string"}},
+               "renewals": [{"name": "push", "every_ms": {"setting": "renew_s", "scale": 1000}, "renews": "Push"},
+                            {"name": "bare", "renews": "Nothing said"},
+                            {"name": "text", "every_ms": {"setting": "name"}, "renews": "X"},
+                            {"name": "gone", "every_ms": {"setting": "missing"}, "when_set": "nothing", "renews": "Y"},
+                            {"name": "push", "every_ms": 1000, "renews": "Again"}]}
+        errors = validate.renewal_checks(doc)
+        self.assertIn("renewals[1]: give every_ms, how often the subscription is renewed", errors)
+        self.assertIn("renewals[2].every_ms.setting: 'name' is not an int setting", errors)
+        self.assertIn("renewals[3].every_ms.setting: no setting 'missing'", errors)
+        self.assertIn("renewals[3].when_set: no setting 'nothing'", errors)
+        self.assertIn("renewals: two renewals named 'push'", errors)
+        self.assertEqual(len(errors), 5)
+        self.assertTrue(self.schema_errors({"name": "bare", "renews": "R"}))
+        self.assertTrue(self.schema_errors({"name": "x", "every_ms": 1000}))
+        self.assertTrue(self.schema_errors({"name": "x", "every_ms": 1000, "renews": "R", "once": True}))
+        self.assertFalse(self.schema_errors({"name": "x", "every_ms": {"setting": "s"}, "renews": "R"}))
+
+    def test_a_spec_driven_renewal_is_its_telemetrys(self):
+        doc = {"telemetry": {"subscribe": {"send": ["/xremote"], "every_ms": 9000},
+                             "websocket": {"send": ["{}"], "every_ms": 10000}},
+               "renewals": [{"name": "websocket", "every_ms": 5000, "renews": "W"},
+                            {"name": "subscribe", "every_ms": 9000, "renews": "S"},
+                            {"name": "zeromq", "every_ms": 30000, "renews": "Z"},
+                            {"name": "own", "every_ms": 4000, "renews": "O"}]}
+        errors = validate.renewal_checks(doc)
+        self.assertIn("renewals[0].every_ms: 5000, but its telemetry sends again every 10000 ms", errors)
+        self.assertIn("renewals: two renewals named 'subscribe'", errors)
+        self.assertIn("renewals[2]: telemetry.zeromq.publish sends nothing again (no every_ms)", errors)
+        self.assertTrue(any(e.startswith("renewals[3]: a spec-driven") for e in errors))
+        doc["extension"] = "wing-meters"
+        doc["renewals"] = [{"name": "websocket", "every_ms": 10000, "renews": "W"},
+                           {"name": "own", "every_ms": 4000, "renews": "O"}]
+        self.assertEqual(validate.renewal_checks(doc), [])
+
+
 class Units(unittest.TestCase):
     def test_a_step_goes_in_scale_and_a_unit_from_names_a_string_state(self):
         import json

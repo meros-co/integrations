@@ -1564,6 +1564,61 @@ def unit_checks(doc: dict) -> list[str]:
     return errors
 
 
+def renewal_checks(doc: dict) -> list[str]:
+    """Every subscription renewed on a timer says how often (SPEC.md,
+    Native modules, Renewals). A spec-driven device's `telemetry.subscribe`
+    renewal is worked out from its `every_ms`; it declares only a native
+    extension's own renewals, or one of its push websocket or ZeroMQ
+    publish, at the interval its telemetry gives. A setting an interval or
+    condition names is declared, an `int` one for `every_ms`."""
+    errors: list[str] = []
+    native = doc.get("implementation") == "native"
+    settings = doc.get("settings") or {}
+    def block(d, key):
+        v = d.get(key) if isinstance(d, dict) else None
+        return v if isinstance(v, dict) else {}
+    telemetry = block(doc, "telemetry")
+    renewals = doc.get("renewals") or []
+    # What a spec-driven device's telemetry sends again, by renewal name.
+    resent = {"websocket": block(telemetry, "websocket").get("every_ms"),
+              "zeromq": block(block(telemetry, "zeromq"), "publish").get("every_ms")}
+    names = [r.get("name") for r in renewals]
+    if not native and block(telemetry, "subscribe").get("every_ms") is not None:
+        names.append("subscribe")
+    for n in set(names):
+        if names.count(n) > 1:
+            errors.append(f"renewals: two renewals named '{n}'")
+    for i, renewal in enumerate(renewals):
+        where = f"renewals[{i}]"
+        name = renewal.get("name")
+        every = renewal.get("every_ms")
+        if every is None:
+            errors.append(f"{where}: give every_ms, how often the subscription is renewed")
+        if not native:
+            if name in resent:
+                if resent[name] is None:
+                    errors.append(f"{where}: telemetry.{name if name == 'websocket' else 'zeromq.publish'} "
+                                  f"sends nothing again (no every_ms)")
+                elif every != resent[name]:
+                    errors.append(f"{where}.every_ms: {every}, but its telemetry sends again "
+                                  f"every {resent[name]} ms")
+            elif not doc.get("extension"):
+                errors.append(f"{where}: a spec-driven device's telemetry.subscribe renewal is worked out "
+                              f"from its telemetry; only a native extension's own, websocket or zeromq "
+                              f"is declared")
+        if isinstance(every, dict):
+            setting = every.get("setting")
+            spec = settings.get(setting)
+            if spec is None:
+                errors.append(f"{where}.every_ms.setting: no setting '{setting}'")
+            elif spec.get("type") != "int":
+                errors.append(f"{where}.every_ms.setting: '{setting}' is not an int setting")
+        when = renewal.get("when_set")
+        if when is not None and when not in settings:
+            errors.append(f"{where}.when_set: no setting '{when}'")
+    return errors
+
+
 def label_checks(doc: dict) -> list[str]:
     """Every parameter and setting has a label and a description (SPEC.md §4)."""
     errors = []
@@ -1618,7 +1673,7 @@ def main() -> int:
 
         errors = cross_field_checks(doc, rel) + port_checks(doc) + label_checks(doc)
         errors += pacing_checks(doc) + acknowledge_checks(doc) + select_checks(doc) + polled_checks(doc)
-        errors += poll_interval_checks(doc) + unit_checks(doc)
+        errors += poll_interval_checks(doc) + renewal_checks(doc) + unit_checks(doc)
 
         # Spec ids are the consumer-facing contract; they must be unique.
         spec_id = doc["id"]

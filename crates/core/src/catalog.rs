@@ -50,6 +50,11 @@ pub struct DeviceSpec {
     /// extension's own reads) worked out from its telemetry.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub polls: Vec<PollSpec>,
+    /// Every subscription the integration renews on a timer and how often:
+    /// a native module's as declared, a spec-driven device's
+    /// `telemetry.subscribe` worked out from its telemetry. Not polls.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub renewals: Vec<RenewalSpec>,
     /// Continuous media the device's module publishes, such as a camera's
     /// live view, keyed by stream name. Watched with `Core::open_stream`.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -431,12 +436,52 @@ pub enum PollEvery {
     },
 }
 
+/// One subscription renewed on a timer and how often (SPEC.md, Native
+/// modules, Renewals): a native module's, as its spec declares it, or a
+/// spec-driven device's `telemetry.subscribe`, sent again at its `every_ms`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RenewalSpec {
+    pub name: String,
+    /// How often it is renewed.
+    pub every_ms: PollEvery,
+    /// The setting it runs only while set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when_set: Option<String>,
+    /// What it renews.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub renews: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+    /// The interval in milliseconds at the settings' defaults: worked out
+    /// from the spec, not declared. `None` for a setting with no default.
+    #[serde(default, skip_deserializing, skip_serializing_if = "Option::is_none")]
+    pub interval_ms: Option<u64>,
+}
+
 fn one() -> u64 {
     1
 }
 
 fn is_one(n: &u64) -> bool {
     *n == 1
+}
+
+/// A poll's or renewal's interval in milliseconds at the settings'
+/// defaults: `None` for a setting with no default.
+fn interval_at_defaults(
+    settings: &BTreeMap<String, ParamSpec>,
+    every: &PollEvery,
+) -> Result<Option<u64>, String> {
+    Ok(match every {
+        PollEvery::Fixed(ms) => Some(*ms),
+        PollEvery::Setting { setting, scale } => settings
+            .get(setting)
+            .ok_or_else(|| format!("no setting '{setting}'"))?
+            .default
+            .as_ref()
+            .and_then(Value::as_u64)
+            .map(|n| n * scale),
+    })
 }
 
 /// A stream a native module publishes.
@@ -483,6 +528,7 @@ impl DeviceSpec {
         spec.expand_select()?;
         spec.expand_polled()?;
         spec.expand_polls()?;
+        spec.expand_renewals()?;
         Ok(spec)
     }
 
@@ -606,21 +652,59 @@ impl DeviceSpec {
         }
         for poll in &mut self.polls {
             poll.interval_ms = match &poll.every_ms {
-                Some(PollEvery::Fixed(ms)) => Some(*ms),
-                Some(PollEvery::Setting { setting, scale }) => {
-                    let declared = self
-                        .settings
-                        .get(setting)
-                        .ok_or_else(|| format!("polls.{}: no setting '{setting}'", poll.name))?;
-                    declared
-                        .default
-                        .as_ref()
-                        .and_then(Value::as_u64)
-                        .map(|n| n * scale)
-                }
+                Some(every) => interval_at_defaults(&self.settings, every)
+                    .map_err(|e| format!("polls.{}: {e}", poll.name))?,
                 None if poll.once => None,
                 None => return Err(format!("polls.{}: give every_ms or once", poll.name)),
             };
+        }
+        Ok(())
+    }
+
+    /// `renewals`: a spec-driven device's `telemetry.subscribe`, where it is
+    /// sent again at an interval, put first as `subscribe`, then each
+    /// renewal's interval at the settings' defaults.
+    fn expand_renewals(&mut self) -> Result<(), String> {
+        if self.implementation == Implementation::Spec {
+            if let Some(r) = self.renewals.iter().find(|r| {
+                r.name == "subscribe"
+                    || (self.extension.is_none() && r.name != "websocket" && r.name != "zeromq")
+            }) {
+                return Err(format!(
+                    "renewals.{}: a spec-driven device's telemetry.subscribe renewal is worked out \
+                     from its telemetry; only a native extension's own, websocket or \
+                     zeromq is declared",
+                    r.name
+                ));
+            }
+            let every = self
+                .telemetry
+                .as_ref()
+                .and_then(|t| t.get("subscribe"))
+                .and_then(|s| s.get("every_ms"))
+                .and_then(Value::as_u64);
+            if let Some(ms) = every {
+                self.renewals.insert(
+                    0,
+                    RenewalSpec {
+                        name: "subscribe".into(),
+                        every_ms: PollEvery::Fixed(ms),
+                        when_set: None,
+                        renews: None,
+                        note: None,
+                        interval_ms: None,
+                    },
+                );
+            }
+        }
+        for (i, r) in self.renewals.iter().enumerate() {
+            if self.renewals[..i].iter().any(|o| o.name == r.name) {
+                return Err(format!("renewals: two renewals named '{}'", r.name));
+            }
+        }
+        for r in &mut self.renewals {
+            r.interval_ms = interval_at_defaults(&self.settings, &r.every_ms)
+                .map_err(|e| format!("renewals.{}: {e}", r.name))?;
         }
         Ok(())
     }
@@ -1030,6 +1114,87 @@ mod tests {
         );
         assert_eq!(out["polls"][0]["interval_ms"], 5000);
         assert_eq!(out["polls"][0]["reads"], "Status");
+    }
+
+    #[test]
+    fn renewals_are_listed_apart_from_polls_with_their_intervals() {
+        // Spec-driven: telemetry.subscribe sent again at every_ms.
+        let spec = parse(&[
+            "transport: { type: osc, port: 10023 }",
+            "telemetry:",
+            "  subscribe: { send: [\"/xremote\"], every_ms: 9000 }",
+            "  poll: { once: true, send: [\"/info\"] }",
+            "  updates: []",
+        ])
+        .unwrap();
+        assert_eq!(spec.polls.len(), 1);
+        assert_eq!(spec.renewals.len(), 1);
+        assert_eq!(spec.renewals[0].name, "subscribe");
+        assert_eq!(spec.renewals[0].interval_ms, Some(9000));
+        let out = serde_json::to_value(&spec).unwrap();
+        assert_eq!(
+            out["renewals"],
+            serde_json::json!([{"name": "subscribe", "every_ms": 9000, "interval_ms": 9000}])
+        );
+        // Native: a setting's value.
+        let spec = parse(&[
+            "implementation: native",
+            "reason: R",
+            "settings:",
+            "  renew_s: { type: int, default: 20, label: R, description: R }",
+            "renewals:",
+            "  - { name: push, every_ms: { setting: renew_s, scale: 1000 }, renews: Push }",
+        ])
+        .unwrap();
+        assert!(spec.polls.is_empty());
+        let out = serde_json::to_value(&spec).unwrap();
+        assert_eq!(
+            out["renewals"][0],
+            serde_json::json!({"name": "push", "every_ms": {"setting": "renew_s", "scale": 1000},
+                               "renews": "Push", "interval_ms": 20000})
+        );
+        // A spec-driven device declares no subscribe renewal of its own.
+        let own = parse(&[
+            "transport: { type: osc, port: 10023 }",
+            "telemetry: { subscribe: { send: [\"/x\"], every_ms: 9000 }, updates: [] }",
+            "renewals: [{ name: subscribe, every_ms: 9000, renews: S }]",
+        ]);
+        let err = own.unwrap_err();
+        assert!(err.contains("worked out from its telemetry"), "{err}");
+    }
+
+    #[test]
+    fn the_catalogs_renewals_say_how_often_they_run() {
+        let catalog = Catalog::embedded();
+        for spec in catalog.devices.values() {
+            for r in &spec.renewals {
+                assert!(
+                    r.interval_ms.is_some(),
+                    "{}: renewal {} has no interval at the defaults",
+                    spec.id,
+                    r.name
+                );
+            }
+            let subscribe = spec
+                .telemetry
+                .as_ref()
+                .and_then(|t| t.get("subscribe"))
+                .and_then(|s| s.get("every_ms"))
+                .and_then(Value::as_u64);
+            if let Some(ms) = subscribe {
+                let r = spec.renewals.iter().find(|r| r.name == "subscribe");
+                assert_eq!(r.and_then(|r| r.interval_ms), Some(ms), "{}", spec.id);
+            }
+        }
+        if let Some(cuecore) = catalog.device("visualproductions-cuecore") {
+            assert_eq!(cuecore.renewals[0].name, "subscribe");
+            assert_eq!(cuecore.renewals[0].interval_ms, Some(30_000));
+        }
+        if let Some(g4) = catalog.device("sennheiser-ew-g3-g4") {
+            let push = g4.renewals.iter().find(|r| r.name == "push").unwrap();
+            assert_eq!(push.interval_ms, Some(8_000));
+            assert!(g4.polls.iter().all(|p| p.name != "push"));
+        }
     }
 
     #[test]
