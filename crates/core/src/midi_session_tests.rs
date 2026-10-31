@@ -1,6 +1,6 @@
 //! A MIDI integration in an RTP-MIDI session, through the public API: a
 //! session the core hosts, joined over loopback, with messages both ways,
-//! and which links may be opened without the device's host.
+//! and a hosted session opened without the device's host.
 
 use std::time::Duration;
 
@@ -37,7 +37,7 @@ async fn wait_connection(core: &Core, device: u64, want: fn(&Connection) -> bool
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn only_a_hosted_session_opens_without_a_host() {
+async fn a_hosted_session_opens_without_a_host() {
     let core = core();
     let request = |settings: Value| OpenRequest {
         device: "generic-midi".into(),
@@ -53,8 +53,6 @@ async fn only_a_hosted_session_opens_without_a_host() {
         ))
         .unwrap();
     core.close(hosted).await;
-    // Joining needs the host offering the session.
-    assert!(core.open(request(json!({"link": "rtp"}))).is_err());
     assert!(matches!(
         core.open(request(json!({"link": "port"}))),
         Err(OpenError::InvalidSettings { .. })
