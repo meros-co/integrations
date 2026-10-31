@@ -303,5 +303,52 @@ class Selections(unittest.TestCase):
         self.assertIn("telemetry.poll: two groups named 'a'", errors)
 
 
+class PollIntervals(unittest.TestCase):
+    SCHEMA = None
+
+    @classmethod
+    def setUpClass(cls):
+        import json
+        cls.SCHEMA = json.loads((validate.ROOT / "schema" / "device-spec-1.json").read_text("utf-8"))
+
+    def schema_errors(self, fragment, definition):
+        import jsonschema
+        sub = dict(self.SCHEMA["$defs"][definition], **{"$defs": self.SCHEMA["$defs"]})
+        return list(jsonschema.Draft202012Validator(sub).iter_errors(fragment))
+
+    def test_a_poll_group_without_an_interval_fails(self):
+        doc = {"telemetry": {"poll": [{"every_ms": 1000, "send": ["A"]}, {"send": ["B"]}]}}
+        self.assertEqual(validate.poll_interval_checks(doc), [
+            "telemetry.poll[1]: give every_ms, or once: true for a poll sent only on connecting"])
+        self.assertTrue(self.schema_errors({"send": ["B"]}, "pollGroup"))
+        self.assertFalse(self.schema_errors({"send": ["B"], "once": True}, "pollGroup"))
+        self.assertTrue(self.schema_errors({"send": ["B"], "once": True, "every_ms": 500}, "pollGroup"))
+        doc["telemetry"]["poll"][1]["once"] = True
+        self.assertEqual(validate.poll_interval_checks(doc), [])
+
+    def test_a_native_poll_says_how_often_and_each_stamp_has_one(self):
+        doc = {"implementation": "native",
+               "settings": {"poll_ms": {"type": "int"}, "meters": {"type": "bool"}, "name": {"type": "string"}},
+               "state": {"polled.status": {}, "polled.meters": {}},
+               "polls": [{"name": "status", "every_ms": {"setting": "poll_ms"}, "reads": "Status"},
+                         {"name": "slow", "reads": "Settings"},
+                         {"name": "fast", "every_ms": {"setting": "name"}, "when_set": "nothing", "reads": "X"}]}
+        errors = validate.poll_interval_checks(doc)
+        self.assertIn("polls[1]: give every_ms, or once: true for a read made only on connecting", errors)
+        self.assertIn("polls[2].every_ms.setting: 'name' is not an int setting", errors)
+        self.assertIn("polls[2].when_set: no setting 'nothing'", errors)
+        self.assertIn("state.polled.meters: no poll named 'meters' under polls says how often it runs", errors)
+        self.assertTrue(self.schema_errors({"name": "slow", "reads": "S"}, "nativePoll"))
+        self.assertFalse(self.schema_errors({"name": "s", "every_ms": 5000, "reads": "S"}, "nativePoll"))
+
+    def test_a_spec_driven_device_declares_no_polls_of_its_own(self):
+        doc = {"polls": [{"name": "x", "every_ms": 1, "reads": "X"}], "telemetry": {"poll": {"once": True, "send": "A"}}}
+        self.assertTrue(any(e.startswith("polls: a spec-driven") for e in validate.poll_interval_checks(doc)))
+        doc["extension"] = "resolume-push"
+        self.assertEqual(validate.poll_interval_checks(doc), [])
+        doc["polls"][0]["name"] = "1"
+        self.assertIn("polls: two polls named '1'", validate.poll_interval_checks(doc))
+
+
 if __name__ == "__main__":
     unittest.main()

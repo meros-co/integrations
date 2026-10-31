@@ -57,9 +57,10 @@ listed, opened and discovered.
 
 **The catalogue** (`catalog` in every package, `GET /v1/catalog` from the
 HTTP service) describes every integration in the build: its models,
-commands and their parameters, settings, state, and every port it uses with
-its default (`ports`), including the integrations that have no default port
-and need one given.
+commands and their parameters, settings, state, every
+periodic read with how often it runs (`polls`, with `interval_ms` at the
+default settings), and every port it uses with its default (`ports`),
+including the integrations that have no default port and need one given.
 
 **When opening a device**, the core normally keeps its state current:
 it subscribes to changes, reads the state on connecting, and polls where it

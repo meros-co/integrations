@@ -715,6 +715,13 @@ COMMON_STATE = r'''  polled.status: { type: int, unit: s, description: "When the
 '''
 
 
+COMMON_POLLS = r'''  - name: status
+    every_ms: { setting: poll_interval_ms }
+    reads: "sysUpTime.0, the liveness check, and a walk of the device's subtrees for its model"
+    note: "Opened for commands only, only sysUpTime.0 is read. A notification received brings the next walk forward to 500 ms after it; a walk still unanswered is not started again."
+'''
+
+
 # ── The spec ────────────────────────────────────────────────────────────────
 
 def assemble(spec_text, cfg, state, commands, supports):
@@ -729,7 +736,7 @@ def assemble(spec_text, cfg, state, commands, supports):
         assert n == 1, f"model {m} has no supports line"
     nl = '\n'
     return (head.rstrip() + nl + nl + SETTINGS + nl + 'commands:' + nl + RAW_COMMANDS + yaml_commands(commands) +
-            nl + nl + 'state:' + nl + COMMON_STATE + yaml_state(state) + nl +
+            nl + nl + 'polls:' + nl + COMMON_POLLS + nl + 'state:' + nl + COMMON_STATE + yaml_state(state) + nl +
             ((nl + quirks.strip() + nl) if quirks else ''))
 
 

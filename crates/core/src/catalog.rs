@@ -45,6 +45,11 @@ pub struct DeviceSpec {
     /// Telemetry fields, keyed by dotted path with `*` for a channel number.
     #[serde(default)]
     pub state: BTreeMap<String, StateField>,
+    /// Every periodic read and how often it runs: a native module's as
+    /// declared, a spec-driven device's poll groups (and its native
+    /// extension's own reads) worked out from its telemetry.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub polls: Vec<PollSpec>,
     /// Continuous media the device's module publishes, such as a camera's
     /// live view, keyed by stream name. Watched with `Core::open_stream`.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -367,6 +372,54 @@ pub struct StateField {
     pub description: String,
 }
 
+/// One periodic read of a device and how often it runs (SPEC.md, Native
+/// modules, Polls): a native module's, as its spec declares it, or a
+/// spec-driven poll group, built from `telemetry.poll`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PollSpec {
+    /// Its key under `polled` in state, where it has a stamp.
+    pub name: String,
+    /// How often it runs; `None` with `once`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub every_ms: Option<PollEvery>,
+    /// Read on connecting (and on each reconnection) only.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub once: bool,
+    /// The setting it runs only while set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when_set: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reads: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+    /// The interval in milliseconds at the settings' defaults: worked out
+    /// from the spec, not declared. `None` for `once`, and for a setting
+    /// with no default.
+    #[serde(default, skip_deserializing, skip_serializing_if = "Option::is_none")]
+    pub interval_ms: Option<u64>,
+}
+
+/// A poll's interval: fixed, or an `int` setting's value times `scale`
+/// milliseconds.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum PollEvery {
+    Fixed(u64),
+    Setting {
+        setting: String,
+        #[serde(default = "one", skip_serializing_if = "is_one")]
+        scale: u64,
+    },
+}
+
+fn one() -> u64 {
+    1
+}
+
+fn is_one(n: &u64) -> bool {
+    *n == 1
+}
+
 /// A stream a native module publishes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StreamSpec {
@@ -410,6 +463,7 @@ impl DeviceSpec {
         let mut spec: DeviceSpec = crate::yaml::from_str(text).map_err(|e| e.to_string())?;
         spec.expand_select()?;
         spec.expand_polled()?;
+        spec.expand_polls()?;
         Ok(spec)
     }
 
@@ -490,6 +544,64 @@ impl DeviceSpec {
                 .filter(|(n, _)| names_setting(send, n))
                 .map(|(n, _)| n.clone())
                 .collect();
+        }
+        Ok(())
+    }
+
+    /// `polls`: a spec-driven device's poll groups put first, then each
+    /// poll's interval at the settings' defaults.
+    fn expand_polls(&mut self) -> Result<(), String> {
+        if self.implementation == Implementation::Spec {
+            if !self.polls.is_empty() && self.extension.is_none() {
+                return Err(
+                    "polls: a spec-driven device's polls are its telemetry.poll groups".into(),
+                );
+            }
+            let telemetry = self.telemetry.as_ref();
+            let groups: Vec<Value> = match telemetry.and_then(|t| t.get("poll")) {
+                Some(Value::Array(g)) => g.clone(),
+                Some(one) => vec![one.clone()],
+                None => Vec::new(),
+            };
+            let mut derived = Vec::new();
+            for (name, group) in poll_group_names(telemetry).into_iter().zip(&groups) {
+                let every = group.get("every_ms").and_then(Value::as_u64);
+                let once = group.get("once").and_then(Value::as_bool) == Some(true);
+                if every.is_none() && !once {
+                    return Err(format!(
+                        "telemetry.poll: group {name} gives neither every_ms nor once"
+                    ));
+                }
+                derived.push(PollSpec {
+                    name,
+                    every_ms: every.map(PollEvery::Fixed),
+                    once: every.is_none(),
+                    when_set: None,
+                    reads: None,
+                    note: None,
+                    interval_ms: None,
+                });
+            }
+            derived.append(&mut self.polls);
+            self.polls = derived;
+        }
+        for poll in &mut self.polls {
+            poll.interval_ms = match &poll.every_ms {
+                Some(PollEvery::Fixed(ms)) => Some(*ms),
+                Some(PollEvery::Setting { setting, scale }) => {
+                    let declared = self
+                        .settings
+                        .get(setting)
+                        .ok_or_else(|| format!("polls.{}: no setting '{setting}'", poll.name))?;
+                    declared
+                        .default
+                        .as_ref()
+                        .and_then(Value::as_u64)
+                        .map(|n| n * scale)
+                }
+                None if poll.once => None,
+                None => return Err(format!("polls.{}: give every_ms or once", poll.name)),
+            };
         }
         Ok(())
     }
@@ -822,6 +934,114 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    /// A spec's head: everything a spec needs before what a test gives.
+    fn head() -> String {
+        [
+            "spec: 1",
+            "id: t",
+            "name: T",
+            "vendor: V",
+            "category: other",
+            "source: [{ title: T }]",
+            "models: [{ id: m, name: M, supports: [], verification: none }]",
+            "",
+        ]
+        .join("\n")
+    }
+
+    fn parse(lines: &[&str]) -> Result<DeviceSpec, String> {
+        DeviceSpec::from_yaml(&(head() + &lines.join("\n") + "\n"))
+    }
+
+    #[test]
+    fn a_spec_driven_devices_poll_groups_are_listed_with_their_intervals() {
+        let spec = parse(&[
+            "transport: { type: http, port: 80 }",
+            "state: { a: { type: int, description: A } }",
+            "telemetry:",
+            "  poll:",
+            "    - { name: fast, every_ms: 1000, send: [{ method: GET, path: /a }] }",
+            "    - { once: true, send: [{ method: GET, path: /b }] }",
+            "  updates: []",
+        ])
+        .unwrap();
+        assert_eq!(spec.polls.len(), 2);
+        assert_eq!(spec.polls[0].name, "fast");
+        assert_eq!(spec.polls[0].interval_ms, Some(1000));
+        assert_eq!(
+            (spec.polls[1].name.as_str(), spec.polls[1].once),
+            ("2", true)
+        );
+        let out = serde_json::to_value(&spec).unwrap();
+        assert_eq!(out["polls"][0]["every_ms"], 1000);
+        assert_eq!(out["polls"][0]["interval_ms"], 1000);
+        assert_eq!(out["polls"][1]["once"], true);
+        assert!(out["polls"][1].get("interval_ms").is_none());
+        // A group that says neither is refused.
+        let bare = parse(&[
+            "transport: { type: http, port: 80 }",
+            "telemetry: { poll: { send: [{ method: GET, path: /a }] }, updates: [] }",
+        ]);
+        assert!(bare.unwrap_err().contains("neither every_ms nor once"));
+    }
+
+    #[test]
+    fn a_native_polls_interval_comes_from_its_setting() {
+        let spec = parse(&[
+            "implementation: native",
+            "reason: R",
+            "settings:",
+            "  poll_s: { type: int, default: 5, label: P, description: P }",
+            "polls:",
+            "  - { name: status, every_ms: { setting: poll_s, scale: 1000 }, reads: Status }",
+            "  - { name: slow, every_ms: 60000, reads: Settings }",
+        ])
+        .unwrap();
+        assert_eq!(spec.polls[0].interval_ms, Some(5000));
+        assert_eq!(spec.polls[1].interval_ms, Some(60000));
+        let out = serde_json::to_value(&spec).unwrap();
+        assert_eq!(
+            out["polls"][0]["every_ms"],
+            serde_json::json!({"setting": "poll_s", "scale": 1000})
+        );
+        assert_eq!(out["polls"][0]["interval_ms"], 5000);
+        assert_eq!(out["polls"][0]["reads"], "Status");
+    }
+
+    #[test]
+    fn every_poll_in_the_catalogue_says_how_often_it_runs() {
+        let catalog = Catalog::embedded();
+        for spec in catalog.devices.values() {
+            for p in &spec.polls {
+                assert!(
+                    p.once || p.every_ms.is_some(),
+                    "{}: poll {} has no interval",
+                    spec.id,
+                    p.name
+                );
+            }
+            // Each poll stamp has its poll.
+            for key in spec.state.keys() {
+                if let Some(name) = key.strip_prefix("polled.") {
+                    assert!(
+                        spec.polls.iter().any(|p| p.name == name),
+                        "{}: {key} has no poll",
+                        spec.id
+                    );
+                }
+            }
+            for g in poll_group_names(spec.telemetry.as_ref()) {
+                assert!(spec.polls.iter().any(|p| p.name == g), "{}: {g}", spec.id);
+            }
+        }
+        // A native module's own reads, at its setting's default.
+        if let Some(ups) = catalog.device("cyberpower-ups") {
+            let status = &ups.polls[0];
+            assert_eq!(status.name, "status");
+            assert_eq!(status.interval_ms, Some(10_000));
         }
     }
 

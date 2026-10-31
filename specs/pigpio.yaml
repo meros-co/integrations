@@ -38,7 +38,7 @@ settings:
   gpios: { type: string, pattern: '^[0-9 ,-]*$', max_length: 256, default: "2-27", label: GPIO kept,
            description: "Broadcom GPIO numbers kept in state and notified, as numbers and ranges such as 2-27 or 4,17,22; the default is the 40-pin header's GPIO." }
   poll_interval_ms: { type: int, min: 0, max: 3600000, default: 5000, label: Mode read interval,
-                      description: "Milliseconds between reads of the GPIO's modes, which another program may change; 0 reads them on connecting only. Levels come as they change." }
+                      description: "Milliseconds between reads of the GPIOs' modes, which another program may change, and of their levels with them; 0 reads them on connecting only. Levels also come as they change." }
   timeout_ms: { type: int, min: 1, max: 60000, default: 2000, label: Timeout, description: "Milliseconds to wait for each answer; three unanswered in a row reconnect." }
 
 ports:
@@ -225,6 +225,17 @@ commands:
   refresh:
     summary: Read every kept GPIO's mode and the levels now
     returns: ack
+
+polls:
+  - name: status
+    every_ms: { setting: poll_interval_ms }
+    when_set: poll_interval_ms
+    reads: "Every kept GPIO's mode, and the levels of GPIOs 0-31 (BR1)"
+    note: "Not when opened for commands only; 0 reads them on connecting only"
+  - name: liveness
+    every_ms: 10000
+    reads: "The current tick (TICK), the liveness check"
+    note: "Only when nothing has been heard for 10 s, and only when opened for commands only or poll_interval_ms is 0"
 
 state:
   polled.status: { type: int, unit: s, description: "When the status poll (pin modes and levels, every poll_interval_ms) was last answered, in Unix seconds: the polled state is as old as this" }

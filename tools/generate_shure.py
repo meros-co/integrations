@@ -480,6 +480,7 @@ transport:
     out.append("  # Every parameter is reported once on connecting; after that the device")
     out.append("  # sends a REP whenever a value changes, so nothing is polled.")
     out.append("  poll:")
+    out.append("    once: true")
     out.append(f"    send: [{q(s.all_cmd)}]")
     out.append("  updates:")
     if s.metering:

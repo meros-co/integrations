@@ -2121,7 +2121,7 @@ telemetry:
     every_ms: 9000                 # and again at this interval
   poll:                            # queries; their replies go through the rules
     send: ["transport info"]
-    every_ms: 5000                 # omit to ask once, on connecting
+    every_ms: 5000                 # or once: true to ask once, on connecting
   updates:
     - header: "^VIDEO OUTPUT ROUTING:$"      # a block's first line
       each_line: "^(\\d+) (\\d+)$"             # applied to every following line
@@ -2143,6 +2143,12 @@ telemetry:
 
 A group is a poll like any other: its items are queries, queued one at a
 time, and an item still waiting from its last round is not queued again.
+
+Every group says how often it is sent: `every_ms`, or `once: true` for a
+group sent only on connecting (and on each reconnection).
+`tools/validate.py` refuses a group with neither, so no poll's interval is
+left to prose. The catalogue lists the groups under the device's `polls`
+(Native modules, Polls).
 
 #### When each poll group was last answered
 
@@ -3235,6 +3241,56 @@ several at once. The spec engine and transports are shared and always built.
 A core can further be started for named integrations only (`devices` in its
 options: spec ids, vendor groups or `all`), and then its catalogue lists only
 those.
+
+### Polls
+
+A native module that reads the device on a timer declares each such read
+under `polls`, with how often it runs, so a consumer can tell how fresh its
+state is without reading prose:
+
+```yaml
+polls:
+  - name: status                              # its polled.<name> stamp
+    every_ms: { setting: poll_interval_ms }   # the setting's value, in ms
+    reads: "sysUpTime.0, the liveness check, and a walk of the device's subtrees"
+  - name: meters
+    every_ms: 250                             # a fixed interval
+    when_set: meters                          # only while meters is set
+    reads: "Every channel's input and output levels"
+  - name: inventory
+    once: true                                # on connecting only
+    reads: "The device's models, serial numbers and firmware versions"
+```
+
+| Field | Meaning |
+|---|---|
+| `name` | The poll's name; where the module keeps when it was last answered, its key under `polled` (§8) |
+| `every_ms` | A number of milliseconds, or `{setting: <name>}`, an `int` setting's value, with `scale: 1000` for a setting in seconds (milliseconds per unit of the setting) |
+| `once` | `true` in place of `every_ms`: read on connecting, and again on each reconnection, never on a timer |
+| `when_set` | A setting the poll runs only while it is set: not empty, not `false` and not `0` |
+| `reads` | What the poll reads |
+| `note` | How the interval varies, where it does (a faster poll while an operation is pending, a backoff after failures) |
+
+A poll is a read the module makes again on its own timer: a status query, a
+walk, a level request, a refresh of pushed state. Retries of an unanswered
+request, keep-alives that read nothing, and a read a command or a push sets
+off are not polls. The interval is the time from one round's start to the
+next. `tools/validate.py` requires `every_ms` or `once` on every poll, a poll
+for each `polled.<name>` key the spec's `state` declares, and that each
+setting named exists (an `int` one for `every_ms`). A spec-driven device
+declares no `polls`: its polls are its `telemetry.poll` groups (§8).
+
+The catalogue lists every integration's polls under `polls`, spec-driven
+ones built from `telemetry.poll` (each group's `name`, or its place from
+1, and its `every_ms` or `once`), with `interval_ms`, the interval at the
+settings' defaults (absent for `once`, and for a setting with no default):
+
+```json
+"polls": [
+  {"name": "status", "every_ms": {"setting": "poll_interval_ms"}, "interval_ms": 10000,
+   "reads": "sysUpTime.0, the liveness check, and a walk of the device's subtrees"}
+]
+```
 
 ### Streams
 

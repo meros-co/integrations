@@ -956,6 +956,7 @@ ports:
     out.append("")
     out.append("telemetry:")
     out.append("  poll:")
+    out.append("    once: true")
     out.append("    send:")
     for i in CONSOLE_READS + LIST_READS:
         out.append(f"      - {i}")

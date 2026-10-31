@@ -2044,6 +2044,20 @@ commands:
       text: { type: string, required: true, max_length: 255, label: "Text", description: "The text." }
     returns: ack
 
+polls:
+  - name: status
+    every_ms: { setting: poll_ms }
+    reads: "The status, lamp, source, shutter, freeze and mutes"
+    note: "Only while monitored; a read refused or unanswered twice is dropped until reconnecting or refresh"
+  - name: settings
+    every_ms: { setting: refresh_ms }
+    reads: "Every other readable setting of the projector's family"
+    note: "Only while monitored"
+  - name: liveness
+    every_ms: 10000
+    reads: "The projector status (the lamp status on the PGWU), as the liveness check"
+    note: "Sent only when no other request is queued or waiting"
+
 state:
   adjustments.brightness.possible: { type: bool, description: "Brightness can be adjusted on the current signal (HDX)" }
   adjustments.contrast.maximum: { type: int, description: "Contrast: the maximum as the extended read gives it (HDX)" }
@@ -2549,8 +2563,8 @@ quirks:
     severity: info
     text: >
       Values set with set_ commands are read back after their acknowledgement while monitoring; opened for
-      commands only, nothing is read beyond what commands ask, except the status (or the PGWU lamp status) after
-      10 s without traffic, as the liveness check.
+      commands only, nothing is read beyond what commands ask, except the status (or the PGWU lamp status) every
+      10 s while no other request is waiting, as the liveness check.
   - models: [hdx-w12, hdx-w14, hdx-w18, hdx-w20-flex]
     severity: info
     text: >

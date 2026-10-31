@@ -954,6 +954,24 @@ def single_value(d):
         f.kind != "flags" for l in d.ack for f in l if f.is_value)
 
 
+# How often the module reads the displays (SPEC.md, Native modules, Polls).
+POLLS = """polls:
+  - name: status
+    every_ms: { setting: poll_interval_s, scale: 1000 }
+    when_set: poll_interval_s
+    reads: "Power, input, volume, mute and the error status of each display"
+    note: "Not when opened for commands only"
+  - name: refresh
+    every_ms: { setting: refresh_interval_s, scale: 1000 }
+    when_set: refresh_interval_s
+    reads: "Every setting each display supports"
+    note: "Not when opened for commands only"
+  - name: liveness
+    every_ms: 10000
+    reads: "The power status of the display connected to, the liveness check"
+    note: "Only when nothing has been sent for 10 s; when opened for commands only, the only read"
+"""
+
 POLLED = '  polled.status: { type: int, unit: s, description: "When the status poll (every poll_interval_s, and the slow reads every refresh_interval_s) was last answered, in Unix seconds: the polled state is as old as this" }\n'
 
 
@@ -1127,7 +1145,7 @@ def spec_text():
             if d.set is not None:
                 led.add(set_name(d))
     return (HEADER + "\n" + models_yaml(names, led) + "\ncommands:\n" + "\n".join(cmds) + "\n\n" + QUIRKS
-            + "\nstate:\n" + POLLED + "\n".join(state_yaml()) + "\n")
+            + "\n" + POLLS + "\nstate:\n" + POLLED + "\n".join(state_yaml()) + "\n")
 
 
 # ── The Rust table ──────────────────────────────────────────────────────────

@@ -432,6 +432,14 @@
         }
       }
     },
+    "polls": {
+      "type": "array",
+      "minItems": 1,
+      "description": "A native module's periodic reads and how often each runs (SPEC.md, Native modules, Polls). A spec-driven device declares its polls under telemetry.poll instead, and the catalogue lists them here.",
+      "items": {
+        "$ref": "#/$defs/nativePoll"
+      }
+    },
     "telemetry": {
       "type": "object",
       "additionalProperties": false,
@@ -3277,8 +3285,114 @@
           "type": "integer",
           "minimum": 100,
           "description": "Sent again at this interval."
+        },
+        "once": {
+          "const": true,
+          "description": "Sent once on connecting (and on each reconnection), never again: in place of every_ms."
         }
-      }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "every_ms"
+          ],
+          "not": {
+            "required": [
+              "once"
+            ]
+          }
+        },
+        {
+          "required": [
+            "once"
+          ],
+          "not": {
+            "required": [
+              "every_ms"
+            ]
+          }
+        }
+      ]
+    },
+    "nativePoll": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "reads"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(_[a-z0-9]+)*$",
+          "description": "The poll's name: its key under polled in state when the module keeps when it was last answered."
+        },
+        "every_ms": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "setting"
+              ],
+              "properties": {
+                "setting": {
+                  "type": "string",
+                  "description": "The int setting that gives the interval."
+                },
+                "scale": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Milliseconds per unit of the setting: 1000 for a setting in seconds. 1 when absent."
+                }
+              }
+            }
+          ],
+          "description": "How often the poll runs: a fixed number of milliseconds, or a setting's value."
+        },
+        "once": {
+          "const": true,
+          "description": "Read once on connecting (and on each reconnection), never again: in place of every_ms."
+        },
+        "when_set": {
+          "type": "string",
+          "description": "A setting the poll runs only while it is set: not empty, not false and not 0."
+        },
+        "reads": {
+          "type": "string",
+          "description": "What the poll reads, in a sentence."
+        },
+        "note": {
+          "type": "string",
+          "description": "How the interval varies, where it does: a faster poll while something is pending, a backoff."
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "every_ms"
+          ],
+          "not": {
+            "required": [
+              "once"
+            ]
+          }
+        },
+        {
+          "required": [
+            "once"
+          ],
+          "not": {
+            "required": [
+              "every_ms"
+            ]
+          }
+        }
+      ]
     },
     "pacing": {
       "type": "object",

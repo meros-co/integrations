@@ -1494,6 +1494,56 @@ def polled_checks(doc: dict) -> list[str]:
     return errors
 
 
+def poll_interval_checks(doc: dict) -> list[str]:
+    """Every poll says how often it runs (SPEC.md §8 and Native modules,
+    Polls): a spec-driven poll group by `every_ms` or `once`, a native
+    module's periodic reads under `polls`, one for each `polled.<name>` it
+    keeps. A setting an interval or condition names is declared."""
+    errors: list[str] = []
+    native = doc.get("implementation") == "native"
+    settings = doc.get("settings") or {}
+    polls = doc.get("polls") or []
+    for where, group in poll_groups(doc.get("telemetry") or {}):
+        where = where.removesuffix(".send")
+        if "every_ms" not in group and group.get("once") is not True:
+            errors.append(f"{where}: give every_ms, or once: true for a poll sent only on connecting")
+    if not native and "polls" in doc and not doc.get("extension"):
+        errors.append("polls: a spec-driven device's polls are its telemetry.poll groups; "
+                      "only a native extension's own reads go under polls")
+        return errors
+    # A spec-driven device's groups are listed under polls too (by name, or
+    # their place from 1), so an extension's polls take other names.
+    group_names = []
+    poll = (doc.get("telemetry") or {}).get("poll")
+    if poll:
+        group_names = ([g.get("name") or str(i + 1) for i, g in enumerate(poll)]
+                       if isinstance(poll, list) else ["1"])
+    own = [p.get("name") for p in polls]
+    names = own + group_names
+    for n in set(own):
+        if names.count(n) > 1:
+            errors.append(f"polls: two polls named '{n}'")
+    for i, poll in enumerate(polls):
+        where = f"polls[{i}]"
+        if "every_ms" not in poll and poll.get("once") is not True:
+            errors.append(f"{where}: give every_ms, or once: true for a read made only on connecting")
+        every = poll.get("every_ms")
+        if isinstance(every, dict):
+            name = every.get("setting")
+            spec = settings.get(name)
+            if spec is None:
+                errors.append(f"{where}.every_ms.setting: no setting '{name}'")
+            elif spec.get("type") != "int":
+                errors.append(f"{where}.every_ms.setting: '{name}' is not an int setting")
+        when = poll.get("when_set")
+        if when is not None and when not in settings:
+            errors.append(f"{where}.when_set: no setting '{when}'")
+    for key in doc.get("state") or {}:
+        if key.startswith("polled.") and key.count(".") == 1 and key.split(".")[1] not in names:
+            errors.append(f"state.{key}: no poll named '{key.split('.')[1]}' under polls says how often it runs")
+    return errors
+
+
 def label_checks(doc: dict) -> list[str]:
     """Every parameter and setting has a label and a description (SPEC.md §4)."""
     errors = []
@@ -1548,6 +1598,7 @@ def main() -> int:
 
         errors = cross_field_checks(doc, rel) + port_checks(doc) + label_checks(doc)
         errors += pacing_checks(doc) + acknowledge_checks(doc) + select_checks(doc) + polled_checks(doc)
+        errors += poll_interval_checks(doc)
 
         # Spec ids are the consumer-facing contract; they must be unique.
         spec_id = doc["id"]

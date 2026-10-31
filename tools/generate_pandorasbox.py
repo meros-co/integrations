@@ -338,7 +338,8 @@ pub(crate) const COMMANDS: &[Cmd] = &[
 
     spec = SPEC.read_text("utf-8")
     head, rest = spec.split("\ncommands:\n", 1)
-    tail = rest[rest.index("\nstate:\n"):]
+    # The polls block, where there is one, and everything after it are kept.
+    tail = rest[rest.index("\npolls:\n" if "\npolls:\n" in rest else "\nstate:\n"):]
     supports = ", ".join(names[c["code"]] for c in funcs)
     head = re.sub(r"(    supports: )\[[^\]]*\]", lambda m: m.group(1) + "[" + supports + "]", head, flags=re.S)
     SPEC.write_text(head + "\ncommands:\n" + "\n".join(spec_cmds) + "\n" + tail, encoding="utf-8", newline="\n")

@@ -1097,7 +1097,7 @@ quirks:
     text: >
       Opened for commands only (monitor false), the core sends no inquiry poll and no inquiry after a command
       to read back what it changed: state changes only when a reply to the host's own inquiry carries it. The
-      version inquiry is still sent on the poll interval as the liveness check.
+      version inquiry is still sent every poll_settings_ms (every 5 s when that is 0) as the liveness check.
   - models: [all]
     severity: info
     text: >
@@ -1229,6 +1229,22 @@ quirks:
       Panasonic AW cameras are not in this spec: Panasonic's own documents describe only its AW protocol
       (panasonic-ptz). A Panasonic or other camera that does speak Sony VISCA over IP can use the sony-
       visca-ip model.
+
+polls:
+  - name: position
+    every_ms: { setting: poll_position_ms }
+    when_set: poll_position_ms
+    reads: "Zoom, focus and pan/tilt positions and the pan/tilt status"
+    note: "Not when opened for commands only"
+  - name: settings
+    every_ms: { setting: poll_settings_ms }
+    when_set: poll_settings_ms
+    reads: "The settings held in the state"
+    note: "Not when opened for commands only"
+  - name: liveness
+    every_ms: { setting: poll_settings_ms }
+    reads: "The version inquiry, the liveness check"
+    note: "Only when opened for commands only; every 5 s when poll_settings_ms is 0"
 
 state:
   power: { type: string, description: "'on', 'standby' or 'power_error'" }

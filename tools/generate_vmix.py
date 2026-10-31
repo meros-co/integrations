@@ -311,7 +311,8 @@ commands.append("""  run_transition:
 names = [f[0] for f in functions] + ["run_transition"]
 text = SPEC.read_text(encoding="utf-8")
 head, rest = text.split("\ncommands:\n", 1)
-tail = rest[rest.index("\nstate:\n"):]
+# The polls block, where there is one, and everything after it are kept.
+tail = rest[rest.index("\npolls:\n" if "\npolls:\n" in rest else "\nstate:\n"):]
 supports, line = [], "    supports: ["
 for i, n in enumerate(names):
     piece = n + (", " if i < len(names) - 1 else "]")
